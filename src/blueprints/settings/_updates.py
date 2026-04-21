@@ -152,6 +152,110 @@ def start_update():
         )
 
 
+def _probe_finished_unit(unit: str) -> tuple[bool, bool]:
+    """Return ``(cleared, unit_was_failed)`` for the systemd transient unit.
+
+    ``cleared`` is True if the unit has reached a terminal state (anything
+    other than ``active``/``activating``) so the caller should flip running
+    to False. ``unit_was_failed`` is True only when systemd reports
+    ``failed`` — used by JTN-787 to decide whether to synthesize a
+    last_failure from the journal.
+
+    All exceptions swallowed — status probing must never fail the endpoint.
+    """
+    import subprocess
+
+    try:
+        result = subprocess.run(
+            ["systemctl", "is-active", unit],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        status = result.stdout.strip()
+        if status in ("active", "activating"):
+            return (False, False)
+        return (True, status == "failed")
+    except Exception:
+        return (False, False)
+
+
+def _synthesize_failure_from_journal(unit: str) -> dict[str, object] | None:
+    """JTN-787: build a last_failure record from ``journalctl -u <unit>``.
+
+    Returns ``None`` when journalctl is unavailable, the unit has no
+    journal lines, or anything else goes wrong. The returned shape mirrors
+    the JTN-704 trap-written record plus a ``synthesized: True`` marker so
+    UI consumers can distinguish the two origins.
+    """
+    import datetime as _dt
+    import subprocess
+
+    try:
+        journal_result = subprocess.run(
+            ["journalctl", "-u", unit, "-n", "20", "--no-pager"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+    except Exception:
+        _mod.logger.debug(
+            "Failed to synthesize last_failure from journalctl", exc_info=True
+        )
+        return None
+    journal_tail = (journal_result.stdout or "").strip()
+    if not journal_tail:
+        return None
+    return {
+        "timestamp": _dt.datetime.now(_dt.UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "exit_code": None,
+        "last_command": "systemd_unit_failed",
+        "recent_journal_lines": journal_tail,
+        "unit": unit,
+        "synthesized": True,
+    }
+
+
+def _auto_clear_stale_update_state() -> tuple[str | None, bool]:
+    """Clear ``_UPDATE_STATE`` when the transient systemd unit has finished.
+
+    Extracted from ``update_status`` so the endpoint stays under the
+    15-point cognitive-complexity cap (JTN-787 / SonarCloud S3776).
+
+    Returns ``(failed_unit_name, unit_failed)`` — ``failed_unit_name`` is
+    the unit whose completion triggered the clear, returned ONLY when the
+    unit ended in ``failed`` state (for the journal-synthesis fallback).
+    ``None`` when nothing needed clearing or the unit succeeded.
+    """
+    if not _mod._UPDATE_STATE.get("running"):
+        return None, False
+
+    unit = _mod._UPDATE_STATE.get("unit")
+    started_at = _mod._UPDATE_STATE.get("started_at")
+    failed_name: str | None = None
+    unit_failed = False
+
+    cleared = False
+    if unit and _mod._systemd_available():
+        cleared, unit_failed = _probe_finished_unit(unit)
+        if cleared:
+            _mod._UPDATE_STATE["last_unit"] = unit
+            _mod._set_update_state(False, None)
+            if unit_failed:
+                failed_name = unit
+
+    # Timeout fallback: force-clear if started >30 min ago.
+    if (
+        not cleared
+        and started_at
+        and (time.time() - float(started_at)) > _mod._UPDATE_TIMEOUT_SECONDS
+    ):
+        _mod._UPDATE_STATE["last_unit"] = unit
+        _mod._set_update_state(False, None)
+
+    return failed_name, unit_failed
+
+
 @_mod.settings_bp.route("/settings/update_status", methods=["GET"])
 def update_status():
     with route_error_boundary(
@@ -159,54 +263,30 @@ def update_status():
         logger=_mod.logger,
         hint="Check systemd status access and last-update metadata files.",
     ):
-        import subprocess
+        failed_unit_name, _unit_failed = _auto_clear_stale_update_state()
 
         running = bool(_mod._UPDATE_STATE.get("running"))
         unit = _mod._UPDATE_STATE.get("unit")
         started_at = _mod._UPDATE_STATE.get("started_at")
-
-        # Auto-clear stale update state
-        if running:
-            cleared = False
-            # Check if the systemd transient unit has finished
-            if unit and _mod._systemd_available():
-                try:
-                    result = subprocess.run(
-                        ["systemctl", "is-active", unit],
-                        capture_output=True,
-                        text=True,
-                        timeout=5,
-                    )
-                    status = result.stdout.strip()
-                    if status not in ("active", "activating"):
-                        _mod._UPDATE_STATE["last_unit"] = unit
-                        _mod._set_update_state(False, None)
-                        cleared = True
-                except Exception:
-                    pass
-            # Timeout fallback: force-clear if started >30 min ago
-            if (
-                not cleared
-                and started_at
-                and (time.time() - float(started_at)) > _mod._UPDATE_TIMEOUT_SECONDS
-            ):
-                _mod._UPDATE_STATE["last_unit"] = unit
-                _mod._set_update_state(False, None)
-
-            # Re-read after potential clear
-            running = bool(_mod._UPDATE_STATE.get("running"))
-            unit = _mod._UPDATE_STATE.get("unit")
-            started_at = _mod._UPDATE_STATE.get("started_at")
 
         # JTN-710: surface the last update failure (written by the EXIT trap
         # in install/update.sh) so the UI can show *why* an update failed
         # without the user SSHing in to read the system journal.
         last_failure = read_last_update_failure()
 
+        # JTN-787: If the transient systemd unit transitioned to ``failed``
+        # but no ``.last-update-failure`` file was written, synthesize one
+        # from the unit's journal tail. This covers the case where
+        # ``install/do_update.sh`` aborts before delegating to
+        # ``install/update.sh`` (e.g. a dirty working tree blocks
+        # ``git checkout``) on a pre-JTN-787 installed script.
+        if last_failure is None and failed_unit_name:
+            synthesized = _synthesize_failure_from_journal(failed_unit_name)
+            if synthesized is not None:
+                last_failure = synthesized
+
         # JTN-708: surface the prev_version breadcrumb so the UI can gate the
-        # "Roll back" button on whether a valid previous tag exists.  The read
-        # already applies the strict semver regex, so an unreadable / corrupt
-        # file is returned as ``None`` (button stays hidden).
+        # "Roll back" button on whether a valid previous tag exists.
         prev_version = _read_prev_version()
 
         return jsonify(

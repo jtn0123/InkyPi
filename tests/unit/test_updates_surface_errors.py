@@ -92,6 +92,126 @@ class TestUpdateStatusLastFailure:
         assert data["last_failure"] == {"parse_error": True}
 
 
+class TestSynthesizeFailureFromJournal:
+    """JTN-787: when the transient systemd unit is ``failed`` but no
+    ``.last-update-failure`` file exists, synthesize one from the unit's
+    journal tail so the UI still has *something* to show. This covers the
+    case where ``install/do_update.sh`` on a pre-JTN-787 install aborts
+    before delegating to ``install/update.sh``."""
+
+    def test_synthesizes_last_failure_when_unit_failed_and_no_file(
+        self, client, monkeypatch, tmp_path
+    ):
+        import subprocess as real_subprocess
+
+        import blueprints.settings as mod
+
+        # Mark an update as running with a known unit so the auto-clear
+        # path is reached.
+        mod._UPDATE_STATE["running"] = True
+        mod._UPDATE_STATE["unit"] = "inkypi-update-1234.service"
+        mod._UPDATE_STATE["started_at"] = 1_000_000.0
+
+        # Isolate lockfile dir so the real ``.last-update-failure`` (if any)
+        # on the developer box doesn't leak in.
+        monkeypatch.setenv("INKYPI_LOCKFILE_DIR", str(tmp_path))
+        monkeypatch.setattr(mod, "_systemd_available", lambda: True)
+
+        journal_output = (
+            "Apr 20 12:00:00 host do_update.sh[1234]: error: Your local "
+            "changes to the following files would be overwritten by "
+            "checkout:\n"
+            "    src/static/styles/main.css\n"
+            "Please commit your changes or stash them before you switch "
+            "branches.\nAborting\n"
+        )
+
+        def fake_run(cmd, *args, **kwargs):
+            # systemctl is-active -> "failed"
+            if cmd[:2] == ["systemctl", "is-active"]:
+                return real_subprocess.CompletedProcess(
+                    args=cmd, returncode=0, stdout="failed\n", stderr=""
+                )
+            # journalctl -u <unit> -n 20 --no-pager -> the tail
+            if cmd[:2] == ["journalctl", "-u"]:
+                return real_subprocess.CompletedProcess(
+                    args=cmd, returncode=0, stdout=journal_output, stderr=""
+                )
+            return real_subprocess.CompletedProcess(
+                args=cmd, returncode=0, stdout="", stderr=""
+            )
+
+        # subprocess is imported lazily inside update_status; patch the
+        # module-level ``subprocess.run`` directly (the view's
+        # ``import subprocess`` returns the same cached module object).
+        monkeypatch.setattr("subprocess.run", fake_run)
+
+        try:
+            resp = client.get("/settings/update_status")
+            assert resp.status_code == 200
+            data = resp.get_json()
+            assert data["running"] is False  # auto-cleared
+            assert data["last_failure"] is not None
+            lf = data["last_failure"]
+            assert lf.get("synthesized") is True
+            assert lf.get("last_command") == "systemd_unit_failed"
+            assert "main.css" in lf.get("recent_journal_lines", "")
+            assert lf.get("unit") == "inkypi-update-1234.service"
+        finally:
+            mod._set_update_state(False, None)
+
+    def test_does_not_synthesize_when_failure_file_already_exists(
+        self, client, monkeypatch, tmp_path
+    ):
+        """If update.sh already wrote .last-update-failure, that record wins
+        and we must not overwrite it with the journal-synthesized one."""
+        import subprocess as real_subprocess
+
+        import blueprints.settings as mod
+
+        real_failure = {
+            "timestamp": "2026-04-20T00:00:00Z",
+            "exit_code": 97,
+            "last_command": "pip_requirements",
+            "recent_journal_lines": "real failure record",
+        }
+        (tmp_path / ".last-update-failure").write_text(
+            json.dumps(real_failure), encoding="utf-8"
+        )
+        monkeypatch.setenv("INKYPI_LOCKFILE_DIR", str(tmp_path))
+
+        mod._UPDATE_STATE["running"] = True
+        mod._UPDATE_STATE["unit"] = "inkypi-update-5678.service"
+        mod._UPDATE_STATE["started_at"] = 1_000_000.0
+        monkeypatch.setattr(mod, "_systemd_available", lambda: True)
+
+        def fake_run(cmd, *args, **kwargs):
+            if cmd[:2] == ["systemctl", "is-active"]:
+                return real_subprocess.CompletedProcess(
+                    args=cmd, returncode=0, stdout="failed\n", stderr=""
+                )
+            if cmd[:2] == ["journalctl", "-u"]:
+                # Should NOT be called; if it is, return a sentinel the
+                # assertion below would catch.
+                return real_subprocess.CompletedProcess(
+                    args=cmd, returncode=0, stdout="SHOULD_NOT_APPEAR", stderr=""
+                )
+            return real_subprocess.CompletedProcess(
+                args=cmd, returncode=0, stdout="", stderr=""
+            )
+
+        monkeypatch.setattr("subprocess.run", fake_run)
+
+        try:
+            resp = client.get("/settings/update_status")
+            assert resp.status_code == 200
+            data = resp.get_json()
+            assert data["last_failure"] == real_failure
+            assert "synthesized" not in data["last_failure"]
+        finally:
+            mod._set_update_state(False, None)
+
+
 class TestStartUpdateRejectsEmptyTargetVersion:
     """POST /settings/update validates ``target_version`` explicitly."""
 

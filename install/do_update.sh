@@ -19,12 +19,97 @@ done
 SCRIPT_DIR=$( cd -P "$( dirname "$SOURCE" )" >/dev/null 2>&1 && pwd )
 
 # ---------------------------------------------------------------------------
+# JTN-787: EXIT trap to record failures that happen *before* delegation to
+# install/update.sh. Without this, errors in the git fetch/checkout phase
+# (e.g. a dirty working tree blocking `git checkout`) abort do_update.sh
+# before it exec's update.sh, so update.sh's JTN-704 trap never runs and
+# the UI has zero signal about why the update failed.
+#
+# The JSON shape MUST match update.sh's trap exactly so downstream readers
+# (src/blueprints/settings/_update_status.py::read_last_update_failure)
+# don't need to branch on origin. Required keys: timestamp, exit_code,
+# last_command, recent_journal_lines.
+#
+# LOCKFILE_DIR is overridable via INKYPI_LOCKFILE_DIR for tests — same
+# contract as install/update.sh (JTN-704).
+# ---------------------------------------------------------------------------
+LOCKFILE_DIR="/var/lib/inkypi"
+if [ -n "${INKYPI_LOCKFILE_DIR:-}" ]; then
+  LOCKFILE_DIR="$INKYPI_LOCKFILE_DIR"
+fi
+FAILURE_FILE="$LOCKFILE_DIR/.last-update-failure"
+
+# Track last command description so the trap can report which phase failed.
+_current_step="startup"
+
+_inkypi_do_update_exit_trap() {
+  local rc=$?
+  # Only act on non-zero exits; a successful do_update.sh exec's update.sh
+  # whose own trap takes over. If we return 0 here without exec'ing (e.g.
+  # same-version early continue followed by the exec), this branch is never
+  # reached because `exec` replaces the process.
+  if [ "$rc" -eq 0 ]; then
+    return 0
+  fi
+  local ts
+  ts=$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || echo "unknown")
+  # Best-effort journal tail — same pattern as update.sh so the UI sees
+  # identical fields on either code path.
+  local journal_tail=""
+  if command -v journalctl >/dev/null 2>&1; then
+    # Prefer the transient unit name exported by systemd-run, if present.
+    local unit_for_journal="${INVOCATION_ID:+inkypi-update}"
+    [ -z "$unit_for_journal" ] && unit_for_journal="inkypi-update"
+    journal_tail=$(journalctl -u "$unit_for_journal" -n 20 --no-pager 2>/dev/null \
+      | tail -n 20 || true)
+  fi
+  local journal_json
+  if command -v python3 >/dev/null 2>&1; then
+    journal_json=$(python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))' \
+      <<<"$journal_tail" 2>/dev/null || echo '""')
+  else
+    journal_json='"'$(printf '%s' "$journal_tail" \
+      | tr -d '\r' \
+      | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g' -e ':a;N;$!ba;s/\n/\\n/g' \
+      | tr -d '\000-\010\013\014\016-\037')'"'
+  fi
+  local step_json
+  if command -v python3 >/dev/null 2>&1; then
+    step_json=$(python3 -c 'import json,sys; print(json.dumps(sys.stdin.read().rstrip("\n")))' \
+      <<<"$_current_step" 2>/dev/null || echo '""')
+  else
+    step_json='"'$(printf '%s' "$_current_step" \
+      | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g')'"'
+  fi
+  mkdir -p "$LOCKFILE_DIR" 2>/dev/null || true
+  local tmp="${FAILURE_FILE}.tmp"
+  {
+    printf '{'
+    printf '"timestamp":"%s",' "$ts"
+    printf '"exit_code":%d,' "$rc"
+    printf '"last_command":%s,' "$step_json"
+    printf '"recent_journal_lines":%s' "$journal_json"
+    printf '}\n'
+  } > "$tmp" 2>/dev/null || true
+  if [ -s "$tmp" ]; then
+    mv -f "$tmp" "$FAILURE_FILE" 2>/dev/null || rm -f "$tmp" 2>/dev/null || true
+  else
+    rm -f "$tmp" 2>/dev/null || true
+  fi
+}
+trap _inkypi_do_update_exit_trap EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+trap 'exit 129' HUP
+
+# ---------------------------------------------------------------------------
 # Resolve the git repo root
 # ---------------------------------------------------------------------------
 # In production, install.sh symlinks src/ → /usr/local/inkypi/src. Following
 # the symlink back gives us the actual git checkout directory.
 PROJECT_DIR="${PROJECT_DIR:-/usr/local/inkypi}"
 
+_current_step="resolve_repo_dir"
 if [ -L "$PROJECT_DIR/src" ] && REAL_SRC=$(realpath "$PROJECT_DIR/src" 2>/dev/null) && [ -n "$REAL_SRC" ]; then
   REPO_DIR=$(dirname "$REAL_SRC")
 elif [ -d "$SCRIPT_DIR/../.git" ]; then
@@ -37,6 +122,7 @@ else
 fi
 
 # Validate it's actually a git repo
+_current_step="validate_git_repo"
 if ! git -C "$REPO_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   echo "ERROR: $REPO_DIR is not a git repository." >&2
   exit 1
@@ -48,9 +134,17 @@ echo "Repository root: $REPO_DIR"
 # Save current version for rollback breadcrumb
 # ---------------------------------------------------------------------------
 CURRENT_VERSION=$(git -C "$REPO_DIR" describe --tags --abbrev=0 2>/dev/null || echo "unknown")
-STATE_DIR="/var/lib/inkypi"
-mkdir -p "$STATE_DIR"
-echo "$CURRENT_VERSION" > "$STATE_DIR/prev_version"
+# JTN-787: honour INKYPI_LOCKFILE_DIR so tests can redirect state writes
+# without needing write access to /var/lib. Production callers do not set it.
+# Failure to create the state dir (e.g. running as non-root on a fresh box)
+# is non-fatal — the prev_version breadcrumb is best-effort and its absence
+# only disables the rollback button, it does not block the update itself.
+STATE_DIR="${INKYPI_LOCKFILE_DIR:-/var/lib/inkypi}"
+if mkdir -p "$STATE_DIR" 2>/dev/null; then
+  echo "$CURRENT_VERSION" > "$STATE_DIR/prev_version" 2>/dev/null || true
+else
+  echo "Warning: could not create $STATE_DIR; skipping prev_version breadcrumb." >&2
+fi
 echo "Current version: $CURRENT_VERSION"
 
 # ---------------------------------------------------------------------------
@@ -78,6 +172,7 @@ fi
 # ---------------------------------------------------------------------------
 # Fetch latest from origin
 # ---------------------------------------------------------------------------
+_current_step="git_fetch"
 echo "Fetching latest from origin..."
 git -C "$REPO_DIR" fetch origin --tags --prune
 
@@ -110,6 +205,19 @@ echo "Target version: $TARGET_TAG"
 if [ "$CURRENT_VERSION" = "$TARGET_TAG" ]; then
   echo "Already at $TARGET_TAG — re-running update.sh for dependency sync."
 else
+  # JTN-787: Reset the narrow allowlist of generated build artifacts before
+  # checkout so a dirty working tree cannot abort the update with
+  # "Your local changes to the following files would be overwritten by
+  # checkout". The CSS bundle is rebuilt by update.sh (build_css_bundle)
+  # immediately after this exec, so discarding it here is safe.
+  #
+  # Keep this allowlist to exactly one known-generated path — do NOT expand
+  # it, because every additional path is a chance to silently throw away
+  # legitimate user changes.
+  _current_step="reset_generated_artifacts"
+  git -C "$REPO_DIR" checkout -- src/static/styles/main.css 2>/dev/null || true
+
+  _current_step="git_checkout"
   echo "Checking out $TARGET_TAG..."
   # Pass the tag via an explicit revision argument before ``--`` so it
   # cannot be interpreted as a flag by git checkout, and add a trailing
@@ -126,5 +234,6 @@ if [ ! -f "$UPDATE_SCRIPT" ]; then
   exit 1
 fi
 
+_current_step="exec_update_sh"
 echo "Running update.sh from checked-out code..."
 exec bash "$UPDATE_SCRIPT"
