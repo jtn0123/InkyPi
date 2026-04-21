@@ -87,8 +87,11 @@
     transition: background-color var(--transition-speed) ease;
 }
 
+/* Handoff parity: hover rows use --surface-2 directly rather than mixing
+   text-3 into surface — cleaner token reference and matches the handoff's
+   .quick-row / .pl-item hover grammar. */
 .playlist-header:hover {
-    background: color-mix(in oklab, var(--surface) 88%, var(--text-3));
+    background: var(--surface-2);
 }
 
 /* Playlist Item */
@@ -401,11 +404,14 @@
   display: none;
 }
 
+/* Handoff parity: empty-state panels sit on --surface-2 directly (no mix).
+   This matches the handoff's subtle "inner container" treatment and keeps
+   the token graph resolvable in both themes. */
 .playlist-card-body .empty-state.compact {
   display: grid;
   gap: 8px;
   padding: 18px 18px 16px;
-  background: color-mix(in oklab, var(--surface) 86%, var(--surface-2));
+  background: var(--surface-2);
   border-color: var(--surface-border);
 }
 
@@ -571,8 +577,12 @@ a.pl-add-row:hover {
   border-top: 1px solid var(--surface-border);
 }
 
+/* Desktop refinement: base rule at line 165 already sets `display: none;` so
+   the toggle stays hidden on desktop (the details section is expanded by
+   default). The mobile @media in _responsive.css flips display to
+   inline-flex on narrow viewports. Properties here apply whenever the
+   button does become visible (e.g. defensive fallback paths). */
 .playlist-toggle-button {
-  display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 28px;

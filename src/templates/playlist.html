@@ -35,6 +35,14 @@
             <button id="newPlaylistBtn" class="action-button primary" type="button">New playlist</button>
         {% endcall %}
 
+        {% set playlist_count = playlist_config.playlists | length %}
+        <div class="page-summary playlist-summary">
+            <span class="status-chip info">{{ playlist_count }} {{ 'playlist' if playlist_count == 1 else 'playlists' }}</span>
+            {% if playlist_config.active_playlist %}
+            <span class="status-chip">Active: {{ playlist_config.active_playlist }}</span>
+            {% endif %}
+        </div>
+
         <!-- Playlists Container -->
         <div class="playlist-list">
             {% if not playlist_config.playlists %}
@@ -44,7 +52,7 @@
             <div class="playlist-item pl-card {% if playlist.name == playlist_config.active_playlist %}active is-active{% endif %}" data-playlist-name="{{ playlist.name }}" data-playlist-card>
                     <div class="playlist-header" data-playlist-action="toggle-card">
                         <div class="playlist-heading">
-                            <button class="playlist-toggle-button" type="button" data-playlist-action="toggle-card" data-playlist-toggle data-collapsed-label="Expand" data-expanded-label="Collapse" aria-expanded="false" aria-label="Toggle {{ playlist.name }}" title="Toggle {{ playlist.name }}">Expand</button>
+                            <button class="playlist-toggle-button" type="button" data-playlist-action="toggle-card" data-playlist-toggle data-collapsed-label="Open" data-expanded-label="Hide" aria-expanded="false" aria-label="Toggle {{ playlist.name }}" title="Toggle {{ playlist.name }}">Open</button>
                             <div class="playlist-heading-copy">
                                 <div class="playlist-title-row">
                                     <h2 class="playlist-title">{{ playlist.name }}</h2>
@@ -55,7 +63,7 @@
                                 <div class="playlist-summary-row">
                                     {% set playlist_item_count = playlist.plugins | length %}
                                     {% set _is_all_day = playlist.start_time == '00:00' and playlist.end_time in ('24:00', '23:59') %}
-                                    <span class="playlist-summary-copy">{% if _is_all_day %}All day{% else %}{{ playlist.start_time }}–{{ playlist.end_time }}{% endif %}{% if not _is_all_day and playlist.end_time < playlist.start_time %} <span class="playlist-wrap-label" title="This playlist wraps past midnight">(next day)</span>{% endif %} · {{ playlist.cycle_minutes or device_cycle_minutes }} min cycle · {{ playlist_item_count }} {{ 'item' if playlist_item_count == 1 else 'items' }}</span>
+                                    <span class="playlist-summary-copy">{% if _is_all_day %}All day{% else %}{{ playlist.start_time }} - {{ playlist.end_time }}{% endif %}{% if not _is_all_day and playlist.end_time < playlist.start_time %} <span class="playlist-wrap-label" title="This playlist wraps past midnight">(next day)</span>{% endif %} · {{ playlist.cycle_minutes or device_cycle_minutes }} min cycle · {{ playlist_item_count }} {{ 'item' if playlist_item_count == 1 else 'items' }}</span>
                                 </div>
                             </div>
                         </div>

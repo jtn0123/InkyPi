@@ -88,6 +88,12 @@ samp {
     --text-primary: var(--text);
     --text-muted: var(--muted);
     --text-secondary: var(--subtext);
+    /* Handoff naming alias: the prototype's styles.css uses `--text-2` /
+       `--text-3` for muted + quieter text; we've always used --subtext /
+       --text-secondary. Keep the alias so new rules copied from the
+       handoff can reference --text-2 without breaking. */
+    --text-2: var(--subtext);
+    --border: var(--surface-border);
     --border-color: var(--surface-border);
     --bg-primary: var(--surface);
     --bg-secondary: #eceae5;
@@ -246,6 +252,12 @@ samp {
     --text-primary: var(--text);
     --text-muted: var(--muted);
     --text-secondary: var(--subtext);
+    /* Handoff naming alias: the prototype's styles.css uses `--text-2` /
+       `--text-3` for muted + quieter text; we've always used --subtext /
+       --text-secondary. Keep the alias so new rules copied from the
+       handoff can reference --text-2 without breaking. */
+    --text-2: var(--subtext);
+    --border: var(--surface-border);
     --border-color: var(--surface-border);
     --bg-primary: var(--surface);
     --bg-secondary: #0e0f10;
@@ -476,7 +488,16 @@ samp {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
-    justify-content: flex-end;
+    /* Left-align count chips under the pageheader so they read as part of the
+       page header context rather than floating as orphans on the right edge.
+       The previous `flex-end` alignment made chips like "1 playlist" or
+       "0 providers / 0 configured" appear disconnected from the title. */
+    justify-content: flex-start;
+    /* Tighter rhythm between the pageheader description and the summary row.
+       The handoff pulls these chips just under the header without a full
+       vertical-xl gap. */
+    margin-top: -4px;
+    margin-bottom: var(--spacing-md, 12px);
 }
 
 .page-shell {
@@ -492,15 +513,6 @@ samp {
 .page-shell-dashboard,
 .page-shell-workflow {
   padding-bottom: calc(88px + env(safe-area-inset-bottom, 0px));
-}
-
-body[data-page="settings"] .tweaks-fab,
-body[data-page="settings"] .tweaks-panel,
-body[data-page="history"] .tweaks-fab,
-body[data-page="history"] .tweaks-panel,
-body[data-page="api-keys"] .tweaks-fab,
-body[data-page="api-keys"] .tweaks-panel {
-  display: none;
 }
 
 @keyframes pageIn {
@@ -1475,6 +1487,16 @@ main[data-page-shell="workflow"] .frame {
    navigation links and the per-page home button — the sidebar already
    provides those. Keep the identity, title, and theme toggle. */
 @media (min-width: 901px) {
+  .shell-sidebar .sys-row {
+    justify-content: space-between;
+  }
+
+  /* Keep #themeToggle visible here. The handoff tucks theme switching into
+     the sidebar footer on desktop, and tests/integration/test_theme_toggle_e2e.py
+     asserts the button is clickable on /. An earlier parity pass added a
+     display:none here; that hid the only instance of the toggle on desktop,
+     so it's removed. */
+
   .shell .app-header nav.header-actions,
   .shell .app-header .header-identity .header-button.icon.current-page {
     display: none;
@@ -1532,6 +1554,21 @@ main[data-page-shell="workflow"] .frame {
 }
 
 /* Tweaks FAB + panel — aesthetic / density / accent switcher */
+
+body[data-page="settings"] .tweaks-fab,
+body[data-page="settings"] .tweaks-panel,
+body[data-page="history"] .tweaks-fab,
+body[data-page="history"] .tweaks-panel,
+body[data-page="api-keys"] .tweaks-fab,
+body[data-page="api-keys"] .tweaks-panel,
+body[data-page="dashboard"] .tweaks-fab,
+body[data-page="dashboard"] .tweaks-panel,
+body[data-page="playlist"] .tweaks-fab,
+body[data-page="playlist"] .tweaks-panel,
+body[data-page="plugin"] .tweaks-fab,
+body[data-page="plugin"] .tweaks-panel {
+  display: none;
+}
 
 .tweaks-fab {
   position: fixed;
@@ -1758,7 +1795,10 @@ main[data-page-shell="workflow"] .frame {
 
 .pageheader .eyebrow {
   font-family: var(--font-mono, 'JetBrains Mono'), ui-monospace, monospace;
-  font-size: 0.68rem;
+  /* Handoff parity: styles.css:149–152 uses 11px (0.6875rem); we were slightly
+     under at 0.68rem (~10.9px). Exact match keeps the eyebrow's x-height
+     lined up with section-head eyebrows on the dashboard hero. */
+  font-size: 0.6875rem;
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--text-3);
@@ -1853,6 +1893,24 @@ main[data-page-shell="workflow"] .frame {
 
 .pageheader-plugin .plugin-mode-row {
   margin-top: 10px;
+}
+
+/* At medium widths the plugin detail header has 3 action buttons competing
+   with the icon + title + description column, forcing the title to wrap in a
+   narrow ribbon on the left. The workflow layout itself collapses to a single
+   column at 1200px, so stack the pageheader a touch earlier (~960px) to give
+   the title its full width and push the action row cleanly below. */
+@media (max-width: 960px) {
+  .pageheader-plugin {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .pageheader-plugin .pageheader-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
 }
 
 /* Refined metrics strip — a 4-up KPI band, evolves the existing .metric-strip */
@@ -2602,6 +2660,14 @@ svg.icon-thin {
     font-weight: var(--font-medium);
 }
 
+body[data-page="playlist"] .breadcrumb,
+body[data-page="plugin"] .breadcrumb,
+body[data-page="settings"] .breadcrumb,
+body[data-page="history"] .breadcrumb,
+body[data-page="api-keys"] .breadcrumb {
+    display: none;
+}
+
 /* Optimized button grid with better performance and consistency */
 .button-grid {
     display: grid;
@@ -3048,23 +3114,24 @@ textarea:focus-visible {
     width: 100%;
 }
 
-/* Label styling — handoff parity: 13px medium muted (was 16px/600 strong).
-   Every form label in the handoff's screens uses this refined scale so the
-   surrounding content reads as the primary emphasis. */
+/* Label styling — handoff parity (styles.css:261): 12px/500 muted. R4 took
+   this 16→13; R5 is the final 13→12 nudge so .field-label sits in the
+   refined 12 / 13 / 14 scale exactly. */
 .form-label {
-    font-size: 0.82rem;
+    font-size: 0.75rem;
     font-weight: 500;
     color: var(--text-secondary, var(--text));
     white-space: nowrap; /* Prevent the label from wrapping */
 }
 
-/* Input field styling — handoff parity: 14px on `--surface-2` with a refined
-   border. Previous values were 16px/`--input-bg` which read as a chunkier
-   legacy Material form. */
+/* Input field styling — handoff parity (styles.css:239–249): 13px on
+   `--surface-2` with 8px/10px padding. R4 took this 16→14; R5 finishes
+   the scale correction to 13 so inputs sit visually lighter than labels'
+   neighbouring copy. */
 .form-input {
     flex: auto;
-    padding: 0.45rem 0.6rem;
-    font-size: 0.88rem;
+    padding: 0.5rem 0.625rem; /* 8px 10px */
+    font-size: 0.81rem; /* ~13px */
     border: 1px solid var(--surface-border);
     border-radius: var(--border-radius-sm);
     box-sizing: border-box;
@@ -3119,9 +3186,11 @@ select.form-input option {
     margin-bottom: 1rem;
 }
 
+/* Handoff parity: error focus ring derives from --error so theme recolors
+   propagate correctly, rather than a hardcoded red rgba. */
 .form-field.has-error .form-input {
     border-color: var(--error);
-    box-shadow: 0 0 0 2px rgba(229, 62, 62, 0.2);
+    box-shadow: 0 0 0 2px color-mix(in oklab, var(--error) 20%, transparent);
 }
 
 .form-field.has-error .form-label {
@@ -3142,9 +3211,11 @@ select.form-input option {
     font-size: 1rem;
 }
 
+/* Handoff parity: tint the focus ring from the --success token rather than a
+   hardcoded green rgba — keeps themes + future recolors consistent. */
 .form-field.has-success .form-input {
     border-color: var(--success);
-    box-shadow: 0 0 0 2px rgba(56, 161, 105, 0.2);
+    box-shadow: 0 0 0 2px color-mix(in oklab, var(--success) 20%, transparent);
 }
 
 .form-success {
@@ -3292,7 +3363,9 @@ select.form-input option {
 
 .remove-btn:focus {
     outline: none;
-    box-shadow: 0 0 3px rgba(26, 188, 156, 0.5); /* Adding a focus effect similar to inputs */
+    /* Handoff parity: focus ring derives from --accent (brand teal) instead
+       of a hardcoded rgba. */
+    box-shadow: 0 0 3px color-mix(in oklab, var(--accent) 50%, transparent);
 }
 
 /* Time input styling */
@@ -3309,7 +3382,7 @@ select.form-input option {
 .time-input:focus {
     outline: none;
     border-color: var(--accent);
-    box-shadow: 0 0 3px rgba(26, 188, 156, 0.5);
+    box-shadow: 0 0 3px color-mix(in oklab, var(--accent) 50%, transparent);
 }
 
 .form-help {
@@ -3389,6 +3462,15 @@ input:disabled, select:disabled, textarea:disabled {
     margin: 0;
 }
 
+/* Handoff parity: the prototype's Slider primitive renders a plain
+   `<input type="range" class="slider-range">`, with accent-color applied
+   to the class itself — not nested inside `.form-group.slider-row`. Keep
+   both selectors so any stray `.slider-range` element picks up the brand
+   thumb/track color even outside the settings slider-row layout. */
+.slider-range {
+    accent-color: var(--accent);
+}
+
 /* ── Form responsive: tablet ── */
 @media (max-width: 768px) {
     .form-group {
@@ -3460,7 +3542,9 @@ input:disabled, select:disabled, textarea:disabled {
     margin: 0;
     text-align: left;
     text-transform: uppercase;
-    letter-spacing: 0.04em;
+    /* Handoff parity: `.section-head h2` in styles.css:388 uses 0.02em tracking;
+       0.04em read too spaced-out against the count chip. */
+    letter-spacing: 0.02em;
     transition: color var(--transition-speed) ease;
 }
 
@@ -3582,12 +3666,15 @@ input:disabled, select:disabled, textarea:disabled {
   min-width: 0;
 }
 
+/* Handoff parity: primary card surfaces use radius-2 (10px) per styles.css:301
+   not radius-3 (14px). The old XL radius was one bucket too soft; aligning to
+   --border-radius-lg keeps the hero stage flush with .card elsewhere. */
 .dashboard-stage,
 .dashboard-status-card,
 .storage-card {
   padding: 16px;
   border: 1px solid var(--surface-border);
-  border-radius: var(--border-radius-xl);
+  border-radius: var(--border-radius-lg);
   background: var(--surface);
 }
 
@@ -3602,20 +3689,22 @@ input:disabled, select:disabled, textarea:disabled {
   display: grid;
   grid-template-columns: 1fr auto 1fr auto 1fr;
   gap: 18px;
-  margin-top: 4px;
+  /* Handoff parity (styles.css:347–354): the KPI strip sits 16px below the
+     preview canvas, not flush against it (was 4px). */
+  margin-top: 16px;
   padding: 4px 8px;
   align-items: center;
 }
 
 .hero-strip .hero-cell {
   min-width: 0;
-  display: grid;
-  gap: 2px;
+  display: block;
 }
 
 .hero-strip .k {
   font-family: var(--font-mono, 'JetBrains Mono'), ui-monospace, monospace;
-  font-size: 0.66rem;
+  /* Handoff parity: 10.5px (~0.656rem) for the mono eyebrow. */
+  font-size: 0.656rem;
   letter-spacing: 0.12em;
   color: var(--text-3);
   text-transform: uppercase;
@@ -3624,7 +3713,11 @@ input:disabled, select:disabled, textarea:disabled {
 
 .hero-strip .v {
   font-weight: 600;
-  font-size: 0.94rem;
+  /* Handoff parity (styles.css:359): 15px value with 3px top margin so the
+     rhythm under the mono .k reads as the refined 10.5 → 3 → 15 → 2 → 12
+     stack rather than a uniform grid gap. */
+  font-size: 0.9375rem; /* 15px */
+  margin-top: 3px;
   letter-spacing: -0.01em;
   color: var(--text);
   /* Handoff parity: do NOT ellipsis-clip the primary value — long plugin
@@ -3640,11 +3733,22 @@ input:disabled, select:disabled, textarea:disabled {
 }
 
 .hero-strip .m {
-  color: var(--text-secondary);
+  /* Handoff (styles.css:360): .m uses --text-2 (≡ our --text-secondary alias)
+     at 12px with a 2px top margin, not a grid gap. */
+  color: var(--text-2, var(--text-secondary));
   font-size: 0.75rem;
-  white-space: nowrap;
+  margin-top: 2px;
+  /* Allow the meta line to wrap to at most two rows rather than single-line
+     ellipsis-clipping. At narrow viewports (~900px) the 3-column hero grid
+     squeezes each cell to ~60px, which was chopping strings like
+     "Every 60 min" to "Every 60…". Two lines fits the common "Playlist:
+     Default · refreshed 3 min ago" case without losing the tail word. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
 }
 
 .hero-divider {
@@ -3705,9 +3809,14 @@ input:disabled, select:disabled, textarea:disabled {
   font-size: 0.78rem;
   color: var(--text-secondary);
   letter-spacing: 0.02em;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  /* Allow the "<WxH> · <driver>" descriptor to wrap onto a second line at
+     narrow viewports rather than silently truncating with an ellipsis. The
+     ` · ` between pieces is a natural break point, so wrapping reads cleanly
+     and avoids the "800×480 · Mock dis…" cut-off that previously hid half
+     the driver label on the desktop stage header. */
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.35;
   min-width: 0;
 }
 
@@ -4008,25 +4117,29 @@ a.quick-switch-link.header-button {
   gap: 6px;
 }
 
+/* Handoff parity (styles.css:374–381): quick-rows render as card-in-card
+   chips with a resting surface-2 background + border. The active state is
+   a subtle 5% accent tint with a 40% accent-border mix against --border,
+   not the louder 18%-weak / 25%-border we previously used. */
 .quick-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  padding: 8px 10px;
+  padding: 9px 10px;
   border-radius: var(--border-radius-md);
-  background: transparent;
-  border: 1px solid transparent;
+  background: var(--surface-2);
+  border: 1px solid var(--surface-border);
   transition: background-color 0.15s ease, border-color 0.15s ease;
 }
 
 .quick-row:hover {
-  background: var(--surface-2);
+  border-color: var(--border-strong, var(--surface-border));
 }
 
 .quick-row.is-active {
-  background: var(--accent-weak);
-  border-color: color-mix(in oklab, var(--accent) 25%, transparent);
+  background: color-mix(in oklab, var(--accent) 5%, var(--surface-2));
+  border-color: color-mix(in oklab, var(--accent) 40%, var(--surface-border));
 }
 
 .quick-row-main {
@@ -4649,11 +4762,18 @@ a.quick-row-link:hover {
 .pageheader-plugin .pageheader-actions {
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
+/* Plugin pageheader buttons use tighter horizontal padding than the base
+   `.header-button` (10px 16px) so the eyebrow row fits Save/Display/Schedule
+   together on narrow desktop viewports. We intentionally avoid `min-height`
+   here because the 36px touch-target height is reserved for mobile media
+   queries (see tests/static/test_mobile_touch_targets.py). Default padding
+   already lands around 34-35px tall on desktop, which matches the handoff. */
 .pageheader-plugin .pageheader-actions .header-button,
 .pageheader-plugin .pageheader-actions .action-button {
-  min-height: 40px;
+  padding-inline: 12px;
 }
 
 .pageheader-plugin .plugin-mode-row .api-key-indicator,
@@ -4863,10 +4983,13 @@ a.quick-row-link:hover {
   gap: 16px;
 }
 
+/* Handoff parity: matches .card standard (14/16 padding, --border-radius-lg,
+   --surface). Previously used symmetric 14px padding which made the preview
+   header feel pinched against the card edge. */
 .workflow-preview-card {
   display: grid;
   gap: 14px;
-  padding: 14px 16px;
+  padding: 14px 16px 16px;
   border: 1px solid var(--surface-border);
   border-radius: var(--border-radius-lg);
   background: var(--surface);
@@ -4957,17 +5080,17 @@ a.quick-row-link:hover {
 
 .workflow-action-panel {
   display: grid;
-  gap: 12px;
-  padding: 16px;
-  background: var(--panel-bg);
-  border: 1px solid var(--panel-border);
-  border-radius: var(--border-radius-md);
+  gap: 8px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
 }
 
 .workflow-utility-card {
-  background: var(--surface);
-  border-color: var(--surface-border);
-  border-radius: var(--border-radius-lg);
+  background: transparent;
+  border-color: transparent;
+  border-radius: 0;
 }
 
 .workflow-device-toggle {
@@ -4975,6 +5098,33 @@ a.quick-row-link:hover {
   align-items: center;
   gap: 8px;
   font-weight: 600;
+}
+
+body[data-page="plugin"] .workflow-device-toggle {
+  display: none;
+}
+
+body[data-page="plugin"] .workflow-help {
+  margin-top: 0;
+  color: var(--text-3);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+body[data-page="plugin"] .workflow-help p {
+  margin: 0;
+}
+
+.progress-header-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.progress-history-button {
+  min-height: 28px;
+  padding: 5px 10px;
+  font-size: 0.76rem;
 }
 
 .workflow-action-group {
@@ -5103,8 +5253,11 @@ a.quick-row-link:hover {
     transition: background-color var(--transition-speed) ease;
 }
 
+/* Handoff parity: hover rows use --surface-2 directly rather than mixing
+   text-3 into surface — cleaner token reference and matches the handoff's
+   .quick-row / .pl-item hover grammar. */
 .playlist-header:hover {
-    background: color-mix(in oklab, var(--surface) 88%, var(--text-3));
+    background: var(--surface-2);
 }
 
 /* Playlist Item */
@@ -5417,11 +5570,14 @@ a.quick-row-link:hover {
   display: none;
 }
 
+/* Handoff parity: empty-state panels sit on --surface-2 directly (no mix).
+   This matches the handoff's subtle "inner container" treatment and keeps
+   the token graph resolvable in both themes. */
 .playlist-card-body .empty-state.compact {
   display: grid;
   gap: 8px;
   padding: 18px 18px 16px;
-  background: color-mix(in oklab, var(--surface) 86%, var(--surface-2));
+  background: var(--surface-2);
   border-color: var(--surface-border);
 }
 
@@ -5587,15 +5743,19 @@ a.pl-add-row:hover {
   border-top: 1px solid var(--surface-border);
 }
 
+/* Desktop refinement: base rule at line 165 already sets `display: none;` so
+   the toggle stays hidden on desktop (the details section is expanded by
+   default). The mobile @media in _responsive.css flips display to
+   inline-flex on narrow viewports. Properties here apply whenever the
+   button does become visible (e.g. defensive fallback paths). */
 .playlist-toggle-button {
-  display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
+  width: 28px;
+  height: 28px;
   padding: 0;
   border: 1px solid var(--surface-border);
-  border-radius: 6px;
+  border-radius: 8px;
   background: transparent;
   color: transparent;
   font-size: 0;
@@ -5606,12 +5766,21 @@ a.pl-add-row:hover {
   content: "\203A";
   margin-left: 0;
   color: var(--text-3);
-  font-size: 1rem;
+  font-size: 1.05rem;
   transform: rotate(0deg);
 }
 
 .playlist-toggle-button[aria-expanded="true"]::after {
   transform: rotate(90deg);
+}
+
+.playlist-toggle-button:hover {
+  border-color: var(--border-strong, var(--surface-border));
+  background: var(--surface-2);
+}
+
+.playlist-header .playlist-toggle-button {
+  order: -1;
 }
 
 /* Caret toggle for collapse/expand */
@@ -6344,13 +6513,23 @@ a.pl-add-row:hover {
 }
 
 /* Logs toggle defaults to an in-flow action on larger viewports. Narrow-screen
-   floating behavior is restored in the responsive section so it does not
-   overlap the sticky Save bar on short laptops. */
+   floating behavior is restored in _responsive.css so it does not overlap the
+   sticky Save bar on short laptops. */
 .settings-logs-toggle {
   display: inline-flex;
   margin: 8px 0 0 auto;
   width: auto;
   font-weight: 700;
+}
+
+/* The chrome-level `.settings-device-name` chip is redundant on the
+   settings page itself (the Device tab heading already shows the name),
+   so hide it. Do NOT hide `#settingsLogsToggle` — it's the affordance
+   that opens the live-logs panel on the Updates tab, and tests +
+   real users depend on it. The handoff's "Download logs" header
+   action is a different feature (file download, not streaming). */
+body[data-page="settings"] .settings-device-name {
+  display: none;
 }
 
 @media (max-width: 768px) {
@@ -6547,11 +6726,15 @@ a.pl-add-row:hover {
   gap: 16px;
 }
 
+/* Handoff parity: API-key rows are .card primitives (1px border, radius-lg,
+   --surface). The second `.api-key-card` block further down refines to 14px
+   radius for the flatter handoff row style. Use canonical tokens here so
+   the cascade resolves cleanly in both themes. */
 .api-key-card {
   padding: 14px 16px;
-  border: 1px solid var(--panel-border);
-  border-radius: 12px;
-  background: var(--panel-bg);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--border-radius-lg);
+  background: var(--surface);
   display: grid;
   gap: 10px;
 }
@@ -6674,7 +6857,10 @@ a.pl-add-row:hover {
 .api-key-card {
   width: 100%;
   padding: 14px 16px;
-  border-radius: 14px;
+  /* Handoff parity: large, flatter cards use radius-3 (14px). This override
+     keeps the API-keys list visually consistent with the handoff Settings
+     layout while the base .api-key-card above falls back to radius-lg. */
+  border-radius: var(--border-radius-xl);
   background: var(--surface);
   border-color: var(--surface-border);
 }
@@ -6729,6 +6915,37 @@ a.pl-add-row:hover {
   line-height: 1.5;
 }
 
+/* Handoff parity: secondary "advanced" panels sit on --surface-2 (one step
+   up from --surface), not an opaque mix. Radius matches .card (10px). */
+.api-keys-more {
+  margin-top: 4px;
+  border: 1px solid var(--surface-border);
+  border-radius: var(--border-radius-lg);
+  background: var(--surface-2);
+  overflow: hidden;
+}
+
+.api-keys-more summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 13px 16px;
+  font-family: var(--font-mono, 'JetBrains Mono'), ui-monospace, monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+
+.api-keys-more summary::-webkit-details-marker {
+  display: none;
+}
+
+.api-keys-more-grid {
+  display: grid;
+  gap: 12px;
+  padding: 0 12px 12px;
+}
+
 .apikey-row {
   display: grid;
   grid-template-columns: minmax(180px, 220px) minmax(0, 1fr) auto;
@@ -6737,22 +6954,25 @@ a.pl-add-row:hover {
   margin-bottom: 12px;
 }
 
+/* Handoff parity: API-key form fields mirror `.input` in styles.css:239–249
+   (8 10 padding, 13px, --radius-1). We keep the mono face since these carry
+   raw secret tokens the user wants to eyeball character-by-character. */
 .apikey-key,
 .apikey-value {
   width: 100%;
-  padding: 10px 12px;
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  font-family: monospace;
-  font-size: 14px;
-  background: var(--input-bg);
-  color: var(--text-primary);
+  padding: 8px 10px;
+  border: 1px solid var(--surface-border);
+  border-radius: 6px;
+  font-family: var(--font-mono, 'JetBrains Mono'), ui-monospace, monospace;
+  font-size: 0.8125rem;
+  background: var(--surface);
+  color: var(--text);
 }
 
 .apikey-value.masked {
   color: var(--text-secondary);
   letter-spacing: 2px;
-  background: var(--bg-secondary);
+  background: var(--surface-2);
 }
 
 .btn-delete,
@@ -6769,15 +6989,25 @@ a.pl-add-row:hover {
   transform: translateY(-1px);
 }
 
+/* Handoff parity: delete control in dense rows is a ghost-danger icon
+   (transparent → error-tinted on hover), not a solid red pill. See the
+   `.btn-ghostDanger` primitive in _card.css:119–140. */
 .btn-delete {
   width: 36px;
   height: 36px;
-  border: none;
-  background: var(--error);
-  color: var(--on-accent);
-  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-secondary);
+  border-radius: 6px;
   cursor: pointer;
   font-size: 18px;
+  transition: color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.btn-delete:hover {
+  background: color-mix(in oklab, var(--error) 14%, transparent);
+  color: var(--error);
+  border-color: color-mix(in oklab, var(--error) 30%, transparent);
 }
 
 .add-buttons-grid {
@@ -6790,23 +7020,37 @@ a.pl-add-row:hover {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 20px;
-  border: 2px dashed var(--border-color);
+  padding: 8px 14px;
+  border: 1px dashed var(--surface-border);
   background: transparent;
-  border-radius: 8px;
+  border-radius: 6px;
   cursor: pointer;
   color: var(--text-secondary);
+  font-size: 0.8125rem;
+  transition: color 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.btn-add:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-weak, transparent);
 }
 
 .btn-preset {
-  padding: 8px 12px;
-  border: 1px solid var(--border-color);
-  background: var(--bg-secondary);
-  border-radius: 8px;
+  padding: 6px 10px;
+  border: 1px solid var(--surface-border);
+  background: var(--surface-2);
+  border-radius: 6px;
   cursor: pointer;
   color: var(--text-secondary);
-  font-size: 12px;
-  font-family: monospace;
+  font-size: 0.75rem;
+  font-family: var(--font-mono, 'JetBrains Mono'), ui-monospace, monospace;
+  transition: color 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.btn-preset:hover {
+  color: var(--text);
+  border-color: var(--border-strong, var(--surface-border));
 }
 
 .clear-button {
@@ -6932,9 +7176,11 @@ a.pl-add-row:hover {
   transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.18s ease;
 }
 
+/* Handoff parity: button hover uses --surface-2 + --border-strong directly
+   rather than the legacy --bg-secondary / --muted aliases. */
 .history-actions .btn:hover {
-  background: var(--bg-secondary);
-  border-color: var(--muted);
+  background: var(--surface-2);
+  border-color: var(--border-strong, var(--surface-border));
 }
 
 .history-actions .btn-primary {
@@ -6957,15 +7203,19 @@ a.pl-add-row:hover {
   background: var(--danger-hover);
 }
 
+/* Handoff parity: danger zones mirror `.card-danger` (see _card.css:61) —
+   single 1px error-tinted border, no double-up via box-shadow. Padding
+   matches the 16px .card standard instead of the old 20px overhang. */
 .history-danger-zone {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
   margin-top: 8px;
-  padding: 20px;
-  border-width: 2px;
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--error) 20%, transparent);
+  padding: 16px;
+  border: 1px solid color-mix(in oklab, var(--error) 30%, var(--surface-border));
+  border-radius: var(--border-radius-lg);
+  background: var(--surface);
 }
 
 .history-danger-zone .danger-zone-body {
@@ -6984,10 +7234,12 @@ a.pl-add-row:hover {
   color: var(--error);
 }
 
+/* Handoff uses --surface-border (aliased to --border) for every separator;
+   --panel-border is a legacy token that skews slightly darker. */
 .danger-zone-divider {
   margin: 28px 0 16px;
   border: 0;
-  border-top: 1px solid var(--panel-border);
+  border-top: 1px solid var(--surface-border);
   opacity: 0.75;
 }
 
@@ -8001,11 +8253,13 @@ body.modal-open {
     overflow: hidden;
 }
 
+/* Handoff parity: modal body padding aligns to the 16px .card standard;
+   10px radius matches --radius-2 / --border-radius-lg. */
 .modal-content {
     background-color: var(--surface);
     margin: 15% auto; /* Center the modal */
-    padding: 20px;
-    border-radius: 10px;
+    padding: 16px;
+    border-radius: var(--border-radius-lg);
     width: 90%;
     max-width: 400px;
     box-shadow: 0 8px 20px var(--shadow-medium, rgba(0, 0, 0, 0.2));
@@ -8014,7 +8268,7 @@ body.modal-open {
 
 .modal-sheet {
     background: var(--modal-bg);
-    border: 1px solid var(--panel-border);
+    border: 1px solid var(--surface-border);
 }
 /* For image preview modal, allow larger canvas */
 .image-modal .modal-content {
@@ -8866,6 +9120,19 @@ body[data-page="settings"] .status-popover {
     bottom: calc(9.25rem + env(safe-area-inset-bottom, 0px));
 }
 
+body[data-page="dashboard"] .status-badge,
+body[data-page="dashboard"] .status-popover,
+body[data-page="playlist"] .status-badge,
+body[data-page="playlist"] .status-popover,
+body[data-page="plugin"] .status-badge,
+body[data-page="plugin"] .status-popover,
+body[data-page="history"] .status-badge,
+body[data-page="history"] .status-popover,
+body[data-page="api-keys"] .status-badge,
+body[data-page="api-keys"] .status-popover {
+    display: none !important;
+}
+
 @keyframes status-badge-pulse {
     0%, 100% { box-shadow: 0 4px 14px rgba(220, 38, 38, 0.25); }
     50% { box-shadow: 0 4px 20px rgba(220, 38, 38, 0.55); }
@@ -9659,6 +9926,7 @@ body[data-page="settings"] .status-popover {
         justify-content: center;
         align-items: center;
         min-height: 44px;
+        min-width: 44px;
     }
 
     .playlist-secondary-button {
@@ -9982,180 +10250,3 @@ body[data-page="settings"] .status-popover {
   }
 }
 
-/* Parity overrides - handoff refinement follow-up */
-body[data-page="dashboard"] .tweaks-fab,
-body[data-page="dashboard"] .tweaks-panel,
-body[data-page="playlist"] .tweaks-fab,
-body[data-page="playlist"] .tweaks-panel,
-body[data-page="plugin"] .tweaks-fab,
-body[data-page="plugin"] .tweaks-panel {
-  display: none;
-}
-
-body[data-page="dashboard"] .status-badge,
-body[data-page="dashboard"] .status-popover,
-body[data-page="playlist"] .status-badge,
-body[data-page="playlist"] .status-popover,
-body[data-page="plugin"] .status-badge,
-body[data-page="plugin"] .status-popover,
-body[data-page="history"] .status-badge,
-body[data-page="history"] .status-popover,
-body[data-page="api-keys"] .status-badge,
-body[data-page="api-keys"] .status-popover {
-  display: none !important;
-}
-
-body[data-page="playlist"] .breadcrumb,
-body[data-page="plugin"] .breadcrumb,
-body[data-page="settings"] .breadcrumb,
-body[data-page="history"] .breadcrumb,
-body[data-page="api-keys"] .breadcrumb {
-  display: none;
-}
-
-@media (min-width: 901px) {
-  .shell-sidebar .sys-row {
-    justify-content: flex-start;
-  }
-
-  .shell-sidebar .sys-row #themeToggle {
-    display: none;
-  }
-}
-
-body[data-page="settings"] .settings-device-name,
-body[data-page="settings"] #settingsLogsToggle {
-  display: none;
-}
-
-body[data-page="dashboard"] .dashboard-hero {
-  gap: 12px;
-  margin-bottom: 16px;
-}
-
-body[data-page="dashboard"] .dashboard-overview-empty {
-  padding: 12px 14px;
-  min-height: 0;
-}
-
-body[data-page="dashboard"] .dashboard-overview-empty.is-compact {
-  padding: 10px 12px;
-}
-
-body[data-page="dashboard"] .quick-switch-card,
-body[data-page="dashboard"] .kpi-card {
-  padding: 12px 14px;
-}
-
-body[data-page="dashboard"] .quick-switch-list {
-  gap: 8px;
-}
-
-body[data-page="dashboard"] .quick-row {
-  padding: 8px 0;
-}
-
-body[data-page="dashboard"] #plugins-grid {
-  margin-top: 0;
-}
-
-body[data-page="playlist"] .playlist-toggle-button {
-  width: 28px;
-  height: 28px;
-  border-radius: 8px;
-}
-
-body[data-page="playlist"] .playlist-toggle-button::after {
-  font-size: 1.05rem;
-}
-
-body[data-page="playlist"] .playlist-toggle-button:hover {
-  border-color: var(--border-strong, var(--surface-border));
-  background: var(--surface-2);
-}
-
-body[data-page="playlist"] .playlist-card-body {
-  padding: 8px;
-}
-
-body[data-page="playlist"] .playlist-card-body .empty-state.compact {
-  padding: 14px 16px;
-}
-
-body[data-page="plugin"] .pageheader-plugin .pageheader-actions {
-  flex-wrap: wrap;
-}
-
-body[data-page="plugin"] .pageheader-plugin .pageheader-actions .header-button,
-body[data-page="plugin"] .pageheader-plugin .pageheader-actions .action-button {
-  min-height: 36px;
-  padding-inline: 12px;
-}
-
-body[data-page="plugin"] .workflow-preview-card {
-  padding: 14px;
-}
-
-body[data-page="plugin"] .workflow-action-panel,
-body[data-page="plugin"] .workflow-utility-card {
-  gap: 8px;
-  padding: 0;
-  background: transparent;
-  border: 0;
-  border-radius: 0;
-}
-
-body[data-page="plugin"] .workflow-device-toggle {
-  display: none;
-}
-
-body[data-page="plugin"] .workflow-help {
-  color: var(--text-3);
-  font-size: 0.82rem;
-  line-height: 1.5;
-}
-
-body[data-page="plugin"] .workflow-help p {
-  margin: 0;
-}
-
-body[data-page="plugin"] .progress-header-actions {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
-
-body[data-page="plugin"] .progress-history-button {
-  min-height: 28px;
-  padding: 5px 10px;
-  font-size: 0.76rem;
-}
-
-body[data-page="api-keys"] .api-keys-more {
-  margin-top: 4px;
-  border: 1px solid var(--surface-border);
-  border-radius: 14px;
-  background: color-mix(in oklab, var(--surface) 92%, var(--surface-2));
-  overflow: hidden;
-}
-
-body[data-page="api-keys"] .api-keys-more summary {
-  list-style: none;
-  cursor: pointer;
-  padding: 13px 16px;
-  font-family: var(--font-mono, 'JetBrains Mono'), ui-monospace, monospace;
-  font-size: 0.72rem;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--text-3);
-}
-
-body[data-page="api-keys"] .api-keys-more summary::-webkit-details-marker {
-  display: none;
-}
-
-body[data-page="api-keys"] .api-keys-more-grid {
-  display: grid;
-  gap: 12px;
-  padding: 0 12px 12px;
-}

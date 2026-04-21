@@ -479,10 +479,14 @@ def test_playlist_default_all_day_renders_as_all_day(client, device_config_dev):
     assert resp.status_code == 200
     body = resp.get_data(as_text=True)
 
-    # Find the all-day playlist block and assert its summary copy
+    # Find the all-day playlist block and assert its summary copy. The window
+    # is sized generously because the playlist card now carries a toggle
+    # button with full a11y metadata (data-collapsed-label, data-expanded-label,
+    # aria-label, title) before the summary copy, which pushes "All day"
+    # further from the first `data-playlist-name` attribute occurrence.
     idx = body.find("JTN639AllDay")
     assert idx != -1
-    chunk = body[idx : idx + 600]
+    chunk = body[idx : idx + 2000]
     assert "All day" in chunk
     assert "00:00 - 24:00" not in chunk
 

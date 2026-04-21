@@ -217,6 +217,13 @@
         const handler = () => hideHistoryImageSkeleton(img);
         img.addEventListener("load", handler);
         img.addEventListener("error", handler);
+        // If the image was already in the browser cache it may have finished
+        // loading before this handler attached — in that case the `load`
+        // event has already fired and the skeleton would stay stuck on top.
+        // Check synchronously and hide the skeleton immediately.
+        if (img.complete && img.naturalWidth > 0) {
+          hideHistoryImageSkeleton(img);
+        }
       });
     }
 

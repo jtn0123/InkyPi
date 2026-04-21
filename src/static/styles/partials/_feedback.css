@@ -925,11 +925,13 @@ body.modal-open {
     overflow: hidden;
 }
 
+/* Handoff parity: modal body padding aligns to the 16px .card standard;
+   10px radius matches --radius-2 / --border-radius-lg. */
 .modal-content {
     background-color: var(--surface);
     margin: 15% auto; /* Center the modal */
-    padding: 20px;
-    border-radius: 10px;
+    padding: 16px;
+    border-radius: var(--border-radius-lg);
     width: 90%;
     max-width: 400px;
     box-shadow: 0 8px 20px var(--shadow-medium, rgba(0, 0, 0, 0.2));
@@ -938,7 +940,7 @@ body.modal-open {
 
 .modal-sheet {
     background: var(--modal-bg);
-    border: 1px solid var(--panel-border);
+    border: 1px solid var(--surface-border);
 }
 /* For image preview modal, allow larger canvas */
 .image-modal .modal-content {

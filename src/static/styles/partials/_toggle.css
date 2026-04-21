@@ -10,7 +10,9 @@
     margin: 0;
     text-align: left;
     text-transform: uppercase;
-    letter-spacing: 0.04em;
+    /* Handoff parity: `.section-head h2` in styles.css:388 uses 0.02em tracking;
+       0.04em read too spaced-out against the count chip. */
+    letter-spacing: 0.02em;
     transition: color var(--transition-speed) ease;
 }
 

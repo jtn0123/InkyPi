@@ -185,11 +185,15 @@
   gap: 16px;
 }
 
+/* Handoff parity: API-key rows are .card primitives (1px border, radius-lg,
+   --surface). The second `.api-key-card` block further down refines to 14px
+   radius for the flatter handoff row style. Use canonical tokens here so
+   the cascade resolves cleanly in both themes. */
 .api-key-card {
   padding: 14px 16px;
-  border: 1px solid var(--panel-border);
-  border-radius: 12px;
-  background: var(--panel-bg);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--border-radius-lg);
+  background: var(--surface);
   display: grid;
   gap: 10px;
 }
@@ -312,7 +316,10 @@
 .api-key-card {
   width: 100%;
   padding: 14px 16px;
-  border-radius: 14px;
+  /* Handoff parity: large, flatter cards use radius-3 (14px). This override
+     keeps the API-keys list visually consistent with the handoff Settings
+     layout while the base .api-key-card above falls back to radius-lg. */
+  border-radius: var(--border-radius-xl);
   background: var(--surface);
   border-color: var(--surface-border);
 }
@@ -367,11 +374,13 @@
   line-height: 1.5;
 }
 
+/* Handoff parity: secondary "advanced" panels sit on --surface-2 (one step
+   up from --surface), not an opaque mix. Radius matches .card (10px). */
 .api-keys-more {
   margin-top: 4px;
   border: 1px solid var(--surface-border);
-  border-radius: 14px;
-  background: color-mix(in oklab, var(--surface) 92%, var(--surface-2));
+  border-radius: var(--border-radius-lg);
+  background: var(--surface-2);
   overflow: hidden;
 }
 
@@ -404,22 +413,25 @@
   margin-bottom: 12px;
 }
 
+/* Handoff parity: API-key form fields mirror `.input` in styles.css:239–249
+   (8 10 padding, 13px, --radius-1). We keep the mono face since these carry
+   raw secret tokens the user wants to eyeball character-by-character. */
 .apikey-key,
 .apikey-value {
   width: 100%;
-  padding: 10px 12px;
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  font-family: monospace;
-  font-size: 14px;
-  background: var(--input-bg);
-  color: var(--text-primary);
+  padding: 8px 10px;
+  border: 1px solid var(--surface-border);
+  border-radius: 6px;
+  font-family: var(--font-mono, 'JetBrains Mono'), ui-monospace, monospace;
+  font-size: 0.8125rem;
+  background: var(--surface);
+  color: var(--text);
 }
 
 .apikey-value.masked {
   color: var(--text-secondary);
   letter-spacing: 2px;
-  background: var(--bg-secondary);
+  background: var(--surface-2);
 }
 
 .btn-delete,
@@ -436,15 +448,25 @@
   transform: translateY(-1px);
 }
 
+/* Handoff parity: delete control in dense rows is a ghost-danger icon
+   (transparent → error-tinted on hover), not a solid red pill. See the
+   `.btn-ghostDanger` primitive in _card.css:119–140. */
 .btn-delete {
   width: 36px;
   height: 36px;
-  border: none;
-  background: var(--error);
-  color: var(--on-accent);
-  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-secondary);
+  border-radius: 6px;
   cursor: pointer;
   font-size: 18px;
+  transition: color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.btn-delete:hover {
+  background: color-mix(in oklab, var(--error) 14%, transparent);
+  color: var(--error);
+  border-color: color-mix(in oklab, var(--error) 30%, transparent);
 }
 
 .add-buttons-grid {
@@ -457,23 +479,37 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 20px;
-  border: 2px dashed var(--border-color);
+  padding: 8px 14px;
+  border: 1px dashed var(--surface-border);
   background: transparent;
-  border-radius: 8px;
+  border-radius: 6px;
   cursor: pointer;
   color: var(--text-secondary);
+  font-size: 0.8125rem;
+  transition: color 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.btn-add:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-weak, transparent);
 }
 
 .btn-preset {
-  padding: 8px 12px;
-  border: 1px solid var(--border-color);
-  background: var(--bg-secondary);
-  border-radius: 8px;
+  padding: 6px 10px;
+  border: 1px solid var(--surface-border);
+  background: var(--surface-2);
+  border-radius: 6px;
   cursor: pointer;
   color: var(--text-secondary);
-  font-size: 12px;
-  font-family: monospace;
+  font-size: 0.75rem;
+  font-family: var(--font-mono, 'JetBrains Mono'), ui-monospace, monospace;
+  transition: color 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.btn-preset:hover {
+  color: var(--text);
+  border-color: var(--border-strong, var(--surface-border));
 }
 
 .clear-button {

@@ -90,9 +90,11 @@
   transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.18s ease;
 }
 
+/* Handoff parity: button hover uses --surface-2 + --border-strong directly
+   rather than the legacy --bg-secondary / --muted aliases. */
 .history-actions .btn:hover {
-  background: var(--bg-secondary);
-  border-color: var(--muted);
+  background: var(--surface-2);
+  border-color: var(--border-strong, var(--surface-border));
 }
 
 .history-actions .btn-primary {
@@ -115,15 +117,19 @@
   background: var(--danger-hover);
 }
 
+/* Handoff parity: danger zones mirror `.card-danger` (see _card.css:61) —
+   single 1px error-tinted border, no double-up via box-shadow. Padding
+   matches the 16px .card standard instead of the old 20px overhang. */
 .history-danger-zone {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
   margin-top: 8px;
-  padding: 20px;
-  border-width: 2px;
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--error) 20%, transparent);
+  padding: 16px;
+  border: 1px solid color-mix(in oklab, var(--error) 30%, var(--surface-border));
+  border-radius: var(--border-radius-lg);
+  background: var(--surface);
 }
 
 .history-danger-zone .danger-zone-body {
@@ -142,10 +148,12 @@
   color: var(--error);
 }
 
+/* Handoff uses --surface-border (aliased to --border) for every separator;
+   --panel-border is a legacy token that skews slightly darker. */
 .danger-zone-divider {
   margin: 28px 0 16px;
   border: 0;
-  border-top: 1px solid var(--panel-border);
+  border-top: 1px solid var(--surface-border);
   opacity: 0.75;
 }
 

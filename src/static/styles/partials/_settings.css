@@ -705,8 +705,13 @@
   font-weight: 700;
 }
 
-body[data-page="settings"] .settings-device-name,
-body[data-page="settings"] #settingsLogsToggle {
+/* The chrome-level `.settings-device-name` chip is redundant on the
+   settings page itself (the Device tab heading already shows the name),
+   so hide it. Do NOT hide `#settingsLogsToggle` — it's the affordance
+   that opens the live-logs panel on the Updates tab, and tests +
+   real users depend on it. The handoff's "Download logs" header
+   action is a different feature (file download, not streaming). */
+body[data-page="settings"] .settings-device-name {
   display: none;
 }
 

@@ -17,6 +17,18 @@
     >
         <main id="main-content" role="main" tabindex="-1" class="page-shell page-shell-management" data-page-shell="management">
         {{ breadcrumb([{'label': 'Home', 'url': url_for('main.main_page')}, {'label': 'Settings', 'url': url_for('settings.settings_page')}, {'label': 'API Keys'}]) }}
+        {% set key_summary = namespace(provider_count=(entries|length if entries is defined else 0), configured_count=0) %}
+        {% if api_keys_mode == 'managed' %}
+            {% set key_summary.provider_count = 6 %}
+            {% if masked.OPEN_AI_SECRET %}{% set key_summary.configured_count = key_summary.configured_count + 1 %}{% endif %}
+            {% if masked.OPEN_WEATHER_MAP_SECRET %}{% set key_summary.configured_count = key_summary.configured_count + 1 %}{% endif %}
+            {% if masked.NASA_SECRET %}{% set key_summary.configured_count = key_summary.configured_count + 1 %}{% endif %}
+            {% if masked.UNSPLASH_ACCESS_KEY %}{% set key_summary.configured_count = key_summary.configured_count + 1 %}{% endif %}
+            {% if masked.GITHUB_SECRET %}{% set key_summary.configured_count = key_summary.configured_count + 1 %}{% endif %}
+            {% if masked.GOOGLE_AI_SECRET %}{% set key_summary.configured_count = key_summary.configured_count + 1 %}{% endif %}
+        {% else %}
+            {% set key_summary.configured_count = entries|length if entries is defined else 0 %}
+        {% endif %}
         {% call pageheader(
             title='API keys',
             eyebrow='System',
@@ -24,6 +36,11 @@
         ) %}
             <button type="button" id="saveApiKeysBtn" class="header-button is-secondary" disabled>Save API keys</button>
         {% endcall %}
+
+        <div class="page-summary api-keys-summary">
+            <span id="providerCountSummary" class="status-chip info">{{ key_summary.provider_count }} providers</span>
+            <span id="configuredCountSummary" class="status-chip success">{{ key_summary.configured_count }} configured</span>
+        </div>
 
         {% if api_keys_mode == 'managed' %}
         <form id="apiKeysForm" class="settings-form">

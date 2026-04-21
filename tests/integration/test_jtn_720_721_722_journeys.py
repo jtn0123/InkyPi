@@ -93,7 +93,11 @@ def test_jtn_720_first_run_setup_add_schedule_refresh_history(
     navigate_and_wait(page, live_server, "/")
     body_text = page.locator("body").inner_text()
     assert "Current display" in body_text
-    assert "Check status" in body_text
+    # The dashboard renders the Display Next CTA alongside the Refresh action
+    # as part of the hero strip. The status-badge floating "Check status"
+    # label only appears when /api/diagnostics reports a warning state, which
+    # an ok dev environment does not, so assert on a stable CTA instead.
+    assert "Display Next" in body_text
 
     navigate_and_wait(page, live_server, "/playlist")
     assert (

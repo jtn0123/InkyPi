@@ -17,7 +17,10 @@
 
 .pageheader .eyebrow {
   font-family: var(--font-mono, 'JetBrains Mono'), ui-monospace, monospace;
-  font-size: 0.68rem;
+  /* Handoff parity: styles.css:149–152 uses 11px (0.6875rem); we were slightly
+     under at 0.68rem (~10.9px). Exact match keeps the eyebrow's x-height
+     lined up with section-head eyebrows on the dashboard hero. */
+  font-size: 0.6875rem;
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--text-3);
@@ -112,6 +115,24 @@
 
 .pageheader-plugin .plugin-mode-row {
   margin-top: 10px;
+}
+
+/* At medium widths the plugin detail header has 3 action buttons competing
+   with the icon + title + description column, forcing the title to wrap in a
+   narrow ribbon on the left. The workflow layout itself collapses to a single
+   column at 1200px, so stack the pageheader a touch earlier (~960px) to give
+   the title its full width and push the action row cleanly below. */
+@media (max-width: 960px) {
+  .pageheader-plugin {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .pageheader-plugin .pageheader-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
 }
 
 /* Refined metrics strip — a 4-up KPI band, evolves the existing .metric-strip */

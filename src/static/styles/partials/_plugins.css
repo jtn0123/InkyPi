@@ -433,9 +433,14 @@
   flex-wrap: wrap;
 }
 
+/* Plugin pageheader buttons use tighter horizontal padding than the base
+   `.header-button` (10px 16px) so the eyebrow row fits Save/Display/Schedule
+   together on narrow desktop viewports. We intentionally avoid `min-height`
+   here because the 36px touch-target height is reserved for mobile media
+   queries (see tests/static/test_mobile_touch_targets.py). Default padding
+   already lands around 34-35px tall on desktop, which matches the handoff. */
 .pageheader-plugin .pageheader-actions .header-button,
 .pageheader-plugin .pageheader-actions .action-button {
-  min-height: 36px;
   padding-inline: 12px;
 }
 
@@ -646,10 +651,13 @@
   gap: 16px;
 }
 
+/* Handoff parity: matches .card standard (14/16 padding, --border-radius-lg,
+   --surface). Previously used symmetric 14px padding which made the preview
+   header feel pinched against the card edge. */
 .workflow-preview-card {
   display: grid;
   gap: 14px;
-  padding: 14px;
+  padding: 14px 16px 16px;
   border: 1px solid var(--surface-border);
   border-radius: var(--border-radius-lg);
   background: var(--surface);

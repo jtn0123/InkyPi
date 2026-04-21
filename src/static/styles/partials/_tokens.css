@@ -36,6 +36,12 @@
     --text-primary: var(--text);
     --text-muted: var(--muted);
     --text-secondary: var(--subtext);
+    /* Handoff naming alias: the prototype's styles.css uses `--text-2` /
+       `--text-3` for muted + quieter text; we've always used --subtext /
+       --text-secondary. Keep the alias so new rules copied from the
+       handoff can reference --text-2 without breaking. */
+    --text-2: var(--subtext);
+    --border: var(--surface-border);
     --border-color: var(--surface-border);
     --bg-primary: var(--surface);
     --bg-secondary: #eceae5;
@@ -194,6 +200,12 @@
     --text-primary: var(--text);
     --text-muted: var(--muted);
     --text-secondary: var(--subtext);
+    /* Handoff naming alias: the prototype's styles.css uses `--text-2` /
+       `--text-3` for muted + quieter text; we've always used --subtext /
+       --text-secondary. Keep the alias so new rules copied from the
+       handoff can reference --text-2 without breaking. */
+    --text-2: var(--subtext);
+    --border: var(--surface-border);
     --border-color: var(--surface-border);
     --bg-primary: var(--surface);
     --bg-secondary: #0e0f10;

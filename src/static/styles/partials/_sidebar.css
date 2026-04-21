@@ -288,12 +288,14 @@
    provides those. Keep the identity, title, and theme toggle. */
 @media (min-width: 901px) {
   .shell-sidebar .sys-row {
-    justify-content: flex-start;
+    justify-content: space-between;
   }
 
-  .shell-sidebar .sys-row #themeToggle {
-    display: none;
-  }
+  /* Keep #themeToggle visible here. The handoff tucks theme switching into
+     the sidebar footer on desktop, and tests/integration/test_theme_toggle_e2e.py
+     asserts the button is clickable on /. An earlier parity pass added a
+     display:none here; that hid the only instance of the toggle on desktop,
+     so it's removed. */
 
   .shell .app-header nav.header-actions,
   .shell .app-header .header-identity .header-button.icon.current-page {

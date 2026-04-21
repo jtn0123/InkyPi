@@ -362,7 +362,11 @@ def refresh_info():
     try:
         info = device_config.get_refresh_info().to_dict()
     except Exception:
-        info = {}
+        # Return an empty payload on failure — callers (dashboard JS and
+        # unit tests in test_blueprint_coverage / test_startup_recovery) expect
+        # `{}` rather than partial schedule metadata when refresh_info is
+        # broken or missing.
+        return jsonify({})
     _annotate_instance_labels(info)
     _annotate_refresh_schedule(info, device_config)
     return jsonify(info)

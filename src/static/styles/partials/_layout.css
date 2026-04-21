@@ -152,7 +152,16 @@
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
-    justify-content: flex-end;
+    /* Left-align count chips under the pageheader so they read as part of the
+       page header context rather than floating as orphans on the right edge.
+       The previous `flex-end` alignment made chips like "1 playlist" or
+       "0 providers / 0 configured" appear disconnected from the title. */
+    justify-content: flex-start;
+    /* Tighter rhythm between the pageheader description and the summary row.
+       The handoff pulls these chips just under the header without a full
+       vertical-xl gap. */
+    margin-top: -4px;
+    margin-bottom: var(--spacing-md, 12px);
 }
 
 .page-shell {
