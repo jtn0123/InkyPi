@@ -579,6 +579,10 @@ install_app_service() {
   # together with inkypi.service — keeps OnFailure= from dangling after updates.
   install_failure_service_unit
 
+  # JTN-785: Write the memory-cap drop-in tuned for this device's RAM. Must
+  # precede daemon-reload so systemd picks up the caps on the next start.
+  install_memory_dropin
+
   sudo systemctl daemon-reload
   sudo systemctl enable $SERVICE_FILE
 }
