@@ -56,6 +56,18 @@
         root.style.setProperty('--accent-hover', 'oklch(' + (isDark ? '74%' : '48%') + ' 0.09 ' + h + ')');
     }
 
+    // Trim trailing slash characters without using a regex. Sonar S5852
+    // flags `/\/+$/` as potentially ReDoS-vulnerable (false positive, but
+    // cheaper to sidestep than to waive per-PR), and this helper is also
+    // easier to read than the regex it replaces.
+    function trimTrailingSlashes(s) {
+        var end = s.length;
+        while (end > 0 && s.charCodeAt(end - 1) === 47 /* '/' */) {
+            end--;
+        }
+        return end === s.length ? s : s.slice(0, end);
+    }
+
     function highlightActiveNav() {
         var items = document.querySelectorAll('.shell-sidebar .nav-item');
         if (!items.length) return;
@@ -64,14 +76,15 @@
         // before treating a longer href as active; a bare prefix check would
         // light up "/plugins" when navigating to a sibling route like
         // "/plugins-library".
-        var path = (window.location.pathname || '/').replace(/\/+$/, '') || '/';
+        var path = trimTrailingSlashes(window.location.pathname || '/') || '/';
         var best = null;
         var bestLen = -1;
         items.forEach(function (a) {
             var href = a.getAttribute('href') || '';
             if (!href || href === '#') return;
-            var hrefPath = new URL(href, window.location.origin)
-                .pathname.replace(/\/+$/, '') || '/';
+            var hrefPath = trimTrailingSlashes(
+                new URL(href, window.location.origin).pathname
+            ) || '/';
             if (
                 path === hrefPath
                 || (hrefPath !== '/' && path.indexOf(hrefPath + '/') === 0)
