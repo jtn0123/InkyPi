@@ -255,9 +255,9 @@
           inputElement.dataset.emptyPlaceholder || "Enter API key";
       }
       removeDeleteButton(sectionId);
-      setCardConfigured(_cardForSection(sectionId), false);
-      // Also remove the "Configured" mask chip since the key is gone.
       const card = _cardForSection(sectionId);
+      setCardConfigured(card, false);
+      // Also remove the "Configured" mask chip since the key is gone.
       card?.querySelector(".api-mask")?.remove();
     }
 

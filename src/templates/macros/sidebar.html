@@ -7,8 +7,15 @@
 {% set system_online = sidebar_system.online_label if sidebar_system is mapping and sidebar_system.online_label is defined else 'online' %}
 {% set system_load = sidebar_system.load_label if sidebar_system is mapping and sidebar_system.load_label is defined else none %}
 {% set brand_parts = [] %}
-{% if device_name and device_name != 'InkyPi' %}
+{#- Only render the brand-host row when the configured device name is
+    something the user has customized. Normalize case and surrounding
+    whitespace so 'inkypi', ' InkyPi ', etc. still suppress the row. -#}
+{% set _device_name_norm = (device_name|string).strip().lower() if device_name else '' %}
+{% if _device_name_norm and _device_name_norm != 'inkypi' %}
     {% set _ = brand_parts.append(device_name) %}
+{% endif %}
+{% if host %}
+    {% set _ = brand_parts.append(host) %}
 {% endif %}
 <aside class="shell-sidebar" aria-label="Primary navigation">
     <a href="{{ url_for('main.main_page') }}" class="sidebar-brand">
@@ -62,10 +69,13 @@
     </nav>
 
     <div class="sidebar-foot">
-        <div class="now-card is-{{ now_state }}" aria-live="polite">
+        <div class="now-card is-{{ now_state }}">
+            {#- Scope aria-live to just the fields that actually change (title
+                + meta). Wrapping the whole card meant screen readers re-read
+                the static "NOW PLAYING" eyebrow on every re-render/nav. -#}
             <div class="now-label">NOW PLAYING</div>
-            <div class="now-title">{{ now_label or '—' }}</div>
-            <div class="now-meta">
+            <div class="now-title" aria-live="polite" aria-atomic="false">{{ now_label or '—' }}</div>
+            <div class="now-meta" aria-live="polite" aria-atomic="false">
                 <span class="live-dot" aria-hidden="true"></span>
                 <span>{{ now_meta if now_label else 'Idle' }}</span>
             </div>

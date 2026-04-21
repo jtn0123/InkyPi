@@ -87,7 +87,18 @@ def test_plugin_style_accordion_chevron_flips(live_server, browser_page):
         '[data-settings-panel="maintenance"].active', timeout=5000
     )
 
-    header = page.locator("button.collapsible-header[data-collapsible-toggle]").first
+    # Guard loudly if Diagnostics is ever flattened too: without this assert,
+    # `.first` on an empty locator would silently time out inside `.click()`
+    # and the contract regression would be obscured by a generic timeout.
+    headers = page.locator(
+        "button.collapsible-header[data-collapsible-toggle]"
+    )
+    assert headers.count() >= 1, (
+        "Expected at least one collapsible header on the settings page; "
+        "if Diagnostics was flattened, move this contract test to whichever "
+        "collapsible survives."
+    )
+    header = headers.first
     icon = header.locator(".collapsible-icon")
 
     # Collapsed baseline: aria-expanded=false, no rotation applied.

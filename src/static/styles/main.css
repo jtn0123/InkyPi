@@ -27,9 +27,18 @@
     padding: 0;
 }
 
-/* Base body styling */
+/* Base body styling.
+ *
+ * Font stack notes: Inter / JetBrains Mono are preferred by the handoff
+ * design but we don't ship @font-face rules for them. On Raspberry Pi OS /
+ * Debian the device will not have them installed, so the stack intentionally
+ * resolves to `system-ui` (and Jost where available) for a legible native
+ * fallback. If/when we bundle Inter and JetBrains Mono WOFF2s under
+ * static/fonts/, add matching @font-face declarations above and the named
+ * families will start being used automatically.
+ */
 body {
-    font-family: var(--font-sans, 'Inter'), Jost, -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    font-family: var(--font-sans, system-ui), 'Inter', Jost, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     background-color: var(--bg);
     color: var(--text);
     line-height: 1.5;
@@ -45,7 +54,7 @@ code,
 pre,
 kbd,
 samp {
-    font-family: var(--font-mono, 'JetBrains Mono'), ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-family: var(--font-mono, ui-monospace), 'JetBrains Mono', SFMono-Regular, Menlo, monospace;
     font-feature-settings: 'ss01';
     letter-spacing: -0.01em;
 }
@@ -1227,7 +1236,8 @@ main[data-page-shell="workflow"] .frame {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 2px 8px 4px;
+  /* Handoff parity follow-up: compact footer card identity. */
+  padding: 2px 8px 6px;
   text-decoration: none;
   color: inherit;
 }
@@ -1266,6 +1276,7 @@ main[data-page-shell="workflow"] .frame {
 .brand-host {
   font-family: var(--font-mono, 'JetBrains Mono'), ui-monospace, monospace;
   font-size: 0.72rem;
+  line-height: 1.45;
   color: var(--text-3);
   white-space: nowrap;
   overflow: hidden;
@@ -1337,14 +1348,16 @@ main[data-page-shell="workflow"] .frame {
   padding-top: 12px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
 }
 
 .now-card {
-  background: var(--surface-2);
+  display: grid;
+  gap: 5px;
+  background: color-mix(in oklab, var(--surface-2) 92%, var(--surface));
   border: 1px solid var(--surface-border);
   border-radius: var(--border-radius-lg);
-  padding: 10px 12px;
+  padding: 12px 12px 11px;
 }
 
 .now-label {
@@ -1358,17 +1371,23 @@ main[data-page-shell="workflow"] .frame {
 .now-title {
   font-weight: 600;
   margin-top: 2px;
+  min-height: 2.5em;
   font-size: 0.82rem;
   color: var(--text);
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
+  /* Clamp to two lines of the (usually wrapped) plugin name. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  white-space: normal;
 }
 
 .now-meta {
   color: var(--muted);
   font-size: 0.75rem;
-  margin-top: 4px;
+  line-height: 1.45;
+  margin-top: 0;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -1419,27 +1438,8 @@ main[data-page-shell="workflow"] .frame {
   height: 14px;
 }
 
-/* Handoff parity follow-up: keep the shell identity compact and ensure the
-   footer card always reads like the prototype's "NOW PLAYING" block. */
-.sidebar-brand {
-  padding-bottom: 6px;
-}
-
-.brand-host {
-  line-height: 1.45;
-}
-
-.sidebar-foot {
-  gap: 10px;
-}
-
-.now-card {
-  display: grid;
-  gap: 5px;
-  padding: 12px 12px 11px;
-  background: color-mix(in oklab, var(--surface-2) 92%, var(--surface));
-}
-
+/* Handoff parity follow-up: the "is-idle" variants are scoped to the
+   .now-card state and don't duplicate earlier selectors. */
 .now-card.is-idle {
   background: color-mix(in oklab, var(--surface-2) 84%, var(--surface));
 }
@@ -1448,19 +1448,6 @@ main[data-page-shell="workflow"] .frame {
   background: var(--text-3);
   box-shadow: none;
   opacity: 0.55;
-}
-
-.now-title {
-  min-height: 2.5em;
-  white-space: normal;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-}
-
-.now-meta {
-  margin-top: 0;
-  line-height: 1.45;
 }
 
 .sys-stats {
@@ -1626,6 +1613,11 @@ body[data-page="plugin"] .tweaks-panel {
   margin-bottom: 12px;
 }
 
+/* Match whichever heading level base.html renders (currently <h2>); keep
+   h3/h4 in scope so future refactors that restore the older heading level
+   don't silently drop the compact style. */
+.tweaks-head h2,
+.tweaks-head h3,
 .tweaks-head h4 {
   margin: 0;
   font-size: 0.78rem;
@@ -2660,6 +2652,13 @@ svg.icon-thin {
     font-weight: var(--font-medium);
 }
 
+/* Breadcrumb is still rendered in the DOM on these pages (the shared
+   pageheader macro emits it) and unit tests assert the markup is present
+   (see tests/integration/test_breadcrumbs.py). The sidebar shell provides
+   "Home" and a page-title eyebrow for shell-layout pages, so the breadcrumb
+   is visually redundant there and we hide it rather than conditionally
+   omit from the template — keeping the landmark available to assistive tech
+   that opts into navigation via hidden-navigation affordances. */
 body[data-page="playlist"] .breadcrumb,
 body[data-page="plugin"] .breadcrumb,
 body[data-page="settings"] .breadcrumb,
@@ -3653,9 +3652,10 @@ input:disabled, select:disabled, textarea:disabled {
 .dashboard-hero {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(280px, 320px);
-  gap: 16px;
+  /* Handoff parity: 12px inter-card gap, 14px bottom margin (was 16/var). */
+  gap: 12px;
   align-items: start;
-  margin-bottom: var(--spacing-xl);
+  margin-bottom: 14px;
 }
 
 .dashboard-stage,
@@ -3680,7 +3680,8 @@ input:disabled, select:disabled, textarea:disabled {
 
 .dashboard-stage {
   display: grid;
-  gap: 12px;
+  /* Handoff parity: tighter vertical rhythm inside the hero stage. */
+  gap: 10px;
 }
 
 /* Refined hero KPI strip shown below the preview image — mono labels,
@@ -3820,7 +3821,13 @@ input:disabled, select:disabled, textarea:disabled {
   min-width: 0;
 }
 
-.dashboard-stage-copy,
+.dashboard-stage-copy {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: var(--text-3);
+}
+
 .storage-card-copy {
   color: var(--text-secondary);
   font-size: 0.92rem;
@@ -3829,7 +3836,9 @@ input:disabled, select:disabled, textarea:disabled {
 
 .dashboard-overview {
   display: grid;
-  gap: 12px;
+  /* Handoff parity: tighter 8px stack, align cards to the top. */
+  gap: 8px;
+  align-content: start;
 }
 
 .dashboard-status-card {
@@ -4024,30 +4033,33 @@ input:disabled, select:disabled, textarea:disabled {
     width: var(--meter-width, 0%);
 }
 
+/* Handoff parity: the empty state reads as a compact inline banner (row,
+   solid border, tighter padding) rather than a large centered card. */
 .dashboard-overview-empty {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
-  justify-content: center;
-  gap: 12px;
-  padding: 32px 20px;
-  border: 1px dashed var(--surface-border);
+  justify-content: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--surface-border);
   border-radius: var(--border-radius-lg);
+  background: var(--surface-2);
   color: var(--text-secondary);
-  text-align: center;
-  min-height: 120px;
+  text-align: left;
+  min-height: 0;
 }
 
 .dashboard-overview-empty .empty-state-icon {
-  width: var(--icon-xl, 32px);
-  height: var(--icon-xl, 32px);
-  opacity: 0.5;
+  width: 18px;
+  height: 18px;
+  opacity: 0.7;
 }
 
 .dashboard-overview-empty p {
   margin: 0;
-  font-size: 0.9rem;
-  max-width: 24ch;
+  font-size: 0.82rem;
+  max-width: none;
 }
 
 .icon-fallback {
@@ -4063,15 +4075,16 @@ input:disabled, select:disabled, textarea:disabled {
   border-radius: var(--border-radius-md);
 }
 
-/* Quick switch playlist card (dashboard aside) */
+/* Quick switch playlist card (dashboard aside). Padding/gap tightened to
+   handoff parity spec (12px 14px / 8px gap). */
 .quick-switch-card {
   background: var(--surface);
   border: 1px solid var(--surface-border);
   border-radius: var(--border-radius-lg);
-  padding: 14px;
+  padding: 12px 14px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
 
 .quick-switch-head {
@@ -4252,48 +4265,8 @@ a.quick-row-link:hover {
   border-color: var(--accent-hover);
 }
 
-.dashboard-hero {
-  gap: 12px;
-  margin-bottom: 14px;
-}
-
-.dashboard-stage {
-  gap: 10px;
-}
-
-.dashboard-stage-copy {
-  margin: 0;
-  font-size: 0.82rem;
-  color: var(--text-3);
-}
-
-.dashboard-overview {
-  gap: 8px;
-  align-content: start;
-}
-
-.dashboard-overview-empty {
-  min-height: 0;
-  padding: 12px 14px;
-  flex-direction: row;
-  justify-content: flex-start;
-  gap: 10px;
-  text-align: left;
-  background: var(--surface-2);
-  border-style: solid;
-}
-
-.dashboard-overview-empty .empty-state-icon {
-  width: 18px;
-  height: 18px;
-  opacity: 0.7;
-}
-
-.dashboard-overview-empty p {
-  max-width: none;
-  font-size: 0.82rem;
-}
-
+/* The compact empty-state variant is used where the overview banner sits
+   inline with a live card rather than as its own card. */
 .dashboard-overview-empty.is-compact {
   padding: 6px 0 0;
   background: transparent;
@@ -4310,11 +4283,6 @@ a.quick-row-link:hover {
 
 .dashboard-overview-empty.is-compact p {
   font-size: 0.78rem;
-}
-
-.quick-switch-card {
-  padding: 12px 14px;
-  gap: 8px;
 }
 
 #plugins-grid {
@@ -5622,7 +5590,12 @@ a.pl-add-row:hover {
 }
 
 /* Visual parity pass: restore the handoff's rotation-card header/body split
-   and visible desktop controls instead of icon-only admin actions. */
+   and visible desktop controls instead of icon-only admin actions. This
+   block intentionally re-declares some selectors above as a focused
+   override layer; consolidating each pair into the earlier rule risks
+   visual regressions across the playlist grid. The re-declaration is
+   additive and documented here rather than merged blind.
+   stylelint-disable no-duplicate-selectors */
 .playlist-frame {
   max-width: 1040px;
 }
@@ -5805,6 +5778,8 @@ a.pl-add-row:hover {
 .pl-caret[aria-expanded="true"] {
   transform: rotate(90deg);
 }
+
+/* stylelint-enable no-duplicate-selectors */
 
 /* Collapse thumb column on narrow viewports */
 @media (max-width: 720px) {
@@ -6146,6 +6121,7 @@ a.pl-add-row:hover {
    click-accessible region on the left. */
 .settings-panel .buttons-container #settings-form-status {
   margin-right: auto;
+  min-height: 1.25rem;
 }
 
 .settings-panel {
@@ -6161,10 +6137,6 @@ a.pl-add-row:hover {
   gap: 12px;
   padding-top: 12px;
   background: linear-gradient(180deg, transparent, color-mix(in srgb, var(--bg) 94%, transparent) 22%);
-}
-
-.settings-panel .buttons-container #settings-form-status {
-  min-height: 1.25rem;
 }
 
 .settings-panel .buttons-container #saveSettingsBtn {

@@ -11,6 +11,7 @@
             {% endif %}
         </div>
     </header>
+    {% if plugins %}
     <div class="plugins-container plugin-tile-grid">
         {% for plugin in plugins %}
         <a href="{{ url_for('plugin.plugin_page', plugin_id=plugin.id) }}" class="plugin-item plugin-tile"
@@ -36,9 +37,12 @@
             </span>
             <svg class="plugin-tile-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><polyline points="9 6 15 12 9 18"></polyline></svg>
         </a>
-        {% else %}
-        {{ empty_state('squares-four', 'No plugins available.', 'Check your installation.', compact=true) }}
         {% endfor %}
     </div>
+    {% else %}
+    {# Emit the empty state as a sibling of the grid so it spans the row
+       and isn't squeezed into a single grid cell. #}
+    {{ empty_state('squares-four', 'No plugins available.', 'Check your installation.', compact=true) }}
+    {% endif %}
 </section>
 {%- endmacro -%}

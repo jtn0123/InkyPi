@@ -2,9 +2,11 @@
 
 Captured on April 20, 2026 from:
 
-- Handoff reference: `/tmp/inkypi_handoff_compare/update-to-inkypi/project`
-- Current worktree: `claude/infallible-montalcini-c71168`
-- Live app: `http://localhost:8080`
+- Handoff reference: `<handoff-reference-path>` (local copy of the
+  `update-to-inkypi/project` export)
+- Current worktree: `<current-branch>` (the branch this report was generated
+  against — commit captured in git history)
+- Live app: `<dev-app-url>` (Flask dev server, typically `http://localhost:8080`)
 
 This comparison is visual first. Some differences are state-driven rather than layout-driven:
 

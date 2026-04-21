@@ -329,6 +329,7 @@
    click-accessible region on the left. */
 .settings-panel .buttons-container #settings-form-status {
   margin-right: auto;
+  min-height: 1.25rem;
 }
 
 .settings-panel {
@@ -344,10 +345,6 @@
   gap: 12px;
   padding-top: 12px;
   background: linear-gradient(180deg, transparent, color-mix(in srgb, var(--bg) 94%, transparent) 22%);
-}
-
-.settings-panel .buttons-container #settings-form-status {
-  min-height: 1.25rem;
 }
 
 .settings-panel .buttons-container #saveSettingsBtn {

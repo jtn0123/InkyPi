@@ -448,6 +448,13 @@ svg.icon-thin {
     font-weight: var(--font-medium);
 }
 
+/* Breadcrumb is still rendered in the DOM on these pages (the shared
+   pageheader macro emits it) and unit tests assert the markup is present
+   (see tests/integration/test_breadcrumbs.py). The sidebar shell provides
+   "Home" and a page-title eyebrow for shell-layout pages, so the breadcrumb
+   is visually redundant there and we hide it rather than conditionally
+   omit from the template — keeping the landmark available to assistive tech
+   that opts into navigation via hidden-navigation affordances. */
 body[data-page="playlist"] .breadcrumb,
 body[data-page="plugin"] .breadcrumb,
 body[data-page="settings"] .breadcrumb,

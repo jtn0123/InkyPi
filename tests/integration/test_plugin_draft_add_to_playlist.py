@@ -95,7 +95,13 @@ def test_draft_add_to_playlist_button_reveals_schedule_tab_with_real_handlers(cl
             """)
 
         # Click the DRAFT-state "Add to Playlist" button.
-        page.click('button[data-plugin-subtab-target="schedule"]')
+        # Target the DRAFT-marked Add-to-Playlist trigger specifically. The
+        # Schedule subtab button itself also matches
+        # `[data-plugin-subtab-target="schedule"]`, so without the draft
+        # marker this test could pass without exercising the DRAFT click path.
+        page.click(
+            'button[data-plugin-draft="true"][data-plugin-subtab-target="schedule"]'
+        )
 
         page.wait_for_timeout(250)
         is_active = page.evaluate(
@@ -155,7 +161,13 @@ def test_draft_add_to_playlist_click_surfaces_failure_if_schedule_panel_missing(
             window.InkyPiPluginPage.create(window.__INKYPI_PLUGIN_BOOT__).init();
             """)
 
-        page.click('button[data-plugin-subtab-target="schedule"]')
+        # Target the DRAFT-marked Add-to-Playlist trigger specifically. The
+        # Schedule subtab button itself also matches
+        # `[data-plugin-subtab-target="schedule"]`, so without the draft
+        # marker this test could pass without exercising the DRAFT click path.
+        page.click(
+            'button[data-plugin-draft="true"][data-plugin-subtab-target="schedule"]'
+        )
         page.wait_for_timeout(400)
 
         # A visible toast or response modal must surface actionable feedback —

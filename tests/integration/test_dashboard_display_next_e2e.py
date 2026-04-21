@@ -175,7 +175,15 @@ def test_quick_switch_sends_playlist_request(
     switch_btn = page.locator('button[data-quick-switch-button][data-playlist-name="Focus"]')
     switch_btn.wait_for(state="visible", timeout=5000)
     switch_btn.click()
-    page.wait_for_timeout(1000)
+
+    # Wait for the observable condition — the fetch call we expect to land —
+    # instead of a fixed 1s sleep that can race on slow CI.
+    page.wait_for_function(
+        """() => (window.__fetchCalls || []).some(
+            c => (c.url || '').includes('display_next_in_playlist')
+        )""",
+        timeout=5000,
+    )
 
     calls = page.evaluate("() => window.__fetchCalls || []")
     quick_switch_calls = [
@@ -236,7 +244,15 @@ def test_refresh_cell_shows_forward_looking_eta(
     }""")
 
     page.locator("#dashboardRefreshBtn").click()
-    page.wait_for_timeout(500)
+
+    # Wait for the hero refresh cell to reflect the stubbed ETA instead of
+    # polling after a fixed 500ms. The mocked fetch resolves synchronously
+    # but the DOM update is scheduled via a rAF.
+    page.locator("#heroRefreshValue").wait_for(state="visible", timeout=5000)
+    page.wait_for_function(
+        "() => document.getElementById('heroRefreshValue')?.textContent === 'in 3m'",
+        timeout=5000,
+    )
 
     assert page.locator("#heroRefreshValue").text_content() == "in 3m"
     refresh_meta = page.locator("#heroRefreshMeta").text_content()

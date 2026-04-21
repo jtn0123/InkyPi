@@ -1,9 +1,10 @@
 .dashboard-hero {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(280px, 320px);
-  gap: 16px;
+  /* Handoff parity: 12px inter-card gap, 14px bottom margin (was 16/var). */
+  gap: 12px;
   align-items: start;
-  margin-bottom: var(--spacing-xl);
+  margin-bottom: 14px;
 }
 
 .dashboard-stage,
@@ -28,7 +29,8 @@
 
 .dashboard-stage {
   display: grid;
-  gap: 12px;
+  /* Handoff parity: tighter vertical rhythm inside the hero stage. */
+  gap: 10px;
 }
 
 /* Refined hero KPI strip shown below the preview image — mono labels,
@@ -168,7 +170,13 @@
   min-width: 0;
 }
 
-.dashboard-stage-copy,
+.dashboard-stage-copy {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: var(--text-3);
+}
+
 .storage-card-copy {
   color: var(--text-secondary);
   font-size: 0.92rem;
@@ -177,7 +185,9 @@
 
 .dashboard-overview {
   display: grid;
-  gap: 12px;
+  /* Handoff parity: tighter 8px stack, align cards to the top. */
+  gap: 8px;
+  align-content: start;
 }
 
 .dashboard-status-card {
@@ -372,30 +382,33 @@
     width: var(--meter-width, 0%);
 }
 
+/* Handoff parity: the empty state reads as a compact inline banner (row,
+   solid border, tighter padding) rather than a large centered card. */
 .dashboard-overview-empty {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
-  justify-content: center;
-  gap: 12px;
-  padding: 32px 20px;
-  border: 1px dashed var(--surface-border);
+  justify-content: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--surface-border);
   border-radius: var(--border-radius-lg);
+  background: var(--surface-2);
   color: var(--text-secondary);
-  text-align: center;
-  min-height: 120px;
+  text-align: left;
+  min-height: 0;
 }
 
 .dashboard-overview-empty .empty-state-icon {
-  width: var(--icon-xl, 32px);
-  height: var(--icon-xl, 32px);
-  opacity: 0.5;
+  width: 18px;
+  height: 18px;
+  opacity: 0.7;
 }
 
 .dashboard-overview-empty p {
   margin: 0;
-  font-size: 0.9rem;
-  max-width: 24ch;
+  font-size: 0.82rem;
+  max-width: none;
 }
 
 .icon-fallback {
@@ -411,15 +424,16 @@
   border-radius: var(--border-radius-md);
 }
 
-/* Quick switch playlist card (dashboard aside) */
+/* Quick switch playlist card (dashboard aside). Padding/gap tightened to
+   handoff parity spec (12px 14px / 8px gap). */
 .quick-switch-card {
   background: var(--surface);
   border: 1px solid var(--surface-border);
   border-radius: var(--border-radius-lg);
-  padding: 14px;
+  padding: 12px 14px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
 
 .quick-switch-head {
@@ -600,48 +614,8 @@ a.quick-row-link:hover {
   border-color: var(--accent-hover);
 }
 
-.dashboard-hero {
-  gap: 12px;
-  margin-bottom: 14px;
-}
-
-.dashboard-stage {
-  gap: 10px;
-}
-
-.dashboard-stage-copy {
-  margin: 0;
-  font-size: 0.82rem;
-  color: var(--text-3);
-}
-
-.dashboard-overview {
-  gap: 8px;
-  align-content: start;
-}
-
-.dashboard-overview-empty {
-  min-height: 0;
-  padding: 12px 14px;
-  flex-direction: row;
-  justify-content: flex-start;
-  gap: 10px;
-  text-align: left;
-  background: var(--surface-2);
-  border-style: solid;
-}
-
-.dashboard-overview-empty .empty-state-icon {
-  width: 18px;
-  height: 18px;
-  opacity: 0.7;
-}
-
-.dashboard-overview-empty p {
-  max-width: none;
-  font-size: 0.82rem;
-}
-
+/* The compact empty-state variant is used where the overview banner sits
+   inline with a live card rather than as its own card. */
 .dashboard-overview-empty.is-compact {
   padding: 6px 0 0;
   background: transparent;
@@ -658,11 +632,6 @@ a.quick-row-link:hover {
 
 .dashboard-overview-empty.is-compact p {
   font-size: 0.78rem;
-}
-
-.quick-switch-card {
-  padding: 12px 14px;
-  gap: 8px;
 }
 
 #plugins-grid {

@@ -7,23 +7,23 @@
     <main id="main-content" role="main" tabindex="-1" class="page-shell page-shell-dashboard" data-page-shell="dashboard">
     <div class="frame">
         {% from 'macros/icons.html' import icon, theme_toggle, breadcrumb %}
+        {% from 'macros/pageheader.html' import pageheader %}
         {{ breadcrumb([{'label': 'Home', 'url': url_for('main.main_page')}, {'label': 'Error Logs'}]) }}
-        <header class="pageheader">
-            <div class="pageheader-main">
-                <div class="eyebrow">Diagnostics</div>
-                <h1 class="page-title">Error Logs</h1>
-                <p class="page-desc">Browser-side error and warning reports captured from this session. Use this page to diagnose client-side failures.</p>
-                <div class="page-meta">
-                    <span class="status-chip {% if reports %}warn{% else %}info{% endif %}">{{ reports | length }} report{{ 's' if reports | length != 1 else '' }}</span>
-                </div>
-            </div>
-            <div class="pageheader-actions">
-                {# data-test-skip-click: opens destructive confirm modal #}
-                <button id="errorsClearBtn" class="header-button is-danger" type="button"
-                        {% if not reports %}disabled{% endif %}
-                        data-test-skip-click="true">Clear All</button>
-            </div>
-        </header>
+        {% set _report_count = reports | length %}
+        {% call pageheader(
+            title='Error Logs',
+            description='Browser-side error and warning reports captured from this session. Use this page to diagnose client-side failures.',
+            eyebrow='Diagnostics',
+            chips=[{
+                'label': _report_count ~ ' report' ~ ('s' if _report_count != 1 else ''),
+                'variant': 'warn' if reports else 'info',
+            }]
+        ) %}
+            {# data-test-skip-click: opens destructive confirm modal #}
+            <button id="errorsClearBtn" class="header-button is-danger" type="button"
+                    {% if not reports %}disabled{% endif %}
+                    data-test-skip-click="true">Clear All</button>
+        {% endcall %}
 
         <div id="errorsEmptyState" {% if reports %}hidden{% endif %} class="empty-state">
             <p>No error reports captured in this session.</p>

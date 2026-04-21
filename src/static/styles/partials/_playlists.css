@@ -456,7 +456,12 @@ a.pl-add-row:hover {
 }
 
 /* Visual parity pass: restore the handoff's rotation-card header/body split
-   and visible desktop controls instead of icon-only admin actions. */
+   and visible desktop controls instead of icon-only admin actions. This
+   block intentionally re-declares some selectors above as a focused
+   override layer; consolidating each pair into the earlier rule risks
+   visual regressions across the playlist grid. The re-declaration is
+   additive and documented here rather than merged blind.
+   stylelint-disable no-duplicate-selectors */
 .playlist-frame {
   max-width: 1040px;
 }
@@ -639,6 +644,8 @@ a.pl-add-row:hover {
 .pl-caret[aria-expanded="true"] {
   transform: rotate(90deg);
 }
+
+/* stylelint-enable no-duplicate-selectors */
 
 /* Collapse thumb column on narrow viewports */
 @media (max-width: 720px) {

@@ -576,12 +576,19 @@
 
     // Today KPI card — populated from /api/stats (24h window) + /api/health/system.
     async function refreshKpis() {
+      // Only manage the "ok"/"warn" state classes with classList so future
+      // base classes on the <dd id="kpi*"> elements (e.g. layout or
+      // typography utilities) aren't clobbered by state updates.
+      const KPI_STATE_CLASSES = ["ok", "warn"];
       const setText = (id, value, extraClass) => {
         const el = document.getElementById(id);
         if (!el) return;
         el.textContent = value;
         if (extraClass !== undefined) {
-          el.className = extraClass ? `${extraClass}` : "";
+          el.classList.remove(...KPI_STATE_CLASSES);
+          if (extraClass) {
+            el.classList.add(extraClass);
+          }
         }
       };
       const setStatus = (value) => {

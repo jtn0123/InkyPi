@@ -137,9 +137,17 @@ def _format_sidebar_refresh_time(
         return "just now"
     if diff_minutes < 60:
         return f"{int(diff_minutes)} min ago"
-    if diff_seconds < 60 * 60 * 24:
+
+    # Bucket "today"/"yesterday" by local calendar date rather than elapsed
+    # seconds. The naive `< 24h` / `< 48h` check mis-labels an 8am refresh of
+    # a 23:00-last-night event as "today at 11:00 PM" (it's actually
+    # yesterday), and misses cross-DST boundaries. Anchor off the local date.
+    today_local = now_dt.date()
+    refresh_date = refresh_local.date()
+    days_ago = (today_local - refresh_date).days
+    if days_ago <= 0:
         return "today at " + refresh_local.strftime("%I:%M %p").lstrip("0")
-    if diff_seconds < 60 * 60 * 48:
+    if days_ago == 1:
         return "yesterday at " + refresh_local.strftime("%I:%M %p").lstrip("0")
     return refresh_local.strftime("%b %d at %I:%M %p").replace(" 0", " ")
 
@@ -412,21 +420,37 @@ def create_app():
 
     app.config["APP_VERSION"] = _read_version()
 
+    # Cache static-file mtime lookups so the per-request context processor does
+    # not hit the filesystem for every static URL it renders. The templates call
+    # `url_for('static', filename=...)` dozens of times per page; without this
+    # cache, each call triggers a fresh `stat()` syscall. Bust the cache on
+    # process restart (good enough for release-keyed URL versioning).
+    _static_mtime_cache: dict[str, str] = {}
+
     @app.context_processor
     def _inject_app_version():
         version = app.config["APP_VERSION"]
+
+        def _lookup_static_version(filename: str) -> str:
+            cached = _static_mtime_cache.get(filename)
+            if cached is not None:
+                return cached
+            static_path = Path(app.static_folder) / filename
+            try:
+                if static_path.is_file():
+                    token = f"{version}-{int(static_path.stat().st_mtime)}"
+                else:
+                    token = version
+            except OSError:
+                token = version
+            _static_mtime_cache[filename] = token
+            return token
 
         def versioned_url_for(endpoint, **values):
             if endpoint == "static":
                 filename = values.get("filename")
                 if filename:
-                    static_path = Path(app.static_folder) / filename
-                    if static_path.is_file():
-                        values.setdefault(
-                            "v", f"{version}-{int(static_path.stat().st_mtime)}"
-                        )
-                    else:
-                        values.setdefault("v", version)
+                    values.setdefault("v", _lookup_static_version(filename))
                 else:
                     values.setdefault("v", version)
             return flask_url_for(endpoint, **values)

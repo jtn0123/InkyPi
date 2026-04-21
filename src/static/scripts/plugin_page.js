@@ -260,8 +260,25 @@
     }
 
     async function handleAction(action, triggerButton) {
-      if (action === "add_to_playlist" && !showPluginSubtab("schedule", { reportMissing: true })) {
-        return;
+      if (action === "add_to_playlist") {
+        // If the schedule panel is already visible (e.g. the user clicked the
+        // inline "Add to Playlist" button that lives at the bottom of
+        // scheduleForm), a side-effect-free existence check avoids the smooth
+        // scroll that would yank the user back to the top of the form
+        // mid-submit. Only switch/scroll the subtab when it isn't already
+        // active or is missing entirely.
+        const schedulePanel = document.querySelector(
+          '[data-plugin-subpanel="schedule"]'
+        );
+        if (!schedulePanel) {
+          // Panel missing — fall through to the full showPluginSubtab call so
+          // the "refresh the page" modal still surfaces via reportMissing.
+          showPluginSubtab("schedule", { reportMissing: true });
+          return;
+        }
+        if (schedulePanel.hidden) {
+          if (!showPluginSubtab("schedule", { reportMissing: true })) return;
+        }
       }
       if (!validateAddToPlaylistAction(action)) return;
 
@@ -801,20 +818,13 @@
         const opener = event.target.closest("[data-open-modal]");
         if (opener) openModal(opener.dataset.openModal, opener);
       });
-      // JTN-633: the DRAFT-state "Add to Playlist" button now routes into the
-      // inline Schedule tab. Keep a direct safeguard so the click can never
-      // silently no-op — if the schedule panel ever goes missing, the user
-      // gets clear feedback instead of nothing happening.
-      document.querySelectorAll('[data-plugin-draft="true"][data-plugin-subtab-target]').forEach((button) => {
-        button.addEventListener("click", (event) => {
-          if (button.disabled || button.getAttribute("aria-disabled") === "true") return;
-          const ok = showPluginSubtab(button.dataset.pluginSubtabTarget, {
-            focus: true,
-            reportMissing: true,
-          });
-          if (!ok) event.preventDefault();
-        });
-      });
+      // JTN-633: the DRAFT-state "Add to Playlist" button routes into the
+      // inline Schedule tab. The preceding loop (line 790) already matches
+      // `[data-plugin-subtab-target]` — which `[data-plugin-draft="true"]`
+      // buttons satisfy — and its `reportMissing: true` path already raises
+      // the missing-panel modal, so we intentionally don't bind a second
+      // handler here (it would double-fire setPluginSubtab, scrollIntoView,
+      // and the focus timeout on every draft click).
       document.querySelectorAll("[data-close-modal]").forEach((button) => {
         button.addEventListener("click", () => closeModal(button.dataset.closeModal));
       });

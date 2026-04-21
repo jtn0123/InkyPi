@@ -6,13 +6,17 @@
 {% endblock %}
 {% block body_attrs %} data-page="dashboard"{% endblock %}
 {% block body %}
+    {# pageheader macro is intentionally hand-rolled on this page (see the
+       <header class="pageheader"> block below) because the dashboard wraps
+       the action buttons in an extra container class that the shared macro
+       does not emit. If that drifts, consider migrating to `{% call
+       pageheader(...) %}` for consistency with the other pages in this PR. #}
     {% from 'macros/plugin_catalog.html' import plugin_catalog %}
     {% set plugin_names = {} %}
     {% for p in plugins %}{% if p.display_name %}{% set _ = plugin_names.update({p.id: p.display_name}) %}{% endif %}{% endfor %}
     <!-- Subtle frame container -->
     <div class="frame">
         {% from 'macros/icons.html' import icon, theme_toggle, empty_state %}
-        {% from 'macros/pageheader.html' import pageheader %}
         <header class="pageheader" role="banner">
             <div class="pageheader-main">
                 <div class="eyebrow">Dashboard</div>
@@ -209,8 +213,8 @@
         pushUrl: {{ (INKYPI_PUSH_URL if INKYPI_PUSH_URL is defined else url_for('events.sse_events')) | tojson }},
         quickSwitchUrl: {{ url_for('playlist.display_next_in_playlist') | tojson }},
         refreshInfoUrl: {{ url_for('main.refresh_info') | tojson }},
-        statsUrl: "/api/stats",
-        systemHealthUrl: "/api/health/system",
+        statsUrl: {{ url_for('stats.refresh_stats') | tojson }},
+        systemHealthUrl: {{ url_for('settings.health_system') | tojson }},
         resolution: {{ config.resolution | tojson }},
         cycleMinutes: {{ device_cycle_minutes | tojson }},
     };

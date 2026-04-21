@@ -51,10 +51,13 @@ def _current_dt(device_config):
 
 def _device_cycle_minutes(device_config):
     try:
-        return int(
-            int(device_config.get_config("plugin_cycle_interval_seconds", default=3600))
-            // 60
+        cycle_seconds = int(
+            device_config.get_config("plugin_cycle_interval_seconds", default=3600)
         )
+        # Mirror the playlist override clamp: avoid a zero-minute cycle (which
+        # would schedule the next refresh in the past and surface "Due now"
+        # immediately) for any configured interval below 60 seconds.
+        return max(1, cycle_seconds // 60)
     except Exception:
         return 60
 

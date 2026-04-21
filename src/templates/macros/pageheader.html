@@ -1,3 +1,12 @@
+{#- Shared page-header macro.
+
+    IMPORTANT — trust contract for `chips_html`:
+      `chips_html` is piped through `| safe`, bypassing Jinja autoescape. Any
+      caller passing user-influenced strings through this param opens an XSS
+      hole. Pass only pre-sanitized / trusted markup (e.g. strings built from
+      constant templates) through `chips_html`. For runtime / user data prefer
+      the structured `chips` list, whose fields are autoescaped below.
+-#}
 {%- macro pageheader(title, description=None, eyebrow=None, chips=None, chips_html=None, title_class=None, title_attr=None) -%}
 {#- role="banner" is explicit so the site-level <header> is still a landmark
     when the pageheader sits inside <main> on some pages. The axe test
@@ -14,7 +23,7 @@
         {% elif chips %}
         <div class="page-meta">
             {% for chip in chips %}
-            {% if chip.url %}<a href="{{ chip.url }}"{% if chip.id %} id="{{ chip.id }}"{% endif %} class="status-chip{% if chip.variant %} {{ chip.variant }}{% endif %}">{{ chip.label }}</a>
+            {% if chip.url %}<a href="{{ chip.url }}"{% if chip.id %} id="{{ chip.id }}"{% endif %} class="status-chip{% if chip.variant %} {{ chip.variant }}{% endif %}"{% if chip.title %} title="{{ chip.title }}"{% endif %}>{{ chip.label }}</a>
             {% else %}<span{% if chip.id %} id="{{ chip.id }}"{% endif %} class="status-chip{% if chip.variant %} {{ chip.variant }}{% endif %}"{% if chip.title %} title="{{ chip.title }}"{% endif %}>{{ chip.label }}</span>{% endif %}
             {% endfor %}
         </div>

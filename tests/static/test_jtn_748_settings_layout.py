@@ -1,5 +1,6 @@
 """Regression tests for the /settings layout fixes in JTN-748."""
 
+import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -21,7 +22,6 @@ def test_settings_summary_device_name_truncates_cleanly():
     # chip variant (info/neutral/accent) is an unrelated styling choice that
     # should be free to change with the design system. Assert both structural
     # classes appear on a single element without pinning to a variant.
-    import re
     chip_match = re.search(
         r'class="[^"]*\bstatus-chip\b[^"]*\bsettings-device-name\b[^"]*"',
         html,

@@ -3,8 +3,9 @@
 Date: 2026-04-20
 
 Context:
-Compare the real worktree at `/Users/justin/Documents/Github/InkyPi/.claude/worktrees/infallible-montalcini-c71168`
-against the prototype bundle from `/Users/justin/Downloads/Update to InkyPi-handoff.zip`.
+Compare the real worktree at `${REPO_ROOT}` (checked out to the
+`claude/infallible-montalcini-c71168` branch) against the prototype bundle
+from `<handoff-artifact-path>/Update to InkyPi-handoff.zip`.
 
 What already landed well:
 - Persistent sidebar shell and shared pageheader language

@@ -71,6 +71,11 @@ body[data-page="plugin"] .tweaks-panel {
   margin-bottom: 12px;
 }
 
+/* Match whichever heading level base.html renders (currently <h2>); keep
+   h3/h4 in scope so future refactors that restore the older heading level
+   don't silently drop the compact style. */
+.tweaks-head h2,
+.tweaks-head h3,
 .tweaks-head h4 {
   margin: 0;
   font-size: 0.78rem;

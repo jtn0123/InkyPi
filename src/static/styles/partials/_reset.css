@@ -27,9 +27,18 @@
     padding: 0;
 }
 
-/* Base body styling */
+/* Base body styling.
+ *
+ * Font stack notes: Inter / JetBrains Mono are preferred by the handoff
+ * design but we don't ship @font-face rules for them. On Raspberry Pi OS /
+ * Debian the device will not have them installed, so the stack intentionally
+ * resolves to `system-ui` (and Jost where available) for a legible native
+ * fallback. If/when we bundle Inter and JetBrains Mono WOFF2s under
+ * static/fonts/, add matching @font-face declarations above and the named
+ * families will start being used automatically.
+ */
 body {
-    font-family: var(--font-sans, 'Inter'), Jost, -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    font-family: var(--font-sans, system-ui), 'Inter', Jost, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     background-color: var(--bg);
     color: var(--text);
     line-height: 1.5;
@@ -45,7 +54,7 @@ code,
 pre,
 kbd,
 samp {
-    font-family: var(--font-mono, 'JetBrains Mono'), ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-family: var(--font-mono, ui-monospace), 'JetBrains Mono', SFMono-Regular, Menlo, monospace;
     font-feature-settings: 'ss01';
     letter-spacing: -0.01em;
 }
