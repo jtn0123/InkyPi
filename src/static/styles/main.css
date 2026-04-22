@@ -6295,6 +6295,7 @@ a.pl-add-row:hover {
     stroke: var(--icon-accent);
 }
 
+
 /* Settings console layout — handoff parity: 180px nav, 28px gap. */
 .settings-console-layout {
   display: grid;
