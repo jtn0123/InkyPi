@@ -332,12 +332,12 @@ def test_api_keys_responsive_css_reserves_short_viewport_sticky_rule_for_setting
         / "static"
         / "styles"
         / "partials"
-        / "_responsive.css"
+        / "_responsive-large.css"
     )
     content = css_path.read_text(encoding="utf-8")
     # Must keep the max-height: 860px media query for /settings.
     assert "max-height: 860px" in content, (
-        "JTN-599: _responsive.css must define a @media (max-height: 860px) "
+        "JTN-599: _responsive-large.css must define a @media (max-height: 860px) "
         "rule to pin the Settings save button on short laptop screens."
     )
     assert ".settings-panel .buttons-container" in content

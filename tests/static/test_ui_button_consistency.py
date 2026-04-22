@@ -8,7 +8,7 @@ SETTINGS_HTML = ROOT / "src" / "templates" / "settings.html"
 PLAYLIST_HTML = ROOT / "src" / "templates" / "playlist.html"
 BUTTON_CSS = ROOT / "src" / "static" / "styles" / "partials" / "_button.css"
 NAVIGATION_CSS = ROOT / "src" / "static" / "styles" / "partials" / "_navigation.css"
-PLAYLISTS_CSS = ROOT / "src" / "static" / "styles" / "partials" / "_playlists.css"
+PLAYLISTS_CSS = ROOT / "src" / "static" / "styles" / "partials" / "_playlist-item.css"
 CSS_COMMENT_RE = re.compile(r"/\*.*?\*/", re.S)
 
 
