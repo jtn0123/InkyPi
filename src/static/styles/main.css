@@ -597,6 +597,8 @@ main[data-page-shell="workflow"] .frame {
 
 .status-card.instance .status-body {
     min-height: 56px;
+    overflow: visible;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 .status-body img { max-width: 100%; max-height: 160px; display: block; }
 
@@ -619,10 +621,6 @@ main[data-page-shell="workflow"] .frame {
 }
 
 /* Status card image hover feedback */
-.status-card.instance .status-body {
-    transition: border-color 0.2s ease, box-shadow 0.2s ease;
-}
-
 .status-card.instance .status-body:hover {
     border-color: var(--accent);
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
@@ -633,7 +631,6 @@ main[data-page-shell="workflow"] .frame {
 }
 
 /* Full, non-cropped instance preview */
-.status-card.instance .status-body { overflow: visible; }
 .status-card.instance .status-body img { width: 100%; height: auto; max-height: none; object-fit: contain; }
 
 .status-placeholder {
@@ -7602,7 +7599,6 @@ body[data-page="settings"] .settings-device-name {
 }
 
 .progress-skeleton .skeleton-progress-step.active .skeleton-step-indicator {
-    background: var(--primary);
     background: linear-gradient(
         90deg,
         var(--skeleton-base, rgba(0,0,0,0.06)) 25%,
@@ -9013,14 +9009,13 @@ details[open] > .update-release-notes-toggle::before {
 }
 .tooltip{visibility: hidden;}
 .tooltip-text{visibility: visible;}
-.live-preview-overlay{backdrop-filter: blur(4px); background: rgba(0,0,0,0.4);}
+.live-preview-overlay{backdrop-filter: blur(4px); background: rgba(0,0,0,0.4); bottom: 20px;}
 @keyframes slide-in-from-right{from{opacity:0;}to{opacity:1;}}
 @keyframes slide-in-from-bottom{from{opacity:0;}to{opacity:1;}}
 /* @keyframes slideInFromRight */
 /* @keyframes slideInFromBottom */
 /* Enhanced Typography Hierarchy */
 /* Mobile adjustments for live preview */
-.live-preview-overlay{bottom: 20px;}
 .live-preview-content{flex-direction: row;}
 
 /* SVG close icon for modal close buttons */
@@ -9319,7 +9314,7 @@ body[data-page="api-keys"] .status-popover {
   margin: -1px;
   overflow: hidden;
   clip: rect(0, 0, 0, 0);
-  white-space: nowrap; /* added line */
+  white-space: nowrap;
   border: 0;
 }
 

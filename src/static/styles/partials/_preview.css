@@ -55,6 +55,8 @@
 
 .status-card.instance .status-body {
     min-height: 56px;
+    overflow: visible;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 .status-body img { max-width: 100%; max-height: 160px; display: block; }
 
@@ -77,10 +79,6 @@
 }
 
 /* Status card image hover feedback */
-.status-card.instance .status-body {
-    transition: border-color 0.2s ease, box-shadow 0.2s ease;
-}
-
 .status-card.instance .status-body:hover {
     border-color: var(--accent);
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
@@ -91,7 +89,6 @@
 }
 
 /* Full, non-cropped instance preview */
-.status-card.instance .status-body { overflow: visible; }
 .status-card.instance .status-body img { width: 100%; height: auto; max-height: none; object-fit: contain; }
 
 .status-placeholder {

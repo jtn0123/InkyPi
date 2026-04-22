@@ -8,7 +8,7 @@ SETTINGS_HTML = ROOT / "src" / "templates" / "settings.html"
 PLAYLIST_HTML = ROOT / "src" / "templates" / "playlist.html"
 BUTTON_CSS = ROOT / "src" / "static" / "styles" / "partials" / "_button.css"
 NAVIGATION_CSS = ROOT / "src" / "static" / "styles" / "partials" / "_navigation.css"
-PLAYLISTS_CSS = ROOT / "src" / "static" / "styles" / "partials" / "_playlist-item.css"
+PLAYLIST_ITEM_CSS = ROOT / "src" / "static" / "styles" / "partials" / "_playlist-item.css"
 CSS_COMMENT_RE = re.compile(r"/\*.*?\*/", re.S)
 
 
@@ -75,7 +75,7 @@ def test_secondary_button_styles_share_surface_treatment_and_compact_scale():
 
 
 def test_playlist_add_row_reads_as_clickable_recovery_action():
-    css = PLAYLISTS_CSS.read_text(encoding="utf-8")
+    css = PLAYLIST_ITEM_CSS.read_text(encoding="utf-8")
     add_row = _css_block(css, ".pl-add-row")
 
     assert ".pl-add-row" in css

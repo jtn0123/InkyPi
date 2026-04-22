@@ -254,7 +254,6 @@
 }
 
 .progress-skeleton .skeleton-progress-step.active .skeleton-step-indicator {
-    background: var(--primary);
     background: linear-gradient(
         90deg,
         var(--skeleton-base, rgba(0,0,0,0.06)) 25%,
