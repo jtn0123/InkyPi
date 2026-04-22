@@ -5422,6 +5422,7 @@ body[data-page="plugin"] .workflow-help p {
     gap: 8px;
 }
 
+
 /* =============== Refined playlist row (.pl-item) ===============
    5-col grid: drag · icon tile · main · inline thumb · actions.
    Applied additively on playlist plugin rows. */
