@@ -156,10 +156,14 @@ def test_main_css_contains_toggle_styles(client):
 
     # Check for toggle switch styling
     assert ".toggle-container" in css_content
-    assert ".toggle-checkbox" in css_content
-    assert ".toggle-checkbox:checked" in css_content
-    assert ".toggle-checkbox::before" in css_content
+    assert 'input[type="checkbox"].toggle-checkbox' in css_content
+    assert ".toggle-checkbox:checked + .toggle-label" in css_content
+    assert ".toggle-checkbox:focus-visible + .toggle-label" in css_content
+    assert ".toggle-label::before" in css_content
     assert "appearance: none" in css_content
+    assert "opacity: 0" in css_content
+    assert "pointer-events: none" in css_content
+    assert ".form-group.nowrap:not(.toggle-row) > *" in css_content
 
 
 def test_main_css_contains_responsive_design(client):

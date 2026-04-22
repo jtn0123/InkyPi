@@ -368,14 +368,15 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  min-height: 32px;
-  padding: 5px 10px;
-  font-size: 0.78rem;
+  min-height: 36px;
+  padding: 7px 12px;
+  font-size: 0.82rem;
 }
 
 .playlist-row-display-btn .action-button-label {
   display: inline;
-  font-size: 0.78rem;
+  font-size: 0.82rem;
+  font-weight: 600;
 }
 
 .playlist-row-display-btn .action-icon,
@@ -385,9 +386,9 @@
 }
 
 .playlist-row-icon-btn {
-  width: 32px;
-  height: 32px;
-  min-height: 32px;
+  width: 36px;
+  height: 36px;
+  min-height: 36px;
   padding: 0;
   display: inline-flex;
   align-items: center;
@@ -433,26 +434,32 @@
 .pl-add-row,
 a.pl-add-row:link,
 a.pl-add-row:visited {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 9px 12px;
+  min-height: 44px;
+  padding: 10px 14px;
   width: 100%;
-  color: var(--text-3);
-  background: transparent;
-  border: 1px dashed var(--surface-border);
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--surface-border);
   border-radius: var(--border-radius-md);
-  font-size: 0.78rem;
+  font-size: 0.82rem;
+  font-weight: 600;
   cursor: pointer;
   text-decoration: none;
-  transition: color 0.15s ease, border-color 0.15s ease;
+  box-shadow: var(--shadow-xs);
+  transition: color 0.15s ease, border-color 0.15s ease, background-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
 }
 
 .pl-add-row:hover,
 a.pl-add-row:hover {
-  color: var(--accent);
-  border-color: var(--accent);
+  color: var(--text);
+  background: var(--surface-2);
+  border-color: var(--border-strong, var(--surface-border));
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
 }
 
 /* Visual parity pass: restore the handoff's rotation-card header/body split
@@ -531,19 +538,22 @@ a.pl-add-row:hover {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  min-height: 32px;
-  padding: 5px 9px;
-  font-size: 0.78rem;
+  min-height: 36px;
+  padding: 7px 12px;
+  font-size: 0.82rem;
 }
 
 .playlist-toolbar .run-next-btn .action-button-label,
 .playlist-toolbar .playlist-secondary-button .action-button-label {
   display: inline;
-  font-size: 0.78rem;
+  font-size: 0.82rem;
+  font-weight: 600;
 }
 
 .playlist-secondary-button.is-icon-only {
-  padding: 6px 7px;
+  width: 36px;
+  min-width: 36px;
+  padding: 0;
 }
 
 .playlist-secondary-button .btn-leading-icon,

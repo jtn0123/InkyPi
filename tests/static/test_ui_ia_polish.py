@@ -3,7 +3,9 @@
 
 from pathlib import Path
 
+ROOT = Path(__file__).resolve().parents[2]
 _STYLES_DIR = Path(__file__).resolve().parents[2] / "src" / "static" / "styles"
+SETTINGS_HTML = ROOT / "src" / "templates" / "settings.html"
 
 
 def _read_all_css() -> str:
@@ -52,14 +54,18 @@ def test_main_css_contains_new_ia_polish_classes(client):
     assert ".section-focus" in css
 
 
-def test_settings_logs_toggle_respects_safe_area(client):
-    """JTN-339: Show Logs floating action must clear the iOS safe area
-    and the settings page must reserve bottom padding so the toggle
-    never covers the last in-flow action on narrow mobile viewports."""
+def test_settings_logs_toggle_shares_action_bar_and_mobile_stays_in_flow(client):
+    """The live-logs action should share the settings footer and avoid
+    reintroducing the old fixed mobile FAB contract."""
     css = _read_all_css()
+    html = SETTINGS_HTML.read_text(encoding="utf-8")
 
     assert ".settings-logs-toggle" in css
-    # Floating button accounts for the iOS home indicator / chrome.
-    assert "env(safe-area-inset-bottom" in css
-    # Settings shell reserves bottom padding for the floating action.
-    assert ".page-shell-settings" in css
+    assert ".page-shell-settings .settings-logs-toggle" not in css
+    assert "@media (max-height: 860px) and (min-width: 769px)" in css
+    assert 'id="settings-form-status"' in html
+    assert 'id="settingsLogsToggle"' in html
+    assert 'id="saveSettingsBtn"' in html
+    assert html.index('id="settings-form-status"') < html.index(
+        'id="settingsLogsToggle"'
+    ) < html.index('id="saveSettingsBtn"')

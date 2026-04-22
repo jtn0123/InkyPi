@@ -91,10 +91,10 @@
           const isOpen = logsPanel.classList.toggle("is-open");
           if (isOpen) {
             logsPanel.removeAttribute("hidden");
-            // The logs panel now lives inside the "maintenance" tab and the
-            // "observability" collapsible (handoff parity layout). The floating
-            // "Show live logs" button needs to activate the tab and expand the
-            // collapsible so the viewer is actually rendered.
+            // The logs panel lives inside the "maintenance" tab and the
+            // "observability" collapsible (handoff parity layout). The footer
+            // action needs to activate the tab and expand the collapsible so
+            // the viewer is actually rendered.
             const parentTab = logsPanel.closest("[data-settings-panel]");
             if (parentTab?.dataset.settingsPanel) {
               setActiveTab(parentTab.dataset.settingsPanel);

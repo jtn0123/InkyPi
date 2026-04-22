@@ -605,27 +605,11 @@
     }
 
     .settings-panel .buttons-container {
-        position: sticky;
-        bottom: 8px;
-        z-index: 6;
-        padding-top: 8px;
-        background: linear-gradient(180deg, transparent, color-mix(in srgb, var(--bg) 94%, transparent) 22%);
-    }
-
-    .page-shell-settings {
-        padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px));
-    }
-
-    .page-shell-settings .settings-logs-toggle {
-        display: block;
-        position: fixed;
-        right: max(16px, env(safe-area-inset-right, 0px) + 8px);
-        bottom: max(74px, env(safe-area-inset-bottom, 0px) + 74px);
-        z-index: 10;
-        border-radius: 999px;
-        padding: 12px 18px;
-        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
-        margin: 0;
+        position: static;
+        bottom: auto;
+        z-index: auto;
+        padding-top: 16px;
+        background: none;
     }
 
     .title-stack {
@@ -986,10 +970,10 @@
 /* ── Short laptop viewports (JTN-572 / JTN-599) ──
    On common laptop screens shorter than ~860px (1280x800, 1366x768, 1280x768),
    the Save button at the bottom of /settings sits below the fold, and there is
-   no visible scroll affordance to reveal it. Pin the buttons container to the
-   bottom of the viewport so the primary action is always one click away
-   regardless of scroll position. */
-@media (max-height: 860px) {
+   no visible scroll affordance to reveal it. Keep the sticky treatment scoped
+   to desktop/tablet widths so phone-sized viewports keep the in-flow footer and
+   do not cover the last form fields. */
+@media (max-height: 860px) and (min-width: 769px) {
     .settings-panel .buttons-container {
         position: sticky;
         bottom: 8px;
