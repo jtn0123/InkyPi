@@ -7666,6 +7666,7 @@ body[data-page="settings"] .settings-device-name {
     opacity: 0.7;
 }
 
+
 /* Enhanced Progress Display */
 .enhanced-progress-header {
     display: flex;
@@ -7928,6 +7929,7 @@ body[data-page="settings"] .settings-device-name {
     color: var(--error);
     font-weight: 500;
 }
+
 
 /* API Validation Indicators */
 .api-validation-indicator {
@@ -8279,6 +8281,7 @@ body[data-page="settings"] .settings-device-name {
     color: var(--muted);
     font-size: 0.8rem;
 }
+
 
 /* Modal Styling */
 .modal {
@@ -8762,6 +8765,7 @@ details[open] > .update-release-notes-toggle::before {
 .success-failure-modal.failure {
     background-color: var(--error);
 }
+
 
 /* Request progress card — always visible in the plugin aside. */
 .progress-block {
