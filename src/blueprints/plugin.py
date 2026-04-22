@@ -34,6 +34,7 @@ from utils.form_utils import (
 from utils.http_utils import json_error, json_success
 from utils.messages import PLAYLIST_NAME_REQUIRED_ERROR
 from utils.plugin_errors import (
+    MANUAL_UPDATE_TIMEOUT_MSG,
     SCREENSHOT_BACKEND_UNAVAILABLE_MSG,
     ScreenshotBackendError,
 )
@@ -669,6 +670,27 @@ def _update_now_direct(plugin_id, plugin_settings, device_config, display_manage
                 status=503,
                 code="backend_unavailable",
             )
+        except TimeoutError as e:
+            # JTN-K4: ``refresh_task.manual_update`` raises TimeoutError
+            # when a plugin render exceeds INKYPI_PLUGIN_TIMEOUT_S (default
+            # 60s).  TimeoutError is NOT a RuntimeError subclass (inherits
+            # from OSError), so without this handler it falls through to
+            # the generic 500 ``internal_error`` below — unhelpful signal.
+            # Map it to a typed 504 ``manual_update_timeout`` so operators
+            # see a transient-retryable error, mirroring JTN-789's 503
+            # ``backend_unavailable`` pattern.
+            logger.warning(
+                "Plugin %s: manual update timed out",
+                sanitize_log_field(plugin_id),
+            )
+            _push_update_now_fallback(
+                plugin_id, plugin_config, device_config, display_manager, e
+            )
+            return json_error(
+                MANUAL_UPDATE_TIMEOUT_MSG,
+                status=504,
+                code="manual_update_timeout",
+            )
         except RuntimeError as e:
             # RuntimeError is raised by plugins to signal a user-actionable
             # failure (bad config, upstream API returned empty, etc.).  Do not
@@ -939,6 +961,24 @@ def update_now():
             SCREENSHOT_BACKEND_UNAVAILABLE_MSG,
             status=503,
             code="backend_unavailable",
+        )
+    except TimeoutError:
+        # JTN-K4: covers the alternate path where ``refresh_task.running``
+        # is True and ``manual_update`` re-raises TimeoutError from the
+        # subprocess worker (preserved via ``_remote_exception`` since the
+        # exception was added to the allow-list alongside JTN-789).
+        # Without this handler the exception falls through to the generic
+        # 500 ``internal_error`` below.  Message comes from a module
+        # constant so CodeQL ``py/stack-trace-exposure`` cannot taint
+        # exception text into the body.
+        logger.warning(
+            "update_now: manual update timed out for plugin %s",
+            sanitize_log_field(plugin_id or "?"),
+        )
+        return json_error(
+            MANUAL_UPDATE_TIMEOUT_MSG,
+            status=504,
+            code="manual_update_timeout",
         )
     except Exception as e:
         logger.exception("Error in update_now: %s", e)

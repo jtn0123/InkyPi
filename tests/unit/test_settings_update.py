@@ -34,6 +34,19 @@ class TestStartUpdate:
     def test_start_update_already_running(self, client, monkeypatch):
         """POST /settings/update returns 409 when update is already running."""
         import blueprints.settings as mod
+        from blueprints.settings import _updates as _updates_mod
+
+        # JTN-K3: POST now runs ``_auto_clear_stale_update_state`` before
+        # the conflict guard, which probes systemd for the recorded unit.
+        # On CI runners systemd is available but the fake unit name we set
+        # below does not exist, so the probe would treat it as "finished"
+        # and clear the state — erasing the 409 this test asserts.  Pin
+        # the probe to "still running" so we continue to exercise the
+        # conflict path without relying on implementation detail of the
+        # reaper.
+        monkeypatch.setattr(
+            _updates_mod, "_probe_finished_unit", lambda _unit: (False, False)
+        )
 
         mod._set_update_state(True, "inkypi-update-test.service")
         try:

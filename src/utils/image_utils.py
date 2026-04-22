@@ -556,6 +556,17 @@ def _run_browser_subprocess(
     so the caller can short-circuit without stringifying ``result``.
     ``transient`` is ``True`` for retryable errors (timeout) and ``False`` for
     deterministic ones (binary vanished between probe and run).
+
+    JTN-S2 cleanup model: chromium intentionally inherits the worker's
+    session/process group (no ``start_new_session``).  The worker calls
+    ``os.setsid()`` at startup, so chromium and all its zygote/renderer
+    descendants share the worker's pgid.  When the parent times the
+    worker out, ``RefreshTask._cleanup_subprocess`` does
+    ``killpg(worker.pid, SIGKILL)`` and the entire chromium tree goes
+    with it in one syscall.  The per-attempt SIGKILL below only signals
+    chromium itself; descendants are caught by the worker-level
+    cleanup.  Putting chromium in its own session here would put it
+    out of reach of that worker-level cleanup and leak the tree.
     """
     try:
         result = subprocess.run(command, capture_output=True, timeout=timeout_seconds)

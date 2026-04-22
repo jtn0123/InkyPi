@@ -58,6 +58,14 @@ def start_update():
         logger=_mod.logger,
         hint="Check update script availability and update process startup.",
     ):
+        # JTN-K3: If a prior update exited before the lockfile/trap machinery
+        # could clear ``_UPDATE_STATE["running"]`` (e.g. do_update.sh bailed
+        # during pre-checkout validation), the stale flag permanently blocks
+        # new updates with 409 until someone happens to hit GET
+        # /settings/update_status — which is the only place that ran the
+        # reaper.  Run the same reaper here so POST self-heals instead of
+        # forcing a manual GET first.
+        _auto_clear_stale_update_state()
         # Accept optional target tag from JSON body before acquiring the lock so
         # we can validate it without holding the lock longer than necessary.
         target_tag: str | None = None
@@ -97,12 +105,6 @@ def start_update():
                 )
 
         script_path = _mod._get_update_script_path()
-        # NOTE: the systemd unit name is now generated *inside*
-        # ``_start_update_via_systemd`` from a hardcoded literal prefix.
-        # We still mirror the same prefix here for the running-state breadcrumb
-        # surfaced via /settings/update_status — the value below is purely an
-        # in-process state hint and is never passed to subprocess.Popen.
-        unit = f"inkypi-update-{int(time.time())}"
         use_systemd = _mod._systemd_available()
 
         # Atomically check-and-set the running flag so concurrent requests
@@ -111,6 +113,12 @@ def start_update():
         #
         # NOTE: _set_update_state() also acquires _update_lock, so we inline
         # the state mutation here to avoid re-entering the non-reentrant lock.
+        # ``unit`` starts as None; on the systemd path we overwrite it with the
+        # real unit name returned by ``_start_update_via_systemd`` below so the
+        # reaper's ``systemctl is-active`` probe queries the actual unit.  The
+        # previous design generated a separate ``int(time.time())`` here and
+        # another inside the helper; the two could diverge by a second and the
+        # probe would query a non-existent unit, blocking the reaper.
         with _mod._update_lock:
             if _mod._UPDATE_STATE.get("running"):
                 # NOTE: ``running`` and ``unit`` are kept at the top level for
@@ -122,9 +130,8 @@ def start_update():
                 return jsonify(payload), 409
             # Flip the state while still holding the lock (inlined to avoid
             # re-acquiring the non-reentrant lock inside _set_update_state).
-            new_unit = f"{unit}.service" if use_systemd else None
             _mod._UPDATE_STATE["running"] = True
-            _mod._UPDATE_STATE["unit"] = new_unit
+            _mod._UPDATE_STATE["unit"] = None
             _mod._UPDATE_STATE["started_at"] = float(time.time())
 
         # Start the actual update process outside the lock (I/O-heavy, must not
@@ -134,8 +141,18 @@ def start_update():
                 # JTN-319: ``_start_update_via_systemd`` no longer accepts an
                 # external script path or unit name — both are derived from
                 # hardcoded constants inside the function so CodeQL can prove
-                # the Popen argv is not user-influenced.
-                _mod._start_update_via_systemd(target_tag=target_tag)
+                # the Popen argv is not user-influenced.  The function returns
+                # the real unit name it passed to systemd-run so we can record
+                # the same value in ``_UPDATE_STATE["unit"]`` without
+                # regenerating ``int(time.time())`` out of phase.
+                real_unit = _mod._start_update_via_systemd(target_tag=target_tag)
+                # Defensive: the contract is ``-> str`` but tests (and earlier
+                # callers) may mock this as returning None / MagicMock.  Only
+                # record the value when it's a real ``.service`` string so the
+                # reaper probe queries a valid systemd unit.
+                if isinstance(real_unit, str):
+                    with _mod._update_lock:
+                        _mod._UPDATE_STATE["unit"] = real_unit
             except Exception:
                 # If systemd-run fails unexpectedly, fall back to thread runner
                 _mod.logger.exception(
@@ -216,6 +233,36 @@ def _synthesize_failure_from_journal(unit: str) -> dict[str, object] | None:
     }
 
 
+def _compare_and_clear_update_state(unit: object, started_at: object) -> bool:
+    """Clear ``_UPDATE_STATE`` iff ``(unit, started_at)`` still matches.
+
+    Args are typed ``object`` to match the callers reading straight from
+    ``_UPDATE_STATE`` (whose values are stored loosely typed); the body
+    does only equality comparisons against the dict, so no narrowing is
+    needed.
+
+    Returns True if the state was cleared; False if a concurrent POST
+    replaced the snapshot and the reaper must leave it alone.
+    """
+    with _mod._update_lock:
+        if (
+            _mod._UPDATE_STATE.get("running")
+            and _mod._UPDATE_STATE.get("unit") == unit
+            and _mod._UPDATE_STATE.get("started_at") == started_at
+        ):
+            # Preserve the last_unit breadcrumb when unit is None (timeout
+            # path with no systemd unit name on file) — matches
+            # ``_set_update_state(False, None)`` which also leaves last_unit
+            # alone so the UI can still surface the previous run's label.
+            if unit is not None:
+                _mod._UPDATE_STATE["last_unit"] = unit
+            _mod._UPDATE_STATE["running"] = False
+            _mod._UPDATE_STATE["unit"] = None
+            _mod._UPDATE_STATE["started_at"] = None
+            return True
+        return False
+
+
 def _auto_clear_stale_update_state() -> tuple[str | None, bool]:
     """Clear ``_UPDATE_STATE`` when the transient systemd unit has finished.
 
@@ -226,6 +273,15 @@ def _auto_clear_stale_update_state() -> tuple[str | None, bool]:
     the unit whose completion triggered the clear, returned ONLY when the
     unit ended in ``failed`` state (for the journal-synthesis fallback).
     ``None`` when nothing needed clearing or the unit succeeded.
+
+    JTN-K3: the clear is compare-and-clear under ``_update_lock`` — the
+    slow ``systemctl is-active`` probe happens outside the lock, but the
+    final mutation only fires if ``(running, unit, started_at)`` still
+    matches the snapshot we probed against.  Without this guard, two POSTs
+    to /settings/update can race: request A reads stale state and calls
+    the reaper, request B acquires the lock and starts a fresh update
+    between A's probe and A's clear, then A's clear erases B's freshly-set
+    running flag and the guard lets a third request start a second update.
     """
     if not _mod._UPDATE_STATE.get("running"):
         return None, False
@@ -237,21 +293,20 @@ def _auto_clear_stale_update_state() -> tuple[str | None, bool]:
 
     cleared = False
     if unit and _mod._systemd_available():
-        cleared, unit_failed = _probe_finished_unit(unit)
-        if cleared:
-            _mod._UPDATE_STATE["last_unit"] = unit
-            _mod._set_update_state(False, None)
-            if unit_failed:
+        probe_cleared, unit_failed = _probe_finished_unit(unit)
+        if probe_cleared:
+            cleared = _compare_and_clear_update_state(unit, started_at)
+            if cleared and unit_failed:
                 failed_name = unit
 
-    # Timeout fallback: force-clear if started >30 min ago.
+    # Timeout fallback: force-clear if started >30 min ago.  Same
+    # compare-and-clear discipline so we never stomp on a fresh start.
     if (
         not cleared
         and started_at
         and (time.time() - float(started_at)) > _mod._UPDATE_TIMEOUT_SECONDS
     ):
-        _mod._UPDATE_STATE["last_unit"] = unit
-        _mod._set_update_state(False, None)
+        _compare_and_clear_update_state(unit, started_at)
 
     return failed_name, unit_failed
 
@@ -346,10 +401,12 @@ def start_rollback():
                 )
 
             use_systemd = _mod._systemd_available()
-            unit = f"inkypi-rollback-{int(time.time())}"
 
             # 3. TOCTOU-safe check-and-set — mirror start_update's pattern so two
-            #    concurrent rollback clicks can't both pass the guard.
+            #    concurrent rollback clicks can't both pass the guard.  ``unit``
+            #    is set to None inside the lock and overwritten below with the
+            #    actual value returned by ``_start_rollback_via_systemd`` (see
+            #    start_update for the rationale).
             with _mod._update_lock:
                 if _mod._UPDATE_STATE.get("running"):
                     response, _ = json_error(
@@ -359,14 +416,16 @@ def start_rollback():
                     payload["running"] = True
                     payload["unit"] = _mod._UPDATE_STATE.get("unit")
                     return jsonify(payload), 409
-                new_unit = f"{unit}.service" if use_systemd else None
                 _mod._UPDATE_STATE["running"] = True
-                _mod._UPDATE_STATE["unit"] = new_unit
+                _mod._UPDATE_STATE["unit"] = None
                 _mod._UPDATE_STATE["started_at"] = float(time.time())
 
             if use_systemd:
                 try:
-                    _mod._start_rollback_via_systemd()
+                    real_unit = _mod._start_rollback_via_systemd()
+                    if isinstance(real_unit, str):
+                        with _mod._update_lock:
+                            _mod._UPDATE_STATE["unit"] = real_unit
                 except Exception:
                     _mod.logger.exception(
                         "systemd-run failed for rollback; clearing running state"

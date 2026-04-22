@@ -244,5 +244,206 @@ class TestDirtyGeneratedCssDoesNotBlockCheckout:
         )
 
 
+class TestK2SafeDirectoryAndAutoStash:
+    """JTN-K2: do_update.sh must work when run as a different uid than the
+    repo owner (dev-install case where the repo lives at /home/$user/InkyPi
+    but the update runs as root via systemd-run) AND must not abort on a
+    dirty working tree with tracked-file modifications.
+    """
+
+    def _make_repo(self, root: Path) -> None:
+        """Minimal git repo with two semver tags, an install/ subdir with a
+        stub update.sh, and an ``origin`` remote pointing at itself so
+        ``git fetch origin`` succeeds offline.
+        """
+        subprocess.run(
+            ["git", "init", "-q", "-b", "main", str(root)],
+            check=True,
+            capture_output=True,
+        )
+        for k, v in (("user.email", "t@t"), ("user.name", "t")):
+            subprocess.run(
+                ["git", "-C", str(root), "config", k, v],
+                check=True,
+                capture_output=True,
+            )
+        # Tracked file we can dirty to exercise the auto-stash path.
+        (root / "src").mkdir()
+        tracked = root / "src" / "placeholder.txt"
+        tracked.write_text("v1\n")
+        # Also seed the generated-CSS path so the narrow JTN-787 reset
+        # still has something to target (keeps the two fixes orthogonal).
+        css_dir = root / "src" / "static" / "styles"
+        css_dir.mkdir(parents=True)
+        (css_dir / "main.css").write_text("/* v1 css */\n")
+        # Stub update.sh that exits 0 so do_update.sh's final exec is a no-op.
+        install_dir = root / "install"
+        install_dir.mkdir()
+        (install_dir / "update.sh").write_text(
+            "#!/bin/bash\necho 'stub update.sh'\nexit 0\n"
+        )
+        (install_dir / "update.sh").chmod(0o755)
+        subprocess.run(
+            ["git", "-C", str(root), "add", "-A"],
+            check=True,
+            capture_output=True,
+        )
+        subprocess.run(
+            ["git", "-C", str(root), "commit", "-q", "-m", "v0.0.1"],
+            check=True,
+            capture_output=True,
+        )
+        subprocess.run(
+            ["git", "-C", str(root), "tag", "v0.0.1"],
+            check=True,
+            capture_output=True,
+        )
+        tracked.write_text("v2\n")
+        subprocess.run(
+            ["git", "-C", str(root), "add", "-A"],
+            check=True,
+            capture_output=True,
+        )
+        subprocess.run(
+            ["git", "-C", str(root), "commit", "-q", "-m", "v0.0.2"],
+            check=True,
+            capture_output=True,
+        )
+        subprocess.run(
+            ["git", "-C", str(root), "tag", "v0.0.2"],
+            check=True,
+            capture_output=True,
+        )
+        subprocess.run(
+            ["git", "-C", str(root), "remote", "add", "origin", str(root)],
+            check=True,
+            capture_output=True,
+        )
+
+    def test_safe_directory_override_tolerates_dubious_ownership(
+        self, tmp_path: Path
+    ) -> None:
+        """Simulate the dev-install scenario where do_update.sh (running as
+        root via systemd-run) operates against a repo owned by another user.
+        Prior to K2, ``git rev-parse`` tripped CVE-2022-24765's ownership
+        guard and do_update.sh exited with "not a git repository".
+        """
+        _require_bash_git()
+
+        # Confirm this git build honours the test knob; skip if not.
+        probe_repo = tmp_path / "probe"
+        probe_repo.mkdir()
+        subprocess.run(
+            ["git", "init", "-q", str(probe_repo)], check=True, capture_output=True
+        )
+        probe = subprocess.run(
+            ["git", "-C", str(probe_repo), "rev-parse", "--git-dir"],
+            env={**os.environ, "GIT_TEST_ASSUME_DIFFERENT_OWNER": "1"},
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if probe.returncode == 0:
+            pytest.skip(
+                "this git build ignores GIT_TEST_ASSUME_DIFFERENT_OWNER; "
+                "cannot simulate CVE-2022-24765 ownership mismatch"
+            )
+        assert "dubious ownership" in (probe.stderr + probe.stdout).lower()
+
+        repo = tmp_path / "repo"
+        self._make_repo(repo)
+        state_dir = tmp_path / "state"
+        state_dir.mkdir()
+
+        proj = tmp_path / "proj"
+        proj.mkdir()
+        (proj / "src").symlink_to(repo / "src")
+
+        proc = _run(
+            {
+                "INKYPI_LOCKFILE_DIR": str(state_dir),
+                "PROJECT_DIR": str(proj),
+                "GIT_TEST_ASSUME_DIFFERENT_OWNER": "1",
+            },
+            args=["v0.0.1"],
+        )
+        combined = proc.stdout + proc.stderr
+        assert proc.returncode == 0, (
+            "JTN-K2 regression: do_update.sh rejected a repo owned by "
+            f"another user. rc={proc.returncode}\n{combined}"
+        )
+        # Neither the masking error nor the raw git warning should leak.
+        assert (
+            "not a git repository" not in combined
+        ), f"ownership guard masked as 'not a git repository': {combined!r}"
+        assert "dubious ownership" not in combined, (
+            "raw dubious-ownership warning reached the user — wrapper "
+            f"is missing the safe.directory override: {combined!r}"
+        )
+
+    def test_auto_stash_unblocks_checkout_with_dirty_tracked_file(
+        self, tmp_path: Path
+    ) -> None:
+        """Dev installs sometimes carry uncommitted tracked-file edits.
+        Prior to K2, ``git checkout <tag>`` aborted with "Your local
+        changes would be overwritten by checkout" and the update failed
+        with no clean recovery.  K2 adds an auto-stash before checkout
+        that preserves the edit in the stash list for later recovery.
+        """
+        _require_bash_git()
+        repo = tmp_path / "repo"
+        self._make_repo(repo)
+        state_dir = tmp_path / "state"
+        state_dir.mkdir()
+
+        # Pin HEAD at v0.0.1 then dirty a tracked file.  Asking for v0.0.2
+        # exercises the checkout path; tracked-file change is not in the
+        # narrow JTN-787 allowlist, so only auto-stash can unblock it.
+        subprocess.run(
+            ["git", "-C", str(repo), "checkout", "-q", "v0.0.1"],
+            check=True,
+            capture_output=True,
+        )
+        tracked = repo / "src" / "placeholder.txt"
+        tracked.write_text("LOCALLY_DIRTY\n")
+
+        proj = tmp_path / "proj"
+        proj.mkdir()
+        (proj / "src").symlink_to(repo / "src")
+
+        proc = _run(
+            {
+                "INKYPI_LOCKFILE_DIR": str(state_dir),
+                "PROJECT_DIR": str(proj),
+            },
+            args=["v0.0.2"],
+        )
+        combined = proc.stdout + proc.stderr
+        assert proc.returncode == 0, (
+            f"JTN-K2 regression: checkout aborted on dirty tracked file. "
+            f"rc={proc.returncode}\n{combined}"
+        )
+        assert "would be overwritten by checkout" not in combined
+        # Stash should hold the rescued edit for later recovery.
+        stash_list = subprocess.run(
+            ["git", "-C", str(repo), "stash", "list"],
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout
+        assert "auto-stash by do_update.sh" in stash_list, (
+            "auto-stash entry missing from stash list — user cannot "
+            f"recover their edits. stash list: {stash_list!r}"
+        )
+        # Checkout must actually land on v0.0.2, not silently stay at v0.0.1.
+        head_tag = subprocess.run(
+            ["git", "-C", str(repo), "describe", "--tags"],
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()
+        assert head_tag == "v0.0.2", f"expected HEAD at v0.0.2; got {head_tag!r}"
+
+
 if __name__ == "__main__":  # pragma: no cover
     sys.exit(pytest.main([__file__, "-v"]))

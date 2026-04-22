@@ -1,6 +1,5 @@
 """RefreshTask — main coordinator for display refresh operations."""
 
-import io
 import logging
 import os
 import queue
@@ -22,6 +21,7 @@ from refresh_task.worker import (
     _execute_refresh_attempt_worker,
     _get_mp_context,
     _remote_exception,
+    sweep_orphan_render_tempfiles,
 )
 from utils.event_bus import get_event_bus
 from utils.image_utils import compute_image_hash
@@ -108,6 +108,21 @@ class RefreshTask:
         """Starts the background thread for refreshing the display."""
         if not self.thread or not self.thread.is_alive():
             logger.info("Starting refresh task")
+            # Clean up any render tempfiles left behind by a prior crash.
+            # Harmless on tmpfs-backed /tmp (reboot already cleared them)
+            # but keeps disk-backed /tmp installs from accumulating orphans
+            # indefinitely.  Swallows all errors so a slow/unreadable tmpdir
+            # can never block service startup.
+            try:
+                deleted, bytes_freed = sweep_orphan_render_tempfiles()
+                if deleted:
+                    logger.info(
+                        "Swept %d orphan render tempfile(s), freed %d bytes",
+                        deleted,
+                        bytes_freed,
+                    )
+            except Exception as exc:  # noqa: BLE001  defensive — startup must not fail
+                logger.warning("Orphan render tempfile sweep failed: %s", exc)
             self.thread = threading.Thread(
                 target=self._run, daemon=True, name="RefreshTask"
             )
@@ -914,9 +929,46 @@ class RefreshTask:
     def _cleanup_subprocess(proc, plugin_id: str) -> None:
         """Terminate a subprocess that is still alive after its timeout.
 
-        Attempts graceful termination first, escalates to SIGKILL if needed,
-        and logs a warning if the process becomes a zombie.
+        JTN-S2: ``killpg(SIGKILL)`` the worker's process group up front,
+        before any terminate/join dance.  The worker calls ``os.setsid()``
+        at startup, so it is a session leader and its pgid equals its
+        pid; the chromium screenshot subprocess plus chromium's zygote /
+        renderer / utility descendants all inherit that same pgid.  Doing
+        the killpg BEFORE checking ``proc.is_alive()`` is critical — if
+        we only killpg "when the worker survives terminate", a worker
+        that exits gracefully on SIGTERM would skip the killpg entirely
+        and leave its chromium descendants reparented to PID 1.  That
+        was the on-device leak: 9 chromium processes survived per
+        timeout because the worker's own SIGTERM handler returned cleanly.
+
+        ``getpgid(0) != pgid`` guards against signaling our own group in
+        the (impossible-in-production) case where the worker never made
+        it past setsid.
         """
+        import signal as _signal
+
+        # 1. Take down the whole worker session up front — catches the
+        #    chromium tree before any of it can be reparented.
+        #    ``getpgid``/``killpg`` are POSIX-only; ``getattr`` guards the
+        #    Windows case so we silently fall through to the
+        #    terminate()/kill() fallback instead of raising AttributeError
+        #    (which the except below would not catch).
+        getpgid = getattr(os, "getpgid", None)
+        killpg = getattr(os, "killpg", None)
+        if callable(getpgid) and callable(killpg):
+            try:
+                pgid = getpgid(proc.pid)
+                # Signal is scoped to the worker's own session (the worker
+                # called ``setsid`` at startup) and guarded against our
+                # own pgid, so the only processes affected are the ones
+                # this refresh task spawned.  SonarCloud python:S4828.
+                if pgid != getpgid(0):
+                    killpg(pgid, _signal.SIGKILL)  # NOSONAR
+            except OSError:
+                # ProcessLookupError / PermissionError are OSError subclasses.
+                pass
+
+        # 2. Standard terminate/kill dance to reap the worker entry.
         proc.terminate()
         proc.join(timeout=2)
         if proc.is_alive():
@@ -951,8 +1003,20 @@ class RefreshTask:
         if payload.get("ok"):
             from PIL import Image
 
-            with Image.open(io.BytesIO(payload["image_bytes"])) as image:
-                result_image = image.copy()
+            # Worker writes PNG to a tempfile and passes the path via the
+            # queue (see worker.py for the pipe-buffer-deadlock rationale).
+            # Load into memory with image.copy() so we can unlink the
+            # underlying file immediately; the in-memory PIL.Image does
+            # not retain a reference to it.
+            image_path = payload["image_path"]
+            try:
+                with Image.open(image_path) as image:
+                    result_image = image.copy()
+            finally:
+                try:
+                    os.unlink(image_path)
+                except OSError:
+                    pass
             logger.info(
                 "plugin_lifecycle: attempt_success | plugin_id=%s attempt=%s",
                 plugin_id,

@@ -520,8 +520,15 @@ def _validate_update_script_path(script_path: str) -> str:
     return real
 
 
-def _start_update_via_systemd(target_tag: str | None = None) -> None:
+def _start_update_via_systemd(target_tag: str | None = None) -> str:
     """Launch the update script in a transient systemd unit.
+
+    Returns the ``inkypi-update-<ts>`` unit name actually passed to
+    systemd-run so the caller can record the real value in
+    ``_UPDATE_STATE["unit"]`` — previously the caller generated its own
+    ``int(time.time())`` unit breadcrumb and the two could differ by a
+    second, causing the reaper's ``systemctl is-active`` probe to query
+    a non-existent unit.
 
     Security (JTN-319 / CodeQL py/command-line-injection):
         All argv elements passed to ``subprocess.Popen`` are either string
@@ -572,6 +579,7 @@ def _start_update_via_systemd(target_tag: str | None = None) -> None:
     # All argv elements above are either string literals or have been
     # validated by the inline ``re.fullmatch`` guards / trusted-root check.
     subprocess.Popen(cmd)  # noqa: S603  # all inputs sanitized; shell=False
+    return f"{unit_name}.service"
 
 
 def _validate_rollback_script_path(script_path: str) -> str:
@@ -602,8 +610,12 @@ def _validate_rollback_script_path(script_path: str) -> str:
     return real
 
 
-def _start_rollback_via_systemd() -> None:
+def _start_rollback_via_systemd() -> str:
     """Launch rollback.sh in a transient systemd unit (JTN-708).
+
+    Returns the ``inkypi-rollback-<ts>.service`` unit name so callers can
+    record the real value in ``_UPDATE_STATE["unit"]`` instead of a
+    separately-generated breadcrumb (same fix as _start_update_via_systemd).
 
     Security posture mirrors ``_start_update_via_systemd``:
         * No caller-controlled values flow into argv — the script path is
@@ -645,6 +657,7 @@ def _start_rollback_via_systemd() -> None:
     ]
     # All argv elements above are string literals or validated internal values.
     subprocess.Popen(cmd)  # noqa: S603  # all inputs sanitized; shell=False
+    return f"{unit_name}.service"
 
 
 def _log_and_publish(msg: str, level: str = "info"):

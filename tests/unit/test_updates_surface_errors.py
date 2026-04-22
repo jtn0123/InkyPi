@@ -347,3 +347,83 @@ class TestReadLastUpdateFailureHelper:
         monkeypatch.setenv("INKYPI_LOCKFILE_DIR", str(tmp_path))
         # Oversized + unparseable content yields the parse_error sentinel.
         assert read_last_update_failure() == {"parse_error": True}
+
+
+class TestStartUpdateReapsStaleRunningState:
+    """JTN-K3: POST /settings/update must self-heal a stale ``running``
+    flag instead of permanently returning 409 when a prior update exited
+    before the lockfile/trap machinery could clear it.
+
+    Before the fix, only GET /settings/update_status ran the reaper;
+    clients that POSTed twice in a row would see 409 "Update already in
+    progress" referencing a unit that had been dead for hours.
+    """
+
+    def _install_mocks(self, monkeypatch):
+        import blueprints.settings as mod
+
+        monkeypatch.setattr(mod, "_systemd_available", lambda: False)
+        monkeypatch.setattr(mod, "_get_update_script_path", lambda: None)
+        fallback_mock = MagicMock()
+        monkeypatch.setattr(mod, "_start_update_fallback_thread", fallback_mock)
+        mod._set_update_state(False, None)
+        return mod, fallback_mock
+
+    def test_post_reaps_timed_out_running_state(self, client, monkeypatch):
+        """Pre-populate a >30 min old running state; POST must succeed.
+
+        Uses the timeout-fallback branch of ``_auto_clear_stale_update_state``
+        so the test does not need to mock systemd probes.
+        """
+        import time as _time
+
+        mod, fallback_mock = self._install_mocks(monkeypatch)
+        try:
+            # Simulate a prior update that died silently: running=True but
+            # started >30 min ago.  _UPDATE_TIMEOUT_SECONDS is the reaper's
+            # timeout-fallback threshold (1800s at time of writing).
+            stale_unit = "inkypi-update-stale.service"
+            mod._UPDATE_STATE["running"] = True
+            mod._UPDATE_STATE["unit"] = stale_unit
+            mod._UPDATE_STATE["started_at"] = float(
+                _time.time() - (mod._UPDATE_TIMEOUT_SECONDS + 60)
+            )
+
+            resp = client.post("/settings/update", json={})
+            assert resp.status_code == 200, (
+                "JTN-K3: POST must self-heal stale running state. "
+                f"status={resp.status_code} body={resp.get_json()!r}"
+            )
+            data = resp.get_json()
+            assert data["success"] is True
+            assert data["running"] is True
+            assert data["unit"] != stale_unit, "new unit must replace the stale one"
+            fallback_mock.assert_called_once()
+        finally:
+            mod._set_update_state(False, None)
+
+    def test_post_preserves_409_for_genuinely_active_update(self, client, monkeypatch):
+        """With a fresh running state (started just now), the reaper is a
+        no-op and the "already running" 409 still fires.  Prevents the
+        K3 fix from trampling a legitimate concurrent update.
+        """
+        import time as _time
+
+        mod, fallback_mock = self._install_mocks(monkeypatch)
+        try:
+            active_unit = "inkypi-update-active.service"
+            mod._UPDATE_STATE["running"] = True
+            mod._UPDATE_STATE["unit"] = active_unit
+            mod._UPDATE_STATE["started_at"] = float(_time.time() - 5)  # 5s ago
+
+            resp = client.post("/settings/update", json={})
+            assert resp.status_code == 409, (
+                "fresh running state must still return 409 (don't trample "
+                f"concurrent updates). body={resp.get_json()!r}"
+            )
+            data = resp.get_json()
+            assert data["running"] is True
+            assert data["unit"] == active_unit
+            fallback_mock.assert_not_called()
+        finally:
+            mod._set_update_state(False, None)

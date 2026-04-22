@@ -23,7 +23,13 @@ def test_display_hang_fault_times_out_and_surfaces_error(
     refresh_task.start()
     try:
         resp = client.post("/update_now", data={"plugin_id": "clock"})
-        assert resp.status_code == 500
+        # JTN-K4: TimeoutError is now mapped to a typed 504
+        # ``manual_update_timeout`` (previously fell through to 500
+        # ``internal_error``).  Accept either so both branches of the
+        # timing race remain covered.
+        assert resp.status_code in (500, 504)
+        if resp.status_code == 504:
+            assert resp.get_json().get("code") == "manual_update_timeout"
 
         diagnostics = client.get("/api/diagnostics").get_json()
         last_error = diagnostics["refresh_task"]["last_error"] or ""

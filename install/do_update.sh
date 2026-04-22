@@ -121,9 +121,25 @@ else
   exit 1
 fi
 
+# JTN-K2: All `git -C "$REPO_DIR"` invocations below go through this wrapper
+# so ``safe.directory`` is set for the resolved checkout on every git call.
+# do_update.sh runs as root via ``systemd-run`` (see
+# _start_update_via_systemd), but on dev installs the repo at
+# /home/$user/InkyPi is owned by a non-root user.  Without
+# ``safe.directory``, git refuses with "dubious ownership"
+# (CVE-2022-24765) and the ``rev-parse`` below silently fails, which the
+# error message renders as "not a git repository" — no signal to the user
+# that the real problem was repo ownership.  Mirrors the same workaround
+# install.sh already applies on its preflight checks.  Scope the override
+# to ``$REPO_DIR`` (not ``*``) so we only trust the specific checkout this
+# invocation targets.
+git_repo() {
+  git -c safe.directory="$REPO_DIR" -C "$REPO_DIR" "$@"
+}
+
 # Validate it's actually a git repo
 _current_step="validate_git_repo"
-if ! git -C "$REPO_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+if ! git_repo rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   echo "ERROR: $REPO_DIR is not a git repository." >&2
   exit 1
 fi
@@ -133,7 +149,7 @@ echo "Repository root: $REPO_DIR"
 # ---------------------------------------------------------------------------
 # Save current version for rollback breadcrumb
 # ---------------------------------------------------------------------------
-CURRENT_VERSION=$(git -C "$REPO_DIR" describe --tags --abbrev=0 2>/dev/null || echo "unknown")
+CURRENT_VERSION=$(git_repo describe --tags --abbrev=0 2>/dev/null || echo "unknown")
 # JTN-787: honour INKYPI_LOCKFILE_DIR so tests can redirect state writes
 # without needing write access to /var/lib. Production callers do not set it.
 # Failure to create the state dir (e.g. running as non-root on a fresh box)
@@ -162,11 +178,11 @@ echo "Current version: $CURRENT_VERSION"
 # Fix: if the full branch glob is not already in the fetch refspec list, wipe
 # and re-add it so subsequent fetches download all branches.
 # ---------------------------------------------------------------------------
-if ! git -C "$REPO_DIR" config --get-all remote.origin.fetch 2>/dev/null \
+if ! git_repo config --get-all remote.origin.fetch 2>/dev/null \
     | grep -qF '+refs/heads/*:refs/remotes/origin/*'; then
   echo "Widening narrow git fetch refspec to include all branches..."
-  git -C "$REPO_DIR" config --unset-all remote.origin.fetch || true
-  git -C "$REPO_DIR" config --add remote.origin.fetch '+refs/heads/*:refs/remotes/origin/*'
+  git_repo config --unset-all remote.origin.fetch || true
+  git_repo config --add remote.origin.fetch '+refs/heads/*:refs/remotes/origin/*'
 fi
 
 # ---------------------------------------------------------------------------
@@ -174,15 +190,20 @@ fi
 # ---------------------------------------------------------------------------
 _current_step="git_fetch"
 echo "Fetching latest from origin..."
-git -C "$REPO_DIR" fetch origin --tags --prune
+git_repo fetch origin --tags --prune
 
 # ---------------------------------------------------------------------------
 # Determine target tag
 # ---------------------------------------------------------------------------
 TARGET_TAG="${1:-}"
 if [ -z "$TARGET_TAG" ]; then
-  # Find the latest semver tag (v1.2.3 format)
-  TARGET_TAG=$(git -C "$REPO_DIR" tag --sort=-v:refname | grep -E '^v?[0-9]+\.[0-9]+\.[0-9]+$' | head -1)
+  # Find the latest semver tag (v1.2.3 format).  Use awk instead of
+  # ``grep -E | head -1``: under ``set -euo pipefail`` a no-match grep
+  # exits 1, which (via pipefail) aborts the script before the empty
+  # check below can emit the intended error message.  awk returns 0 on
+  # no match, so the ``if [ -z ... ]`` block correctly catches it.
+  TARGET_TAG=$(git_repo tag --sort=-v:refname \
+    | awk '/^v?[0-9]+\.[0-9]+\.[0-9]+$/ { print; exit }')
   if [ -z "$TARGET_TAG" ]; then
     echo "ERROR: No semver tags found in repository." >&2
     exit 1
@@ -215,14 +236,34 @@ else
   # it, because every additional path is a chance to silently throw away
   # legitimate user changes.
   _current_step="reset_generated_artifacts"
-  git -C "$REPO_DIR" checkout -- src/static/styles/main.css 2>/dev/null || true
+  git_repo checkout -- src/static/styles/main.css 2>/dev/null || true
+
+  # JTN-K2: On dev installs the repo at /home/$user/InkyPi may have
+  # additional tracked-file modifications beyond the narrow CSS reset
+  # above (local debugging edits, work-in-progress fixes, etc.). Without
+  # this stash, the checkout below aborts with "Your local changes
+  # would be overwritten by checkout" and the update silently fails.
+  #
+  # Tracked-only — do NOT pass --include-untracked, which would stash
+  # the runtime ``src/config/device.json`` that the live service reads.
+  # Stashed entries remain in ``git stash list`` so the user can recover
+  # via ``git stash pop`` after the update.  No-op if the tree is clean.
+  _current_step="stash_local_modifications"
+  # ``git diff --quiet`` only reports unstaged worktree changes; staged
+  # modifications (``git add``-ed but not committed) would still abort the
+  # checkout with "Your local changes would be overwritten by checkout".
+  # Stash when either side is dirty.
+  if ! git_repo diff --quiet || ! git_repo diff --cached --quiet; then
+    echo "Stashing local modifications before checkout (recover with 'git stash pop')..."
+    git_repo stash push --message "auto-stash by do_update.sh $(date -u +%Y-%m-%dT%H:%M:%SZ)" --quiet || true
+  fi
 
   _current_step="git_checkout"
   echo "Checking out $TARGET_TAG..."
   # Pass the tag via an explicit revision argument before ``--`` so it
   # cannot be interpreted as a flag by git checkout, and add a trailing
   # ``--`` to make clear nothing after it is a pathspec.
-  git -C "$REPO_DIR" checkout "refs/tags/$TARGET_TAG" --
+  git_repo checkout "refs/tags/$TARGET_TAG" --
 fi
 
 # ---------------------------------------------------------------------------

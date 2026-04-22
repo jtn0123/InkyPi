@@ -44,8 +44,10 @@ def test_plugin_generate_image_timeout(client, monkeypatch):
 
     data = {"plugin_id": "clock"}
     resp = client.post("/update_now", data=data)
-    # Should return error, not crash
-    assert resp.status_code in (200, 500)
+    # Should return error, not crash.  JTN-K4 now maps TimeoutError to a
+    # typed 504 ``manual_update_timeout`` (previously fell through to 500
+    # ``internal_error`` via the generic handler).
+    assert resp.status_code in (200, 500, 504)
     if resp.status_code == 200:
         result = resp.get_json()
         if result:

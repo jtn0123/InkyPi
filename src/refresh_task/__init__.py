@@ -17,6 +17,7 @@ from refresh_task.worker import (
     _get_mp_context,
     _remote_exception,
     _restore_child_config,
+    sweep_orphan_render_tempfiles,
 )
 
 __all__ = [
@@ -30,4 +31,5 @@ __all__ = [
     "_get_mp_context",
     "_remote_exception",
     "_restore_child_config",
+    "sweep_orphan_render_tempfiles",
 ]

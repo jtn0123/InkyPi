@@ -1,9 +1,12 @@
 """Subprocess worker helpers for plugin execution."""
 
-import io
+import glob
 import logging
 import multiprocessing
+import os
 import sys
+import tempfile
+import time
 import traceback
 from collections.abc import Callable, Mapping
 from datetime import datetime
@@ -36,7 +39,7 @@ class LegacyConfigLike(Protocol):
 
 class WorkerSuccessPayload(TypedDict):
     ok: bool
-    image_bytes: bytes
+    image_path: str
     plugin_meta: object
 
 
@@ -54,6 +57,52 @@ class ResultQueueLike(Protocol):
     """Queue interface shared by queue.Queue and multiprocessing.Queue."""
 
     def put(self, item: WorkerPayload) -> object: ...
+
+
+_RENDER_TEMPFILE_PREFIX = "inkypi_render_"
+_RENDER_TEMPFILE_SUFFIX = ".png"
+
+
+def sweep_orphan_render_tempfiles(max_age_seconds: int = 3600) -> tuple[int, int]:
+    """Delete leftover render tempfiles older than *max_age_seconds*.
+
+    The child writes a PNG tempfile and puts its path on the result queue;
+    the parent opens, copies, and unlinks.  If the parent crashes between
+    read and unlink — or terminates the child before it can put — the
+    tempfile leaks.  On tmpfs-backed ``/tmp`` this is harmless (reboot
+    clears it), but disk-backed ``/tmp`` accumulates them indefinitely.
+
+    Called at service startup from :meth:`RefreshTask.start`.  Bounded by
+    file age so a currently-running render (child just wrote file, parent
+    hasn't read yet) is never touched.
+
+    Returns:
+        ``(file_count, total_bytes_freed)``.  Caller typically only uses
+        this for logging; failures are swallowed so a slow or unreadable
+        ``/tmp`` cannot prevent the service from starting.
+    """
+    tmpdir = tempfile.gettempdir()
+    pattern = os.path.join(
+        tmpdir, f"{_RENDER_TEMPFILE_PREFIX}*{_RENDER_TEMPFILE_SUFFIX}"
+    )
+    now = time.time()
+    deleted = 0
+    bytes_freed = 0
+    for path in glob.iglob(pattern):
+        try:
+            stat = os.stat(path)
+        except OSError:
+            # File vanished between glob and stat, or permission denied.
+            continue
+        if now - stat.st_mtime <= max_age_seconds:
+            continue
+        try:
+            os.unlink(path)
+        except OSError:
+            continue
+        deleted += 1
+        bytes_freed += stat.st_size
+    return deleted, bytes_freed
 
 
 def _get_mp_context() -> multiprocessing.context.BaseContext:
@@ -168,9 +217,18 @@ def _execute_refresh_attempt_worker(
 
     Intended to be the ``target`` of a ``multiprocessing.Process``.
     Restores the config singleton in the child process, executes the refresh
-    action, serialises the resulting image to PNG bytes, and pushes a result
-    dict onto *result_queue*.  Any exception is caught and pushed as a
-    failure payload so the parent process can reconstruct it.
+    action, writes the resulting image to a tempfile, and pushes a result
+    dict carrying the **path** (not the bytes) onto *result_queue*.  Any
+    exception is caught and pushed as a failure payload so the parent
+    process can reconstruct it.
+
+    Why a tempfile instead of raw bytes on the queue: ``Queue.put`` hands
+    large payloads to a background feeder thread whose write to the pipe
+    blocks at ~64 KB (Linux default pipe buffer).  The parent is usually
+    waiting in ``proc.join()``, which cannot return until the child exits,
+    which cannot happen until the feeder drains the pipe, which the parent
+    only reads after ``proc.join()`` returns — classic deadlock.  A path
+    round-trip keeps the queue payload under 1 KB and avoids the deadlock.
 
     Args:
         result_queue: A ``multiprocessing.Queue`` used to return exactly one
@@ -181,6 +239,27 @@ def _execute_refresh_attempt_worker(
             ``Config`` object) used to restore the child Config singleton.
         current_dt: The current device-timezone datetime passed to the plugin.
     """
+    # JTN-S2: become a session leader so any chromium subprocess spawned
+    # below shares the worker's session/process group.  When the parent
+    # times the worker out and calls ``_cleanup_subprocess``, that
+    # cleanup ``killpg``-s the whole session — collecting chromium plus
+    # its zygote/renderer/utility descendants in one syscall.  Without
+    # this, chromium descendants get reparented to PID 1 and leak.
+    # Best-effort — ``setsid`` fails harmlessly if the worker is already
+    # a session leader (rare but possible under some test mocks), so we
+    # swallow the error rather than abort the whole render.
+    #
+    # Two guards: ``os.setsid`` is POSIX-only (absent on Windows), and
+    # several unit tests invoke this entry point in-process where an
+    # unconditional ``setsid`` would detach the test runner's session.
+    # Only call it when we're actually running as a multiprocessing child.
+    setsid = getattr(os, "setsid", None)
+    if callable(setsid) and multiprocessing.parent_process() is not None:
+        try:
+            setsid()
+        except OSError:
+            pass
+
     try:
         child_config = _restore_child_config(refresh_context)
         # JTN-783: spawned / forkserver children start with an empty plugin
@@ -206,12 +285,29 @@ def _execute_refresh_attempt_worker(
             plugin_meta = metadata_getter()
         if image is None:
             raise RuntimeError("Plugin returned None image")
-        image_bytes = io.BytesIO()
-        image.save(image_bytes, format="PNG")
+        # Write PNG to a tempfile and hand off the path via the queue instead
+        # of the raw bytes.  multiprocessing.Queue.put spawns a feeder thread
+        # that writes the pickled payload to a pipe whose default buffer is
+        # 65,536 bytes on Linux.  Any payload bigger than that blocks the
+        # feeder on the second write until the reader drains the pipe — but
+        # the parent is inside ``proc.join()`` waiting for the child to exit,
+        # and the child can't exit until the feeder finishes.  Classic
+        # deadlock.  Every real plugin's PNG is larger than 64 KB (e.g.
+        # clock at 800x480 is ~89 KB), so this manifested on every single
+        # render.  Passing a filesystem path keeps the queue payload < 1 KB
+        # and sidesteps the pipe buffer entirely.  Parent deletes the file
+        # after reading in task.py::_handle_process_result.
+        with tempfile.NamedTemporaryFile(
+            suffix=_RENDER_TEMPFILE_SUFFIX,
+            prefix=_RENDER_TEMPFILE_PREFIX,
+            delete=False,
+        ) as png_file:
+            image.save(png_file, format="PNG")
+            image_path = png_file.name
         result_queue.put(
             {
                 "ok": True,
-                "image_bytes": image_bytes.getvalue(),
+                "image_path": image_path,
                 "plugin_meta": plugin_meta,
             }
         )
