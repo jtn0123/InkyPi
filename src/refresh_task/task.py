@@ -964,7 +964,8 @@ class RefreshTask:
                 # this refresh task spawned.  SonarCloud python:S4828.
                 if pgid != getpgid(0):
                     killpg(pgid, _signal.SIGKILL)  # NOSONAR
-            except (ProcessLookupError, PermissionError, OSError):
+            except OSError:
+                # ProcessLookupError / PermissionError are OSError subclasses.
                 pass
 
         # 2. Standard terminate/kill dance to reap the worker entry.
