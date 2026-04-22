@@ -368,7 +368,8 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  min-height: 36px;
+  min-height: 0;
+  height: 36px;
   padding: 7px 12px;
   font-size: 0.82rem;
 }
@@ -388,7 +389,7 @@
 .playlist-row-icon-btn {
   width: 36px;
   height: 36px;
-  min-height: 36px;
+  min-height: 0;
   padding: 0;
   display: inline-flex;
   align-items: center;
@@ -538,7 +539,8 @@ a.pl-add-row:hover {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  min-height: 36px;
+  min-height: 0;
+  height: 36px;
   padding: 7px 12px;
   font-size: 0.82rem;
 }

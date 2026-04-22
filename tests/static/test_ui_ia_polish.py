@@ -1,6 +1,7 @@
 # pyright: reportMissingImports=false
 """Targeted tests for final UI IA and polish additions."""
 
+import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -62,10 +63,18 @@ def test_settings_logs_toggle_shares_action_bar_and_mobile_stays_in_flow(client)
 
     assert ".settings-logs-toggle" in css
     assert ".page-shell-settings .settings-logs-toggle" not in css
-    assert "@media (max-height: 860px) and (min-width: 769px)" in css
+    assert re.search(
+        r"@media \(max-height: 860px\) and \(min-width: 769px\)\s*\{"
+        r"[^}]*\.settings-panel \.buttons-container\s*\{[^}]*"
+        r"position:\s*sticky;[^}]*bottom:\s*8px;",
+        css,
+        re.S,
+    )
     assert 'id="settings-form-status"' in html
     assert 'id="settingsLogsToggle"' in html
     assert 'id="saveSettingsBtn"' in html
-    assert html.index('id="settings-form-status"') < html.index(
-        'id="settingsLogsToggle"'
-    ) < html.index('id="saveSettingsBtn"')
+    assert (
+        html.index('id="settings-form-status"')
+        < html.index('id="settingsLogsToggle"')
+        < html.index('id="saveSettingsBtn"')
+    )

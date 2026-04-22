@@ -724,6 +724,12 @@
         font-weight: 700;
     }
 
+    .playlist-secondary-button.is-icon-only {
+        width: 44px;
+        min-width: 44px;
+        padding: 0;
+    }
+
     .playlist-card-body {
         padding: 0 14px 14px;
     }

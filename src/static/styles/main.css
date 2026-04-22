@@ -3587,12 +3587,15 @@ input:disabled, select:disabled, textarea:disabled {
     --toggle-knob-size: 14px;
     --toggle-knob-offset: 3px;
     --toggle-knob-travel: 14px;
+    --toggle-hit-size: 36px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     position: relative;
     width: var(--toggle-track-width);
     height: var(--toggle-track-height);
+    min-width: var(--toggle-hit-size);
+    min-height: var(--toggle-hit-size);
 }
 
 /* Keep the native checkbox as the real control for semantics and keyboard
@@ -5570,7 +5573,8 @@ body[data-page="plugin"] .workflow-help p {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  min-height: 36px;
+  min-height: 0;
+  height: 36px;
   padding: 7px 12px;
   font-size: 0.82rem;
 }
@@ -5590,7 +5594,7 @@ body[data-page="plugin"] .workflow-help p {
 .playlist-row-icon-btn {
   width: 36px;
   height: 36px;
-  min-height: 36px;
+  min-height: 0;
   padding: 0;
   display: inline-flex;
   align-items: center;
@@ -5740,7 +5744,8 @@ a.pl-add-row:hover {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  min-height: 36px;
+  min-height: 0;
+  height: 36px;
   padding: 7px 12px;
   font-size: 0.82rem;
 }
@@ -6596,6 +6601,10 @@ body[data-page="settings"] .settings-device-name {
 }
 
 @media (max-width: 768px) {
+  .settings-form--sticky-save {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
   .settings-panel .buttons-container {
     position: static;
     bottom: auto;
@@ -9959,6 +9968,12 @@ body[data-page="api-keys"] .status-popover {
         display: inline;
         font-size: 0.82rem;
         font-weight: 700;
+    }
+
+    .playlist-secondary-button.is-icon-only {
+        width: 44px;
+        min-width: 44px;
+        padding: 0;
     }
 
     .playlist-card-body {

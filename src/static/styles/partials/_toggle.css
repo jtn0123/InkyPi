@@ -24,12 +24,15 @@
     --toggle-knob-size: 14px;
     --toggle-knob-offset: 3px;
     --toggle-knob-travel: 14px;
+    --toggle-hit-size: 36px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     position: relative;
     width: var(--toggle-track-width);
     height: var(--toggle-track-height);
+    min-width: var(--toggle-hit-size);
+    min-height: var(--toggle-hit-size);
 }
 
 /* Keep the native checkbox as the real control for semantics and keyboard

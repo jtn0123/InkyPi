@@ -726,6 +726,10 @@ body[data-page="settings"] .settings-device-name {
 }
 
 @media (max-width: 768px) {
+  .settings-form--sticky-save {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
   .settings-panel .buttons-container {
     position: static;
     bottom: auto;
