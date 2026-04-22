@@ -224,10 +224,13 @@ def _synthesize_failure_from_journal(unit: str) -> dict[str, object] | None:
     }
 
 
-def _compare_and_clear_update_state(
-    unit: str | None, started_at: float | None
-) -> bool:
+def _compare_and_clear_update_state(unit: object, started_at: object) -> bool:
     """Clear ``_UPDATE_STATE`` iff ``(unit, started_at)`` still matches.
+
+    Args are typed ``object`` to match the callers reading straight from
+    ``_UPDATE_STATE`` (whose values are stored loosely typed); the body
+    does only equality comparisons against the dict, so no narrowing is
+    needed.
 
     Returns True if the state was cleared; False if a concurrent POST
     replaced the snapshot and the reaper must leave it alone.
