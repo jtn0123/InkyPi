@@ -122,16 +122,19 @@ else
 fi
 
 # JTN-K2: All `git -C "$REPO_DIR"` invocations below go through this wrapper
-# so ``safe.directory='*'`` is set on every git call.  do_update.sh runs as
-# root via ``systemd-run`` (see _start_update_via_systemd), but on dev
-# installs the repo at /home/$user/InkyPi is owned by a non-root user.
-# Without ``safe.directory``, git refuses with "dubious ownership"
+# so ``safe.directory`` is set for the resolved checkout on every git call.
+# do_update.sh runs as root via ``systemd-run`` (see
+# _start_update_via_systemd), but on dev installs the repo at
+# /home/$user/InkyPi is owned by a non-root user.  Without
+# ``safe.directory``, git refuses with "dubious ownership"
 # (CVE-2022-24765) and the ``rev-parse`` below silently fails, which the
 # error message renders as "not a git repository" — no signal to the user
 # that the real problem was repo ownership.  Mirrors the same workaround
-# install.sh already applies on its preflight checks.
+# install.sh already applies on its preflight checks.  Scope the override
+# to ``$REPO_DIR`` (not ``*``) so we only trust the specific checkout this
+# invocation targets.
 git_repo() {
-  git -c safe.directory="*" -C "$REPO_DIR" "$@"
+  git -c safe.directory="$REPO_DIR" -C "$REPO_DIR" "$@"
 }
 
 # Validate it's actually a git repo
@@ -241,7 +244,11 @@ else
   # Stashed entries remain in ``git stash list`` so the user can recover
   # via ``git stash pop`` after the update.  No-op if the tree is clean.
   _current_step="stash_local_modifications"
-  if ! git_repo diff --quiet; then
+  # ``git diff --quiet`` only reports unstaged worktree changes; staged
+  # modifications (``git add``-ed but not committed) would still abort the
+  # checkout with "Your local changes would be overwritten by checkout".
+  # Stash when either side is dirty.
+  if ! git_repo diff --quiet || ! git_repo diff --cached --quiet; then
     echo "Stashing local modifications before checkout (recover with 'git stash pop')..."
     git_repo stash push --message "auto-stash by do_update.sh $(date -u +%Y-%m-%dT%H:%M:%SZ)" --quiet || true
   fi

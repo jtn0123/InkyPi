@@ -234,6 +234,15 @@ def _auto_clear_stale_update_state() -> tuple[str | None, bool]:
     the unit whose completion triggered the clear, returned ONLY when the
     unit ended in ``failed`` state (for the journal-synthesis fallback).
     ``None`` when nothing needed clearing or the unit succeeded.
+
+    JTN-K3: the clear is compare-and-clear under ``_update_lock`` — the
+    slow ``systemctl is-active`` probe happens outside the lock, but the
+    final mutation only fires if ``(running, unit, started_at)`` still
+    matches the snapshot we probed against.  Without this guard, two POSTs
+    to /settings/update can race: request A reads stale state and calls
+    the reaper, request B acquires the lock and starts a fresh update
+    between A's probe and A's clear, then A's clear erases B's freshly-set
+    running flag and the guard lets a third request start a second update.
     """
     if not _mod._UPDATE_STATE.get("running"):
         return None, False
@@ -247,19 +256,43 @@ def _auto_clear_stale_update_state() -> tuple[str | None, bool]:
     if unit and _mod._systemd_available():
         cleared, unit_failed = _probe_finished_unit(unit)
         if cleared:
-            _mod._UPDATE_STATE["last_unit"] = unit
-            _mod._set_update_state(False, None)
-            if unit_failed:
-                failed_name = unit
+            with _mod._update_lock:
+                # Compare-and-clear: only clear if the state we probed is
+                # still the current state.  Otherwise a concurrent POST
+                # already started a new update and must not be disturbed.
+                if (
+                    _mod._UPDATE_STATE.get("running")
+                    and _mod._UPDATE_STATE.get("unit") == unit
+                    and _mod._UPDATE_STATE.get("started_at") == started_at
+                ):
+                    _mod._UPDATE_STATE["last_unit"] = unit
+                    _mod._UPDATE_STATE["running"] = False
+                    _mod._UPDATE_STATE["unit"] = None
+                    _mod._UPDATE_STATE["started_at"] = None
+                    if unit_failed:
+                        failed_name = unit
+                else:
+                    # A newer update replaced the state we snapshotted;
+                    # the reaper must not clear it.
+                    cleared = False
 
-    # Timeout fallback: force-clear if started >30 min ago.
+    # Timeout fallback: force-clear if started >30 min ago.  Same
+    # compare-and-clear discipline so we never stomp on a fresh start.
     if (
         not cleared
         and started_at
         and (time.time() - float(started_at)) > _mod._UPDATE_TIMEOUT_SECONDS
     ):
-        _mod._UPDATE_STATE["last_unit"] = unit
-        _mod._set_update_state(False, None)
+        with _mod._update_lock:
+            if (
+                _mod._UPDATE_STATE.get("running")
+                and _mod._UPDATE_STATE.get("unit") == unit
+                and _mod._UPDATE_STATE.get("started_at") == started_at
+            ):
+                _mod._UPDATE_STATE["last_unit"] = unit
+                _mod._UPDATE_STATE["running"] = False
+                _mod._UPDATE_STATE["unit"] = None
+                _mod._UPDATE_STATE["started_at"] = None
 
     return failed_name, unit_failed
 

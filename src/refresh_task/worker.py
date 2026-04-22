@@ -248,10 +248,17 @@ def _execute_refresh_attempt_worker(
     # Best-effort — ``setsid`` fails harmlessly if the worker is already
     # a session leader (rare but possible under some test mocks), so we
     # swallow the error rather than abort the whole render.
-    try:
-        os.setsid()
-    except OSError:
-        pass
+    #
+    # Two guards: ``os.setsid`` is POSIX-only (absent on Windows), and
+    # several unit tests invoke this entry point in-process where an
+    # unconditional ``setsid`` would detach the test runner's session.
+    # Only call it when we're actually running as a multiprocessing child.
+    setsid = getattr(os, "setsid", None)
+    if callable(setsid) and multiprocessing.parent_process() is not None:
+        try:
+            setsid()
+        except OSError:
+            pass
 
     try:
         child_config = _restore_child_config(refresh_context)

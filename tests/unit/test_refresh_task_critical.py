@@ -453,6 +453,14 @@ class TestWorkerSessionLeaderCleanup:
 
         # Patch the worker module's ``os`` reference.
         monkeypatch.setattr("refresh_task.worker.os.setsid", fake_setsid)
+        # Fake being a multiprocessing child — production guard in the
+        # worker skips ``setsid`` when called in-process (so unit tests
+        # can't detach the test runner's session) but we want to exercise
+        # the path here.
+        monkeypatch.setattr(
+            "refresh_task.worker.multiprocessing.parent_process",
+            lambda: object(),
+        )
 
         # Provide enough mock context for the worker to no-op a render.
         from PIL import Image as _Image
@@ -467,6 +475,7 @@ class TestWorkerSessionLeaderCleanup:
 
         from unittest.mock import MagicMock
 
+        q: _queue.Queue = _queue.Queue()
         with (
             patch(
                 "refresh_task.worker.get_plugin_instance",
@@ -478,7 +487,7 @@ class TestWorkerSessionLeaderCleanup:
             ),
         ):
             _execute_refresh_attempt_worker(
-                _queue.Queue(),
+                q,
                 {"id": "test"},
                 _FakeAction(),
                 MagicMock(),
@@ -490,6 +499,17 @@ class TestWorkerSessionLeaderCleanup:
             "leak when the parent's _cleanup_subprocess only signals the "
             "worker pid (JTN-S2 regression)"
         )
+        # Drain the worker's tempfile so successful renders don't leak a
+        # PNG into the test runner's tmpdir on every invocation.
+        try:
+            payload = q.get_nowait()
+        except _queue.Empty:
+            payload = None
+        if payload and payload.get("ok") and payload.get("image_path"):
+            try:
+                os.unlink(payload["image_path"])
+            except OSError:
+                pass
 
     def test_worker_setsid_eperm_is_swallowed(self, monkeypatch):
         """If setsid fails (already a session leader, e.g. under some test
@@ -503,6 +523,12 @@ class TestWorkerSessionLeaderCleanup:
             raise OSError(1, "Operation not permitted")
 
         monkeypatch.setattr("refresh_task.worker.os.setsid", setsid_eperm)
+        # Pretend to be a multiprocessing child so the guard does not
+        # short-circuit setsid before we reach the EPERM path.
+        monkeypatch.setattr(
+            "refresh_task.worker.multiprocessing.parent_process",
+            lambda: object(),
+        )
 
         from PIL import Image as _Image
 

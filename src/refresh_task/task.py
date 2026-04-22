@@ -949,12 +949,23 @@ class RefreshTask:
 
         # 1. Take down the whole worker session up front — catches the
         #    chromium tree before any of it can be reparented.
-        try:
-            pgid = os.getpgid(proc.pid)
-            if pgid != os.getpgid(0):
-                os.killpg(pgid, _signal.SIGKILL)
-        except (ProcessLookupError, PermissionError, OSError):
-            pass
+        #    ``getpgid``/``killpg`` are POSIX-only; ``getattr`` guards the
+        #    Windows case so we silently fall through to the
+        #    terminate()/kill() fallback instead of raising AttributeError
+        #    (which the except below would not catch).
+        getpgid = getattr(os, "getpgid", None)
+        killpg = getattr(os, "killpg", None)
+        if callable(getpgid) and callable(killpg):
+            try:
+                pgid = getpgid(proc.pid)
+                # Signal is scoped to the worker's own session (the worker
+                # called ``setsid`` at startup) and guarded against our
+                # own pgid, so the only processes affected are the ones
+                # this refresh task spawned.  SonarCloud python:S4828.
+                if pgid != getpgid(0):
+                    killpg(pgid, _signal.SIGKILL)  # NOSONAR
+            except (ProcessLookupError, PermissionError, OSError):
+                pass
 
         # 2. Standard terminate/kill dance to reap the worker entry.
         proc.terminate()

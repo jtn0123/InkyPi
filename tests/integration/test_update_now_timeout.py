@@ -19,8 +19,16 @@ from __future__ import annotations
 class TestUpdateNowTimeoutDirect:
     """/update_now must map ``TimeoutError`` to HTTP 504 on the direct path."""
 
-    def test_timeout_error_returns_504(self, client, monkeypatch):
+    def test_timeout_error_returns_504(self, client, flask_app, monkeypatch):
         """Plugin raising ``TimeoutError`` -> 504 ``manual_update_timeout``."""
+        # Force the direct path: if the app fixture defaults
+        # ``refresh_task.running`` to True, the request would route through
+        # the async refresh-task branch instead of the direct-call branch
+        # this test is trying to cover.  Pin it False so the patched
+        # ``get_plugin_instance`` below is guaranteed to run.
+        refresh_task = flask_app.config["REFRESH_TASK"]
+        monkeypatch.setattr(refresh_task, "running", False)
+
         from plugins.plugin_registry import get_plugin_instance as _real_get
 
         def _boom(plugin_config):
