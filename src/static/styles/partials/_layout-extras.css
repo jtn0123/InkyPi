@@ -1,0 +1,207 @@
+/* Snackbar for undo */
+#undoSnackbar {
+  position: fixed;
+  left: 16px;
+  bottom: 16px;
+  z-index: 1100;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--surface-border);
+  border-radius: 6px;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.25);
+  display: none;
+  padding: 10px 12px;
+  gap: 10px;
+  align-items: center;
+}
+#undoSnackbar .btn-link { background: none; border: none; color: var(--accent); cursor: pointer; font-weight: 700; }
+
+/* Virtualize large lists with content-visibility */
+.playlist-list, .button-grid, .history-grid {
+  content-visibility: auto;
+  contain-intrinsic-size: 1px 5000px; /* allow fast initial layout */
+}
+
+/* Dashboard header spacer - reserves space where home button would be on other pages */
+.header-nav-spacer {
+  display: inline-block;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+}
+
+/* Staggered card reveal animation */
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.plugins-container .icon-button {
+  animation: fade-in-up 0.3s ease-out both;
+}
+
+.plugins-container .icon-button:nth-child(1) { animation-delay: 0ms; }
+.plugins-container .icon-button:nth-child(2) { animation-delay: 30ms; }
+.plugins-container .icon-button:nth-child(3) { animation-delay: 60ms; }
+.plugins-container .icon-button:nth-child(4) { animation-delay: 90ms; }
+.plugins-container .icon-button:nth-child(5) { animation-delay: 120ms; }
+.plugins-container .icon-button:nth-child(6) { animation-delay: 150ms; }
+.plugins-container .icon-button:nth-child(7) { animation-delay: 180ms; }
+.plugins-container .icon-button:nth-child(8) { animation-delay: 210ms; }
+.plugins-container .icon-button:nth-child(9) { animation-delay: 240ms; }
+.plugins-container .icon-button:nth-child(10) { animation-delay: 270ms; }
+.plugins-container .icon-button:nth-child(11) { animation-delay: 300ms; }
+.plugins-container .icon-button:nth-child(12) { animation-delay: 330ms; }
+
+@media (max-width: 768px) {
+  .header-nav-spacer {
+    display: none;
+  }
+}
+
+/* Debug console (JTN-587)
+   Floating bottom-left button + slide-up panel that captures client-side JS
+   errors. Deliberately named "Debug console" to distinguish it from the
+   server-side "Error Logs" page. */
+.debug-console-toggle {
+  position: fixed;
+  left: max(16px, env(safe-area-inset-left, 0px) + 8px);
+  bottom: max(16px, env(safe-area-inset-bottom, 0px) + 16px);
+  z-index: 900;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--on-accent);
+  background: var(--error);
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.22);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.debug-console-toggle:hover {
+  opacity: 0.9;
+  transform: scale(1.04);
+}
+
+.debug-console-toggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.debug-console-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.28);
+  font-size: 0.72rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.debug-console-panel {
+  position: fixed;
+  left: max(12px, env(safe-area-inset-left, 0px) + 8px);
+  bottom: max(72px, env(safe-area-inset-bottom, 0px) + 72px);
+  width: min(400px, calc(100vw - 24px));
+  max-height: 40vh;
+  z-index: 901;
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--border-radius-md, 8px);
+  background: var(--surface);
+  border: 1px solid var(--surface-border);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.22);
+  overflow: hidden;
+}
+
+.debug-console-panel[hidden] {
+  display: none;
+}
+
+.debug-console-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--surface-border);
+  background: var(--panel-bg);
+  flex-shrink: 0;
+}
+
+.debug-console-title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  margin: 0;
+  color: var(--text);
+}
+
+.debug-console-close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1.2rem;
+  line-height: 1;
+  color: var(--muted);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.debug-console-close:hover {
+  color: var(--text);
+  background: var(--button-bg);
+}
+
+.debug-console-close:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.debug-console-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.debug-console-empty {
+  padding: 16px;
+  font-size: 0.82rem;
+  color: var(--muted);
+  text-align: center;
+}
+
+.debug-console-entry {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px;
+  align-items: baseline;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--surface-border);
+  font-size: 0.8rem;
+}
+
+.debug-console-entry:last-child {
+  border-bottom: none;
+}
+
+.debug-console-time {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  font-size: 0.75rem;
+}
+
+.debug-console-msg {
+  color: var(--error);
+  word-break: break-word;
+}

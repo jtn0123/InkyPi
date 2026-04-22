@@ -539,36 +539,7 @@ main[data-page-shell="workflow"] .frame {
     display: none;
 }
 
-/* Skip-to-main-content link for keyboard navigation */
-.skip-link {
-  position: absolute;
-  top: -100%;
-  left: 16px;
-  z-index: 10000;
-  padding: 8px 16px;
-  background: var(--surface);
-  color: var(--text);
-  border: 2px solid var(--accent);
-  border-radius: 4px;
-  font-weight: 600;
-  text-decoration: none;
-}
-.skip-link:focus {
-  top: 8px;
-}
 
-/* Visually hidden helper for accessibility */
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap; /* added line */
-  border: 0;
-}
 
 /* Device frame overlay for large preview */
 .device-frame-overlay {
@@ -998,6 +969,7 @@ main[data-page-shell="workflow"] .frame {
     border-radius: 999px; /* pill */
     font-size: 0.78rem;
 }
+
 
 /* Snackbar for undo */
 #undoSnackbar {
@@ -9315,6 +9287,37 @@ body[data-page="api-keys"] .status-popover {
     }
 }
 
+
+/* Skip-to-main-content link for keyboard navigation */
+.skip-link {
+  position: absolute;
+  top: -100%;
+  left: 16px;
+  z-index: 10000;
+  padding: 8px 16px;
+  background: var(--surface);
+  color: var(--text);
+  border: 2px solid var(--accent);
+  border-radius: 4px;
+  font-weight: 600;
+  text-decoration: none;
+}
+.skip-link:focus {
+  top: 8px;
+}
+
+/* Visually hidden helper for accessibility */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap; /* added line */
+  border: 0;
+}
 
 /* ── Progress steps mobile ── */
 @media (max-width: 640px) {
