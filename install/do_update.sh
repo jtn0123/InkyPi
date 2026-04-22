@@ -197,8 +197,13 @@ git_repo fetch origin --tags --prune
 # ---------------------------------------------------------------------------
 TARGET_TAG="${1:-}"
 if [ -z "$TARGET_TAG" ]; then
-  # Find the latest semver tag (v1.2.3 format)
-  TARGET_TAG=$(git_repo tag --sort=-v:refname | grep -E '^v?[0-9]+\.[0-9]+\.[0-9]+$' | head -1)
+  # Find the latest semver tag (v1.2.3 format).  Use awk instead of
+  # ``grep -E | head -1``: under ``set -euo pipefail`` a no-match grep
+  # exits 1, which (via pipefail) aborts the script before the empty
+  # check below can emit the intended error message.  awk returns 0 on
+  # no match, so the ``if [ -z ... ]`` block correctly catches it.
+  TARGET_TAG=$(git_repo tag --sort=-v:refname \
+    | awk '/^v?[0-9]+\.[0-9]+\.[0-9]+$/ { print; exit }')
   if [ -z "$TARGET_TAG" ]; then
     echo "ERROR: No semver tags found in repository." >&2
     exit 1
