@@ -1,0 +1,102 @@
+/* ── Narrowest screens ── */
+@media (max-width: 430px) {
+    .frame,
+    .playlist-frame,
+    .api-keys-frame {
+        width: min(100%, 100vw - 8px);
+        margin: 4px auto;
+        padding: 12px;
+    }
+
+    .header-actions,
+    .playlist-toolbar,
+    .history-toolbar,
+    .logs-actions {
+        grid-template-columns: 1fr;
+    }
+
+    .metric-strip {
+        grid-template-columns: 1fr;
+    }
+
+    .history-card {
+        grid-template-columns: 1fr;
+    }
+
+    .history-thumb {
+        aspect-ratio: 4 / 3;
+    }
+
+    .plugins-container {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .plugin-item,
+    .history-card,
+    .api-key-card {
+        border-radius: 14px;
+    }
+
+    .settings-side-nav {
+        top: 4px;
+    }
+
+    .workflow-action-panel {
+        bottom: 4px;
+        padding: 12px;
+    }
+
+    .page-summary {
+        margin-right: -2px;
+    }
+}
+
+/* ── Tablet landscape (iPad landscape, small laptops) ── */
+@media (min-width: 1024px) {
+    .frame {
+        max-width: 1200px;
+        margin-inline: auto;
+    }
+
+    .settings-grid {
+        max-width: 1400px;
+        margin-inline: auto;
+    }
+}
+
+/* ── Large screens (>1440px) ── */
+@media (min-width: 1440px) {
+    .page-shell {
+        max-width: 1600px;
+        margin-inline: auto;
+    }
+}
+
+/* ── Landscape mobile ── */
+@media (max-height: 500px) and (orientation: landscape) {
+    .modal-content,
+    .response-modal-content {
+        max-height: 85vh;
+        overflow-y: auto;
+    }
+
+    .image-modal .modal-content {
+        max-height: 90vh;
+    }
+}
+
+/* ── Short laptop viewports (JTN-572 / JTN-599) ──
+   On common laptop screens shorter than ~860px (1280x800, 1366x768, 1280x768),
+   the Save button at the bottom of /settings sits below the fold, and there is
+   no visible scroll affordance to reveal it. Keep the sticky treatment scoped
+   to desktop/tablet widths so phone-sized viewports keep the in-flow footer and
+   do not cover the last form fields. */
+@media (max-height: 860px) and (min-width: 769px) {
+    .settings-panel .buttons-container {
+        position: sticky;
+        bottom: 8px;
+        z-index: 6;
+        padding-top: 8px;
+        background: linear-gradient(180deg, transparent, color-mix(in srgb, var(--bg) 94%, transparent) 22%);
+    }
+}

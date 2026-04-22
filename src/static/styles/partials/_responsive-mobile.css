@@ -1,0 +1,457 @@
+/* ── Phone-first mobile hardening ── */
+@media (max-width: 768px) {
+    .frame,
+    .playlist-frame,
+    .api-keys-frame {
+        width: min(100%, 100vw - 16px);
+        margin: 8px auto;
+        padding: 14px;
+        border-radius: 18px;
+    }
+
+    .app-header,
+    .header-content,
+    .header-identity,
+    .header-actions,
+    .page-intro,
+    .page-summary,
+    .history-toolbar,
+    .playlist-header,
+    .playlist-toolbar,
+    .workflow-action-group,
+    .buttons-container,
+    .inline-action-row,
+    .logs-actions,
+    .logs-filters {
+        width: 100%;
+    }
+
+    .header-content,
+    .app-header,
+    .playlist-header,
+    .dashboard-stage-header,
+    .storage-card-head {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    /* Allow the Fit/Native segmented control + Live chip + resolution chip
+       to wrap onto multiple lines at narrow widths so the flex row's
+       min-content doesn't blow out the parent grid track. The long
+       resolution chip (e.g. "800×480 · 7-color Inky Impression") would
+       otherwise force horizontal overflow at ~360px. */
+    .dashboard-stage-controls {
+        flex-wrap: wrap;
+        row-gap: 8px;
+        min-width: 0;
+    }
+
+    .dashboard-stage-controls .status-chip {
+        min-width: 0;
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .header-actions,
+    .playlist-toolbar,
+    .history-toolbar,
+    .logs-actions {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+    }
+
+    .page-intro {
+        gap: 10px;
+    }
+
+    .page-summary {
+        gap: 6px;
+        overflow-x: auto;
+        padding-bottom: 2px;
+        flex-wrap: nowrap;
+    }
+
+    .page-summary .status-chip {
+        flex: 0 0 auto;
+    }
+
+    .dashboard-hero,
+    .workflow-layout,
+    .settings-grid,
+    .settings-console-layout,
+    .sections-grid.two-col,
+    .api-keys-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .dashboard-stage,
+    .dashboard-status-card,
+    .storage-card,
+    .workflow-action-panel,
+    .api-key-card,
+    .playlist-item,
+    .history-card {
+        padding: 14px;
+    }
+
+    .dashboard-stage {
+        gap: 12px;
+    }
+
+    .dashboard-stage .image-container img {
+        max-height: min(42vh, 18rem);
+    }
+
+    .dashboard-overview {
+        gap: 10px;
+    }
+
+    .plugins-container {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+    }
+
+    .plugins-container .plugin-item {
+        padding: 16px 10px 14px;
+        min-height: 120px;
+    }
+
+    .plugin-name {
+        min-height: 2.7em;
+    }
+
+    .settings-grid {
+        gap: 14px;
+    }
+
+    .settings-console-layout {
+        gap: 12px;
+    }
+
+    .settings-mobile-toggle {
+        display: block;
+    }
+
+    .settings-side-nav {
+        position: static;
+        z-index: 5;
+        display: none;
+        flex-direction: column;
+        gap: 6px;
+        padding: 8px;
+        border: 1px solid var(--panel-border);
+        border-radius: var(--border-radius-md);
+        background: color-mix(in srgb, var(--panel-bg) 92%, transparent);
+        backdrop-filter: blur(16px);
+    }
+
+    .settings-side-nav.is-open {
+        display: flex;
+    }
+
+    .settings-side-link {
+        flex: 0 0 auto;
+        min-width: max-content;
+        border-radius: var(--border-radius-md);
+        padding: 10px 14px;
+        text-align: center;
+    }
+
+    .settings-console-main,
+    .settings-console-panel.active {
+        display: grid;
+        gap: 12px;
+    }
+
+    .logs-viewer,
+    .diagnostics-panel,
+    .diagnostics-panel-sm {
+        max-height: min(42vh, 22rem);
+        min-height: 180px;
+    }
+
+    .settings-panel .buttons-container {
+        position: static;
+        bottom: auto;
+        z-index: auto;
+        padding-top: 16px;
+        background: none;
+    }
+
+    .title-stack {
+        gap: 0;
+    }
+
+    .app-subtitle {
+        font-size: 0.75rem;
+    }
+
+    .plugin-mode-row {
+        margin: 0 0 8px;
+        gap: 6px;
+    }
+
+    .workflow-layout {
+        display: block;
+    }
+
+    /* JTN design refresh: both panels always visible on mobile; user scrolls
+       through main → aside stacked. Replaces the old Configure/Preview mode
+       toggle (workflow-mode-bar) which is no longer rendered. */
+    .workflow-main-panel,
+    .workflow-side-panel {
+        display: grid;
+        gap: 14px;
+    }
+
+    .workflow-side-panel {
+        margin-top: 14px;
+    }
+
+    .workflow-action-panel {
+        position: sticky;
+        bottom: 8px;
+        z-index: 7;
+        border-radius: 18px;
+        box-shadow: 0 10px 30px color-mix(in srgb, var(--text) 12%, transparent);
+        background: color-mix(in srgb, var(--panel-bg) 94%, transparent);
+        backdrop-filter: blur(16px);
+    }
+
+    .workflow-device-toggle {
+        font-size: 0.92rem;
+    }
+
+    .workflow-action-group {
+        display: grid;
+        grid-template-columns: 1fr;
+    }
+
+    .workflow-help {
+        font-size: 0.88rem;
+        line-height: 1.45;
+    }
+
+    .workflow-section-header p {
+        font-size: 0.88rem;
+    }
+
+    .status-bar {
+        grid-template-columns: 1fr;
+        gap: 10px;
+    }
+
+    .status-card.compact .image-container,
+    .status-card.instance .status-body img {
+        max-width: 100%;
+    }
+
+    .playlist-list {
+        gap: 12px;
+    }
+
+    .playlist-item {
+        padding: 0;
+        overflow: hidden;
+    }
+
+    .playlist-header {
+        padding: 14px;
+    }
+
+    .playlist-toolbar {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .playlist-toolbar .run-next-btn {
+        grid-column: 1 / -1;
+    }
+
+    .playlist-secondary-button,
+    .playlist-toggle-button {
+        display: inline-flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 44px;
+        min-width: 44px;
+    }
+
+    .playlist-secondary-button {
+        border-radius: 999px;
+        border: 1px solid var(--panel-border);
+        background: var(--surface);
+        color: var(--text);
+        padding: 9px 12px;
+    }
+
+    .playlist-secondary-button .action-button-label {
+        display: inline;
+        font-size: 0.82rem;
+        font-weight: 700;
+    }
+
+    .playlist-secondary-button.is-icon-only {
+        width: 44px;
+        min-width: 44px;
+        padding: 0;
+    }
+
+    .playlist-card-body {
+        padding: 0 14px 14px;
+    }
+
+    .playlist-item.mobile-collapsed .playlist-card-body {
+        display: none;
+    }
+
+    .plugin-item {
+        padding: 12px 0;
+        border-top-width: 1px;
+    }
+
+    .plugin-info {
+        width: 100%;
+        flex-wrap: wrap;
+        align-items: center;
+    }
+
+    .plugin-instance {
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+
+    .plugin-thumbnail-container {
+        margin-left: 0;
+        width: 100%;
+        max-width: 180px;
+    }
+
+    .plugin-thumbnail-container .img-skeleton,
+    .plugin-thumbnail {
+        width: 100%;
+        height: auto;
+        min-height: 100px;
+    }
+
+    .plugin-actions {
+        width: 100%;
+        justify-content: stretch;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .plugin-actions .latest-refresh {
+        width: 100%;
+    }
+
+    .edit-button,
+    .delete-button,
+    .plugin-actions .edit-button,
+    .plugin-actions .delete-button {
+        min-width: 44px;
+        min-height: 44px;
+    }
+
+    .history-actions {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+    }
+
+    .history-actions .btn:first-child {
+        grid-column: 1 / -1;
+    }
+
+    .metric-strip {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .history-card {
+        grid-template-columns: 104px minmax(0, 1fr);
+        align-items: start;
+        gap: 12px;
+    }
+
+    .history-thumb {
+        aspect-ratio: 1 / 1.2;
+    }
+
+    .history-name {
+        font-size: 0.94rem;
+    }
+
+    .history-sub {
+        font-size: 0.8rem;
+    }
+
+    .api-key-actions {
+        gap: 8px;
+    }
+
+    .api-key-card {
+        gap: 8px;
+    }
+
+    .api-key-status {
+        font-size: 0.8rem;
+    }
+
+    .api-key-actions .delete-button-danger {
+        align-self: flex-start;
+    }
+
+    .modal-content,
+    .thumbnail-preview-content {
+        width: min(100vw - 12px, 100%);
+        max-width: none;
+        margin: auto auto 0;
+        border-radius: 20px 20px 0 0;
+        max-height: min(88vh, 44rem);
+        overflow-y: auto;
+    }
+
+    .modal {
+        align-items: flex-end;
+    }
+
+    /* ── 36 px minimum touch targets (JTN-223) ── */
+    button,
+    .btn,
+    .action-button,
+    .header-button,
+    .icon-button,
+    .chip,
+    a.btn,
+    select,
+    select.form-input,
+    .button-group button,
+    .collapsible-header {
+        min-height: 36px;
+        min-width: 36px;
+    }
+
+    /* Checkboxes and radios: enlarge the hit area without distorting
+       the visual indicator. Width/height controls the drawn box;
+       the parent label provides the extra tap space. */
+    input[type="checkbox"],
+    input[type="radio"] {
+        width: 20px;
+        height: 20px;
+        min-width: 20px;
+        min-height: 20px;
+    }
+
+    /* Labels that wrap a checkbox/radio get a comfortable tap zone */
+    label:has(> input[type="checkbox"]),
+    label:has(> input[type="radio"]) {
+        min-height: 36px;
+        display: inline-flex;
+        align-items: center;
+        padding-top: 8px;
+        padding-bottom: 8px;
+    }
+}
+

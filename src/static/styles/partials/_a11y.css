@@ -1,0 +1,67 @@
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+
+    .img-skeleton {
+        animation: none;
+        background: var(--skeleton-base, rgba(0,0,0,0.06));
+    }
+
+    .loading-panel {
+        animation: none;
+        background: var(--skeleton-base, rgba(0,0,0,0.06));
+    }
+
+    .section-focus {
+        animation: none;
+    }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+    :root {
+        --surface-border: #000;
+        --text: #000;
+        --accent: #0066cc;
+    }
+
+    [data-theme="dark"] {
+        --surface-border: #fff;
+        --text: #fff;
+        --accent: #4d9fff;
+    }
+
+    .icon-button,
+    .action-button,
+    .header-button {
+        border-width: 2px;
+    }
+
+    /* Ensure skeletons remain visible in high contrast */
+    .img-skeleton,
+    .loading-panel {
+        border: 1px solid var(--surface-border);
+    }
+
+    /* Strengthen box shadows for visibility */
+    .frame,
+    .dashboard-stage,
+    .dashboard-status-card {
+        box-shadow: 0 0 0 1px var(--surface-border);
+    }
+
+    /* Disabled states need stronger contrast */
+    .action-button:disabled,
+    .header-button:disabled,
+    button:disabled {
+        opacity: 0.6;
+        border: 2px solid var(--surface-border);
+    }
+}
+

@@ -9315,6 +9315,7 @@ body[data-page="api-keys"] .status-popover {
     }
 }
 
+
 /* ── Progress steps mobile ── */
 @media (max-width: 640px) {
     .enhanced-progress-steps {
@@ -9678,6 +9679,7 @@ body[data-page="api-keys"] .status-popover {
         width: 95%;
     }
 }
+
 
 /* ── Phone-first mobile hardening ── */
 @media (max-width: 768px) {
@@ -10135,6 +10137,7 @@ body[data-page="api-keys"] .status-popover {
         padding-bottom: 8px;
     }
 }
+
 
 /* ── Narrowest screens ── */
 @media (max-width: 430px) {
