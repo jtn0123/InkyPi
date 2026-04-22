@@ -1,10 +1,13 @@
 # pyright: reportMissingImports=false
 """Tests for UI enhancement CSS and styling."""
 
+import re
 from pathlib import Path
 
 # CSS is now split into @import partials; read all partials from disk
 _STYLES_DIR = Path(__file__).resolve().parents[2] / "src" / "static" / "styles"
+TOGGLE_CSS = _STYLES_DIR / "partials" / "_toggle.css"
+FORM_CSS = _STYLES_DIR / "partials" / "_form.css"
 
 
 def _read_all_css() -> str:
@@ -14,6 +17,12 @@ def _read_all_css() -> str:
         for p in sorted(_STYLES_DIR.glob("partials/_*.css"))
     ]
     return "\n".join(parts)
+
+
+def _css_block(css: str, selector: str) -> str:
+    match = re.search(rf"{re.escape(selector)}\s*\{{(?P<body>[^}}]*)\}}", css)
+    assert match, f"{selector} rule missing"
+    return match.group("body")
 
 
 def test_main_css_contains_progressive_disclosure_styles(client):
@@ -153,13 +162,21 @@ def test_main_css_contains_enhanced_button_styles(client):
 def test_main_css_contains_toggle_styles(client):
     """Test that main.css contains enhanced toggle styling."""
     css_content = _read_all_css()
+    toggle_css = TOGGLE_CSS.read_text(encoding="utf-8")
+    form_css = FORM_CSS.read_text(encoding="utf-8")
+    toggle_input = _css_block(toggle_css, 'input[type="checkbox"].toggle-checkbox')
 
     # Check for toggle switch styling
     assert ".toggle-container" in css_content
-    assert ".toggle-checkbox" in css_content
-    assert ".toggle-checkbox:checked" in css_content
-    assert ".toggle-checkbox::before" in css_content
-    assert "appearance: none" in css_content
+    assert 'input[type="checkbox"].toggle-checkbox' in css_content
+    assert ".toggle-checkbox:checked + .toggle-label" in css_content
+    assert ".toggle-checkbox:focus-visible + .toggle-label" in css_content
+    assert ".toggle-label::before" in css_content
+    assert "appearance: none" in toggle_input
+    assert "opacity: 0" in toggle_input
+    assert "z-index: 1" in toggle_input
+    assert "pointer-events: none" in toggle_css
+    assert ".form-group.nowrap:not(.toggle-row) > *" in form_css
 
 
 def test_main_css_contains_responsive_design(client):

@@ -350,12 +350,13 @@ svg.icon-thin {
 }
 
 .header-button.is-secondary {
-    background-color: var(--bg-secondary);
+    background-color: var(--surface);
     color: var(--text);
-    border: 1px solid var(--border-color);
+    border: 1px solid var(--surface-border);
 }
 .header-button.is-secondary:hover {
-    background-color: var(--panel-bg);
+    background-color: var(--surface-2);
+    border-color: var(--border-strong, var(--surface-border));
 }
 .header-button.is-dark {
     background-color: var(--text);

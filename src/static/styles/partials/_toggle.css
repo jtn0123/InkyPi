@@ -19,39 +19,66 @@
 /* Toggle Container — handoff parity: refined 34×20 track (was chunky 50×24).
    Matches the `<Toggle>` primitive in components.jsx. */
 .toggle-container {
-    display: inline-block;
+    --toggle-track-width: 34px;
+    --toggle-track-height: 20px;
+    --toggle-knob-size: 14px;
+    --toggle-knob-offset: 3px;
+    --toggle-knob-travel: 14px;
+    --toggle-hit-size: 36px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     position: relative;
-    width: 34px;
-    height: 20px;
+    width: var(--toggle-track-width);
+    height: var(--toggle-track-height);
+    min-width: var(--toggle-hit-size);
+    min-height: var(--toggle-hit-size);
 }
 
-/* Legacy hidden checkbox implementation removed to avoid hiding controls */
-/* The project now styles the visible checkbox directly via .toggle-checkbox */
+/* Keep the native checkbox as the real control for semantics and keyboard
+   interaction, but visually hide it so the custom track/knob is the only
+   rendered switch chrome. */
+input[type="checkbox"].toggle-checkbox {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    min-width: 100%;
+    min-height: 100%;
+    margin: 0;
+    opacity: 0;
+    cursor: pointer;
+    z-index: 1;
+}
 
 /* Toggle Background */
 .toggle-label {
     position: absolute;
-    cursor: pointer;
+    width: var(--toggle-track-width);
+    height: var(--toggle-track-height);
     background-color: var(--divider);
-    border-radius: 12px;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    transition: 0.2s;
+    border-radius: 999px;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    transition: background-color 0.2s ease, box-shadow 0.2s ease;
+    pointer-events: none;
 }
 
 /* Toggle Knob — 14×14 centered in a 20-high track (3px inset). */
 .toggle-label::before {
     position: absolute;
     content: "";
-    height: 14px;
-    width: 14px;
+    height: var(--toggle-knob-size);
+    width: var(--toggle-knob-size);
     background-color: var(--surface);
     border-radius: 50%;
-    top: 3px;
-    left: 3px;
-    transition: 0.2s;
+    top: var(--toggle-knob-offset);
+    left: var(--toggle-knob-offset);
+    transition: transform 0.2s ease, background-color 0.2s ease;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
 }
 
@@ -61,7 +88,19 @@
 }
 
 .toggle-checkbox:checked + .toggle-label::before {
-    transform: translateX(14px);
+    transform: translateX(var(--toggle-knob-travel));
+}
+
+.toggle-checkbox:focus-visible + .toggle-label {
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 28%, transparent);
+}
+
+.toggle-checkbox:disabled {
+    cursor: not-allowed;
+}
+
+.toggle-checkbox:disabled + .toggle-label {
+    opacity: 0.55;
 }
 
 /* Collapsible sections */

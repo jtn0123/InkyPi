@@ -331,11 +331,10 @@
   padding-bottom: calc(6rem + env(safe-area-inset-bottom, 0px));
 }
 
-/* Handoff parity: the settings status stays left-aligned while the sticky
-   footer right-aligns a compact Save button (see `#saveSettingsBtn` rule
-   below — `width: auto` with a clamped `min-width`). The logs toggle now
-   renders in-flow rather than as a fixed FAB, so it no longer overlaps the
-   sticky action area. */
+/* Handoff parity: the settings status stays left-aligned while the footer
+   groups the secondary live-logs affordance with the primary Save action.
+   Desktop keeps the pair sticky; mobile switches the bar back in-flow so it
+   never covers the last fields in the form. */
 .settings-panel .buttons-container #settings-form-status {
   margin-right: auto;
   min-height: 1.25rem;
@@ -361,6 +360,12 @@
   width: auto;
   min-width: clamp(12rem, 24vw, 15rem);
   padding-inline: 24px;
+}
+
+.settings-panel .buttons-container #settingsLogsToggle {
+  flex: 0 0 auto;
+  width: auto;
+  min-width: clamp(11rem, 22vw, 13rem);
 }
 
 .logs-panel {
@@ -701,12 +706,11 @@
     animation: shake-item 0.35s ease-in-out;
 }
 
-/* Logs toggle defaults to an in-flow action on larger viewports. Narrow-screen
-   floating behavior is restored in _responsive.css so it does not overlap the
-   sticky Save bar on short laptops. */
+/* The live-logs toggle lives inside the shared settings action bar so it
+   matches the rest of the action hierarchy instead of floating separately. */
 .settings-logs-toggle {
   display: inline-flex;
-  margin: 8px 0 0 auto;
+  margin: 0;
   width: auto;
   font-weight: 700;
 }
@@ -722,7 +726,25 @@ body[data-page="settings"] .settings-device-name {
 }
 
 @media (max-width: 768px) {
+  .settings-form--sticky-save {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  .settings-panel .buttons-container {
+    position: static;
+    bottom: auto;
+    z-index: auto;
+    align-items: stretch;
+    padding-top: 16px;
+    background: none;
+  }
+
   .settings-panel .buttons-container #saveSettingsBtn {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .settings-panel .buttons-container #settingsLogsToggle {
     width: 100%;
     min-width: 0;
   }

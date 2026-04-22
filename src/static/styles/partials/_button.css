@@ -117,9 +117,16 @@
 }
 
 .action-button.compact {
-    font-size: 0.9rem;
-    padding: 10px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: 44px;
+    padding: 10px 16px;
+    font-size: 0.875rem;
+    letter-spacing: var(--tracking-wide);
     width: auto;
+    flex: 0 0 auto;
 }
 
 /* Loading state for action buttons */
@@ -161,12 +168,13 @@
    against the filled primary (Refresh vs Display next on dashboard;
    "Check for updates" vs "Update now" on settings). */
 .action-button.is-secondary {
-    background-color: transparent;
+    background-color: var(--surface);
     color: var(--text);
     border: 1px solid var(--surface-border);
+    box-shadow: none;
 }
 .action-button.is-secondary:hover {
-    background-color: var(--panel-bg);
+    background-color: var(--surface-2);
     border-color: var(--border-strong, var(--surface-border));
     transform: translateY(-1px);
     box-shadow: var(--shadow-sm);

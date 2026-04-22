@@ -470,9 +470,22 @@ input:disabled, select:disabled, textarea:disabled {
         align-items: stretch;
     }
 
-    .form-group.nowrap > * {
+    .form-group.nowrap:not(.toggle-row) > * {
         width: 100%;
         flex: none;
+    }
+
+    .form-group.nowrap.toggle-row > .toggle-item-text {
+        width: 100%;
+        flex: 1 1 auto;
+    }
+
+    .form-group.nowrap.toggle-row > .toggle-container {
+        width: 48px;
+        min-width: 48px;
+        min-height: 48px;
+        flex: 0 0 auto;
+        align-self: flex-start;
     }
 
     /* Better spacing for form sections */
