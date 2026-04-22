@@ -1,0 +1,264 @@
+/* Handoff parity: the empty state reads as a compact inline banner (row,
+   solid border, tighter padding) rather than a large centered card. */
+.dashboard-overview-empty {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--surface-border);
+  border-radius: var(--border-radius-lg);
+  background: var(--surface-2);
+  color: var(--text-secondary);
+  text-align: left;
+  min-height: 0;
+}
+
+.dashboard-overview-empty .empty-state-icon {
+  width: 18px;
+  height: 18px;
+  opacity: 0.7;
+}
+
+.dashboard-overview-empty p {
+  margin: 0;
+  font-size: 0.82rem;
+  max-width: none;
+}
+
+.icon-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  font-size: 1.4rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: var(--surface);
+  border-radius: var(--border-radius-md);
+}
+
+/* Quick switch playlist card (dashboard aside). Padding/gap tightened to
+   handoff parity spec (12px 14px / 8px gap). */
+.quick-switch-card {
+  background: var(--surface);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--border-radius-lg);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.quick-switch-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.quick-switch-head h3 {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* When used as a plain muted link (no .header-button companion class) the
+   original styling applies. The handoff renders this as a small button, so
+   templates now also tag it `.header-button.is-secondary`; we just shrink
+   it to a compact size here. */
+.quick-switch-link:not(.header-button),
+a.quick-switch-link:not(.header-button):link,
+a.quick-switch-link:not(.header-button):visited {
+  color: var(--muted);
+  font-size: 0.78rem;
+  text-decoration: none;
+}
+
+.quick-switch-link:not(.header-button):hover {
+  color: var(--accent);
+}
+
+a.quick-switch-link.header-button {
+  padding: 5px 10px;
+  font-size: 0.78rem;
+  min-height: 0;
+  text-decoration: none;
+}
+
+.quick-switch-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Handoff parity (styles.css:374–381): quick-rows render as card-in-card
+   chips with a resting surface-2 background + border. The active state is
+   a subtle 5% accent tint with a 40% accent-border mix against --border,
+   not the louder 18%-weak / 25%-border we previously used. */
+.quick-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 10px;
+  border-radius: var(--border-radius-md);
+  background: var(--surface-2);
+  border: 1px solid var(--surface-border);
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.quick-row:hover {
+  border-color: var(--border-strong, var(--surface-border));
+}
+
+.quick-row.is-active {
+  background: color-mix(in oklab, var(--accent) 5%, var(--surface-2));
+  border-color: color-mix(in oklab, var(--accent) 40%, var(--surface-border));
+}
+
+.quick-row-main {
+  min-width: 0;
+  flex: 1;
+}
+
+.quick-row-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.quick-name {
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quick-sub {
+  font-family: var(--font-mono, 'JetBrains Mono'), ui-monospace, monospace;
+  font-size: 0.7rem;
+  color: var(--text-3);
+  margin-top: 2px;
+}
+
+a.quick-row-link:link,
+a.quick-row-link:visited {
+  color: var(--muted);
+  font-size: 0.78rem;
+  text-decoration: none;
+  padding: 4px 10px;
+  border-radius: var(--border-radius-sm);
+  border: 1px solid var(--surface-border);
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+a.quick-row-link:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.quick-row-btn.is-busy {
+  opacity: 0.72;
+  cursor: wait;
+}
+
+/* Visual parity pass: tighter dashboard rhythm, grouped header actions, and a
+   compact empty-state note so the aside no longer creates a dead panel. */
+.dashboard-pageheader-actions {
+  align-items: center;
+  gap: 8px;
+  padding-top: 0;
+}
+
+.dashboard-header-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  width: auto;
+  min-height: 32px;
+  padding: 7px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0;
+  line-height: 1;
+  box-shadow: none;
+}
+
+.dashboard-header-button .btn-leading-icon {
+  width: 14px;
+  height: 14px;
+}
+
+.dashboard-header-button.is-secondary {
+  background: transparent;
+  color: var(--text-2);
+  border-color: transparent;
+}
+
+.dashboard-header-button.is-secondary:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.dashboard-header-button.is-secondary .btn-leading-icon {
+  color: var(--text-3);
+}
+
+.dashboard-header-button.is-secondary:hover .btn-leading-icon {
+  color: var(--text);
+}
+
+.dashboard-header-button.primary {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border: 1px solid var(--accent);
+  box-shadow: var(--shadow-xs);
+}
+
+.dashboard-header-button.primary:hover {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+
+/* The compact empty-state variant is used where the overview banner sits
+   inline with a live card rather than as its own card. */
+.dashboard-overview-empty.is-compact {
+  padding: 6px 0 0;
+  background: transparent;
+  border: 0;
+  min-height: 0;
+  color: var(--text-3);
+}
+
+.dashboard-overview-empty.is-compact .empty-state-icon {
+  width: 14px;
+  height: 14px;
+  opacity: 0.45;
+}
+
+.dashboard-overview-empty.is-compact p {
+  font-size: 0.78rem;
+}
+
+#plugins-grid {
+  margin-top: 0;
+}
+
+#plugins-grid .section-head {
+  margin-bottom: 8px;
+}
+
+#plugins-grid .plugins-container.plugin-tile-grid {
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 8px;
+}

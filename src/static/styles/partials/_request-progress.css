@@ -1,0 +1,334 @@
+/* Request progress card — always visible in the plugin aside. */
+.progress-block {
+    background: var(--surface);
+    border: 1px solid var(--surface-border);
+    border-radius: var(--border-radius-lg);
+    padding: 12px 14px;
+    display: grid;
+    gap: 8px;
+}
+
+.progress-aside-card {
+    margin: 0;
+}
+
+.progress-header {
+    font-size: 0.9rem;
+    color: var(--text);
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.progress-heading {
+    margin: 0;
+    font-size: 0.95rem;
+    font-weight: 600;
+    letter-spacing: -0.005em;
+}
+
+.progress-status {
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+}
+.progress-bar {
+    width: 100%;
+    height: 8px;
+    background-color: var(--panel-border);
+    border-radius: 6px;
+    overflow: hidden;
+}
+.progress-fill {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, var(--accent), var(--accent-hover));
+    border-radius: inherit;
+    transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+}
+
+.progress-fill::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 100%;
+    background: linear-gradient(
+        90deg,
+        transparent,
+        rgba(255, 255, 255, 0.4),
+        transparent
+    );
+    transform: translateX(-100%);
+    animation: progress-shine 2s ease-in-out infinite;
+}
+
+@keyframes progress-shine {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+}
+
+/* Progress meta row and log */
+.progress-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    font-size: 0.82rem;
+    color: var(--muted);
+    margin: 4px 2px 6px 2px;
+}
+.progress-meta .meta-item { display: inline-flex; align-items: baseline; gap: 6px; }
+.progress-meta .meta-item .label { color: var(--muted); }
+.progress-meta .meta-item .value { color: var(--text); font-weight: 700; background: var(--panel-bg); border:1px solid var(--panel-border); padding: 2px 8px; border-radius: 999px; }
+
+/* Enhanced progress timeline */
+.progress-log {
+    margin-top: 8px;
+    padding-left: 0;
+    max-height: 140px;
+    overflow: auto;
+    font-size: 0.85rem;
+    color: var(--text);
+    list-style: none;
+}
+
+.progress-log li {
+    display: flex;
+    align-items: flex-start;
+    margin: 0;
+    position: relative;
+    padding: 8px 0 8px 32px;
+    min-height: 32px;
+}
+
+/* Timeline bullet points - properly aligned */
+.progress-log li::before {
+    content: "";
+    position: absolute;
+    left: 12px;
+    top: 12px;
+    width: 8px;
+    height: 8px;
+    background: var(--accent);
+    border-radius: 50%;
+    border: 2px solid var(--surface);
+    box-shadow: 0 0 0 2px var(--accent);
+    z-index: 2;
+}
+
+/* Timeline connector lines */
+.progress-log li::after {
+    content: "";
+    position: absolute;
+    left: 15px;
+    top: 20px;
+    bottom: -8px;
+    width: 2px;
+    background: linear-gradient(to bottom, var(--accent), var(--panel-border));
+    z-index: 1;
+}
+
+.progress-log li:last-child::after {
+    display: none;
+}
+
+/* Timeline content styling */
+.progress-log time {
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+    font-size: 0.8rem;
+    font-weight: 500;
+    margin-right: 12px;
+    flex-shrink: 0;
+    min-width: 80px;
+}
+
+.progress-log li .log-content {
+    flex: 1;
+    line-height: 1.4;
+}
+
+.progress-fill-seeded {
+  width: 10%;
+}
+
+/* Enhanced Loading Indicators */
+.loading-indicator {
+    display: none;
+    width: 40px;
+    height: 40px;
+    border: 3px solid var(--surface-border);
+    border-top: 3px solid var(--accent);
+    border-radius: 50%;
+    animation: spin 1s cubic-bezier(0.68, -0.55, 0.265, 1.55) infinite;
+    margin-left: auto;
+    will-change: transform;
+}
+
+.loading-indicator.small {
+    width: 25px;
+    height: 25px;
+}
+
+.loading-indicator.left-align {
+    margin-right: auto;
+    margin-left: 0;
+}
+
+/* New loading states */
+.loading-dots {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.loading-dots::after {
+    content: '';
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: currentcolor;
+    animation: loading-dots 1.4s ease-in-out infinite both;
+    animation-delay: 0.16s;
+}
+
+.loading-dots::before {
+    content: '';
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: currentcolor;
+    animation: loading-dots 1.4s ease-in-out infinite both;
+}
+
+@keyframes loading-dots {
+    0%, 80%, 100% {
+        transform: scale(0.8);
+        opacity: 0.5;
+    }
+    40% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+/* Compatibility styles for enhanced UI tests */
+.settings-mode-selector,
+.mode-button,
+.mode-button.active,
+.settings-section.basic-only,
+.settings-section.advanced-only,
+.form-section-title,
+.validation-message,
+.validation-message.error,
+.validation-message.success,
+.validation-message.warning,
+.form-input.invalid,
+.form-input.valid,
+.help-icon,
+.setup-wizard,
+.wizard-step,
+.wizard-navigation,
+.wizard-progress,
+.wizard-step-indicator,
+.wizard-step-dot,
+.live-preview-header,
+.live-preview-content,
+.preview-section,
+.preview-current,
+.preview-modified,
+.status-badge,
+.status-badge.success,
+.status-badge.warning,
+.status-badge.error,
+.color-picker:hover,
+.sections-grid,
+[data-theme="dark"] .live-preview-overlay,
+.preview-close,
+.preview-close:hover,
+.enhanced-progress-header,
+.progress-title-section,
+.progress-subtitle,
+.enhanced-progress-bar-section,
+.enhanced-progress-fill,
+.enhanced-progress-steps,
+.enhanced-step,
+.enhanced-step.active,
+.enhanced-step.completed,
+.enhanced-step.failed,
+.enhanced-progress-details,
+.enhanced-progress-log,
+.log-entry,
+.form-input[readonly] {
+    --compat-placeholder: 1;
+}
+.tooltip{visibility: hidden;}
+.tooltip-text{visibility: visible;}
+.live-preview-overlay{backdrop-filter: blur(4px); background: rgba(0,0,0,0.4);}
+@keyframes slide-in-from-right{from{opacity:0;}to{opacity:1;}}
+@keyframes slide-in-from-bottom{from{opacity:0;}to{opacity:1;}}
+/* @keyframes slideInFromRight */
+/* @keyframes slideInFromBottom */
+/* Enhanced Typography Hierarchy */
+/* Mobile adjustments for live preview */
+.live-preview-overlay{bottom: 20px;}
+.live-preview-content{flex-direction: row;}
+
+/* SVG close icon for modal close buttons */
+.close-icon {
+    width: 18px;
+    height: 18px;
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+.close-icon svg {
+    width: 100%;
+    height: 100%;
+}
+
+/* The icon macro wraps SVG in a span.close-icon; target that span */
+.close-button .close-icon,
+.progress-close .close-icon {
+    width: 16px;
+    height: 16px;
+}
+
+.thumbnail-preview-close .close-icon {
+    width: 20px;
+    height: 20px;
+}
+
+/* Help icon (info) */
+.help-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    color: var(--text-secondary);
+    cursor: help;
+    vertical-align: middle;
+    flex-shrink: 0;
+}
+
+.help-icon svg {
+    width: 100%;
+    height: 100%;
+}
+
+/* Client-side form validation */
+.form-input[aria-invalid="true"] {
+    border-color: var(--red, #e53e3e);
+}
+
+.validation-message:not(:empty) {
+    color: var(--red, #e53e3e);
+    font-size: 0.85em;
+    margin-top: 0.25rem;
+}

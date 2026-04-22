@@ -1,0 +1,263 @@
+/* Enhanced Progress Display */
+.enhanced-progress-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 12px;
+}
+
+.progress-title-section {
+    flex: 1;
+}
+
+.progress-title {
+    font-weight: 600;
+    color: var(--text);
+    font-size: 1rem;
+    line-height: 1.4;
+    display: block;
+}
+
+.progress-subtitle {
+    color: var(--text-muted);
+    font-size: 0.875rem;
+    line-height: 1.3;
+    margin-top: 2px;
+    display: block;
+}
+
+.progress-controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.progress-elapsed {
+    color: var(--text-muted);
+    font-size: 0.875rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.enhanced-progress-bar-section {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.progress-bar-container {
+    flex: 1;
+    height: 8px;
+    background-color: var(--muted);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.enhanced-progress-fill {
+    height: 100%;
+    background: linear-gradient(
+        90deg,
+        var(--primary) 0%,
+        var(--primary-hover) 100%
+    );
+    border-radius: 4px;
+    transition: width 0.3s ease;
+}
+
+.progress-percentage {
+    color: var(--text-muted);
+    font-size: 0.875rem;
+    font-variant-numeric: tabular-nums;
+    min-width: 3em;
+    text-align: right;
+}
+
+/* Enhanced Step Indicators */
+.enhanced-progress-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+.enhanced-step {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 8px;
+    border-radius: var(--border-radius-sm);
+    transition: all 0.3s ease;
+}
+
+.enhanced-step.active {
+    background-color: var(--primary-bg);
+    border-left: 3px solid var(--primary);
+    padding-left: 9px;
+}
+
+.enhanced-step.completed {
+    opacity: 0.8;
+}
+
+.enhanced-step.failed {
+    background-color: var(--error-bg);
+    border-left: 3px solid var(--error);
+    padding-left: 9px;
+}
+
+.step-indicator {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background-color: var(--muted);
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    flex-shrink: 0;
+}
+
+.enhanced-step.active .step-indicator {
+    background-color: var(--primary);
+    color: var(--on-accent);
+}
+
+.enhanced-step.completed .step-indicator {
+    background-color: var(--success);
+    color: var(--on-accent);
+}
+
+.enhanced-step.completed .step-indicator::after {
+    content: '\2713';
+    font-size: 0.875rem;
+}
+
+.enhanced-step.completed .step-number {
+    display: none;
+}
+
+.enhanced-step.failed .step-indicator {
+    background-color: var(--error);
+    color: var(--on-accent);
+}
+
+.enhanced-step.failed .step-indicator::after {
+    content: '\2715';
+    font-size: 0.875rem;
+}
+
+.enhanced-step.failed .step-number {
+    display: none;
+}
+
+.step-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.step-name {
+    font-weight: 500;
+    color: var(--text);
+    line-height: 1.4;
+}
+
+.enhanced-step.completed .step-name {
+    color: var(--text-muted);
+}
+
+.step-timing {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    margin-top: 2px;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Enhanced Progress Details */
+.enhanced-progress-details {
+    border-top: 1px solid var(--surface-border);
+    padding-top: 16px;
+    margin-top: 16px;
+}
+
+.progress-details-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.progress-details-header span {
+    font-weight: 600;
+    color: var(--text);
+    font-size: 0.875rem;
+}
+
+.details-toggle {
+    background: none;
+    border: none;
+    color: var(--primary);
+    cursor: pointer;
+    font-size: 0.75rem;
+    padding: 4px 8px;
+    border-radius: var(--border-radius-sm);
+    transition: background-color 0.2s ease;
+}
+
+.details-toggle:hover {
+    background-color: var(--primary-bg);
+}
+
+.enhanced-progress-log {
+    max-height: 200px;
+    overflow-y: auto;
+    border: 1px solid var(--surface-border);
+    border-radius: var(--border-radius-sm);
+    padding: 8px;
+    background-color: var(--surface);
+    font-size: 0.875rem;
+    line-height: 1.4;
+    list-style: none;
+}
+
+.log-entry {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 4px 0;
+    border-bottom: 1px solid var(--surface-border);
+}
+
+.log-entry:last-child {
+    border-bottom: none;
+}
+
+.log-time {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    font-variant-numeric: tabular-nums;
+    flex-shrink: 0;
+    min-width: 5em;
+}
+
+.log-content {
+    flex: 1;
+    color: var(--text);
+}
+
+.log-entry.log-step .log-content {
+    font-weight: 500;
+}
+
+.log-entry.log-success .log-content {
+    color: var(--success);
+    font-weight: 500;
+}
+
+.log-entry.log-error .log-content {
+    color: var(--error);
+    font-weight: 500;
+}
+

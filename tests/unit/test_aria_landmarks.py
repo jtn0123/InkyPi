@@ -137,20 +137,20 @@ def test_dashboard_has_navigation_landmark(client):
 
 def test_skip_link_css_offscreen():
     """The .skip-link rule must use a negative top/left or clip to hide off-screen."""
-    layout_css = (
+    a11y_css = (
         Path(__file__).parent.parent.parent
         / "src"
         / "static"
         / "styles"
         / "partials"
-        / "_layout.css"
+        / "_a11y.css"
     )
-    assert layout_css.exists(), f"_layout.css not found at {layout_css}"
-    css = layout_css.read_text(encoding="utf-8")
+    assert a11y_css.exists(), f"_a11y.css not found at {a11y_css}"
+    css = a11y_css.read_text(encoding="utf-8")
 
     # Find the .skip-link block
     match = re.search(r"\.skip-link\s*\{([^}]+)\}", css)
-    assert match, ".skip-link rule not found in _layout.css"
+    assert match, ".skip-link rule not found in _a11y.css"
 
     block = match.group(1)
     # Must use a mechanism that hides it off-screen by default

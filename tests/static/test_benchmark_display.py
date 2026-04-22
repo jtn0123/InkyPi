@@ -57,7 +57,7 @@ class TestBenchmarkTableCSS:
     """Ensure the bench-table CSS class exists."""
 
     def test_bench_table_class_in_css(self):
-        css = Path("src/static/styles/partials/_settings.css").read_text()
+        css = Path("src/static/styles/partials/_settings-console.css").read_text()
         assert ".bench-table" in css
 
     def test_bench_table_class_used_in_js(self):

@@ -164,12 +164,12 @@ def test_settings_responsive_css_sticky_save_selector_matches_real_dom():
         / "static"
         / "styles"
         / "partials"
-        / "_responsive.css"
+        / "_responsive-large.css"
     )
     content = css_path.read_text(encoding="utf-8")
     assert ".settings-panel .buttons-container" in content, (
-        "JTN-572: _responsive.css must pin the Save button on /settings with "
-        "a descendant combinator selector."
+        "JTN-572: _responsive-large.css must pin the Save button on /settings "
+        "with a descendant combinator selector."
     )
     # Regression guard: the broken child-combinator selector must NOT reappear.
     assert ".settings-panel > .buttons-container" not in content, (
