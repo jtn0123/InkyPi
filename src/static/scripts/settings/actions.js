@@ -49,26 +49,43 @@
         flushList();
         continue;
       }
-      const bulletMatch = trimmed.match(/^[-*\u2022]\s+(.+)$/);
-      if (bulletMatch) {
-        if (!inList) {
-          out.push("<ul>");
-          inList = true;
-        }
-        out.push("<li>" + escapeReleaseNotesHTML(bulletMatch[1]) + "</li>");
-        continue;
-      }
-      const headingMatch = trimmed.match(/^(#{1,6})\s+(.+)$/);
-      if (headingMatch) {
-        flushList();
-        const text = headingMatch[2];
-        // Skip the redundant version heading ("# v0.64.1 (2026-04-21)")
-        if (!sawVersionHeading && /^v?\d/.test(text)) {
-          sawVersionHeading = true;
+      // Hand-rolled bullet / heading detection instead of anchored-greedy
+      // regexes to avoid any super-linear backtracking risk (SonarCloud
+      // S5852). `trimmed` has no newlines so slice+trim is O(n).
+      const firstChar = trimmed.charAt(0);
+      if (firstChar === "-" || firstChar === "*" || firstChar === "\u2022") {
+        const rest = trimmed.slice(1).replace(/^[ \t]+/, "");
+        if (rest && trimmed.charAt(1) !== firstChar) {
+          if (!inList) {
+            out.push("<ul>");
+            inList = true;
+          }
+          out.push("<li>" + escapeReleaseNotesHTML(rest) + "</li>");
           continue;
         }
-        out.push("<h4>" + escapeReleaseNotesHTML(text) + "</h4>");
-        continue;
+      }
+      if (firstChar === "#") {
+        let hashCount = 0;
+        while (hashCount < trimmed.length && trimmed.charAt(hashCount) === "#") {
+          hashCount += 1;
+        }
+        if (hashCount >= 1 && hashCount <= 6) {
+          const afterHashes = trimmed.slice(hashCount);
+          const spaceRun = afterHashes.match(/^[ \t]+/);
+          if (spaceRun) {
+            const text = afterHashes.slice(spaceRun[0].length);
+            if (text) {
+              flushList();
+              // Skip the redundant version heading ("# v0.64.1 (2026-04-21)")
+              if (!sawVersionHeading && /^v?\d/.test(text)) {
+                sawVersionHeading = true;
+                continue;
+              }
+              out.push("<h4>" + escapeReleaseNotesHTML(text) + "</h4>");
+              continue;
+            }
+          }
+        }
       }
       flushList();
       out.push("<p>" + escapeReleaseNotesHTML(trimmed) + "</p>");

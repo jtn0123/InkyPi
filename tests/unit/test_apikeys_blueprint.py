@@ -92,7 +92,10 @@ def test_mask_value_normal():
 
     result = mask_value("my_secret_key")
     assert "●" in result
-    assert len(result) <= 20
+    # Long values keep the trailing four chars so operators can identify
+    # the key they stored without exposing the token itself.
+    assert result.endswith("_key")
+    assert result == "●●●●●●●●_key"
 
 
 def test_mask_value_empty():
@@ -100,6 +103,22 @@ def test_mask_value_empty():
 
     assert mask_value("") == "(empty)"
     assert mask_value(None) == "(empty)"
+
+
+def test_mask_value_short_hides_everything():
+    """Inputs of 4 chars or fewer are fully masked so the visible suffix
+    doesn't devolve into the whole token."""
+    from blueprints.apikeys import mask_value
+
+    assert mask_value("abc") == "●●●"
+    assert mask_value("abcd") == "●●●●"
+
+
+def test_mask_value_five_chars_reveals_last_four():
+    """Five-char input is the boundary where the suffix first appears."""
+    from blueprints.apikeys import mask_value
+
+    assert mask_value("abcde") == "●●●●●●●●bcde"
 
 
 def test_get_env_path_with_project_dir(monkeypatch):
