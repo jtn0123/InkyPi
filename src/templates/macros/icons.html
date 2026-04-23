@@ -70,9 +70,9 @@
 
 {% macro breadcrumb(items) -%}
 <nav aria-label="Breadcrumb" class="breadcrumb">
-    <ol>
+    <ol class="breadcrumb-list">
         {% for item in items %}
-        <li{% if loop.last %} aria-current="page"{% endif %}>
+        <li class="breadcrumb-item"{% if loop.last %} aria-current="page"{% endif %}>
             {% if item.url and not loop.last %}
             <a href="{{ item.url }}">{{ item.label }}</a>
             {% else %}

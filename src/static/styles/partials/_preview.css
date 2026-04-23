@@ -321,9 +321,21 @@
 }
 
 .metric-pill-value {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
   font-size: 0.98rem;
   font-weight: 600;
   color: var(--text);
+}
+
+.metric-pill-value em {
+  font-family: var(--font-mono, 'JetBrains Mono'), ui-monospace, monospace;
+  font-style: normal;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--text-3);
+  letter-spacing: 0.02em;
 }
 
 .metric-strip.compact .metric-pill {

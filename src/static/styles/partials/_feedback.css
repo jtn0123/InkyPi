@@ -32,6 +32,101 @@ body.modal-open {
     background: var(--modal-bg);
     border: 1px solid var(--surface-border);
 }
+/* Quick-update confirm modal (sidebar download chip target). Dedicated
+   scope so the layout doesn't inherit the narrow 400px action-button
+   grid used by the generic response modal. */
+.quick-update-modal .modal-content {
+    max-width: 480px;
+    margin: 12vh auto;
+    padding: 22px 24px 18px;
+}
+
+.quick-update-versions {
+    display: flex;
+    align-items: stretch;
+    gap: 10px;
+    margin: 6px 0 14px;
+}
+
+.quick-update-version-tile {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 10px 12px;
+    border: 1px solid var(--surface-border);
+    border-radius: var(--border-radius-md);
+    background: var(--surface-2, var(--surface));
+}
+
+.quick-update-version-tile-latest {
+    border-color: color-mix(in srgb, var(--accent) 40%, var(--surface-border));
+    background: color-mix(in oklab, var(--accent-weak, var(--surface-2)) 60%, var(--surface-2));
+}
+
+.quick-update-version-label {
+    font-family: var(--font-mono, 'JetBrains Mono'), ui-monospace, monospace;
+    font-size: 0.64rem;
+    letter-spacing: 0.1em;
+    color: var(--text-3, var(--muted));
+    text-transform: uppercase;
+}
+
+.quick-update-version-value {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text);
+}
+
+.quick-update-arrow {
+    align-self: center;
+    color: var(--text-3, var(--muted));
+    font-size: 1.1rem;
+    flex-shrink: 0;
+}
+
+.quick-update-body {
+    color: var(--muted);
+    font-size: 0.88rem;
+    line-height: 1.5;
+    margin: 0 0 16px;
+}
+
+.quick-update-actions {
+    margin-top: 0;
+}
+
+.quick-update-actions .action-button {
+    min-height: 40px;
+    padding: 10px 18px;
+    font-size: 0.92rem;
+    white-space: nowrap;
+}
+
+.quick-update-footer {
+    display: flex;
+    justify-content: center;
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 1px solid var(--surface-border);
+}
+
+.quick-update-link {
+    color: var(--text-3, var(--muted));
+    font-size: 0.82rem;
+    text-decoration: none;
+    padding: 4px 6px;
+    border-radius: var(--border-radius-sm);
+    transition: color 0.15s ease;
+}
+
+.quick-update-link:hover,
+.quick-update-link:focus-visible {
+    color: var(--accent);
+    text-decoration: underline;
+}
+
 /* For image preview modal, allow larger canvas */
 .image-modal .modal-content {
   max-width: 95vw;
@@ -393,19 +488,46 @@ details[open] > .update-release-notes-toggle::before {
 
 .update-release-notes-body {
     margin-top: 6px;
-    padding: 0 0 0 18px;
+    padding: 0 0 0 4px;
     font-size: 0.82rem;
     line-height: 1.55;
     color: var(--text-secondary);
     max-height: 200px;
     overflow-y: auto;
-    white-space: pre-wrap;
+}
+
+.update-release-notes-body ul {
+    list-style: disc outside;
+    margin: 0 0 8px;
+    padding-left: 18px;
+}
+
+.update-release-notes-body li {
+    margin: 2px 0;
+}
+
+.update-release-notes-body h4 {
+    margin: 10px 0 4px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--text);
+    text-transform: none;
+    letter-spacing: 0;
+}
+
+.update-release-notes-body h4:first-child {
+    margin-top: 0;
+}
+
+.update-release-notes-body p {
+    margin: 4px 0;
 }
 
 .update-actions {
     display: flex;
     gap: var(--spacing-sm);
     flex-wrap: wrap;
+    align-items: center;
 }
 
 /* Legacy compatibility */

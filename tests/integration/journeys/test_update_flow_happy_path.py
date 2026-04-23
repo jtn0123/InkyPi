@@ -197,17 +197,21 @@ def test_update_flow_happy_path(
         timeout=10000,
     )
 
-    # -- Step 3: assert tag displayed + badge says "Update available" ------
+    # -- Step 3: assert tag displayed + Update Now enabled -----------------
     latest_text = page.locator("#latestVersion").inner_text().strip()
     assert (
         _STUBBED_LATEST_TAG in latest_text
     ), f"#latestVersion should show stubbed tag; got {latest_text!r}"
-    badge_text = page.locator("#updateBadge").inner_text().strip()
-    assert (
-        "update available" in badge_text.lower()
-    ), f"#updateBadge should reflect update availability; got {badge_text!r}"
 
-    # "Update Now" must now be enabled (it ships disabled).
+    # The old `#updateBadge` chip was removed — the sidebar download icon
+    # carries the "update available" signal site-wide, and the check button
+    # only shows a transient "Checking…" label. The authoritative signal
+    # here is that `#startUpdateBtn` becomes enabled once a newer version
+    # is reported (it ships disabled on first paint).
+    assert page.locator("#updateBadge").count() == 0, (
+        "#updateBadge chip was removed in favour of the sidebar indicator; "
+        "a lingering element would re-introduce the duplicate signal."
+    )
     assert not page.locator("#startUpdateBtn").is_disabled(), (
         "#startUpdateBtn should be enabled once the check-for-updates call "
         "reports a newer version"

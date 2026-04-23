@@ -1,4 +1,4 @@
-const CACHE_NAME = "inkypi-shell-v1";
+const CACHE_NAME = "inkypi-shell-v23";
 
 const SHELL_ASSETS = [
   "/static/styles/main.css",
@@ -8,6 +8,8 @@ const SHELL_ASSETS = [
   "/static/scripts/form_validator.js",
   "/static/scripts/response_modal.js",
   "/static/scripts/ui_helpers.js",
+  "/static/scripts/tweaks_panel.js",
+  "/static/scripts/update_indicator.js",
 ];
 
 self.addEventListener("install", (event) => {

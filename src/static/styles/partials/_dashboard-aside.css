@@ -146,6 +146,14 @@ a.quick-switch-link.header-button {
   font-size: 0.7rem;
   color: var(--text-3);
   margin-top: 2px;
+  /* The quick-switch card is the narrow column of the dashboard aside
+     (~180-220px). The summary string "All day · 60 min cycle · 0 items"
+     otherwise wraps to 3 lines; single-line ellipsis keeps the rhythm
+     tight and the full value is still available via the row's data-*
+     attributes (and the "All playlists" link is one click away). */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 a.quick-row-link:link,

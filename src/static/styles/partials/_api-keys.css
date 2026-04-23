@@ -189,15 +189,26 @@
 }
 
 /* Handoff parity: API-key rows are .card primitives (1px border, radius-xl,
-   --surface) — flatter row style for the handoff Settings layout. */
+   --surface) — flatter row style for the handoff Settings layout. A subtle
+   2px left-border tint indicates status at a glance (accent when a key is
+   configured, warning when empty) without crowding the right-side chip. */
 .api-key-card {
   padding: 14px 16px;
   border: 1px solid var(--surface-border);
+  border-left-width: 2px;
   border-radius: var(--border-radius-xl);
   background: var(--surface);
   display: grid;
   gap: 10px;
   width: 100%;
+}
+
+.api-key-card[data-configured="true"] {
+  border-left-color: color-mix(in oklab, var(--accent) 55%, var(--surface-border));
+}
+
+.api-key-card[data-configured="false"] {
+  border-left-color: color-mix(in oklab, var(--warning, #f59e0b) 60%, var(--surface-border));
 }
 
 .key-row {

@@ -400,6 +400,13 @@ svg.icon-thin {
     height: 16px;
     flex-shrink: 0;
     color: currentColor;
+    display: inline-block;
+}
+
+.btn-leading-icon svg {
+    width: 100%;
+    height: 100%;
+    display: block;
 }
 
 /* Breadcrumb navigation */

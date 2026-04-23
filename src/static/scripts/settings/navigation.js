@@ -54,13 +54,36 @@
       initializeMobilePanelState();
     }
 
+    function activateTabForHash() {
+      // When the user lands on /settings#section-software-update (e.g. from
+      // the sidebar quick-update modal's "See release notes" link) we need
+      // to activate the panel that owns the hash target, or the section
+      // stays under the hidden "maintenance" panel.
+      const hash = (location.hash || "").replace(/^#/, "");
+      if (!hash) return false;
+      const target = document.getElementById(hash);
+      if (!target) return false;
+      const panel = target.closest("[data-settings-panel]");
+      if (!panel || !panel.dataset.settingsPanel) return false;
+      setActiveTab(panel.dataset.settingsPanel);
+      // Wait a tick so the now-visible panel lays out before scrolling —
+      // otherwise scrollIntoView resolves against a `display:none` target.
+      setTimeout(() => {
+        target.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 50);
+      return true;
+    }
+
     function initializeTabs() {
       for (const button of document.querySelectorAll("[data-settings-tab]")) {
         button.addEventListener("click", () =>
           setActiveTab(button.dataset.settingsTab)
         );
       }
-      setActiveTab("device");
+      if (!activateTabForHash()) {
+        setActiveTab("device");
+      }
+      window.addEventListener("hashchange", activateTabForHash);
     }
 
     function initMobileNav() {

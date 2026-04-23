@@ -156,9 +156,16 @@
     body.hidden = !shouldExpand;
     item.classList.toggle("mobile-expanded", shouldExpand);
     item.classList.toggle("mobile-collapsed", !shouldExpand);
-    toggle.textContent = shouldExpand
+    item.classList.toggle("is-open", shouldExpand);
+    const label = shouldExpand
       ? toggle.dataset.expandedLabel || "Hide"
       : toggle.dataset.collapsedLabel || "Open";
+    const labelEl = toggle.querySelector(".playlist-toggle-label");
+    if (labelEl) {
+      labelEl.textContent = label;
+    } else {
+      toggle.textContent = label;
+    }
     toggle.setAttribute("aria-expanded", String(shouldExpand));
 
     if (!isMobile) return;

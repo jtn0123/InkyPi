@@ -28,6 +28,7 @@
     <script src="{{ url_for('static', filename='vendor/htmx.min.js') }}" defer
             integrity="{{ sri_for('vendor/htmx.min.js') }}" crossorigin="anonymous"></script>
     <script src="{{ url_for('static', filename='scripts/tweaks_panel.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='scripts/update_indicator.js') }}" defer></script>
     {% block head %}{% endblock %}
     <script nonce="{{ csp_nonce }}">
       if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost" || location.hostname === "127.0.0.1")) {
@@ -69,7 +70,8 @@
         <div class="tweaks-head">
             <h2>Appearance</h2>
             <button type="button" class="tweaks-close" aria-label="Close tweaks panel">
-                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="6" y1="6" x2="18" y2="18"></line><line x1="18" y1="6" x2="6" y2="18"></line></svg>
+                {% from 'macros/icons.html' import icon %}
+                {{ icon('x', 'close-icon') | safe }}
             </button>
         </div>
         <div class="tweak-group">
@@ -91,13 +93,52 @@
         <div class="tweak-group">
             <div class="accent-head">
                 <span class="tweak-label" style="margin-bottom:0;">Accent hue</span>
-                <span id="accentHueValue" class="accent-value">170°</span>
+                <span id="accentHueValue" class="accent-value" data-accent-value>170°</span>
             </div>
-            <input id="accentHueSlider" class="accent-slider" type="range" min="0" max="360" step="1" value="170" aria-label="Accent hue">
+            <input id="accentHueSlider" class="accent-slider" type="range" min="0" max="360" step="1" value="170" aria-label="Accent hue" data-accent-slider>
         </div>
         <div class="tweak-group">
-            <button id="tweaksReset" type="button" class="density-option" style="width:100%;">Reset to defaults</button>
+            <button id="tweaksReset" type="button" class="density-option" style="width:100%;" data-tweaks-reset>Reset to defaults</button>
         </div>
     </aside>
+
+    {# Shared quick-update confirm modal. Populated + toggled by
+       /static/scripts/update_indicator.js whenever the sidebar update
+       button is clicked from any page. Button layout: primary action +
+       Cancel sit in `.buttons-container`, and "See release notes" is a
+       subtle text link beneath them — the action-button class made it
+       wrap to three stacked lines at 400px. #}
+    <div id="quickUpdateModal" class="modal quick-update-modal" role="dialog" aria-modal="true"
+         aria-labelledby="quickUpdateTitle" hidden>
+        <div class="modal-content">
+            <button type="button" id="closeQuickUpdateBtn" class="close-button" aria-label="Close">
+                {% from 'macros/icons.html' import icon %}
+                {{ icon('x', 'close-icon') | safe }}
+            </button>
+            <h2 id="quickUpdateTitle">Update available</h2>
+            <div class="separator"></div>
+            <div class="quick-update-versions">
+                <div class="quick-update-version-tile">
+                    <span class="quick-update-version-label">Installed</span>
+                    <span class="quick-update-version-value mono" id="quickUpdateCurrent">—</span>
+                </div>
+                <span class="quick-update-arrow" aria-hidden="true">→</span>
+                <div class="quick-update-version-tile quick-update-version-tile-latest">
+                    <span class="quick-update-version-label">Latest</span>
+                    <span class="quick-update-version-value mono" id="quickUpdateLatest">—</span>
+                </div>
+            </div>
+            <p class="quick-update-body">
+                The web UI will be briefly unavailable while the service restarts.
+            </p>
+            <div class="buttons-container quick-update-actions">
+                <button type="button" class="action-button primary" id="quickUpdateStartBtn">Update now</button>
+                <button type="button" class="action-button is-secondary" id="quickUpdateCancelBtn">Cancel</button>
+            </div>
+            <div class="quick-update-footer">
+                <a id="quickUpdateDetailsLink" class="quick-update-link" href="{{ url_for('settings.settings_page') }}#section-software-update">See release notes</a>
+            </div>
+        </div>
+    </div>
 </body>
 </html>

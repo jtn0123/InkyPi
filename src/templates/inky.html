@@ -112,19 +112,19 @@
                         <dl class="kv-list kpi-list">
                             <div>
                                 <dt>Refreshes</dt>
-                                <dd id="kpiRefreshes">&mdash;</dd>
+                                <dd class="mono" id="kpiRefreshes">&mdash;</dd>
                             </div>
                             <div>
                                 <dt>Avg render</dt>
-                                <dd id="kpiAvgRender">&mdash;</dd>
+                                <dd class="mono" id="kpiAvgRender">&mdash;</dd>
                             </div>
                             <div>
                                 <dt>Errors</dt>
-                                <dd id="kpiErrors">&mdash;</dd>
+                                <dd class="mono" id="kpiErrors">&mdash;</dd>
                             </div>
                             <div>
                                 <dt>Storage free</dt>
-                                <dd id="kpiStorageFree">&mdash;</dd>
+                                <dd class="mono" id="kpiStorageFree">&mdash;</dd>
                             </div>
                         </dl>
                     </section>
@@ -202,10 +202,8 @@
                     {% endif %}
                 </aside>
             </div>
-            {% set quick_launch_limit = 10 %}
-            {% set quick_launch_plugins = plugins[:quick_launch_limit] %}
             {{ plugin_catalog(
-                plugins=quick_launch_plugins,
+                plugins=plugins,
                 heading='Plugins',
                 count_label=(plugins|length ~ ' installed'),
                 action_href=url_for('plugin.plugins_page'),

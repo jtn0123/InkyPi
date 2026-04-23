@@ -287,9 +287,14 @@
 .plugins-container.plugin-tile-grid .plugin-tile .icon-image {
     width: 22px;
     height: 22px;
+    min-width: 0;
+    min-height: 0;
     flex-shrink: 0;
     padding: 0;
     margin: 0;
+    background: transparent;
+    border: 0;
+    border-radius: 0;
 }
 
 .plugin-tile-body {
@@ -334,7 +339,14 @@
     height: 14px;
     color: var(--text-3);
     flex-shrink: 0;
+    display: inline-block;
     transition: transform 0.15s ease, color 0.15s ease;
+}
+
+.plugin-tile-chev svg {
+    width: 100%;
+    height: 100%;
+    display: block;
 }
 
 .plugins-container.plugin-tile-grid .plugin-tile:hover .plugin-tile-chev {

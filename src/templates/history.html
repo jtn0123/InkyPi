@@ -13,6 +13,9 @@
         {% from 'macros/pageheader.html' import pageheader %}
         {{ breadcrumb([{'label': 'Home', 'url': url_for('main.main_page')}, {'label': 'History'}]) }}
         {% set hist_chips = [{'label': total ~ ' items', 'variant': 'info'}] %}
+        {% if storage and storage.pct_free is not none %}
+            {% set _ = hist_chips.append({'label': storage.pct_free | round(0, 'floor') | int ~ '% free'}) %}
+        {% endif %}
         {% call pageheader(
             title='Recent renders',
             eyebrow='History',
@@ -25,10 +28,10 @@
         <div id="storage-block" class="storage-card" {% if not storage or storage.pct_free is none %}hidden{% endif %}>
             <div class="storage-card-head">
                 <div>
-                    <div class="storage-card-title">Storage</div>
+                    <div class="storage-card-title">Storage available</div>
                     <div class="storage-card-copy">Track remaining local capacity before the history cache starts competing with new renders.</div>
                 </div>
-                <div id="storage-text" class="storage-card-copy">
+                <div id="storage-text" class="storage-card-copy mono">
                     {% if storage and storage.pct_free is not none %}
                         {{ storage.pct_free|round(2) }}% free • {{ storage.free_gb }} GB remaining of {{ storage.total_gb }} GB total
                     {% else %}
@@ -48,25 +51,25 @@
             {% if metrics.request_ms is not none %}
             <div class="metric-pill" title="Time spent fetching upstream data during the last refresh" aria-label="Request latency: {{ metrics.request_ms }} milliseconds (time fetching upstream data on last refresh)">
                 <span class="metric-pill-label">Request</span>
-                <span class="metric-pill-value">{{ metrics.request_ms }} ms</span>
+                <span class="metric-pill-value">{{ metrics.request_ms }} <em>ms</em></span>
             </div>
             {% endif %}
             {% if metrics.generate_ms is not none %}
             <div class="metric-pill" title="Time spent rendering the plugin image during the last refresh" aria-label="Generate latency: {{ metrics.generate_ms }} milliseconds (plugin render time on last refresh)">
                 <span class="metric-pill-label">Generate</span>
-                <span class="metric-pill-value">{{ metrics.generate_ms }} ms</span>
+                <span class="metric-pill-value">{{ metrics.generate_ms }} <em>ms</em></span>
             </div>
             {% endif %}
             {% if metrics.preprocess_ms is not none %}
             <div class="metric-pill" title="Time spent preprocessing the image (resize, dither) during the last refresh" aria-label="Preprocess latency: {{ metrics.preprocess_ms }} milliseconds (resize and dither on last refresh)">
                 <span class="metric-pill-label">Preprocess</span>
-                <span class="metric-pill-value">{{ metrics.preprocess_ms }} ms</span>
+                <span class="metric-pill-value">{{ metrics.preprocess_ms }} <em>ms</em></span>
             </div>
             {% endif %}
             {% if metrics.display_ms is not none %}
             <div class="metric-pill" title="Time spent pushing pixels to the e-ink panel during the last refresh" aria-label="Display latency: {{ metrics.display_ms }} milliseconds (pushing pixels to the panel on last refresh)">
                 <span class="metric-pill-label">Display</span>
-                <span class="metric-pill-value">{{ metrics.display_ms }} ms</span>
+                <span class="metric-pill-value">{{ metrics.display_ms }} <em>ms</em></span>
             </div>
             {% endif %}
         </section>
