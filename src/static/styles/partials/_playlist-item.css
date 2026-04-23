@@ -385,20 +385,9 @@ a.pl-add-row:hover {
   flex: 0 0 auto;
 }
 
-/* Visually hide the text label but keep it exposed to assistive tech so
-   users still hear "Open" / "Hide" when the button is focused. The inline
-   SVG caret is the visible affordance. */
-.playlist-toggle-button .playlist-toggle-label {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
-}
+/* The label itself uses the shared `.sr-only` utility so AT still hears
+   "Open" / "Hide" when the button is focused. The inline SVG caret is
+   the visible affordance. */
 
 /* Kill any legacy ::after caret defined by the older `_playlists.css`
    rule — the inline SVG inside `.playlist-caret` is now the visible

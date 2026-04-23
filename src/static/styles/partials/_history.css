@@ -196,7 +196,11 @@
 
 .danger-zone-label {
   display: inline-block;
-  justify-self: start;
+  /* The label sits inside `.danger-zone-body`, a grid child; but that body
+     is itself a flex child of `.danger-zone`. `justify-self` only applies
+     to grid children, so use `align-self` to control cross-axis placement
+     in case the label ends up in a flex context (e.g. alternate layouts). */
+  align-self: start;
   font-size: 0.7rem;
   font-weight: 700;
   letter-spacing: 0.08em;

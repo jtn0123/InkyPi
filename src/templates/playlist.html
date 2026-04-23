@@ -62,7 +62,7 @@
             <div class="playlist-item pl-card {% if playlist.name == playlist_config.active_playlist %}active is-active{% endif %}" data-playlist-name="{{ playlist.name }}" data-playlist-card>
                     <div class="playlist-header" data-playlist-action="toggle-card">
                         <div class="playlist-heading">
-                            <button class="playlist-toggle-button" type="button" data-playlist-action="toggle-card" data-playlist-toggle data-collapsed-label="Open" data-expanded-label="Hide" aria-expanded="false" aria-label="Toggle {{ playlist.name }}" title="Toggle {{ playlist.name }}">{{ icon('caret-right', 'playlist-caret') | safe }}<span class="playlist-toggle-label">Open</span></button>
+                            <button class="playlist-toggle-button" type="button" data-playlist-action="toggle-card" data-playlist-toggle data-collapsed-label="Open" data-expanded-label="Hide" aria-expanded="false" aria-label="Toggle {{ playlist.name }}" title="Toggle {{ playlist.name }}">{{ icon('caret-right', 'playlist-caret') | safe }}<span class="playlist-toggle-label sr-only">Open</span></button>
                             <div class="playlist-heading-copy">
                                 <div class="playlist-title-row">
                                     <h2 class="playlist-title">{{ playlist.name }}</h2>

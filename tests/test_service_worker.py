@@ -15,10 +15,19 @@ def test_sw_js_content_type_javascript(client):
 
 
 def test_sw_js_contains_cache_name(client):
-    """GET /sw.js body contains the expected CACHE_NAME constant."""
+    """GET /sw.js body contains the versioned CACHE_NAME constant.
+
+    The cache version is bumped whenever the shell asset list changes; we
+    only care that the name follows the `inkypi-shell-v<n>` convention so
+    the activate handler can prune stale versions deterministically.
+    """
+    import re
+
     response = client.get("/sw.js")
     body = response.data.decode("utf-8")
-    assert "inkypi-shell-v1" in body
+    assert re.search(
+        r"inkypi-shell-v\d+", body
+    ), "sw.js must declare a versioned CACHE_NAME (inkypi-shell-v<n>)"
 
 
 def test_sw_js_service_worker_allowed_header(client):

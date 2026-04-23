@@ -958,19 +958,6 @@ main[data-page-shell="workflow"] .frame {
   line-height: 1.5;
 }
 
-.danger-zone {
-  display: grid;
-  gap: 12px;
-  padding: 16px;
-  border-radius: var(--border-radius-md);
-  border: 1px solid color-mix(in srgb, var(--error) 35%, var(--panel-border));
-  background: color-mix(in srgb, var(--error) 6%, var(--panel-bg));
-}
-
-.danger-zone h3 {
-  margin: 0;
-}
-
 .displayed-now {
     background-color: var(--accent);
     color: var(--on-accent);
@@ -1344,8 +1331,7 @@ main[data-page-shell="workflow"] .frame {
   min-height: 0;
 }
 
-.nav-section,
-.sidebar-nav-section {
+.nav-section {
   font-family: var(--font-mono, 'JetBrains Mono'), ui-monospace, monospace;
   font-size: 0.66rem;
   letter-spacing: 0.08em;
@@ -1355,8 +1341,7 @@ main[data-page-shell="workflow"] .frame {
   font-weight: 500;
 }
 
-.nav-item,
-.sidebar-nav-item {
+.nav-item {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -1374,30 +1359,24 @@ main[data-page-shell="workflow"] .frame {
   width: 100%;
 }
 
-.nav-item:hover,
-.sidebar-nav-item:hover {
+.nav-item:hover {
   background: var(--surface-2);
   color: var(--text);
 }
 
-.nav-item.active,
-.sidebar-nav-item.active {
+.nav-item.active {
   background: var(--accent-weak);
   color: var(--text);
   box-shadow: inset 2px 0 0 var(--accent);
 }
 
 .nav-item.active svg,
-.nav-item.active .icon-image,
-.sidebar-nav-item.active svg,
-.sidebar-nav-item.active .icon-image {
+.nav-item.active .icon-image {
   color: var(--accent);
 }
 
 .nav-item .icon-image,
-.nav-item svg,
-.sidebar-nav-item .icon-image,
-.sidebar-nav-item svg {
+.nav-item svg {
   width: var(--icon-sm);
   height: var(--icon-sm);
   flex-shrink: 0;
@@ -5930,20 +5909,9 @@ a.pl-add-row:hover {
   flex: 0 0 auto;
 }
 
-/* Visually hide the text label but keep it exposed to assistive tech so
-   users still hear "Open" / "Hide" when the button is focused. The inline
-   SVG caret is the visible affordance. */
-.playlist-toggle-button .playlist-toggle-label {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
-}
+/* The label itself uses the shared `.sr-only` utility so AT still hears
+   "Open" / "Hide" when the button is focused. The inline SVG caret is
+   the visible affordance. */
 
 /* Kill any legacy ::after caret defined by the older `_playlists.css`
    rule — the inline SVG inside `.playlist-caret` is now the visible
@@ -6613,9 +6581,13 @@ a.pl-add-row:hover {
   white-space: normal;
 }
 
-/* Row-variants keep their own direction */
+/* Row-variants keep their own direction. `.toggle-row` and `.slider-row`
+   are carried by slider / switch pairs inside settings.html which must
+   stay horizontal so the control sits next to the label. */
 .settings-console-panel .form-group.nowrap,
-.settings-console-panel .form-group.inline-row {
+.settings-console-panel .form-group.inline-row,
+.settings-console-panel .form-group.toggle-row,
+.settings-console-panel .form-group.slider-row {
   flex-direction: row;
   align-items: center;
 }
@@ -7597,7 +7569,11 @@ body[data-page="settings"] .settings-device-name {
 
 .danger-zone-label {
   display: inline-block;
-  justify-self: start;
+  /* The label sits inside `.danger-zone-body`, a grid child; but that body
+     is itself a flex child of `.danger-zone`. `justify-self` only applies
+     to grid children, so use `align-self` to control cross-axis placement
+     in case the label ends up in a flex context (e.g. alternate layouts). */
+  align-self: start;
   font-size: 0.7rem;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -9328,17 +9304,6 @@ details[open] > .update-release-notes-toggle::before {
     z-index: 2;
 }
 
-/* Pending state (first entry when a run is in progress) shows a clock glyph
-   so users can tell at a glance which step is currently streaming. The
-   template/JS can set `.is-pending` on the active <li>; otherwise every
-   entry renders as a check. */
-.progress-log li.is-pending::before {
-    content: "◴";
-    color: var(--warning, #f59e0b);
-    background: color-mix(in oklab, var(--warning, #f59e0b) 15%, var(--surface));
-    border-color: color-mix(in oklab, var(--warning, #f59e0b) 45%, var(--surface-border));
-}
-
 /* Timeline connector lines */
 .progress-log li::after {
     content: "";
@@ -10343,6 +10308,11 @@ body[data-page="api-keys"] .status-popover {
         z-index: auto;
         padding-top: 16px;
         background: none;
+        /* Drop the desktop `width: fit-content` so the Save / Logs pair
+           spans the full card on narrow screens instead of floating as a
+           narrow pill. */
+        width: 100%;
+        max-width: 100%;
     }
 
     .title-stack {

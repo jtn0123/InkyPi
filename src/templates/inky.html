@@ -166,7 +166,8 @@
                             <div class="quick-row{% if _is_active %} is-active{% endif %}" data-quick-switch-row data-playlist-name="{{ p.name }}" data-playlist-switchable="{{ 'true' if _has_items else 'false' }}" data-playlist-open-url="{{ url_for('playlist.playlists') }}">
                                 <div class="quick-row-main">
                                     <div class="quick-name">{{ p.name }}</div>
-                                    <div class="quick-sub">{% if _all_day %}All day{% else %}{{ p.start_time }}–{{ p.end_time }}{% endif %} · {{ p.cycle_minutes or device_cycle_minutes }} min cycle · {{ p.plugins|length }} item{{ '' if p.plugins|length == 1 else 's' }}</div>
+                                    {% set _quick_sub_summary = ('All day' if _all_day else p.start_time ~ '–' ~ p.end_time) ~ ' · ' ~ (p.cycle_minutes or device_cycle_minutes) ~ ' min cycle · ' ~ (p.plugins|length) ~ ' item' ~ ('' if p.plugins|length == 1 else 's') %}
+                                    <div class="quick-sub" title="{{ _quick_sub_summary }}">{{ _quick_sub_summary }}</div>
                                 </div>
                                 <div class="quick-row-actions" data-quick-switch-actions>
                                     <span class="status-chip success quick-row-status" data-quick-switch-status{% if not _is_active %} hidden{% endif %}>Active</span>

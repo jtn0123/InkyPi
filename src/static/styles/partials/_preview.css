@@ -416,19 +416,6 @@
   line-height: 1.5;
 }
 
-.danger-zone {
-  display: grid;
-  gap: 12px;
-  padding: 16px;
-  border-radius: var(--border-radius-md);
-  border: 1px solid color-mix(in srgb, var(--error) 35%, var(--panel-border));
-  background: color-mix(in srgb, var(--error) 6%, var(--panel-bg));
-}
-
-.danger-zone h3 {
-  margin: 0;
-}
-
 .displayed-now {
     background-color: var(--accent);
     color: var(--on-accent);

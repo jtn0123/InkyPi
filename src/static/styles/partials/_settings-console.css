@@ -105,9 +105,13 @@
   white-space: normal;
 }
 
-/* Row-variants keep their own direction */
+/* Row-variants keep their own direction. `.toggle-row` and `.slider-row`
+   are carried by slider / switch pairs inside settings.html which must
+   stay horizontal so the control sits next to the label. */
 .settings-console-panel .form-group.nowrap,
-.settings-console-panel .form-group.inline-row {
+.settings-console-panel .form-group.inline-row,
+.settings-console-panel .form-group.toggle-row,
+.settings-console-panel .form-group.slider-row {
   flex-direction: row;
   align-items: center;
 }

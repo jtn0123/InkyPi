@@ -179,6 +179,11 @@
         z-index: auto;
         padding-top: 16px;
         background: none;
+        /* Drop the desktop `width: fit-content` so the Save / Logs pair
+           spans the full card on narrow screens instead of floating as a
+           narrow pill. */
+        width: 100%;
+        max-width: 100%;
     }
 
     .title-stack {

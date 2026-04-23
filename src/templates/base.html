@@ -41,6 +41,7 @@
         <a href="#main-content" class="skip-link">Skip to main content</a>
     </nav>
     {% from 'macros/sidebar.html' import sidebar %}
+    {% from 'macros/icons.html' import icon %}
     <div class="shell" data-density="balanced">
         {{ sidebar(active=(active_nav if active_nav is defined else None),
                     host=(request.host if request is defined else None),
@@ -70,7 +71,6 @@
         <div class="tweaks-head">
             <h2>Appearance</h2>
             <button type="button" class="tweaks-close" aria-label="Close tweaks panel">
-                {% from 'macros/icons.html' import icon %}
                 {{ icon('x', 'close-icon') | safe }}
             </button>
         </div>
@@ -98,7 +98,7 @@
             <input id="accentHueSlider" class="accent-slider" type="range" min="0" max="360" step="1" value="170" aria-label="Accent hue" data-accent-slider>
         </div>
         <div class="tweak-group">
-            <button id="tweaksReset" type="button" class="density-option" style="width:100%;" data-tweaks-reset>Reset to defaults</button>
+            <button type="button" class="density-option" style="width:100%;" data-tweaks-reset>Reset to defaults</button>
         </div>
     </aside>
 
@@ -112,7 +112,6 @@
          aria-labelledby="quickUpdateTitle" hidden>
         <div class="modal-content">
             <button type="button" id="closeQuickUpdateBtn" class="close-button" aria-label="Close">
-                {% from 'macros/icons.html' import icon %}
                 {{ icon('x', 'close-icon') | safe }}
             </button>
             <h2 id="quickUpdateTitle">Update available</h2>

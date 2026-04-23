@@ -41,7 +41,7 @@
            A tooltip surfaces the target version; click opens the quick-update
            confirm modal below. #}
         <button type="button" id="sidebarUpdateBtn" class="sidebar-update-btn" hidden
-                aria-label="Update available" aria-haspopup="dialog" title="Update available">
+                aria-label="Update available" aria-haspopup="dialog" aria-controls="quickUpdateModal" title="Update available">
             {{ icon('download-simple', 'icon-image') | safe }}
             <span class="sidebar-update-dot" aria-hidden="true"></span>
         </button>
