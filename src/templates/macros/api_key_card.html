@@ -19,6 +19,7 @@
         masked        – The full `masked` dict from the template context
         api_key_plugins – The plugin-usage dict (may be None)
 -#}
+{% from 'macros/icons.html' import icon %}
 {% macro api_key_card(label, key_name, input_id, status_id, placeholder, masked, api_key_plugins, delete_label=None) %}
 <div class="form-group api-key-card" data-key-card data-configured="{{ 'true' if masked[key_name] else 'false' }}">
     <div class="key-row">
@@ -31,7 +32,7 @@
                 <span class="api-mask mono" aria-hidden="true">{{ masked[key_name] }}</span>
                 <span class="status-chip success has-dot" data-role="key-chip">Configured</span>
                 <div id="{{ status_id }}" class="api-key-status sr-only"><strong>Status:</strong> Configured ({{ masked[key_name] }})</div>
-                <button type="button" class="header-button is-secondary api-key-toggle" data-api-action="reveal-input" data-input-id="{{ input_id }}" aria-expanded="false" aria-controls="{{ input_id }}-actions"><span data-role="toggle-label">Change</span></button>
+                <button type="button" class="header-button is-secondary api-key-toggle" data-api-action="reveal-input" data-input-id="{{ input_id }}" aria-expanded="false" aria-controls="{{ input_id }}-actions">{{ icon('pencil-simple', 'btn-leading-icon') | safe }}<span data-role="toggle-label">Change</span></button>
             {% else %}
                 <span class="status-chip warning has-dot" data-role="key-chip">Not set</span>
                 <div id="{{ status_id }}" class="api-key-status sr-only"><strong>Status:</strong> Not configured</div>

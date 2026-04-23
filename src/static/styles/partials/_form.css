@@ -356,10 +356,14 @@ select.form-input option {
     box-shadow: 0 0 3px color-mix(in oklab, var(--accent) 50%, transparent);
 }
 
+/* Handoff parity (styles.css:305): hint text under form fields — tertiary
+   color and ~11.5px so it reads lighter than the field copy above it. */
 .form-help {
-    color: var(--text-secondary);
-    font-size: 0.9rem;
-    margin-top: 8px;
+    color: var(--text-3, var(--text-secondary));
+    font-size: 0.72rem;
+    font-weight: 400;
+    margin-top: 6px;
+    line-height: 1.45;
 }
 
 .form-group:last-child{margin-bottom: 0;}
@@ -373,19 +377,6 @@ input:disabled, select:disabled, textarea:disabled {
     opacity: 0.6;
     cursor: not-allowed;
     background-color: var(--bg-secondary, var(--surface));
-}
-
-.slider-value {
-    font-weight: 700;
-    font-size: 1.05rem;
-    color: var(--text);
-    min-width: 2.5em;
-    text-align: center;
-    padding: 2px 8px;
-    background: var(--panel-bg);
-    border: 1px solid var(--panel-border);
-    border-radius: 6px;
-    font-variant-numeric: tabular-nums;
 }
 
 /* Handoff parity: stacked slider pattern — label + mono value on top,

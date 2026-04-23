@@ -124,6 +124,82 @@
         applyDensity(density);
         if (typeof state.accent === 'number') applyAccent(accent);
 
+        // Selectors scan document-wide so the floating FAB panel in base.html
+        // and the Settings > Appearance tab stay in sync (toggling a preset in
+        // either location updates the active-class markers in both).
+        const aestheticButtons = document.querySelectorAll('.aesthetic-option[data-aesthetic]');
+        function syncAestheticActive(val) {
+            aestheticButtons.forEach(function (btn) {
+                btn.classList.toggle('active', btn.dataset.aesthetic === val);
+                btn.setAttribute('aria-pressed', btn.dataset.aesthetic === val ? 'true' : 'false');
+            });
+        }
+        syncAestheticActive(aesthetic);
+        aestheticButtons.forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                const val = btn.dataset.aesthetic || DEFAULT_AESTHETIC;
+                applyAesthetic(val);
+                const s = load();
+                s.aesthetic = val;
+                save(s);
+                syncAestheticActive(val);
+            });
+        });
+
+        // Filter by `[data-density]` so the Reset button (same class,
+        // no data-density) isn't treated as a density option.
+        const densityButtons = document.querySelectorAll('.density-option[data-density]');
+        function syncDensityActive(val) {
+            densityButtons.forEach(function (btn) {
+                btn.classList.toggle('active', btn.dataset.density === val);
+                btn.setAttribute('aria-pressed', btn.dataset.density === val ? 'true' : 'false');
+            });
+        }
+        syncDensityActive(density);
+        densityButtons.forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                const val = btn.dataset.density || DEFAULT_DENSITY;
+                applyDensity(val);
+                const s = load();
+                s.density = val;
+                save(s);
+                syncDensityActive(val);
+            });
+        });
+
+        const accentSliders = document.querySelectorAll('[data-accent-slider]');
+        const accentValues = document.querySelectorAll('[data-accent-value]');
+        function syncAccent(v) {
+            accentSliders.forEach(function (s) { if (s.value !== String(v)) s.value = String(v); });
+            accentValues.forEach(function (n) { n.textContent = v + '°'; });
+        }
+        syncAccent(accent);
+        accentSliders.forEach(function (slider) {
+            slider.addEventListener('input', function () {
+                const v = Number.parseInt(slider.value, 10);
+                if (Number.isNaN(v)) return;
+                applyAccent(v);
+                syncAccent(v);
+                const s = load();
+                s.accent = v;
+                save(s);
+            });
+        });
+
+        const resetButtons = document.querySelectorAll('[data-tweaks-reset]');
+        resetButtons.forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                save({});
+                applyAesthetic(DEFAULT_AESTHETIC);
+                applyDensity(DEFAULT_DENSITY);
+                document.documentElement.style.removeProperty('--accent');
+                document.documentElement.style.removeProperty('--accent-hover');
+                syncAestheticActive(DEFAULT_AESTHETIC);
+                syncDensityActive(DEFAULT_DENSITY);
+                syncAccent(DEFAULT_ACCENT);
+            });
+        });
+
         const fab = document.getElementById('tweaksFab');
         const panel = document.getElementById('tweaksPanel');
         if (!fab || !panel) return;
@@ -160,78 +236,6 @@
         const closeBtn = panel.querySelector('.tweaks-close');
         if (closeBtn) {
             closeBtn.addEventListener('click', function () { setPanelOpen(false); });
-        }
-
-        // Aesthetic buttons
-        const aestheticButtons = panel.querySelectorAll('.aesthetic-option');
-        function syncAestheticActive(val) {
-            aestheticButtons.forEach(function (btn) {
-                btn.classList.toggle('active', btn.dataset.aesthetic === val);
-                btn.setAttribute('aria-pressed', btn.dataset.aesthetic === val ? 'true' : 'false');
-            });
-        }
-        syncAestheticActive(aesthetic);
-        aestheticButtons.forEach(function (btn) {
-            btn.addEventListener('click', function () {
-                const val = btn.dataset.aesthetic || DEFAULT_AESTHETIC;
-                applyAesthetic(val);
-                const s = load();
-                s.aesthetic = val;
-                save(s);
-                syncAestheticActive(val);
-            });
-        });
-
-        // Density buttons
-        const densityButtons = panel.querySelectorAll('.density-option');
-        function syncDensityActive(val) {
-            densityButtons.forEach(function (btn) {
-                btn.classList.toggle('active', btn.dataset.density === val);
-                btn.setAttribute('aria-pressed', btn.dataset.density === val ? 'true' : 'false');
-            });
-        }
-        syncDensityActive(density);
-        densityButtons.forEach(function (btn) {
-            btn.addEventListener('click', function () {
-                const val = btn.dataset.density || DEFAULT_DENSITY;
-                applyDensity(val);
-                const s = load();
-                s.density = val;
-                save(s);
-                syncDensityActive(val);
-            });
-        });
-
-        // Accent slider
-        const accentSlider = panel.querySelector('#accentHueSlider');
-        const accentValue = panel.querySelector('#accentHueValue');
-        if (accentSlider) {
-            accentSlider.value = String(accent);
-            if (accentValue) accentValue.textContent = accent + '°';
-            accentSlider.addEventListener('input', function () {
-                const v = Number.parseInt(accentSlider.value, 10);
-                if (Number.isNaN(v)) return;
-                applyAccent(v);
-                if (accentValue) accentValue.textContent = v + '°';
-                const s = load();
-                s.accent = v;
-                save(s);
-            });
-        }
-
-        const resetBtn = panel.querySelector('#tweaksReset');
-        if (resetBtn) {
-            resetBtn.addEventListener('click', function () {
-                save({});
-                applyAesthetic(DEFAULT_AESTHETIC);
-                applyDensity(DEFAULT_DENSITY);
-                document.documentElement.style.removeProperty('--accent');
-                document.documentElement.style.removeProperty('--accent-hover');
-                syncAestheticActive(DEFAULT_AESTHETIC);
-                syncDensityActive(DEFAULT_DENSITY);
-                if (accentSlider) accentSlider.value = String(DEFAULT_ACCENT);
-                if (accentValue) accentValue.textContent = DEFAULT_ACCENT + '°';
-            });
         }
     }
 

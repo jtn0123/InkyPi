@@ -231,6 +231,7 @@ coverage.xml
 !/src/static/scripts/store.js
 !/src/static/scripts/debug_console.js
 !/src/static/scripts/tweaks_panel.js
+!/src/static/scripts/update_indicator.js
 # Snapshot failure artifacts (actual PNGs saved on mismatch)
 tests/snapshots/actual/
 tests/snapshots/layout/actual/

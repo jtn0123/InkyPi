@@ -1,10 +1,16 @@
-.history-grid {
+/* Shorthand aliases: handoff/design-mockup markup uses `.hist-*` while the
+   production templates use `.history-*`. Each rule below pairs both selectors
+   so either spelling lights up the same visual styles without forcing a
+   template-wide rename. */
+.history-grid,
+.hist-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
   gap: 12px;
 }
 
-.history-card {
+.history-card,
+.hist-card {
   display: grid;
   gap: 10px;
   padding: 12px;
@@ -14,17 +20,20 @@
   transition: border-color var(--transition-speed) ease;
 }
 
-.history-card:hover {
+.history-card:hover,
+.hist-card:hover {
   border-color: var(--text-3);
 }
 
-.history-card-body {
+.history-card-body,
+.hist-card-body {
   display: grid;
   gap: 8px;
   min-width: 0;
 }
 
-.history-thumb {
+.history-thumb,
+.hist-thumb {
   position: relative;
   display: block;
   border-radius: 12px;
@@ -36,25 +45,30 @@
   transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
 }
 
-.history-thumb:hover {
+.history-thumb:hover,
+.hist-thumb:hover {
   border-color: var(--accent);
   transform: translateY(-2px);
   box-shadow: var(--shadow-sm);
 }
 
 .history-thumb img,
-.history-thumb .img-skeleton {
+.history-thumb .img-skeleton,
+.hist-thumb img,
+.hist-thumb .img-skeleton {
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
 
-.history-meta {
+.history-meta,
+.hist-meta {
   display: grid;
   gap: 4px;
 }
 
-.history-name {
+.history-name,
+.hist-name {
   font-weight: 500;
   font-size: 0.82rem;
   color: var(--text);
@@ -64,19 +78,23 @@
   white-space: nowrap;
 }
 
-.history-sub {
+.history-sub,
+.hist-sub,
+.hist-when {
   font-size: 0.72rem;
   color: var(--text-3);
   line-height: 1.4;
 }
 
-.history-actions {
+.history-actions,
+.hist-actions {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
 }
 
-.history-actions .btn {
+.history-actions .btn,
+.hist-actions .btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -92,35 +110,43 @@
 
 /* Handoff parity: button hover uses --surface-2 + --border-strong directly
    rather than the legacy --bg-secondary / --muted aliases. */
-.history-actions .btn:hover {
+.history-actions .btn:hover,
+.hist-actions .btn:hover {
   background: var(--surface-2);
   border-color: var(--border-strong, var(--surface-border));
 }
 
-.history-actions .btn-primary {
+.history-actions .btn-primary,
+.hist-actions .btn-primary {
   background: var(--accent);
   border-color: var(--accent);
   color: var(--on-accent);
 }
 
-.history-actions .btn-primary:hover {
+.history-actions .btn-primary:hover,
+.hist-actions .btn-primary:hover {
   background: var(--primary-hover);
 }
 
-.history-actions .btn-danger {
+.history-actions .btn-danger,
+.hist-actions .btn-danger {
   background: var(--error);
   border-color: var(--error);
   color: var(--on-accent);
 }
 
-.history-actions .btn-danger:hover {
+.history-actions .btn-danger:hover,
+.hist-actions .btn-danger:hover {
   background: var(--danger-hover);
 }
 
 /* Handoff parity: danger zones mirror `.card-danger` (see _card.css:61) —
    single 1px error-tinted border, no double-up via box-shadow. Padding
-   matches the 16px .card standard instead of the old 20px overhang. */
-.history-danger-zone {
+   matches the 16px .card standard instead of the old 20px overhang.
+   The base `.danger-zone` rule applies the handoff's left-body / right-actions
+   split so both history and settings (Power & recovery) share the same shape
+   without duplicating the flex wiring. */
+.danger-zone {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -130,22 +156,33 @@
   border: 1px solid color-mix(in oklab, var(--error) 30%, var(--surface-border));
   border-radius: var(--border-radius-lg);
   background: var(--surface);
+  flex-wrap: wrap;
 }
 
-.history-danger-zone .danger-zone-body {
+.danger-zone .danger-zone-body {
   display: grid;
   gap: 4px;
   min-width: 0;
 }
 
-.history-danger-zone p {
+.danger-zone p {
   margin: 0;
   color: var(--text-secondary);
   font-size: 0.9rem;
 }
 
-.history-danger-zone h3 {
+.danger-zone h2,
+.danger-zone h3 {
   color: var(--error);
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.danger-zone .inline-action-row {
+  flex-shrink: 0;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 /* Handoff uses --surface-border (aliased to --border) for every separator;
@@ -159,6 +196,11 @@
 
 .danger-zone-label {
   display: inline-block;
+  /* The label sits inside `.danger-zone-body`, a grid child; but that body
+     is itself a flex child of `.danger-zone`. `justify-self` only applies
+     to grid children, so use `align-self` to control cross-axis placement
+     in case the label ends up in a flex context (e.g. alternate layouts). */
+  align-self: start;
   font-size: 0.7rem;
   font-weight: 700;
   letter-spacing: 0.08em;

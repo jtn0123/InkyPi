@@ -57,6 +57,13 @@ UI_BROWSER_TESTS = {
     "test_logs_access.py",
     # JTN-726 refresh-interval change journey (UI save -> reload -> diagnostics).
     "test_refresh_interval_change.py",
+    # Settings → Updates tab DOM coverage (release notes rendering,
+    # disclosure visibility, markdown renderer). Stubs /api/version via
+    # page.route() so no live GitHub dependency.
+    "test_settings_updates_dom.py",
+    # Sidebar update indicator + quick-update modal flow (shows on update
+    # available, click opens modal, confirm POSTs, cancel no-POST, hash nav).
+    "test_sidebar_update_indicator.py",
 }
 A11Y_BROWSER_TESTS = {
     "test_a11y_sweep.py",

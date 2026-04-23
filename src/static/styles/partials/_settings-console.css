@@ -5,14 +5,17 @@
   gap: 28px;
 }
 
+/* Handoff parity: prototype drops the `border-right` divider and relies
+   on the 28px layout gap for separation. Sticky offset tightens from 16→8
+   so the nav locks higher, and a 4px vertical pad buys breathing room
+   against the page header above. */
 .settings-side-nav {
   display: grid;
   gap: 1px;
   align-self: start;
   position: sticky;
-  top: 16px;
-  border-right: 1px solid var(--divider);
-  padding-right: var(--spacing-md);
+  top: 8px;
+  padding: 4px 0;
 }
 
 .settings-side-link {
@@ -36,14 +39,15 @@
 
 .settings-side-link:hover {
   color: var(--text);
-  background: var(--panel-bg);
+  background: var(--surface-2, var(--panel-bg));
 }
 
 /* Handoff: active state uses inset box-shadow instead of a border so the
-   nav row width doesn't shift between states. */
+   nav row width doesn't shift between states. Background matches hover to
+   keep the tab feeling stable as the pointer crosses the active row. */
 .settings-side-link.active {
   color: var(--text);
-  background: var(--panel-bg);
+  background: var(--surface-2, var(--panel-bg));
   box-shadow: inset 2px 0 0 var(--accent);
 }
 
@@ -52,6 +56,13 @@
   height: 16px;
   color: var(--text-3, var(--muted));
   flex-shrink: 0;
+  display: inline-block;
+}
+
+.settings-side-link .settings-side-icon svg {
+  width: 100%;
+  height: 100%;
+  display: block;
 }
 
 /* Handoff parity: icon only takes accent color on the ACTIVE tab, not on
@@ -68,11 +79,60 @@
 
 .settings-console-panel {
   display: none;
-  gap: 16px;
+  gap: 14px;
 }
 
 .settings-console-panel.active {
   display: grid;
+}
+
+/* Handoff parity: inside settings panels the default form-group stacks its
+   label ABOVE the control (column layout), matching the React prototype's
+   `.form-group { flex-direction: column; gap: 6px; }`. The global
+   `.form-group` defaults to row/align-center/wrap so other pages (plugin
+   forms, modals, dashboards) still read as inline pairs. Row-style variants
+   (`.nowrap`, `.toggle-row`, `.slider-row`) opt out via their own rules. */
+.settings-console-panel .form-group {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  flex-wrap: nowrap;
+}
+
+.settings-console-panel .form-group > .form-label,
+.settings-console-panel .form-group > label {
+  margin-bottom: 0;
+  white-space: normal;
+}
+
+/* Row-variants keep their own direction. `.toggle-row` and `.slider-row`
+   are carried by slider / switch pairs inside settings.html which must
+   stay horizontal so the control sits next to the label. */
+.settings-console-panel .form-group.nowrap,
+.settings-console-panel .form-group.inline-row,
+.settings-console-panel .form-group.toggle-row,
+.settings-console-panel .form-group.slider-row {
+  flex-direction: row;
+  align-items: center;
+}
+
+/* Two-column grid used for paired fields inside settings cards
+   (Orientation + Preview size, Plugin cycle interval + Unit, etc.).
+   Collapses to one column on narrow cards. Applied without the
+   `form-group` prefix so the template can keep its `<div class="row-2">`
+   wrapper and the child `.form-group` column rule above still governs
+   label stacking. */
+.settings-console-panel .row-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  align-items: start;
+}
+
+@media (max-width: 640px) {
+  .settings-console-panel .row-2 {
+    grid-template-columns: 1fr;
+  }
 }
 
 .observability-toolbar {
@@ -171,13 +231,33 @@
 .backup-restore-restore {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 10px;
   flex-wrap: wrap;
+  min-width: 0;
 }
 
-.backup-restore-restore .form-input[type="file"] {
-  max-width: 220px;
-  font-size: 0.78rem;
+/* Handoff parity: native <input type="file"> is visually hidden so the
+   row doesn't blow past the card width with Chrome's default "Choose File"
+   button + "No file chosen" text. A <label> styled as a button triggers
+   the picker, and the filename renders as muted text alongside. */
+.backup-restore-pick {
+  cursor: pointer;
+}
+
+.backup-restore-pick:focus-within,
+.backup-restore-restore input[type="file"]:focus + .backup-restore-pick {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.backup-restore-filename {
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  max-width: 18rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
 }
 
 /* Compact inline toggle used inside `.inline-row` — label + hint stacked

@@ -112,19 +112,19 @@
                         <dl class="kv-list kpi-list">
                             <div>
                                 <dt>Refreshes</dt>
-                                <dd id="kpiRefreshes">&mdash;</dd>
+                                <dd class="mono" id="kpiRefreshes">&mdash;</dd>
                             </div>
                             <div>
                                 <dt>Avg render</dt>
-                                <dd id="kpiAvgRender">&mdash;</dd>
+                                <dd class="mono" id="kpiAvgRender">&mdash;</dd>
                             </div>
                             <div>
                                 <dt>Errors</dt>
-                                <dd id="kpiErrors">&mdash;</dd>
+                                <dd class="mono" id="kpiErrors">&mdash;</dd>
                             </div>
                             <div>
                                 <dt>Storage free</dt>
-                                <dd id="kpiStorageFree">&mdash;</dd>
+                                <dd class="mono" id="kpiStorageFree">&mdash;</dd>
                             </div>
                         </dl>
                     </section>
@@ -166,7 +166,8 @@
                             <div class="quick-row{% if _is_active %} is-active{% endif %}" data-quick-switch-row data-playlist-name="{{ p.name }}" data-playlist-switchable="{{ 'true' if _has_items else 'false' }}" data-playlist-open-url="{{ url_for('playlist.playlists') }}">
                                 <div class="quick-row-main">
                                     <div class="quick-name">{{ p.name }}</div>
-                                    <div class="quick-sub">{% if _all_day %}All day{% else %}{{ p.start_time }}–{{ p.end_time }}{% endif %} · {{ p.cycle_minutes or device_cycle_minutes }} min cycle · {{ p.plugins|length }} item{{ '' if p.plugins|length == 1 else 's' }}</div>
+                                    {% set _quick_sub_summary = ('All day' if _all_day else p.start_time ~ '–' ~ p.end_time) ~ ' · ' ~ (p.cycle_minutes or device_cycle_minutes) ~ ' min cycle · ' ~ (p.plugins|length) ~ ' item' ~ ('' if p.plugins|length == 1 else 's') %}
+                                    <div class="quick-sub" title="{{ _quick_sub_summary }}">{{ _quick_sub_summary }}</div>
                                 </div>
                                 <div class="quick-row-actions" data-quick-switch-actions>
                                     <span class="status-chip success quick-row-status" data-quick-switch-status{% if not _is_active %} hidden{% endif %}>Active</span>
@@ -202,10 +203,8 @@
                     {% endif %}
                 </aside>
             </div>
-            {% set quick_launch_limit = 10 %}
-            {% set quick_launch_plugins = plugins[:quick_launch_limit] %}
             {{ plugin_catalog(
-                plugins=quick_launch_plugins,
+                plugins=plugins,
                 heading='Plugins',
                 count_label=(plugins|length ~ ' installed'),
                 action_href=url_for('plugin.plugins_page'),

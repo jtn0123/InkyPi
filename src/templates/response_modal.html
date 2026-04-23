@@ -1,9 +1,10 @@
+{% from 'macros/icons.html' import icon %}
 <!-- Reusable Success/Failure Notification Modal -->
 <!-- aria-live="assertive" announces modal text to screen readers immediately (JTN-507) -->
 <div id="responseModal" class="response-modal success-failure-modal" role="alertdialog" aria-modal="true" aria-labelledby="responseModalTitle" aria-describedby="modalMessage" aria-live="assertive" hidden>
     <div id="modalContent" class="response-modal-content">
         <h2 id="responseModalTitle" class="sr-only">Notification</h2>
-        <button type="button" class="close-button" id="responseModalClose" aria-label="Close"><svg class="close-icon" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg"><line x1="200" y1="56" x2="56" y2="200" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/><line x1="200" y1="200" x2="56" y2="56" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/></svg></button>
+        <button type="button" class="close-button" id="responseModalClose" aria-label="Close">{{ icon('x', 'close-icon') | safe }}</button>
         <p id="modalMessage"></p>
     </div>
 </div>

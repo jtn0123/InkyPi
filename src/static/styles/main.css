@@ -863,9 +863,21 @@ main[data-page-shell="workflow"] .frame {
 }
 
 .metric-pill-value {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
   font-size: 0.98rem;
   font-weight: 600;
   color: var(--text);
+}
+
+.metric-pill-value em {
+  font-family: var(--font-mono, 'JetBrains Mono'), ui-monospace, monospace;
+  font-style: normal;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--text-3);
+  letter-spacing: 0.02em;
 }
 
 .metric-strip.compact .metric-pill {
@@ -944,19 +956,6 @@ main[data-page-shell="workflow"] .frame {
 .info-banner-text {
   font-size: 13px;
   line-height: 1.5;
-}
-
-.danger-zone {
-  display: grid;
-  gap: 12px;
-  padding: 16px;
-  border-radius: var(--border-radius-md);
-  border: 1px solid color-mix(in srgb, var(--error) 35%, var(--panel-border));
-  background: color-mix(in srgb, var(--error) 6%, var(--panel-bg));
-}
-
-.danger-zone h3 {
-  margin: 0;
 }
 
 .displayed-now {
@@ -1201,6 +1200,18 @@ main[data-page-shell="workflow"] .frame {
   overflow: hidden;
 }
 
+/* Row that holds the brand link plus the update-available affordance.
+   The update button lives as a sibling of `<a.sidebar-brand>` (nested
+   buttons inside anchors are invalid HTML) and is positioned to the far
+   right so the InkyPi/host label doesn't shift when the button unhides. */
+.sidebar-brand-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-right: 4px;
+}
+
 .sidebar-brand {
   display: flex;
   align-items: center;
@@ -1209,6 +1220,65 @@ main[data-page-shell="workflow"] .frame {
   padding: 2px 8px 6px;
   text-decoration: none;
   color: inherit;
+  flex: 1;
+  min-width: 0;
+}
+
+/* Small square download chip. Shows a subtle accent dot in the corner
+   so the call-to-action is visible even at small zoom levels. */
+.sidebar-update-btn {
+  position: relative;
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  border: 1px solid var(--surface-border);
+  background: var(--surface-2, var(--surface));
+  color: var(--text);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  transition: background-color 0.15s ease, border-color 0.15s ease,
+              color 0.15s ease, transform 0.15s ease;
+}
+
+.sidebar-update-btn:hover {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+  transform: translateY(-1px);
+}
+
+.sidebar-update-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.sidebar-update-btn .icon-image {
+  width: 16px;
+  height: 16px;
+  color: inherit;
+  display: inline-flex;
+}
+
+.sidebar-update-btn .icon-image svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.sidebar-update-dot {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid var(--surface);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent);
 }
 
 .brand-mark {
@@ -2583,6 +2653,13 @@ svg.icon-thin {
     height: 16px;
     flex-shrink: 0;
     color: currentColor;
+    display: inline-block;
+}
+
+.btn-leading-icon svg {
+    width: 100%;
+    height: 100%;
+    display: block;
 }
 
 /* Breadcrumb navigation */
@@ -3372,10 +3449,14 @@ select.form-input option {
     box-shadow: 0 0 3px color-mix(in oklab, var(--accent) 50%, transparent);
 }
 
+/* Handoff parity (styles.css:305): hint text under form fields — tertiary
+   color and ~11.5px so it reads lighter than the field copy above it. */
 .form-help {
-    color: var(--text-secondary);
-    font-size: 0.9rem;
-    margin-top: 8px;
+    color: var(--text-3, var(--text-secondary));
+    font-size: 0.72rem;
+    font-weight: 400;
+    margin-top: 6px;
+    line-height: 1.45;
 }
 
 .form-group:last-child{margin-bottom: 0;}
@@ -3389,19 +3470,6 @@ input:disabled, select:disabled, textarea:disabled {
     opacity: 0.6;
     cursor: not-allowed;
     background-color: var(--bg-secondary, var(--surface));
-}
-
-.slider-value {
-    font-weight: 700;
-    font-size: 1.05rem;
-    color: var(--text);
-    min-width: 2.5em;
-    text-align: center;
-    padding: 2px 8px;
-    background: var(--panel-bg);
-    border: 1px solid var(--panel-border);
-    border-radius: 6px;
-    font-variant-numeric: tabular-nums;
 }
 
 /* Handoff parity: stacked slider pattern — label + mono value on top,
@@ -3728,8 +3796,12 @@ input[type="checkbox"].toggle-checkbox {
    3 cells (NOW | NEXT | REFRESH) separated by thin dividers. */
 .hero-strip {
   display: grid;
-  grid-template-columns: 1fr auto 1fr auto 1fr;
-  gap: 18px;
+  /* Give the REFRESH cell ~30% more horizontal room so common meta strings
+     like "Every 60 min · auto" stay on a single line at default density.
+     NOW / NEXT still wrap gracefully via `.m`'s 2-line clamp when a long
+     plugin or playlist name lands in them. */
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto minmax(0, 1.3fr);
+  gap: 14px;
   /* Handoff parity (styles.css:347–354): the KPI strip sits 16px below the
      preview canvas, not flush against it (was 4px). */
   margin-top: 16px;
@@ -3879,6 +3951,15 @@ input[type="checkbox"].toggle-checkbox {
   /* Handoff parity: tighter 8px stack, align cards to the top. */
   gap: 8px;
   align-content: start;
+  /* min-width:0 on the column plus each direct child keeps nowrap'd inner
+     text (e.g. .quick-sub's single-line summary) from pushing the whole
+     overview column past its 320px grid-track. Without this, the cards
+     hang ~40px outside the hero grid on common viewport widths. */
+  min-width: 0;
+}
+
+.dashboard-overview > * {
+  min-width: 0;
 }
 
 .dashboard-status-card {
@@ -4222,6 +4303,14 @@ a.quick-switch-link.header-button {
   font-size: 0.7rem;
   color: var(--text-3);
   margin-top: 2px;
+  /* The quick-switch card is the narrow column of the dashboard aside
+     (~180-220px). The summary string "All day · 60 min cycle · 0 items"
+     otherwise wraps to 3 lines; single-line ellipsis keeps the rhythm
+     tight and the full value is still available via the row's data-*
+     attributes (and the "All playlists" link is one click away). */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 a.quick-row-link:link,
@@ -4628,9 +4717,14 @@ a.quick-row-link:hover {
 .plugins-container.plugin-tile-grid .plugin-tile .icon-image {
     width: 22px;
     height: 22px;
+    min-width: 0;
+    min-height: 0;
     flex-shrink: 0;
     padding: 0;
     margin: 0;
+    background: transparent;
+    border: 0;
+    border-radius: 0;
 }
 
 .plugin-tile-body {
@@ -4675,7 +4769,14 @@ a.quick-row-link:hover {
     height: 14px;
     color: var(--text-3);
     flex-shrink: 0;
+    display: inline-block;
     transition: transform 0.15s ease, color 0.15s ease;
+}
+
+.plugin-tile-chev svg {
+    width: 100%;
+    height: 100%;
+    display: block;
 }
 
 .plugins-container.plugin-tile-grid .plugin-tile:hover .plugin-tile-chev {
@@ -5502,6 +5603,22 @@ body[data-page="plugin"] .workflow-help p {
   margin-top: 0;
 }
 
+/* Mono stamp treatment for the "Refreshed X ago" row — the handoff renders
+   this as a quiet, tabular-looking timestamp rather than a pill. Overrides
+   the pill styling inherited from `_plugins.css:107` so it reads as inline
+   metadata inside the playlist row instead of a standalone chip. */
+.pl-item-meta .latest-refresh {
+  display: inline;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  font-family: var(--font-mono, 'JetBrains Mono'), ui-monospace, monospace;
+  font-size: 0.7rem;
+  color: var(--text-3);
+  letter-spacing: 0.02em;
+}
+
 .pl-item-thumb {
   grid-area: thumb;
   width: 96px;
@@ -5695,7 +5812,10 @@ a.pl-add-row:hover {
 }
 
 .playlist-summary-row {
-  gap: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .playlist-summary-copy {
@@ -5785,26 +5905,43 @@ a.pl-add-row:hover {
   border: 1px solid var(--surface-border);
   border-radius: 8px;
   background: transparent;
-  color: transparent;
-  font-size: 0;
+  color: var(--text-3);
   flex: 0 0 auto;
 }
 
+/* The label itself uses the shared `.sr-only` utility so AT still hears
+   "Open" / "Hide" when the button is focused. The inline SVG caret is
+   the visible affordance. */
+
+/* Kill any legacy ::after caret defined by the older `_playlists.css`
+   rule — the inline SVG inside `.playlist-caret` is now the visible
+   affordance, and two carets stacked would look broken. */
 .playlist-toggle-button::after {
-  content: "\203A";
-  margin-left: 0;
-  color: var(--text-3);
-  font-size: 1.05rem;
-  transform: rotate(0deg);
+  content: none;
 }
 
-.playlist-toggle-button[aria-expanded="true"]::after {
+.playlist-toggle-button .playlist-caret {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  transition: transform 0.2s ease;
+}
+
+.playlist-toggle-button .playlist-caret svg {
+  width: 100%;
+  height: 100%;
+}
+
+.playlist-toggle-button[aria-expanded="true"] .playlist-caret {
   transform: rotate(90deg);
 }
 
 .playlist-toggle-button:hover {
   border-color: var(--border-strong, var(--surface-border));
   background: var(--surface-2);
+  color: var(--text);
 }
 
 .playlist-header .playlist-toggle-button {
@@ -5850,6 +5987,20 @@ a.pl-add-row:hover {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   gap: 6px 12px;
+}
+
+/* Appearance tab — the Reset card holds a single action. Center it so the
+   button reads as a deliberate anchored reset rather than stretching
+   awkwardly to card-width. The button keeps a comfortable min-width. */
+.appearance-reset-body {
+  display: flex;
+  justify-content: center;
+}
+
+.appearance-reset-btn {
+  flex: 0 0 auto;
+  width: auto;
+  min-width: 12rem;
 }
 
 .settings-card {
@@ -5919,16 +6070,25 @@ a.pl-add-row:hover {
   padding: 12px 16px 14px;
 }
 
-.settings-console-panel .update-panel,
-.settings-console-panel .danger-zone {
-  background: var(--surface);
-  border: 1px solid var(--surface-border);
-  border-radius: var(--border-radius-lg);
-  margin-bottom: 14px;
-  padding: 14px 16px;
+/* Handoff parity: the Updates panel already sits inside a `.card` (with
+   its own head/body chrome). The older rule re-applied surface + border +
+   padding on the inner `.update-panel`, producing a visible card-in-card.
+   Strip those so the update-panel flows flush with the card body, and let
+   the card wrapper supply the framing. */
+.settings-console-panel .update-panel {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  margin: 0;
 }
 
+/* Danger zone sits standalone (no wrapping card) so it keeps its own
+   framing. Base `.danger-zone` rule in _history.css drives the layout;
+   here we scope the error-tinted border and subtle surface tint that
+   the prototype applies only on the settings Power tab. */
 .settings-console-panel .danger-zone {
+  background: color-mix(in oklab, var(--error) 4%, var(--surface));
   border-color: color-mix(in oklab, var(--error) 30%, var(--surface-border));
 }
 
@@ -6178,28 +6338,47 @@ a.pl-add-row:hover {
   padding-bottom: calc(6rem + env(safe-area-inset-bottom, 0px));
 }
 
-/* Handoff parity: the settings status stays left-aligned while the footer
-   groups the secondary live-logs affordance with the primary Save action.
-   Desktop keeps the pair sticky; mobile switches the bar back in-flow so it
-   never covers the last fields in the form. */
+/* Status flows inline to the left of the action pair inside the pill.
+   Hidden when empty so the pill shrinks to the two buttons. */
 .settings-panel .buttons-container #settings-form-status {
-  margin-right: auto;
-  min-height: 1.25rem;
+  margin: 0;
+  min-height: 0;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+}
+
+.settings-panel .buttons-container #settings-form-status:empty {
+  display: none;
 }
 
 .settings-panel {
   gap: 16px;
 }
 
+/* Sticky save footer — the action pair sits in a centered, rounded pill
+   that floats bottom-center of the viewport so it reads as a deliberate
+   anchored control group. The previous full-width gradient painted a
+   dark slab under the empty status span on the left which looked like
+   an unfinished grey box; the pill is width-fit so nothing sits in the
+   void next to the buttons. Backdrop-blur lets long scrolled content
+   peek through softly behind the buttons. */
 .settings-panel .buttons-container {
   position: sticky;
   bottom: 16px;
   z-index: 6;
   align-items: center;
-  justify-content: flex-end;
-  gap: 12px;
-  padding-top: 12px;
-  background: linear-gradient(180deg, transparent, color-mix(in srgb, var(--bg) 94%, transparent) 22%);
+  justify-content: center;
+  gap: 10px;
+  padding: 8px 10px;
+  width: fit-content;
+  max-width: calc(100% - 16px);
+  margin: 0 auto;
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--border-radius-lg);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(10px) saturate(120%);
+  -webkit-backdrop-filter: blur(10px) saturate(120%);
 }
 
 .settings-panel .buttons-container #saveSettingsBtn {
@@ -6302,14 +6481,17 @@ a.pl-add-row:hover {
   gap: 28px;
 }
 
+/* Handoff parity: prototype drops the `border-right` divider and relies
+   on the 28px layout gap for separation. Sticky offset tightens from 16→8
+   so the nav locks higher, and a 4px vertical pad buys breathing room
+   against the page header above. */
 .settings-side-nav {
   display: grid;
   gap: 1px;
   align-self: start;
   position: sticky;
-  top: 16px;
-  border-right: 1px solid var(--divider);
-  padding-right: var(--spacing-md);
+  top: 8px;
+  padding: 4px 0;
 }
 
 .settings-side-link {
@@ -6333,14 +6515,15 @@ a.pl-add-row:hover {
 
 .settings-side-link:hover {
   color: var(--text);
-  background: var(--panel-bg);
+  background: var(--surface-2, var(--panel-bg));
 }
 
 /* Handoff: active state uses inset box-shadow instead of a border so the
-   nav row width doesn't shift between states. */
+   nav row width doesn't shift between states. Background matches hover to
+   keep the tab feeling stable as the pointer crosses the active row. */
 .settings-side-link.active {
   color: var(--text);
-  background: var(--panel-bg);
+  background: var(--surface-2, var(--panel-bg));
   box-shadow: inset 2px 0 0 var(--accent);
 }
 
@@ -6349,6 +6532,13 @@ a.pl-add-row:hover {
   height: 16px;
   color: var(--text-3, var(--muted));
   flex-shrink: 0;
+  display: inline-block;
+}
+
+.settings-side-link .settings-side-icon svg {
+  width: 100%;
+  height: 100%;
+  display: block;
 }
 
 /* Handoff parity: icon only takes accent color on the ACTIVE tab, not on
@@ -6365,11 +6555,60 @@ a.pl-add-row:hover {
 
 .settings-console-panel {
   display: none;
-  gap: 16px;
+  gap: 14px;
 }
 
 .settings-console-panel.active {
   display: grid;
+}
+
+/* Handoff parity: inside settings panels the default form-group stacks its
+   label ABOVE the control (column layout), matching the React prototype's
+   `.form-group { flex-direction: column; gap: 6px; }`. The global
+   `.form-group` defaults to row/align-center/wrap so other pages (plugin
+   forms, modals, dashboards) still read as inline pairs. Row-style variants
+   (`.nowrap`, `.toggle-row`, `.slider-row`) opt out via their own rules. */
+.settings-console-panel .form-group {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  flex-wrap: nowrap;
+}
+
+.settings-console-panel .form-group > .form-label,
+.settings-console-panel .form-group > label {
+  margin-bottom: 0;
+  white-space: normal;
+}
+
+/* Row-variants keep their own direction. `.toggle-row` and `.slider-row`
+   are carried by slider / switch pairs inside settings.html which must
+   stay horizontal so the control sits next to the label. */
+.settings-console-panel .form-group.nowrap,
+.settings-console-panel .form-group.inline-row,
+.settings-console-panel .form-group.toggle-row,
+.settings-console-panel .form-group.slider-row {
+  flex-direction: row;
+  align-items: center;
+}
+
+/* Two-column grid used for paired fields inside settings cards
+   (Orientation + Preview size, Plugin cycle interval + Unit, etc.).
+   Collapses to one column on narrow cards. Applied without the
+   `form-group` prefix so the template can keep its `<div class="row-2">`
+   wrapper and the child `.form-group` column rule above still governs
+   label stacking. */
+.settings-console-panel .row-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  align-items: start;
+}
+
+@media (max-width: 640px) {
+  .settings-console-panel .row-2 {
+    grid-template-columns: 1fr;
+  }
 }
 
 .observability-toolbar {
@@ -6468,13 +6707,33 @@ a.pl-add-row:hover {
 .backup-restore-restore {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 10px;
   flex-wrap: wrap;
+  min-width: 0;
 }
 
-.backup-restore-restore .form-input[type="file"] {
-  max-width: 220px;
-  font-size: 0.78rem;
+/* Handoff parity: native <input type="file"> is visually hidden so the
+   row doesn't blow past the card width with Chrome's default "Choose File"
+   button + "No file chosen" text. A <label> styled as a button triggers
+   the picker, and the filename renders as muted text alongside. */
+.backup-restore-pick {
+  cursor: pointer;
+}
+
+.backup-restore-pick:focus-within,
+.backup-restore-restore input[type="file"]:focus + .backup-restore-pick {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.backup-restore-filename {
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  max-width: 18rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
 }
 
 /* Compact inline toggle used inside `.inline-row` — label + hint stacked
@@ -6789,15 +7048,26 @@ body[data-page="settings"] .settings-device-name {
 }
 
 /* Handoff parity: API-key rows are .card primitives (1px border, radius-xl,
-   --surface) — flatter row style for the handoff Settings layout. */
+   --surface) — flatter row style for the handoff Settings layout. A subtle
+   2px left-border tint indicates status at a glance (accent when a key is
+   configured, warning when empty) without crowding the right-side chip. */
 .api-key-card {
   padding: 14px 16px;
   border: 1px solid var(--surface-border);
+  border-left-width: 2px;
   border-radius: var(--border-radius-xl);
   background: var(--surface);
   display: grid;
   gap: 10px;
   width: 100%;
+}
+
+.api-key-card[data-configured="true"] {
+  border-left-color: color-mix(in oklab, var(--accent) 55%, var(--surface-border));
+}
+
+.api-key-card[data-configured="false"] {
+  border-left-color: color-mix(in oklab, var(--warning, #f59e0b) 60%, var(--surface-border));
 }
 
 .key-row {
@@ -7101,13 +7371,19 @@ body[data-page="settings"] .settings-device-name {
   border-color: var(--error);
 }
 
-.history-grid {
+/* Shorthand aliases: handoff/design-mockup markup uses `.hist-*` while the
+   production templates use `.history-*`. Each rule below pairs both selectors
+   so either spelling lights up the same visual styles without forcing a
+   template-wide rename. */
+.history-grid,
+.hist-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
   gap: 12px;
 }
 
-.history-card {
+.history-card,
+.hist-card {
   display: grid;
   gap: 10px;
   padding: 12px;
@@ -7117,17 +7393,20 @@ body[data-page="settings"] .settings-device-name {
   transition: border-color var(--transition-speed) ease;
 }
 
-.history-card:hover {
+.history-card:hover,
+.hist-card:hover {
   border-color: var(--text-3);
 }
 
-.history-card-body {
+.history-card-body,
+.hist-card-body {
   display: grid;
   gap: 8px;
   min-width: 0;
 }
 
-.history-thumb {
+.history-thumb,
+.hist-thumb {
   position: relative;
   display: block;
   border-radius: 12px;
@@ -7139,25 +7418,30 @@ body[data-page="settings"] .settings-device-name {
   transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
 }
 
-.history-thumb:hover {
+.history-thumb:hover,
+.hist-thumb:hover {
   border-color: var(--accent);
   transform: translateY(-2px);
   box-shadow: var(--shadow-sm);
 }
 
 .history-thumb img,
-.history-thumb .img-skeleton {
+.history-thumb .img-skeleton,
+.hist-thumb img,
+.hist-thumb .img-skeleton {
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
 
-.history-meta {
+.history-meta,
+.hist-meta {
   display: grid;
   gap: 4px;
 }
 
-.history-name {
+.history-name,
+.hist-name {
   font-weight: 500;
   font-size: 0.82rem;
   color: var(--text);
@@ -7167,19 +7451,23 @@ body[data-page="settings"] .settings-device-name {
   white-space: nowrap;
 }
 
-.history-sub {
+.history-sub,
+.hist-sub,
+.hist-when {
   font-size: 0.72rem;
   color: var(--text-3);
   line-height: 1.4;
 }
 
-.history-actions {
+.history-actions,
+.hist-actions {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
 }
 
-.history-actions .btn {
+.history-actions .btn,
+.hist-actions .btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -7195,35 +7483,43 @@ body[data-page="settings"] .settings-device-name {
 
 /* Handoff parity: button hover uses --surface-2 + --border-strong directly
    rather than the legacy --bg-secondary / --muted aliases. */
-.history-actions .btn:hover {
+.history-actions .btn:hover,
+.hist-actions .btn:hover {
   background: var(--surface-2);
   border-color: var(--border-strong, var(--surface-border));
 }
 
-.history-actions .btn-primary {
+.history-actions .btn-primary,
+.hist-actions .btn-primary {
   background: var(--accent);
   border-color: var(--accent);
   color: var(--on-accent);
 }
 
-.history-actions .btn-primary:hover {
+.history-actions .btn-primary:hover,
+.hist-actions .btn-primary:hover {
   background: var(--primary-hover);
 }
 
-.history-actions .btn-danger {
+.history-actions .btn-danger,
+.hist-actions .btn-danger {
   background: var(--error);
   border-color: var(--error);
   color: var(--on-accent);
 }
 
-.history-actions .btn-danger:hover {
+.history-actions .btn-danger:hover,
+.hist-actions .btn-danger:hover {
   background: var(--danger-hover);
 }
 
 /* Handoff parity: danger zones mirror `.card-danger` (see _card.css:61) —
    single 1px error-tinted border, no double-up via box-shadow. Padding
-   matches the 16px .card standard instead of the old 20px overhang. */
-.history-danger-zone {
+   matches the 16px .card standard instead of the old 20px overhang.
+   The base `.danger-zone` rule applies the handoff's left-body / right-actions
+   split so both history and settings (Power & recovery) share the same shape
+   without duplicating the flex wiring. */
+.danger-zone {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -7233,22 +7529,33 @@ body[data-page="settings"] .settings-device-name {
   border: 1px solid color-mix(in oklab, var(--error) 30%, var(--surface-border));
   border-radius: var(--border-radius-lg);
   background: var(--surface);
+  flex-wrap: wrap;
 }
 
-.history-danger-zone .danger-zone-body {
+.danger-zone .danger-zone-body {
   display: grid;
   gap: 4px;
   min-width: 0;
 }
 
-.history-danger-zone p {
+.danger-zone p {
   margin: 0;
   color: var(--text-secondary);
   font-size: 0.9rem;
 }
 
-.history-danger-zone h3 {
+.danger-zone h2,
+.danger-zone h3 {
   color: var(--error);
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.danger-zone .inline-action-row {
+  flex-shrink: 0;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 /* Handoff uses --surface-border (aliased to --border) for every separator;
@@ -7262,6 +7569,11 @@ body[data-page="settings"] .settings-device-name {
 
 .danger-zone-label {
   display: inline-block;
+  /* The label sits inside `.danger-zone-body`, a grid child; but that body
+     is itself a flex child of `.danger-zone`. `justify-self` only applies
+     to grid children, so use `align-self` to control cross-axis placement
+     in case the label ends up in a flex context (e.g. alternate layouts). */
+  align-self: start;
   font-size: 0.7rem;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -8289,6 +8601,101 @@ body.modal-open {
     background: var(--modal-bg);
     border: 1px solid var(--surface-border);
 }
+/* Quick-update confirm modal (sidebar download chip target). Dedicated
+   scope so the layout doesn't inherit the narrow 400px action-button
+   grid used by the generic response modal. */
+.quick-update-modal .modal-content {
+    max-width: 480px;
+    margin: 12vh auto;
+    padding: 22px 24px 18px;
+}
+
+.quick-update-versions {
+    display: flex;
+    align-items: stretch;
+    gap: 10px;
+    margin: 6px 0 14px;
+}
+
+.quick-update-version-tile {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 10px 12px;
+    border: 1px solid var(--surface-border);
+    border-radius: var(--border-radius-md);
+    background: var(--surface-2, var(--surface));
+}
+
+.quick-update-version-tile-latest {
+    border-color: color-mix(in srgb, var(--accent) 40%, var(--surface-border));
+    background: color-mix(in oklab, var(--accent-weak, var(--surface-2)) 60%, var(--surface-2));
+}
+
+.quick-update-version-label {
+    font-family: var(--font-mono, 'JetBrains Mono'), ui-monospace, monospace;
+    font-size: 0.64rem;
+    letter-spacing: 0.1em;
+    color: var(--text-3, var(--muted));
+    text-transform: uppercase;
+}
+
+.quick-update-version-value {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text);
+}
+
+.quick-update-arrow {
+    align-self: center;
+    color: var(--text-3, var(--muted));
+    font-size: 1.1rem;
+    flex-shrink: 0;
+}
+
+.quick-update-body {
+    color: var(--muted);
+    font-size: 0.88rem;
+    line-height: 1.5;
+    margin: 0 0 16px;
+}
+
+.quick-update-actions {
+    margin-top: 0;
+}
+
+.quick-update-actions .action-button {
+    min-height: 40px;
+    padding: 10px 18px;
+    font-size: 0.92rem;
+    white-space: nowrap;
+}
+
+.quick-update-footer {
+    display: flex;
+    justify-content: center;
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 1px solid var(--surface-border);
+}
+
+.quick-update-link {
+    color: var(--text-3, var(--muted));
+    font-size: 0.82rem;
+    text-decoration: none;
+    padding: 4px 6px;
+    border-radius: var(--border-radius-sm);
+    transition: color 0.15s ease;
+}
+
+.quick-update-link:hover,
+.quick-update-link:focus-visible {
+    color: var(--accent);
+    text-decoration: underline;
+}
+
 /* For image preview modal, allow larger canvas */
 .image-modal .modal-content {
   max-width: 95vw;
@@ -8650,19 +9057,46 @@ details[open] > .update-release-notes-toggle::before {
 
 .update-release-notes-body {
     margin-top: 6px;
-    padding: 0 0 0 18px;
+    padding: 0 0 0 4px;
     font-size: 0.82rem;
     line-height: 1.55;
     color: var(--text-secondary);
     max-height: 200px;
     overflow-y: auto;
-    white-space: pre-wrap;
+}
+
+.update-release-notes-body ul {
+    list-style: disc outside;
+    margin: 0 0 8px;
+    padding-left: 18px;
+}
+
+.update-release-notes-body li {
+    margin: 2px 0;
+}
+
+.update-release-notes-body h4 {
+    margin: 10px 0 4px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--text);
+    text-transform: none;
+    letter-spacing: 0;
+}
+
+.update-release-notes-body h4:first-child {
+    margin-top: 0;
+}
+
+.update-release-notes-body p {
+    margin: 4px 0;
 }
 
 .update-actions {
     display: flex;
     gap: var(--spacing-sm);
     flex-wrap: wrap;
+    align-items: center;
 }
 
 /* Legacy compatibility */
@@ -8846,18 +9280,27 @@ details[open] > .update-release-notes-toggle::before {
     min-height: 32px;
 }
 
-/* Timeline bullet points - properly aligned */
+/* Timeline bullet — check mark inside an accent disc.
+   Historical entries are, by definition, completed steps so a ✓ reads more
+   meaningfully than a plain dot while keeping the timeline rhythm intact.
+   The disc also visually anchors the connector line beneath it. */
 .progress-log li::before {
-    content: "";
+    content: "✓";
     position: absolute;
-    left: 12px;
-    top: 12px;
-    width: 8px;
-    height: 8px;
-    background: var(--accent);
+    left: 8px;
+    top: 6px;
+    width: 16px;
+    height: 16px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: color-mix(in oklab, var(--accent) 18%, var(--surface));
+    color: var(--accent);
     border-radius: 50%;
-    border: 2px solid var(--surface);
-    box-shadow: 0 0 0 2px var(--accent);
+    font-size: 0.68rem;
+    font-weight: 700;
+    line-height: 1;
+    border: 1px solid color-mix(in oklab, var(--accent) 45%, var(--surface-border));
     z-index: 2;
 }
 
@@ -8866,7 +9309,7 @@ details[open] > .update-release-notes-toggle::before {
     content: "";
     position: absolute;
     left: 15px;
-    top: 20px;
+    top: 22px;
     bottom: -8px;
     width: 2px;
     background: linear-gradient(to bottom, var(--accent), var(--panel-border));
@@ -9865,6 +10308,11 @@ body[data-page="api-keys"] .status-popover {
         z-index: auto;
         padding-top: 16px;
         background: none;
+        /* Drop the desktop `width: fit-content` so the Save / Logs pair
+           spans the full card on narrow screens instead of floating as a
+           narrow pill. */
+        width: 100%;
+        max-width: 100%;
     }
 
     .title-stack {

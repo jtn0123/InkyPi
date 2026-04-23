@@ -5,21 +5,93 @@
 
   function getVersionElements() {
     return {
-      badge: document.getElementById("updateBadge"),
       checkBtn: document.getElementById("checkUpdatesBtn"),
       latestEl: document.getElementById("latestVersion"),
       notesBody: document.getElementById("releaseNotesBody"),
       notesContainer: document.getElementById("releaseNotesContainer"),
+      notesVersion: document.getElementById("releaseNotesVersion"),
       updateBtn: document.getElementById("startUpdateBtn"),
       whatsNewBody: document.getElementById("whatsNewBody"),
       whatsNewBtn: document.getElementById("whatsNewBtn"),
     };
   }
 
-  function setStatusChip(chip, text, variant) {
-    if (!chip) return;
-    chip.textContent = text;
-    chip.className = variant ? `status-chip ${variant}` : "status-chip";
+  function escapeReleaseNotesHTML(str) {
+    return String(str)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  }
+
+  // Minimal markdown → HTML for GitHub release notes. The upstream format
+  // is a top-level `# v<ver>` heading (redundant with our version chip),
+  // `## <Category>` sections, and `- ` bullets. Everything else becomes
+  // a paragraph. Keeping the scope tight avoids pulling in a full parser
+  // and makes the output auditable from a unit test.
+  function renderReleaseNotesHTML(markdown) {
+    if (!markdown || typeof markdown !== "string") return "";
+    const lines = markdown.replace(/\r\n/g, "\n").split("\n");
+    const out = [];
+    let inList = false;
+    const flushList = () => {
+      if (inList) {
+        out.push("</ul>");
+        inList = false;
+      }
+    };
+    let sawVersionHeading = false;
+    for (const raw of lines) {
+      const line = raw.trimEnd();
+      const trimmed = line.trim();
+      if (!trimmed) {
+        flushList();
+        continue;
+      }
+      // Hand-rolled bullet / heading detection instead of anchored-greedy
+      // regexes to avoid any super-linear backtracking risk (SonarCloud
+      // S5852). `trimmed` has no newlines so slice+trim is O(n).
+      const firstChar = trimmed.charAt(0);
+      if (firstChar === "-" || firstChar === "*" || firstChar === "\u2022") {
+        const rest = trimmed.slice(1).replace(/^[ \t]+/, "");
+        if (rest && trimmed.charAt(1) !== firstChar) {
+          if (!inList) {
+            out.push("<ul>");
+            inList = true;
+          }
+          out.push("<li>" + escapeReleaseNotesHTML(rest) + "</li>");
+          continue;
+        }
+      }
+      if (firstChar === "#") {
+        let hashCount = 0;
+        while (hashCount < trimmed.length && trimmed.charAt(hashCount) === "#") {
+          hashCount += 1;
+        }
+        if (hashCount >= 1 && hashCount <= 6) {
+          const afterHashes = trimmed.slice(hashCount);
+          const spaceRun = afterHashes.match(/^[ \t]+/);
+          if (spaceRun) {
+            const text = afterHashes.slice(spaceRun[0].length);
+            if (text) {
+              flushList();
+              // Skip the redundant version heading ("# v0.64.1 (2026-04-21)")
+              if (!sawVersionHeading && /^v?\d/.test(text)) {
+                sawVersionHeading = true;
+                continue;
+              }
+              out.push("<h4>" + escapeReleaseNotesHTML(text) + "</h4>");
+              continue;
+            }
+          }
+        }
+      }
+      flushList();
+      out.push("<p>" + escapeReleaseNotesHTML(trimmed) + "</p>");
+    }
+    flushList();
+    return out.join("");
   }
 
   function setCheckButtonLoading(checkBtn, isLoading) {
@@ -29,44 +101,56 @@
     if (spinner) {
       spinner.style.display = isLoading ? "inline-block" : "none";
     }
-  }
-
-  function syncReleaseNotes(notesText, notesContainer, notesBody) {
-    if (!notesContainer) return;
-    notesContainer.hidden = !notesText;
-    if (notesBody) {
-      notesBody.textContent = notesText || "";
+    const label = checkBtn.querySelector(".btn-label");
+    if (label) {
+      label.textContent = isLoading ? "Checking\u2026" : "Check for updates";
     }
   }
 
-  function syncWhatsNew(notesText, whatsNewBtn, whatsNewBody) {
+  function syncReleaseNotes(notesText, notesContainer, notesBody, notesVersion, latest) {
+    if (!notesContainer) return;
+    const html = renderReleaseNotesHTML(notesText);
+    notesContainer.hidden = !html;
+    if (notesBody) {
+      notesBody.innerHTML = html;
+    }
+    if (notesVersion) {
+      notesVersion.textContent = latest ? "\u00b7 v" + String(latest).replace(/^v/, "") : "";
+    }
+  }
+
+  function syncWhatsNew(notesText, whatsNewBtn, whatsNewBody, updateAvailable) {
     if (whatsNewBody) {
-      whatsNewBody.textContent = notesText || "";
+      whatsNewBody.innerHTML = renderReleaseNotesHTML(notesText);
     }
     if (whatsNewBtn) {
-      whatsNewBtn.hidden = !notesText;
+      // Only show "What's new" when there's actually a new version — when
+      // the device is up-to-date the release notes are still surfaced via
+      // the disclosure below, so the modal button would be redundant.
+      whatsNewBtn.hidden = !(updateAvailable && notesText);
     }
   }
 
   function renderVersionCheckResult(elements, data) {
     if (elements.latestEl) {
-      elements.latestEl.textContent = data.latest || "—";
+      elements.latestEl.textContent = data.latest || "\u2014";
     }
-    if (data.update_available) {
-      setStatusChip(elements.badge, "Update available", "warning");
-      if (elements.updateBtn) elements.updateBtn.disabled = false;
-    } else if (data.latest) {
-      setStatusChip(elements.badge, "Up to date", "success");
-      if (elements.updateBtn) elements.updateBtn.disabled = true;
-    } else {
-      setStatusChip(elements.badge, "Unable to check");
+    if (elements.updateBtn) {
+      elements.updateBtn.disabled = !data.update_available;
     }
     syncReleaseNotes(
       data.release_notes,
       elements.notesContainer,
-      elements.notesBody
+      elements.notesBody,
+      elements.notesVersion,
+      data.latest
     );
-    syncWhatsNew(data.release_notes, elements.whatsNewBtn, elements.whatsNewBody);
+    syncWhatsNew(
+      data.release_notes,
+      elements.whatsNewBtn,
+      elements.whatsNewBody,
+      !!data.update_available
+    );
   }
 
   async function fetchVersionData(versionUrl) {
@@ -114,20 +198,37 @@
       openWhatsNew,
     } = modals;
 
-    async function checkForUpdates() {
+    async function checkForUpdates(options) {
       const elements = getVersionElements();
+      const silent = !!(options && options.silent);
       setCheckButtonLoading(elements.checkBtn, true);
-      setStatusChip(elements.badge, "Checking...");
       try {
         const data = await fetchVersionData(config.versionUrl);
         renderVersionCheckResult(elements, data);
+        if (!silent) {
+          if (data.update_available) {
+            showResponseModal(
+              "success",
+              `Update available: v${String(data.latest).replace(/^v/, "")}`
+            );
+          } else if (data.latest) {
+            showResponseModal("success", "You're on the latest version.");
+          } else {
+            showResponseModal("failure", "Unable to check for updates.");
+          }
+        }
       } catch (e) {
         if (e?.name === "AbortError") {
           console.debug("Version check aborted:", e);
           return;
         }
         console.warn("Version check failed:", e);
-        setStatusChip(elements.badge, "Check failed");
+        if (!silent) {
+          showResponseModal(
+            "failure",
+            "Unable to check for updates. Try again later."
+          );
+        }
       } finally {
         setCheckButtonLoading(elements.checkBtn, false);
       }
@@ -162,7 +263,9 @@
             clearInterval(state.updateTimer);
             state.updateTimer = null;
             setTimeout(logs.fetchAndRenderLogs, 500);
-            checkForUpdates();
+            // Silent refresh — the user was just watching the update log
+            // stream, they don't need another toast announcing the state.
+            checkForUpdates({ silent: true });
           }
         } catch (e) {
           console.warn(`${logLabel} status poll failed:`, e);
@@ -334,9 +437,14 @@
         ?.addEventListener("click", importConfig);
       const importFileInput = document.getElementById("importFile");
       const importBtn = document.getElementById("importConfigBtn");
+      const importFileName = document.getElementById("importFileName");
       if (importFileInput && importBtn) {
         importFileInput.addEventListener("change", () => {
           importBtn.disabled = !importFileInput.files?.length;
+          if (importFileName) {
+            const file = importFileInput.files?.[0];
+            importFileName.textContent = file ? file.name : "No file chosen";
+          }
         });
       }
 
@@ -401,4 +509,6 @@
   }
 
   settingsModules.createActionsModule = createActionsModule;
+  settingsModules.renderReleaseNotesHTML = renderReleaseNotesHTML;
+  settingsModules.renderVersionCheckResult = renderVersionCheckResult;
 })();

@@ -79,6 +79,22 @@
   margin-top: 0;
 }
 
+/* Mono stamp treatment for the "Refreshed X ago" row — the handoff renders
+   this as a quiet, tabular-looking timestamp rather than a pill. Overrides
+   the pill styling inherited from `_plugins.css:107` so it reads as inline
+   metadata inside the playlist row instead of a standalone chip. */
+.pl-item-meta .latest-refresh {
+  display: inline;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  font-family: var(--font-mono, 'JetBrains Mono'), ui-monospace, monospace;
+  font-size: 0.7rem;
+  color: var(--text-3);
+  letter-spacing: 0.02em;
+}
+
 .pl-item-thumb {
   grid-area: thumb;
   width: 96px;
@@ -272,7 +288,10 @@ a.pl-add-row:hover {
 }
 
 .playlist-summary-row {
-  gap: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .playlist-summary-copy {
@@ -362,26 +381,43 @@ a.pl-add-row:hover {
   border: 1px solid var(--surface-border);
   border-radius: 8px;
   background: transparent;
-  color: transparent;
-  font-size: 0;
+  color: var(--text-3);
   flex: 0 0 auto;
 }
 
+/* The label itself uses the shared `.sr-only` utility so AT still hears
+   "Open" / "Hide" when the button is focused. The inline SVG caret is
+   the visible affordance. */
+
+/* Kill any legacy ::after caret defined by the older `_playlists.css`
+   rule — the inline SVG inside `.playlist-caret` is now the visible
+   affordance, and two carets stacked would look broken. */
 .playlist-toggle-button::after {
-  content: "\203A";
-  margin-left: 0;
-  color: var(--text-3);
-  font-size: 1.05rem;
-  transform: rotate(0deg);
+  content: none;
 }
 
-.playlist-toggle-button[aria-expanded="true"]::after {
+.playlist-toggle-button .playlist-caret {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  transition: transform 0.2s ease;
+}
+
+.playlist-toggle-button .playlist-caret svg {
+  width: 100%;
+  height: 100%;
+}
+
+.playlist-toggle-button[aria-expanded="true"] .playlist-caret {
   transform: rotate(90deg);
 }
 
 .playlist-toggle-button:hover {
   border-color: var(--border-strong, var(--surface-border));
   background: var(--surface-2);
+  color: var(--text);
 }
 
 .playlist-header .playlist-toggle-button {

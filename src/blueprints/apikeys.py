@@ -144,10 +144,17 @@ def write_env_file(filepath, entries):
 
 
 def mask_value(value):
-    """Mask API key value for display. Never reveal actual values for security."""
+    """Mask API key value for display.
+
+    Reveals only the final four characters so operators can tell which key
+    they stored without exposing the token itself (matches the prototype's
+    `sk-****-4d2f` style while staying conservative on what's leaked).
+    """
     if not value:
         return "(empty)"
-    return "●" * min(len(value), 20)
+    if len(value) <= 4:
+        return "●" * len(value)
+    return "●" * 8 + value[-4:]
 
 
 @apikeys_bp.route("/api-keys", methods=["GET"])

@@ -20,10 +20,15 @@ class TestCheckUpdatesButtonSpinner:
         assert b'id="checkUpdatesBtn"' in resp.data
         assert b"btn-spinner" in resp.data
 
-    def test_settings_page_has_update_badge(self, client):
+    def test_settings_page_has_update_action_buttons(self, client):
+        """The standalone `#updateBadge` chip was removed; the Updates tab
+        now exposes the check / start / what's-new trio of buttons only,
+        with the sidebar download chip carrying the availability signal."""
         resp = client.get("/settings")
         assert resp.status_code == 200
-        assert b'id="updateBadge"' in resp.data
+        assert b'id="updateBadge"' not in resp.data
+        assert b'id="startUpdateBtn"' in resp.data
+        assert b'id="whatsNewBtn"' in resp.data
 
     def test_settings_page_has_version_cards(self, client):
         resp = client.get("/settings")

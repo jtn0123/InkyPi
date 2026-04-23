@@ -33,6 +33,13 @@
            chip on this page. #}
         {% set settings_chips_html %}
             <span class="status-chip settings-page-device-name" title="{{ device_settings.name }}">{{ device_settings.name }}</span>
+            {% if device_settings.orientation %}
+            <span class="status-chip">{{ device_settings.orientation | capitalize }}</span>
+            {% endif %}
+            {% set _tz = device_settings.get('timezone') %}
+            {% if _tz %}
+            <span class="status-chip" title="{{ _tz }}">{{ _tz }}</span>
+            {% endif %}
         {% endset %}
         {% call pageheader(
             title='Device & system',
@@ -42,48 +49,36 @@
         ) %}
             <button type="button" class="header-button is-secondary" id="downloadLogsBtn">Download logs</button>
             <a class="header-button is-secondary" href="{{ url_for('settings.api_keys_page') }}">
-                <svg class="btn-leading-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
-                    <circle cx="8" cy="15" r="4"/><path d="M10.85 12.15 19 4"/><path d="M18 5l3 3"/><path d="M15 8l3 3"/>
-                </svg>
+                {{ icon('key', 'btn-leading-icon') | safe }}
                 <span>API keys</span>
             </a>
         {% endcall %}
         <div class="settings-console-layout">
         <button type="button" class="settings-mobile-toggle header-button is-secondary" id="settingsMobileNavToggle" aria-expanded="false" aria-controls="settingsSideNav">Sections</button>
         <nav class="settings-side-nav" id="settingsSideNav" role="navigation" aria-label="Settings groups">
-            {# Handoff parity: each tab carries a small leading icon. Inline SVGs
-               (Phosphor-ish) keep the template self-contained — we don't have
-               the Phosphor web font loaded, and adding 5 SVG assets for this
-               alone isn't worth it. `aria-hidden="true"` keeps the label as
-               the accessible name. #}
+            {# Phosphor icons via icon() macro; aria-hidden so the label is the accessible name. #}
             <button type="button" class="settings-side-link active" data-settings-tab="device">
-                <svg class="settings-side-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
-                    <rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/>
-                </svg>
+                {{ icon('monitor', 'settings-side-icon') | safe }}
                 <span>Device</span>
             </button>
             <button type="button" class="settings-side-link" data-settings-tab="scheduling">
-                <svg class="settings-side-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
-                    <circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>
-                </svg>
+                {{ icon('clock', 'settings-side-icon') | safe }}
                 <span>Scheduling</span>
             </button>
             <button type="button" class="settings-side-link" data-settings-tab="image">
-                <svg class="settings-side-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
-                    <path d="M12 3a9 9 0 1 0 0 18c1.1 0 2-.9 2-2a2 2 0 0 1 2-2h1a4 4 0 0 0 4-4 9 9 0 0 0-9-10z"/><circle cx="7.5" cy="10.5" r="1"/><circle cx="12" cy="7.5" r="1"/><circle cx="16.5" cy="10.5" r="1"/>
-                </svg>
+                {{ icon('palette', 'settings-side-icon') | safe }}
                 <span>Image</span>
             </button>
+            <button type="button" class="settings-side-link" data-settings-tab="appearance">
+                {{ icon('sparkle', 'settings-side-icon') | safe }}
+                <span>Appearance</span>
+            </button>
             <button type="button" class="settings-side-link" data-settings-tab="maintenance">
-                <svg class="settings-side-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
-                    <path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/>
-                </svg>
+                {{ icon('download-simple', 'settings-side-icon') | safe }}
                 <span>Updates</span>
             </button>
             <button type="button" class="settings-side-link" data-settings-tab="power">
-                <svg class="settings-side-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
-                    <path d="M12 3v9"/><path d="M7.5 6.5a7 7 0 1 0 9 0"/>
-                </svg>
+                {{ icon('power', 'settings-side-icon') | safe }}
                 <span>Power</span>
             </button>
         </nav>
@@ -235,11 +230,16 @@
 
                 <section class="settings-console-panel" data-settings-panel="maintenance">
 
-                <!-- Software Update — always visible, top of Updates tab -->
+                <!-- Software Update — always visible, top of Updates tab.
+                     The "Update available" chip was removed in favour of
+                     the sidebar download indicator (update_indicator.js).
+                     The in-progress "Checking..." state is rendered on
+                     the check button itself instead of a separate chip,
+                     so the status lives in exactly one place. Success /
+                     failure are surfaced via the shared response modal. -->
                 <div class="card" id="section-software-update">
                 <div class="card-head">
                     <h2 class="card-title">Software update</h2>
-                    <span class="status-chip" id="updateBadge">Checking...</span>
                 </div>
                 <div class="card-body">
                 <div class="update-panel" id="updatePanel">
@@ -268,51 +268,52 @@
                             </button>
                         </div>
                     </div>
-                    {# Handoff parity: version tiles on the left, action
-                       buttons pushed to the right via `margin-left:auto` on
-                       `.update-actions`. Release notes live below as a
-                       plain <details> to keep the row compact. #}
-                    <div class="update-row">
+                    {# Handoff parity: `.update-version-row` holds just the
+                       Installed → Latest tiles. Release notes live below as a
+                       plain <details>, and `.update-actions` sits on its own
+                       row at the bottom — mirrors the handoff screens.jsx
+                       Software Update card layout. #}
+                    <div class="update-version-row">
                         <div class="update-version-card">
                             <span class="update-version-label">Installed</span>
-                            <span class="update-version-number" id="currentVersion">{{ app_version }}</span>
+                            <span class="update-version-number mono" id="currentVersion">{{ app_version }}</span>
                         </div>
                         <span class="update-arrow" aria-hidden="true">→</span>
                         <div class="update-version-card">
                             <span class="update-version-label">Latest</span>
-                            <span class="update-version-number" id="latestVersion">—</span>
-                        </div>
-                        <div class="update-actions">
-                            <button type="button" id="checkUpdatesBtn" class="action-button compact is-secondary"><span class="btn-spinner" aria-hidden="true"></span> Check for updates</button>
-                            <button type="button" id="startUpdateBtn" class="action-button compact primary" disabled>Update now</button>
-                            <button type="button" id="whatsNewBtn" class="action-button compact is-secondary" hidden>What's new</button>
+                            <span class="update-version-number mono" id="latestVersion">—</span>
                         </div>
                     </div>
                     <div id="releaseNotesContainer" class="update-release-notes" hidden>
                         <details>
-                            <summary class="update-release-notes-toggle">Release notes <span class="update-release-version" id="releaseNotesVersion"></span></summary>
+                            <summary class="update-release-notes-toggle">Release notes <span class="update-release-version mono" id="releaseNotesVersion"></span></summary>
                             <div id="releaseNotesBody" class="update-release-notes-body"></div>
                         </details>
+                    </div>
+                    <div class="update-actions">
+                        <button type="button" id="checkUpdatesBtn" class="action-button compact is-secondary" aria-live="polite"><span class="btn-spinner" aria-hidden="true"></span><span class="btn-label">Check for updates</span></button>
+                        <button type="button" id="startUpdateBtn" class="action-button compact primary" disabled>Update now</button>
+                        <button type="button" id="whatsNewBtn" class="action-button compact is-secondary" hidden>What's new</button>
                     </div>
                 </div>
                 </div>
                 </div>
 
-                <!-- Backup & Restore -->
+                <!-- Backup & Restore — handoff parity with the handoff
+                     screens.jsx Backup card: a compact card with just the
+                     section title, an inline button row, and the
+                     Include-API-keys toggle. No subtitle. -->
                 <div class="card card-dense" id="section-backup-restore">
                     <div class="card-head">
-                        <div>
-                            <h2 class="card-title">Backup &amp; restore</h2>
-                            <p class="card-sub">Export a full config snapshot or restore from a prior backup.</p>
-                        </div>
+                        <h2 class="card-title">Backup &amp; restore</h2>
                     </div>
                     <div class="card-body">
-                    {# Handoff parity: a single horizontal `inline-row` packs Download,
-                       Restore-from-file, and the Include-API-keys toggle together. #}
                     <div class="inline-row backup-restore-row">
                         <button type="button" id="exportConfigBtn" class="action-button compact is-secondary">Download backup</button>
                         <div class="backup-restore-restore">
-                            <input type="file" id="importFile" accept="application/json" class="form-input" aria-label="Select backup file to restore" />
+                            <input type="file" id="importFile" accept="application/json" class="sr-only" aria-label="Select backup file to restore" />
+                            <label for="importFile" class="action-button compact is-secondary backup-restore-pick">Choose file…</label>
+                            <span id="importFileName" class="backup-restore-filename" aria-live="polite">No file chosen</span>
                             <button type="button" id="importConfigBtn" class="action-button compact is-secondary" disabled>Restore from file</button>
                         </div>
                     </div>
@@ -450,14 +451,12 @@
                      Device / Scheduling / Image / Updates / Power). Tests that
                      drive reboot/shutdown must open the "power" tab first. -->
                 <section class="settings-console-panel" data-settings-panel="power">
-                <div class="card card-danger" id="section-power">
-                    <div class="card-head">
-                        <div>
-                            <h2 class="card-title">Power &amp; recovery</h2>
-                            <p class="card-sub">Lifecycle operations on the device itself. Physical access may be required to recover.</p>
-                        </div>
+                <section class="danger-zone power-danger-zone" id="section-power" aria-labelledby="powerDangerZoneTitle">
+                    <div class="danger-zone-body">
+                        <span class="danger-zone-label">Danger zone</span>
+                        <h2 id="powerDangerZoneTitle">Power &amp; recovery</h2>
+                        <p>Lifecycle operations on the device itself. Physical access may be required to recover.</p>
                     </div>
-                    <div class="card-body">
                     <div class="inline-action-row">
                         <!-- data-test-skip-click: reboot/shutdown physically power-cycle the Pi -->
                         <button type="button" id="rebootBtn" class="action-button compact is-warning" data-test-skip-click="true">Reboot</button>
@@ -465,8 +464,7 @@
                         <!-- data-test-skip-click: destructive reset, excluded from test_click_sweep -->
                         <button type="button" id="safeResetBtn" class="action-button compact is-secondary" data-test-skip-click="true">Safe reset</button>
                     </div>
-                    </div>
-                </div>
+                </section>
                 </section>
 
                 <!-- Image Settings -->
@@ -528,6 +526,62 @@
                         </div>
                         {% endif %}
                     </div>
+                    </div>
+                </div>
+                </section>
+
+                <!-- Appearance — aesthetic preset / density / accent hue. Changes
+                     apply instantly and persist to localStorage under inkypi_tweaks_v1
+                     (shared with the floating tweaks panel). -->
+                <section class="settings-console-panel" data-settings-panel="appearance">
+                <div class="card card-dense" id="section-appearance-aesthetic">
+                    <div class="card-head">
+                        <div>
+                            <h2 class="card-title">Aesthetic</h2>
+                            <p class="card-sub">Color and surface treatment. Changes apply instantly and persist on this browser.</p>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="aesthetic-options" role="toolbar" aria-label="Aesthetic">
+                            <button type="button" class="aesthetic-option" data-aesthetic="console" aria-pressed="false"><span class="aesthetic-swatch aesthetic-swatch-console" aria-hidden="true"></span>Console</button>
+                            <button type="button" class="aesthetic-option" data-aesthetic="paper" aria-pressed="false"><span class="aesthetic-swatch aesthetic-swatch-paper" aria-hidden="true"></span>Paper</button>
+                            <button type="button" class="aesthetic-option" data-aesthetic="minimal" aria-pressed="false"><span class="aesthetic-swatch aesthetic-swatch-minimal" aria-hidden="true"></span>Minimal</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="card card-dense" id="section-appearance-accent">
+                    <div class="card-head">
+                        <div>
+                            <h2 class="card-title">Accent hue</h2>
+                            <p class="card-sub">Slide through the color wheel; accents across the app update live.</p>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="accent-head">
+                            <span class="form-label">Hue</span>
+                            <span class="accent-value" data-accent-value>170°</span>
+                        </div>
+                        <input class="accent-slider" type="range" min="0" max="360" step="1" value="170" aria-label="Accent hue" data-accent-slider>
+                    </div>
+                </div>
+                <div class="card card-dense" id="section-appearance-density">
+                    <div class="card-head">
+                        <div>
+                            <h2 class="card-title">Density</h2>
+                            <p class="card-sub">How tightly content is packed across the app.</p>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="density-options" role="toolbar" aria-label="Density">
+                            <button type="button" class="density-option" data-density="compact" aria-pressed="false">Compact</button>
+                            <button type="button" class="density-option" data-density="balanced" aria-pressed="false">Balanced</button>
+                            <button type="button" class="density-option" data-density="cozy" aria-pressed="false">Cozy</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="card card-dense appearance-reset-card" id="section-appearance-reset">
+                    <div class="card-body appearance-reset-body">
+                        <button type="button" class="action-button is-secondary appearance-reset-btn" data-tweaks-reset>Reset to defaults</button>
                     </div>
                 </div>
                 </section>

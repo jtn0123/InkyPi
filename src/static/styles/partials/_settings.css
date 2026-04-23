@@ -5,6 +5,20 @@
   gap: 6px 12px;
 }
 
+/* Appearance tab — the Reset card holds a single action. Center it so the
+   button reads as a deliberate anchored reset rather than stretching
+   awkwardly to card-width. The button keeps a comfortable min-width. */
+.appearance-reset-body {
+  display: flex;
+  justify-content: center;
+}
+
+.appearance-reset-btn {
+  flex: 0 0 auto;
+  width: auto;
+  min-width: 12rem;
+}
+
 .settings-card {
   background: var(--panel-bg);
   border: 1px solid var(--panel-border);
@@ -72,16 +86,25 @@
   padding: 12px 16px 14px;
 }
 
-.settings-console-panel .update-panel,
-.settings-console-panel .danger-zone {
-  background: var(--surface);
-  border: 1px solid var(--surface-border);
-  border-radius: var(--border-radius-lg);
-  margin-bottom: 14px;
-  padding: 14px 16px;
+/* Handoff parity: the Updates panel already sits inside a `.card` (with
+   its own head/body chrome). The older rule re-applied surface + border +
+   padding on the inner `.update-panel`, producing a visible card-in-card.
+   Strip those so the update-panel flows flush with the card body, and let
+   the card wrapper supply the framing. */
+.settings-console-panel .update-panel {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  margin: 0;
 }
 
+/* Danger zone sits standalone (no wrapping card) so it keeps its own
+   framing. Base `.danger-zone` rule in _history.css drives the layout;
+   here we scope the error-tinted border and subtle surface tint that
+   the prototype applies only on the settings Power tab. */
 .settings-console-panel .danger-zone {
+  background: color-mix(in oklab, var(--error) 4%, var(--surface));
   border-color: color-mix(in oklab, var(--error) 30%, var(--surface-border));
 }
 
@@ -331,28 +354,47 @@
   padding-bottom: calc(6rem + env(safe-area-inset-bottom, 0px));
 }
 
-/* Handoff parity: the settings status stays left-aligned while the footer
-   groups the secondary live-logs affordance with the primary Save action.
-   Desktop keeps the pair sticky; mobile switches the bar back in-flow so it
-   never covers the last fields in the form. */
+/* Status flows inline to the left of the action pair inside the pill.
+   Hidden when empty so the pill shrinks to the two buttons. */
 .settings-panel .buttons-container #settings-form-status {
-  margin-right: auto;
-  min-height: 1.25rem;
+  margin: 0;
+  min-height: 0;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+}
+
+.settings-panel .buttons-container #settings-form-status:empty {
+  display: none;
 }
 
 .settings-panel {
   gap: 16px;
 }
 
+/* Sticky save footer — the action pair sits in a centered, rounded pill
+   that floats bottom-center of the viewport so it reads as a deliberate
+   anchored control group. The previous full-width gradient painted a
+   dark slab under the empty status span on the left which looked like
+   an unfinished grey box; the pill is width-fit so nothing sits in the
+   void next to the buttons. Backdrop-blur lets long scrolled content
+   peek through softly behind the buttons. */
 .settings-panel .buttons-container {
   position: sticky;
   bottom: 16px;
   z-index: 6;
   align-items: center;
-  justify-content: flex-end;
-  gap: 12px;
-  padding-top: 12px;
-  background: linear-gradient(180deg, transparent, color-mix(in srgb, var(--bg) 94%, transparent) 22%);
+  justify-content: center;
+  gap: 10px;
+  padding: 8px 10px;
+  width: fit-content;
+  max-width: calc(100% - 16px);
+  margin: 0 auto;
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--border-radius-lg);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(10px) saturate(120%);
+  -webkit-backdrop-filter: blur(10px) saturate(120%);
 }
 
 .settings-panel .buttons-container #saveSettingsBtn {

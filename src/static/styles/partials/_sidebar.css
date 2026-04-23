@@ -23,6 +23,18 @@
   overflow: hidden;
 }
 
+/* Row that holds the brand link plus the update-available affordance.
+   The update button lives as a sibling of `<a.sidebar-brand>` (nested
+   buttons inside anchors are invalid HTML) and is positioned to the far
+   right so the InkyPi/host label doesn't shift when the button unhides. */
+.sidebar-brand-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-right: 4px;
+}
+
 .sidebar-brand {
   display: flex;
   align-items: center;
@@ -31,6 +43,65 @@
   padding: 2px 8px 6px;
   text-decoration: none;
   color: inherit;
+  flex: 1;
+  min-width: 0;
+}
+
+/* Small square download chip. Shows a subtle accent dot in the corner
+   so the call-to-action is visible even at small zoom levels. */
+.sidebar-update-btn {
+  position: relative;
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  border: 1px solid var(--surface-border);
+  background: var(--surface-2, var(--surface));
+  color: var(--text);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  transition: background-color 0.15s ease, border-color 0.15s ease,
+              color 0.15s ease, transform 0.15s ease;
+}
+
+.sidebar-update-btn:hover {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+  transform: translateY(-1px);
+}
+
+.sidebar-update-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.sidebar-update-btn .icon-image {
+  width: 16px;
+  height: 16px;
+  color: inherit;
+  display: inline-flex;
+}
+
+.sidebar-update-btn .icon-image svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.sidebar-update-dot {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid var(--surface);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent);
 }
 
 .brand-mark {

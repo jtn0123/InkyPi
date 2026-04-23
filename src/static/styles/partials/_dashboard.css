@@ -37,8 +37,12 @@
    3 cells (NOW | NEXT | REFRESH) separated by thin dividers. */
 .hero-strip {
   display: grid;
-  grid-template-columns: 1fr auto 1fr auto 1fr;
-  gap: 18px;
+  /* Give the REFRESH cell ~30% more horizontal room so common meta strings
+     like "Every 60 min · auto" stay on a single line at default density.
+     NOW / NEXT still wrap gracefully via `.m`'s 2-line clamp when a long
+     plugin or playlist name lands in them. */
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto minmax(0, 1.3fr);
+  gap: 14px;
   /* Handoff parity (styles.css:347–354): the KPI strip sits 16px below the
      preview canvas, not flush against it (was 4px). */
   margin-top: 16px;
@@ -188,6 +192,15 @@
   /* Handoff parity: tighter 8px stack, align cards to the top. */
   gap: 8px;
   align-content: start;
+  /* min-width:0 on the column plus each direct child keeps nowrap'd inner
+     text (e.g. .quick-sub's single-line summary) from pushing the whole
+     overview column past its 320px grid-track. Without this, the cards
+     hang ~40px outside the hero grid on common viewport widths. */
+  min-width: 0;
+}
+
+.dashboard-overview > * {
+  min-width: 0;
 }
 
 .dashboard-status-card {

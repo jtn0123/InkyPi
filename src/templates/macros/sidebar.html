@@ -28,13 +28,24 @@
     {% set _ = brand_parts.append(host) %}
 {% endif %}
 <aside class="shell-sidebar" aria-label="Primary navigation">
-    <a href="{{ url_for('main.main_page') }}" class="sidebar-brand">
-        <span class="brand-mark" aria-hidden="true">I</span>
-        <span class="brand-meta">
-            <span class="brand-name">InkyPi</span>
-            {% if brand_parts %}<span class="brand-host">{{ brand_parts | join(' · ') }}</span>{% endif %}
-        </span>
-    </a>
+    <div class="sidebar-brand-row">
+        <a href="{{ url_for('main.main_page') }}" class="sidebar-brand">
+            <span class="brand-mark" aria-hidden="true">I</span>
+            <span class="brand-meta">
+                <span class="brand-name">InkyPi</span>
+                {% for part in brand_parts %}<span class="brand-host" title="{{ part }}">{{ part }}</span>{% endfor %}
+            </span>
+        </a>
+        {# Rendered hidden; update_indicator.js polls /api/version on every
+           page load and unhides this button when an update is available.
+           A tooltip surfaces the target version; click opens the quick-update
+           confirm modal below. #}
+        <button type="button" id="sidebarUpdateBtn" class="sidebar-update-btn" hidden
+                aria-label="Update available" aria-haspopup="dialog" aria-controls="quickUpdateModal" title="Update available">
+            {{ icon('download-simple', 'icon-image') | safe }}
+            <span class="sidebar-update-dot" aria-hidden="true"></span>
+        </button>
+    </div>
 
     <nav class="sidebar-nav" aria-label="Site navigation">
         <div class="nav-section">Main</div>

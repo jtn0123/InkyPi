@@ -105,18 +105,27 @@
     min-height: 32px;
 }
 
-/* Timeline bullet points - properly aligned */
+/* Timeline bullet — check mark inside an accent disc.
+   Historical entries are, by definition, completed steps so a ✓ reads more
+   meaningfully than a plain dot while keeping the timeline rhythm intact.
+   The disc also visually anchors the connector line beneath it. */
 .progress-log li::before {
-    content: "";
+    content: "✓";
     position: absolute;
-    left: 12px;
-    top: 12px;
-    width: 8px;
-    height: 8px;
-    background: var(--accent);
+    left: 8px;
+    top: 6px;
+    width: 16px;
+    height: 16px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: color-mix(in oklab, var(--accent) 18%, var(--surface));
+    color: var(--accent);
     border-radius: 50%;
-    border: 2px solid var(--surface);
-    box-shadow: 0 0 0 2px var(--accent);
+    font-size: 0.68rem;
+    font-weight: 700;
+    line-height: 1;
+    border: 1px solid color-mix(in oklab, var(--accent) 45%, var(--surface-border));
     z-index: 2;
 }
 
@@ -125,7 +134,7 @@
     content: "";
     position: absolute;
     left: 15px;
-    top: 20px;
+    top: 22px;
     bottom: -8px;
     width: 2px;
     background: linear-gradient(to bottom, var(--accent), var(--panel-border));
