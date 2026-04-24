@@ -1,79 +1,23 @@
 # CHANGELOG
 
 
-## v2.0.0 (2026-04-24)
+## v1.0.1 (2026-04-24)
 
 ### Continuous Integration
 
-- Stop SIGPIPE from ls|head failing wheelhouse build
+- Stop SIGPIPE from `ls|head` failing the wheelhouse build
   ([#585](https://github.com/jtn0123/InkyPi/pull/585),
   [`33f3a74`](https://github.com/jtn0123/InkyPi/commit/33f3a749582316802aeb90e00a4aeafbc42548d6))
 
-* feat!: enforce conventional-commit PR titles and surface skipped releases
+### Notes
 
-Since v0.64.1, five consecutive PRs merged to main without a version bump because their squash-merge
-  subjects (css:, security:, ui:, Normalize..., Stabilize...) are prefixes that
-  python-semantic-release's Angular parser does not recognize. The release workflow exited "success"
-  silently on each, hiding the regression.
-
-Changes:
-
-- .github/workflows/pr-title-lint.yml: add amannn/action-semantic-pull-request to block PRs whose
-  title does not start with a recognized Conventional Commits type. Because PRs are squash-merged,
-  the title becomes the commit subject on main and is what semantic-release parses. -
-  .github/workflows/release.yml: emit a ::warning annotation and a step summary when no release tag
-  is cut, so future silent skips are visible on the Actions run and commit status pages. -
-  CONTRIBUTING.md + .github/pull_request_template.md: spell out the
-  squash-merge-title-is-the-bump-signal pitfall and list the full set of recognized types (feat,
-  fix, perf → bump; everything else → no bump).
-
-BREAKING CHANGE: cutting v1.0.0 to mark the UI/UX overhaul milestone that accumulated across #579
-  (render pipeline stabilization — pipe deadlock + chromium leak + update flow), #580 (lxml
-  CVE-2026-41066 patch), #581 (settings actions normalization), #582 (CSS partial split so every
-  file is <=500 lines), and #583 (sidebar update indicator and Updates tab polish). No external HTTP
-  API or config file format changes in this release; the major bump signals project-level stability
-  rather than a contract break.
-
-Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>
-
-* docs: address CodeRabbit feedback on release-pipeline PR
-
-- PR template + CONTRIBUTING.md: document the `type!:` shorthand for major bumps (this PR uses
-  `feat!:` but the docs only mentioned the `BREAKING CHANGE:` footer form). - CONTRIBUTING.md: add
-  `revert:` to the recognized types list so it stays in sync with pr-title-lint.yml. - release.yml:
-  drop unused `GH_TOKEN` env and URL-encode `%`/`\r`/`\n` in the commit subject before the
-  `::warning` annotation so subjects like "bump coverage to 90%" don't render garbled.
-
-* ci: stop SIGPIPE from ls|head failing wheelhouse build
-
-After wheels are built successfully, the diagnostic line
-
-ls -la dist/wheels | head -40
-
-runs under `set -euo pipefail`. Once `head -40` has 40 lines it closes the pipe; `ls` then gets
-  SIGPIPE on its next write and `pipefail` propagates the failure, aborting the step with exit code
-  2 even though all wheels built. This broke the v1.0.0 wheelhouse job (aarch64 + armv7l) after the
-  wheel count crossed head's cutoff — no tarballs got attached to the v1.0.0 release, so on-device
-  installs would fall back to slow per-wheel compile on Pi Zero 2 W.
-
-Append `|| true` to ignore the pipe failure on this diagnostic line. `wc -l` below is unaffected
-  because `wc` reads until EOF.
-
-After this merges, trigger the wheelhouse workflow manually for v1.0.0 (workflow_dispatch with
-  tag=v1.0.0) to backfill the missing wheel tarballs onto the existing release.
-
----------
-
-Co-authored-by: Claude Opus 4.7 <noreply@anthropic.com>
-
-### Breaking Changes
-
-- Cutting v1.0.0 to mark the UI/UX overhaul milestone that accumulated across #579 (render pipeline
-  stabilization — pipe deadlock + chromium leak + update flow), #580 (lxml CVE-2026-41066 patch),
-  #581 (settings actions normalization), #582 (CSS partial split so every file is <=500 lines), and
-  #583 (sidebar update indicator and Updates tab polish). No external HTTP API or config file format
-  changes in this release; the major bump signals project-level stability rather than a contract
-  break.
+- This release replaces a tag (`v2.0.0`) that semantic-release cut
+  accidentally. The `v2.0.0` squash-merge body leaked a `BREAKING CHANGE:`
+  footer from the prior PR's branch lineage, so the parser forced a major
+  bump for what was only a one-line CI fix. The tag and release have been
+  deleted; `v1.0.1` replaces it with the correct patch semantics. See the
+  companion docs update documenting the "branch from `origin/main`, not
+  from your previous feature branch" rule.
 
 
 ## v1.0.0 (2026-04-24)
