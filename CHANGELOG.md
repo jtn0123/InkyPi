@@ -1,6 +1,63 @@
 # CHANGELOG
 
 
+## v1.0.0 (2026-04-24)
+
+### Features
+
+- Enforce conventional-commit PR titles and surface skipped releases
+  ([#584](https://github.com/jtn0123/InkyPi/pull/584),
+  [`7d8f850`](https://github.com/jtn0123/InkyPi/commit/7d8f850e9f7d33a40d3e2403ec233ffe2fa0652c))
+
+* feat!: enforce conventional-commit PR titles and surface skipped releases
+
+Since v0.64.1, five consecutive PRs merged to main without a version bump because their squash-merge
+  subjects (css:, security:, ui:, Normalize..., Stabilize...) are prefixes that
+  python-semantic-release's Angular parser does not recognize. The release workflow exited "success"
+  silently on each, hiding the regression.
+
+Changes:
+
+- .github/workflows/pr-title-lint.yml: add amannn/action-semantic-pull-request to block PRs whose
+  title does not start with a recognized Conventional Commits type. Because PRs are squash-merged,
+  the title becomes the commit subject on main and is what semantic-release parses. -
+  .github/workflows/release.yml: emit a ::warning annotation and a step summary when no release tag
+  is cut, so future silent skips are visible on the Actions run and commit status pages. -
+  CONTRIBUTING.md + .github/pull_request_template.md: spell out the
+  squash-merge-title-is-the-bump-signal pitfall and list the full set of recognized types (feat,
+  fix, perf → bump; everything else → no bump).
+
+BREAKING CHANGE: cutting v1.0.0 to mark the UI/UX overhaul milestone that accumulated across #579
+  (render pipeline stabilization — pipe deadlock + chromium leak + update flow), #580 (lxml
+  CVE-2026-41066 patch), #581 (settings actions normalization), #582 (CSS partial split so every
+  file is <=500 lines), and #583 (sidebar update indicator and Updates tab polish). No external HTTP
+  API or config file format changes in this release; the major bump signals project-level stability
+  rather than a contract break.
+
+Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>
+
+* docs: address CodeRabbit feedback on release-pipeline PR
+
+- PR template + CONTRIBUTING.md: document the `type!:` shorthand for major bumps (this PR uses
+  `feat!:` but the docs only mentioned the `BREAKING CHANGE:` footer form). - CONTRIBUTING.md: add
+  `revert:` to the recognized types list so it stays in sync with pr-title-lint.yml. - release.yml:
+  drop unused `GH_TOKEN` env and URL-encode `%`/`\r`/`\n` in the commit subject before the
+  `::warning` annotation so subjects like "bump coverage to 90%" don't render garbled.
+
+---------
+
+Co-authored-by: Claude Opus 4.7 <noreply@anthropic.com>
+
+### Breaking Changes
+
+- Cutting v1.0.0 to mark the UI/UX overhaul milestone that accumulated across #579 (render pipeline
+  stabilization — pipe deadlock + chromium leak + update flow), #580 (lxml CVE-2026-41066 patch),
+  #581 (settings actions normalization), #582 (CSS partial split so every file is <=500 lines), and
+  #583 (sidebar update indicator and Updates tab polish). No external HTTP API or config file format
+  changes in this release; the major bump signals project-level stability rather than a contract
+  break.
+
+
 ## v0.64.1 (2026-04-21)
 
 ### Bug Fixes
