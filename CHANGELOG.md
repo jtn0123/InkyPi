@@ -1,23 +1,127 @@
 # CHANGELOG
 
 
-## v1.0.1 (2026-04-24)
+## v1.0.2 (2026-04-24)
+
+### Bug Fixes
+
+- Refresh pinned raspios_lite_arm64 SHA256 ([#587](https://github.com/jtn0123/InkyPi/pull/587),
+  [`4c18c70`](https://github.com/jtn0123/InkyPi/commit/4c18c70cf8a84d492d3b56709bafabedd2dea421))
+
+Raspberry Pi Foundation re-uploaded the 2025-05-13-raspios-bookworm-arm64-lite.img.xz artifact at
+  the pinned URL, so the existing pinned hash no longer matches what the server returns. The
+  `Download pinned Pi OS Lite base image` step in .github/workflows/build-pi-image.yml fails sha256
+  verification on every run (most recently visible on the v1.0.1 release dispatch — run
+  24869204223).
+
+Updated SHA256 was verified against Raspberry Pi Foundation's own published .sha256 file at the same
+  URL:
+
+https://downloads.raspberrypi.org/raspios_lite_arm64/images/raspios_lite_arm64-2025-05-13/2025-05-13-raspios-bookworm-arm64-lite.img.xz.sha256
+
+Both the published .sha256 and a locally recomputed sha256 over the downloaded file agree:
+  62d025b9bc7ca0e1facfec74ae56ac13978b6745c58177f081d39fbb8041ed45.
+
+Co-authored-by: Claude Opus 4.7 <noreply@anthropic.com>
+
+
+## v1.0.1 (2026-04-23)
+
+### Chores
+
+- Correct accidental v2.0.0 bump to v1.0.1 ([#586](https://github.com/jtn0123/InkyPi/pull/586),
+  [`93b2db0`](https://github.com/jtn0123/InkyPi/commit/93b2db0951da12d1cd881643d77f373288d6e355))
+
+PR #585 (a one-line CI fix with title `ci: stop SIGPIPE from ls|head`) triggered a major bump to
+  v2.0.0 because its squash-merge body leaked a `BREAKING CHANGE:` footer from #584's branch
+  lineage. python-semantic-release's Angular parser scans the full commit body, not just the
+  subject, so the footer forced `feat!:`-equivalent behavior on a chore commit. Root cause: #585 was
+  branched from the #584 branch instead of a fresh `origin/main`; when GitHub squash-merged #585, it
+  concatenated every individual commit message (including #584's two commits, which carried the
+  footer).
+
+Changes in this commit:
+
+- VERSION / pyproject.toml / uv.lock: revert 2.0.0 -> 1.0.1. The accidental `v2.0.0` git tag and
+  GitHub release have already been deleted; this commit + a new `v1.0.1` tag on the merge commit
+  replace it with correct patch semantics. - CHANGELOG.md: strip the auto-generated v2.0.0 section
+  and replace it with a v1.0.1 entry that attributes the content to #585 and notes the
+  accidental-major context. - CONTRIBUTING.md: add an "Always branch from `origin/main`" subsection
+  documenting the failure mode and pointing at the repo squash-merge setting that backstops it.
+
+Co-authored-by: Claude Opus 4.7 <noreply@anthropic.com>
 
 ### Continuous Integration
 
-- Stop SIGPIPE from `ls|head` failing the wheelhouse build
+- Stop SIGPIPE from ls|head failing wheelhouse build
   ([#585](https://github.com/jtn0123/InkyPi/pull/585),
   [`33f3a74`](https://github.com/jtn0123/InkyPi/commit/33f3a749582316802aeb90e00a4aeafbc42548d6))
 
-### Notes
+* feat!: enforce conventional-commit PR titles and surface skipped releases
 
-- This release replaces a tag (`v2.0.0`) that semantic-release cut
-  accidentally. The `v2.0.0` squash-merge body leaked a `BREAKING CHANGE:`
-  footer from the prior PR's branch lineage, so the parser forced a major
-  bump for what was only a one-line CI fix. The tag and release have been
-  deleted; `v1.0.1` replaces it with the correct patch semantics. See the
-  companion docs update documenting the "branch from `origin/main`, not
-  from your previous feature branch" rule.
+Since v0.64.1, five consecutive PRs merged to main without a version bump because their squash-merge
+  subjects (css:, security:, ui:, Normalize..., Stabilize...) are prefixes that
+  python-semantic-release's Angular parser does not recognize. The release workflow exited "success"
+  silently on each, hiding the regression.
+
+Changes:
+
+- .github/workflows/pr-title-lint.yml: add amannn/action-semantic-pull-request to block PRs whose
+  title does not start with a recognized Conventional Commits type. Because PRs are squash-merged,
+  the title becomes the commit subject on main and is what semantic-release parses. -
+  .github/workflows/release.yml: emit a ::warning annotation and a step summary when no release tag
+  is cut, so future silent skips are visible on the Actions run and commit status pages. -
+  CONTRIBUTING.md + .github/pull_request_template.md: spell out the
+  squash-merge-title-is-the-bump-signal pitfall and list the full set of recognized types (feat,
+  fix, perf → bump; everything else → no bump).
+
+BREAKING CHANGE: cutting v1.0.0 to mark the UI/UX overhaul milestone that accumulated across #579
+  (render pipeline stabilization — pipe deadlock + chromium leak + update flow), #580 (lxml
+  CVE-2026-41066 patch), #581 (settings actions normalization), #582 (CSS partial split so every
+  file is <=500 lines), and #583 (sidebar update indicator and Updates tab polish). No external HTTP
+  API or config file format changes in this release; the major bump signals project-level stability
+  rather than a contract break.
+
+Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>
+
+* docs: address CodeRabbit feedback on release-pipeline PR
+
+- PR template + CONTRIBUTING.md: document the `type!:` shorthand for major bumps (this PR uses
+  `feat!:` but the docs only mentioned the `BREAKING CHANGE:` footer form). - CONTRIBUTING.md: add
+  `revert:` to the recognized types list so it stays in sync with pr-title-lint.yml. - release.yml:
+  drop unused `GH_TOKEN` env and URL-encode `%`/`\r`/`\n` in the commit subject before the
+  `::warning` annotation so subjects like "bump coverage to 90%" don't render garbled.
+
+* ci: stop SIGPIPE from ls|head failing wheelhouse build
+
+After wheels are built successfully, the diagnostic line
+
+ls -la dist/wheels | head -40
+
+runs under `set -euo pipefail`. Once `head -40` has 40 lines it closes the pipe; `ls` then gets
+  SIGPIPE on its next write and `pipefail` propagates the failure, aborting the step with exit code
+  2 even though all wheels built. This broke the v1.0.0 wheelhouse job (aarch64 + armv7l) after the
+  wheel count crossed head's cutoff — no tarballs got attached to the v1.0.0 release, so on-device
+  installs would fall back to slow per-wheel compile on Pi Zero 2 W.
+
+Append `|| true` to ignore the pipe failure on this diagnostic line. `wc -l` below is unaffected
+  because `wc` reads until EOF.
+
+After this merges, trigger the wheelhouse workflow manually for v1.0.0 (workflow_dispatch with
+  tag=v1.0.0) to backfill the missing wheel tarballs onto the existing release.
+
+---------
+
+Co-authored-by: Claude Opus 4.7 <noreply@anthropic.com>
+
+### Breaking Changes
+
+- Cutting v1.0.0 to mark the UI/UX overhaul milestone that accumulated across #579 (render pipeline
+  stabilization — pipe deadlock + chromium leak + update flow), #580 (lxml CVE-2026-41066 patch),
+  #581 (settings actions normalization), #582 (CSS partial split so every file is <=500 lines), and
+  #583 (sidebar update indicator and Updates tab polish). No external HTTP API or config file format
+  changes in this release; the major bump signals project-level stability rather than a contract
+  break.
 
 
 ## v1.0.0 (2026-04-24)
