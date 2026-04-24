@@ -5,7 +5,8 @@
     feat: / fix: / perf:                         -> triggers a release bump
     refactor: / docs: / style: / test: / build: / ci: / chore: / revert:
                                                  -> no bump (valid but silent)
-  BREAKING CHANGE: footer anywhere in the body   -> major bump
+  BREAKING CHANGE: footer in body, OR `!` after
+  the type (e.g. `feat!:` / `fix!:`)             -> major bump
   See CONTRIBUTING.md.
 -->
 

@@ -65,8 +65,6 @@ jobs:
 
       - name: Warn loudly if no release was cut
         if: steps.resolve_tag.outputs.released != 'true'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           # python-semantic-release exits 0 when a merged commit doesn't match
           # a bumpable conventional-commit type (feat/fix/perf or BREAKING
@@ -87,7 +85,13 @@ jobs:
             echo "a bump (\`feat:\`, \`fix:\`, \`perf:\`, or a \`BREAKING CHANGE:\`"
             echo "footer). See CONTRIBUTING.md."
           } >> "$GITHUB_STEP_SUMMARY"
-          echo "::warning title=No release cut::semantic-release skipped this commit; subject: ${SUBJECT}"
+          # GitHub workflow commands require %, CR, and LF in message bodies
+          # to be URL-encoded, otherwise subjects like "bump coverage to 90%"
+          # render garbled in the annotation.
+          ESCAPED=${SUBJECT//%/%25}
+          ESCAPED=${ESCAPED//$'\r'/%0D}
+          ESCAPED=${ESCAPED//$'\n'/%0A}
+          echo "::warning title=No release cut::semantic-release skipped this commit; subject: ${ESCAPED}"
           # Non-failing on purpose — docs/chore/refactor PRs legitimately skip
           # release, so we only surface the info rather than red-crossing the run.
 

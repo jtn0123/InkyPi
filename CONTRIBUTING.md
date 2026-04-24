@@ -142,11 +142,13 @@ Recognized types:
 - `build:` — build system / dependencies
 - `ci:` — CI configuration
 - `chore:` — maintenance
+- `revert:` — reverts a previous commit
 
-Only `feat`, `fix`, and `perf` (and `BREAKING CHANGE:` footers for majors)
-trigger a release. The other types are accepted but don't bump the version.
-Avoid ad-hoc prefixes like `security:`, `ui:`, or `css:` — they pass no-lint
-locally but produce non-releasing merges.
+Only `feat`, `fix`, and `perf` trigger a release. A major bump is triggered
+either by a `BREAKING CHANGE:` footer in the commit body OR by appending `!`
+to the type (e.g. `feat!: drop Python 3.10 support`). The other types are
+accepted but don't bump the version. Avoid ad-hoc prefixes like `security:`,
+`ui:`, or `css:` — they pass no-lint locally but produce non-releasing merges.
 
 ## Code Style
 
