@@ -22,6 +22,20 @@ name: Build pre-installed Pi image
 # Does NOT modify install.sh — option 2 (source install) stays self-contained.
 
 on:
+  # JTN-745 FIX: semantic-release publishes via GITHUB_TOKEN, so the standalone
+  # `release` trigger does not fire for automated releases (GitHub's anti-loop
+  # rule blocks GITHUB_TOKEN-originated events from starting new workflows).
+  # Mirroring build-wheelhouse.yml, this workflow is now reusable via
+  # `workflow_call`, and release.yml invokes it directly after publish so the
+  # parent Release workflow goes red if Pi image build fails. We keep the
+  # release/manual triggers for maintainers who publish or rebuild outside the
+  # default semantic-release path.
+  workflow_call:
+    inputs:
+      tag:
+        description: Release tag to build an image for (e.g. v0.42.3)
+        required: true
+        type: string
   release:
     types: [published]
   # Manual trigger so maintainers can rebuild against an existing tag
@@ -37,7 +51,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: build-pi-image-${{ github.event.release.tag_name || inputs.tag }}
+  group: build-pi-image-${{ github.event.release.tag_name || inputs.tag || github.run_id }}
   cancel-in-progress: false
 
 # =============================================================================
