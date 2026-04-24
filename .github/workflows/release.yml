@@ -157,3 +157,11 @@ jobs:
     uses: ./.github/workflows/build-wheelhouse.yml
     with:
       tag: ${{ needs.release.outputs.tag }}
+
+  pi-image:
+    name: Build pre-installed Pi image
+    needs: release
+    if: needs.release.outputs.released == 'true'
+    uses: ./.github/workflows/build-pi-image.yml
+    with:
+      tag: ${{ needs.release.outputs.tag }}
