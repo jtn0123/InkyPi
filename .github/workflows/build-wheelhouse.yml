@@ -124,7 +124,12 @@ jobs:
                 -r /src/install/requirements.txt
             '
 
-          ls -la dist/wheels | head -40
+          # `|| true` swallows SIGPIPE from `head` closing the pipe once it
+          # has enough lines — under `set -o pipefail`, the resulting exit
+          # code propagates and fails an otherwise-successful wheel build
+          # (v1.0.0 wheelhouse run failed this way after the wheel count
+          # grew past head's cutoff). This is diagnostic output only.
+          ls -la dist/wheels | head -40 || true
           echo "Wheel count: $(find dist/wheels -name '*.whl' | wc -l)"
 
       - name: Package wheelhouse tarball
