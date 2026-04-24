@@ -173,6 +173,7 @@
                 name="{{ field.name }}"
                 value="{{ current_value }}"
                 class="form-input"
+                {% if field.validation_id is defined %}aria-describedby="{{ field.validation_id }}"{% elif field.type == 'url' %}aria-describedby="{{ field.id | default(field.name) }}-error"{% endif %}
                 {% if field.placeholder %}placeholder="{{ field.placeholder }}"{% endif %}
                 {% if field.min is defined %}min="{{ field.min }}"{% endif %}
                 {% if field.max is defined %}max="{{ field.max }}"{% endif %}
@@ -181,6 +182,7 @@
                 {% if field.list %}list="{{ field.list.id }}"{% endif %}
                 {% if field.pattern %}pattern="{{ field.pattern }}"{% endif %}
             >
+            {% if field.validation_id is defined %}<span id="{{ field.validation_id }}" class="validation-message" role="alert"></span>{% elif field.type == 'url' %}<span id="{{ field.id | default(field.name) }}-error" class="validation-message" role="alert"></span>{% endif %}
             {% if field.list %}
             <datalist id="{{ field.list.id }}">
                 {% for opt in field.list.options %}

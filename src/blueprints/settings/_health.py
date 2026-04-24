@@ -1,7 +1,10 @@
 """Health and system monitoring route handlers."""
 
+import logging
 import os
+import threading
 import time
+from collections.abc import Generator
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -10,6 +13,72 @@ from flask import Response, current_app, request, stream_with_context
 import blueprints.settings as _mod
 from utils.http_utils import json_error, json_internal_error, json_success
 from utils.progress_events import get_progress_bus, to_sse
+
+logger = logging.getLogger(__name__)
+_PROGRESS_STREAM_LOCK = threading.Lock()
+_PROGRESS_STREAM_ACTIVE = 0
+
+
+def _progress_stream_limit() -> int:
+    try:
+        return max(0, int(os.getenv("INKYPI_PROGRESS_SSE_MAX_CONNECTIONS", "4")))
+    except Exception:
+        return 4
+
+
+def _reserve_progress_stream() -> bool:
+    global _PROGRESS_STREAM_ACTIVE
+    with _PROGRESS_STREAM_LOCK:
+        if _progress_stream_limit() <= _PROGRESS_STREAM_ACTIVE:
+            return False
+        _PROGRESS_STREAM_ACTIVE += 1
+        return True
+
+
+def _release_progress_stream() -> None:
+    global _PROGRESS_STREAM_ACTIVE
+    with _PROGRESS_STREAM_LOCK:
+        _PROGRESS_STREAM_ACTIVE = max(0, _PROGRESS_STREAM_ACTIVE - 1)
+
+
+def _progress_stream_enabled() -> bool:
+    return os.getenv("INKYPI_PROGRESS_SSE_ENABLED", "true").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+        "on",
+    )
+
+
+def _progress_stream_last_seq() -> int:
+    try:
+        return int(request.args.get("last_seq", "0"))
+    except Exception:
+        return 0
+
+
+def _progress_stream_limit_response() -> Response:
+    logger.warning("/api/progress/stream: subscriber cap reached, returning 503")
+    return Response(
+        "Too many progress SSE connections",
+        status=503,
+        mimetype="text/plain",
+    )
+
+
+def _iter_progress_events(bus: Any, last_seq: int) -> Generator[str, None, None]:
+    for ev in bus.recent(limit=100):
+        if int(ev.get("seq", 0)) > last_seq:
+            yield to_sse(str(ev.get("state", "event")), ev)
+    local_seq = last_seq
+    while True:
+        events = bus.wait_for(local_seq, timeout_s=15.0)
+        if not events:
+            yield ": keep-alive\n\n"
+            continue
+        for ev in events:
+            local_seq = max(local_seq, int(ev.get("seq", 0)))
+            yield to_sse(str(ev.get("state", "event")), ev)
 
 
 def _filter_health_by_window(health, window_min):
@@ -78,34 +147,33 @@ def health_system():
 
 @_mod.settings_bp.route("/api/progress/stream", methods=["GET"])
 def progress_stream():
-    if os.getenv("INKYPI_PROGRESS_SSE_ENABLED", "true").strip().lower() not in (
-        "1",
-        "true",
-        "yes",
-        "on",
-    ):
+    if not _progress_stream_enabled():
         return json_error("Progress SSE disabled", status=404)
 
     bus = get_progress_bus()
-    try:
-        last_seq = int(request.args.get("last_seq", "0"))
-    except Exception:
-        last_seq = 0
+    last_seq = _progress_stream_last_seq()
+
+    if not _reserve_progress_stream():
+        return _progress_stream_limit_response()
+
+    release_latch = threading.Lock()
+    released = False
+
+    def release_once() -> None:
+        nonlocal released
+        with release_latch:
+            if released:
+                return
+            released = True
+        _release_progress_stream()
 
     @stream_with_context
-    def gen():
-        # Backfill
-        for ev in bus.recent(limit=100):
-            if int(ev.get("seq", 0)) > last_seq:
-                yield to_sse(str(ev.get("state", "event")), ev)
-        local_seq = last_seq
-        while True:
-            events = bus.wait_for(local_seq, timeout_s=15.0)
-            if not events:
-                yield ": keep-alive\n\n"
-                continue
-            for ev in events:
-                local_seq = max(local_seq, int(ev.get("seq", 0)))
-                yield to_sse(str(ev.get("state", "event")), ev)
+    def gen() -> Generator[str, None, None]:
+        try:
+            yield from _iter_progress_events(bus, last_seq)
+        finally:
+            release_once()
 
-    return Response(gen(), mimetype="text/event-stream")
+    response = Response(gen(), mimetype="text/event-stream")
+    response.call_on_close(release_once)
+    return response

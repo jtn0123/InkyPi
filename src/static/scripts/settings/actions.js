@@ -2,6 +2,40 @@
   const settingsModules =
     globalThis.InkyPiSettingsModules ||
     (globalThis.InkyPiSettingsModules = {});
+  const VERSION_CACHE_KEY = "inkypi-update-check";
+  const VERSION_CACHE_TTL_MS = 10 * 60 * 1000;
+
+  function getCachedVersionData() {
+    try {
+      const raw = sessionStorage.getItem(VERSION_CACHE_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== "object") return null;
+      if (
+        typeof parsed.ts !== "number" ||
+        Date.now() - parsed.ts > VERSION_CACHE_TTL_MS
+      ) {
+        return null;
+      }
+      return parsed.data && typeof parsed.data === "object"
+        ? parsed.data
+        : null;
+    } catch (e) {
+      console.warn("Unable to read cached update metadata:", e);
+      return null;
+    }
+  }
+
+  function setCachedVersionData(data) {
+    try {
+      sessionStorage.setItem(
+        VERSION_CACHE_KEY,
+        JSON.stringify({ ts: Date.now(), data })
+      );
+    } catch (e) {
+      console.warn("Unable to cache update metadata:", e);
+    }
+  }
 
   function getVersionElements() {
     return {
@@ -161,10 +195,26 @@
         cache: "no-store",
         signal: controller.signal,
       });
-      return await response.json();
+      const data = await response.json();
+      if (
+        response.ok &&
+        data &&
+        typeof data === "object" &&
+        "latest" in data
+      ) {
+        setCachedVersionData(data);
+      }
+      return data;
     } finally {
       clearTimeout(timeoutId);
     }
+  }
+
+  function hydrateVersionCheckFromCache() {
+    const data = getCachedVersionData();
+    if (!data) return false;
+    renderVersionCheckResult(getVersionElements(), data);
+    return true;
   }
 
   function getExportRequestInit(includeKeys) {
@@ -219,7 +269,6 @@
         }
       } catch (e) {
         if (e?.name === "AbortError") {
-          console.debug("Version check aborted:", e);
           return;
         }
         console.warn("Version check failed:", e);
@@ -500,6 +549,7 @@
       checkForUpdates,
       exportConfig,
       handleShutdown,
+      hydrateVersionCheckFromCache,
       importConfig,
       refreshUpdateStatus,
       startRollback,

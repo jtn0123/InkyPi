@@ -20,7 +20,8 @@
     if (!node) return;
     if (open && triggerEl) _lastHistoryModalTrigger = triggerEl;
     node.hidden = !open;
-    node.style.display = open ? "block" : "none";
+    node.style.display = open ? "flex" : "none";
+    node.classList.toggle("is-open", open);
     if (open) {
       // Move focus to the first focusable element inside the modal
       const focusable = node.querySelector(

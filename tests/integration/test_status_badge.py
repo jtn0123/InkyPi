@@ -14,7 +14,7 @@ import json
 
 def test_every_page_loads_status_badge_script(client):
     """Every top-level page in the shared base template loads status_badge.js."""
-    paths = ["/", "/playlist", "/history", "/settings", "/plugin/clock"]
+    paths = ["/", "/playlist", "/history", "/settings", "/plugins", "/plugin/clock"]
     for path in paths:
         resp = client.get(path)
         assert resp.status_code == 200, f"{path}: expected 200"
@@ -23,6 +23,15 @@ def test_every_page_loads_status_badge_script(client):
             f"{path}: status_badge.js is not loaded — the base template must "
             "include it so the badge surfaces on every page"
         )
+
+
+def test_plugin_pages_opt_out_of_floating_status_badge(client):
+    """Plugin list/detail pages suppress the floating badge that overlaps UI."""
+    for path in ("/plugins", "/plugin/clock"):
+        resp = client.get(path)
+        assert resp.status_code == 200, f"{path}: expected 200"
+        html = resp.data.decode()
+        assert '<meta name="status-badge-disabled" content="1">' in html
 
 
 def test_diagnostics_exposes_badge_contract(client, flask_app):

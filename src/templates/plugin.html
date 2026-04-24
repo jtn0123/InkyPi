@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block title %}{{ plugin.display_name }} - InkyPi{% endblock %}
 {% block head %}
+    <meta name="status-badge-disabled" content="1">
     <script src="{{ url_for('static', filename='scripts/lightbox.js') }}" defer></script>
     <script src="{{ url_for('static', filename='scripts/progressive_disclosure.js') }}" defer></script>
     <script src="{{ url_for('static', filename='scripts/plugin_form.js') }}" defer></script>
@@ -322,13 +323,13 @@
                         <div class="form-group schedule-inline-group">
                             <input type="radio" id="refreshTypeScheduled" name="refreshType" value="scheduled">
                             <label for="refreshTypeScheduled">Daily at</label>
-                            <input id="scheduleTime" class="time-input" type="time" name="refreshTime" step="900" aria-label="Scheduled time">
+                            <input id="scheduleTime" class="time-input" type="time" name="refreshTime" step="900" aria-label="Scheduled time" disabled>
                         </div>
                     </section>
                 </div>
                 <div class="schedule-form-actions">
                     <p class="schedule-panel-note">This uses the current plugin settings as the starting point for the new playlist entry.</p>
-                    <button type="button" data-plugin-action="add_to_playlist" class="action-button" {% if api_key_missing %}disabled title="Configure {{ api_key.service }} API key first"{% endif %}>Add to Playlist</button>
+                    <button type="button" data-plugin-action="add_to_playlist" data-schedule-submit class="action-button" {% if api_key_missing %}data-api-key-missing="true" aria-describedby="api-chip-help" title="Configure {{ api_key.service }} API key first"{% else %}disabled title="Complete the schedule fields first"{% endif %}>Add to Playlist</button>
                 </div>
             </form>
             {% endif %}

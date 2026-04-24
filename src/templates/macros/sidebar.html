@@ -47,6 +47,51 @@
         </button>
     </div>
 
+    <details class="mobile-site-nav">
+        <summary class="mobile-site-nav-summary">
+            {{ icon('list-checks', 'icon-image') | safe }}
+            <span>Menu</span>
+        </summary>
+        <nav class="mobile-site-nav-panel" aria-label="Mobile site navigation">
+            <a href="{{ url_for('main.main_page') }}"
+               class="mobile-site-nav-item{% if active == 'dashboard' %} active{% endif %}"
+               {% if active == 'dashboard' %}aria-current="page"{% endif %}>
+                {{ icon('house', 'icon-image') | safe }}
+                <span>Dashboard</span>
+            </a>
+            <a href="{{ url_for('playlist.playlists') }}"
+               class="mobile-site-nav-item{% if active == 'playlists' %} active{% endif %}"
+               {% if active == 'playlists' %}aria-current="page"{% endif %}>
+                {{ icon('squares-four', 'icon-image') | safe }}
+                <span>Playlists</span>
+            </a>
+            <a href="{{ url_for('plugin.plugins_page') }}"
+               class="mobile-site-nav-item{% if active == 'plugins' %} active{% endif %}"
+               {% if active == 'plugins' %}aria-current="page"{% endif %}>
+                {{ icon('magic-wand', 'icon-image') | safe }}
+                <span>Plugins</span>
+            </a>
+            <a href="{{ url_for('history.history_page') }}"
+               class="mobile-site-nav-item{% if active == 'history' %} active{% endif %}"
+               {% if active == 'history' %}aria-current="page"{% endif %}>
+                {{ icon('clock-counter-clockwise', 'icon-image') | safe }}
+                <span>History</span>
+            </a>
+            <a href="{{ url_for('settings.settings_page') }}"
+               class="mobile-site-nav-item{% if active == 'settings' %} active{% endif %}"
+               {% if active == 'settings' %}aria-current="page"{% endif %}>
+                {{ icon('gear-six', 'icon-image') | safe }}
+                <span>Settings</span>
+            </a>
+            <a href="{{ url_for('settings.api_keys_page') }}"
+               class="mobile-site-nav-item{% if active == 'api-keys' %} active{% endif %}"
+               {% if active == 'api-keys' %}aria-current="page"{% endif %}>
+                {{ icon('key', 'icon-image') | safe }}
+                <span>API Keys</span>
+            </a>
+        </nav>
+    </details>
+
     <nav class="sidebar-nav" aria-label="Site navigation">
         <div class="nav-section">Main</div>
         <a href="{{ url_for('main.main_page') }}"

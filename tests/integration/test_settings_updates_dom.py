@@ -119,6 +119,48 @@ def test_update_available_renders_badge_notes_and_whats_new(live_server, browser
     assert state["updateBtnDisabled"] is False
 
 
+def test_updates_tab_hydrates_from_sidebar_version_cache(live_server, browser_page):
+    """If the global update indicator already found an update, the Updates
+    tab should show that same state immediately without another manual check."""
+    page = browser_page
+    payload = {
+        "current": "0.64.0",
+        "latest": "0.65.0",
+        "update_available": True,
+        "update_running": False,
+        "release_notes": "# v0.65.0\n\n- Cached release note",
+    }
+    _stub_api_version(page, payload)
+    navigate_and_wait(page, live_server, "/")
+    page.evaluate(
+        """(data) => {
+          sessionStorage.setItem(
+            'inkypi-update-check',
+            JSON.stringify({ ts: Date.now(), data })
+          );
+        }""",
+        payload,
+    )
+    navigate_and_wait(page, live_server, "/settings")
+    _open_maintenance_tab(page)
+
+    state = page.evaluate("""() => ({
+          latest: (document.getElementById("latestVersion").textContent || "").trim(),
+          notesVersion: (document.getElementById("releaseNotesVersion").textContent || "").trim(),
+          notesHidden: document.getElementById("releaseNotesContainer").hidden,
+          notesHtml: document.getElementById("releaseNotesBody").innerHTML,
+          whatsNewHidden: document.getElementById("whatsNewBtn").hidden,
+          updateBtnDisabled: document.getElementById("startUpdateBtn").disabled,
+        })""")
+
+    assert state["latest"] == "0.65.0"
+    assert state["notesVersion"] == "\u00b7 v0.65.0"
+    assert state["notesHidden"] is False
+    assert "<li>Cached release note</li>" in state["notesHtml"]
+    assert state["whatsNewHidden"] is False
+    assert state["updateBtnDisabled"] is False
+
+
 def test_up_to_date_hides_whats_new_and_disables_update(live_server, browser_page):
     """When already on latest: What's-new hidden, Update-now disabled, but
     release notes disclosure still renders so the user can read the last

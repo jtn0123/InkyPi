@@ -4,6 +4,8 @@
 from datetime import UTC, datetime, timedelta
 from unittest.mock import MagicMock
 
+from blueprints.settings import _health
+
 
 class TestHealthPlugins:
     def test_filters_stale_entries(self, client, monkeypatch):
@@ -169,13 +171,65 @@ class TestProgressStream:
         monkeypatch.setenv("INKYPI_PROGRESS_SSE_ENABLED", "true")
 
         resp = client.get("/api/progress/stream")
-        assert resp.status_code == 200
-        assert "text/event-stream" in resp.content_type
+        try:
+            assert resp.status_code == 200
+            assert "text/event-stream" in resp.content_type
+        finally:
+            resp.close()
 
     def test_last_seq_non_numeric(self, client, monkeypatch):
         """Non-numeric last_seq defaults to 0 without error."""
         monkeypatch.setenv("INKYPI_PROGRESS_SSE_ENABLED", "true")
 
         resp = client.get("/api/progress/stream?last_seq=abc")
-        assert resp.status_code == 200
-        assert "text/event-stream" in resp.content_type
+        try:
+            assert resp.status_code == 200
+            assert "text/event-stream" in resp.content_type
+        finally:
+            resp.close()
+
+    def test_connection_cap_returns_503(self, client, monkeypatch):
+        """SSE endpoint refuses excess subscribers instead of tying up workers."""
+        monkeypatch.setenv("INKYPI_PROGRESS_SSE_ENABLED", "true")
+        monkeypatch.setenv("INKYPI_PROGRESS_SSE_MAX_CONNECTIONS", "0")
+
+        resp = client.get("/api/progress/stream")
+
+        assert resp.status_code == 503
+        assert resp.get_data(as_text=True) == "Too many progress SSE connections"
+
+    def test_enabled_helper_accepts_truthy_values(self, monkeypatch):
+        monkeypatch.setenv("INKYPI_PROGRESS_SSE_ENABLED", "yes")
+
+        assert _health._progress_stream_enabled() is True
+
+    def test_enabled_helper_rejects_disabled_values(self, monkeypatch):
+        monkeypatch.setenv("INKYPI_PROGRESS_SSE_ENABLED", "off")
+
+        assert _health._progress_stream_enabled() is False
+
+    def test_iter_progress_events_backfills_and_follows_new_events(self):
+        bus = MagicMock()
+        bus.recent.return_value = [
+            {"seq": 1, "state": "old"},
+            {"seq": 3, "state": "ready", "message": "done"},
+        ]
+        bus.wait_for.return_value = [{"seq": 4, "state": "next"}]
+
+        stream = _health._iter_progress_events(bus, last_seq=2)
+
+        backfill = next(stream)
+        assert backfill.startswith("event: ready\n")
+        assert '"seq":3' in backfill
+        assert '"seq":1' not in backfill
+        assert next(stream).startswith("event: next\n")
+        bus.wait_for.assert_called_once_with(2, timeout_s=15.0)
+
+    def test_iter_progress_events_emits_keepalive_when_idle(self):
+        bus = MagicMock()
+        bus.recent.return_value = []
+        bus.wait_for.return_value = []
+
+        stream = _health._iter_progress_events(bus, last_seq=0)
+
+        assert next(stream) == ": keep-alive\n\n"

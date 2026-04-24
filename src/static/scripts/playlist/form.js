@@ -28,6 +28,43 @@
     return name;
   }
 
+  function showPlaylistNameError(message) {
+    const input = document.getElementById("playlist_name");
+    const error = document.getElementById("playlist-name-error");
+    if (!input) return;
+    input.setAttribute("aria-invalid", "true");
+    if (error) error.textContent = message;
+    input.focus();
+  }
+
+  function bindPlaylistNameLengthGuard() {
+    const input = document.getElementById("playlist_name");
+    if (!input || input.dataset.lengthGuardBound === "true") return;
+    input.dataset.lengthGuardBound = "true";
+    input.addEventListener("beforeinput", (event) => {
+      if (event.inputType !== "insertFromPaste") return;
+      const max = Number.parseInt(input.getAttribute("maxlength") || "0", 10);
+      if (!max || !event.data) return;
+      const start = input.selectionStart ?? input.value.length;
+      const end = input.selectionEnd ?? input.value.length;
+      const nextLength = input.value.length - Math.max(0, end - start) + event.data.length;
+      if (nextLength <= max) return;
+      event.preventDefault();
+      showPlaylistNameError("Name must be 64 characters or fewer");
+    });
+    input.addEventListener("input", () => {
+      const error = document.getElementById("playlist-name-error");
+      const max = Number.parseInt(input.getAttribute("maxlength") || "0", 10);
+      if (
+        error?.textContent === "Name must be 64 characters or fewer" &&
+        (input.value || "").length <= (max || 64)
+      ) {
+        input.setAttribute("aria-invalid", "false");
+        error.textContent = "";
+      }
+    });
+  }
+
   function validateCycleMinutes() {
     const input = document.getElementById("cycle_minutes");
     const error = document.getElementById("cycle-minutes-error");
@@ -219,6 +256,7 @@
 
   function initFormControls() {
     if (ns.runtime.formControlsBound) return;
+    bindPlaylistNameLengthGuard();
     const newBtn = document.getElementById("newPlaylistBtn");
     if (newBtn) {
       newBtn.addEventListener("click", (event) =>

@@ -194,6 +194,9 @@
   border: 1px solid var(--surface-border);
   border-radius: var(--border-radius-lg);
   background: var(--panel-bg);
+  box-sizing: border-box;
+  min-width: 0;
+  width: 100%;
 }
 
 .schedule-form-grid {
@@ -439,6 +442,39 @@ body[data-page="plugin"] .workflow-help p {
 
   .schedule-form-grid {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .schedule-fieldset,
+  .schedule-inline-group,
+  .schedule-inline-group .form-input,
+  .schedule-form-card select,
+  .schedule-form-card input {
+    min-width: 0;
+    max-width: 100%;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .schedule-inline-group {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    overflow-x: clip;
+  }
+
+  .schedule-inline-group > .validation-message,
+  .schedule-inline-group > select,
+  .schedule-inline-group > input[type="number"],
+  .schedule-inline-group > input[type="time"] {
+    grid-column: 1 / -1;
+  }
+
+  .schedule-inline-group .form-label {
+    width: auto;
+  }
+
+  .schedule-inline-group .form-input {
+    width: 100%;
   }
 
   .schedule-form-actions {

@@ -75,6 +75,8 @@ def test_response_modal_restores_focus_to_trigger():
 
     assert "lastResponseModalTrigger" in content
     assert "responseModalClose" in content
+    assert "success-failure-modal-open" in content
+    assert "is-visible" in content
 
 
 def test_plugin_workflow_panels_do_not_hide_content_from_assistive_tech():

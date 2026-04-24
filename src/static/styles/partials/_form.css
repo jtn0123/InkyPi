@@ -439,6 +439,20 @@ input:disabled, select:disabled, textarea:disabled {
         gap: 8px 12px;
     }
 
+    #playlistModal .form-group,
+    #refreshSettingsModal .form-group {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+        align-items: stretch;
+    }
+
+    #playlistModal input[type="time"],
+    #refreshSettingsModal input[type="time"] {
+        width: 100%;
+        min-width: 0;
+        max-width: 100%;
+    }
+
     /* Stack form elements on very small screens */
     .form-group.nowrap {
         flex-direction: column;

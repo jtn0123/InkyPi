@@ -29,7 +29,7 @@ class Countdown(BasePlugin):
                     field(
                         "title",
                         label="Title",
-                        placeholder="Vacation",
+                        placeholder="Required title, e.g. Vacation",
                         required=True,
                     ),
                     field("date", "date", label="Target Date", default=tomorrow),
