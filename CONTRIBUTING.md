@@ -150,6 +150,27 @@ to the type (e.g. `feat!: drop Python 3.10 support`). The other types are
 accepted but don't bump the version. Avoid ad-hoc prefixes like `security:`,
 `ui:`, or `css:` — they pass no-lint locally but produce non-releasing merges.
 
+### Always branch from `origin/main`
+
+For every new PR — especially a follow-up opened right after your previous
+one merged — start from a fresh `origin/main`:
+
+```bash
+git fetch origin
+git checkout -b my-new-branch origin/main
+```
+
+Do **not** branch from your previous feature branch. GitHub's squash-merge
+body concatenates every individual commit message on the branch being
+merged. If any of those commits came from an earlier PR that carried a
+`BREAKING CHANGE:` footer, that footer leaks into the new squash body —
+and `semantic-release` will force a major bump on a PR whose title is
+just a `ci:` or `fix:`. (This happened once, and the accidental `v2.0.0`
+had to be retagged as `v1.0.1`.) A companion safeguard lives in the repo
+setting `Settings → Pull Requests → Default commit message for squash
+merging`, which should be set to **"Pull request title"** so only the
+title is ever passed to the parser.
+
 ## Code Style
 
 Private helpers (`_*` functions) longer than ~5 lines or with non-obvious intent should have a docstring.
