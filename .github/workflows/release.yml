@@ -63,6 +63,34 @@ jobs:
             echo "No new release tag on this run."
           fi
 
+      - name: Warn loudly if no release was cut
+        if: steps.resolve_tag.outputs.released != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # python-semantic-release exits 0 when a merged commit doesn't match
+          # a bumpable conventional-commit type (feat/fix/perf or BREAKING
+          # CHANGE). A silent green here hid 5 unreleased PRs in a row. Emit
+          # a prominent annotation so future misses are visible on the commit
+          # status page and in the Actions summary.
+          SUBJECT=$(git log -1 --pretty=%s)
+          {
+            echo "## No release cut"
+            echo ""
+            echo "\`semantic-release version\` found no bumpable commits since"
+            echo "the last tag. Most recent commit subject:"
+            echo ""
+            echo "    ${SUBJECT}"
+            echo ""
+            echo "If this merge included user-facing changes, the PR title"
+            echo "probably didn't use a conventional-commits type that triggers"
+            echo "a bump (\`feat:\`, \`fix:\`, \`perf:\`, or a \`BREAKING CHANGE:\`"
+            echo "footer). See CONTRIBUTING.md."
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "::warning title=No release cut::semantic-release skipped this commit; subject: ${SUBJECT}"
+          # Non-failing on purpose — docs/chore/refactor PRs legitimately skip
+          # release, so we only surface the info rather than red-crossing the run.
+
       - name: Strip build-only files from GitHub release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

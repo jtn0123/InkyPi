@@ -124,13 +124,29 @@ Run this after modifying any CSS partial.
 
 ## Commit Convention
 
-We use [Conventional Commits](https://www.conventionalcommits.org/):
+We use [Conventional Commits](https://www.conventionalcommits.org/) — and
+because PRs are **squash-merged**, **the PR title becomes the commit subject
+on `main`** and is what `python-semantic-release` parses to decide the next
+version. A PR title that doesn't match a recognized type will silently skip
+the release bump. The PR Title Lint check enforces this pre-merge.
 
-- `feat:` — new feature
-- `fix:` — bug fix
+Recognized types:
+
+- `feat:` — new feature (→ minor bump)
+- `fix:` — bug fix (→ patch bump)
+- `perf:` — performance improvement (→ patch bump)
+- `refactor:` — code change that neither fixes a bug nor adds a feature
 - `docs:` — documentation only
+- `style:` — formatting, missing semicolons, etc.
 - `test:` — adding or updating tests
-- `chore:` — maintenance, dependencies, CI
+- `build:` — build system / dependencies
+- `ci:` — CI configuration
+- `chore:` — maintenance
+
+Only `feat`, `fix`, and `perf` (and `BREAKING CHANGE:` footers for majors)
+trigger a release. The other types are accepted but don't bump the version.
+Avoid ad-hoc prefixes like `security:`, `ui:`, or `css:` — they pass no-lint
+locally but produce non-releasing merges.
 
 ## Code Style
 

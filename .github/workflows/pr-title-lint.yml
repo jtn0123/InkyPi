@@ -1,0 +1,44 @@
+name: PR Title Lint
+
+# Enforces Conventional Commits on PR titles. Because this repo squash-merges,
+# the PR title becomes the commit subject on main, which is what
+# python-semantic-release parses to decide whether to bump the version. If the
+# title doesn't start with one of the recognized types (feat/fix/perf or a
+# BREAKING CHANGE footer for a major bump), no release is cut — see
+# CONTRIBUTING.md and the release workflow.
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  pull-requests: read
+
+jobs:
+  lint:
+    name: Validate PR title
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check title matches Conventional Commits
+        uses: amannn/action-semantic-pull-request@v5.5.3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          types: |
+            feat
+            fix
+            perf
+            refactor
+            docs
+            style
+            test
+            build
+            ci
+            chore
+            revert
+          requireScope: false
+          subjectPattern: ^[^A-Z].+$
+          subjectPatternError: |
+            The PR title subject "{subject}" should start with a lowercase
+            letter (after the `type(scope):` prefix). Example:
+              feat(playlist): add drag-and-drop reordering

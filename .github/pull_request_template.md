@@ -1,3 +1,14 @@
+<!--
+  PR title must start with a Conventional Commits type — PRs are squash-merged
+  and the title becomes the commit subject on main, which semantic-release
+  parses for the next version. Use one of:
+    feat: / fix: / perf:                         -> triggers a release bump
+    refactor: / docs: / style: / test: / build: / ci: / chore: / revert:
+                                                 -> no bump (valid but silent)
+  BREAKING CHANGE: footer anywhere in the body   -> major bump
+  See CONTRIBUTING.md.
+-->
+
 ## Summary
 
 -
