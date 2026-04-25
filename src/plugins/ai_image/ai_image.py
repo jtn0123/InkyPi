@@ -19,6 +19,7 @@ from plugins.base_plugin.settings_schema import (
     row,
     schema,
     section,
+    widget,
 )
 
 logger = logging.getLogger(__name__)
@@ -42,10 +43,12 @@ DEFAULT_IMAGE_QUALITY = "medium"
 
 class AIImage(BasePlugin):
     def validate_settings(self, settings: Mapping[str, object]) -> str | None:
-        """Reject empty prompts at save time so bad input does not persist."""
-        err: str | None = validate_required_text(settings, "textPrompt", "Prompt")
-        if err:
-            return err
+        """Validate provider/model choices and prompt requirements."""
+        randomize_prompt = settings.get("randomizePrompt") == "true"
+        if not randomize_prompt:
+            err: str | None = validate_required_text(settings, "textPrompt", "Prompt")
+            if err:
+                return err
 
         err = validate_provider(settings)
         if err:
@@ -70,15 +73,18 @@ class AIImage(BasePlugin):
                     "textarea",
                     label="Prompt",
                     placeholder="A surreal breakfast floating through a neon sky.",
-                    hint="Describe the scene you want the model to render. Bold, simple compositions read best on e-ink.",
-                    required=True,
+                    hint="Describe the scene you want, or use Surprise me to draft one automatically. Bold, simple compositions read best on e-ink.",
                     rows=4,
+                ),
+                widget(
+                    "ai-image-prompt-tools",
+                    template="widgets/ai_image_prompt_tools.html",
                 ),
                 field(
                     "randomizePrompt",
                     "checkbox",
-                    label="Remix prompt before generating",
-                    hint="Pass your prompt through a writing model first to add vivid detail and unexpected styling.",
+                    label="Vivid remix",
+                    hint="Before image generation, let the selected provider turn your prompt into a more vivid version. If the prompt is blank, it will invent one.",
                     submit_unchecked=True,
                     checked_value="true",
                     unchecked_value="false",
@@ -283,6 +289,8 @@ class AIImage(BasePlugin):
             text_prompt = ""
         image_model, image_quality = self._validate_generate_inputs(settings, provider)
         randomize_prompt = settings.get("randomizePrompt") == "true"
+        if not text_prompt.strip() and not randomize_prompt:
+            raise RuntimeError("Prompt is required unless Vivid remix is enabled.")
         orientation = device_config.get_config("orientation")
         if not isinstance(orientation, str):
             orientation = "horizontal"

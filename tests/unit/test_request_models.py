@@ -40,6 +40,22 @@ def test_parse_playlist_create_request_returns_typed_minutes() -> None:
     assert parsed.playlist_name == "Night"
     assert parsed.start_min == 22 * 60
     assert parsed.end_min == 5 * 60
+    assert parsed.cycle_minutes_int is None
+
+
+def test_parse_playlist_create_request_accepts_cycle_override() -> None:
+    parsed, error = parse_playlist_create_request(
+        {
+            "playlist_name": "Night",
+            "start_time": "22:00",
+            "end_time": "05:00",
+            "cycle_minutes": "15",
+        }
+    )
+
+    assert error is None
+    assert parsed is not None
+    assert parsed.cycle_minutes_int == 15
 
 
 def test_parse_playlist_create_request_rejects_matching_times() -> None:

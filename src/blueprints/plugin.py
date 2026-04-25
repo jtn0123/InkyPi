@@ -201,6 +201,50 @@ def plugin_page(plugin_id: str) -> Any:
     )
 
 
+@plugin_bp.route("/plugin/ai_image/random_prompt", methods=["POST"])  # type: ignore[untyped-decorator]
+def ai_image_random_prompt() -> Any:
+    """Generate a prompt suggestion for the AI Image plugin."""
+    device_config = current_app.config[_CONFIG_KEY]
+    data = request.get_json(silent=True) or {}
+    if not isinstance(data, dict):
+        return json_error("Invalid JSON payload", status=400)
+
+    provider = str(data.get("provider") or "openai").strip().lower()
+    seed_prompt = str(data.get("prompt") or "")
+
+    with route_error_boundary(
+        "generate AI image prompt",
+        logger=logger,
+        hint="Ensure the selected provider API key is configured.",
+    ):
+        if provider == "google":
+            api_key = device_config.load_env_key("GOOGLE_AI_SECRET")
+            if not api_key:
+                raise ClientInputError("Google AI API Key not configured.", status=400)
+            from google import genai
+
+            from plugins.ai_image.ai_image import AIImage
+
+            client = genai.Client(api_key=api_key)
+            prompt = AIImage.fetch_image_prompt_google(client, seed_prompt)
+        else:
+            api_key = device_config.load_env_key("OPEN_AI_SECRET")
+            if not api_key:
+                raise ClientInputError("OpenAI API Key not configured.", status=400)
+            from openai import OpenAI
+
+            from plugins.ai_image.ai_image import AIImage
+
+            client = OpenAI(api_key=api_key)
+            prompt = AIImage.fetch_image_prompt(client, seed_prompt)
+
+        if not prompt:
+            raise ClientInputError(
+                "Prompt generator returned an empty prompt.", status=502
+            )
+        return json_success("Generated prompt.", prompt=prompt)
+
+
 @plugin_bp.route("/plugins", methods=["GET"])  # type: ignore[untyped-decorator]
 def plugins_page() -> Any:
     device_config = current_app.config[_CONFIG_KEY]

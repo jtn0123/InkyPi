@@ -630,6 +630,9 @@ def create_playlist() -> Any:
                     parsed.playlist_name, parsed.start_time, parsed.end_time
                 )
             )
+            _apply_cycle_override(
+                playlist_manager, parsed.playlist_name, parsed.cycle_minutes_int
+            )
 
         device_config.update_atomic(_do_add_playlist)
         if not add_pl_result or not add_pl_result[0]:
@@ -714,6 +717,15 @@ def update_playlist(playlist_name: str) -> Any:
             status=400,
             code=_CODE_VALIDATION,
             details={"field": "playlist_name"},
+        )
+
+    existing_with_new_name = playlist_manager.get_playlist(new_name)
+    if existing_with_new_name is not None and existing_with_new_name is not playlist:
+        return json_error(
+            "A playlist with that name already exists",
+            status=400,
+            code=_CODE_VALIDATION,
+            details={"field": "new_name"},
         )
 
     # Prevent overlapping (exclude the playlist being updated)

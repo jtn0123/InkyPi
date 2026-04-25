@@ -245,6 +245,22 @@ class TestUpdatePlaylist:
         pl = pm.get_playlist("Cycled")
         assert pl.cycle_interval_seconds == 15 * 60
 
+    def test_duplicate_rename_rejected(self, client):
+        _create_playlist(client, "First", "06:00", "08:00")
+        _create_playlist(client, "Second", "10:00", "12:00")
+
+        resp = client.put(
+            "/update_playlist/Second",
+            json={
+                "new_name": "First",
+                "start_time": "10:00",
+                "end_time": "12:00",
+            },
+        )
+
+        assert resp.status_code == 400
+        assert "already exists" in resp.get_json()["error"]
+
 
 # ---------------------------------------------------------------------------
 # /delete_playlist/<name> (DELETE)

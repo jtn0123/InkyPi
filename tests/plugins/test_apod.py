@@ -215,6 +215,7 @@ def test_apod_hdurl_preference_on_non_low_resource(device_config_dev, monkeypatc
             result = p.generate_image({}, device_config_dev)
 
         assert mock_from_url.call_args.args[0] == "http://example.com/high_res.png"
+        assert mock_from_url.call_args.kwargs["resize"] is True
         assert result is not None
 
 

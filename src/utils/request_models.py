@@ -47,6 +47,7 @@ class PlaylistCreateRequest:
     end_time: str
     start_min: int
     end_min: int
+    cycle_minutes_int: int | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -270,6 +271,10 @@ def parse_playlist_create_request(
     if time_err is not None or start_min is None or end_min is None:
         return None, time_err
 
+    cycle_minutes_int, cycle_err = validate_cycle_minutes(data.get("cycle_minutes"))
+    if cycle_err is not None:
+        return None, cycle_err
+
     return (
         PlaylistCreateRequest(
             playlist_name=playlist_name,
@@ -277,6 +282,7 @@ def parse_playlist_create_request(
             end_time=str(end_time),
             start_min=start_min,
             end_min=end_min,
+            cycle_minutes_int=cycle_minutes_int,
         ),
         None,
     )

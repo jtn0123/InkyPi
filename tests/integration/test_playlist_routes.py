@@ -30,6 +30,21 @@ def test_create_update_delete_playlist_flow(client):
     assert resp.status_code == 200
 
 
+def test_create_playlist_persists_cycle_override(client, device_config_dev):
+    payload = {
+        "playlist_name": "FastLoop",
+        "start_time": "06:00",
+        "end_time": "09:00",
+        "cycle_minutes": 12,
+    }
+
+    resp = client.post("/create_playlist", json=payload)
+
+    assert resp.status_code == 200
+    playlist = device_config_dev.get_playlist_manager().get_playlist("FastLoop")
+    assert playlist.cycle_interval_seconds == 12 * 60
+
+
 def test_delete_default_playlist_is_refused(client, device_config_dev):
     """JTN-781: DELETE /delete_playlist/Default must return 400 and keep the playlist."""
     pm = device_config_dev.get_playlist_manager()

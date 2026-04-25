@@ -105,14 +105,14 @@
         <div class="workflow-layout" data-workflow-layout>
         <section class="workflow-main-panel" data-workflow-panel="configure">
         <div class="plugin-subtab-bar" role="tablist" aria-label="Plugin configuration sections">
-            <button type="button" class="plugin-subtab active" role="tab" aria-selected="true" data-plugin-subtab="configure">Configure</button>
+            <button type="button" id="pluginConfigureTab" class="plugin-subtab active" role="tab" aria-selected="true" aria-controls="pluginConfigurePanel" data-plugin-subtab="configure">Configure</button>
             {% if style_settings %}
-            <button type="button" class="plugin-subtab" role="tab" aria-selected="false" data-plugin-subtab="style">Style</button>
+            <button type="button" id="pluginStyleTab" class="plugin-subtab" role="tab" aria-selected="false" aria-controls="pluginStylePanel" tabindex="-1" data-plugin-subtab="style">Style</button>
             {% endif %}
-            <button type="button" class="plugin-subtab" role="tab" aria-selected="false" data-plugin-subtab="schedule">Schedule</button>
+            <button type="button" id="pluginScheduleTab" class="plugin-subtab" role="tab" aria-selected="false" aria-controls="pluginSchedulePanel" tabindex="-1" data-plugin-subtab="schedule">Schedule</button>
         </div>
         <form id="settingsForm" class="settings-form workflow-settings-form" action="{{ url_for('plugin.save_plugin_settings') }}" method="post" aria-label="Plugin settings for {{ plugin.display_name }}" novalidate>
-            <div class="settings-container plugin-subpanel" data-plugin-subpanel="configure">
+            <div id="pluginConfigurePanel" class="settings-container plugin-subpanel" role="tabpanel" aria-labelledby="pluginConfigureTab" data-plugin-subpanel="configure">
                 <div class="workflow-section-header">
                     <h2>Configuration</h2>
                     <p>Adjust content and presentation settings before generating a new preview.</p>
@@ -205,7 +205,7 @@
             </div>
 
             {% if style_settings %}
-            <div class="settings-container plugin-subpanel" data-plugin-subpanel="style" hidden>
+            <div id="pluginStylePanel" class="settings-container plugin-subpanel" role="tabpanel" aria-labelledby="pluginStyleTab" data-plugin-subpanel="style" hidden aria-hidden="true">
                 <div class="workflow-section-header">
                     <h2>Style</h2>
                     <p>Frame, margins, and colors applied to the rendered image.</p>
@@ -286,7 +286,7 @@
             <input type="hidden" name="instance_name" value="{{ plugin_instance }}">
             {% endif %}
         </form>
-        <div id="pluginSchedulePanel" class="settings-container plugin-subpanel plugin-schedule-panel" data-plugin-subpanel="schedule" hidden>
+        <div id="pluginSchedulePanel" class="settings-container plugin-subpanel plugin-schedule-panel" role="tabpanel" aria-labelledby="pluginScheduleTab" data-plugin-subpanel="schedule" hidden aria-hidden="true">
             <div class="workflow-section-header">
                 <h2>Schedule</h2>
                 {% if plugin_instance %}
@@ -501,6 +501,7 @@
             styleSettings: {{ style_settings | default(false) | tojson }},
             urls: {
                 add_to_playlist: {{ url_for('playlist.add_plugin') | tojson }},
+                random_prompt: {{ url_for("plugin.ai_image_random_prompt") | tojson }},
                 save_settings: {{ url_for("plugin.save_plugin_settings") | tojson }},
                 update_instance: {{ url_for('plugin.update_plugin_instance', instance_name=(plugin_instance or '')) | tojson }},
                 update_now: {{ url_for("plugin.update_now") | tojson }},

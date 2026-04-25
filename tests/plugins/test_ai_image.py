@@ -105,6 +105,39 @@ def test_ai_image_validate_settings_uses_default_model_for_openai():
     )
 
 
+def test_ai_image_validate_settings_allows_blank_prompt_when_vivid_remix_enabled():
+    from plugins.ai_image.ai_image import AIImage
+
+    plugin = AIImage({"id": "ai_image"})
+
+    assert (
+        plugin.validate_settings(
+            {
+                "textPrompt": "",
+                "randomizePrompt": "true",
+                "provider": "openai",
+            }
+        )
+        is None
+    )
+
+
+def test_ai_image_validate_settings_rejects_blank_prompt_without_vivid_remix():
+    from plugins.ai_image.ai_image import AIImage
+
+    plugin = AIImage({"id": "ai_image"})
+
+    error = plugin.validate_settings(
+        {
+            "textPrompt": " ",
+            "randomizePrompt": "false",
+            "provider": "openai",
+        }
+    )
+
+    assert error == "Prompt is required."
+
+
 def test_ai_image_generate_image_success(client, monkeypatch, mock_openai):
     monkeypatch.setenv("OPEN_AI_SECRET", "test")
 
@@ -335,6 +368,24 @@ def test_ai_image_randomize_prompt_blank_input(device_config_dev, monkeypatch):
         assert result is not None
 
 
+def test_ai_image_blank_prompt_without_randomize_raises(device_config_dev, monkeypatch):
+    from plugins.ai_image.ai_image import AIImage
+
+    p = AIImage({"id": "ai_image"})
+    monkeypatch.setattr(device_config_dev, "load_env_key", lambda key: "fake_key")
+
+    with pytest.raises(RuntimeError, match="Prompt is required"):
+        p.generate_image(
+            {
+                "textPrompt": "",
+                "imageModel": "gpt-image-2",
+                "quality": "medium",
+                "randomizePrompt": "false",
+            },
+            device_config_dev,
+        )
+
+
 def test_fetch_image_prompt_basic(monkeypatch):
     """Test fetch_image_prompt with basic functionality."""
     from plugins.ai_image.ai_image import AIImage
@@ -522,7 +573,23 @@ def test_ai_image_prompt_field_is_textarea():
     assert prompt_field is not None, "textPrompt field missing from schema"
     assert prompt_field["type"] == "textarea"
     assert prompt_field.get("rows") == 4
-    assert prompt_field.get("required") is True
+    assert prompt_field.get("required") is not True
+
+
+def test_ai_image_schema_includes_random_prompt_widget():
+    from plugins.ai_image.ai_image import AIImage
+
+    p = AIImage({"id": "ai_image"})
+    schema = p.build_settings_schema()
+
+    widgets = [
+        item
+        for section in schema["sections"]
+        for item in section["items"]
+        if item.get("kind") == "widget"
+    ]
+
+    assert any(item.get("widget_type") == "ai-image-prompt-tools" for item in widgets)
 
 
 def test_ai_image_prompt_renders_as_textarea(client):
@@ -532,6 +599,37 @@ def test_ai_image_prompt_renders_as_textarea(client):
     body = resp.data.decode("utf-8")
     assert "<textarea" in body
     assert 'name="textPrompt"' in body
+    assert "Surprise me" in body
+    assert "data-ai-image-random-prompt" in body
+
+
+def test_ai_image_random_prompt_endpoint_openai(client, monkeypatch):
+    from plugins.ai_image.ai_image import AIImage
+
+    monkeypatch.setenv("OPEN_AI_SECRET", "test")
+
+    with patch.object(AIImage, "fetch_image_prompt", return_value="a glass city"):
+        resp = client.post(
+            "/plugin/ai_image/random_prompt",
+            json={"provider": "openai", "prompt": ""},
+        )
+
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["success"] is True
+    assert body["prompt"] == "a glass city"
+
+
+def test_ai_image_random_prompt_endpoint_missing_key(client, monkeypatch):
+    monkeypatch.delenv("OPEN_AI_SECRET", raising=False)
+
+    resp = client.post(
+        "/plugin/ai_image/random_prompt",
+        json={"provider": "openai", "prompt": ""},
+    )
+
+    assert resp.status_code == 400
+    assert "OpenAI API Key" in resp.get_json()["error"]
 
 
 def test_fetch_image_prompt_api_error_handling():
