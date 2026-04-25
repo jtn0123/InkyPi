@@ -1,6 +1,44 @@
 # CHANGELOG
 
 
+## v1.0.3 (2026-04-25)
+
+### Bug Fixes
+
+- Polish dogfood UI regressions ([#589](https://github.com/jtn0123/InkyPi/pull/589),
+  [`65ba79e`](https://github.com/jtn0123/InkyPi/commit/65ba79e35de1c266c78d256e1a710a44d6581a16))
+
+### Continuous Integration
+
+- Call build-pi-image from release.yml (fires on semantic-release cuts)
+  ([#588](https://github.com/jtn0123/InkyPi/pull/588),
+  [`e766bfa`](https://github.com/jtn0123/InkyPi/commit/e766bfa5bf9c8742f25af5e4eec2a83f33e0ad5d))
+
+Problem: `build-pi-image.yml` triggers on `release: [published]`, but semantic-release publishes via
+  `GITHUB_TOKEN`, and GitHub's anti-loop rule blocks `GITHUB_TOKEN`-originated events from starting
+  new workflow runs. Net effect: the Pi image build never auto-fires on releases cut by the Release
+  workflow — maintainers had to remember to `workflow_dispatch` it by hand. `build-wheelhouse.yml`
+  already solved this (JTN-745) by exposing itself as a reusable workflow and letting `release.yml`
+  invoke it after publish.
+
+This patch mirrors the wheelhouse wiring:
+
+- build-pi-image.yml: add `workflow_call` trigger with a `tag` input; keep existing `release:
+  [published]` and `workflow_dispatch` triggers so maintainers publishing outside the
+  semantic-release path (or rebuilding an older tag) can still fire it directly. Extend the
+  concurrency group with `github.run_id` as the final fallback so reusable invocations get a unique
+  group key (same shape as build-wheelhouse.yml). - release.yml: add a `pi-image` job that `needs:
+  release`, is gated on `needs.release.outputs.released == 'true'`, and calls
+  `./.github/workflows/build-pi-image.yml` with the resolved tag. Placement matches the existing
+  `wheelhouse` job.
+
+Net behaviour: every semantic-release-cut release now triggers the Pi image build automatically, and
+  a failed Pi image build turns the parent Release run red rather than silently skipping. Manual
+  publish paths (PAT-auth release creation) retain the existing `release: [published]` fast path.
+
+Co-authored-by: Claude Opus 4.7 <noreply@anthropic.com>
+
+
 ## v1.0.2 (2026-04-24)
 
 ### Bug Fixes
