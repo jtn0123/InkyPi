@@ -1,8 +1,10 @@
 import json
 import os
+from pathlib import Path
+from typing import Any
 
 
-def _write_min_config(path, name="Cfg"):
+def _write_min_config(path: str, name: str = "Cfg") -> None:
     cfg = {
         "name": name,
         "display_type": "mock",
@@ -21,7 +23,7 @@ def _write_min_config(path, name="Cfg"):
         json.dump(cfg, f)
 
 
-def test_get_plugin_image_path(monkeypatch, tmp_path):
+def test_get_plugin_image_path(monkeypatch: Any, tmp_path: Path) -> None:
     import config as config_mod
 
     # Use temp device.json
@@ -35,7 +37,9 @@ def test_get_plugin_image_path(monkeypatch, tmp_path):
     assert path.endswith("weather_My_Instance.png")
 
 
-def test_read_plugins_list_handles_missing_dir(monkeypatch, tmp_path):
+def test_read_plugins_list_handles_missing_dir(
+    monkeypatch: Any, tmp_path: Path
+) -> None:
     import config as config_mod
 
     # Point BASE_DIR to temp that lacks plugins dir
@@ -50,8 +54,8 @@ def test_read_plugins_list_handles_missing_dir(monkeypatch, tmp_path):
 
 
 def test_read_plugins_list_uses_cache_when_plugin_files_unchanged(
-    monkeypatch, tmp_path
-):
+    monkeypatch: Any, tmp_path: Path
+) -> None:
     import config as config_mod
 
     cfg_path = tmp_path / "config" / "device.json"
@@ -68,7 +72,7 @@ def test_read_plugins_list_uses_cache_when_plugin_files_unchanged(
     original_json_load = config_mod.json.load
     parse_count = {"n": 0}
 
-    def counting_load(fp):
+    def counting_load(fp: Any) -> Any:
         parse_count["n"] += 1
         return original_json_load(fp)
 
@@ -79,8 +83,8 @@ def test_read_plugins_list_uses_cache_when_plugin_files_unchanged(
 
 
 def test_read_plugins_list_refreshes_cache_when_plugin_file_changes(
-    monkeypatch, tmp_path
-):
+    monkeypatch: Any, tmp_path: Path
+) -> None:
     import config as config_mod
 
     cfg_path = tmp_path / "config" / "device.json"
@@ -102,7 +106,9 @@ def test_read_plugins_list_refreshes_cache_when_plugin_file_changes(
     assert cfg.read_plugins_list() == [{"id": "demo", "name": "Updated Demo"}]
 
 
-def test_determine_config_path_bootstrap_failure(monkeypatch, tmp_path):
+def test_determine_config_path_bootstrap_failure(
+    monkeypatch: Any, tmp_path: Path
+) -> None:
     import config as config_mod
 
     # Point BASE_DIR to isolated tmp src
@@ -115,7 +121,7 @@ def test_determine_config_path_bootstrap_failure(monkeypatch, tmp_path):
     # Simulate missing install template so bootstrap fails
     # Also ensure config dir not creatable by mocking shutil.copyfile to raise
 
-    def _boom(*_a, **_kw):
+    def _boom(*_a: Any, **_kw: Any) -> None:
         raise OSError("copy failed")
 
     monkeypatch.setattr(config_mod.shutil, "copyfile", _boom)
