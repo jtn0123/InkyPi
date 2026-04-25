@@ -21,10 +21,11 @@ from plugins.base_plugin.settings_schema import (
 logger = logging.getLogger(__name__)
 
 OPENAI_IMAGE_MODEL = "gpt-image-1.5"
+OPENAI_IMAGE_MODEL_2 = "gpt-image-2"
 GOOGLE_IMAGE_MODEL = "imagen-4.0-generate-001"
 
 IMAGE_MODELS_BY_PROVIDER = {
-    "openai": (OPENAI_IMAGE_MODEL,),
+    "openai": (OPENAI_IMAGE_MODEL, OPENAI_IMAGE_MODEL_2),
     "google": (GOOGLE_IMAGE_MODEL,),
 }
 IMAGE_MODELS = [
@@ -32,7 +33,7 @@ IMAGE_MODELS = [
     for provider_models in IMAGE_MODELS_BY_PROVIDER.values()
     for model in provider_models
 ]
-DEFAULT_IMAGE_MODEL = OPENAI_IMAGE_MODEL
+DEFAULT_IMAGE_MODEL = OPENAI_IMAGE_MODEL_2
 DEFAULT_IMAGE_QUALITY = "medium"
 
 
@@ -61,14 +62,15 @@ class AIImage(BasePlugin):
                     "textarea",
                     label="Prompt",
                     placeholder="A surreal breakfast floating through a neon sky.",
+                    hint="Describe the scene you want the model to render. Bold, simple compositions read best on e-ink.",
                     required=True,
                     rows=4,
                 ),
                 field(
                     "randomizePrompt",
                     "checkbox",
-                    label="Randomize Prompt",
-                    hint="Use the current prompt as a seed and let the model remix it before generating the image.",
+                    label="Remix prompt before generating",
+                    hint="Pass your prompt through a writing model first to add vivid detail and unexpected styling.",
                     submit_unchecked=True,
                     checked_value="true",
                     unchecked_value="false",
@@ -82,6 +84,7 @@ class AIImage(BasePlugin):
                         "select",
                         label="Provider",
                         default="openai",
+                        hint="Pick the AI service that should render the image. Each provider uses its own API key.",
                         options=[
                             option("openai", "OpenAI"),
                             option("google", "Google"),
@@ -97,7 +100,11 @@ class AIImage(BasePlugin):
                         options_by_value={
                             "openai": [
                                 option(
-                                    DEFAULT_IMAGE_MODEL,
+                                    OPENAI_IMAGE_MODEL_2,
+                                    "GPT Image 2 \u00b7 ~$0.08/img (recommended)",
+                                ),
+                                option(
+                                    OPENAI_IMAGE_MODEL,
                                     "GPT Image 1.5 \u00b7 ~$0.07/img",
                                 ),
                             ],
@@ -119,7 +126,12 @@ class AIImage(BasePlugin):
                         options_source="imageModel",
                         options_source_default=DEFAULT_IMAGE_MODEL,
                         options_by_value={
-                            DEFAULT_IMAGE_MODEL: [
+                            OPENAI_IMAGE_MODEL_2: [
+                                option("high", "High (~$0.24)"),
+                                option("medium", "Medium (~$0.08)"),
+                                option("low", "Low (~$0.02)"),
+                            ],
+                            OPENAI_IMAGE_MODEL: [
                                 option("high", "High (~$0.20)"),
                                 option("medium", "Medium (~$0.07)"),
                                 option("low", "Low (~$0.01)"),
@@ -141,9 +153,12 @@ class AIImage(BasePlugin):
         template_params = super().generate_settings_template()
         template_params["api_key"] = {
             "required": True,
-            "service": "OpenAI / Google",
             "expected_key": "OPEN_AI_SECRET",
             "alt_key": "GOOGLE_AI_SECRET",
+            "services": [
+                {"name": "OpenAI", "env_var": "OPEN_AI_SECRET"},
+                {"name": "Google", "env_var": "GOOGLE_AI_SECRET"},
+            ],
         }
         return template_params
 
@@ -167,17 +182,41 @@ class AIImage(BasePlugin):
     ):
         if not randomize_prompt:
             return text_prompt
-        logger.debug("Generating randomized prompt using Gemini...")
-        randomized = AIImage.fetch_image_prompt_google(google_client, text_prompt)
-        logger.info(f"Randomized prompt: '{randomized}'")
+        logger.info("Remixing prompt with Gemini before image generation...")
+        try:
+            randomized = AIImage.fetch_image_prompt_google(
+                google_client, text_prompt
+            )
+        except Exception as exc:
+            logger.warning(
+                "Prompt remix via Gemini failed (%s); using original prompt.", exc
+            )
+            return text_prompt
+        if not randomized or not randomized.strip():
+            logger.warning(
+                "Prompt remix via Gemini returned an empty result; using original prompt."
+            )
+            return text_prompt
+        logger.info(f"Remixed prompt: '{randomized}'")
         return randomized
 
     def _maybe_randomize_openai_prompt(self, ai_client, text_prompt, randomize_prompt):
         if not randomize_prompt:
             return text_prompt
-        logger.debug("Generating randomized prompt using GPT...")
-        randomized = AIImage.fetch_image_prompt(ai_client, text_prompt)
-        logger.info(f"Randomized prompt: '{randomized}'")
+        logger.info("Remixing prompt with GPT before image generation...")
+        try:
+            randomized = AIImage.fetch_image_prompt(ai_client, text_prompt)
+        except Exception as exc:
+            logger.warning(
+                "Prompt remix via GPT failed (%s); using original prompt.", exc
+            )
+            return text_prompt
+        if not randomized or not randomized.strip():
+            logger.warning(
+                "Prompt remix via GPT returned an empty result; using original prompt."
+            )
+            return text_prompt
+        logger.info(f"Remixed prompt: '{randomized}'")
         return randomized
 
     def _generate_google_image(
@@ -395,7 +434,13 @@ class AIImage(BasePlugin):
             temperature=1,
         )
 
-        prompt = response.choices[0].message.content.strip()
+        choices = getattr(response, "choices", None) or []
+        message = getattr(choices[0], "message", None) if choices else None
+        content = getattr(message, "content", None) if message else None
+        prompt = (content or "").strip()
+        if not prompt:
+            logger.warning("OpenAI returned an empty remix; caller will fall back.")
+            return ""
         logger.info(f"Generated random image prompt: {prompt}")
         return prompt
 
@@ -448,6 +493,10 @@ class AIImage(BasePlugin):
             ),
         )
 
-        prompt = response.text.strip()
+        text = getattr(response, "text", None) or ""
+        prompt = text.strip()
+        if not prompt:
+            logger.warning("Gemini returned an empty remix; caller will fall back.")
+            return ""
         logger.info(f"Generated random image prompt via Gemini: {prompt}")
         return prompt

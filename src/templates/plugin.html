@@ -130,6 +130,8 @@
                         </div>
                     </section>
                     {% if api_key and api_key.required %}
+                    {% set api_services = api_key.services if api_key.services else None %}
+                    {% set api_multi = api_services and api_services | length > 1 %}
                     <section class="plugin-editor-card plugin-editor-card-api" aria-labelledby="pluginApiCardHeading">
                         <div class="plugin-editor-card-label">API key</div>
                         {% if api_key.present %}
@@ -145,18 +147,38 @@
                         {% endif %}
                         <div class="plugin-inline-api-row">
                             <div class="plugin-inline-api-copy">
+                                {% if api_multi %}
+                                <h3 id="pluginApiCardHeading">AI provider key</h3>
+                                {% if api_key.present %}
+                                <p>{{ api_key.service }} is configured and ready for fresh previews. Add another provider any time to switch between them.</p>
+                                {% else %}
+                                <p>This plugin needs a key from at least one of the supported providers ({{ api_services | map(attribute='name') | join(' or ') }}) before it can refresh or generate a preview.</p>
+                                {% endif %}
+                                {% else %}
                                 <h3 id="pluginApiCardHeading">{{ api_key.service }}</h3>
                                 {% if api_key.present %}
                                 <p>This provider is configured and ready for fresh previews.</p>
                                 {% else %}
                                 <p>This plugin needs a configured {{ api_key.service }} key before it can refresh or generate a preview.</p>
                                 {% endif %}
+                                {% endif %}
                             </div>
                             <div class="plugin-inline-api-actions">
+                                {% if api_multi %}
+                                {% for svc in api_services %}
+                                {% if svc.present %}
+                                {{ status_chip(svc.name, 'success', title=svc.name ~ ' API key is configured.') }}
+                                {% endif %}
+                                {% endfor %}
+                                {% if not api_key.present %}
+                                {{ status_chip('Required', 'warning') }}
+                                {% endif %}
+                                {% else %}
                                 {% if api_key.present %}
                                 {{ status_chip('Configured', 'success') }}
                                 {% else %}
                                 {{ status_chip('Required', 'warning') }}
+                                {% endif %}
                                 {% endif %}
                                 <a href="{{ url_for('settings.api_keys_page') }}" class="action-button is-secondary plugin-inline-api-link" data-api-keys-link>Manage keys</a>
                             </div>

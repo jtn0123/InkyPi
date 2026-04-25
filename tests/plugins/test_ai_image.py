@@ -492,10 +492,12 @@ def test_ai_image_generate_settings_template():
     template = p.generate_settings_template()
 
     assert "api_key" in template
-    assert template["api_key"]["service"] == "OpenAI / Google"
     assert template["api_key"]["expected_key"] == "OPEN_AI_SECRET"
     assert template["api_key"]["alt_key"] == "GOOGLE_AI_SECRET"
     assert template["api_key"]["required"] is True
+    services = template["api_key"]["services"]
+    assert [s["name"] for s in services] == ["OpenAI", "Google"]
+    assert [s["env_var"] for s in services] == ["OPEN_AI_SECRET", "GOOGLE_AI_SECRET"]
     assert "settings_schema" in template
 
 
@@ -531,7 +533,7 @@ def test_ai_image_prompt_renders_as_textarea(client):
 
 
 def test_fetch_image_prompt_api_error_handling():
-    """Test fetch_image_prompt with malformed API response."""
+    """Empty/malformed API responses should return ``""`` so callers fall back."""
     from plugins.ai_image.ai_image import AIImage
 
     mock_client = MagicMock()
@@ -539,8 +541,59 @@ def test_fetch_image_prompt_api_error_handling():
     mock_response.choices = []
     mock_client.chat.completions.create.return_value = mock_response
 
-    with pytest.raises(IndexError):
-        AIImage.fetch_image_prompt(mock_client, "a cat")
+    assert AIImage.fetch_image_prompt(mock_client, "a cat") == ""
+
+    # None content (e.g. reasoning models that route output elsewhere)
+    null_choice = MagicMock()
+    null_choice.message.content = None
+    mock_response_null = MagicMock()
+    mock_response_null.choices = [null_choice]
+    mock_client.chat.completions.create.return_value = mock_response_null
+    assert AIImage.fetch_image_prompt(mock_client, "a cat") == ""
+
+
+def test_ai_image_randomize_falls_back_when_remix_fails(
+    device_config_dev, monkeypatch
+):
+    """If prompt remix raises, image generation should still succeed with the
+    user's original prompt rather than aborting the whole flow."""
+    from plugins.ai_image.ai_image import AIImage
+
+    p = AIImage({"id": "ai_image"})
+    monkeypatch.setattr(device_config_dev, "load_env_key", lambda key: "fake_key")
+
+    with (
+        patch("plugins.ai_image.ai_image.OpenAI") as mock_openai,
+        patch(
+            "plugins.ai_image.ai_image.AIImage.fetch_image_prompt",
+            side_effect=Exception("remix boom"),
+        ),
+    ):
+        mock_client = MagicMock()
+        mock_openai.return_value = mock_client
+
+        img = PILImage.new("RGB", (64, 64), "black")
+        buf = BytesIO()
+        img.save(buf, format="PNG")
+        img_b64 = base64.b64encode(buf.getvalue()).decode()
+
+        mock_response = MagicMock()
+        mock_response.data = [MagicMock()]
+        mock_response.data[0].b64_json = img_b64
+        mock_client.images.generate.return_value = mock_response
+
+        settings = {
+            "textPrompt": "a calm forest at dusk",
+            "imageModel": "gpt-image-2",
+            "quality": "medium",
+            "randomizePrompt": "true",
+        }
+
+        result = p.generate_image(settings, device_config_dev)
+        assert result is not None
+
+        prompt_arg = mock_client.images.generate.call_args[1]["prompt"]
+        assert prompt_arg.startswith("a calm forest at dusk")
 
 
 def test_fetch_image_prompt_content_parsing():

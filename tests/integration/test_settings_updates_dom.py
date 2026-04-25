@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 
 import pytest
 from tests.integration.browser_helpers import navigate_and_wait
@@ -25,7 +26,7 @@ pytestmark = pytest.mark.skipif(
 
 
 def _stub_api_version(page, payload: dict) -> None:
-    """Route /api/version to return a known JSON payload."""
+    """Route /api/version (and /api/version?force=1) to return a known payload."""
 
     def handler(route):
         route.fulfill(
@@ -34,7 +35,9 @@ def _stub_api_version(page, payload: dict) -> None:
             body=json.dumps(payload),
         )
 
-    page.route("**/api/version", handler)
+    # Match the endpoint with or without a query string — manual "Check for
+    # updates" clicks now append ?force=1 to bypass the server cache.
+    page.route(re.compile(r".*/api/version(?:\?.*)?$"), handler)
 
 
 def _open_maintenance_tab(page):

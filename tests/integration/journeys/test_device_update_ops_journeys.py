@@ -31,8 +31,14 @@ def stable_version_check(monkeypatch):
     settings_mod._VERSION_CACHE["latest"] = None
     settings_mod._VERSION_CACHE["checked_at"] = 0.0
     settings_mod._VERSION_CACHE["release_notes"] = None
+    settings_mod._VERSION_CACHE["last_error"] = None
+    # Accept the ``force_refresh`` kwarg the real implementation added so the
+    # "Check for updates" button's ?force=1 path works without 500ing.
     monkeypatch.setattr(
-        settings_mod, "_check_latest_version", lambda: _STUBBED_LATEST_TAG, raising=True
+        settings_mod,
+        "_check_latest_version",
+        lambda force_refresh=False: _STUBBED_LATEST_TAG,
+        raising=True,
     )
 
 

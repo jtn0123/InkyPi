@@ -457,17 +457,25 @@ def start_rollback():
 
 @_mod.settings_bp.route("/api/version", methods=["GET"])
 def api_version():
-    """Return current and latest version info."""
+    """Return current and latest version info.
+
+    Accepts ``?force=1`` to bypass the in-process cache so the "Check for
+    updates" button always hits GitHub instead of serving a possibly-stale
+    result from an earlier page load. Returns ``check_succeeded`` / ``check_error``
+    so the UI can distinguish "you're on latest" from "we couldn't reach GitHub".
+    """
     with route_error_boundary(
         "version check",
         logger=_mod.logger,
         hint="Check release metadata retrieval and semver parsing.",
     ):
+        force_refresh = request.args.get("force", "").lower() in ("1", "true", "yes")
         current = current_app.config.get("APP_VERSION", "unknown")
-        latest = _mod._check_latest_version()
+        latest = _mod._check_latest_version(force_refresh=force_refresh)
         update_available = False
         if latest and current != "unknown":
             update_available = _mod._semver_gt(latest, current)
+        check_error = _mod._VERSION_CACHE.get("last_error")
         return jsonify(
             {
                 "current": current,
@@ -475,5 +483,7 @@ def api_version():
                 "update_available": update_available,
                 "update_running": bool(_mod._UPDATE_STATE.get("running")),
                 "release_notes": _mod._VERSION_CACHE.get("release_notes"),
+                "check_succeeded": latest is not None,
+                "check_error": check_error if latest is None else None,
             }
         )

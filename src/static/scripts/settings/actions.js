@@ -153,11 +153,17 @@
     );
   }
 
-  async function fetchVersionData(versionUrl) {
+  async function fetchVersionData(versionUrl, { force = false } = {}) {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 8000);
     try {
-      const response = await fetch(versionUrl, {
+      // Manual "Check for updates" clicks pass ?force=1 so the server
+      // bypasses its 1h cache and actually hits GitHub. Silent/background
+      // checks leave the cache alone.
+      const url = force
+        ? versionUrl + (versionUrl.includes("?") ? "&" : "?") + "force=1"
+        : versionUrl;
+      const response = await fetch(url, {
         cache: "no-store",
         signal: controller.signal,
       });
@@ -201,9 +207,13 @@
     async function checkForUpdates(options) {
       const elements = getVersionElements();
       const silent = !!(options && options.silent);
+      // Manual clicks force a fresh server-side fetch so a stale 1h cache
+      // can't hide a release that actually exists. Silent/background
+      // refreshes reuse whatever the server already has.
+      const force = !silent;
       setCheckButtonLoading(elements.checkBtn, true);
       try {
-        const data = await fetchVersionData(config.versionUrl);
+        const data = await fetchVersionData(config.versionUrl, { force });
         renderVersionCheckResult(elements, data);
         if (!silent) {
           if (data.update_available) {
@@ -214,7 +224,13 @@
           } else if (data.latest) {
             showResponseModal("success", "You're on the latest version.");
           } else {
-            showResponseModal("failure", "Unable to check for updates.");
+            const detail = data.check_error
+              ? ` (${data.check_error})`
+              : "";
+            showResponseModal(
+              "failure",
+              `Unable to reach GitHub to check for updates${detail}. Try again in a moment.`
+            );
           }
         }
       } catch (e) {

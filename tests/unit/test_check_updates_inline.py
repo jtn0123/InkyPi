@@ -46,6 +46,7 @@ class TestApiVersionInlineResult:
         mod._VERSION_CACHE["latest"] = "99.0.0"
         mod._VERSION_CACHE["checked_at"] = time.time()
         mod._VERSION_CACHE["release_notes"] = None
+        mod._VERSION_CACHE["last_error"] = None
         original_version = client.application.config.get("APP_VERSION")
         try:
             client.application.config["APP_VERSION"] = "1.0.0"
@@ -56,9 +57,12 @@ class TestApiVersionInlineResult:
             assert "latest" in data
             assert data["latest"] == "99.0.0"
             assert data["update_available"] is True
+            assert data["check_succeeded"] is True
+            assert data["check_error"] is None
         finally:
             mod._VERSION_CACHE["latest"] = None
             mod._VERSION_CACHE["checked_at"] = 0.0
+            mod._VERSION_CACHE["last_error"] = None
             if original_version is not None:
                 client.application.config["APP_VERSION"] = original_version
             else:
@@ -101,6 +105,7 @@ class TestApiVersionInlineResult:
         # Force cache miss so it tries to fetch
         mod._VERSION_CACHE["latest"] = None
         mod._VERSION_CACHE["checked_at"] = 0.0
+        mod._VERSION_CACHE["last_error"] = None
         monkeypatch.setattr(
             "blueprints.settings.http_get",
             MagicMock(side_effect=Exception("network down")),
@@ -111,6 +116,46 @@ class TestApiVersionInlineResult:
             assert resp.status_code == 200
             data = resp.get_json()
             assert "current" in data
+            assert data["check_succeeded"] is False
+            assert data["check_error"]
+            assert "network down" in data["check_error"]
         finally:
             mod._VERSION_CACHE["latest"] = None
             mod._VERSION_CACHE["checked_at"] = 0.0
+            mod._VERSION_CACHE["last_error"] = None
+
+    def test_force_refresh_bypasses_cache(self, client, monkeypatch):
+        """?force=1 must hit the HTTP layer even if a fresh cache entry exists."""
+        import blueprints.settings as mod
+
+        mod._VERSION_CACHE["latest"] = "1.0.0"
+        mod._VERSION_CACHE["checked_at"] = time.time()
+        mod._VERSION_CACHE["release_notes"] = None
+        mod._VERSION_CACHE["last_error"] = None
+
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = {
+            "tag_name": "v9.9.9",
+            "body": "shiny",
+        }
+        mock_resp.raise_for_status = MagicMock()
+        mock_get = MagicMock(return_value=mock_resp)
+        monkeypatch.setattr("blueprints.settings.http_get", mock_get)
+
+        try:
+            # Cached call should not invoke http_get
+            resp = client.get("/api/version")
+            assert mock_get.call_count == 0
+            assert resp.get_json()["latest"] == "1.0.0"
+
+            # Forced call should ignore the cache and fetch
+            resp = client.get("/api/version?force=1")
+            assert mock_get.call_count == 1
+            data = resp.get_json()
+            assert data["latest"] == "9.9.9"
+            assert data["check_succeeded"] is True
+        finally:
+            mod._VERSION_CACHE["latest"] = None
+            mod._VERSION_CACHE["checked_at"] = 0.0
+            mod._VERSION_CACHE["last_error"] = None
+            mod._VERSION_CACHE["release_notes"] = None

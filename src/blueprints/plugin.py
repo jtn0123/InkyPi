@@ -98,10 +98,37 @@ def plugin_page(plugin_id: str):
 
         # Check if API key is present for plugins that require it
         if "api_key" in template_params and template_params["api_key"].get("required"):
-            expected_key = template_params["api_key"].get("expected_key")
-            if expected_key:
-                key_present = device_config.load_env_key(expected_key) is not None
-                template_params["api_key"]["present"] = key_present
+            api_key_meta = template_params["api_key"]
+            services = api_key_meta.get("services")
+            if services:
+                resolved = []
+                any_present = False
+                for svc in services:
+                    env_var = svc.get("env_var")
+                    name = svc.get("name") or env_var or ""
+                    present = bool(env_var) and (
+                        device_config.load_env_key(env_var) is not None
+                    )
+                    resolved.append(
+                        {"name": name, "env_var": env_var, "present": present}
+                    )
+                    any_present = any_present or present
+                api_key_meta["services"] = resolved
+                api_key_meta["present"] = any_present
+                configured_names = [s["name"] for s in resolved if s["present"]]
+                all_names = [s["name"] for s in resolved]
+                if configured_names:
+                    api_key_meta["service"] = " · ".join(configured_names)
+                else:
+                    api_key_meta["service"] = " or ".join(all_names) or api_key_meta.get(
+                        "service", ""
+                    )
+            else:
+                expected_key = api_key_meta.get("expected_key")
+                if expected_key:
+                    api_key_meta["present"] = (
+                        device_config.load_env_key(expected_key) is not None
+                    )
 
         # If viewing an existing instance, pre-populate its settings
         plugin_instance_name = request.args.get("instance")
