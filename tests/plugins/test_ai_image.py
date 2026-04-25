@@ -639,6 +639,18 @@ def test_ai_image_random_prompt_endpoint_missing_key(
     assert "OpenAI API Key" in resp.get_json()["error"]
 
 
+def test_ai_image_random_prompt_endpoint_rejects_unknown_provider(client: Any) -> None:
+    resp = client.post(
+        "/plugin/ai_image/random_prompt",
+        json={"provider": "opneai", "prompt": ""},
+    )
+
+    assert resp.status_code == 400
+    body = resp.get_json()
+    assert "Unsupported provider" in body["error"]
+    assert body["details"]["field"] == "provider"
+
+
 def test_fetch_image_prompt_api_error_handling():
     """Empty/malformed API responses should return ``""`` so callers fall back."""
     from plugins.ai_image.ai_image import AIImage
@@ -840,6 +852,35 @@ def test_maybe_randomize_openai_prompt_uses_original_when_empty(monkeypatch):
             plugin._maybe_randomize_openai_prompt(MagicMock(), "keep me", True)
             == "keep me"
         )
+
+
+def test_openai_blank_random_prompt_uses_fallback_before_image_call(
+    device_config_dev: Any, monkeypatch: Any
+) -> None:
+    from plugins.ai_image.ai_image import FALLBACK_IMAGE_PROMPT, AIImage
+
+    plugin = AIImage({"id": "ai_image"})
+    monkeypatch.setattr(device_config_dev, "load_env_key", lambda key: "fake_key")
+
+    with (
+        patch(
+            "plugins.ai_image.ai_image.AIImage.fetch_image_prompt",
+            return_value="",
+        ),
+        patch.object(plugin, "fetch_image", return_value=MagicMock()) as mock_fetch,
+    ):
+        plugin.generate_image(
+            {
+                "textPrompt": "",
+                "provider": "openai",
+                "imageModel": "gpt-image-2",
+                "quality": "medium",
+                "randomizePrompt": "true",
+            },
+            device_config_dev,
+        )
+
+    assert mock_fetch.call_args.args[1] == FALLBACK_IMAGE_PROMPT
 
 
 def test_maybe_randomize_google_prompt_success(monkeypatch):

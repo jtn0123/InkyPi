@@ -375,46 +375,49 @@ class Config:
 
     def read_plugins_list(self) -> list[dict[str, Any]]:
         """Reads the plugin-info.json config JSON from each plugin folder. Excludes the base plugin."""
-        plugins_root = os.path.join(self.BASE_DIR, "plugins")
-        if not os.path.isdir(plugins_root):
-            self._plugins_list_cache_fingerprint = None
-            self._plugins_list_cache_data = None
-            return []
+        with self._config_lock:
+            plugins_root = os.path.join(self.BASE_DIR, "plugins")
+            if not os.path.isdir(plugins_root):
+                self._plugins_list_cache_fingerprint = None
+                self._plugins_list_cache_data = None
+                return []
 
-        plugin_info_files: list[str] = []
-        with os.scandir(plugins_root) as entries:
-            for entry in entries:
-                if entry.name == "__pycache__" or not entry.is_dir():
+            plugin_info_files: list[str] = []
+            with os.scandir(plugins_root) as entries:
+                for entry in entries:
+                    if entry.name == "__pycache__" or not entry.is_dir():
+                        continue
+                    plugin_info_file = os.path.join(entry.path, "plugin-info.json")
+                    if os.path.isfile(plugin_info_file):
+                        plugin_info_files.append(plugin_info_file)
+
+            fingerprint_parts: list[tuple[str, int, int]] = []
+            for plugin_info_file in sorted(plugin_info_files):
+                try:
+                    stat = os.stat(plugin_info_file)
+                except OSError:
                     continue
-                plugin_info_file = os.path.join(entry.path, "plugin-info.json")
-                if os.path.isfile(plugin_info_file):
-                    plugin_info_files.append(plugin_info_file)
+                fingerprint_parts.append(
+                    (plugin_info_file, stat.st_mtime_ns, stat.st_size)
+                )
 
-        fingerprint_parts: list[tuple[str, int, int]] = []
-        for plugin_info_file in sorted(plugin_info_files):
-            try:
-                stat = os.stat(plugin_info_file)
-            except OSError:
-                continue
-            fingerprint_parts.append((plugin_info_file, stat.st_mtime_ns, stat.st_size))
+            fingerprint = tuple(fingerprint_parts)
+            if (
+                fingerprint == self._plugins_list_cache_fingerprint
+                and self._plugins_list_cache_data is not None
+            ):
+                return [plugin.copy() for plugin in self._plugins_list_cache_data]
 
-        fingerprint = tuple(fingerprint_parts)
-        if (
-            fingerprint == self._plugins_list_cache_fingerprint
-            and self._plugins_list_cache_data is not None
-        ):
-            return [plugin.copy() for plugin in self._plugins_list_cache_data]
+            plugins_list: list[dict[str, Any]] = []
+            for plugin_info_file, _mtime_ns, _size in fingerprint:
+                logger.debug(f"Reading plugin info from {plugin_info_file}")
+                with open(plugin_info_file) as f:
+                    plugin_info = cast(dict[str, Any], json.load(f))
+                plugins_list.append(plugin_info)
 
-        plugins_list: list[dict[str, Any]] = []
-        for plugin_info_file, _mtime_ns, _size in fingerprint:
-            logger.debug(f"Reading plugin info from {plugin_info_file}")
-            with open(plugin_info_file) as f:
-                plugin_info = cast(dict[str, Any], json.load(f))
-            plugins_list.append(plugin_info)
-
-        self._plugins_list_cache_fingerprint = fingerprint
-        self._plugins_list_cache_data = [plugin.copy() for plugin in plugins_list]
-        return plugins_list
+            self._plugins_list_cache_fingerprint = fingerprint
+            self._plugins_list_cache_data = [plugin.copy() for plugin in plugins_list]
+            return plugins_list
 
     def write_config(self) -> None:
         """Updates the cached config from the model objects and writes to the config file.

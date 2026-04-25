@@ -719,15 +719,6 @@ def update_playlist(playlist_name: str) -> Any:
             details={"field": "playlist_name"},
         )
 
-    existing_with_new_name = playlist_manager.get_playlist(new_name)
-    if existing_with_new_name is not None and existing_with_new_name is not playlist:
-        return json_error(
-            "A playlist with that name already exists",
-            status=400,
-            code=_CODE_VALIDATION,
-            details={"field": "new_name"},
-        )
-
     # Prevent overlapping (exclude the playlist being updated)
     try:
         overlap_err = _check_playlist_overlap(
@@ -739,8 +730,16 @@ def update_playlist(playlist_name: str) -> Any:
         pass
 
     upd_result: list[bool] = []
+    duplicate_name_result: list[bool] = []
 
     def _do_update_playlist(cfg: Any) -> None:
+        existing_with_new_name = playlist_manager.get_playlist(new_name)
+        if (
+            existing_with_new_name is not None
+            and existing_with_new_name is not playlist
+        ):
+            duplicate_name_result.append(True)
+            return
         upd_result.append(
             playlist_manager.update_playlist(
                 playlist_name, new_name, start_time, end_time
@@ -749,6 +748,13 @@ def update_playlist(playlist_name: str) -> Any:
         _apply_cycle_override(playlist_manager, new_name, cycle_minutes_int)
 
     device_config.update_atomic(_do_update_playlist)
+    if duplicate_name_result:
+        return json_error(
+            "A playlist with that name already exists",
+            status=400,
+            code=_CODE_VALIDATION,
+            details={"field": "new_name"},
+        )
     if not upd_result or not upd_result[0]:
         return json_error("Failed to update playlist", status=500)
 

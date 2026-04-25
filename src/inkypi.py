@@ -11,7 +11,7 @@ from time import perf_counter
 
 from flask import Flask, g, url_for as flask_url_for
 from jinja2 import ChoiceLoader, FileSystemLoader
-from waitress import serve  # type: ignore[import-untyped]
+from waitress import serve
 from werkzeug.serving import is_running_from_reloader
 
 from app_setup.asset_helpers import setup_asset_helpers

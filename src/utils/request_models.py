@@ -342,7 +342,7 @@ def parse_playlist_reorder_request(
     ordered = data.get("ordered")
     if not isinstance(ordered, list):
         return None, RequestModelError(
-            "playlist_name and ordered list are required",
+            "ordered list is required",
             field="ordered",
         )
 

@@ -39,6 +39,7 @@ IMAGE_MODELS = [
 ]
 DEFAULT_IMAGE_MODEL = OPENAI_IMAGE_MODEL_2
 DEFAULT_IMAGE_QUALITY = "medium"
+FALLBACK_IMAGE_PROMPT = "A vivid imaginative scene, high detail."
 
 
 class AIImage(BasePlugin):
@@ -233,6 +234,13 @@ class AIImage(BasePlugin):
         logger.info(f"Remixed prompt: '{randomized}'")
         return randomized
 
+    def _ensure_image_prompt(self, text_prompt: str) -> str:
+        prompt = text_prompt.strip()
+        if prompt:
+            return prompt
+        logger.warning("Prompt remix returned no usable prompt; using fallback prompt.")
+        return FALLBACK_IMAGE_PROMPT
+
     def _generate_google_image(
         self, device_config: Any, text_prompt: str, image_model: str, randomize: bool
     ) -> ImageType:
@@ -247,6 +255,7 @@ class AIImage(BasePlugin):
         prompt = self._maybe_randomize_google_prompt(
             google_client, text_prompt, randomize
         )
+        prompt = self._ensure_image_prompt(prompt)
         logger.info(f"Generating image with {image_model}...")
         return self.fetch_image_google(google_client, prompt, image_model)
 
@@ -266,6 +275,7 @@ class AIImage(BasePlugin):
 
         ai_client = OpenAI(api_key=api_key)
         prompt = self._maybe_randomize_openai_prompt(ai_client, text_prompt, randomize)
+        prompt = self._ensure_image_prompt(prompt)
         logger.info(f"Generating image with {image_model}...")
         return self.fetch_image(
             ai_client,

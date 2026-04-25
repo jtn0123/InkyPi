@@ -210,6 +210,13 @@ def ai_image_random_prompt() -> Any:
         return json_error("Invalid JSON payload", status=400)
 
     provider = str(data.get("provider") or "openai").strip().lower()
+    if provider not in ("openai", "google"):
+        raise ClientInputError(
+            f"Unsupported provider: {provider!r}",
+            status=400,
+            code="validation_error",
+            field="provider",
+        )
     seed_prompt = str(data.get("prompt") or "")
 
     with route_error_boundary(

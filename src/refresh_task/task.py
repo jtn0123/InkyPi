@@ -921,24 +921,35 @@ class RefreshTask:
         return "".join(ch if ch.isalnum() else "_" for ch in plugin_id).upper()
 
     @classmethod
-    def _plugin_timeout_seconds(cls, plugin_id: str) -> float:
+    def _env_seconds_with_precedence(
+        cls,
+        plugin_id: str,
+        env_key: str,
+        defaults: Mapping[str, float],
+    ) -> float:
         suffix = cls._plugin_env_suffix(plugin_id)
-        specific_key = f"INKYPI_PLUGIN_TIMEOUT_S_{suffix}"
+        specific_key = f"{env_key}_{suffix}"
         if specific_key in os.environ:
-            return float(os.getenv(specific_key, "60") or "60")
-        if "INKYPI_PLUGIN_TIMEOUT_S" in os.environ:
-            return float(os.getenv("INKYPI_PLUGIN_TIMEOUT_S", "60") or "60")
-        return _PLUGIN_TIMEOUT_DEFAULTS_S.get(plugin_id, 60.0)
+            return float(os.getenv(specific_key) or "60")
+        if env_key in os.environ:
+            return float(os.getenv(env_key) or "60")
+        return defaults.get(plugin_id, 60.0)
+
+    @classmethod
+    def _plugin_timeout_seconds(cls, plugin_id: str) -> float:
+        return cls._env_seconds_with_precedence(
+            plugin_id,
+            "INKYPI_PLUGIN_TIMEOUT_S",
+            _PLUGIN_TIMEOUT_DEFAULTS_S,
+        )
 
     @classmethod
     def _manual_update_wait_seconds(cls, plugin_id: str) -> float:
-        suffix = cls._plugin_env_suffix(plugin_id)
-        specific_key = f"INKYPI_MANUAL_UPDATE_WAIT_S_{suffix}"
-        if specific_key in os.environ:
-            return float(os.getenv(specific_key, "60") or "60")
-        if "INKYPI_MANUAL_UPDATE_WAIT_S" in os.environ:
-            return float(os.getenv("INKYPI_MANUAL_UPDATE_WAIT_S", "60") or "60")
-        return _MANUAL_WAIT_DEFAULTS_S.get(plugin_id, 60.0)
+        return cls._env_seconds_with_precedence(
+            plugin_id,
+            "INKYPI_MANUAL_UPDATE_WAIT_S",
+            _MANUAL_WAIT_DEFAULTS_S,
+        )
 
     def manual_update(self, refresh_action: RefreshAction) -> dict[str, Any] | None:
         """Manually triggers an update for the specified plugin id and plugin settings by notifying the background process."""

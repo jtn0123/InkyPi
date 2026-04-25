@@ -199,6 +199,15 @@ def test_parse_playlist_reorder_request_rejects_wrong_item_shape() -> None:
     assert error.field == "ordered"
 
 
+def test_parse_playlist_reorder_request_labels_missing_ordered() -> None:
+    parsed, error = parse_playlist_reorder_request({"playlist_name": "Default"})
+
+    assert parsed is None
+    assert error is not None
+    assert error.field == "ordered"
+    assert error.message == "ordered list is required"
+
+
 def test_parse_playlist_name_request_strips_name() -> None:
     parsed, error = parse_playlist_name_request(
         {"playlist_name": " Default "}, missing_message="playlist_name required"
