@@ -6,6 +6,7 @@ import subprocess
 import time
 from io import BytesIO
 from pathlib import Path
+from typing import Any, cast
 
 # PIL imports are deferred to function scope to reduce startup RSS on
 # low-memory devices (JTN-606).  The ImageDraw/ImageFont/ImageOps submodules
@@ -44,7 +45,7 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 _SRC_ROOT = Path(__file__).resolve().parents[1]
 
 
-def resolve_path(file_path):
+def resolve_path(file_path: str | os.PathLike[str]) -> str:
     src_dir = os.getenv("SRC_DIR")
     if src_dir is None:
         # Default to the src directory
@@ -56,19 +57,19 @@ def resolve_path(file_path):
             # callers do not depend on the current working directory.
             src_path = (_REPO_ROOT / src_path).resolve()
 
-    return str(src_path / file_path)
+    return str(src_path / str(file_path))
 
 
-def get_ip_address():
+def get_ip_address() -> str | None:
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
             s.connect((_DNS_CHECK_HOST, 80))
-            return s.getsockname()[0]
+            return cast(str, s.getsockname()[0])
     except OSError:
         return None
 
 
-def get_wifi_name():
+def get_wifi_name() -> str | None:
     try:
         iwgetid_bin = shutil.which("iwgetid") or "/sbin/iwgetid"
         if not os.path.isabs(iwgetid_bin):
@@ -78,7 +79,7 @@ def get_wifi_name():
         return None
 
 
-def is_connected():
+def is_connected() -> bool:
     """Check if the Raspberry Pi has an internet connection."""
     sock = None
     try:
@@ -94,7 +95,12 @@ def is_connected():
                 pass
 
 
-def get_font(font_name, font_size=50, font_weight="normal", strict=False):
+def get_font(
+    font_name: str,
+    font_size: int = 50,
+    font_weight: str = "normal",
+    strict: bool = False,
+) -> Any | None:
     from PIL import ImageFont
 
     font_variants = FONT_FAMILIES.get(font_name)
@@ -117,24 +123,24 @@ def get_font(font_name, font_size=50, font_weight="normal", strict=False):
     return None
 
 
-def get_fonts():
+def get_fonts() -> list[dict[str, str]]:
     return [
         {
             "font_family": font_family,
             "url": resolve_path(os.path.join("static", "fonts", variant["file"])),
-            "font_weight": variant.get("font-weight", "normal"),
-            "font_style": variant.get("font-style", "normal"),
+            "font_weight": variant.get("font-weight", "normal") or "normal",
+            "font_style": variant.get("font-style", "normal") or "normal",
         }
         for font_family, variants in FONT_FAMILIES.items()
         for variant in variants
     ]
 
 
-def get_font_path(font_name):
+def get_font_path(font_name: str) -> str:
     return resolve_path(os.path.join("static", "fonts", FONTS[font_name]))
 
 
-def generate_startup_image(dimensions=(800, 480)):
+def generate_startup_image(dimensions: tuple[int, int] = (800, 480)) -> Any:
     from PIL import Image, ImageDraw
 
     bg_color = (255, 255, 255)
@@ -147,7 +153,7 @@ def generate_startup_image(dimensions=(800, 480)):
     image = Image.new("RGBA", dimensions, bg_color)
     image_draw = ImageDraw.Draw(image)
 
-    title_font_size = width * 0.145
+    title_font_size = int(width * 0.145)
     image_draw.text(
         (width / 2, height / 2),
         "inkypi",
@@ -157,7 +163,7 @@ def generate_startup_image(dimensions=(800, 480)):
     )
 
     text = f"To get started, visit http://{hostname}.local"
-    text_font_size = width * 0.032
+    text_font_size = int(width * 0.032)
 
     # Draw the instructions
     y_text = height * 3 / 4
@@ -170,7 +176,7 @@ def generate_startup_image(dimensions=(800, 480)):
     )
 
     # Draw the IP on a line below
-    ip_text_font_size = width * 0.032
+    ip_text_font_size = int(width * 0.032)
     if ip:
         ip_text = f"or http://{ip}"
         bbox = image_draw.textbbox((0, 0), text, font=get_font("Jost", text_font_size))
@@ -187,9 +193,11 @@ def generate_startup_image(dimensions=(800, 480)):
     return image
 
 
-def parse_form(request_form):
-    request_dict = request_form.to_dict()
+def parse_form(request_form: Any) -> dict[str, Any]:
+    request_dict: dict[str, Any] = request_form.to_dict()
     for key in request_form:
+        if not isinstance(key, str):
+            continue
         if key.endswith("[]"):
             request_dict[key] = request_form.getlist(key)
     return request_dict
@@ -315,7 +323,9 @@ def _validate_image_content(content: bytes, extension: str) -> None:
         raise RuntimeError("Uploaded file is not a valid image") from exc
 
 
-def _get_existing_file_location(key, form_data):
+def _get_existing_file_location(
+    key: str, form_data: dict[str, Any] | Any
+) -> tuple[Any | None, bool]:
     """Return the existing file location(s) from form_data for the given key.
 
     Returns the stored value for scalar keys, or a list for list keys (``key[]``).
@@ -332,7 +342,9 @@ def _get_existing_file_location(key, form_data):
     return (existing if isinstance(existing, list) else [existing]), True
 
 
-def _validate_and_read_file(file, file_name):
+def _validate_and_read_file(
+    file: Any, file_name: str
+) -> tuple[bytes | None, str | None]:
     """Read and validate file content. Returns (content, extension) or raises RuntimeError."""
     extension = os.path.splitext(file_name)[1].replace(".", "")
     if not extension or extension.lower() not in _ALLOWED_FILE_EXTENSIONS:
@@ -364,7 +376,7 @@ def _validate_and_read_file(file, file_name):
     return content, ext
 
 
-def _rewind_file_stream(file):
+def _rewind_file_stream(file: Any) -> None:
     """Rewind file stream so callers can re-read from the beginning."""
     try:
         if hasattr(file, "stream"):
@@ -375,7 +387,9 @@ def _rewind_file_stream(file):
         logger.debug("Failed to rewind file stream", exc_info=True)
 
 
-def _save_uploaded_file(file, file_name, extension, content):
+def _save_uploaded_file(
+    file: Any, file_name: str, extension: str, content: bytes
+) -> str:
     """Persist the uploaded file and return its path on disk."""
     safe_name = os.path.basename(file_name)
     file_save_dir = resolve_path(os.path.join("static", "images", "saved"))
@@ -388,7 +402,9 @@ def _save_uploaded_file(file, file_name, extension, content):
     return file_path
 
 
-def _collect_existing_locations(request_keys, form_data):
+def _collect_existing_locations(
+    request_keys: set[str], form_data: dict[str, Any] | Any
+) -> dict[str, Any]:
     """Seed the file-location map with any pre-existing paths from form_data."""
     file_location_map = {}
     for key in request_keys:
@@ -398,7 +414,9 @@ def _collect_existing_locations(request_keys, form_data):
     return file_location_map
 
 
-def handle_request_files(request_files, form_data=None):
+def handle_request_files(
+    request_files: Any, form_data: dict[str, Any] | None = None
+) -> dict[str, Any]:
     if form_data is None:
         form_data = {}
     request_keys = (
@@ -415,6 +433,8 @@ def handle_request_files(request_files, form_data=None):
 
         content, extension = _validate_and_read_file(file, file_name)
         if content is None:
+            continue
+        if extension is None:
             continue
 
         file_path = _save_uploaded_file(file, file_name, extension, content)

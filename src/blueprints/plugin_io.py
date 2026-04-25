@@ -10,8 +10,9 @@ from __future__ import annotations
 import json
 import logging
 from datetime import UTC, datetime
+from typing import Any, cast
 
-from flask import Blueprint, current_app, jsonify, request
+from flask import Blueprint, Response, current_app, jsonify, request
 
 from utils.form_utils import sanitize_log_field
 from utils.http_utils import json_error
@@ -30,10 +31,10 @@ _ERR_PLUGIN_INSTANCE_NOT_FOUND = "Plugin instance not found"
 # ---------------------------------------------------------------------------
 
 
-def _all_instances(playlist_manager) -> list[dict]:
+def _all_instances(playlist_manager: Any) -> list[dict[str, Any]]:
     """Collect all plugin instances across all playlists as export dicts."""
     seen: set[tuple[str, str]] = set()
-    instances: list[dict] = []
+    instances: list[dict[str, Any]] = []
     for playlist in playlist_manager.playlists:
         for plugin_inst in playlist.plugins:
             key = (plugin_inst.plugin_id, plugin_inst.name)
@@ -50,7 +51,7 @@ def _all_instances(playlist_manager) -> list[dict]:
     return instances
 
 
-def _build_export_payload(instances: list[dict]) -> dict:
+def _build_export_payload(instances: list[dict[str, Any]]) -> dict[str, Any]:
     return {
         "version": _EXPORT_VERSION,
         "exported_at": datetime.now(UTC).isoformat(),
@@ -58,7 +59,7 @@ def _build_export_payload(instances: list[dict]) -> dict:
     }
 
 
-def _make_json_attachment(payload: dict, filename: str):
+def _make_json_attachment(payload: dict[str, Any], filename: str) -> Response:
     """Return a Flask response with the payload as a JSON file download."""
     from flask import Response
 
@@ -77,8 +78,8 @@ def _make_json_attachment(payload: dict, filename: str):
 # ---------------------------------------------------------------------------
 
 
-@plugin_io_bp.route("/api/plugins/export", methods=["GET"])
-def export_plugins():
+@plugin_io_bp.route("/api/plugins/export", methods=["GET"])  # type: ignore
+def export_plugins() -> Response:
     """Export one or all plugin instances as a downloadable JSON file.
 
     Query parameters:
@@ -129,7 +130,7 @@ def export_plugins():
 # ---------------------------------------------------------------------------
 
 
-def _parse_import_body() -> dict | None:
+def _parse_import_body() -> Any | None:
     """Return parsed JSON from request body (JSON or multipart file).
 
     Returns None when content cannot be parsed as JSON.
@@ -158,28 +159,33 @@ def _parse_import_body() -> dict | None:
     return None
 
 
-def _validate_payload(payload: object) -> str | None:
+def _validate_payload(payload: object) -> tuple[str | None, list[dict[str, Any]]]:
     """Return an error message if the payload shape is invalid, else None."""
     if not isinstance(payload, dict):
-        return "Invalid JSON: expected an object"
+        return "Invalid JSON: expected an object", []
     if "version" not in payload:
-        return "Missing required field: 'version'"
+        return "Missing required field: 'version'", []
     if "instances" not in payload:
-        return "Missing required field: 'instances'"
-    if not isinstance(payload["instances"], list):
-        return "'instances' must be an array"
-    for i, inst in enumerate(payload["instances"]):
+        return "Missing required field: 'instances'", []
+    raw_instances = payload.get("instances")
+    if not isinstance(raw_instances, list):
+        return "'instances' must be an array", []
+    instances: list[dict[str, Any]] = []
+    for i, inst in enumerate(raw_instances):
         if not isinstance(inst, dict):
-            return f"instances[{i}] must be an object"
+            return f"instances[{i}] must be an object", []
         if "plugin_id" not in inst:
-            return f"instances[{i}] missing required field 'plugin_id'"
+            return f"instances[{i}] missing required field 'plugin_id'", []
         if "settings" not in inst:
-            return f"instances[{i}] missing required field 'settings'"
-    return None
+            return f"instances[{i}] missing required field 'settings'", []
+        instances.append(cast(dict[str, Any], inst))
+    return None, instances
 
 
-@plugin_io_bp.route("/api/plugins/import", methods=["POST"])
-def import_plugins():
+@plugin_io_bp.route("/api/plugins/import", methods=["POST"])  # type: ignore
+def import_plugins() -> (
+    tuple[Response | dict[str, Any], int] | Response | dict[str, Any]
+):
     """Import plugin instances from a JSON body or multipart file upload.
 
     Returns:
@@ -195,8 +201,8 @@ def import_plugins():
     if payload is None:
         return json_error("Could not parse JSON from request", status=400)
 
-    validation_error = _validate_payload(payload)
-    if validation_error:
+    validation_error, instances = _validate_payload(payload)
+    if validation_error is not None:
         return json_error(validation_error, status=400)
 
     # Build set of installed plugin_ids for fast lookup
@@ -223,7 +229,7 @@ def import_plugins():
     skipped: list[str] = []
     renamed: list[str] = []
 
-    for inst in payload["instances"]:
+    for inst in instances:
         plugin_id = str(inst.get("plugin_id", "")).strip()
         name = str(inst.get("name", "")).strip() or plugin_id
         settings = inst.get("settings", {})

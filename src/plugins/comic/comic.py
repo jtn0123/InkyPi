@@ -1,6 +1,10 @@
 import logging
+from collections.abc import Mapping
+from typing import Any, cast
 
 from PIL import Image, ImageDraw
+from PIL.Image import Image as ImageType
+from PIL.ImageFont import ImageFont
 
 from plugins.base_plugin.base_plugin import BasePlugin
 from plugins.base_plugin.settings_schema import field, option, row, schema, section
@@ -12,8 +16,8 @@ logger = logging.getLogger(__name__)
 
 
 class Comic(BasePlugin):
-    def build_settings_schema(self):
-        return schema(
+    def build_settings_schema(self) -> dict[str, object]:
+        schema_payload: dict[str, object] = schema(
             section(
                 "Source",
                 row(
@@ -52,17 +56,21 @@ class Comic(BasePlugin):
                 ),
             )
         )
+        return schema_payload
 
-    def generate_settings_template(self):
+    def generate_settings_template(self) -> dict[str, object]:
         template_params = super().generate_settings_template()
+        settings_template: dict[str, object] = template_params
         template_params["comics"] = list(COMICS)
-        return template_params
+        return settings_template
 
-    def generate_image(self, settings, device_config):
+    def generate_image(
+        self, settings: Mapping[str, Any], device_config: Any
+    ) -> ImageType:
         logger.info("=== Comic Plugin: Starting image generation ===")
 
         comic = settings.get("comic")
-        if not comic or comic not in COMICS:
+        if not isinstance(comic, str) or comic not in COMICS:
             comic = "XKCD"
 
         logger.info(f"Fetching comic: {comic}")
@@ -95,10 +103,18 @@ class Comic(BasePlugin):
         logger.info("=== Comic Plugin: Image generation complete ===")
         return image
 
-    def _compose_image(self, comic_panel, is_caption, caption_font_size, width, height):
+    def _compose_image(
+        self,
+        comic_panel: Mapping[str, str],
+        is_caption: bool,
+        caption_font_size: str | None,
+        width: int,
+        height: int,
+    ) -> ImageType:
         # Use adaptive loader for memory-efficient processing
         # Note: Comic images are usually reasonable size, but still benefit from optimization
-        img = self.image_loader.from_url(
+        image_loader = cast(Any, self.image_loader)
+        img = image_loader.from_url(
             comic_panel["image_url"],
             dimensions=(width, height),
             resize=False,  # We'll handle custom sizing below
@@ -110,7 +126,8 @@ class Comic(BasePlugin):
         with img:
             background = Image.new("RGB", (width, height), "white")
             font_size = int(caption_font_size) if caption_font_size else 20
-            font = get_font("Jost", font_size=font_size)
+            font_loader = cast(Any, get_font)
+            font = font_loader("Jost", font_size=font_size)
             draw = ImageDraw.Draw(background)
             top_padding, bottom_padding = 0, 0
 
@@ -158,7 +175,7 @@ class Comic(BasePlugin):
 
             return background
 
-    def _wrap_text(self, text, font, width):
+    def _wrap_text(self, text: str, font: ImageFont, width: int) -> tuple[int, str]:
         lines = []
         words = text.split()[::-1]
 

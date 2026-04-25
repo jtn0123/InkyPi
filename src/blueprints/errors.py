@@ -9,8 +9,9 @@ INKYPI_TEST_CAPTURE_CLIENT_LOG env var is set in dev mode) and provides a
 from __future__ import annotations
 
 import logging
+from typing import Any
 
-from flask import Blueprint, render_template
+from flask import Blueprint, Response, render_template
 
 from blueprints.client_log import get_captured_reports, reset_captured_reports
 from utils.http_utils import json_success
@@ -20,15 +21,15 @@ logger = logging.getLogger(__name__)
 errors_bp = Blueprint("errors", __name__)
 
 
-@errors_bp.route("/errors", methods=["GET"])
-def errors_page() -> str:
+@errors_bp.route("/errors", methods=["GET"])  # type: ignore
+def errors_page() -> Response | str:
     """Render the /errors page showing captured client-side error reports."""
     reports = get_captured_reports()
     return render_template("errors.html", reports=reports)
 
 
-@errors_bp.route("/errors/clear", methods=["POST"])
-def errors_clear():
+@errors_bp.route("/errors/clear", methods=["POST"])  # type: ignore
+def errors_clear() -> Any:
     """Clear all captured client-side error reports.
 
     Called by the in-app confirmation modal on /errors — NOT via window.confirm.

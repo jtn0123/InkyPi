@@ -1,6 +1,10 @@
 import logging
 import os
+from collections.abc import Mapping, Sequence
 from datetime import UTC, date, datetime, timedelta
+from typing import Any, cast
+
+from PIL import Image
 
 from utils.http_client import get_http_session
 
@@ -25,7 +29,9 @@ query($username: String!) {
 """
 
 
-def contributions_generate_image(plugin_instance, settings, device_config):
+def contributions_generate_image(
+    plugin_instance: Any, settings: Mapping[str, object], device_config: Any
+) -> Image.Image:
     dimensions = plugin_instance.get_oriented_dimensions(device_config)
 
     api_key = device_config.load_env_key("GITHUB_SECRET")
@@ -33,14 +39,21 @@ def contributions_generate_image(plugin_instance, settings, device_config):
         logger.error("GitHub API Key not configured")
         raise RuntimeError("GitHub API Key not configured.")
 
-    colors = settings.get("contributionColor[]") or [
-        "#ebedf0",
-        "#9be9a8",
-        "#40c463",
-        "#30a14e",
-        "#216e39",
-    ]
-    github_username = settings.get("githubUsername")
+    raw_colors = settings.get("contributionColor[]")
+    colors = (
+        raw_colors
+        if isinstance(raw_colors, list)
+        else [
+            "#ebedf0",
+            "#9be9a8",
+            "#40c463",
+            "#30a14e",
+            "#216e39",
+        ]
+    )
+    colors = [color for color in colors if isinstance(color, str)]
+    raw_username = settings.get("githubUsername")
+    github_username = raw_username if isinstance(raw_username, str) else ""
     if not github_username:
         raise RuntimeError("GitHub username is required.")
 
@@ -69,7 +82,7 @@ def contributions_generate_image(plugin_instance, settings, device_config):
 _GITHUB_API_BASE = os.getenv("INKYPI_GITHUB_API_URL", "https://api.github.com")
 
 
-def fetch_contributions(username, api_key):
+def fetch_contributions(username: str, api_key: str) -> dict[str, Any]:
     url = f"{_GITHUB_API_BASE}/graphql"
     headers = {"Authorization": f"Bearer {api_key}"}
     variables = {"username": username}
@@ -80,10 +93,12 @@ def fetch_contributions(username, api_key):
         timeout=30,
     )
     resp.raise_for_status()
-    return resp.json()
+    return cast(dict[str, Any], resp.json())
 
 
-def parse_contributions(data, colors):
+def parse_contributions(
+    data: Mapping[str, Any], colors: Sequence[str]
+) -> tuple[list[list[dict[str, Any]]], list[dict[str, object]]]:
     weeks = data["data"]["user"]["contributionsCollection"]["contributionCalendar"][
         "weeks"
     ]
@@ -91,7 +106,7 @@ def parse_contributions(data, colors):
     grid = [list(week["contributionDays"]) for week in weeks]
     max_contrib = max(day["contributionCount"] for week in grid for day in week)
 
-    def get_color(count):
+    def get_color(count: int) -> str:
         if max_contrib == 0 or count == 0:
             return colors[0]
         level = int((count / max_contrib) * (len(colors) - 1))
@@ -101,8 +116,8 @@ def parse_contributions(data, colors):
         for day in week:
             day["color"] = get_color(day["contributionCount"])
 
-    month_positions = []
-    seen_months = set()
+    month_positions: list[dict[str, object]] = []
+    seen_months: set[str] = set()
     for i, week in enumerate(weeks):
         first_day = week["contributionDays"][0]["date"]
         # Only month/year labels are extracted; tz is irrelevant for formatting.
@@ -118,7 +133,7 @@ def parse_contributions(data, colors):
     return grid, month_positions
 
 
-def calculate_metrics(data):
+def calculate_metrics(data: Mapping[str, Any]) -> list[dict[str, object]]:
     weeks = data["data"]["user"]["contributionsCollection"]["contributionCalendar"][
         "weeks"
     ]

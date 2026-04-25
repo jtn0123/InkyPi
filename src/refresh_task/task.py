@@ -5,14 +5,15 @@ import os
 import queue
 import threading
 from collections import deque
+from collections.abc import Callable, Mapping
 from datetime import UTC, datetime
 from time import perf_counter, sleep
-from typing import Any, NoReturn
+from typing import Any, NoReturn, cast
 from uuid import uuid4
 
 from model import PlaylistManager, RefreshInfo
 from plugins.plugin_registry import get_plugin_instance
-from refresh_task.actions import ManualUpdateRequest, PlaylistRefresh
+from refresh_task.actions import ManualUpdateRequest, PlaylistRefresh, RefreshAction
 from refresh_task.context import RefreshContext
 from refresh_task.health import PluginHealthTracker
 from refresh_task.housekeeping import RefreshHousekeeper
@@ -32,6 +33,7 @@ from utils.progress_events import get_progress_bus
 from utils.time_utils import now_device_tz
 from utils.webhooks import send_failure_webhook
 
+_sd_notify: Callable[[str], None] | None
 try:
     # Optional import; code must continue if unavailable
     from benchmarks.benchmark_storage import save_refresh_event, save_stage_event
@@ -66,19 +68,19 @@ logger = logging.getLogger(__name__)
 class RefreshTask:
     """Handles the logic for refreshing the display using a background thread."""
 
-    def __init__(self, device_config, display_manager):
+    def __init__(self, device_config: Any, display_manager: Any) -> None:
         self.device_config = device_config
         self.display_manager = display_manager
         self.refresh_context = RefreshContext.from_config(device_config)
 
-        self.thread = None
+        self.thread: threading.Thread | None = None
         self.lock = threading.Lock()
         self.condition = threading.Condition(self.lock)
         self.running = False
         self.manual_update_requests: deque[ManualUpdateRequest] = deque(maxlen=50)
         self.progress_bus = get_progress_bus()
         self.event_bus = get_event_bus()
-        self.plugin_health: dict[str, dict] = {}
+        self.plugin_health: dict[str, dict[str, Any]] = {}
         self.scheduler = RefreshScheduler(
             device_config=self.device_config,
             condition=self.condition,
@@ -102,7 +104,7 @@ class RefreshTask:
 
         Reads ``PLUGIN_FAILURE_THRESHOLD`` from the environment (default 5).
         """
-        return PluginHealthTracker.circuit_breaker_threshold()
+        return int(PluginHealthTracker.circuit_breaker_threshold())
 
     def start(self) -> None:
         """Starts the background thread for refreshing the display."""
@@ -137,7 +139,7 @@ class RefreshTask:
                 )
                 self.watchdog_thread.start()
 
-    def stop(self):
+    def stop(self) -> None:
         """Stops the refresh task by notifying the background thread to exit."""
         with self.condition:
             self.running = False
@@ -160,7 +162,7 @@ class RefreshTask:
 
         Defaults to 30s if WATCHDOG_USEC is unset (e.g. running outside systemd).
         """
-        return RefreshScheduler.watchdog_interval_seconds()
+        return float(RefreshScheduler.watchdog_interval_seconds())
 
     def _watchdog_heartbeat_loop(self) -> None:
         """Background loop that feeds the systemd watchdog at WatchdogSec/2 cadence.
@@ -175,7 +177,7 @@ class RefreshTask:
         )
 
     @staticmethod
-    def _notify_watchdog():
+    def _notify_watchdog() -> None:
         """Send a WATCHDOG=1 keepalive notification to systemd, if available.
 
         The ``cysystemd`` import is optional; when the library is absent or the
@@ -185,8 +187,12 @@ class RefreshTask:
         """
         RefreshScheduler.notify_watchdog(_sd_notify)
 
-    @staticmethod
-    def _complete_manual_request(manual_request, metrics=None, exception=None):
+    def _complete_manual_request(
+        self,
+        manual_request: ManualUpdateRequest | None,
+        metrics: dict[str, Any] | None = None,
+        exception: BaseException | None = None,
+    ) -> None:
         """Signal the waiting caller that a manual update request has finished.
 
         Sets both the ``done`` and ``image_saved`` events on *manual_request*
@@ -214,7 +220,7 @@ class RefreshTask:
         # instead of timing out waiting for a signal that will never come.
         manual_request.image_saved.set()
 
-    def _run(self):
+    def _run(self) -> None:
         """Background thread loop coordinating refresh operations."""
         while True:
             result = None
@@ -262,7 +268,9 @@ class RefreshTask:
             cleanup_interval_ticks=self._CLEANUP_INTERVAL_TICKS,
         )
 
-    def _wait_for_trigger(self):
+    def _wait_for_trigger(
+        self,
+    ) -> tuple[Any, Any, datetime, ManualUpdateRequest | None] | None:
         """Wait for the next refresh trigger while holding the condition lock.
 
         The method blocks for ``plugin_cycle_interval_seconds`` or until notified
@@ -272,11 +280,18 @@ class RefreshTask:
         Threading:
             Acquires ``self.condition`` and releases it before returning.
         """
-        return self.scheduler.wait_for_trigger(is_running=lambda: self.running)
+        return cast(
+            tuple[Any, Any, datetime, ManualUpdateRequest | None] | None,
+            self.scheduler.wait_for_trigger(is_running=lambda: self.running),
+        )
 
     def _select_refresh_action(
-        self, playlist_manager, latest_refresh, current_dt, manual_request
-    ):
+        self,
+        playlist_manager: Any,
+        latest_refresh: Any,
+        current_dt: datetime,
+        manual_request: ManualUpdateRequest | None,
+    ) -> tuple[RefreshAction | None, str | None]:
         """Determine which refresh action to perform.
 
         If ``manual_action`` is provided it is returned immediately. Otherwise,
@@ -300,18 +315,18 @@ class RefreshTask:
             playlist, plugin_instance = self._determine_next_plugin(
                 playlist_manager, latest_refresh, current_dt
             )
-            if plugin_instance:
+            if playlist is not None and plugin_instance:
                 refresh_action = PlaylistRefresh(playlist, plugin_instance)
         return refresh_action, request_id
 
     def _perform_refresh(
         self,
-        refresh_action,
-        latest_refresh,
-        current_dt,
-        request_id=None,
-        manual_request=None,
-    ):
+        refresh_action: RefreshAction,
+        latest_refresh: Any,
+        current_dt: datetime,
+        request_id: str | None = None,
+        manual_request: ManualUpdateRequest | None = None,
+    ) -> tuple[dict[str, Any] | None, bool, dict[str, Any]]:
         """Execute the refresh action and update the display if needed.
 
         Returns a tuple ``(refresh_info, used_cached, metrics)`` where
@@ -519,7 +534,7 @@ class RefreshTask:
             image=image,
             plugin_config=plugin_config,
             refresh_action=refresh_action,
-            refresh_info=refresh_info,
+            refresh_info=cast(Any, refresh_info),
             benchmark_id=benchmark_id,
             plugin_id=plugin_id,
             instance_name=instance_name,
@@ -570,13 +585,13 @@ class RefreshTask:
         image: Any,
         plugin_config: dict[str, Any],
         refresh_action: Any,
-        refresh_info: RefreshInfo,
+        refresh_info: Mapping[str, Any],
         benchmark_id: str | None,
         plugin_id: str,
         instance_name: str | None,
         request_id: str | None,
         manual_request: ManualUpdateRequest | None,
-    ) -> tuple[int, int]:
+    ) -> tuple[int | None, int | None]:
         """Push the image to the display, or skip when the cache is warm.
 
         Returns ``(display_duration_ms, preprocess_ms)``.  Also unblocks the
@@ -607,16 +622,16 @@ class RefreshTask:
 
     def _push_to_display(
         self,
-        image,
-        plugin_config,
-        refresh_action,
-        refresh_info,
-        benchmark_id,
-        plugin_id,
-        instance_name,
-        request_id,
-        manual_request=None,
-    ):
+        image: Any,
+        plugin_config: Mapping[str, Any],
+        refresh_action: Any,
+        refresh_info: Mapping[str, Any],
+        benchmark_id: str | None,
+        plugin_id: str,
+        instance_name: str | None,
+        request_id: str | None,
+        manual_request: ManualUpdateRequest | None = None,
+    ) -> tuple[int | None, int | None]:
         """Push image to the display hardware and record benchmark stages."""
         logger.info(f"Updating display. | refresh_info: {refresh_info}")
         history_meta = self.housekeeper.build_history_meta(refresh_action)
@@ -641,7 +656,7 @@ class RefreshTask:
         on_image_saved = None
         if manual_request is not None:
 
-            def on_image_saved(save_metrics: dict):  # noqa: E306
+            def on_image_saved(save_metrics: Mapping[str, Any]) -> None:
                 manual_request.image_saved_metrics = {
                     "generate_ms": None,  # filled in by the waiter if needed
                     "preprocess_ms": save_metrics.get("preprocess_ms"),
@@ -706,14 +721,14 @@ class RefreshTask:
             try:
                 save_stage_event(
                     self.device_config,
-                    benchmark_id,
+                    benchmark_id or "",
                     "display_pipeline",
                     display_duration_ms,
                 )
                 if display_driver:
                     save_stage_event(
                         self.device_config,
-                        benchmark_id,
+                        benchmark_id or "",
                         "display_driver",
                         display_duration_ms,
                         extra={"driver": display_driver},
@@ -724,12 +739,18 @@ class RefreshTask:
                 )
         return display_duration_ms, preprocess_ms
 
-    def _save_benchmark(self, benchmark_id, refresh_info, used_cached, metrics):
+    def _save_benchmark(
+        self,
+        benchmark_id: str,
+        refresh_info: Mapping[str, Any],
+        used_cached: bool,
+        metrics: Mapping[str, Any],
+    ) -> None:
         """Persist a refresh_event row best-effort."""
         try:
             cpu_percent = memory_percent = None
             try:
-                import psutil  # type: ignore
+                import psutil
 
                 cpu_percent = psutil.cpu_percent(interval=None)
                 memory_percent = psutil.virtual_memory().percent
@@ -773,8 +794,8 @@ class RefreshTask:
         plugin_id: str,
         instance_name: str | None,
         exc: BaseException,
-        plugin_config: dict,
-        refresh_action,
+        plugin_config: Mapping[str, Any],
+        refresh_action: Any,
     ) -> None:
         """Render and push an error-card fallback image to the display.
 
@@ -790,7 +811,12 @@ class RefreshTask:
             refresh_action=refresh_action,
         )
 
-    def _update_refresh_info(self, refresh_info, metrics, used_cached):
+    def _update_refresh_info(
+        self,
+        refresh_info: Mapping[str, Any],
+        metrics: Mapping[str, Any],
+        used_cached: bool,
+    ) -> None:
         """Persist the latest refresh information to the device config.
 
         Threading:
@@ -810,7 +836,11 @@ class RefreshTask:
         """Create and queue a ManualUpdateRequest; wake the background thread."""
         request = ManualUpdateRequest(str(uuid4()), refresh_action)
         with self.condition:
-            if len(self.manual_update_requests) >= self.manual_update_requests.maxlen:
+            if (
+                self.manual_update_requests.maxlen is not None
+                and len(self.manual_update_requests)
+                >= self.manual_update_requests.maxlen
+            ):
                 raise RuntimeError(
                     "Manual update queue is full. Please wait for pending requests to complete."
                 )
@@ -861,7 +891,7 @@ class RefreshTask:
         """Return metrics or raise the stored exception for a finished request."""
         exc = request.exception
         if exc is None:
-            return request.metrics
+            return cast(dict[str, Any], request.metrics)
         self.progress_bus.publish(
             {
                 "state": "error",
@@ -874,7 +904,7 @@ class RefreshTask:
             raise exc
         raise RuntimeError(str(exc))
 
-    def manual_update(self, refresh_action):
+    def manual_update(self, refresh_action: RefreshAction) -> dict[str, Any] | None:
         """Manually triggers an update for the specified plugin id and plugin settings by notifying the background process."""
         if not self.running:
             logger.warning(
@@ -926,7 +956,7 @@ class RefreshTask:
         return f"Plugin '{plugin_id}' timed out after {int(timeout_s)}s"
 
     @staticmethod
-    def _cleanup_subprocess(proc, plugin_id: str) -> None:
+    def _cleanup_subprocess(proc: Any, plugin_id: str) -> None:
         """Terminate a subprocess that is still alive after its timeout.
 
         JTN-S2: ``killpg(SIGKILL)`` the worker's process group up front,
@@ -983,7 +1013,12 @@ class RefreshTask:
             )
 
     @staticmethod
-    def _handle_process_result(result_queue, proc, plugin_id: str, attempt: int):
+    def _handle_process_result(
+        result_queue: Any,
+        proc: Any,
+        plugin_id: str,
+        attempt: int,
+    ) -> tuple[Any, Any]:
         """Read and validate the result queue from a finished subprocess.
 
         Returns ``(image, metadata)`` on success, or ``(None, exception)``
@@ -1029,8 +1064,14 @@ class RefreshTask:
         )
 
     def _run_subprocess_attempt(
-        self, refresh_action, plugin_config, current_dt, plugin_id, timeout_s, attempt
-    ):
+        self,
+        refresh_action: RefreshAction,
+        plugin_config: Mapping[str, Any],
+        current_dt: datetime,
+        plugin_id: str,
+        timeout_s: float,
+        attempt: int,
+    ) -> tuple[Any, Any]:
         """Spawn a subprocess for one plugin execution attempt.
 
         Returns ``(image, exc_or_meta)`` on success, or raises/returns an exception
@@ -1038,7 +1079,7 @@ class RefreshTask:
         """
         ctx = _get_mp_context()
         result_queue = ctx.Queue(maxsize=1)
-        proc = ctx.Process(
+        proc = cast(Any, ctx).Process(
             target=_execute_refresh_attempt_worker,
             args=(
                 result_queue,
@@ -1071,8 +1112,12 @@ class RefreshTask:
                 pass
 
     def _execute_with_policy(
-        self, refresh_action, plugin_config, current_dt: datetime, request_id=None
-    ):
+        self,
+        refresh_action: RefreshAction,
+        plugin_config: Mapping[str, Any],
+        current_dt: datetime,
+        request_id: str | None = None,
+    ) -> tuple[Any, Any]:
         """Run a plugin with the configured retry and isolation policy.
 
         Reads environment variables to determine the execution strategy:
@@ -1174,19 +1219,26 @@ class RefreshTask:
 
     @staticmethod
     def _make_inprocess_worker(
-        refresh_action, plugin_config, device_config, current_dt, plugin_id
-    ):
+        refresh_action: RefreshAction,
+        plugin_config: Mapping[str, Any],
+        device_config: Any,
+        current_dt: datetime,
+        plugin_id: str,
+    ) -> tuple[Callable[[], None], dict[str, Any], threading.Event]:
         """Return a ``(worker_fn, result_holder, cancel_event)`` tuple.
 
         The returned *worker_fn* is suitable for ``threading.Thread(target=...)``.
         """
-        result_holder: dict = {}
+        result_holder: dict[str, Any] = {}
         cancel_event = threading.Event()
         result_holder["cancel_event"] = cancel_event
 
-        def _worker(holder=result_holder, _cancel=cancel_event):
+        def _worker(
+            holder: dict[str, Any] = result_holder,
+            _cancel: threading.Event = cancel_event,
+        ) -> None:
             try:
-                plugin = get_plugin_instance(plugin_config)
+                plugin = get_plugin_instance(dict(plugin_config))
                 image = refresh_action.execute(plugin, device_config, current_dt)
                 meta = None
                 if hasattr(plugin, "get_latest_metadata"):
@@ -1211,7 +1263,9 @@ class RefreshTask:
         return _worker, result_holder, cancel_event
 
     @staticmethod
-    def _handle_thread_timeout(plugin_id, timeout_s, cancel_event):
+    def _handle_thread_timeout(
+        plugin_id: str, timeout_s: float, cancel_event: threading.Event
+    ) -> TimeoutError:
         """Mark a timed-out worker thread as a zombie and return a TimeoutError."""
         cancel_event.set()
         with RefreshTask._zombie_thread_lock:
@@ -1227,7 +1281,12 @@ class RefreshTask:
         )
         return TimeoutError(f"Plugin '{plugin_id}' timed out after {int(timeout_s)}s")
 
-    def _execute_inprocess(self, refresh_action, plugin_config, current_dt: datetime):
+    def _execute_inprocess(
+        self,
+        refresh_action: RefreshAction,
+        plugin_config: Mapping[str, Any],
+        current_dt: datetime,
+    ) -> tuple[Any, Any]:
         """Run a plugin directly in the current process (no subprocess isolation).
 
         Used when ``INKYPI_PLUGIN_ISOLATION=none`` to avoid pickling constraints
@@ -1295,7 +1354,7 @@ class RefreshTask:
         plugin_id: str,
         instance: str | None,
         ok: bool,
-        metrics: dict | None,
+        metrics: dict[str, Any] | None,
         error: str | None,
     ) -> None:
         """Update the in-memory health entry for a plugin and trigger circuit-breaker logic.
@@ -1323,19 +1382,13 @@ class RefreshTask:
         )
 
     def _cb_on_success(
-        self,
-        plugin_instance,
-        plugin_id: str,
-        instance: str | None,
+        self, plugin_instance: Any, plugin_id: str, instance: str | None
     ) -> None:
         """Reset the circuit breaker on a successful refresh."""
         self.health_tracker.on_success(plugin_instance, plugin_id, instance)
 
     def _cb_on_failure(
-        self,
-        plugin_instance,
-        plugin_id: str,
-        instance: str | None,
+        self, plugin_instance: Any, plugin_id: str, instance: str | None
     ) -> None:
         """Increment the failure counter and pause the plugin if threshold exceeded."""
         self.health_tracker.on_failure(
@@ -1350,12 +1403,12 @@ class RefreshTask:
 
         Returns True if the instance was found and reset, False otherwise.
         """
-        return self.health_tracker.reset_circuit_breaker(plugin_id, instance)
+        return bool(self.health_tracker.reset_circuit_breaker(plugin_id, instance))
 
-    def get_health_snapshot(self) -> dict:
-        return self.health_tracker.snapshot()
+    def get_health_snapshot(self) -> dict[str, Any]:
+        return cast(dict[str, Any], self.health_tracker.snapshot())
 
-    def signal_config_change(self):
+    def signal_config_change(self) -> None:
         """Notify the background thread that config has changed (e.g., interval updated).
 
         Also rebuilds the ``RefreshContext`` snapshot so that subsequent
@@ -1366,11 +1419,13 @@ class RefreshTask:
             with self.condition:
                 self.condition.notify_all()
 
-    def _get_current_datetime(self):
+    def _get_current_datetime(self) -> datetime:
         """Retrieves the current datetime based on the device's configured timezone."""
         return now_device_tz(self.device_config)
 
-    def _determine_next_plugin(self, playlist_manager, latest_refresh_info, current_dt):
+    def _determine_next_plugin(
+        self, playlist_manager: Any, latest_refresh_info: Any, current_dt: datetime
+    ) -> tuple[Any | None, Any | None]:
         """Determines the next plugin to refresh based on the active playlist, plugin cycle interval, and current time."""
         playlist = playlist_manager.determine_active_playlist(current_dt)
         if not playlist:
@@ -1427,7 +1482,7 @@ class RefreshTask:
         )
         return None, None
 
-    def log_system_stats(self):
+    def log_system_stats(self) -> None:
         """Log a snapshot of CPU, memory, disk, swap, and network I/O metrics.
 
         Uses ``psutil`` to gather system statistics.  If ``psutil`` is not

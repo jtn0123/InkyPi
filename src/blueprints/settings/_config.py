@@ -1,6 +1,7 @@
 """Settings pages, save, import/export, API keys, isolation, and safe-reset route handlers."""
 
 import unicodedata
+from typing import Any
 from zoneinfo import available_timezones
 
 from flask import current_app, redirect, render_template, request
@@ -13,38 +14,52 @@ from utils.time_utils import calculate_seconds
 _DEVICE_NAME_MAX_LEN = 64
 
 
-@_mod.settings_bp.route("/settings/isolation", methods=["GET", "POST", "DELETE"])
-def plugin_isolation():
+def _isolation_state() -> tuple[Any, list[Any], set[Any]]:
     device_config = current_app.config["DEVICE_CONFIG"]
     isolated = device_config.get_config("isolated_plugins", default=[])
     if not isinstance(isolated, list):
         isolated = []
     registered_ids = {plugin["id"] for plugin in device_config.get_plugins()}
+    return device_config, isolated, registered_ids
 
-    if request.method == "GET":
-        return json_success(isolated_plugins=sorted(set(isolated)))
 
+def _validated_isolation_plugin_id(registered_ids: set[Any]) -> str:
     body = request.get_json(silent=True)
     if not isinstance(body, dict):
-        return json_error("Request body must be a JSON object", status=400)
+        raise ClientInputError("Request body must be a JSON object", status=400)
     plugin_id = body.get("plugin_id")
     if not isinstance(plugin_id, str) or not plugin_id.strip():
-        return json_error(
+        raise ClientInputError(
             "plugin_id is required and must be a non-empty string",
             status=422,
             code="validation_error",
-            details={"field": "plugin_id"},
+            field="plugin_id",
         )
     normalized_plugin_id = plugin_id.strip()
     if normalized_plugin_id not in registered_ids:
-        return json_error(
+        raise ClientInputError(
             "plugin_id must reference a registered plugin",
             status=422,
             code="validation_error",
-            details={"field": "plugin_id"},
+            field="plugin_id",
         )
+    return normalized_plugin_id
 
-    if request.method == "POST":
+
+def plugin_isolation() -> Any:
+    _, isolated, _ = _isolation_state()
+    return json_success(isolated_plugins=sorted(set(isolated)))
+
+
+def add_plugin_isolation() -> Any:
+    with route_error_boundary(
+        "add plugin isolation",
+        logger=_mod.logger,
+        hint="Provide a valid registered plugin_id in a JSON object.",
+    ):
+        device_config, isolated, registered_ids = _isolation_state()
+        normalized_plugin_id = _validated_isolation_plugin_id(registered_ids)
+
         if normalized_plugin_id not in isolated:
             isolated.append(normalized_plugin_id)
             device_config.update_value(
@@ -52,14 +67,36 @@ def plugin_isolation():
             )
         return json_success(isolated_plugins=sorted(set(isolated)))
 
-    # DELETE
-    isolated = [p for p in isolated if p != normalized_plugin_id]
-    device_config.update_value("isolated_plugins", sorted(set(isolated)), write=True)
-    return json_success(isolated_plugins=sorted(set(isolated)))
+
+def remove_plugin_isolation() -> Any:
+    with route_error_boundary(
+        "remove plugin isolation",
+        logger=_mod.logger,
+        hint="Provide a valid registered plugin_id in a JSON object.",
+    ):
+        device_config, isolated, registered_ids = _isolation_state()
+        normalized_plugin_id = _validated_isolation_plugin_id(registered_ids)
+
+        isolated = [p for p in isolated if p != normalized_plugin_id]
+        device_config.update_value(
+            "isolated_plugins", sorted(set(isolated)), write=True
+        )
+        return json_success(isolated_plugins=sorted(set(isolated)))
 
 
-@_mod.settings_bp.route("/settings/safe_reset", methods=["POST"])
-def safe_reset():
+_mod.settings_bp.add_url_rule(
+    "/settings/isolation", view_func=plugin_isolation, methods=["GET"]
+)
+_mod.settings_bp.add_url_rule(
+    "/settings/isolation", view_func=add_plugin_isolation, methods=["POST"]
+)
+_mod.settings_bp.add_url_rule(
+    "/settings/isolation", view_func=remove_plugin_isolation, methods=["DELETE"]
+)
+
+
+@_mod.settings_bp.route("/settings/safe_reset", methods=["POST"])  # type: ignore[untyped-decorator]
+def safe_reset() -> Any:
     with route_error_boundary(
         "safe reset",
         logger=_mod.logger,
@@ -86,8 +123,8 @@ def safe_reset():
         return json_success(message="Safe reset applied.")
 
 
-@_mod.settings_bp.route("/settings", methods=["GET"])
-def settings_page():
+@_mod.settings_bp.route("/settings", methods=["GET"])  # type: ignore[untyped-decorator]
+def settings_page() -> Any:
     device_config = current_app.config["DEVICE_CONFIG"]
     timezones = sorted(available_timezones())
     return render_template(
@@ -98,8 +135,8 @@ def settings_page():
     )
 
 
-@_mod.settings_bp.route("/settings/diagnostics", methods=["GET"])
-def diagnostics_redirect():
+@_mod.settings_bp.route("/settings/diagnostics", methods=["GET"])  # type: ignore[untyped-decorator]
+def diagnostics_redirect() -> Any:
     """Redirect /settings/diagnostics to the Diagnostics accordion on /settings.
 
     Diagnostics is an accordion embedded in the main settings page rather than
@@ -110,8 +147,8 @@ def diagnostics_redirect():
     return redirect("/settings#diagnostics", code=302)
 
 
-@_mod.settings_bp.route("/settings/backup", methods=["GET"])
-def backup_restore_page():
+@_mod.settings_bp.route("/settings/backup", methods=["GET"])  # type: ignore[untyped-decorator]
+def backup_restore_page() -> Any:
     device_config = current_app.config["DEVICE_CONFIG"]
     # For now, reuse the main settings page and anchor to a section; separate template can be added later
     return render_template(
@@ -139,11 +176,11 @@ def _include_export_keys() -> bool:
     return str(value or "").strip().lower() in ("1", "true", "yes", "on")
 
 
-@_mod.settings_bp.route("/settings/export", methods=["GET"])
-@_mod.settings_bp.route(
+@_mod.settings_bp.route("/settings/export", methods=["GET"])  # type: ignore[untyped-decorator]
+@_mod.settings_bp.route(  # type: ignore[untyped-decorator]
     "/settings/export", methods=["POST"], endpoint="export_settings_post"
 )
-def export_settings():
+def export_settings() -> Any:
     with route_error_boundary(
         "export settings",
         logger=_mod.logger,
@@ -179,7 +216,7 @@ def export_settings():
         return json_success(data=data)
 
 
-def _extract_import_payload():
+def _extract_import_payload() -> dict[str, Any] | None:
     payload = None
     if request.is_json:
         payload = request.get_json(silent=True)
@@ -194,11 +231,11 @@ def _extract_import_payload():
                 return None
     if not payload or not isinstance(payload, dict):
         return None
-    return payload
+    return dict(payload)
 
 
-@_mod.settings_bp.route("/settings/import", methods=["POST"])
-def import_settings():
+@_mod.settings_bp.route("/settings/import", methods=["POST"])  # type: ignore[untyped-decorator]
+def import_settings() -> Any:
     with route_error_boundary(
         "import settings",
         logger=_mod.logger,
@@ -251,11 +288,11 @@ def import_settings():
         return json_success(message=f"Restored {' and '.join(parts)}")
 
 
-@_mod.settings_bp.route("/settings/api-keys", methods=["GET"])
-def api_keys_page():
+@_mod.settings_bp.route("/settings/api-keys", methods=["GET"])  # type: ignore[untyped-decorator]
+def api_keys_page() -> Any:
     device_config = current_app.config["DEVICE_CONFIG"]
 
-    def mask(value):
+    def mask(value: str | None) -> str | None:
         if not value:
             return None
         try:
@@ -294,8 +331,8 @@ def api_keys_page():
     )
 
 
-@_mod.settings_bp.route("/settings/save_api_keys", methods=["POST"])
-def save_api_keys():
+@_mod.settings_bp.route("/settings/save_api_keys", methods=["POST"])  # type: ignore[untyped-decorator]
+def save_api_keys() -> Any:
     device_config = current_app.config["DEVICE_CONFIG"]
     with route_error_boundary(
         "saving API keys",
@@ -339,14 +376,17 @@ def save_api_keys():
                 continue
             device_config.set_env_key(key, value)
             updated.append(key)
-        extra: dict = {"updated": updated}
         if skipped_placeholder:
-            extra["skipped_placeholder"] = skipped_placeholder
-        return json_success(message="API keys saved.", **extra)
+            return json_success(
+                message="API keys saved.",
+                updated=updated,
+                skipped_placeholder=skipped_placeholder,
+            )
+        return json_success(message="API keys saved.", updated=updated)
 
 
-@_mod.settings_bp.route("/settings/delete_api_key", methods=["POST"])
-def delete_api_key():
+@_mod.settings_bp.route("/settings/delete_api_key", methods=["POST"])  # type: ignore[untyped-decorator]
+def delete_api_key() -> Any:
     device_config = current_app.config["DEVICE_CONFIG"]
     key = request.form.get("key")
     valid_keys = {
@@ -368,7 +408,7 @@ def delete_api_key():
         return json_success(message=f"Deleted {key}.")
 
 
-def _field_error(message, field):
+def _field_error(message: str, field: str) -> Any:
     """Return a 422 validation error response for *field*."""
     return json_error(
         message,
@@ -378,7 +418,7 @@ def _field_error(message, field):
     )
 
 
-def _validate_interval(form_data):
+def _validate_interval(form_data: dict[str, str]) -> Any | None:
     """Validate and return the parsed interval, or a JSON error response."""
     interval = form_data.get("interval")
     unit = form_data.get("unit")
@@ -402,7 +442,7 @@ def _validate_interval(form_data):
     return None
 
 
-def _validate_device_name(form_data):
+def _validate_device_name(form_data: dict[str, str]) -> tuple[str | None, Any | None]:
     """Validate and normalize the submitted device name."""
     raw_device_name = form_data.get("deviceName", "")
     device_name = raw_device_name.strip()
@@ -421,7 +461,13 @@ def _validate_device_name(form_data):
     return device_name, None
 
 
-def _validate_enum_field(form_data, field, allowed, *, required=True):
+def _validate_enum_field(
+    form_data: dict[str, str],
+    field: str,
+    allowed: tuple[str, ...],
+    *,
+    required: bool = True,
+) -> Any | None:
     """Validate that *field* is one of *allowed* values.
 
     When *required* is True the field must be present and non-empty.
@@ -443,7 +489,7 @@ def _validate_enum_field(form_data, field, allowed, *, required=True):
     return None
 
 
-def _validate_image_settings(form_data):
+def _validate_image_settings(form_data: dict[str, str]) -> Any | None:
     """Validate numeric image-adjustment fields in *form_data*."""
     import math
 
@@ -473,7 +519,7 @@ def _validate_image_settings(form_data):
     return None
 
 
-def _validate_settings_form(form_data):
+def _validate_settings_form(form_data: dict[str, str]) -> tuple[Any | None, str | None]:
     """Validate settings form data and return any error plus normalized fields."""
     normalized_device_name, err = _validate_device_name(form_data)
     if err:
@@ -514,13 +560,23 @@ def _validate_settings_form(form_data):
     return _validate_image_settings(form_data), normalized_device_name
 
 
-def _build_settings_dict(form_data, normalized_device_name):
+def _build_settings_dict(
+    form_data: dict[str, str], normalized_device_name: str
+) -> tuple[dict[str, Any], int]:
     """Build the persisted settings payload from validated form data."""
     unit = form_data.get("unit")
     interval = form_data.get("interval")
+    assert interval is not None
+    assert unit is not None
     plugin_cycle_interval_seconds = calculate_seconds(int(interval), unit)
 
-    settings = {
+    image_settings: dict[str, float] = {
+        "saturation": float(form_data.get("saturation", "1.0")),
+        "brightness": float(form_data.get("brightness", "1.0")),
+        "sharpness": float(form_data.get("sharpness", "1.0")),
+        "contrast": float(form_data.get("contrast", "1.0")),
+    }
+    settings: dict[str, Any] = {
         "name": normalized_device_name,
         "orientation": form_data.get("orientation"),
         "inverted_image": form_data.get("invertImage") == "on",
@@ -528,23 +584,18 @@ def _build_settings_dict(form_data, normalized_device_name):
         "timezone": form_data.get("timezoneName"),
         "time_format": form_data.get("timeFormat"),
         "plugin_cycle_interval_seconds": plugin_cycle_interval_seconds,
-        "image_settings": {
-            "saturation": float(form_data.get("saturation", "1.0")),
-            "brightness": float(form_data.get("brightness", "1.0")),
-            "sharpness": float(form_data.get("sharpness", "1.0")),
-            "contrast": float(form_data.get("contrast", "1.0")),
-        },
+        "image_settings": image_settings,
         "preview_size_mode": form_data.get("previewSizeMode", "native"),
     }
     if "inky_saturation" in form_data:
-        settings["image_settings"]["inky_saturation"] = float(
+        image_settings["inky_saturation"] = float(
             form_data.get("inky_saturation", "0.5")
         )
     return settings, plugin_cycle_interval_seconds
 
 
-@_mod.settings_bp.route("/save_settings", methods=["POST"])
-def save_settings():
+@_mod.settings_bp.route("/save_settings", methods=["POST"])  # type: ignore[untyped-decorator]
+def save_settings() -> Any:
     device_config = current_app.config["DEVICE_CONFIG"]
 
     with route_error_boundary(
@@ -557,6 +608,7 @@ def save_settings():
         error, normalized_device_name = _validate_settings_form(form_data)
         if error:
             return error
+        assert normalized_device_name is not None
 
         previous_interval_seconds = device_config.get_config(
             "plugin_cycle_interval_seconds"
@@ -574,22 +626,45 @@ def save_settings():
 
 
 # Legacy route aliases used by older UI/tests.
-@_mod.settings_bp.route("/settings/device", methods=["GET", "POST"])
-def save_device_settings():
-    if request.method == "GET":
-        return settings_page()
+def device_settings_page() -> Any:
+    return settings_page()
+
+
+def save_device_settings() -> Any:
     return save_settings()
 
 
-@_mod.settings_bp.route("/settings/display", methods=["GET", "POST"])
-def save_display_settings():
-    if request.method == "GET":
-        return settings_page()
+def display_settings_page() -> Any:
+    return settings_page()
+
+
+def save_display_settings() -> Any:
     return save_settings()
 
 
-@_mod.settings_bp.route("/settings/network", methods=["GET", "POST"])
-def save_network_settings():
-    if request.method == "GET":
-        return settings_page()
+def network_settings_page() -> Any:
+    return settings_page()
+
+
+def save_network_settings() -> Any:
     return save_settings()
+
+
+_mod.settings_bp.add_url_rule(
+    "/settings/device", view_func=device_settings_page, methods=["GET"]
+)
+_mod.settings_bp.add_url_rule(
+    "/settings/device", view_func=save_device_settings, methods=["POST"]
+)
+_mod.settings_bp.add_url_rule(
+    "/settings/display", view_func=display_settings_page, methods=["GET"]
+)
+_mod.settings_bp.add_url_rule(
+    "/settings/display", view_func=save_display_settings, methods=["POST"]
+)
+_mod.settings_bp.add_url_rule(
+    "/settings/network", view_func=network_settings_page, methods=["GET"]
+)
+_mod.settings_bp.add_url_rule(
+    "/settings/network", view_func=save_network_settings, methods=["POST"]
+)

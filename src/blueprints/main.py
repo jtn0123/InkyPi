@@ -8,6 +8,7 @@ from uuid import uuid4
 
 from flask import (
     Blueprint,
+    Response,
     current_app,
     jsonify,
     render_template,
@@ -41,13 +42,16 @@ except Exception:  # pragma: no cover
 main_bp = Blueprint("main", __name__)
 
 
-def _current_dt(device_config):
+def _current_dt(device_config: Any) -> datetime:
     try:
         from utils import time_utils
 
-        return time_utils.now_device_tz(device_config)
+        current_dt = time_utils.now_device_tz(device_config)
+        if isinstance(current_dt, datetime):
+            return current_dt
     except Exception:
-        return datetime.now(UTC)
+        pass
+    return datetime.now(UTC)
 
 
 def _device_cycle_minutes(device_config: Any) -> int:
@@ -158,8 +162,8 @@ def _is_dev_mode() -> bool:
     return env in {"dev", "development"}
 
 
-@main_bp.route("/", methods=["GET"])
-def main_page():
+@main_bp.route("/", methods=["GET"])  # type: ignore
+def main_page() -> Any:
     device_config = current_app.config["DEVICE_CONFIG"]
     # Compute a non-mutating next-up preview for SSR convenience
     playlist_manager = device_config.get_playlist_manager()
@@ -216,8 +220,8 @@ def main_page():
     )
 
 
-@main_bp.route("/preview", methods=["GET"])
-def preview_image():
+@main_bp.route("/preview", methods=["GET"])  # type: ignore
+def preview_image() -> Any:
     device_config = current_app.config["DEVICE_CONFIG"]
     # Prefer processed image; fall back to current raw image if missing
     path = device_config.processed_image_file
@@ -232,8 +236,8 @@ def preview_image():
     return maybe_serve_webp(safe_root, filename, request.headers.get("Accept"))
 
 
-@main_bp.route("/dev/mock-frame", methods=["GET"])
-def dev_mock_frame():
+@main_bp.route("/dev/mock-frame", methods=["GET"])  # type: ignore
+def dev_mock_frame() -> Any:
     """Serve the latest simulated mock-display frame in dev mode only."""
     if not _is_dev_mode():
         return ("Not found", 404)
@@ -255,8 +259,8 @@ def dev_mock_frame():
     )
 
 
-@main_bp.route("/api/screenshot", methods=["GET"])
-def screenshot():
+@main_bp.route("/api/screenshot", methods=["GET"])  # type: ignore
+def screenshot() -> Any:
     """Return the current display image as PNG or WebP (JTN-450).
 
     Prefer the processed image; fall back to current_image_file.  Supports
@@ -295,8 +299,8 @@ def screenshot():
     return response
 
 
-@main_bp.route("/api/current_image", methods=["GET"])
-def get_current_image():
+@main_bp.route("/api/current_image", methods=["GET"])  # type: ignore
+def get_current_image() -> Any:
     """Serve current_image.png with conditional request support (If-Modified-Since) for polling."""
     device_config = current_app.config["DEVICE_CONFIG"]
     image_path = device_config.current_image_file
@@ -335,7 +339,7 @@ def get_current_image():
     return response
 
 
-def _plugin_display_name_map():
+def _plugin_display_name_map() -> dict[str, str]:
     """Return a {plugin_id: display_name} mapping for the current device config."""
     try:
         device_config = current_app.config["DEVICE_CONFIG"]
@@ -347,7 +351,7 @@ def _plugin_display_name_map():
         return {}
 
 
-def _annotate_instance_labels(payload):
+def _annotate_instance_labels(payload: Any) -> Any:
     """Attach friendly plugin/instance labels to a refresh-info-like dict.
 
     Adds ``plugin_display_name``, ``plugin_instance_label``, and
@@ -371,8 +375,8 @@ def _annotate_instance_labels(payload):
     return payload
 
 
-@main_bp.route("/refresh-info", methods=["GET"])
-def refresh_info():
+@main_bp.route("/refresh-info", methods=["GET"])  # type: ignore
+def refresh_info() -> Any:
     device_config = current_app.config["DEVICE_CONFIG"]
     try:
         info = device_config.get_refresh_info().to_dict()
@@ -387,8 +391,8 @@ def refresh_info():
     return jsonify(info)
 
 
-@main_bp.route("/next-up", methods=["GET"])
-def next_up():
+@main_bp.route("/next-up", methods=["GET"])  # type: ignore
+def next_up() -> Any:
     device_config = current_app.config["DEVICE_CONFIG"]
     playlist_manager = device_config.get_playlist_manager()
     current_dt = _current_dt(device_config)
@@ -415,8 +419,8 @@ def next_up():
         return jsonify({})
 
 
-@main_bp.route("/api/plugin_order", methods=["POST"])
-def save_plugin_order():
+@main_bp.route("/api/plugin_order", methods=["POST"])  # type: ignore
+def save_plugin_order() -> Any:
     """Save custom plugin order from dashboard drag-and-drop."""
     device_config = current_app.config["DEVICE_CONFIG"]
     data = request.get_json(silent=True)
@@ -443,8 +447,8 @@ def save_plugin_order():
     return json_success()
 
 
-@main_bp.route("/sw.js", methods=["GET"])
-def service_worker():
+@main_bp.route("/sw.js", methods=["GET"])  # type: ignore
+def service_worker() -> Any:
     """Serve the service worker from the origin root.
 
     Service workers must be registered from the origin root to control all
@@ -462,8 +466,8 @@ def service_worker():
 
 
 # Serve static assets from src/static for test and dev environments
-@main_bp.route("/static/<path:filename>", methods=["GET"])
-def static_files(filename: str):
+@main_bp.route("/static/<path:filename>", methods=["GET"])  # type: ignore
+def static_files(filename: str) -> Any:
     try:
         static_dir = os.path.abspath(
             os.path.join(os.path.dirname(__file__), "..", "static")
@@ -473,8 +477,8 @@ def static_files(filename: str):
         return ("Not found", 404)
 
 
-@main_bp.record
-def _configure_app_static(state):
+@main_bp.record  # type: ignore
+def _configure_app_static(state: Any) -> None:
     """Ensure Flask's built-in static route serves from src/static for tests/dev."""
     try:
         app = state.app
@@ -493,14 +497,19 @@ def _configure_app_static(state):
 _display_next_limiter = CooldownLimiter(10)
 
 
-def _reset_display_next_cooldown():
+def _reset_display_next_cooldown() -> None:
     """Reset the display-next rate limiter. Exposed for testing."""
     _display_next_limiter.reset()
 
 
 def _display_next_direct(
-    device_config, display_manager, plugin_instance, playlist, current_dt, benchmark_id
-):
+    device_config: Any,
+    display_manager: Any,
+    plugin_instance: Any,
+    playlist: Any,
+    current_dt: datetime,
+    benchmark_id: str,
+) -> tuple[int | None, Response | dict[str, Any] | tuple[Any, int] | None]:
     """Execute a direct display update (dev path, no background task).
 
     Returns ``(generate_ms, error_response)``.  When *error_response* is not
@@ -509,7 +518,6 @@ def _display_next_direct(
     from time import perf_counter
 
     from plugins.plugin_registry import get_plugin_instance
-    from utils.image_utils import compute_image_hash
 
     plugin_config = device_config.get_plugin(plugin_instance.plugin_id)
     if not plugin_config:
@@ -558,7 +566,7 @@ def _display_next_direct(
             playlist=playlist.name,
             plugin_instance=plugin_instance.name,
             refresh_time=current_dt.isoformat(),
-            image_hash=compute_image_hash(image),
+            image_hash=None,
             request_ms=None,
             display_ms=None,
             generate_ms=generate_ms,
@@ -573,7 +581,9 @@ def _display_next_direct(
     return generate_ms, None
 
 
-def _gather_display_metrics(device_config, generate_ms):
+def _gather_display_metrics(
+    device_config: Any, generate_ms: int | None
+) -> tuple[Any | None, Any | None, int | None, Any | None]:
     """Read timing metrics from refresh_info, filling in any gaps.
 
     Returns ``(request_ms, display_ms, generate_ms, preprocess_ms)``.
@@ -591,15 +601,19 @@ def _gather_display_metrics(device_config, generate_ms):
 
 
 def _persist_dev_refresh_event(
-    device_config, benchmark_id, plugin_instance, playlist, metrics
-):
+    device_config: Any,
+    benchmark_id: str,
+    plugin_instance: Any,
+    playlist: Any,
+    metrics: tuple[Any | None, Any | None, int | None, Any | None],
+) -> None:
     """Persist a refresh event for the dev (direct) path."""
     request_ms, display_ms, generate_ms, preprocess_ms = metrics
     try:
         ri = device_config.get_refresh_info()
         cpu_percent = memory_percent = None
         try:
-            import psutil  # type: ignore
+            import psutil
 
             cpu_percent = psutil.cpu_percent(interval=None)
             memory_percent = psutil.virtual_memory().percent
@@ -627,8 +641,8 @@ def _persist_dev_refresh_event(
         pass
 
 
-@main_bp.route("/display-next", methods=["POST"])
-def display_next():
+@main_bp.route("/display-next", methods=["POST"])  # type: ignore
+def display_next() -> Any:
     allowed, retry_after = _display_next_limiter.check()
     if not allowed:
         remaining = math.ceil(retry_after)
@@ -701,8 +715,8 @@ def display_next():
     )
 
 
-@main_bp.route("/refresh", methods=["POST"])
-def refresh_alias():
+@main_bp.route("/refresh", methods=["POST"])  # type: ignore
+def refresh_alias() -> Any:
     """Backward-compatible alias for manual display advance."""
     return display_next()
 
@@ -712,8 +726,8 @@ def refresh_alias():
 # ---------------------------------------------------------------------------
 
 
-@main_bp.app_template_filter("friendly_instance_label")
-def _jinja_friendly_instance_label(instance_name, plugin_id=None):
+@main_bp.app_template_filter("friendly_instance_label")  # type: ignore
+def _jinja_friendly_instance_label(instance_name: Any, plugin_id: Any = None) -> Any:
     """Jinja filter: return a friendly label for a plugin instance.
 
     Usage: ``{{ inst.name | friendly_instance_label(inst.plugin_id) }}``.
@@ -724,14 +738,14 @@ def _jinja_friendly_instance_label(instance_name, plugin_id=None):
     return friendly_instance_label(instance_name, plugin_id, display_name)
 
 
-@main_bp.app_template_filter("instance_suffix_label")
-def _jinja_instance_suffix_label(instance_name, plugin_id=None):
+@main_bp.app_template_filter("instance_suffix_label")  # type: ignore
+def _jinja_instance_suffix_label(instance_name: Any, plugin_id: Any = None) -> str:
     """Jinja filter: return a parenthesised-suffix label, or empty string."""
     label = instance_suffix_label(instance_name, plugin_id)
     return label or ""
 
 
-@main_bp.app_template_filter("is_auto_instance_name")
-def _jinja_is_auto_instance_name(instance_name, plugin_id=None):
+@main_bp.app_template_filter("is_auto_instance_name")  # type: ignore
+def _jinja_is_auto_instance_name(instance_name: Any, plugin_id: Any = None) -> bool:
     """Jinja filter: True when the instance name is the auto-generated key."""
-    return is_auto_instance_name(instance_name, plugin_id)
+    return bool(is_auto_instance_name(instance_name, plugin_id))

@@ -2,9 +2,10 @@ import logging
 import os
 import re
 import tempfile
+from typing import Any
 
 from dotenv import dotenv_values
-from flask import Blueprint, render_template, request
+from flask import Blueprint, Response, render_template, request
 
 from utils.http_utils import json_error, json_internal_error, json_success
 
@@ -29,7 +30,7 @@ API_KEY_VALIDATION_ERROR = "Invalid API key entry"
 
 
 # Path to .env file
-def get_env_path():
+def get_env_path() -> str:
     """Get path to .env file in the project root."""
     project_dir = os.environ.get("PROJECT_DIR")
     if project_dir:
@@ -38,7 +39,7 @@ def get_env_path():
     return os.path.join(base_dir, ".env")
 
 
-def parse_env_file(filepath):
+def parse_env_file(filepath: str) -> list[tuple[str, str]]:
     """Parse .env file and return list of (key, value) tuples."""
     if not os.path.exists(filepath):
         return []
@@ -58,7 +59,9 @@ def _has_invalid_control_chars(value: str) -> bool:
     )
 
 
-def _validate_api_key_entry(entry, existing_values: dict):
+def _validate_api_key_entry(
+    entry: object, existing_values: dict[str, str]
+) -> tuple[str | None, str, Response | dict[str, Any] | tuple[Any, int] | None]:
     """Validate a single API key entry dict and resolve its value.
 
     Returns ``(key, value, None)`` on success, or ``(None, None, error_response)``
@@ -66,18 +69,18 @@ def _validate_api_key_entry(entry, existing_values: dict):
     "skip this entry" without an error.
     """
     if not isinstance(entry, dict):
-        return None, None, json_error("Each entry must be an object", status=400)
+        return None, "", json_error("Each entry must be an object", status=400)
 
     raw_key = entry.get("key", "")
     if not isinstance(raw_key, str):
-        return None, None, json_error("Entry key must be a string", status=400)
+        return None, "", json_error("Entry key must be a string", status=400)
     key = raw_key.strip()
 
     keep_existing = entry.get("keepExisting", False)
     if not isinstance(keep_existing, bool):
         return (
             None,
-            None,
+            "",
             json_error("keepExisting must be a boolean", status=400),
         )
 
@@ -85,7 +88,7 @@ def _validate_api_key_entry(entry, existing_values: dict):
         return "", "", None
 
     if not re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", key):
-        return None, None, json_error("Invalid key format", status=400)
+        return None, "", json_error("Invalid key format", status=400)
 
     if keep_existing:
         value = existing_values.get(key) or ""
@@ -94,7 +97,7 @@ def _validate_api_key_entry(entry, existing_values: dict):
         if not isinstance(raw_value, str):
             return (
                 None,
-                None,
+                "",
                 json_error("Entry value must be a string", status=400),
             )
         value = raw_value.strip()
@@ -102,14 +105,14 @@ def _validate_api_key_entry(entry, existing_values: dict):
     if _has_invalid_control_chars(value):
         return (
             None,
-            None,
+            "",
             json_error("Invalid characters in value", status=400),
         )
 
     return key, value, None
 
 
-def write_env_file(filepath, entries):
+def write_env_file(filepath: str, entries: list[tuple[str, str]]) -> bool:
     """Write entries to .env file atomically via tempfile + os.replace."""
     try:
         env_dir = os.path.dirname(filepath) or "."
@@ -143,7 +146,7 @@ def write_env_file(filepath, entries):
         return False
 
 
-def mask_value(value):
+def mask_value(value: str) -> str:
     """Mask API key value for display.
 
     Reveals only the final four characters so operators can tell which key
@@ -157,8 +160,8 @@ def mask_value(value):
     return "●" * 8 + value[-4:]
 
 
-@apikeys_bp.route("/api-keys", methods=["GET"])
-def apikeys_page():
+@apikeys_bp.route("/api-keys", methods=["GET"])  # type: ignore
+def apikeys_page() -> Response | str:
     """Render API keys management page."""
     env_path = get_env_path()
     entries = parse_env_file(env_path)
@@ -190,8 +193,8 @@ def apikeys_page():
     )
 
 
-@apikeys_bp.route("/api-keys/save", methods=["POST"])
-def save_apikeys():
+@apikeys_bp.route("/api-keys/save", methods=["POST"])  # type: ignore
+def save_apikeys() -> tuple[Response | dict[str, Any], int] | Response | dict[str, Any]:
     """Save API keys to .env file."""
     try:
         data = request.get_json(silent=True)

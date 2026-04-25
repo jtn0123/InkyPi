@@ -7,10 +7,14 @@ For the API key, set `NASA_SECRET={API_KEY}` in your .env file.
 
 import logging
 import os
+from collections.abc import Mapping
 from datetime import UTC, date, datetime, timedelta
 from random import randint
+from typing import Any, cast
 
-from plugins.base_plugin.base_plugin import BasePlugin
+from PIL import Image
+
+from plugins.base_plugin.base_plugin import BasePlugin, DeviceConfigLike
 from plugins.base_plugin.settings_schema import callout, field, schema, section
 from utils.http_client import get_http_session
 
@@ -24,7 +28,7 @@ _APOD_MIN_DATE = date(1995, 6, 16)
 
 
 class Apod(BasePlugin):
-    def _candidate_image_urls(self, data: dict) -> list[str]:
+    def _candidate_image_urls(self, data: dict[str, object]) -> list[str]:
         """Return APOD image URLs ordered by device-appropriate preference.
 
         On low-resource devices like a Pi Zero 2 W, prefer NASA's standard
@@ -32,6 +36,10 @@ class Apod(BasePlugin):
         """
         standard_url = data.get("url")
         hd_url = data.get("hdurl")
+        if not isinstance(standard_url, str):
+            standard_url = None
+        if not isinstance(hd_url, str):
+            hd_url = None
         ordered = (
             [standard_url, hd_url]
             if self.image_loader.is_low_resource
@@ -43,7 +51,7 @@ class Apod(BasePlugin):
                 deduped.append(url)
         return deduped
 
-    def validate_settings(self, settings: dict) -> str | None:
+    def validate_settings(self, settings: Mapping[str, object]) -> str | None:
         """Reject out-of-range custom dates at save time (JTN-379).
 
         The frontend ``<input type="date">`` enforces ``min``/``max``, but a
@@ -54,7 +62,11 @@ class Apod(BasePlugin):
         if settings.get("randomizeApod") == "true":
             # Random mode picks its own date — ignore customDate.
             return None
-        custom_date_str = (settings.get("customDate") or "").strip()
+        raw_custom_date = settings.get("customDate")
+        if isinstance(raw_custom_date, str):
+            custom_date_str = raw_custom_date.strip()
+        else:
+            custom_date_str = ""
         if not custom_date_str:
             # No custom date set — ``generate_image`` falls back to today.
             return None
@@ -72,7 +84,7 @@ class Apod(BasePlugin):
             return f"Date must be on or before today ({today.isoformat()})."
         return None
 
-    def build_settings_schema(self):
+    def build_settings_schema(self) -> dict[str, object]:
         today = datetime.now(tz=UTC).strftime("%Y-%m-%d")
         return schema(
             section(
@@ -112,7 +124,7 @@ class Apod(BasePlugin):
         except (ValueError, TypeError):
             return 20.0
 
-    def generate_settings_template(self):
+    def generate_settings_template(self) -> dict[str, object]:
         template_params = super().generate_settings_template()
         template_params["api_key"] = {
             "required": True,
@@ -122,7 +134,9 @@ class Apod(BasePlugin):
         template_params["style_settings"] = False
         return template_params
 
-    def generate_image(self, settings, device_config):
+    def generate_image(
+        self, settings: Mapping[str, object], device_config: DeviceConfigLike
+    ) -> Image.Image:
         logger.info(f"APOD plugin settings: {settings}")
 
         api_key = device_config.load_env_key("NASA_SECRET")
@@ -138,8 +152,8 @@ class Apod(BasePlugin):
             delta_days = (end - start).days
             random_date = start + timedelta(days=randint(0, delta_days))
             params["date"] = random_date.strftime("%Y-%m-%d")
-        elif settings.get("customDate"):
-            params["date"] = settings["customDate"]
+        elif isinstance(settings.get("customDate"), str):
+            params["date"] = cast(str, settings["customDate"])
 
         apod_url = os.getenv("INKYPI_NASA_API_URL", "https://api.nasa.gov")
         response = get_http_session().get(
@@ -152,12 +166,12 @@ class Apod(BasePlugin):
             logger.error(f"NASA API error: {response.text}")
             raise RuntimeError("Failed to retrieve NASA APOD.")
 
-        data = response.json()
+        data = cast(dict[str, object], response.json())
 
         if data.get("media_type") != "image":
             raise RuntimeError("APOD is not an image today.")
 
-        image = None
+        image: Image.Image | None = None
         selected_image_url = None
         timeout_ms = int(self._request_timeout() * 1000)
         dimensions = self.get_oriented_dimensions(device_config)
@@ -166,7 +180,7 @@ class Apod(BasePlugin):
             raise RuntimeError("Failed to load APOD image.")
 
         for idx, image_url in enumerate(candidate_urls):
-            image = self.image_loader.from_url(
+            image = cast(Any, self.image_loader).from_url(
                 image_url,
                 dimensions=dimensions,
                 timeout_ms=timeout_ms,

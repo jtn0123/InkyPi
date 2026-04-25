@@ -1,8 +1,9 @@
 import json
 import logging
 import os
+from collections.abc import Mapping
 from time import perf_counter
-from typing import Any
+from typing import Any, cast
 
 from flask import (
     Blueprint,
@@ -61,10 +62,10 @@ _MSG_CIRCUIT_BREAKER_RESET = "Circuit-breaker reset for plugin instance."
 
 def _plugins_dir() -> str:
     """Resolve the current plugin source directory at request time."""
-    return resolve_path("plugins")
+    return str(cast(Any, resolve_path)("plugins"))
 
 
-def _cacheable_send_file(path: str, ttl_env: str = "INKYPI_RENDER_CACHE_TTL_S"):
+def _cacheable_send_file(path: str, ttl_env: str = "INKYPI_RENDER_CACHE_TTL_S") -> Any:
     safe_path = os.path.realpath(path)
     if not os.path.isfile(safe_path):
         abort(404)
@@ -132,8 +133,8 @@ def _resolve_api_key_presence(
         api_key_meta["present"] = device_config.load_env_key(expected_key) is not None
 
 
-@plugin_bp.route("/plugin/<plugin_id>", methods=["GET"])
-def plugin_page(plugin_id: str):
+@plugin_bp.route("/plugin/<plugin_id>", methods=["GET"])  # type: ignore[untyped-decorator]
+def plugin_page(plugin_id: str) -> Any:
     device_config = current_app.config[_CONFIG_KEY]
     playlist_manager = device_config.get_playlist_manager()
 
@@ -200,8 +201,8 @@ def plugin_page(plugin_id: str):
     )
 
 
-@plugin_bp.route("/plugins", methods=["GET"])
-def plugins_page():
+@plugin_bp.route("/plugins", methods=["GET"])  # type: ignore[untyped-decorator]
+def plugins_page() -> Any:
     device_config = current_app.config[_CONFIG_KEY]
     plugins = device_config.get_plugins()
 
@@ -213,8 +214,8 @@ def plugins_page():
     )
 
 
-@plugin_bp.route("/images/<plugin_id>/<path:filename>", methods=["GET"])
-def image(plugin_id: str, filename: str):
+@plugin_bp.route("/images/<plugin_id>/<path:filename>", methods=["GET"])  # type: ignore[untyped-decorator]
+def image(plugin_id: str, filename: str) -> Any:
     # Reject null-byte / absolute path inputs up front (defence in depth).
     if (
         not plugin_id
@@ -256,15 +257,16 @@ def image(plugin_id: str, filename: str):
         )
         abort(404)
 
-    # Build the directory path from the listdir-derived name.
-    cursor = os.path.join(plugins_dir, plugin_dirname)
+    plugin_dirname_str = str(plugin_dirname)
+    cursor = os.path.join(plugins_dir, plugin_dirname_str)
     resolved_parts: list[str] = []
     for segment in segments:
         match = _match_listdir(cursor, segment)
         if match is None:
             abort(404)
-        resolved_parts.append(match)
-        cursor = os.path.join(cursor, match)
+        match_str = str(match)
+        resolved_parts.append(match_str)
+        cursor = os.path.join(cursor, match_str)
 
     # Defence-in-depth: reject any symlink entry that escapes PLUGINS_DIR.
     try:
@@ -275,7 +277,7 @@ def image(plugin_id: str, filename: str):
     if not os.path.isfile(cursor):
         abort(404)
 
-    safe_dir = os.path.join(plugins_dir, plugin_dirname)
+    safe_dir = os.path.join(plugins_dir, plugin_dirname_str)
     safe_name = os.path.join(*resolved_parts)
     resp = send_from_directory(safe_dir, safe_name)
     try:
@@ -291,8 +293,8 @@ def image(plugin_id: str, filename: str):
     "/plugin_latest_image/<string:plugin_id>",
     endpoint="plugin_latest_image",
     methods=["GET"],
-)
-def latest_plugin_image(plugin_id: str):
+)  # type: ignore[untyped-decorator]
+def latest_plugin_image(plugin_id: str) -> Any:
     """Serve the most recent history image for a given plugin_id.
 
     Searches the history directory for the latest PNG matching the plugin_id,
@@ -332,7 +334,10 @@ def latest_plugin_image(plugin_id: str):
 
 
 def _cleanup_plugin_resources(
-    device_config, plugin_id, plugin_instance_name, plugin_settings=None
+    device_config: Any,
+    plugin_id: str | None,
+    plugin_instance_name: str | None,
+    plugin_settings: dict[str, Any] | None = None,
 ) -> None:
     """Clean up cached image and run plugin-specific teardown after instance deletion.
 
@@ -372,8 +377,8 @@ def _cleanup_plugin_resources(
         )
 
 
-@plugin_bp.route("/delete_plugin_instance", methods=["POST", "DELETE"])
-def delete_plugin_instance():
+@plugin_bp.route("/delete_plugin_instance", methods=["POST", "DELETE"])  # type: ignore[untyped-decorator]
+def delete_plugin_instance() -> Any:
     device_config = current_app.config[_CONFIG_KEY]
     playlist_manager = device_config.get_playlist_manager()
 
@@ -407,7 +412,7 @@ def delete_plugin_instance():
 
         del_result: list[bool] = []
 
-        def _do_delete(cfg):
+        def _do_delete(cfg: Any) -> None:
             del_result.append(playlist.delete_plugin(plugin_id, plugin_instance))
 
         device_config.update_atomic(_do_delete)
@@ -420,8 +425,8 @@ def delete_plugin_instance():
     return json_success(message="Deleted plugin instance.")
 
 
-@plugin_bp.route("/update_plugin_instance/<string:instance_name>", methods=["PUT"])
-def update_plugin_instance(instance_name: str):
+@plugin_bp.route("/update_plugin_instance/<string:instance_name>", methods=["PUT"])  # type: ignore[untyped-decorator]
+def update_plugin_instance(instance_name: str) -> Any:
     device_config = current_app.config[_CONFIG_KEY]
     playlist_manager = device_config.get_playlist_manager()
 
@@ -430,7 +435,7 @@ def update_plugin_instance(instance_name: str):
         logger=logger,
         hint="Check submitted plugin settings and config persistence.",
     ):
-        form_data = parse_form(request.form)
+        form_data = cast(dict[str, Any], cast(Any, parse_form)(request.form))
         if not instance_name:
             raise ClientInputError(
                 "Instance name is required",
@@ -438,8 +443,13 @@ def update_plugin_instance(instance_name: str):
                 code="validation_error",
                 field="instance_name",
             )
-        plugin_settings = form_data
-        plugin_settings.update(handle_request_files(request.files, request.form))
+        plugin_settings: dict[str, Any] = form_data
+        plugin_settings.update(
+            cast(
+                dict[str, Any],
+                cast(Any, handle_request_files)(request.files, request.form),
+            )
+        )
 
         plugin_id = plugin_settings.pop(_PLUGIN_ID, None)
         if not plugin_id:
@@ -466,7 +476,7 @@ def update_plugin_instance(instance_name: str):
         # previously it was accepted blindly, saved into settings verbatim,
         # and the new refresh config was never applied — reload silently
         # reverted the user's change while the toast said "success".
-        new_refresh_config = None
+        new_refresh_config: dict[str, Any] | None = None
         raw_refresh = plugin_settings.pop("refresh_settings", None)
         if raw_refresh is not None:
             try:
@@ -538,7 +548,7 @@ def update_plugin_instance(instance_name: str):
 
         before_settings = dict(plugin_instance.settings or {})
 
-        def _do_update_instance(cfg):
+        def _do_update_instance(cfg: Any) -> None:
             plugin_instance.settings = plugin_settings
             if new_refresh_config is not None:
                 plugin_instance.refresh = new_refresh_config
@@ -552,8 +562,8 @@ def update_plugin_instance(instance_name: str):
     return json_success(message=f"Updated plugin instance {instance_name}.")
 
 
-@plugin_bp.route("/display_plugin_instance", methods=["POST"])
-def display_plugin_instance():
+@plugin_bp.route("/display_plugin_instance", methods=["POST"])  # type: ignore[untyped-decorator]
+def display_plugin_instance() -> Any:
     device_config = current_app.config[_CONFIG_KEY]
     refresh_task = current_app.config["REFRESH_TASK"]
     playlist_manager = device_config.get_playlist_manager()
@@ -603,8 +613,8 @@ def display_plugin_instance():
 @plugin_bp.route(
     "/plugin_instance/<string:plugin_id>/<string:instance_name>/force_retry",
     methods=["POST"],
-)
-def force_retry_plugin_instance(plugin_id: str, instance_name: str):
+)  # type: ignore[untyped-decorator]
+def force_retry_plugin_instance(plugin_id: str, instance_name: str) -> Any:
     """Clear the circuit-breaker paused state for a plugin instance.
 
     Allows a paused plugin to be retried on the next scheduler cycle without
@@ -636,7 +646,12 @@ def force_retry_plugin_instance(plugin_id: str, instance_name: str):
     )
 
 
-def _safe_display_image(display_manager, image, image_settings, history_meta):
+def _safe_display_image(
+    display_manager: Any,
+    image: Any,
+    image_settings: Any,
+    history_meta: Mapping[str, Any] | None,
+) -> Any:
     """Invoke display_manager.display_image, tolerating older stubs without ``history_meta``.
 
     Some test doubles monkeypatch ``display_image`` with a (image, image_settings)
@@ -653,7 +668,12 @@ def _safe_display_image(display_manager, image, image_settings, history_meta):
         return display_manager.display_image(image, image_settings=image_settings)
 
 
-def _update_now_direct(plugin_id, plugin_settings, device_config, display_manager):
+def _update_now_direct(
+    plugin_id: str,
+    plugin_settings: dict[str, Any],
+    device_config: Any,
+    display_manager: Any,
+) -> Any:
     """Execute a plugin directly (refresh task not running) and push to display.
 
     Returns a Flask response tuple.  On plugin failure, a fallback error-card
@@ -808,14 +828,14 @@ def _update_now_direct(plugin_id, plugin_settings, device_config, display_manage
 
 
 def _push_update_now_fallback(
-    plugin_id,
-    plugin_config,
-    device_config,
-    display_manager,
-    exc,
+    plugin_id: str,
+    plugin_config: dict[str, Any] | Mapping[str, Any],
+    device_config: Any,
+    display_manager: Any,
+    exc: BaseException,
     *,
     record_history: bool = True,
-):
+) -> None:
     """Best-effort: render and push an error-card image so the display updates on failure.
 
     ``record_history``: when False, the fallback is *displayed* but no
@@ -862,8 +882,11 @@ def _push_update_now_fallback(
 
 
 def _push_update_now_fallback_from_current_exception(
-    plugin_id, plugin_config, device_config, display_manager
-):
+    plugin_id: str,
+    plugin_config: dict[str, Any] | Mapping[str, Any],
+    device_config: Any,
+    display_manager: Any,
+) -> None:
     """Variant of _push_update_now_fallback that uses the currently-raised exception.
 
     Centralised so callers don't need to capture the exception into a local
@@ -882,15 +905,17 @@ def _push_update_now_fallback_from_current_exception(
     )
 
 
-@plugin_bp.route("/api/job/<job_id>", methods=["GET"])
-def job_status(job_id: str):
+@plugin_bp.route("/api/job/<job_id>", methods=["GET"])  # type: ignore[untyped-decorator]
+def job_status(job_id: str) -> tuple[Any, int]:
     """Poll the status of an asynchronous render job."""
     queue = get_job_queue()
     info = queue.get_status(job_id)
     return jsonify(info), 200
 
 
-def _run_update_now(app, plugin_id, plugin_settings):
+def _run_update_now(
+    app: Any, plugin_id: str, plugin_settings: dict[str, Any]
+) -> dict[str, Any]:
     """Execute plugin render in a background thread (job-queue worker).
 
     Needs the Flask *app* so we can push an application context — the worker
@@ -954,8 +979,8 @@ def _run_update_now(app, plugin_id, plugin_settings):
             }
 
 
-@plugin_bp.route("/update_now", methods=["POST"])
-def update_now():
+@plugin_bp.route("/update_now", methods=["POST"])  # type: ignore[untyped-decorator]
+def update_now() -> Any:
     """Render a plugin image and push it to the display.
 
     When the client sends ``X-Async: true`` (or ``?async=1``), the render is
@@ -972,8 +997,10 @@ def update_now():
 
     plugin_id: str | None = None
     try:
-        plugin_settings = parse_form(request.form)
-        plugin_settings.update(handle_request_files(request.files))
+        plugin_settings = cast(dict[str, Any], cast(Any, parse_form)(request.form))
+        plugin_settings.update(
+            cast(dict[str, Any], cast(Any, handle_request_files)(request.files))
+        )
         plugin_id = plugin_settings.pop(_PLUGIN_ID, None)
         if not plugin_id:
             return json_error(
@@ -1062,15 +1089,17 @@ def update_now():
         return json_error(_ERR_INTERNAL, status=500, code="internal_error")
 
 
-@plugin_bp.route("/save_plugin_settings", methods=["POST"])
-def save_plugin_settings():
+@plugin_bp.route("/save_plugin_settings", methods=["POST"])  # type: ignore[untyped-decorator]
+def save_plugin_settings() -> Any:
     device_config = current_app.config[_CONFIG_KEY]
     playlist_manager = device_config.get_playlist_manager()
     htmx = _is_htmx_request()
 
     try:
-        plugin_settings = parse_form(request.form)
-        plugin_settings.update(handle_request_files(request.files))
+        plugin_settings = cast(dict[str, Any], cast(Any, parse_form)(request.form))
+        plugin_settings.update(
+            cast(dict[str, Any], cast(Any, handle_request_files)(request.files))
+        )
         plugin_id = plugin_settings.pop(_PLUGIN_ID, None)
         if not plugin_id:
             if htmx:
@@ -1096,15 +1125,17 @@ def save_plugin_settings():
         return json_error(_ERR_INTERNAL, status=500)
 
 
-@plugin_bp.route("/plugin/<string:plugin_id>/save", methods=["POST"])
-def save_plugin_settings_alias(plugin_id: str):
+@plugin_bp.route("/plugin/<string:plugin_id>/save", methods=["POST"])  # type: ignore[untyped-decorator]
+def save_plugin_settings_alias(plugin_id: str) -> Any:
     """Backward-compatible route alias for plugin settings save."""
     device_config = current_app.config[_CONFIG_KEY]
     playlist_manager = device_config.get_playlist_manager()
 
     try:
-        plugin_settings = parse_form(request.form)
-        plugin_settings.update(handle_request_files(request.files))
+        plugin_settings = cast(dict[str, Any], cast(Any, parse_form)(request.form))
+        plugin_settings.update(
+            cast(dict[str, Any], cast(Any, handle_request_files)(request.files))
+        )
         return _save_plugin_settings_common(
             plugin_id=plugin_id,
             plugin_settings=plugin_settings,
@@ -1121,7 +1152,8 @@ def save_plugin_settings_alias(plugin_id: str):
 def _is_htmx_request() -> bool:
     """Return True when the current request originated from HTMX (JTN-506)."""
     try:
-        return request.headers.get("HX-Request", "").lower() == "true"
+        header_value = request.headers.get("HX-Request", "")
+        return isinstance(header_value, str) and header_value.lower() == "true"
     except RuntimeError:
         # Outside an active request context
         return False
@@ -1129,7 +1161,7 @@ def _is_htmx_request() -> bool:
 
 def _render_plugin_form_error(
     message: str, status: int = 400, field: str | None = None
-):
+) -> Any:
     """Return an HTML error partial for the plugin settings form (JTN-506).
 
     HTMX swaps error content into ``#plugin-form-errors``; Flask clients that
@@ -1146,7 +1178,7 @@ def _render_plugin_form_error(
     return resp
 
 
-def _render_plugin_form_success(message: str):
+def _render_plugin_form_success(message: str) -> Any:
     """Return an HTMX success partial; fires ``pluginSettingsSaved`` toast event."""
     html = render_template(
         "partials/plugin_form_errors.html",
@@ -1163,8 +1195,11 @@ def _render_plugin_form_success(message: str):
 
 
 def _save_plugin_settings_common(
-    plugin_id, plugin_settings, device_config, playlist_manager
-):
+    plugin_id: str,
+    plugin_settings: dict[str, Any],
+    device_config: Any,
+    playlist_manager: Any,
+) -> Any:
     htmx = _is_htmx_request()
     result = save_plugin_settings_workflow(
         plugin_id,
@@ -1200,7 +1235,7 @@ def _save_plugin_settings_common(
 
 
 def _find_history_image(
-    device_config, plugin_id: str, instance_name: str
+    device_config: Any, plugin_id: str, instance_name: str
 ) -> str | None:
     """Return path to a history PNG that matches plugin and instance, if any.
 
@@ -1236,7 +1271,7 @@ def _find_history_image(
     return None
 
 
-def _find_latest_plugin_refresh_time(device_config, plugin_id: str) -> str | None:
+def _find_latest_plugin_refresh_time(device_config: Any, plugin_id: str) -> str | None:
     """Return the most recent refresh time for any instance of this plugin.
 
     Filenames follow the display_YYYYMMDD_HHMMSS pattern, so sorting by
@@ -1260,7 +1295,7 @@ def _find_latest_plugin_refresh_time(device_config, plugin_id: str) -> str | Non
                     meta = json.load(fh)
                 if meta.get(_PLUGIN_ID) == plugin_id:
                     refresh_time = meta.get("refresh_time")
-                    if refresh_time:
+                    if isinstance(refresh_time, str) and refresh_time:
                         return refresh_time
             except Exception:
                 continue
@@ -1274,8 +1309,8 @@ def _find_latest_plugin_refresh_time(device_config, plugin_id: str) -> str | Non
     "/instance_image/<string:plugin_id>/<string:instance_name>",
     endpoint="plugin_instance_image",
     methods=["GET"],
-)
-def instance_image(plugin_id: str, instance_name: str):
+)  # type: ignore[untyped-decorator]
+def instance_image(plugin_id: str, instance_name: str) -> Any:
     device_config = current_app.config[_CONFIG_KEY]
     playlist_manager = device_config.get_playlist_manager()
 

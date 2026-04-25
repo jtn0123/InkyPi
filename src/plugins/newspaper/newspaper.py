@@ -1,5 +1,7 @@
 import logging
+from collections.abc import Mapping
 from datetime import UTC, datetime, timedelta
+from typing import Any, cast
 
 from PIL import Image
 
@@ -16,19 +18,26 @@ VALID_NEWSPAPER_SLUGS = {
 }
 
 
-class Newspaper(BasePlugin):
-    def build_settings_schema(self):
-        return schema(
-            section(
-                "Source",
-                callout(
-                    "Search by newspaper title or narrow by location. The linked inputs keep the selected edition and its slug in sync.",
-                ),
-                widget("newspaper-search", template="widgets/newspaper_search.html"),
-            )
+class Newspaper(BasePlugin):  # type: ignore[misc, unused-ignore]
+    def build_settings_schema(self) -> dict[str, object]:
+        return cast(  # type: ignore[redundant-cast, unused-ignore]
+            dict[str, object],
+            schema(
+                section(
+                    "Source",
+                    callout(
+                        "Search by newspaper title or narrow by location. The linked inputs keep the selected edition and its slug in sync.",
+                    ),
+                    widget(
+                        "newspaper-search", template="widgets/newspaper_search.html"
+                    ),
+                )
+            ),
         )
 
-    def generate_image(self, settings, device_config):
+    def generate_image(
+        self, settings: Mapping[str, object], device_config: Any
+    ) -> Image.Image:
         newspaper_slug = settings.get("newspaperSlug")
         if newspaper_slug and str(newspaper_slug).strip():
             newspaper_slug = str(newspaper_slug).strip().upper()
@@ -46,7 +55,7 @@ class Newspaper(BasePlugin):
         image = None
         for date in days:
             image_url = FREEDOM_FORUM_URL.format(date.day, newspaper_slug)
-            image = get_image(image_url)
+            image = cast(Any, get_image)(image_url)
             if image:
                 logger.info(
                     f"Found {newspaper_slug} front cover for {date.strftime('%Y-%m-%d')}"
@@ -74,7 +83,7 @@ class Newspaper(BasePlugin):
 
         return image
 
-    def generate_settings_template(self):
+    def generate_settings_template(self) -> dict[str, object]:
         template_params = super().generate_settings_template()
         template_params["newspapers"] = sorted(NEWSPAPERS, key=lambda n: n["name"])
-        return template_params
+        return cast(dict[str, object], template_params)  # type: ignore[redundant-cast, unused-ignore]

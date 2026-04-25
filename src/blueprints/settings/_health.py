@@ -81,11 +81,11 @@ def _iter_progress_events(bus: Any, last_seq: int) -> Generator[str, None, None]
             yield to_sse(str(ev.get("state", "event")), ev)
 
 
-def _filter_health_by_window(health, window_min):
+def _filter_health_by_window(health: dict[str, Any], window_min: int) -> dict[str, Any]:
     if not isinstance(health, dict) or window_min <= 0:
         return health
     cutoff = datetime.now(UTC) - timedelta(minutes=window_min)
-    filtered = {}
+    filtered: dict[str, Any] = {}
     for plugin_id, item in health.items():
         last_seen = item.get("last_seen") if isinstance(item, dict) else None
         if not last_seen:
@@ -103,8 +103,8 @@ def _filter_health_by_window(health, window_min):
     return filtered
 
 
-@_mod.settings_bp.route("/api/health/plugins", methods=["GET"])
-def health_plugins():
+@_mod.settings_bp.route("/api/health/plugins", methods=["GET"])  # type: ignore[untyped-decorator]
+def health_plugins() -> tuple[Any, int] | Response:
     try:
         rt = current_app.config["REFRESH_TASK"]
         health = rt.get_health_snapshot() if hasattr(rt, "get_health_snapshot") else {}
@@ -118,12 +118,12 @@ def health_plugins():
         return json_internal_error("health plugins", details={"error": str(e)})
 
 
-@_mod.settings_bp.route("/api/health/system", methods=["GET"])
-def health_system():
+@_mod.settings_bp.route("/api/health/system", methods=["GET"])  # type: ignore[untyped-decorator]
+def health_system() -> tuple[Any, int] | Response:
     try:
         data: dict[str, Any] = {}
         try:
-            import psutil  # type: ignore
+            import psutil
 
             du = psutil.disk_usage("/")
             vm = psutil.virtual_memory()
@@ -145,8 +145,8 @@ def health_system():
         return json_internal_error("health system", details={"error": str(e)})
 
 
-@_mod.settings_bp.route("/api/progress/stream", methods=["GET"])
-def progress_stream():
+@_mod.settings_bp.route("/api/progress/stream", methods=["GET"])  # type: ignore[untyped-decorator]
+def progress_stream() -> Response | tuple[Any, int]:
     if not _progress_stream_enabled():
         return json_error("Progress SSE disabled", status=404)
 
@@ -167,7 +167,7 @@ def progress_stream():
             released = True
         _release_progress_stream()
 
-    @stream_with_context
+    @stream_with_context  # type: ignore[untyped-decorator]
     def gen() -> Generator[str, None, None]:
         try:
             yield from _iter_progress_events(bus, last_seq)

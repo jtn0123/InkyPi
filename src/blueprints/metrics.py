@@ -23,8 +23,8 @@ metrics_bp = Blueprint("metrics", __name__)
 _CONTENT_TYPE = "text/plain; version=0.0.4; charset=utf-8"
 
 
-@metrics_bp.route("/metrics", methods=["GET"])
-def prometheus_metrics():
+@metrics_bp.route("/metrics", methods=["GET"])  # type: ignore
+def prometheus_metrics() -> Response:
     """Return all InkyPi metrics in Prometheus text exposition format."""
     if generate_latest is None:
         return Response(

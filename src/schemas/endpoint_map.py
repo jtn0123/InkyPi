@@ -67,6 +67,8 @@ ENDPOINT_SCHEMAS: dict[str, type] = {
     "playlist.display_next_in_playlist": MetricsSuccessResponse,
     "plugin.job_status": JobStatusResponse,
     "settings.plugin_isolation": IsolationResponse,
+    "settings.add_plugin_isolation": IsolationResponse,
+    "settings.remove_plugin_isolation": IsolationResponse,
     "history.history_redisplay": SuccessMessageResponse,
     "history.history_delete": SuccessMessageResponse,
     "history.history_clear": SuccessMessageResponse,

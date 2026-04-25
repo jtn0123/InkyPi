@@ -1,8 +1,11 @@
 import base64
 import logging
+from collections.abc import Mapping
 from io import BytesIO
+from typing import Any, cast
 
 from openai import OpenAI
+from PIL.Image import Image as ImageType
 
 from plugins.base_plugin.base_plugin import (
     BasePlugin,
@@ -38,23 +41,28 @@ DEFAULT_IMAGE_QUALITY = "medium"
 
 
 class AIImage(BasePlugin):
-    def validate_settings(self, settings: dict) -> str | None:
+    def validate_settings(self, settings: Mapping[str, object]) -> str | None:
         """Reject empty prompts at save time so bad input does not persist."""
-        if err := validate_required_text(settings, "textPrompt", "Prompt"):
-            return err
-        if err := validate_provider(settings):
+        err: str | None = validate_required_text(settings, "textPrompt", "Prompt")
+        if err:
             return err
 
-        provider = (settings.get("provider") or "openai").strip().lower()
-        model = (settings.get("imageModel") or DEFAULT_IMAGE_MODEL).strip()
+        err = validate_provider(settings)
+        if err:
+            return err
+
+        provider_value = settings.get("provider", "openai")
+        model_value = settings.get("imageModel", DEFAULT_IMAGE_MODEL)
+        provider = str(provider_value).strip().lower()
+        model = str(model_value).strip()
         allowed = IMAGE_MODELS_BY_PROVIDER.get(provider)
         if not allowed or model not in allowed:
             return f"Invalid image model for provider {provider!r}: {model!r}"
 
         return None
 
-    def build_settings_schema(self):
-        return schema(
+    def build_settings_schema(self) -> dict[str, object]:
+        schema_payload: dict[str, object] = schema(
             section(
                 "Prompt",
                 field(
@@ -136,9 +144,7 @@ class AIImage(BasePlugin):
                                 option("medium", "Medium (~$0.07)"),
                                 option("low", "Low (~$0.01)"),
                             ],
-                            GOOGLE_IMAGE_MODEL: [
-                                option("standard", "Standard"),
-                            ],
+                            GOOGLE_IMAGE_MODEL: [option("standard", "Standard")],
                         },
                     ),
                 ),
@@ -148,9 +154,11 @@ class AIImage(BasePlugin):
                 ),
             ),
         )
+        return schema_payload
 
-    def generate_settings_template(self):
+    def generate_settings_template(self) -> dict[str, object]:
         template_params = super().generate_settings_template()
+        settings_template: dict[str, object] = template_params
         template_params["api_key"] = {
             "required": True,
             "services": [
@@ -158,10 +166,12 @@ class AIImage(BasePlugin):
                 {"name": "Google", "env_var": "GOOGLE_AI_SECRET"},
             ],
         }
-        return template_params
+        return settings_template
 
-    def _validate_generate_inputs(self, settings, provider):
-        image_model = (settings.get("imageModel") or DEFAULT_IMAGE_MODEL).strip()
+    def _validate_generate_inputs(
+        self, settings: Mapping[str, object], provider: str
+    ) -> tuple[str, str]:
+        image_model = str(settings.get("imageModel", DEFAULT_IMAGE_MODEL)).strip()
         allowed_models = IMAGE_MODELS_BY_PROVIDER.get(provider)
         if not allowed_models:
             logger.error(f"Invalid provider for AI image plugin: {provider}")
@@ -173,11 +183,11 @@ class AIImage(BasePlugin):
                 provider,
             )
             raise RuntimeError("Invalid Image Model provided.")
-        return image_model, settings.get("quality", DEFAULT_IMAGE_QUALITY)
+        return image_model, str(settings.get("quality", DEFAULT_IMAGE_QUALITY))
 
     def _maybe_randomize_google_prompt(
-        self, google_client, text_prompt, randomize_prompt
-    ):
+        self, google_client: Any, text_prompt: str, randomize_prompt: bool
+    ) -> str:
         if not randomize_prompt:
             return text_prompt
         logger.info("Remixing prompt with Gemini before image generation...")
@@ -196,7 +206,9 @@ class AIImage(BasePlugin):
         logger.info(f"Remixed prompt: '{randomized}'")
         return randomized
 
-    def _maybe_randomize_openai_prompt(self, ai_client, text_prompt, randomize_prompt):
+    def _maybe_randomize_openai_prompt(
+        self, ai_client: Any, text_prompt: str, randomize_prompt: bool
+    ) -> str:
         if not randomize_prompt:
             return text_prompt
         logger.info("Remixing prompt with GPT before image generation...")
@@ -216,8 +228,8 @@ class AIImage(BasePlugin):
         return randomized
 
     def _generate_google_image(
-        self, device_config, text_prompt, image_model, randomize
-    ):
+        self, device_config: Any, text_prompt: str, image_model: str, randomize: bool
+    ) -> ImageType:
         api_key = device_config.load_env_key("GOOGLE_AI_SECRET")
         if not api_key:
             logger.error("Google AI API Key not configured")
@@ -234,13 +246,13 @@ class AIImage(BasePlugin):
 
     def _generate_openai_image(
         self,
-        device_config,
-        text_prompt,
-        image_model,
-        image_quality,
-        orientation,
-        randomize,
-    ):
+        device_config: Any,
+        text_prompt: str,
+        image_model: str,
+        image_quality: str,
+        orientation: str,
+        randomize: bool,
+    ) -> ImageType:
         api_key = device_config.load_env_key("OPEN_AI_SECRET")
         if not api_key:
             logger.error("OpenAI API Key not configured")
@@ -257,20 +269,29 @@ class AIImage(BasePlugin):
             orientation=orientation,
         )
 
-    def generate_image(self, settings, device_config):
+    def generate_image(
+        self, settings: Mapping[str, object], device_config: Any
+    ) -> ImageType:
         logger.info("=== AI Image Plugin: Starting image generation ===")
 
-        provider = settings.get("provider", "openai")
+        provider_value = settings.get("provider", "openai")
+        provider = provider_value if isinstance(provider_value, str) else "openai"
+        if not provider:
+            raise RuntimeError("Provider is required.")
         text_prompt = settings.get("textPrompt", "")
+        if not isinstance(text_prompt, str):
+            text_prompt = ""
         image_model, image_quality = self._validate_generate_inputs(settings, provider)
         randomize_prompt = settings.get("randomizePrompt") == "true"
         orientation = device_config.get_config("orientation")
+        if not isinstance(orientation, str):
+            orientation = "horizontal"
 
         logger.info(
             f"Settings: provider={provider}, model={image_model}, quality={image_quality}, orientation={orientation}"
         )
 
-        image = None
+        image: ImageType | None = None
         try:
             if provider == "google":
                 image = self._generate_google_image(
@@ -308,12 +329,12 @@ class AIImage(BasePlugin):
 
     def fetch_image(
         self,
-        ai_client,
-        prompt,
-        model=DEFAULT_IMAGE_MODEL,
-        quality="medium",
-        orientation="horizontal",
-    ):
+        ai_client: Any,
+        prompt: str,
+        model: str = DEFAULT_IMAGE_MODEL,
+        quality: str = "medium",
+        orientation: str = "horizontal",
+    ) -> ImageType:
         """Fetch image from OpenAI API."""
         logger.info(
             f"Generating image for prompt: {prompt}, model: {model}, quality: {quality}"
@@ -345,14 +366,15 @@ class AIImage(BasePlugin):
         response = ai_client.images.generate(**args)
         image_base64 = response.data[0].b64_json
         image_bytes = base64.b64decode(image_base64)
-        image = self.image_loader.from_bytesio(
+        image_loader = cast(Any, self.image_loader)
+        image = image_loader.from_bytesio(
             BytesIO(image_bytes), (1536, 1536), resize=False
         )
         if image is None:
             raise RuntimeError("Failed to decode generated image")
         return image
 
-    def fetch_image_google(self, client, prompt, model):
+    def fetch_image_google(self, client: Any, prompt: str, model: str) -> ImageType:
         """Fetch image from Google Imagen API."""
         from google.genai import types
 
@@ -375,7 +397,8 @@ class AIImage(BasePlugin):
         )
         if not response.generated_images:
             raise RuntimeError("Google Imagen returned no images")
-        image = self.image_loader.from_bytesio(
+        image_loader = cast(Any, self.image_loader)
+        image = image_loader.from_bytesio(
             BytesIO(response.generated_images[0].image.image_bytes),
             (1536, 1536),
             resize=False,
@@ -385,7 +408,7 @@ class AIImage(BasePlugin):
         return image
 
     @staticmethod
-    def fetch_image_prompt(ai_client, from_prompt=None):
+    def fetch_image_prompt(ai_client: Any, from_prompt: str | None = None) -> str:
         logger.info("Getting random image prompt...")
 
         system_content = (
@@ -441,7 +464,7 @@ class AIImage(BasePlugin):
         return prompt
 
     @staticmethod
-    def fetch_image_prompt_google(client, from_prompt=None):
+    def fetch_image_prompt_google(client: Any, from_prompt: str | None = None) -> str:
         """Use Gemini to remix a prompt before generating an image."""
         from google.genai import types
 

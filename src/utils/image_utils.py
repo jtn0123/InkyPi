@@ -93,7 +93,7 @@ def load_image_from_path(
         return None
 
 
-def get_image(image_url, timeout_seconds: float = 10.0):
+def get_image(image_url: str, timeout_seconds: float = 10.0) -> Image.Image | None:
     """Fetch an image from a URL and return a PIL Image, or None on failure.
 
     The hostname is validated and DNS-pinned for the duration of the fetch
@@ -141,7 +141,9 @@ def get_image(image_url, timeout_seconds: float = 10.0):
     return img
 
 
-def _stream_to_disk(url: str, timeout: float, hostname: str, pinned_ips: tuple) -> str:
+def _stream_to_disk(
+    url: str, timeout: float, hostname: str, pinned_ips: tuple[str, ...]
+) -> str:
     """Download *url* to a temporary file via streaming and return its path.
 
     The caller is responsible for deleting the file when done.  The response
@@ -218,7 +220,9 @@ def fetch_and_resize_remote_image(
     return resized
 
 
-def change_orientation(image, orientation, inverted: bool = False):
+def change_orientation(
+    image: Image.Image, orientation: str, inverted: bool = False
+) -> Image.Image:
     """Rotate an image based on the given orientation.
 
     Raises a :class:`ValueError` if an unsupported orientation is provided.
@@ -236,7 +240,11 @@ def change_orientation(image, orientation, inverted: bool = False):
     return image.rotate(angle, expand=1)
 
 
-def resize_image(image, desired_size, image_settings=None):
+def resize_image(
+    image: Image.Image,
+    desired_size: tuple[int, int],
+    image_settings: list[str] | None = None,
+) -> Image.Image:
     """Crop and resize an image to the desired dimensions while preserving aspect ratio.
 
     The image is first cropped to match the target aspect ratio (centred by
@@ -296,7 +304,9 @@ def resize_image(image, desired_size, image_settings=None):
     return image.resize((desired_width, desired_height), LANCZOS)
 
 
-def apply_image_enhancement(img, image_settings=None):
+def apply_image_enhancement(
+    img: Image.Image, image_settings: dict[str, float] | None = None
+) -> Image.Image:
     """Apply brightness, contrast, saturation, and sharpness adjustments to an image.
 
     Each parameter defaults to ``1.0`` (no change) when absent from
@@ -357,7 +367,7 @@ def pad_image_blur(img: Image, dimensions: tuple[int, int]) -> Image:
     return bkg
 
 
-def compute_image_hash(image):
+def compute_image_hash(image: Image.Image) -> str:
     """Compute SHA-256 hash of an image.
 
     Raises:
@@ -422,7 +432,11 @@ def _playwright_screenshot_html(
     return img
 
 
-def take_screenshot_html(html_str, dimensions, timeout_ms=None):
+def take_screenshot_html(
+    html_str: str,
+    dimensions: tuple[int, int],
+    timeout_ms: int | None = None,
+) -> Image.Image | None:
     """Render an HTML string as an image by writing it to a temporary file.
 
     Prefers Playwright for rendering (better local-asset support); falls back
@@ -481,7 +495,7 @@ def take_screenshot_html(html_str, dimensions, timeout_ms=None):
 def _find_browser_command(
     target: str,
     img_file_path: str,
-    dimensions: tuple,
+    dimensions: tuple[int, int],
     timeout_ms: int | None,
 ) -> list[str] | None:
     """Return the browser subprocess command for a headless screenshot, or None.
@@ -585,7 +599,7 @@ def _run_browser_subprocess(
 
 def _take_screenshot_once(
     target: str,
-    dimensions: tuple,
+    dimensions: tuple[int, int],
     timeout_ms: int | None,
     attempt: int,
 ) -> tuple[Image.Image | None, bool]:
@@ -668,7 +682,11 @@ def _take_screenshot_once(
     return image, transient
 
 
-def take_screenshot(target, dimensions, timeout_ms=None):
+def take_screenshot(
+    target: str,
+    dimensions: tuple[int, int],
+    timeout_ms: int | None = None,
+) -> Image.Image | None:
     """Capture a screenshot of *target* using a headless browser subprocess.
 
     Iterates through known browser binaries (Chrome, Chromium) to find one

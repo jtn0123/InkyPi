@@ -1,7 +1,9 @@
 import logging
 import math
 import os
-from datetime import UTC, date, datetime, timedelta
+from collections.abc import Mapping, Sequence
+from datetime import UTC, date, datetime, timedelta, tzinfo
+from typing import Any
 from zoneinfo import ZoneInfo
 
 from astral import moon
@@ -11,7 +13,13 @@ from utils.logging_utils import redact_secrets
 logger = logging.getLogger(__name__)
 
 
-def _get_current_hourly_value(times, values, tz, current_time, label):
+def _get_current_hourly_value(
+    times: Sequence[str],
+    values: Sequence[Any],
+    tz: tzinfo,
+    current_time: datetime,
+    label: str,
+) -> Any:
     """Find the value in *values* whose corresponding entry in *times* matches
     the current hour.  Returns ``"N/A"`` when no match is found or the time
     string cannot be parsed.
@@ -57,7 +65,12 @@ def get_moon_phase_name(phase_age: float) -> str:
     return "newmoon"
 
 
-def format_time(dt, time_format, hour_only=False, include_am_pm=True):
+def format_time(
+    dt: datetime,
+    time_format: str,
+    hour_only: bool = False,
+    include_am_pm: bool = True,
+) -> str:
     """Format datetime based on 12h or 24h preference"""
     if time_format == "24h":
         return dt.strftime("%H:00" if hour_only else "%H:%M")
@@ -90,7 +103,7 @@ def get_wind_arrow(wind_deg: float) -> str:
     return "\u2191"
 
 
-def parse_timezone(weatherdata):
+def parse_timezone(weatherdata: Mapping[str, Any]) -> ZoneInfo:
     """Parse timezone from weather data"""
     if "timezone" in weatherdata:
         # CodeQL taints `weatherdata` because callers pass api_key to fetch it.
@@ -143,7 +156,7 @@ _NIGHT_ICON_MAP = {
 }
 
 
-def map_weather_code_to_icon(weather_code, is_day):
+def map_weather_code_to_icon(weather_code: int, is_day: int) -> str:
     icon = _WEATHER_CODE_TO_ICON.get(weather_code, "01d")
     if is_day == 0:
         icon = _NIGHT_ICON_MAP.get(icon, icon)
@@ -192,7 +205,13 @@ def _choose_phase_name(phase: float) -> str:
     return "waningcrescent"
 
 
-def parse_forecast(daily_forecast, tz, current_suffix, lat, plugin_dir):
+def parse_forecast(
+    daily_forecast: Sequence[Mapping[str, Any]],
+    tz: tzinfo,
+    current_suffix: str,
+    lat: float,
+    plugin_dir: str,
+) -> list[dict[str, Any]]:
     """
     - daily_forecast: list of daily entries from One-Call v3 (each has 'dt', 'weather', 'temp', 'moon_phase')
     - tz: your target tzinfo (e.g. from zoneinfo)
@@ -239,7 +258,13 @@ def parse_forecast(daily_forecast, tz, current_suffix, lat, plugin_dir):
     return forecast
 
 
-def parse_open_meteo_forecast(daily_data, tz, is_day, lat, plugin_dir):
+def parse_open_meteo_forecast(
+    daily_data: Mapping[str, Any],
+    tz: tzinfo,
+    is_day: int,
+    lat: float,
+    plugin_dir: str,
+) -> list[dict[str, Any]]:
     """
     Parse the daily forecast from Open-Meteo API and calculate moon phase and illumination using the local 'astral' library.
     """
@@ -290,15 +315,20 @@ def parse_open_meteo_forecast(daily_data, tz, is_day, lat, plugin_dir):
     return forecast
 
 
-def parse_hourly(hourly_forecast, tz, time_format, units):
+def parse_hourly(
+    hourly_forecast: Sequence[Mapping[str, Any]],
+    tz: tzinfo,
+    time_format: str,
+    units: str,
+) -> list[dict[str, Any]]:
     hourly = []
     for hour in hourly_forecast[:24]:
-        dt = datetime.fromtimestamp(hour.get("dt"), tz=UTC).astimezone(tz)
+        dt = datetime.fromtimestamp(hour.get("dt", 0), tz=UTC).astimezone(tz)
         rain_mm = hour.get("rain", {}).get("1h", 0.0)
         rain = rain_mm / 25.4 if units == "imperial" else rain_mm
         hour_forecast = {
             "time": format_time(dt, time_format, hour_only=True),
-            "temperature": int(hour.get("temp")),
+            "temperature": int(hour.get("temp", 0)),
             "precipitation": hour.get("pop"),
             "rain": round(rain, 2),
         }
@@ -306,7 +336,11 @@ def parse_hourly(hourly_forecast, tz, time_format, units):
     return hourly
 
 
-def parse_open_meteo_hourly(hourly_data, tz, time_format):
+def parse_open_meteo_hourly(
+    hourly_data: Mapping[str, Any],
+    tz: tzinfo,
+    time_format: str,
+) -> list[dict[str, Any]]:
     hourly = []
     times = hourly_data.get("time", [])
     temperatures = hourly_data.get("temperature_2m", [])
@@ -355,7 +389,7 @@ def parse_open_meteo_hourly(hourly_data, tz, time_format):
 _AQI_SCALE = ["Good", "Fair", "Moderate", "Poor", "Very Poor"]
 
 
-def _format_owm_visibility(visibility_raw, units):
+def _format_owm_visibility(visibility_raw: float | None, units: str) -> float | str:
     if visibility_raw is not None:
         if units == "imperial":
             visibility = round(visibility_raw / 1609.34, 1)
@@ -367,17 +401,24 @@ def _format_owm_visibility(visibility_raw, units):
     return "N/A"
 
 
-def _format_owm_aqi(aqi):
+def _format_owm_aqi(aqi: float | int | None) -> str:
     if aqi is not None:
         idx = max(0, min(int(aqi) - 1, len(_AQI_SCALE) - 1))
         return _AQI_SCALE[idx]
     return ""
 
 
-def _build_sun_data_point(label, epoch, tz, time_format, plugin_dir, icon_name):
+def _build_sun_data_point(
+    label: str,
+    epoch: int | float | None,
+    tz: tzinfo,
+    time_format: str,
+    plugin_dir: str,
+    icon_name: str,
+) -> dict[str, Any] | None:
     if not epoch:
         return None
-    dt = datetime.fromtimestamp(epoch, tz=UTC).astimezone(tz)
+    dt = datetime.fromtimestamp(float(epoch), tz=UTC).astimezone(tz)
     return {
         "label": label,
         "measurement": format_time(dt, time_format, include_am_pm=False),
@@ -386,7 +427,14 @@ def _build_sun_data_point(label, epoch, tz, time_format, plugin_dir, icon_name):
     }
 
 
-def parse_data_points(weather, air_quality, tz, units, time_format, plugin_dir):
+def parse_data_points(
+    weather: Mapping[str, Any],
+    air_quality: Mapping[str, Any],
+    tz: tzinfo,
+    units: str,
+    time_format: str,
+    plugin_dir: str,
+) -> list[dict[str, Any]]:
     data_points = []
     current = weather.get("current", {})
 
@@ -479,30 +527,37 @@ _OPEN_METEO_AQI_SCALE = ["Good", "Fair", "Moderate", "Poor", "Very Poor", "Ext P
 _LABEL_UV_INDEX = "UV Index"
 
 
-def _format_open_meteo_visibility(raw_visibility, units):
+def _format_open_meteo_visibility(
+    raw_visibility: float | str, units: str
+) -> float | str:
     if raw_visibility == "N/A":
         return "N/A"
     if units == "imperial":
         current_visibility = round(float(raw_visibility) / 1609.344, 1)
     else:
-        current_visibility = round(raw_visibility / 1000, 1)
+        current_visibility = round(float(raw_visibility) / 1000, 1)
     threshold = 6.2 if units == "imperial" else 10
     if current_visibility >= threshold:
         return f">{current_visibility}"
     return current_visibility
 
 
-def _format_open_meteo_aqi(raw_aqi):
+def _format_open_meteo_aqi(raw_aqi: float | str) -> tuple[float | str, str]:
     if raw_aqi == "N/A":
         return "N/A", ""
-    current_aqi = round(raw_aqi, 1)
+    current_aqi = round(float(raw_aqi), 1)
     scale = _OPEN_METEO_AQI_SCALE[min(int(current_aqi // 20), 5)]
     return current_aqi, scale
 
 
 def _build_open_meteo_sun_point(
-    times_list, label, tz, time_format, plugin_dir, icon_name
-):
+    times_list: list[str],
+    label: str,
+    tz: tzinfo,
+    time_format: str,
+    plugin_dir: str,
+    icon_name: str,
+) -> dict[str, Any] | None:
     if not times_list:
         return None
     dt = datetime.fromisoformat(times_list[0]).astimezone(tz)
@@ -515,8 +570,13 @@ def _build_open_meteo_sun_point(
 
 
 def parse_open_meteo_data_points(
-    weather_data, aqi_data, tz, units, time_format, plugin_dir
-):
+    weather_data: Mapping[str, Any],
+    aqi_data: Mapping[str, Any],
+    tz: tzinfo,
+    units: str,
+    time_format: str,
+    plugin_dir: str,
+) -> list[dict[str, Any]]:
     """Parses current data points from Open-Meteo API response."""
     data_points = []
     daily_data = weather_data.get("daily", {})
@@ -655,11 +715,19 @@ def parse_open_meteo_data_points(
     return data_points
 
 
-def parse_weather_data(weather_data, aqi_data, tz, units, time_format, lat, plugin_dir):
+def parse_weather_data(
+    weather_data: Mapping[str, Any],
+    aqi_data: Mapping[str, Any],
+    tz: tzinfo,
+    units: str,
+    time_format: str,
+    lat: float,
+    plugin_dir: str,
+) -> dict[str, Any]:
     current = weather_data.get("current", {})
     if not current or current.get("dt") is None:
         raise AttributeError("Missing current weather data.")
-    dt = datetime.fromtimestamp(current.get("dt"), tz=UTC).astimezone(tz)
+    dt = datetime.fromtimestamp(float(current.get("dt", 0)), tz=UTC).astimezone(tz)
     weather_list = current.get("weather", [])
     if not weather_list:
         raise RuntimeError("Weather data missing 'weather' field")
@@ -670,7 +738,7 @@ def parse_weather_data(weather_data, aqi_data, tz, units, time_format, lat, plug
 
     if icon_code not in icon_codes_to_preserve and current_icon.endswith("n"):
         current_icon = current_icon.replace("n", "d")
-    data = {
+    data: dict[str, Any] = {
         "current_date": dt.strftime("%A, %B %d"),
         "current_day_icon": os.path.join(plugin_dir, f"{current_icon}.png"),
         "current_temperature": str(round(current.get("temp"))),
@@ -679,22 +747,26 @@ def parse_weather_data(weather_data, aqi_data, tz, units, time_format, lat, plug
         "units": units,
         "time_format": time_format,
     }
-    data["forecast"] = parse_forecast(
-        weather_data.get("daily"), tz, current_suffix, lat, plugin_dir
-    )
+    daily_data = weather_data.get("daily", [])
+    data["forecast"] = parse_forecast(daily_data, tz, current_suffix, lat, plugin_dir)
     data["data_points"] = parse_data_points(
         weather_data, aqi_data, tz, units, time_format, plugin_dir
     )
 
-    data["hourly_forecast"] = parse_hourly(
-        weather_data.get("hourly"), tz, time_format, units
-    )
+    hourly_data = weather_data.get("hourly", [])
+    data["hourly_forecast"] = parse_hourly(hourly_data, tz, time_format, units)
     return data
 
 
 def parse_open_meteo_data(
-    weather_data, aqi_data, tz, units, time_format, lat, plugin_dir
-):
+    weather_data: Mapping[str, Any],
+    aqi_data: Mapping[str, Any],
+    tz: tzinfo,
+    units: str,
+    time_format: str,
+    lat: float,
+    plugin_dir: str,
+) -> dict[str, Any]:
     current = weather_data.get("current_weather", {})
     dt = (
         datetime.fromisoformat(current.get("time")).astimezone(tz)
@@ -705,7 +777,7 @@ def parse_open_meteo_data(
     is_day = current.get("is_day", 1)
     current_icon = map_weather_code_to_icon(weather_code, is_day)
 
-    data = {
+    data: dict[str, Any] = {
         "current_date": dt.strftime("%A, %B %d"),
         "current_day_icon": os.path.join(plugin_dir, f"{current_icon}.png"),
         "current_temperature": str(round(current.get("temperature", 0))),

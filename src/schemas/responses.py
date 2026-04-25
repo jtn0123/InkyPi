@@ -356,7 +356,7 @@ class DiagnosticsClientLogErrors(TypedDict):
 
     count_5m: int
     warn_count_5m: int
-    last_error_ts: str | None
+    last_error_ts: float | None
     window_seconds: int
 
 

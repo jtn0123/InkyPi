@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import logging
 
-from flask import Flask, request
+from flask import Flask, Response, request
 
 from schemas.endpoint_map import ENDPOINT_SCHEMAS
 from schemas.validator import validate_typeddict
@@ -24,8 +24,8 @@ logger = logging.getLogger(__name__)
 def register(app: Flask) -> None:
     """Attach the dev-only response schema validator to *app*."""
 
-    @app.after_request
-    def _validate_response_schema(response):
+    @app.after_request  # type: ignore
+    def _validate_response_schema(response: Response) -> Response:
         try:
             if response.mimetype != "application/json":
                 return response

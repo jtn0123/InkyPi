@@ -1,17 +1,22 @@
 import logging
+from collections.abc import Mapping
 from datetime import UTC, date, datetime, timedelta
+from typing import cast
 
-from plugins.base_plugin.base_plugin import BasePlugin
+from PIL import Image
+
+from plugins.base_plugin.base_plugin import BasePlugin, DeviceConfigLike
 from plugins.base_plugin.settings_schema import field, row, schema, section
 from utils.time_utils import get_timezone
 
 logger = logging.getLogger(__name__)
 
 
-class Countdown(BasePlugin):
-    def validate_settings(self, settings: dict) -> str | None:
+class Countdown(BasePlugin):  # type: ignore[misc, unused-ignore]
+    def validate_settings(self, settings: Mapping[str, object]) -> str | None:
         """Reject invalid countdown dates at save time."""
-        date_str = (settings.get("date") or "").strip()
+        raw_date = settings.get("date")
+        date_str = raw_date.strip() if isinstance(raw_date, str) else ""
         if not date_str:
             return "Date is required."
         try:
@@ -20,40 +25,47 @@ class Countdown(BasePlugin):
             return f"Invalid date format: {date_str!r} (expected YYYY-MM-DD)"
         return None
 
-    def build_settings_schema(self):
+    def build_settings_schema(self) -> dict[str, object]:
         tomorrow = (datetime.now(tz=UTC) + timedelta(days=1)).strftime("%Y-%m-%d")
-        return schema(
-            section(
-                "Countdown",
-                row(
-                    field(
-                        "title",
-                        label="Title",
-                        placeholder="Required title, e.g. Vacation",
-                        required=True,
+        return cast(  # type: ignore[redundant-cast, unused-ignore]
+            dict[str, object],
+            schema(
+                section(
+                    "Countdown",
+                    row(
+                        field(
+                            "title",
+                            label="Title",
+                            placeholder="Required title, e.g. Vacation",
+                            required=True,
+                        ),
+                        field("date", "date", label="Target Date", default=tomorrow),
                     ),
-                    field("date", "date", label="Target Date", default=tomorrow),
-                ),
-            )
+                )
+            ),
         )
 
-    def generate_settings_template(self):
+    def generate_settings_template(self) -> dict[str, object]:
         template_params = super().generate_settings_template()
         template_params["style_settings"] = True
-        return template_params
+        return cast(dict[str, object], template_params)  # type: ignore[redundant-cast, unused-ignore]
 
-    def generate_image(self, settings, device_config):
+    def generate_image(
+        self, settings: Mapping[str, object], device_config: DeviceConfigLike
+    ) -> Image.Image:
         dimensions = self.get_oriented_dimensions(device_config)
 
         tz_name = device_config.get_config("timezone", default="America/New_York")
-        tz = get_timezone(tz_name)
+        tz = get_timezone(tz_name if isinstance(tz_name, str) else None)
         current_time = datetime.now(tz)
 
-        title = settings.get("title") or "Countdown"
+        raw_title = settings.get("title")
+        title = raw_title if isinstance(raw_title, str) and raw_title else "Countdown"
         countdown_date_str = settings.get("date")
         try:
             countdown_date = datetime.strptime(  # noqa: DTZ007
-                countdown_date_str or "", "%Y-%m-%d"
+                countdown_date_str if isinstance(countdown_date_str, str) else "",
+                "%Y-%m-%d",
             ).replace(tzinfo=tz)
         except ValueError:
             # Fall back to 30 days out so the plugin renders something useful

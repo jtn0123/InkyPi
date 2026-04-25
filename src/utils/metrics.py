@@ -18,7 +18,12 @@ import time
 logger = logging.getLogger(__name__)
 
 try:
-    from prometheus_client import CollectorRegistry, Counter, Gauge, Histogram
+    from prometheus_client import (
+        CollectorRegistry as _RealCollectorRegistry,
+        Counter as _RealCounter,
+        Gauge as _RealGauge,
+        Histogram as _RealHistogram,
+    )
 
     _PROMETHEUS_AVAILABLE = True
 except ModuleNotFoundError:
@@ -50,14 +55,19 @@ except ModuleNotFoundError:
         def __call__(self, *_: object, **__: object) -> _NoopMetric:
             return _NoopMetric()
 
-    CollectorRegistry = _NoopRegistryFactory()  # type: ignore[assignment]
-    Counter = _NoopMetricFactory()  # type: ignore[assignment]
-    Gauge = _NoopMetricFactory()  # type: ignore[assignment]
-    Histogram = _NoopMetricFactory()  # type: ignore[assignment]
+    CollectorRegistry = _NoopRegistryFactory()
+    Counter = _NoopMetricFactory()
+    Gauge = _NoopMetricFactory()
+    Histogram = _NoopMetricFactory()
 
     logger.warning(
         "prometheus_client is not installed; metrics collection is disabled."
     )
+else:
+    CollectorRegistry = _RealCollectorRegistry
+    Counter = _RealCounter
+    Gauge = _RealGauge
+    Histogram = _RealHistogram
 
 # ---------------------------------------------------------------------------
 # Registry — one per process; tests can create fresh instances as needed.

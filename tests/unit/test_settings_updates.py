@@ -481,6 +481,10 @@ class TestStartUpdateViaSystemdValidation:
             monkeypatch.setattr(mod, "_get_update_script_path", lambda: script_path)
         return calls
 
+    def _redirect_target_version_file(self, monkeypatch, tmp_path):
+        monkeypatch.setenv("INKYPI_LOCKFILE_DIR", str(tmp_path))
+        return tmp_path / "update-target-version"
+
     def test_rejects_target_tag_with_shell_injection(self, monkeypatch):
         import pytest
 
@@ -519,9 +523,10 @@ class TestStartUpdateViaSystemdValidation:
             mod._start_update_via_systemd(target_tag="v1.2.3-rc_1")
         assert calls == []
 
-    def test_accepts_valid_invocation(self, monkeypatch):
+    def test_accepts_valid_invocation(self, monkeypatch, tmp_path):
         import blueprints.settings as mod
 
+        target_file = self._redirect_target_version_file(monkeypatch, tmp_path)
         calls = self._patch_popen_tracker(
             monkeypatch, "/usr/local/inkypi/install/do_update.sh"
         )
@@ -534,11 +539,14 @@ class TestStartUpdateViaSystemdValidation:
         assert any(arg.startswith("--unit=inkypi-update-") for arg in cmd)
         assert "/bin/bash" in cmd
         assert "/usr/local/inkypi/install/do_update.sh" in cmd
-        assert "v0.28.1" in cmd
+        assert "v0.28.1" not in cmd
+        assert target_file.read_text(encoding="utf-8") == "v0.28.1\n"
 
-    def test_accepts_valid_invocation_without_target_tag(self, monkeypatch):
+    def test_accepts_valid_invocation_without_target_tag(self, monkeypatch, tmp_path):
         import blueprints.settings as mod
 
+        target_file = self._redirect_target_version_file(monkeypatch, tmp_path)
+        target_file.write_text("v9.9.9\n", encoding="utf-8")
         calls = self._patch_popen_tracker(
             monkeypatch, "/usr/local/inkypi/install/update.sh"
         )
@@ -548,10 +556,12 @@ class TestStartUpdateViaSystemdValidation:
         assert "/usr/local/inkypi/install/update.sh" in cmd
         # target tag must not be appended when None
         assert cmd[-1] == "/usr/local/inkypi/install/update.sh"
+        assert not target_file.exists()
 
-    def test_accepts_valid_semver_variants(self, monkeypatch):
+    def test_accepts_valid_semver_variants(self, monkeypatch, tmp_path):
         import blueprints.settings as mod
 
+        target_file = self._redirect_target_version_file(monkeypatch, tmp_path)
         calls = self._patch_popen_tracker(
             monkeypatch, "/usr/local/inkypi/install/do_update.sh"
         )
@@ -561,13 +571,16 @@ class TestStartUpdateViaSystemdValidation:
         for call, tag in zip(
             calls, ("v0.28.1", "0.28.1", "v1.0.0-beta.1", "2.3.4-rc1"), strict=True
         ):
-            assert call[-1] == tag
+            assert call[-1] == "/usr/local/inkypi/install/do_update.sh"
+            assert tag not in call
+        assert target_file.read_text(encoding="utf-8") == "2.3.4-rc1\n"
 
-    def test_unit_name_uses_hardcoded_prefix(self, monkeypatch):
+    def test_unit_name_uses_hardcoded_prefix(self, monkeypatch, tmp_path):
         """The systemd unit prefix MUST be the hardcoded ``inkypi-update``
         literal — no caller-controlled value can influence it."""
         import blueprints.settings as mod
 
+        self._redirect_target_version_file(monkeypatch, tmp_path)
         calls = self._patch_popen_tracker(
             monkeypatch, "/usr/local/inkypi/install/do_update.sh"
         )

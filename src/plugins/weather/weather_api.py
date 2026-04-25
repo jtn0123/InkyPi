@@ -1,5 +1,6 @@
 import logging
 import os
+from typing import Any
 
 from utils.http_client import get_http_session
 from utils.logging_utils import redact_secrets
@@ -28,7 +29,9 @@ OPEN_METEO_UNIT_PARAMS = {
 }
 
 
-def get_weather_data(api_key, units, lat, long, timeout=20):
+def get_weather_data(
+    api_key: str, units: str, lat: float, long: float, timeout: int | float = 20
+) -> Any:
     url = WEATHER_URL.format(lat=lat, long=long, units=units, api_key=api_key)
     response = get_http_session().get(url, timeout=timeout)
     if not 200 <= response.status_code < 300:
@@ -43,7 +46,9 @@ def get_weather_data(api_key, units, lat, long, timeout=20):
     return response.json()
 
 
-def get_air_quality(api_key, lat, long, timeout=20):
+def get_air_quality(
+    api_key: str, lat: float, long: float, timeout: int | float = 20
+) -> Any:
     url = AIR_QUALITY_URL.format(lat=lat, long=long, api_key=api_key)
     response = get_http_session().get(url, timeout=timeout)
 
@@ -56,7 +61,9 @@ def get_air_quality(api_key, lat, long, timeout=20):
     return response.json()
 
 
-def get_location(api_key, lat, long, timeout=20):
+def get_location(
+    api_key: str, lat: float, long: float, timeout: int | float = 20
+) -> str:
     url = GEOCODING_URL.format(lat=lat, long=long, api_key=api_key)
     response = get_http_session().get(url, timeout=timeout)
 
@@ -72,7 +79,13 @@ def get_location(api_key, lat, long, timeout=20):
     return f"{location_data.get('name')}, {location_data.get('state', location_data.get('country'))}"
 
 
-def get_open_meteo_data(lat, long, units, forecast_days, timeout=20):
+def get_open_meteo_data(
+    lat: float,
+    long: float,
+    units: str,
+    forecast_days: int,
+    timeout: int | float = 20,
+) -> Any:
     unit_params = OPEN_METEO_UNIT_PARAMS[units]
     url = (
         OPEN_METEO_FORECAST_URL.format(lat=lat, long=long, forecast_days=forecast_days)
@@ -87,7 +100,9 @@ def get_open_meteo_data(lat, long, units, forecast_days, timeout=20):
     return response.json()
 
 
-def get_open_meteo_air_quality(lat, long, timeout=20):
+def get_open_meteo_air_quality(
+    lat: float, long: float, timeout: int | float = 20
+) -> Any:
     url = OPEN_METEO_AIR_QUALITY_URL.format(lat=lat, long=long)
     response = get_http_session().get(url, timeout=timeout)
     if not 200 <= response.status_code < 300:

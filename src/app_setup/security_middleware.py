@@ -13,15 +13,22 @@ from __future__ import annotations
 import logging
 import os
 import secrets
+from collections.abc import Callable
 from time import perf_counter
+from typing import Any, cast
 from urllib.parse import quote, urlencode, urlunsplit
 
-from flask import Flask, abort, g, make_response, redirect, request, session
+from flask import Flask, Response, abort, g, make_response, redirect, request, session
 
 from app_setup.smoke import SMOKE_RENDER_PATH, smoke_render_enabled
 from config import Config
 from utils.http_utils import json_error
-from utils.rate_limit import make_auth_bucket, make_mutating_bucket, make_refresh_bucket
+from utils.rate_limit import (
+    TokenBucket,
+    make_auth_bucket,
+    make_mutating_bucket,
+    make_refresh_bucket,
+)
 from utils.rate_limiter import SlidingWindowLimiter
 
 logger = logging.getLogger(__name__)
@@ -109,8 +116,8 @@ def setup_https_redirect(app: Flask, *, dev_mode: bool) -> None:
     """When INKYPI_FORCE_HTTPS=1 (and not in dev mode), redirect HTTP→HTTPS."""
     force_https = not dev_mode and _env_bool("INKYPI_FORCE_HTTPS")
 
-    @app.before_request
-    def _redirect_to_https():
+    @app.before_request  # type: ignore
+    def _redirect_to_https() -> Response | None:
         if not force_https:
             return None
         if (
@@ -173,37 +180,43 @@ def setup_https_redirect(app: Flask, *, dev_mode: bool) -> None:
 
 
 def _generate_csrf_token() -> str:
+    raw_token = session.get("_csrf_token")
+    if isinstance(raw_token, str):
+        return raw_token
+
     if "_csrf_token" not in session:
         session["_csrf_token"] = secrets.token_hex(32)
-    return session["_csrf_token"]
+    generated_token = session["_csrf_token"]
+    return str(generated_token)
 
 
 def _extract_csrf_token_from_request() -> str | None:
     """Extract the CSRF token from the request header, form data, or JSON body."""
     header_token = request.headers.get("X-CSRFToken")
-    if header_token:
+    if isinstance(header_token, str):
         return header_token
     content_type = request.content_type or ""
     if "form" in content_type:
         form_token = request.form.get("csrf_token")
-        if form_token:
+        if isinstance(form_token, str):
             return form_token
     if "json" in content_type:
         json_body = request.get_json(silent=True)
         if isinstance(json_body, dict):
-            return json_body.get("_csrf_token")
+            candidate = json_body.get("_csrf_token")
+            return candidate if isinstance(candidate, str) else None
     return None
 
 
 def setup_csrf_protection(app: Flask) -> None:
     """Register CSRF token generation and per-request validation."""
 
-    @app.context_processor
-    def _inject_csrf_token():
+    @app.context_processor  # type: ignore
+    def _inject_csrf_token() -> dict[str, Any]:
         return {"csrf_token": _generate_csrf_token}
 
-    @app.before_request
-    def _check_csrf_token():
+    @app.before_request  # type: ignore
+    def _check_csrf_token() -> Response | None:
         if request.method in _CSRF_SAFE_METHODS:
             return None
         if request.path in _CSRF_EXEMPT_PATHS:
@@ -215,11 +228,13 @@ def setup_csrf_protection(app: Flask) -> None:
         if request.path == SMOKE_RENDER_PATH and smoke_render_enabled():
             return None
         token = session.get("_csrf_token")
+        if not isinstance(token, str):
+            token = None
         if not token:
             _generate_csrf_token()
             return json_error("CSRF token missing or invalid", status=403)
         request_token = _extract_csrf_token_from_request()
-        if not request_token or not secrets.compare_digest(request_token, token):
+        if request_token is None or not secrets.compare_digest(request_token, token):
             return json_error("CSRF token missing or invalid", status=403)
         return None
 
@@ -245,9 +260,9 @@ _mutation_limiter = SlidingWindowLimiter(_MUTATE_MAX, _MUTATE_WINDOW)
 
 # Endpoint-specific token-bucket limiters (lazy-initialised at first call to
 # setup_rate_limiting so env vars set after import are respected).
-_auth_bucket = None
-_refresh_bucket = None
-_mutating_bucket = None
+_auth_bucket: TokenBucket | None = None
+_refresh_bucket: TokenBucket | None = None
+_mutating_bucket: TokenBucket | None = None
 
 
 def _is_mutating_path(path: str) -> bool:
@@ -255,25 +270,28 @@ def _is_mutating_path(path: str) -> bool:
     return path in _MUTATING_RATE_PATHS or path.startswith(_MUTATING_RATE_PREFIX)
 
 
-def _apply_token_bucket_limits(path: str, addr: str):
+def _apply_token_bucket_limits(path: str, addr: str) -> Response | None:
     """Check per-endpoint token-bucket limits; return a 429 response or None.
 
     Extracted to keep ``_rate_limit_mutations`` below SonarCloud's cognitive
     complexity threshold (S3776).
     """
-    if path in _AUTH_RATE_PATHS and not _auth_bucket.try_acquire(addr):  # type: ignore[union-attr]
+    if _auth_bucket is None or _refresh_bucket is None or _mutating_bucket is None:
+        return None
+
+    if path in _AUTH_RATE_PATHS and not _auth_bucket.try_acquire(addr):
         body, code = json_error("Too many login attempts — try again later", status=429)
         resp = make_response(body, code)
         resp.headers["Retry-After"] = "30"
         return resp
-    if path in _REFRESH_RATE_PATHS and not _refresh_bucket.try_acquire(addr):  # type: ignore[union-attr]
+    if path in _REFRESH_RATE_PATHS and not _refresh_bucket.try_acquire(addr):
         body, code = json_error(
             "Refresh rate limit exceeded — try again later", status=429
         )
         resp = make_response(body, code)
         resp.headers["Retry-After"] = "6"
         return resp
-    if _is_mutating_path(path) and not _mutating_bucket.try_acquire(addr):  # type: ignore[union-attr]
+    if _is_mutating_path(path) and not _mutating_bucket.try_acquire(addr):
         body, code = json_error("Too many requests — try again later", status=429)
         resp = make_response(body, code)
         resp.headers["Retry-After"] = "6"
@@ -297,8 +315,8 @@ def setup_rate_limiting(app: Flask) -> None:
     _refresh_bucket = make_refresh_bucket()
     _mutating_bucket = make_mutating_bucket()
 
-    @app.before_request
-    def _rate_limit_mutations():
+    @app.before_request  # type: ignore
+    def _rate_limit_mutations() -> Response | None:
         if request.method in _CSRF_SAFE_METHODS:
             return None
         if request.path in _RATE_EXEMPT:
@@ -339,12 +357,12 @@ def setup_csp_nonce(app: Flask) -> None:
     intentionally NOT used.
     """
 
-    @app.before_request
-    def _generate_csp_nonce():
+    @app.before_request  # type: ignore
+    def _generate_csp_nonce() -> None:
         g.csp_nonce = secrets.token_urlsafe(16)
 
-    @app.context_processor
-    def _inject_csp_nonce():
+    @app.context_processor  # type: ignore
+    def _inject_csp_nonce() -> dict[str, Any]:
         return {"csp_nonce": getattr(g, "csp_nonce", "")}
 
 
@@ -372,7 +390,7 @@ _DEFAULT_CSP_TEMPLATE = (
 )
 
 
-def _emit_request_timing_log(response) -> None:
+def _emit_request_timing_log(response: Response) -> None:
     """Emit a timing log line if INKYPI_REQUEST_TIMING is set."""
     if not _env_bool("INKYPI_REQUEST_TIMING"):
         return
@@ -397,7 +415,7 @@ def _emit_request_timing_log(response) -> None:
     )
 
 
-def _apply_static_cache_headers(response) -> None:
+def _apply_static_cache_headers(response: Response) -> None:
     """Set long-lived Cache-Control on hashed static assets."""
     if not request.path.startswith("/static/"):
         return
@@ -410,7 +428,7 @@ def _apply_static_cache_headers(response) -> None:
         response.headers.setdefault("Cache-Control", f"public, max-age={_CACHE_1_DAY}")
 
 
-def _apply_baseline_security_headers(response) -> None:
+def _apply_baseline_security_headers(response: Response) -> None:
     """Set the always-on baseline security headers."""
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
     response.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
@@ -420,7 +438,7 @@ def _apply_baseline_security_headers(response) -> None:
     )
 
 
-def _apply_hsts_header(response) -> None:
+def _apply_hsts_header(response: Response) -> None:
     """Set HSTS when the request arrived over HTTPS (or via a TLS proxy)."""
     is_https = (
         request.is_secure
@@ -433,7 +451,7 @@ def _apply_hsts_header(response) -> None:
         )
 
 
-def _apply_csp_header(response, *, dev_mode: bool) -> None:
+def _apply_csp_header(response: Response, *, dev_mode: bool) -> None:
     """Set the Content-Security-Policy header (report-only in dev mode)."""
     nonce = getattr(g, "csp_nonce", "")
     # Honour operator-supplied CSP verbatim (no nonce injection).
@@ -450,25 +468,30 @@ def _apply_csp_header(response, *, dev_mode: bool) -> None:
         response.headers[header_name] = csp_value
 
 
-def _apply_hot_reload_header(response, *, dev_mode: bool) -> None:
+def _apply_hot_reload_header(response: Response, *, dev_mode: bool) -> None:
     """Surface the dev-mode plugin hot-reload status as a response header."""
     # Resolve the symbol from the inkypi module so monkey-patches in
     # tests/unit/test_inkypi.py affect the call here too.
     import sys
 
     inkypi_mod = sys.modules.get("inkypi")
-    pop_fn = (
-        getattr(inkypi_mod, "pop_hot_reload_info", None)
-        if inkypi_mod is not None
-        else None
-    )
+    pop_fn: Callable[[], dict[str, Any] | None] | None = None
+    if inkypi_mod is not None:
+        candidate = getattr(inkypi_mod, "pop_hot_reload_info", None)
+        if callable(candidate):
+            pop_fn = cast(Callable[[], dict[str, Any] | None], candidate)
+
     if pop_fn is None:
-        from plugins.plugin_registry import pop_hot_reload_info as pop_fn
+        from plugins.plugin_registry import pop_hot_reload_info
+
+        pop_fn = pop_hot_reload_info
+
     info = pop_fn()
     if info and dev_mode:
+        reloaded = info.get("reloaded")
         response.headers.setdefault(
             "X-InkyPi-Hot-Reload",
-            f"{info['plugin_id']}:{int(info['reloaded'])}",
+            f"{info.get('plugin_id')}:{int(reloaded) if isinstance(reloaded, bool) else 0}",
         )
 
 
@@ -479,8 +502,8 @@ def setup_security_headers(app: Flask, *, dev_mode: bool) -> None:
     cognitive complexity stays low (SonarCloud S3776).
     """
 
-    @app.after_request
-    def _set_security_headers(response):
+    @app.after_request  # type: ignore
+    def _set_security_headers(response: Response) -> Response:
         for step in (
             _emit_request_timing_log,
             _apply_static_cache_headers,

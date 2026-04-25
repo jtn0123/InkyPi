@@ -11,7 +11,7 @@ import json
 import logging
 import os
 from functools import lru_cache
-from typing import Any
+from typing import Any, cast
 
 logger = logging.getLogger(__name__)
 
@@ -22,9 +22,10 @@ SCHEMA_PATH = os.path.join(_SRC_DIR, "config", "schemas", "device_config.schema.
 # Module-level reference so tests can monkeypatch: e.g.
 #   monkeypatch.setattr("utils.config_schema.jsonschema", None)
 try:
-    import jsonschema as jsonschema  # type: ignore[assignment]
+    import jsonschema as _jsonschema_module
 except ImportError:  # pragma: no cover
-    jsonschema = None  # type: ignore[assignment]
+    _jsonschema_module = None
+jsonschema: Any | None = _jsonschema_module
 
 
 class ConfigValidationError(ValueError):
@@ -40,7 +41,7 @@ class ConfigValidationError(ValueError):
 def _load_schema(schema_path: str) -> dict[str, Any]:
     """Load and cache the device config JSON Schema from *schema_path*."""
     with open(schema_path) as fh:
-        return json.load(fh)  # type: ignore[return-value]
+        return cast(dict[str, Any], json.load(fh))
 
 
 def _format_error(ve: Any) -> str:

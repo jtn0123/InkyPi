@@ -1,32 +1,42 @@
 import html
 import re
+from collections.abc import Callable, Mapping
+from typing import Any, TypedDict
 
 import feedparser
 
 from utils.http_utils import http_get
 
 
-def _match(pattern, text):
+def _match(pattern: str, text: str) -> str:
     """Extract first capture group from pattern, or return empty string on failure."""
     m = re.search(pattern, text)
     return m.group(1) if m else ""
 
 
-def _img_src(element):
+def _img_src(element: str) -> str:
     return _match(r'<img[^>]+src=["\"]([^"\"]+)["\"]', element)
 
 
-def _img_alt(element):
+def _img_alt(element: str) -> str:
     return _match(r'<img[^>]+alt=["\"]([^"\"]+)["\"]', element)
 
 
-def _split_safe(text, sep, index):
+def _split_safe(text: str, sep: str, index: int) -> str:
     """Split text and return the part at index, or the full text on failure."""
     parts = text.split(sep)
     return parts[index].strip() if len(parts) > index else text.strip()
 
 
-COMICS = {
+class _ComicSelectors(TypedDict):
+    feed: str
+    element: Callable[[Any], str]
+    url: Callable[[str], str]
+    title: Callable[[Any], str]
+    caption: Callable[[str], str]
+
+
+COMICS: dict[str, _ComicSelectors] = {
     "XKCD": {
         "feed": "https://xkcd.com/atom.xml",
         "element": lambda feed: feed.entries[0].description,
@@ -90,12 +100,12 @@ COMICS = {
 }
 
 # Display labels for comics whose key differs from the official title.
-COMIC_LABELS = {
+COMIC_LABELS: Mapping[str, str] = {
     "webcomic name": "Webcomic Name",
 }
 
 
-def get_panel(comic_name):
+def get_panel(comic_name: str) -> dict[str, str]:
     response = http_get(COMICS[comic_name]["feed"], timeout=20.0, use_cache=False)
     response.raise_for_status()
     feed = feedparser.parse(response.content)

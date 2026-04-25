@@ -14,6 +14,7 @@ import io
 import os
 from functools import lru_cache
 from pathlib import Path
+from typing import cast
 
 from flask import Response, send_from_directory
 from PIL import Image
@@ -120,7 +121,7 @@ def _safe_join(root: str, filename: str) -> str:
     joined = safe_join(root, filename)
     if joined is None or not os.path.isfile(joined):
         raise NotFound
-    return joined
+    return cast(str, joined)
 
 
 # ---------------------------------------------------------------------------

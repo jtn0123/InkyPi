@@ -2,7 +2,9 @@ import importlib
 import inspect
 import logging
 import sys
+from collections.abc import Callable
 from pathlib import Path
+from typing import Any, cast
 
 from PIL import Image
 
@@ -11,7 +13,7 @@ from display.abstract_display import AbstractDisplay
 logger = logging.getLogger(__name__)
 
 
-def split_image_for_bi_color_epd(image):
+def split_image_for_bi_color_epd(image: Image.Image) -> tuple[Image.Image, Image.Image]:
     """
     Convert image into two 1-bit layers for bi-color (black and red) e-paper displays.
     """
@@ -46,7 +48,7 @@ class WaveshareDisplay(AbstractDisplay):
     The module drivers are in display.waveshare_epd.
     """
 
-    def initialize_display(self):
+    def initialize_display(self) -> None:
         """
         Initializes the Waveshare display device.
 
@@ -61,7 +63,8 @@ class WaveshareDisplay(AbstractDisplay):
         logger.info("Initializing Waveshare display")
 
         # get the device type which should be the model number of the device.
-        display_type = self.device_config.get_config("display_type")
+        display_type_raw = self.device_config.get_config("display_type")
+        display_type = str(display_type_raw or "")
         logger.info(f"Loading EPD display for {display_type} display")
 
         if not display_type:
@@ -80,15 +83,16 @@ class WaveshareDisplay(AbstractDisplay):
         try:
             # Dynamically load module
             epd_module = importlib.import_module(module_name)
-            self.epd_display = epd_module.EPD()
+            self.epd_display: Any = epd_module.EPD()
             # Workaround for init functions with inconsistent casing
-            self.epd_display_init = getattr(
-                self.epd_display, "Init", getattr(self.epd_display, "init", None)
-            )
-
-            if not callable(self.epd_display_init):
+            init_method = getattr(self.epd_display, "Init", None)
+            if not callable(init_method):
+                init_method = getattr(self.epd_display, "init", None)
+            if not callable(init_method):
                 raise AttributeError("No Init/init method found")
-
+            self.epd_display_init: Callable[[], None] = cast(
+                Callable[[], None], init_method
+            )
             self.epd_display_init()
 
             display_args_spec = inspect.getfullargspec(self.epd_display.display)
@@ -101,7 +105,7 @@ class WaveshareDisplay(AbstractDisplay):
                 f"Display does not support required methods: {display_type}"
             ) from None
 
-        self.bi_color_display = len(display_args_spec.args) > 2
+        self.bi_color_display: bool = len(display_args_spec.args) > 2
 
         # update the resolution directly from the loaded device context
         if not self.device_config.get_config("resolution"):
@@ -109,7 +113,9 @@ class WaveshareDisplay(AbstractDisplay):
             resolution = [w, h] if w >= h else [h, w]
             self.device_config.update_value("resolution", resolution, write=True)
 
-    def display_image(self, image, image_settings=None):
+    def display_image(
+        self, image: Image.Image, image_settings: list[object] | None = None
+    ) -> None:
         if image_settings is None:
             image_settings = []
 

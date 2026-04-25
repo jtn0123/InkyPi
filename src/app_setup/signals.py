@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 import signal
 
-from flask import Flask
+from flask import Flask, Response
 from werkzeug.serving import is_running_from_reloader
 
 logger = logging.getLogger(__name__)
@@ -16,7 +16,7 @@ def setup_signal_handlers(app: Flask) -> None:
     if is_running_from_reloader():
         return
 
-    def _shutdown_handler(signum, frame):
+    def _shutdown_handler(signum: int, frame: object | None) -> None | Response:
         sig_name = signal.Signals(signum).name
         logger.info("Received %s — shutting down gracefully", sig_name)
         rt = app.config.get("REFRESH_TASK")

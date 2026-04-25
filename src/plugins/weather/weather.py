@@ -1,6 +1,8 @@
 import logging
 import os
-from datetime import datetime
+from collections.abc import Mapping, Sequence
+from datetime import datetime, tzinfo
+from typing import Any, cast
 
 from plugins.base_plugin.base_plugin import BasePlugin
 from plugins.base_plugin.settings_schema import (
@@ -18,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 
 class Weather(BasePlugin):
-    def validate_settings(self, settings: dict) -> str | None:
+    def validate_settings(self, settings: Mapping[str, Any]) -> str | None:
         """Reject out-of-range latitude/longitude at save time.
 
         Without this, the map widget's readonly inputs can still be bypassed by
@@ -30,11 +32,11 @@ class Weather(BasePlugin):
         if lat_raw in (None, "") or lon_raw in (None, ""):
             return "Latitude and longitude are required."
         try:
-            lat = float(lat_raw)
+            lat = float(cast(str | int | float, lat_raw))
         except (TypeError, ValueError):
             return "Latitude must be a number between -90 and 90."
         try:
-            lon = float(lon_raw)
+            lon = float(cast(str | int | float, lon_raw))
         except (TypeError, ValueError):
             return "Longitude must be a number between -180 and 180."
         if not -90.0 <= lat <= 90.0:
@@ -43,7 +45,7 @@ class Weather(BasePlugin):
             return "Longitude must be between -180 and 180."
         return None
 
-    def build_settings_schema(self):
+    def build_settings_schema(self) -> Any:
         return schema(
             section(
                 "Location",
@@ -215,7 +217,7 @@ class Weather(BasePlugin):
         except (ValueError, TypeError):
             return 20.0
 
-    def generate_settings_template(self):
+    def generate_settings_template(self) -> Any:
         template_params = super().generate_settings_template()
         template_params["api_key"] = {
             "required": True,
@@ -225,16 +227,18 @@ class Weather(BasePlugin):
         template_params["style_settings"] = True
         return template_params
 
-    def generate_image(self, settings, device_config):
+    def generate_image(self, settings: Mapping[str, Any], device_config: Any) -> Any:
         # Defaults chosen so the plugin renders with an empty settings dict
         # (first-run preview, bare /update_now): NYC via OpenMeteo, imperial.
         # OpenMeteo has no API key, so the default path works on fresh devices
         # where OPEN_WEATHER_MAP_SECRET is unset.
-        lat_str = settings.get("latitude") or "40.7128"
-        long_str = settings.get("longitude") or "-74.0060"
+        lat_raw = settings.get("latitude")
+        long_raw = settings.get("longitude")
+        lat_str = lat_raw if lat_raw is not None else "40.7128"
+        long_str = long_raw if long_raw is not None else "-74.0060"
         try:
-            lat = float(lat_str)
-            long = float(long_str)
+            lat = float(cast(str | int | float, lat_str))
+            long = float(cast(str | int | float, long_str))
         except (ValueError, TypeError):
             raise RuntimeError(
                 "Latitude and longitude must be valid numbers."
@@ -319,78 +323,130 @@ class Weather(BasePlugin):
         return image
 
     # Delegate methods — keep backward compatibility for tests and external callers
-    def get_weather_data(self, api_key, units, lat, long):
+    def get_weather_data(
+        self, api_key: str, units: str, lat: float, long: float
+    ) -> Any:
         return weather_api.get_weather_data(
             api_key, units, lat, long, self._request_timeout()
         )
 
-    def get_air_quality(self, api_key, lat, long):
+    def get_air_quality(self, api_key: str, lat: float, long: float) -> Any:
         return weather_api.get_air_quality(api_key, lat, long, self._request_timeout())
 
-    def get_location(self, api_key, lat, long):
+    def get_location(self, api_key: str, lat: float, long: float) -> str:
         return weather_api.get_location(api_key, lat, long, self._request_timeout())
 
-    def get_open_meteo_data(self, lat, long, units, forecast_days):
+    def get_open_meteo_data(
+        self, lat: float, long: float, units: str, forecast_days: int
+    ) -> Any:
         return weather_api.get_open_meteo_data(
             lat, long, units, forecast_days, self._request_timeout()
         )
 
-    def get_open_meteo_air_quality(self, lat, long):
+    def get_open_meteo_air_quality(self, lat: float, long: float) -> Any:
         return weather_api.get_open_meteo_air_quality(
             lat, long, self._request_timeout()
         )
 
-    def format_time(self, dt, time_format, hour_only=False, include_am_pm=True):
+    def format_time(
+        self,
+        dt: datetime,
+        time_format: str,
+        hour_only: bool = False,
+        include_am_pm: bool = True,
+    ) -> str:
         return _wd.format_time(dt, time_format, hour_only, include_am_pm)
 
-    def get_wind_arrow(self, wind_deg):
+    def get_wind_arrow(self, wind_deg: float) -> str:
         return _wd.get_wind_arrow(wind_deg)
 
-    def parse_timezone(self, weatherdata):
+    def parse_timezone(self, weatherdata: Mapping[str, Any]) -> Any:
         return _wd.parse_timezone(weatherdata)
 
-    def map_weather_code_to_icon(self, weather_code, is_day):
+    def map_weather_code_to_icon(self, weather_code: int, is_day: int) -> str:
         return _wd.map_weather_code_to_icon(weather_code, is_day)
 
-    def get_moon_phase_icon_path(self, phase_name, lat):
+    def get_moon_phase_icon_path(self, phase_name: str, lat: float) -> str:
         return _wd.get_moon_phase_icon_path(phase_name, lat, self.get_plugin_dir())
 
-    def parse_forecast(self, daily_forecast, tz, current_suffix, lat):
+    def parse_forecast(
+        self,
+        daily_forecast: Sequence[Mapping[str, Any]],
+        tz: tzinfo,
+        current_suffix: str,
+        lat: float,
+    ) -> list[dict[str, Any]]:
         return _wd.parse_forecast(
             daily_forecast, tz, current_suffix, lat, self.get_plugin_dir()
         )
 
-    def parse_open_meteo_forecast(self, daily_data, tz, is_day, lat):
+    def parse_open_meteo_forecast(
+        self, daily_data: Mapping[str, Any], tz: tzinfo, is_day: int, lat: float
+    ) -> list[dict[str, Any]]:
         return _wd.parse_open_meteo_forecast(
             daily_data, tz, is_day, lat, self.get_plugin_dir()
         )
 
-    def parse_hourly(self, hourly_forecast, tz, time_format, units):
+    def parse_hourly(
+        self,
+        hourly_forecast: list[dict[str, Any]],
+        tz: tzinfo,
+        time_format: str,
+        units: str,
+    ) -> list[dict[str, Any]]:
         return _wd.parse_hourly(hourly_forecast, tz, time_format, units)
 
-    def parse_open_meteo_hourly(self, hourly_data, tz, time_format):
+    def parse_open_meteo_hourly(
+        self, hourly_data: Mapping[str, Any], tz: tzinfo, time_format: str
+    ) -> list[dict[str, Any]]:
         return _wd.parse_open_meteo_hourly(hourly_data, tz, time_format)
 
-    def parse_data_points(self, weather, air_quality, tz, units, time_format):
+    def parse_data_points(
+        self,
+        weather: Mapping[str, Any],
+        air_quality: Mapping[str, Any],
+        tz: tzinfo,
+        units: str,
+        time_format: str,
+    ) -> list[dict[str, Any]]:
         return _wd.parse_data_points(
             weather, air_quality, tz, units, time_format, self.get_plugin_dir()
         )
 
     def parse_open_meteo_data_points(
-        self, weather_data, aqi_data, tz, units, time_format
-    ):
+        self,
+        weather_data: Mapping[str, Any],
+        aqi_data: Mapping[str, Any],
+        tz: tzinfo,
+        units: str,
+        time_format: str,
+    ) -> list[dict[str, Any]]:
         return _wd.parse_open_meteo_data_points(
             weather_data, aqi_data, tz, units, time_format, self.get_plugin_dir()
         )
 
-    def parse_weather_data(self, weather_data, aqi_data, tz, units, time_format, lat):
+    def parse_weather_data(
+        self,
+        weather_data: Mapping[str, Any],
+        aqi_data: Mapping[str, Any],
+        tz: tzinfo,
+        units: str,
+        time_format: str,
+        lat: float,
+    ) -> dict[str, Any]:
         return _wd.parse_weather_data(
             weather_data, aqi_data, tz, units, time_format, lat, self.get_plugin_dir()
         )
 
     def parse_open_meteo_data(
-        self, weather_data, aqi_data, tz, units, time_format, lat
-    ):
+        self,
+        weather_data: Mapping[str, Any],
+        aqi_data: Mapping[str, Any],
+        tz: tzinfo,
+        units: str,
+        time_format: str,
+        lat: float,
+    ) -> dict[str, Any]:
         return _wd.parse_open_meteo_data(
             weather_data, aqi_data, tz, units, time_format, lat, self.get_plugin_dir()
         )

@@ -23,11 +23,13 @@ Flow:
 
 import logging
 import os
+from collections.abc import Mapping, Sequence
 from datetime import UTC, date, datetime, timedelta
 from random import randint
-from typing import Any
+from typing import Any, cast
 
 from PIL import Image
+from PIL.Image import Image as ImageType
 
 from plugins.base_plugin.base_plugin import BasePlugin
 from plugins.base_plugin.settings_schema import callout, field, schema, section
@@ -49,7 +51,7 @@ class Wpotd(BasePlugin):
         "INKYPI_WIKIPEDIA_API_URL", "https://en.wikipedia.org/w/api.php"
     )
 
-    def validate_settings(self, settings: dict) -> str | None:
+    def validate_settings(self, settings: Mapping[str, object]) -> str | None:
         """Reject out-of-range custom dates at save time (JTN-651).
 
         The frontend ``<input type="date">`` enforces ``min``/``max``, but a
@@ -61,7 +63,10 @@ class Wpotd(BasePlugin):
         if settings.get("randomizeWpotd") == "true":
             # Random mode picks its own date — ignore customDate.
             return None
-        custom_date_str = (settings.get("customDate") or "").strip()
+        raw_custom_date = settings.get("customDate")
+        custom_date_str = (
+            raw_custom_date.strip() if isinstance(raw_custom_date, str) else ""
+        )
         if not custom_date_str:
             # No custom date set — ``generate_image`` falls back to today.
             return None
@@ -79,9 +84,9 @@ class Wpotd(BasePlugin):
             return f"Date must be on or before today ({today.isoformat()})."
         return None
 
-    def build_settings_schema(self):
+    def build_settings_schema(self) -> dict[str, object]:
         today = datetime.now(tz=UTC).strftime("%Y-%m-%d")
-        return schema(
+        schema_payload: dict[str, object] = schema(
             section(
                 "Source",
                 callout(
@@ -119,21 +124,25 @@ class Wpotd(BasePlugin):
                 ),
             )
         )
+        return schema_payload
 
-    def generate_settings_template(self) -> dict[str, Any]:
+    def generate_settings_template(self) -> dict[str, object]:
         template_params = super().generate_settings_template()
+        settings_template: dict[str, object] = template_params
         template_params["style_settings"] = False
-        return template_params
+        return settings_template
 
     def generate_image(
-        self, settings: dict[str, Any], device_config: dict[str, Any]
-    ) -> Image.Image:
+        self, settings: Mapping[str, object], device_config: Any
+    ) -> ImageType:
         logger.info(f"WPOTD plugin settings: {settings}")
         datetofetch = self._determine_date(settings)
         logger.info(f"WPOTD plugin datetofetch: {datetofetch}")
 
         data = self._fetch_potd(datetofetch)
-        picurl = data["image_src"]
+        picurl = data.get("image_src")
+        if not isinstance(picurl, str):
+            raise RuntimeError("Failed to resolve WPOTD image URL.")
         logger.info(f"WPOTD plugin Picture URL: {picurl}")
 
         image = self._download_image(picurl)
@@ -150,34 +159,34 @@ class Wpotd(BasePlugin):
 
         return image
 
-    def _determine_date(self, settings: dict[str, Any]) -> date:
+    def _determine_date(self, settings: Mapping[str, object]) -> date:
         if settings.get("randomizeWpotd") == "true":
             start = datetime(2015, 1, 1, tzinfo=UTC)
             delta_days = (datetime.now(tz=UTC) - start).days
             return (start + timedelta(days=randint(0, delta_days))).date()
-        if settings.get("customDate"):
+        custom_date = settings.get("customDate")
+        if isinstance(custom_date, str):
             try:
                 # YYYY-MM-DD date input; the parsed date is returned as-is.
-                return datetime.strptime(  # noqa: DTZ007
-                    settings["customDate"], "%Y-%m-%d"
-                ).date()
+                return date.fromisoformat(custom_date)
             except ValueError:
                 logger.warning(
                     "Invalid customDate %r for WPOTD, defaulting to today",
-                    settings["customDate"],
+                    custom_date,
                 )
                 return datetime.now(tz=UTC).date()
         else:
             return datetime.now(tz=UTC).date()
 
-    def _download_image(self, url: str) -> Image.Image:
+    def _download_image(self, url: str) -> ImageType:
         if url.lower().endswith(".svg"):
             logger.warning(
                 "SVG format is not supported by Pillow. Skipping image download."
             )
             raise RuntimeError("Failed to load WPOTD image.")
         dimensions = (4096, 4096)
-        image = self.image_loader.from_url(
+        image_loader = cast(Any, self.image_loader)
+        image = image_loader.from_url(
             url,
             dimensions=dimensions,
             timeout_ms=10000,
@@ -189,7 +198,7 @@ class Wpotd(BasePlugin):
             raise RuntimeError("Failed to load WPOTD image.")
         return image
 
-    def _fetch_potd(self, cur_date: date) -> dict[str, Any]:
+    def _fetch_potd(self, cur_date: date) -> dict[str, object]:
         title = f"Template:POTD/{cur_date.isoformat()}"
         params = {
             "action": "query",
@@ -201,7 +210,24 @@ class Wpotd(BasePlugin):
 
         data = self._make_request(params)
         try:
-            filename = data["query"]["pages"][0]["images"][0]["title"]
+            query = data.get("query")
+            if not isinstance(query, Mapping):
+                raise KeyError("query")
+            pages = query.get("pages")
+            if not isinstance(pages, Sequence) or len(pages) == 0:
+                raise KeyError("pages")
+            first_page = pages[0]
+            if not isinstance(first_page, Mapping):
+                raise KeyError("pages[0]")
+            images = first_page.get("images")
+            if not isinstance(images, Sequence) or len(images) == 0:
+                raise KeyError("images")
+            image = images[0]
+            if not isinstance(image, Mapping):
+                raise KeyError("images[0]")
+            filename = image.get("title")
+            if not isinstance(filename, str):
+                raise KeyError("images[0].title")
         except (KeyError, IndexError) as e:
             logger.error(f"Failed to retrieve POTD filename for {cur_date}: {e}")
             raise RuntimeError("Failed to retrieve POTD filename.") from e
@@ -225,26 +251,47 @@ class Wpotd(BasePlugin):
         }
         data = self._make_request(params)
         try:
-            page = next(iter(data["query"]["pages"].values()))
-            return page["imageinfo"][0]["url"]
+            query = data.get("query")
+            if not isinstance(query, Mapping):
+                raise KeyError("query")
+            pages = query.get("pages")
+            if not isinstance(pages, Mapping):
+                raise KeyError("pages")
+            first_page = next(iter(pages.values()), None)
+            if not isinstance(first_page, Mapping):
+                raise KeyError("pages.values()[0]")
+            image_info = first_page.get("imageinfo")
+            if not isinstance(image_info, Sequence) or len(image_info) == 0:
+                raise KeyError("imageinfo")
+            first_image = image_info[0]
+            if not isinstance(first_image, Mapping):
+                raise KeyError("imageinfo[0]")
+            url = first_image.get("url")
+            if not isinstance(url, str):
+                raise KeyError("imageinfo[0].url")
+            return url
         except (KeyError, IndexError, StopIteration) as e:
             logger.error(f"Failed to retrieve image URL for {filename}: {e}")
             raise RuntimeError("Failed to retrieve image URL.") from e
 
-    def _make_request(self, params: dict[str, Any]) -> dict[str, Any]:
+    def _make_request(self, params: Mapping[str, object]) -> dict[str, Any]:
         try:
             response = get_http_session().get(
-                self.API_URL, params=params, headers=self.HEADERS, timeout=10
+                self.API_URL,
+                params=cast(Any, dict(params)),
+                headers=self.HEADERS,
+                timeout=10,
             )
             response.raise_for_status()
-            return response.json()
+            json_payload: dict[str, Any] = response.json()
+            return json_payload
         except Exception as e:
             logger.error(f"Wikipedia API request failed with params {params}: {str(e)}")
             raise RuntimeError("Wikipedia API request failed.") from e
 
     def _shrink_to_fit(
-        self, image: Image.Image, max_width: int, max_height: int
-    ) -> Image.Image:
+        self, image: ImageType, max_width: int, max_height: int
+    ) -> ImageType:
         """
         Resize the image to fit within max_width and max_height while maintaining aspect ratio.
         Uses high-quality resampling.

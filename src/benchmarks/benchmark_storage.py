@@ -3,10 +3,16 @@ import os
 import random
 import sqlite3
 import time
-from typing import Any
+from typing import Any, Protocol
 
 
-def _get_db_path(device_config) -> str:
+class DeviceConfigLike(Protocol):
+    BASE_DIR: str
+
+    def get_config(self, key: str, default: Any = None) -> Any: ...
+
+
+def _get_db_path(device_config: DeviceConfigLike) -> str:
     # BASE_DIR is src/; fallback from __file__ (src/benchmarks/) goes up one level
     fallback = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     try:
@@ -24,7 +30,7 @@ def _get_db_path(device_config) -> str:
         return default_path
 
 
-def _is_enabled(device_config) -> bool:
+def _is_enabled(device_config: DeviceConfigLike) -> bool:
     try:
         enabled = device_config.get_config("enable_benchmarks", default=True)
     except Exception:
@@ -44,7 +50,9 @@ def _is_enabled(device_config) -> bool:
     return random.random() < sample_rate
 
 
-def _should_record_event(device_config, refresh_event: dict[str, Any]) -> bool:
+def _should_record_event(
+    device_config: DeviceConfigLike, refresh_event: dict[str, Any]
+) -> bool:
     if not _is_enabled(device_config):
         return False
     # Optional include/exclude plugin filters
@@ -184,7 +192,9 @@ def _ensure_optional_columns(
         )
 
 
-def save_refresh_event(device_config, refresh_event: dict[str, Any]) -> None:
+def save_refresh_event(
+    device_config: DeviceConfigLike, refresh_event: dict[str, Any]
+) -> None:
     """Persist a single refresh event. Best-effort; never raises upstream.
 
     Expected keys in refresh_event: refresh_id, plugin_id, instance, playlist,
@@ -240,7 +250,7 @@ def save_refresh_event(device_config, refresh_event: dict[str, Any]) -> None:
 
 
 def save_stage_event(
-    device_config,
+    device_config: DeviceConfigLike,
     refresh_id: str,
     stage: str,
     duration_ms: int | None = None,

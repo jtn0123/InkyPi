@@ -20,7 +20,7 @@ _SWAGGER_CSS_URL = "https://unpkg.com/swagger-ui-dist@5.17.14/swagger-ui.css"
 _SWAGGER_JS_URL = "https://unpkg.com/swagger-ui-dist@5.17.14/swagger-ui-bundle.js"
 
 
-@api_docs_bp.route("/api/docs", methods=["GET"])
+@api_docs_bp.route("/api/docs", methods=["GET"])  # type: ignore
 def swagger_ui() -> Response:
     """Serve the Swagger UI HTML page pointing at /api/openapi.json."""
     css_integrity = cdn_sri("swagger-ui-css")
@@ -59,7 +59,7 @@ def swagger_ui() -> Response:
     return Response(html, status=200, mimetype="text/html")
 
 
-@api_docs_bp.route("/api/openapi.json", methods=["GET"])
+@api_docs_bp.route("/api/openapi.json", methods=["GET"])  # type: ignore
 def openapi_spec() -> Response:
     """Serve the OpenAPI 3.0 spec as JSON."""
     with open(_SPEC_PATH, encoding="utf-8") as f:

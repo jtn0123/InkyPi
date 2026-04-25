@@ -1,4 +1,8 @@
 import logging
+from collections.abc import Mapping
+from typing import cast
+
+from PIL import Image
 
 from display.abstract_display import AbstractDisplay
 
@@ -15,7 +19,7 @@ class InkyDisplay(AbstractDisplay):
     The Inky display driver supports auto configuration.
     """
 
-    def initialize_display(self):
+    def initialize_display(self) -> None:
         """
         Initializes the Inky display device.
 
@@ -38,7 +42,9 @@ class InkyDisplay(AbstractDisplay):
                 write=True,
             )
 
-    def display_image(self, image, image_settings=None):
+    def display_image(
+        self, image: Image.Image, image_settings: list[object] | None = None
+    ) -> None:
         if image_settings is None:
             image_settings = []
 
@@ -61,8 +67,15 @@ class InkyDisplay(AbstractDisplay):
             raise ValueError("No image provided.")
 
         # Display the image on the Inky display
-        image_settings_cfg = self.device_config.get_config("image_settings") or {}
-        inky_saturation = image_settings_cfg.get("inky_saturation", 0.5)
+        image_settings_cfg = cast(
+            Mapping[str, object], self.device_config.get_config("image_settings") or {}
+        )
+        inky_saturation_raw = image_settings_cfg.get("inky_saturation", 0.5)
+        inky_saturation = (
+            float(inky_saturation_raw)
+            if isinstance(inky_saturation_raw, int | float)
+            else 0.5
+        )
         logger.info("Inky Saturation: %s", inky_saturation)
         try:
             self.inky_display.set_image(image, saturation=inky_saturation)

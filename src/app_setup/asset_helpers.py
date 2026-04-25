@@ -18,6 +18,7 @@ import json
 import logging
 import os
 from pathlib import Path
+from typing import cast
 
 from flask import Flask
 
@@ -40,7 +41,9 @@ def _load_manifest() -> dict[str, str]:
     _manifest_loaded = True
     if _MANIFEST_PATH.is_file():
         try:
-            _manifest_cache = json.loads(_MANIFEST_PATH.read_text(encoding="utf-8"))
+            _manifest_cache = cast(
+                dict[str, str], json.loads(_MANIFEST_PATH.read_text(encoding="utf-8"))
+            )
             logger.debug("Loaded asset manifest from %s", _MANIFEST_PATH)
         except Exception as exc:  # pragma: no cover — I/O edge case
             logger.warning("Failed to parse asset manifest: %s", exc)
@@ -90,7 +93,7 @@ def setup_asset_helpers(app: Flask) -> None:
         )
 
 
-def _override_manifest_path_for_tests(path: str | os.PathLike) -> None:
+def _override_manifest_path_for_tests(path: str | os.PathLike[str]) -> None:
     """Redirect manifest reads to *path* (test helper only)."""
     global _MANIFEST_PATH
     _MANIFEST_PATH = Path(path)

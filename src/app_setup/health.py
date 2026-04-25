@@ -8,12 +8,12 @@ from flask import Flask
 def register_health_endpoints(app: Flask) -> None:
     """Register /healthz (always-OK liveness) and /readyz (refresh-task readiness)."""
 
-    @app.route("/healthz", methods=["GET"])
-    def healthz():
+    @app.route("/healthz", methods=["GET"])  # type: ignore
+    def healthz() -> tuple[str, int]:
         return ("OK", 200)
 
-    @app.route("/readyz", methods=["GET"])
-    def readyz():
+    @app.route("/readyz", methods=["GET"])  # type: ignore
+    def readyz() -> tuple[str, int]:
         try:
             rt = app.config.get("REFRESH_TASK")
             web_only = bool(app.config.get("WEB_ONLY"))

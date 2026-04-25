@@ -14,6 +14,7 @@ class + message in logs for operators.
 import logging
 import re
 from datetime import UTC, datetime
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -106,7 +107,9 @@ def strip_class_prefix(message: str) -> str:
     return _CLASS_PREFIX_RE.sub("", message, count=1).strip()
 
 
-def sanitize_error_message(raw_message: str, *, error_class: str | None = None) -> str:
+def sanitize_error_message(
+    raw_message: str | None, *, error_class: str | None = None
+) -> str:
     """Convert a raw exception message into a user-friendly string.
 
     The returned string:
@@ -154,7 +157,7 @@ def render_error_image(
     error_class: str,
     error_message: str,
     timestamp: str | None = None,
-):
+) -> Any:
     """Render a plain error-card image sized to the display dimensions.
 
     Uses only PIL primitives (no custom fonts) so it never fails due to

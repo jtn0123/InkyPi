@@ -1,14 +1,22 @@
 import logging
 import os
+from collections.abc import Mapping
+from typing import Any, cast
+
+from PIL import Image
 
 from utils.http_client import get_http_session
 
 logger = logging.getLogger(__name__)
 
 
-def stars_generate_image(plugin_instance, settings, device_config):
-    username = settings.get("githubUsername")
-    repository = settings.get("githubRepository")
+def stars_generate_image(
+    plugin_instance: Any, settings: Mapping[str, object], device_config: Any
+) -> Image.Image:
+    raw_username = settings.get("githubUsername")
+    raw_repository = settings.get("githubRepository")
+    username = raw_username if isinstance(raw_username, str) else ""
+    repository = raw_repository if isinstance(raw_repository, str) else ""
 
     if not username or not repository:
         raise RuntimeError("GitHub username and repository are required.")
@@ -37,7 +45,7 @@ def stars_generate_image(plugin_instance, settings, device_config):
 _GITHUB_API_BASE = os.getenv("INKYPI_GITHUB_API_URL", "https://api.github.com")
 
 
-def fetch_stars(github_repository):
+def fetch_stars(github_repository: str) -> int:
     url = f"{_GITHUB_API_BASE}/repos/{github_repository}"
     headers = {"Accept": "application/json"}
 
@@ -50,7 +58,7 @@ def fetch_stars(github_repository):
         )
         return 0
     try:
-        data = response.json()
+        data = cast(dict[str, Any], response.json())
     except ValueError as e:
         logger.error("GitHub Stars Plugin: Invalid JSON response: %s", e)
         return 0

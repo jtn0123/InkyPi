@@ -50,7 +50,7 @@ def _history_file(config_dir: str, instance_name: str) -> str:
 
 
 def record_change(
-    config_dir: str, instance_name: str, before: dict, after: dict
+    config_dir: str, instance_name: str, before: dict[str, Any], after: dict[str, Any]
 ) -> None:
     """Append a change record to the instance's JSONL history file.
 
@@ -108,7 +108,9 @@ def _safe_log_name(instance_name: str) -> str:
     return str(instance_name).replace("\r", "").replace("\n", "")[:64]
 
 
-def get_history(config_dir: str, instance_name: str, limit: int = 20) -> list[dict]:
+def get_history(
+    config_dir: str, instance_name: str, limit: int = 20
+) -> list[dict[str, Any]]:
     """Return up to *limit* most-recent history entries for *instance_name*.
 
     Entries are returned newest-first.
@@ -117,7 +119,7 @@ def get_history(config_dir: str, instance_name: str, limit: int = 20) -> list[di
     if not os.path.isfile(path):
         return []
 
-    entries: list[dict] = []
+    entries: list[dict[str, Any]] = []
     try:
         with open(path, encoding="utf-8") as fh:
             for raw in fh:
@@ -141,7 +143,9 @@ def get_history(config_dir: str, instance_name: str, limit: int = 20) -> list[di
     return entries[:limit]
 
 
-def compute_diff(before: dict[str, Any], after: dict[str, Any]) -> dict[str, Any]:
+def compute_diff(
+    before: dict[str, Any], after: dict[str, Any]
+) -> dict[str, dict[str, Any]]:
     """Return a diff dict describing what changed between *before* and *after*.
 
     Returns a dict with three keys:
@@ -160,4 +164,8 @@ def compute_diff(before: dict[str, Any], after: dict[str, Any]) -> dict[str, Any
         if before[k] != after[k]
     }
 
-    return {"added": added, "removed": removed, "changed": changed}
+    return {
+        "added": added,
+        "removed": removed,
+        "changed": changed,
+    }
