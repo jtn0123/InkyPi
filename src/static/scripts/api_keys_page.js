@@ -231,6 +231,41 @@
       if (saveBtn) saveBtn.disabled = true;
     }
 
+    // Recompute the "X providers" / "Y configured" badges from the current
+    // DOM. In generic mode the page-load template sets both counts equal to
+    // entries|length; once the user adds a preset row (key set, value still
+    // empty) the counts must diverge, otherwise the badges are stale and
+    // the pair is also redundantly identical (ISSUE-003 / ISSUE-004).
+    //  - "providers" = rows with a non-empty key in the editor
+    //  - "configured" = rows that already have a saved value (existing rows
+    //    or new rows whose value field is filled)
+    function refreshKeyCounts() {
+      if (config.mode !== "generic") return;
+      const rows = Array.from(document.querySelectorAll(".apikey-row"));
+      let providers = 0;
+      let configured = 0;
+      for (const row of rows) {
+        const key = row.querySelector(".apikey-key")?.value.trim() || "";
+        if (!key) continue;
+        providers += 1;
+        // Use the trimmed value so a whitespace-only field does NOT bump
+        // the "saved" badge — `saveGenericKeys` rejects whitespace-only
+        // entries the same way; keeping all three in sync (badge,
+        // input-listener clear, validator) avoids false reassurance.
+        const value = row.querySelector(".apikey-value")?.value.trim() || "";
+        const wasSaved = row.dataset.existing === "true";
+        if (wasSaved || value.length > 0) configured += 1;
+      }
+      const providersChip = document.getElementById("providerCountSummary");
+      if (providersChip) {
+        providersChip.textContent = `${providers} provider${providers === 1 ? "" : "s"}`;
+      }
+      const configuredChip = document.getElementById("configuredCountSummary");
+      if (configuredChip) {
+        configuredChip.textContent = `${configured} saved`;
+      }
+    }
+
     // Extracted to keep saveManagedKeys below the cognitive-complexity
     // threshold (SonarCloud javascript:S3776). Shows the appropriate modal
     // for a successful resp.ok response and refreshes the configured-status
@@ -376,10 +411,29 @@
       // Initialize aria-labels now; re-run on every keyInput change so the
       // label tracks the key name the user just typed.
       updateRowAriaLabels(row, key);
-      keyInput.addEventListener("input", () =>
-        updateRowAriaLabels(row, keyInput.value)
-      );
+      keyInput.addEventListener("input", () => {
+        updateRowAriaLabels(row, keyInput.value);
+        refreshKeyCounts();
+      });
+      // Clear inline aria-invalid as soon as the user types real (non-
+      // whitespace) content into a previously flagged-empty value field,
+      // and also bump the "configured" count. Trim so this stays in sync
+      // with `saveGenericKeys` and `refreshKeyCounts`, which both reject
+      // whitespace-only — otherwise typing spaces would falsely clear the
+      // error state right before the validator re-flags the field on save.
+      valInput.addEventListener("input", () => {
+        if (valInput.value.trim().length > 0 && valInput.getAttribute("aria-invalid") === "true") {
+          valInput.setAttribute("aria-invalid", "false");
+          const errorId = valInput.getAttribute("aria-describedby");
+          if (errorId) {
+            const err = document.getElementById(errorId);
+            if (err) err.textContent = "";
+          }
+        }
+        refreshKeyCounts();
+      });
       list.appendChild(row);
+      refreshKeyCounts();
       (key ? row.querySelector(".apikey-value") : row.querySelector(".apikey-key")).focus();
     }
 
@@ -421,6 +475,7 @@
       }
       markDirty();
       row?.remove();
+      refreshKeyCounts();
       if (deletedKey) {
         const presetBtn = document.querySelector(
           `.btn-preset[data-key="${deletedKey}"]`
@@ -465,11 +520,23 @@
     async function saveGenericKeys() {
       const rows = document.querySelectorAll(".apikey-row");
       const entries = [];
-      let missingValue = false;
+      const missingValueInputs = [];
       rows.forEach((row) => {
-        const key = row.querySelector(".apikey-key")?.value.trim();
-        const value = row.querySelector(".apikey-value")?.value.trim();
+        const keyInput = row.querySelector(".apikey-key");
+        const valueInput = row.querySelector(".apikey-value");
+        const key = keyInput?.value.trim();
+        const value = valueInput?.value.trim();
         const isExisting = row.dataset.existing === "true";
+        // Reset any prior inline error state for the value field. A fresh
+        // submit re-validates from scratch.
+        if (valueInput) {
+          valueInput.setAttribute("aria-invalid", "false");
+          const errorId = valueInput.getAttribute("aria-describedby");
+          if (errorId) {
+            const err = document.getElementById(errorId);
+            if (err) err.textContent = "";
+          }
+        }
         if (!key) return;
         if (isExisting) {
           if (value) {
@@ -478,12 +545,35 @@
             entries.push({ key, value: null, keepExisting: true });
           }
         } else if (!value) {
-          missingValue = true;
+          if (valueInput) missingValueInputs.push(valueInput);
         } else {
           entries.push({ key, value });
         }
       });
-      if (missingValue) {
+      if (missingValueInputs.length > 0) {
+        // Surface inline errors on the offending input(s) so AT users see the
+        // problem on the field itself, not just in the corner toast (ISSUE-005).
+        // Ensure each input has an associated validation-message element.
+        for (const input of missingValueInputs) {
+          input.setAttribute("aria-invalid", "true");
+          let errorId = input.getAttribute("aria-describedby");
+          let errorEl = errorId ? document.getElementById(errorId) : null;
+          if (!errorEl) {
+            errorId = `${input.id || "apikey-value"}-error`;
+            errorEl = document.createElement("span");
+            errorEl.id = errorId;
+            errorEl.className = "validation-message";
+            errorEl.setAttribute("role", "alert");
+            input.insertAdjacentElement("afterend", errorEl);
+            input.setAttribute("aria-describedby", errorId);
+          }
+          errorEl.textContent = "Enter a value or delete this row";
+        }
+        try {
+          missingValueInputs[0].focus();
+        } catch {
+          // focus() can throw if the input was just detached; ignore.
+        }
         showResponseModal("failure", "Please enter a value for new API keys");
         return;
       }
@@ -535,6 +625,12 @@
     function init() {
       if (config.mode === "generic") {
         hideExistingPresets();
+        // Sync the badge labels with the JS-rendered form once on load. The
+        // server-side template renders provider/configured counts as
+        // "X providers" / "Y configured", but the JS now uses
+        // "X provider(s)" / "Y saved" — keep terminology consistent on first
+        // paint instead of waiting until the user edits a row.
+        refreshKeyCounts();
       }
       // Add show/hide toggle buttons next to password inputs
       document.querySelectorAll('input[type="password"].form-input').forEach((input) => {

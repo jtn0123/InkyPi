@@ -431,15 +431,15 @@
 
     async function importConfig() {
       const btn = document.getElementById("importConfigBtn");
-      if (btn) {
-        btn.disabled = true;
-        btn.textContent = "Restoring…";
-      }
       const fileInput = document.getElementById("importFile");
       const file = fileInput?.files?.[0];
       if (!file) {
         showResponseModal("failure", "Choose a backup file first");
         return;
+      }
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = "Restoring…";
       }
       const form = new FormData();
       form.append("file", file);
@@ -459,11 +459,9 @@
         showResponseModal("failure", "Import failed");
       } finally {
         if (btn) {
-          btn.disabled = false;
-          btn.textContent = "Restore from File";
+          btn.textContent = "Restore from file";
+          btn.disabled = !fileInput?.files?.length;
         }
-        const input = document.getElementById("importFile");
-        if (btn) btn.disabled = !input?.files?.length;
       }
     }
 

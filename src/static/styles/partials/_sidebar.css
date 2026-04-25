@@ -448,9 +448,15 @@
   .mobile-site-nav-panel {
     position: absolute;
     top: calc(100% + 8px);
-    left: 0;
+    /* Anchor to the right edge of the (narrow, middle-column) Menu button
+     * and let the dropdown grow leftward into the brand column. With only
+     * `left: 0; right: 0` the panel was constrained to the middle grid
+     * column at 390px viewports, clipping item labels (e.g. "API Keys"). */
     right: 0;
+    min-width: max(100%, 220px);
+    max-width: calc(100vw - 28px);
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: 6px;
     padding: 8px;
     border: 1px solid var(--surface-border);

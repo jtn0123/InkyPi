@@ -403,7 +403,12 @@ def test_jtn_730_settings_deep_high_risk_paths(live_server, tmp_path):
             page.set_input_files("#importFile", str(import_file))
             assert page.locator("#importConfigBtn").is_enabled()
             page.locator("#importConfigBtn").click()
-            _wait_for_toast_text(page, "Import completed")
+            # Server now reports the count of applied keys ("Restored 5
+            # settings" rather than the older "Import completed") so the
+            # user knows the restore actually did something. Look for the
+            # "settings" suffix that's stable across whatever count the
+            # import_payload above produces.
+            _wait_for_toast_text(page, "settings")
             page.reload(wait_until="domcontentloaded")
             page.wait_for_selector("[data-page-shell]", timeout=10000)
             assert page.locator("#deviceName").input_value() == "JTN730 Imported Device"

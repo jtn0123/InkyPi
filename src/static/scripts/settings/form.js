@@ -82,6 +82,25 @@
     const { getFormSnapshot, restoreFormFromSnapshot } = shared;
     const snapshotState = { current: null };
 
+    // Server caps the cycle interval at "less than 24 hours" — see
+    // _validate_settings_form. Without a client-side `max`, users can type
+    // 999999 hours, click Save, and only then learn the limit (ISSUE-009).
+    // Bind `max` to whichever unit is currently selected so the failure
+    // surfaces inline.
+    function _maxIntervalForUnit(unit) {
+      if (unit === "hour") return 23;
+      // minutes (default): 23h59 = 1439, but the server interpretation is
+      // "strictly less than 24 hours" so 1440 would be invalid; use 1439.
+      return 1439;
+    }
+
+    function refreshIntervalMax() {
+      const intervalInput = document.getElementById("interval");
+      const unitSelect = document.getElementById("unit");
+      if (!intervalInput || !unitSelect) return;
+      intervalInput.max = String(_maxIntervalForUnit(unitSelect.value));
+    }
+
     function populateIntervalFields() {
       const intervalInput = document.getElementById("interval");
       const unitSelect = document.getElementById("unit");
@@ -96,6 +115,7 @@
         intervalInput.value = String(Math.max(1, intervalInMinutes));
         unitSelect.value = "minute";
       }
+      refreshIntervalMax();
     }
 
     function checkDirty() {
@@ -213,6 +233,12 @@
         ?.addEventListener("change", (event) => {
           toggleUseDeviceLocation(event.currentTarget);
         });
+      // ISSUE-009: re-cap the plugin-cycle-interval field whenever the unit
+      // changes, so the inline browser validation reflects the server's
+      // "<24h" rule for the currently-selected unit.
+      document
+        .getElementById("unit")
+        ?.addEventListener("change", refreshIntervalMax);
       for (const slider of document.querySelectorAll(".settings-slider")) {
         slider.addEventListener("input", () => updateSliderValue(slider));
       }

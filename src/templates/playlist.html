@@ -116,8 +116,15 @@
                                 <div class="loading-indicator small left-align"></div>
                             </div>
 
+                            {# ISSUE-010: only emit the thumb wrapper when we have an
+                               actual refresh image to show. Previously the wrapper
+                               was emitted unconditionally with whitespace-only
+                               content, which made `.pl-item-thumb:empty` not
+                               match (whitespace text nodes count) so the
+                               wrapper rendered as a hardcoded-black 96×56
+                               box that looked broken in the light theme. #}
+                            {% if plugin_instance.latest_refresh_time %}
                             <div class="pl-item-thumb">
-                                {% if plugin_instance.latest_refresh_time %}
                                 <div class="plugin-thumbnail-container lightboxable"
                                      data-thumbnail-playlist="{{ playlist.name }}"
                                      data-thumbnail-plugin="{{ plugin_instance.plugin_id }}"
@@ -133,8 +140,8 @@
                                         loading="lazy"
                                     >
                                 </div>
-                                {% endif %}
                             </div>
+                            {% endif %}
 
                             <div class="plugin-actions pl-item-actions">
                                 <button class="header-button is-secondary plugin-display-btn playlist-row-display-btn" type="button" title="Display {{ pi_label }} now" data-playlist-action="display-instance" data-playlist="{{ playlist.name }}" data-plugin-id="{{ plugin_instance.plugin_id }}" data-instance="{{ plugin_instance.name }}" data-instance-label="{{ pi_label }}">

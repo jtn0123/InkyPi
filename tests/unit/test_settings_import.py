@@ -46,7 +46,11 @@ class TestImportSettings:
         assert data["success"] is True
 
     def test_import_filters_disallowed_env_keys(self, client, device_config_dev):
+        # Pair a disallowed env key with at least one allowed config key so
+        # the request still has *something* to apply; otherwise it would 400
+        # (see test_import_rejects_payload_with_no_recognized_keys below).
         payload = {
+            "config": {"name": "Filters Test"},
             "env_keys": {"EVIL_KEY": "hacked"},
         }
         resp = client.post("/settings/import", json=payload)
@@ -87,6 +91,43 @@ class TestImportSettings:
         )
         assert resp.status_code == 200
         assert resp.get_json()["success"] is True
+
+    def test_import_rejects_payload_with_no_recognized_keys(
+        self, client, device_config_dev
+    ):
+        """A payload that survives JSON parse but contains no whitelisted
+        config keys and no whitelisted env_keys must fail loudly (400),
+        not silently return 'Import completed'. Otherwise users uploading
+        a stranger's export or a malformed backup get a green success
+        toast while their device config is unchanged.
+        """
+        original_name = device_config_dev.get_config("name")
+        payload = {
+            "config": {"dangerous_key": "ignored"},
+            "env_keys": {"EVIL_KEY": "ignored"},
+        }
+        resp = client.post("/settings/import", json=payload)
+        assert resp.status_code == 400
+        body = resp.get_json()
+        assert body["success"] is False
+        assert "no recognizable" in body["error"].lower()
+        # Device config must be untouched.
+        assert device_config_dev.get_config("name") == original_name
+
+    def test_import_success_message_reports_counts(self, client, device_config_dev):
+        """Success message should reflect what was applied so the user
+        knows the restore actually did something."""
+        resp = client.post(
+            "/settings/import",
+            json={
+                "config": {"name": "MsgTest", "timezone": "UTC"},
+                "env_keys": {"OPEN_AI_SECRET": "sk-msg-test"},
+            },
+        )
+        assert resp.status_code == 200
+        message = resp.get_json()["message"]
+        assert "2 settings" in message
+        assert "1 API key" in message
 
 
 # ---------------------------------------------------------------------------
