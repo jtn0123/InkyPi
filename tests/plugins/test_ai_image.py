@@ -552,9 +552,7 @@ def test_fetch_image_prompt_api_error_handling():
     assert AIImage.fetch_image_prompt(mock_client, "a cat") == ""
 
 
-def test_ai_image_randomize_falls_back_when_remix_fails(
-    device_config_dev, monkeypatch
-):
+def test_ai_image_randomize_falls_back_when_remix_fails(device_config_dev, monkeypatch):
     """If prompt remix raises, image generation should still succeed with the
     user's original prompt rather than aborting the whole flow."""
     from plugins.ai_image.ai_image import AIImage

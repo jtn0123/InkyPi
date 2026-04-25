@@ -120,9 +120,9 @@ def plugin_page(plugin_id: str):
                 if configured_names:
                     api_key_meta["service"] = " · ".join(configured_names)
                 else:
-                    api_key_meta["service"] = " or ".join(all_names) or api_key_meta.get(
-                        "service", ""
-                    )
+                    api_key_meta["service"] = " or ".join(
+                        all_names
+                    ) or api_key_meta.get("service", "")
             else:
                 expected_key = api_key_meta.get("expected_key")
                 if expected_key:

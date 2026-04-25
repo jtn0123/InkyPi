@@ -184,9 +184,7 @@ class AIImage(BasePlugin):
             return text_prompt
         logger.info("Remixing prompt with Gemini before image generation...")
         try:
-            randomized = AIImage.fetch_image_prompt_google(
-                google_client, text_prompt
-            )
+            randomized = AIImage.fetch_image_prompt_google(google_client, text_prompt)
         except Exception as exc:
             logger.warning(
                 "Prompt remix via Gemini failed (%s); using original prompt.", exc

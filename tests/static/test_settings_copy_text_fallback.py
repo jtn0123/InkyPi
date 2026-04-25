@@ -27,9 +27,9 @@ def test_copy_text_falls_back_to_exec_command_for_http_lan():
         "copyText must fall back to a legacy execCommand path so HTTP-on-LAN "
         "deployments can still copy logs."
     )
-    assert 'document.execCommand("copy")' in js, (
-        "Fallback path should call document.execCommand('copy')."
-    )
+    assert (
+        'document.execCommand("copy")' in js
+    ), "Fallback path should call document.execCommand('copy')."
 
 
 def test_copy_text_does_not_short_circuit_on_insecure_context():
