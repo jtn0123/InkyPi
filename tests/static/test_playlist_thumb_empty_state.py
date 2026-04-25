@@ -34,7 +34,7 @@ def test_thumb_wrapper_only_emitted_when_there_is_a_refresh_image():
     # is conditionally rendered.
     assert refresh_guard < thumb_div, (
         "the {% if plugin_instance.latest_refresh_time %} guard must wrap the "
-        "<div class=\"pl-item-thumb\"> wrapper, not just its inner content. "
+        '<div class="pl-item-thumb"> wrapper, not just its inner content. '
         "Otherwise an unrefreshed instance leaves the wrapper in the DOM and "
         "paints a hardcoded-black 96×56 box in light theme."
     )

@@ -26,9 +26,9 @@ def test_refresh_key_counts_function_exists_and_updates_both_chips():
     """The page must have a function that recomputes both badges from the
     current DOM. Without this the labels stay stale after add/delete."""
     js = _read_js()
-    assert "function refreshKeyCounts" in js, (
-        "refreshKeyCounts() helper missing — badges will not update on add/delete"
-    )
+    assert (
+        "function refreshKeyCounts" in js
+    ), "refreshKeyCounts() helper missing — badges will not update on add/delete"
     # Make sure both chip ids are touched.
     assert 'getElementById("providerCountSummary")' in js
     assert 'getElementById("configuredCountSummary")' in js
@@ -94,15 +94,15 @@ def test_save_generic_keys_marks_empty_value_input_aria_invalid():
     assert save_match, "saveGenericKeys function not found"
     body = save_match.group("body")
     # Must collect inputs (not just a boolean) and mark them invalid.
-    assert "missingValueInputs" in body or "missingValueInput" in body, (
-        "saveGenericKeys should track WHICH inputs were empty so it can mark them"
-    )
-    assert 'setAttribute("aria-invalid", "true")' in body, (
-        "Empty value inputs must get aria-invalid='true' on submit"
-    )
-    assert "validation-message" in body, (
-        "An inline validation-message element must be inserted/used"
-    )
+    assert (
+        "missingValueInputs" in body or "missingValueInput" in body
+    ), "saveGenericKeys should track WHICH inputs were empty so it can mark them"
+    assert (
+        'setAttribute("aria-invalid", "true")' in body
+    ), "Empty value inputs must get aria-invalid='true' on submit"
+    assert (
+        "validation-message" in body
+    ), "An inline validation-message element must be inserted/used"
     # Toast still fires for visual users.
     assert "Please enter a value for new API keys" in body
     # Focus moves to the first invalid input so keyboard users land there.

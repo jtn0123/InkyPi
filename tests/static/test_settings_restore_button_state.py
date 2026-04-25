@@ -36,9 +36,9 @@ def test_import_config_validates_file_before_disabling_button():
     body = _import_config_body()
     file_check_pos = body.find('"Choose a backup file first"')
     relabel_pos = body.find('"Restoring')
-    assert file_check_pos != -1, (
-        "missing-file early return is gone — restoring it is the whole point of this test"
-    )
+    assert (
+        file_check_pos != -1
+    ), "missing-file early return is gone — restoring it is the whole point of this test"
     assert relabel_pos != -1, '"Restoring..." label not found in importConfig'
     assert file_check_pos < relabel_pos, (
         f"file-presence check (pos {file_check_pos}) must run BEFORE the "
@@ -55,9 +55,9 @@ def test_import_config_finally_block_restores_label_and_disabled_state():
     finally_match = re.search(r"finally\s*\{(?P<finally>.*?)\}\s*$", body, flags=re.S)
     assert finally_match, "importConfig has no finally block"
     finally_body = finally_match.group("finally")
-    assert '"Restore from file"' in finally_body, (
-        "finally must reset the button label to 'Restore from file'"
-    )
-    assert "fileInput?.files?.length" in finally_body or "files?.length" in finally_body, (
-        "finally must re-derive the disabled state from the current file input"
-    )
+    assert (
+        '"Restore from file"' in finally_body
+    ), "finally must reset the button label to 'Restore from file'"
+    assert (
+        "fileInput?.files?.length" in finally_body or "files?.length" in finally_body
+    ), "finally must re-derive the disabled state from the current file input"

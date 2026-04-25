@@ -33,9 +33,7 @@ def _block_for_selector(css: str, selector: str) -> str:
         re.S,
     ):
         sels = [
-            " ".join(s.split())
-            for s in match.group("sels").split(",")
-            if s.strip()
+            " ".join(s.split()) for s in match.group("sels").split(",") if s.strip()
         ]
         if normalized in sels:
             return match.group("body")
@@ -57,12 +55,12 @@ def test_mobile_site_nav_panel_does_not_clip_to_grid_column():
         "to the narrow middle grid column and clips item labels at 390px."
     )
     # Must declare some width-affordance so the dropdown can outgrow the column.
-    assert "min-width" in block, (
-        "Panel needs a min-width so it can extend beyond the narrow column"
-    )
-    assert "max-width" in block and "100vw" in block, (
-        "Panel needs a viewport-bounded max-width so it doesn't spill off-screen"
-    )
+    assert (
+        "min-width" in block
+    ), "Panel needs a min-width so it can extend beyond the narrow column"
+    assert (
+        "max-width" in block and "100vw" in block
+    ), "Panel needs a viewport-bounded max-width so it doesn't spill off-screen"
 
 
 def test_mobile_site_nav_panel_anchors_to_right_edge():
@@ -70,6 +68,6 @@ def test_mobile_site_nav_panel_anchors_to_right_edge():
     brand column) on narrow viewports — an explicit choice worth pinning."""
     css = SIDEBAR_CSS.read_text(encoding="utf-8")
     block = _block_for_selector(css, ".mobile-site-nav-panel")
-    assert re.search(r"\bright:\s*0\b", block), (
-        "Panel should anchor to right:0; if you change anchor side, update this test."
-    )
+    assert re.search(
+        r"\bright:\s*0\b", block
+    ), "Panel should anchor to right:0; if you change anchor side, update this test."

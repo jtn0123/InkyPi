@@ -29,9 +29,7 @@ def _block_for_selector(css: str, selector: str) -> str:
         re.S,
     ):
         sels = [
-            " ".join(s.split())
-            for s in match.group("sels").split(",")
-            if s.strip()
+            " ".join(s.split()) for s in match.group("sels").split(",") if s.strip()
         ]
         if normalized in sels:
             return match.group("body")
@@ -41,7 +39,9 @@ def _block_for_selector(css: str, selector: str) -> str:
 def test_playlist_title_truncates_with_ellipsis_in_partial():
     """Source-of-truth: the partial that the build pulls in must declare
     truncation on `.playlist-title`."""
-    block = _block_for_selector(PLAYLISTS_CSS.read_text(encoding="utf-8"), ".playlist-title")
+    block = _block_for_selector(
+        PLAYLISTS_CSS.read_text(encoding="utf-8"), ".playlist-title"
+    )
     assert "overflow: hidden" in block
     assert "text-overflow: ellipsis" in block
     assert "white-space: nowrap" in block

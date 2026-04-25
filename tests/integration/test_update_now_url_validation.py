@@ -137,9 +137,7 @@ class TestImageUrlValidation:
         os.makedirs(history_dir, exist_ok=True)
         # Snapshot existing sidecars so the test isn't fragile to fixture state.
         sidecars_before = {
-            name
-            for name in os.listdir(history_dir)
-            if name.endswith(".json")
+            name for name in os.listdir(history_dir) if name.endswith(".json")
         }
 
         resp = client.post(
@@ -149,9 +147,7 @@ class TestImageUrlValidation:
         assert resp.status_code == 422
 
         sidecars_after = {
-            name
-            for name in os.listdir(history_dir)
-            if name.endswith(".json")
+            name for name in os.listdir(history_dir) if name.endswith(".json")
         }
         new_sidecars = sidecars_after - sidecars_before
         assert not new_sidecars, (

@@ -23,9 +23,9 @@ def test_form_js_caps_interval_max_per_unit():
     page load + on unit change. Otherwise the field has no max and the
     server has to backstop typos."""
     js = _read()
-    assert "_maxIntervalForUnit" in js, (
-        "missing _maxIntervalForUnit() helper that maps unit -> interval cap"
-    )
+    assert (
+        "_maxIntervalForUnit" in js
+    ), "missing _maxIntervalForUnit() helper that maps unit -> interval cap"
     # The two unit values are "hour" and "minute" — the helper must map both.
     fn_match = re.search(
         r"function _maxIntervalForUnit\([^)]*\)\s*\{(?P<body>.*?)\n {4}\}",
@@ -50,9 +50,9 @@ def test_unit_change_listener_refreshes_max():
         r'getElementById\("unit"\)\s*\?\.addEventListener\("change",\s*refreshIntervalMax\)',
         js,
     )
-    assert bind_match, (
-        "unit <select> must listen for change and call refreshIntervalMax"
-    )
+    assert (
+        bind_match
+    ), "unit <select> must listen for change and call refreshIntervalMax"
 
 
 def test_populate_interval_fields_sets_initial_max():

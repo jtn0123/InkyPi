@@ -48,6 +48,6 @@ def test_device_name_title_documents_non_space_requirement():
     title_match = re.search(r'title="([^"]*)"', tag)
     assert title_match, "device name input has no title attribute"
     title = title_match.group(1).lower()
-    assert "non-space" in title or "non-whitespace" in title or "at least one" in title, (
-        f"device name title {title!r} should mention the non-whitespace requirement"
-    )
+    assert (
+        "non-space" in title or "non-whitespace" in title or "at least one" in title
+    ), f"device name title {title!r} should mention the non-whitespace requirement"

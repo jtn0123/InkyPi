@@ -643,7 +643,11 @@ def _update_now_direct(plugin_id, plugin_settings, device_config, display_manage
             # invalid URL, no render was actually attempted, and we
             # shouldn't bump Dashboard "Refreshes / Errors" for a typo.
             _push_update_now_fallback(
-                plugin_id, plugin_config, device_config, display_manager, e,
+                plugin_id,
+                plugin_config,
+                device_config,
+                display_manager,
+                e,
                 record_history=False,
             )
             return json_error(
@@ -756,7 +760,12 @@ def _update_now_direct(plugin_id, plugin_settings, device_config, display_manage
 
 
 def _push_update_now_fallback(
-    plugin_id, plugin_config, device_config, display_manager, exc, *,
+    plugin_id,
+    plugin_config,
+    device_config,
+    display_manager,
+    exc,
+    *,
     record_history: bool = True,
 ):
     """Best-effort: render and push an error-card image so the display updates on failure.
