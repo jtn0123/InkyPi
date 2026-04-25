@@ -1,4 +1,5 @@
 # pyright: reportMissingImports=false
+from typing import Any
 
 
 def test_playlist_page_renders(client):
@@ -30,7 +31,9 @@ def test_create_update_delete_playlist_flow(client):
     assert resp.status_code == 200
 
 
-def test_create_playlist_persists_cycle_override(client, device_config_dev):
+def test_create_playlist_persists_cycle_override(
+    client: Any, device_config_dev: Any
+) -> None:
     payload = {
         "playlist_name": "FastLoop",
         "start_time": "06:00",

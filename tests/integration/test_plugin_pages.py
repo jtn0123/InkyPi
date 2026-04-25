@@ -1,4 +1,5 @@
 # pyright: reportMissingImports=false
+from typing import Any
 
 
 def test_plugin_page_ai_text(client):
@@ -10,7 +11,7 @@ def test_plugin_page_ai_text(client):
     assert b"/preview" in resp.data
 
 
-def test_plugin_page_ai_image(client):
+def test_plugin_page_ai_image(client: Any) -> None:
     resp = client.get("/plugin/ai_image")
     assert resp.status_code == 200
     assert b"AI Image" in resp.data or b"Image Model" in resp.data
@@ -19,7 +20,9 @@ def test_plugin_page_ai_image(client):
     assert b"data-ai-image-random-prompt" in resp.data
 
 
-def test_clock_page_hides_generic_style_tab_and_labels_face_colors(client):
+def test_clock_page_hides_generic_style_tab_and_labels_face_colors(
+    client: Any,
+) -> None:
     resp = client.get("/plugin/clock")
     assert resp.status_code == 200
     body = resp.data.decode("utf-8")
@@ -31,7 +34,7 @@ def test_clock_page_hides_generic_style_tab_and_labels_face_colors(client):
     assert 'aria-pressed="false"' in body
 
 
-def test_plugin_tabs_have_tabpanel_wiring(client):
+def test_plugin_tabs_have_tabpanel_wiring(client: Any) -> None:
     resp = client.get("/plugin/ai_text")
     assert resp.status_code == 200
     body = resp.data.decode("utf-8")

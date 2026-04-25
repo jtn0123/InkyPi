@@ -63,7 +63,7 @@ def test_generate_settings_template():
     assert template["style_settings"] is False
 
 
-def test_clock_color_schema_labels_explain_face_colors():
+def test_clock_color_schema_labels_explain_face_colors() -> None:
     from plugins.clock.clock import Clock
 
     schema = Clock({"id": "clock"}).build_settings_schema()
@@ -186,7 +186,7 @@ def test_timezone_handling():
     assert img is not None
 
 
-def test_invalid_timezone_falls_back_in_generate_image():
+def test_invalid_timezone_falls_back_in_generate_image() -> None:
     """Imported or migrated bad timezone values should not crash rendering."""
     from unittest.mock import MagicMock
 

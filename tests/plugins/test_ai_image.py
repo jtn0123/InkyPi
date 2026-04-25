@@ -1,6 +1,7 @@
 # pyright: reportMissingImports=false
 import base64
 from io import BytesIO
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -96,7 +97,7 @@ def test_ai_image_validate_settings_rejects_provider_model_mismatch():
     assert "google" in error
 
 
-def test_ai_image_validate_settings_uses_default_model_for_openai():
+def test_ai_image_validate_settings_uses_default_model_for_openai() -> None:
     from plugins.ai_image.ai_image import AIImage
 
     plugin = AIImage({"id": "ai_image"})
@@ -105,7 +106,9 @@ def test_ai_image_validate_settings_uses_default_model_for_openai():
     )
 
 
-def test_ai_image_validate_settings_allows_blank_prompt_when_vivid_remix_enabled():
+def test_ai_image_validate_settings_allows_blank_prompt_when_vivid_remix_enabled() -> (
+    None
+):
     from plugins.ai_image.ai_image import AIImage
 
     plugin = AIImage({"id": "ai_image"})
@@ -122,7 +125,7 @@ def test_ai_image_validate_settings_allows_blank_prompt_when_vivid_remix_enabled
     )
 
 
-def test_ai_image_validate_settings_rejects_blank_prompt_without_vivid_remix():
+def test_ai_image_validate_settings_rejects_blank_prompt_without_vivid_remix() -> None:
     from plugins.ai_image.ai_image import AIImage
 
     plugin = AIImage({"id": "ai_image"})
@@ -368,7 +371,9 @@ def test_ai_image_randomize_prompt_blank_input(device_config_dev, monkeypatch):
         assert result is not None
 
 
-def test_ai_image_blank_prompt_without_randomize_raises(device_config_dev, monkeypatch):
+def test_ai_image_blank_prompt_without_randomize_raises(
+    device_config_dev: Any, monkeypatch: Any
+) -> None:
     from plugins.ai_image.ai_image import AIImage
 
     p = AIImage({"id": "ai_image"})
@@ -576,7 +581,7 @@ def test_ai_image_prompt_field_is_textarea():
     assert prompt_field.get("required") is not True
 
 
-def test_ai_image_schema_includes_random_prompt_widget():
+def test_ai_image_schema_includes_random_prompt_widget() -> None:
     from plugins.ai_image.ai_image import AIImage
 
     p = AIImage({"id": "ai_image"})
@@ -592,7 +597,7 @@ def test_ai_image_schema_includes_random_prompt_widget():
     assert any(item.get("widget_type") == "ai-image-prompt-tools" for item in widgets)
 
 
-def test_ai_image_prompt_renders_as_textarea(client):
+def test_ai_image_prompt_renders_as_textarea(client: Any) -> None:
     """Settings page should render the prompt as a <textarea> (JTN-377)."""
     resp = client.get("/plugin/ai_image")
     assert resp.status_code == 200
@@ -603,7 +608,7 @@ def test_ai_image_prompt_renders_as_textarea(client):
     assert "data-ai-image-random-prompt" in body
 
 
-def test_ai_image_random_prompt_endpoint_openai(client, monkeypatch):
+def test_ai_image_random_prompt_endpoint_openai(client: Any, monkeypatch: Any) -> None:
     from plugins.ai_image.ai_image import AIImage
 
     monkeypatch.setenv("OPEN_AI_SECRET", "test")
@@ -620,7 +625,9 @@ def test_ai_image_random_prompt_endpoint_openai(client, monkeypatch):
     assert body["prompt"] == "a glass city"
 
 
-def test_ai_image_random_prompt_endpoint_missing_key(client, monkeypatch):
+def test_ai_image_random_prompt_endpoint_missing_key(
+    client: Any, monkeypatch: Any
+) -> None:
     monkeypatch.delenv("OPEN_AI_SECRET", raising=False)
 
     resp = client.post(

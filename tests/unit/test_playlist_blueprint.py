@@ -4,6 +4,7 @@
 import json
 import threading
 from datetime import UTC, datetime
+from typing import Any
 from unittest.mock import patch
 
 # ---------------------------------------------------------------------------
@@ -245,7 +246,7 @@ class TestUpdatePlaylist:
         pl = pm.get_playlist("Cycled")
         assert pl.cycle_interval_seconds == 15 * 60
 
-    def test_duplicate_rename_rejected(self, client):
+    def test_duplicate_rename_rejected(self, client: Any) -> None:
         _create_playlist(client, "First", "06:00", "08:00")
         _create_playlist(client, "Second", "10:00", "12:00")
 
