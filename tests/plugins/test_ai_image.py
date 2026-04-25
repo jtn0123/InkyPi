@@ -691,3 +691,206 @@ def test_ai_image_google_raises_when_decode_returns_none(
                 },
                 device_config_dev,
             )
+
+
+# ---------------------------------------------------------------------------
+# Coverage for the remix-prompt fallback branches. PR #590 hardened these so
+# a broken prompt-rewriter cannot tank the whole image-generation flow; the
+# tests below lock in every branch (success, exception, empty string) for
+# both providers so regressions show up immediately in pytest, not as a
+# silently degraded UI.
+# ---------------------------------------------------------------------------
+
+
+def _google_modules(monkeypatch, mock_client):
+    """Stub the google.genai module tree for tests that use the Google path."""
+    import sys
+
+    mock_genai = MagicMock()
+    mock_google = MagicMock()
+    mock_google.genai = mock_genai
+    mock_genai.Client.return_value = mock_client
+    monkeypatch.setitem(sys.modules, "google", mock_google)
+    monkeypatch.setitem(sys.modules, "google.genai", mock_genai)
+    monkeypatch.setitem(sys.modules, "google.genai.types", mock_genai.types)
+    return mock_genai
+
+
+def _make_b64_image() -> str:
+    img = PILImage.new("RGB", (64, 64), "green")
+    buf = BytesIO()
+    img.save(buf, format="PNG")
+    return buf.getvalue()
+
+
+def test_maybe_randomize_openai_prompt_uses_original_when_empty(monkeypatch):
+    """Empty remix output must fall back to the user's prompt."""
+    from plugins.ai_image.ai_image import AIImage
+
+    plugin = AIImage({"id": "ai_image"})
+    with patch(
+        "plugins.ai_image.ai_image.AIImage.fetch_image_prompt", return_value="   "
+    ):
+        assert (
+            plugin._maybe_randomize_openai_prompt(MagicMock(), "keep me", True)
+            == "keep me"
+        )
+
+
+def test_maybe_randomize_google_prompt_success(monkeypatch):
+    """Success path: remixed text replaces the prompt."""
+    from plugins.ai_image.ai_image import AIImage
+
+    plugin = AIImage({"id": "ai_image"})
+    with patch(
+        "plugins.ai_image.ai_image.AIImage.fetch_image_prompt_google",
+        return_value="remixed gemini",
+    ):
+        assert (
+            plugin._maybe_randomize_google_prompt(MagicMock(), "orig", True)
+            == "remixed gemini"
+        )
+
+
+def test_maybe_randomize_google_prompt_falls_back_on_exception():
+    """Exception in Gemini remix must fall back to the user's prompt."""
+    from plugins.ai_image.ai_image import AIImage
+
+    plugin = AIImage({"id": "ai_image"})
+    with patch(
+        "plugins.ai_image.ai_image.AIImage.fetch_image_prompt_google",
+        side_effect=Exception("gemini boom"),
+    ):
+        assert (
+            plugin._maybe_randomize_google_prompt(MagicMock(), "stay calm", True)
+            == "stay calm"
+        )
+
+
+def test_maybe_randomize_google_prompt_falls_back_on_empty():
+    """Empty Gemini remix output must fall back to the user's prompt."""
+    from plugins.ai_image.ai_image import AIImage
+
+    plugin = AIImage({"id": "ai_image"})
+    with patch(
+        "plugins.ai_image.ai_image.AIImage.fetch_image_prompt_google", return_value=""
+    ):
+        assert (
+            plugin._maybe_randomize_google_prompt(MagicMock(), "orig", True) == "orig"
+        )
+
+
+def test_maybe_randomize_disabled_returns_original():
+    """When the checkbox is off, neither path should call the remixer."""
+    from plugins.ai_image.ai_image import AIImage
+
+    plugin = AIImage({"id": "ai_image"})
+    with patch(
+        "plugins.ai_image.ai_image.AIImage.fetch_image_prompt"
+    ) as mock_openai_fetch:
+        assert (
+            plugin._maybe_randomize_openai_prompt(MagicMock(), "stay", False) == "stay"
+        )
+        mock_openai_fetch.assert_not_called()
+
+    with patch(
+        "plugins.ai_image.ai_image.AIImage.fetch_image_prompt_google"
+    ) as mock_google_fetch:
+        assert (
+            plugin._maybe_randomize_google_prompt(MagicMock(), "stay", False) == "stay"
+        )
+        mock_google_fetch.assert_not_called()
+
+
+def test_fetch_image_prompt_google_empty_text_returns_empty(monkeypatch):
+    """fetch_image_prompt_google should return '' (not crash) on empty/None text."""
+    from plugins.ai_image.ai_image import AIImage
+
+    mock_client = MagicMock()
+    _google_modules(monkeypatch, mock_client)
+
+    # None response.text → ""
+    mock_resp_none = MagicMock()
+    mock_resp_none.text = None
+    mock_client.models.generate_content.return_value = mock_resp_none
+    assert AIImage.fetch_image_prompt_google(mock_client, "seed") == ""
+
+    # Whitespace-only response.text → ""
+    mock_resp_blank = MagicMock()
+    mock_resp_blank.text = "   \n  "
+    mock_client.models.generate_content.return_value = mock_resp_blank
+    assert AIImage.fetch_image_prompt_google(mock_client, "seed") == ""
+
+
+def test_ai_image_schema_exposes_gpt_image_2_and_quality_presets():
+    """build_settings_schema should wire up the GPT Image 2 model + quality
+    options added in PR #590. Traversing the schema here also gives coverage
+    credit for the option(...) lines that land inside nested dict literals."""
+    from plugins.ai_image.ai_image import AIImage
+
+    plugin = AIImage({"id": "ai_image"})
+    schema = plugin.build_settings_schema()
+
+    # Collect every field by name across all sections.
+    fields = {}
+    for section in schema["sections"]:
+        for item in section["items"]:
+            if item.get("kind") == "row":
+                for sub in item["items"]:
+                    if sub.get("kind") == "field":
+                        fields[sub["name"]] = sub
+            elif item.get("kind") == "field":
+                fields[item["name"]] = item
+
+    model_options = fields["imageModel"]["options_by_value"]["openai"]
+    model_values = [o["value"] for o in model_options]
+    assert "gpt-image-2" in model_values
+    assert "gpt-image-1.5" in model_values
+    # GPT Image 2 should be listed first (recommended/default).
+    assert model_values[0] == "gpt-image-2"
+
+    quality_by_model = fields["quality"]["options_by_value"]
+    assert "gpt-image-2" in quality_by_model
+    gpt2_qualities = [o["value"] for o in quality_by_model["gpt-image-2"]]
+    assert set(gpt2_qualities) == {"high", "medium", "low"}
+
+
+def test_ai_image_google_randomize_end_to_end_falls_back(
+    device_config_dev, monkeypatch
+):
+    """End-to-end: Google provider + randomize + remix failure → generation
+    still succeeds using the original prompt (matches the OpenAI parity test
+    just above but exercises the Gemini branch)."""
+    from plugins.ai_image.ai_image import AIImage
+
+    plugin = AIImage({"id": "ai_image"})
+    monkeypatch.setattr(device_config_dev, "load_env_key", lambda key: "fake_key")
+
+    mock_client = MagicMock()
+    _google_modules(monkeypatch, mock_client)
+
+    # Remix blows up; image generation succeeds.
+    with patch(
+        "plugins.ai_image.ai_image.AIImage.fetch_image_prompt_google",
+        side_effect=Exception("gemini boom"),
+    ):
+        mock_generated = MagicMock()
+        mock_generated.image.image_bytes = _make_b64_image()
+        mock_response = MagicMock()
+        mock_response.generated_images = [mock_generated]
+        mock_client.models.generate_images.return_value = mock_response
+
+        result = plugin.generate_image(
+            {
+                "textPrompt": "a quiet library",
+                "provider": "google",
+                "imageModel": "imagen-4.0-generate-001",
+                "quality": "standard",
+                "randomizePrompt": "true",
+            },
+            device_config_dev,
+        )
+        assert result is not None
+        # Prompt passed to Imagen should still begin with the user's original.
+        prompt_arg = mock_client.models.generate_images.call_args[1]["prompt"]
+        assert prompt_arg.startswith("a quiet library")
