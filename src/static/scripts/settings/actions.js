@@ -187,11 +187,20 @@
     );
   }
 
-  async function fetchVersionData(versionUrl) {
+  function appendForceParam(versionUrl) {
+    const separator = versionUrl.includes("?") ? "&" : "?";
+    return versionUrl + separator + "force=1";
+  }
+
+  async function fetchVersionData(versionUrl, { force = false } = {}) {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 8000);
     try {
-      const response = await fetch(versionUrl, {
+      // Manual "Check for updates" clicks pass ?force=1 so the server
+      // bypasses its 1h cache and actually hits GitHub. Silent/background
+      // checks leave the cache alone.
+      const url = force ? appendForceParam(versionUrl) : versionUrl;
+      const response = await fetch(url, {
         cache: "no-store",
         signal: controller.signal,
       });
@@ -251,9 +260,13 @@
     async function checkForUpdates(options) {
       const elements = getVersionElements();
       const silent = !!(options && options.silent);
+      // Manual clicks force a fresh server-side fetch so a stale 1h cache
+      // can't hide a release that actually exists. Silent/background
+      // refreshes reuse whatever the server already has.
+      const force = !silent;
       setCheckButtonLoading(elements.checkBtn, true);
       try {
-        const data = await fetchVersionData(config.versionUrl);
+        const data = await fetchVersionData(config.versionUrl, { force });
         renderVersionCheckResult(elements, data);
         if (!silent) {
           if (data.update_available) {
@@ -264,7 +277,15 @@
           } else if (data.latest) {
             showResponseModal("success", "You're on the latest version.");
           } else {
-            showResponseModal("failure", "Unable to check for updates.");
+            // Server produces a complete, self-contained reason in
+            // `check_error` (e.g. "Couldn't reach GitHub: timeout" or
+            // "Latest GitHub release (...) is not a stable X.Y.Z tag ..."),
+            // so show it verbatim instead of prepending a possibly-wrong
+            // "couldn't reach GitHub" preamble.
+            const message = data.check_error
+              ? data.check_error
+              : "Unable to check for updates. Try again later.";
+            showResponseModal("failure", message);
           }
         }
       } catch (e) {

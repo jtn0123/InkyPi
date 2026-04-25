@@ -13,15 +13,69 @@
   }
 
   async function copyText(text) {
-    if (!navigator.clipboard || !globalThis.isSecureContext) {
-      return false;
+    // Prefer the async Clipboard API when the page is a secure context
+    // (HTTPS, localhost). InkyPi is commonly served on the LAN over plain
+    // HTTP, which browsers treat as insecure and therefore block the async
+    // API. We fall through to a legacy execCommand-based path below so the
+    // Copy buttons still work in that setup.
+    if (navigator.clipboard && globalThis.isSecureContext) {
+      try {
+        await navigator.clipboard.writeText(text);
+        return true;
+      } catch (e) {
+        console.warn("Clipboard write failed, trying fallback:", e);
+      }
     }
+    return copyTextViaExecCommand(text);
+  }
+
+  function restoreFocus(prevActive) {
+    if (!prevActive || typeof prevActive.focus !== "function") return;
     try {
-      await navigator.clipboard.writeText(text);
-      return true;
+      prevActive.focus({ preventScroll: true });
+    } catch (err) {
+      // Non-fatal — the previously-focused element may have been removed
+      // from the DOM between selecting our temporary textarea and now.
+      // Log at debug so the failure is diagnosable without spamming users.
+      console.debug("Failed to restore focus after copy:", err);
+    }
+  }
+
+  function copyTextViaExecCommand(text) {
+    if (typeof document === "undefined" || !document.body) return false;
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    // Keep the textarea off-screen but selectable. iOS requires a non-zero
+    // font-size or it silently refuses to select; the rest of these styles
+    // stop the page from scrolling when we focus it.
+    ta.setAttribute("readonly", "");
+    ta.style.position = "fixed";
+    ta.style.top = "0";
+    ta.style.left = "0";
+    ta.style.width = "1px";
+    ta.style.height = "1px";
+    ta.style.padding = "0";
+    ta.style.border = "0";
+    ta.style.opacity = "0";
+    ta.style.pointerEvents = "none";
+    document.body.appendChild(ta);
+    const prevActive = document.activeElement;
+    try {
+      ta.focus({ preventScroll: true });
+      ta.select();
+      ta.setSelectionRange(0, text.length);
+      // execCommand("copy") is deprecated but is still the only way to copy
+      // text to the clipboard from a non-secure context. The async Clipboard
+      // API requires HTTPS / localhost, and InkyPi is commonly served over
+      // plain HTTP on the LAN. Keep this fallback until browsers ship a
+      // non-secure-context replacement. NOSONAR javascript:S1874
+      return document.execCommand("copy"); // NOSONAR
     } catch (e) {
-      console.warn("Clipboard write failed:", e);
+      console.warn("execCommand copy failed:", e);
       return false;
+    } finally {
+      ta.remove();
+      restoreFocus(prevActive);
     }
   }
 

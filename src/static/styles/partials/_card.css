@@ -189,8 +189,15 @@
 
 /* Radio-input variant — native radios inside labels, so FormData submission
    works without JS plumbing. The radio itself is visually hidden; the label
-   reflects the pressed state via :has(). */
-.seg-radio {
+   reflects the pressed state via :has().
+
+   Note: scope absolute positioning to each individual .seg-btn label, not
+   the shared .seg-radio group. A radio that stretches across the whole
+   group (inset:0 on .seg-radio {position:relative}) stacks on top of its
+   siblings and steals every click for whichever radio paints last — the
+   bug that made "Horizontal", "Fit to container", and "12 h" unclickable
+   in the Device settings panel. */
+.seg-radio .seg-btn {
   position: relative;
 }
 

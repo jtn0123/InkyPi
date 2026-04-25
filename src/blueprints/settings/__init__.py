@@ -772,6 +772,9 @@ _VERSION_CACHE: dict[str, object] = {
     "latest": None,
     "checked_at": 0.0,
     "release_notes": None,
+    # Surface why the last check failed so the UI can distinguish "on latest"
+    # from "we never managed to reach GitHub." Cleared on a successful fetch.
+    "last_error": None,
 }
 _VERSION_CACHE_TTL = 3600  # 1 hour
 
@@ -784,11 +787,21 @@ def _semver_gt(a: str, b: str) -> bool:
         return False
 
 
-def _check_latest_version() -> str | None:
-    """Fetch the latest release tag from the GitHub Releases API. Returns None on failure."""
+def _check_latest_version(force_refresh: bool = False) -> str | None:
+    """Fetch the latest release tag from the GitHub Releases API.
+
+    Returns the latest version string on success or ``None`` on any failure.
+    When the check fails, ``_VERSION_CACHE['last_error']`` is populated with a
+    short human-readable reason so the UI can report it to the user instead
+    of silently claiming "on latest".
+
+    When ``force_refresh`` is True the cache is bypassed — this is what the
+    "Check for updates" button needs so a manual click always hits GitHub.
+    """
     now = time.time()
     if (
-        _VERSION_CACHE["latest"]
+        not force_refresh
+        and _VERSION_CACHE["latest"]
         and (now - float(_VERSION_CACHE["checked_at"] or 0)) < _VERSION_CACHE_TTL
     ):
         return _VERSION_CACHE["latest"]  # type: ignore[return-value]
@@ -807,9 +820,28 @@ def _check_latest_version() -> str | None:
             _VERSION_CACHE["latest"] = latest
             _VERSION_CACHE["checked_at"] = now
             _VERSION_CACHE["release_notes"] = data.get("body")
+            _VERSION_CACHE["last_error"] = None
             return latest
-    except Exception:
-        logger.debug("Failed to check latest version via GitHub API", exc_info=True)
+        # Response decoded but the tag isn't a stable X.Y.Z release (e.g. a
+        # pre-release tag like v1.2.3-rc1). That's not a network failure, it
+        # just means there's nothing auto-installable. Record a message the
+        # client can show verbatim so we don't misreport this as "couldn't
+        # reach GitHub".
+        logger.warning(
+            "Latest GitHub release tag %r is not a stable X.Y.Z release; "
+            "auto-update skipped.",
+            tag,
+        )
+        _VERSION_CACHE["last_error"] = (
+            f"Latest GitHub release ({tag!r}) is not a stable X.Y.Z tag — "
+            "nothing to auto-install yet."
+        )
+    except Exception as exc:
+        # Bubble up a short reason to the client. Log at INFO so it lands in
+        # the in-app log panel without spamming errors on every check.
+        reason = str(exc) or exc.__class__.__name__
+        logger.info("Version check via GitHub API failed: %s", reason)
+        _VERSION_CACHE["last_error"] = f"Couldn't reach GitHub: {reason}"
     return None
 
 

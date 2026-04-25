@@ -2,6 +2,7 @@ import json
 import logging
 import os
 from time import perf_counter
+from typing import Any
 
 from flask import (
     Blueprint,
@@ -79,6 +80,58 @@ def _cacheable_send_file(path: str, ttl_env: str = "INKYPI_RENDER_CACHE_TTL_S"):
     return resp
 
 
+def _resolve_multi_service_api_key(
+    api_key_meta: dict[str, Any], device_config: Any
+) -> None:
+    """Populate per-service presence + a display label for plugins that list
+    multiple providers under ``services``. Mutates *api_key_meta* in place.
+
+    Each entry of ``services`` is ``{name, env_var}``; this adds ``present``
+    to each, sets the aggregate ``present`` flag, and picks a ``service``
+    label that reflects which provider(s) are actually configured (so the
+    chip shows "OpenAI" when only OpenAI is set, not "OpenAI / Google").
+    """
+    services = api_key_meta.get("services") or []
+    resolved = []
+    any_present = False
+    for svc in services:
+        env_var = svc.get("env_var")
+        name = svc.get("name") or env_var or ""
+        present = bool(env_var) and (device_config.load_env_key(env_var) is not None)
+        resolved.append({"name": name, "env_var": env_var, "present": present})
+        any_present = any_present or present
+    api_key_meta["services"] = resolved
+    api_key_meta["present"] = any_present
+
+    configured_names = [s["name"] for s in resolved if s["present"]]
+    if configured_names:
+        api_key_meta["service"] = " · ".join(configured_names)
+    else:
+        all_names = [s["name"] for s in resolved]
+        api_key_meta["service"] = " or ".join(all_names) or api_key_meta.get(
+            "service", ""
+        )
+
+
+def _resolve_api_key_presence(
+    template_params: dict[str, Any], device_config: Any
+) -> None:
+    """Attach ``present`` and provider-aware display metadata to ``api_key``.
+
+    Single-provider plugins still use ``expected_key``; multi-provider plugins
+    supply a ``services`` list that drives per-provider presence flags.
+    """
+    api_key_meta = template_params.get("api_key")
+    if not api_key_meta or not api_key_meta.get("required"):
+        return
+    if api_key_meta.get("services"):
+        _resolve_multi_service_api_key(api_key_meta, device_config)
+        return
+    expected_key = api_key_meta.get("expected_key")
+    if expected_key:
+        api_key_meta["present"] = device_config.load_env_key(expected_key) is not None
+
+
 @plugin_bp.route("/plugin/<plugin_id>", methods=["GET"])
 def plugin_page(plugin_id: str):
     device_config = current_app.config[_CONFIG_KEY]
@@ -96,12 +149,7 @@ def plugin_page(plugin_id: str):
         plugin = get_plugin_instance(plugin_config)
         template_params = plugin.generate_settings_template()
 
-        # Check if API key is present for plugins that require it
-        if "api_key" in template_params and template_params["api_key"].get("required"):
-            expected_key = template_params["api_key"].get("expected_key")
-            if expected_key:
-                key_present = device_config.load_env_key(expected_key) is not None
-                template_params["api_key"]["present"] = key_present
+        _resolve_api_key_presence(template_params, device_config)
 
         # If viewing an existing instance, pre-populate its settings
         plugin_instance_name = request.args.get("instance")

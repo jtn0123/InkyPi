@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from typing import Any
 
-def option(value, label, **kwargs):
-    data = {"value": value, "label": label}
+
+def option(value: Any, label: str, **kwargs: Any) -> dict[str, Any]:
+    data: dict[str, Any] = {"value": value, "label": label}
     data.update(kwargs)
     return data
 

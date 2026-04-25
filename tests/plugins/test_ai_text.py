@@ -12,9 +12,13 @@ def test_ai_text_generate_settings_template(monkeypatch, device_config_dev):
 
     assert "api_key" in template
     assert template["api_key"]["required"] is True
-    assert template["api_key"]["service"] == "OpenAI / Google"
-    assert template["api_key"]["expected_key"] == "OPEN_AI_SECRET"
-    assert template["api_key"]["alt_key"] == "GOOGLE_AI_SECRET"
+    services = template["api_key"]["services"]
+    assert [s["name"] for s in services] == ["OpenAI", "Google"]
+    assert [s["env_var"] for s in services] == ["OPEN_AI_SECRET", "GOOGLE_AI_SECRET"]
+    # Legacy expected_key/alt_key are now obsolete — `services` is the sole
+    # source of truth for multi-provider plugins.
+    assert "expected_key" not in template["api_key"]
+    assert "alt_key" not in template["api_key"]
     assert template["style_settings"] is True
     assert "settings_schema" in template
 
