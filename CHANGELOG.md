@@ -1,6 +1,39 @@
 # CHANGELOG
 
 
+## v1.0.6 (2026-04-25)
+
+### Bug Fixes
+
+- Polish playlists and image plugin flows ([#593](https://github.com/jtn0123/InkyPi/pull/593),
+  [`c545492`](https://github.com/jtn0123/InkyPi/commit/c545492c3189bea04738c088b5d652c03a3b15e4))
+
+* refactor: add type ratchets and request models
+
+* chore: align tests mypy baseline with ci
+
+* fix: polish playlists and image plugin flows
+
+* fix: address request model review feedback
+
+* fix: satisfy mypy ratchet for review tests
+
+* fix: cache plugin info scans for perf gate
+
+* test: type plugin info cache regressions
+
+* fix: address coderabbit polish feedback
+
+### Refactoring
+
+- Clear src mypy debt ([#592](https://github.com/jtn0123/InkyPi/pull/592),
+  [`f0968ba`](https://github.com/jtn0123/InkyPi/commit/f0968baacab8e581e952bc34b1ed1f08c963304f))
+
+* refactor: clear src mypy debt
+
+* fix: pin split isolation route schemas
+
+
 ## v1.0.5 (2026-04-25)
 
 ### Bug Fixes
