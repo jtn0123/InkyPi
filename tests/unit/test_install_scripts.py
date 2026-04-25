@@ -3547,6 +3547,12 @@ class TestMemoryCapTiering:
             "pick up the per-device caps on next update (JTN-785)"
         )
 
+    def test_do_update_reads_target_version_file(self):
+        content = (REPO_ROOT / "install" / "do_update.sh").read_text()
+        assert 'TARGET_VERSION_FILE="$LOCKFILE_DIR/update-target-version"' in content
+        assert '[ -r "$TARGET_VERSION_FILE" ]' in content
+        assert 'head -n 1 "$TARGET_VERSION_FILE"' in content
+
     def test_dropin_filename_does_not_collide_with_plugin_isolation(self, tmp_path):
         """JTN-783 ships a plugin-isolation.conf drop-in. The JTN-785 drop-in
         must use a distinct filename (memory.conf) so both coexist in

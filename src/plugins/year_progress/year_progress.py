@@ -1,6 +1,10 @@
 import logging
+from collections.abc import Mapping
 from datetime import datetime
+from typing import Any
 from zoneinfo import ZoneInfo
+
+from PIL.Image import Image as ImageType
 
 from plugins.base_plugin.base_plugin import BasePlugin
 
@@ -8,12 +12,14 @@ logger = logging.getLogger(__name__)
 
 
 class YearProgress(BasePlugin):
-    def generate_settings_template(self):
-        template_params = super().generate_settings_template()
+    def generate_settings_template(self) -> dict[str, object]:
+        template_params: dict[str, object] = super().generate_settings_template()
         template_params["style_settings"] = True
         return template_params
 
-    def generate_image(self, settings, device_config):
+    def generate_image(
+        self, settings: Mapping[str, object], device_config: Any
+    ) -> ImageType:
         dimensions = self.get_oriented_dimensions(device_config)
 
         tz_name = device_config.get_config("timezone", default="America/New_York")

@@ -7,7 +7,7 @@ import logging
 import re
 import time as _time
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, cast
 
 from utils.form_utils import sanitize_log_field
 from utils.messages import PLAYLIST_NAME_REQUIRED_ERROR
@@ -198,7 +198,7 @@ def validate_plugin_settings_security(
     try:
         from plugins.plugin_registry import get_plugin_instance as _get_plugin_instance
 
-        plugin_obj = _get_plugin_instance(plugin_config)
+        plugin_obj = cast(Any, _get_plugin_instance)(plugin_config)
         settings_error = plugin_obj.validate_settings(plugin_settings)
         if settings_error:
             return WorkflowError(str(settings_error), status=400)
@@ -280,6 +280,7 @@ def prepare_add_plugin_workflow(
             field=security_err.field,
         )
 
+    assert instance_name is not None
     plugin_dict = build_playlist_plugin_dict(
         plugin_id, plugin_settings, refresh_config or {}, instance_name
     )

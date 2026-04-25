@@ -7,15 +7,16 @@ import os
 import sys
 import threading
 from pathlib import Path
+from typing import Any, cast
 
 from utils.app_utils import resolve_path
 
 logger = logging.getLogger("plugins.plugin_registry")
 PLUGINS_DIR = "plugins"
-PLUGIN_CLASSES = {}
-_PLUGIN_CONFIGS = {}
+PLUGIN_CLASSES: dict[str, Any] = {}
+_PLUGIN_CONFIGS: dict[str, dict[str, Any]] = {}
 _registry_lock = threading.RLock()
-_LAST_HOT_RELOAD: dict | None = None
+_LAST_HOT_RELOAD: dict[str, object] | None = None
 _hot_reload_lock = threading.Lock()
 
 
@@ -29,8 +30,13 @@ def _is_dev_mode() -> bool:
     return env_mode in ("dev", "development")
 
 
-def _load_single_plugin_instance(plugin_config):
+def _load_single_plugin_instance(plugin_config: dict[str, Any]) -> Any:
     plugin_id = plugin_config.get("id")
+    if not isinstance(plugin_id, str) or not plugin_id:
+        raise ValueError("Plugin config is missing a valid id.")
+    plugin_class_name = plugin_config.get("class")
+    if not isinstance(plugin_class_name, str) or not plugin_class_name:
+        raise ValueError(f"Plugin '{plugin_id}' is missing a valid class.")
     module_name = f"plugins.{plugin_id}.{plugin_id}"
     try:
         reloaded = False
@@ -45,10 +51,10 @@ def _load_single_plugin_instance(plugin_config):
             reloaded = True
         else:
             module = importlib.import_module(module_name)
-        plugin_cls = getattr(module, plugin_config.get("class"), None)
+        plugin_cls = getattr(module, plugin_class_name, None)
         if not plugin_cls:
             raise ImportError(
-                f"Class '{plugin_config.get('class')}' not found in module {module_name}"
+                f"Class '{plugin_class_name}' not found in module {module_name}"
             )
         instance = plugin_cls(plugin_config)
         # record hot reload info for request/response hooks to surface
@@ -117,15 +123,18 @@ def _check_plugin_version(
     return api_version, version
 
 
-def load_plugins(plugins_config):
+def load_plugins(plugins_config: list[dict[str, Any]]) -> None:
     """Validate plugin directories and register configs for lazy loading.
 
     Plugin modules are not imported until first use via get_plugin_instance(),
     reducing startup memory and time on low-resource devices.
     """
-    plugins_module_path = Path(resolve_path(PLUGINS_DIR))
+    plugins_module_path = Path(cast(str, cast(Any, resolve_path)(PLUGINS_DIR)))
     for plugin in plugins_config:
         plugin_id = plugin.get("id")
+        if not isinstance(plugin_id, str) or not plugin_id:
+            logger.error("Plugin config is missing a valid id, skipping.")
+            continue
         if plugin.get("disabled", False):
             logger.info(f"Plugin {plugin_id} is disabled, skipping.")
             continue
@@ -162,12 +171,14 @@ def load_plugins(plugins_config):
         logger.debug(f"Registered plugin '{plugin_id}' for lazy loading")
 
 
-def get_plugin_instance(plugin_config):
+def get_plugin_instance(plugin_config: dict[str, Any]) -> Any:
     plugin_id = plugin_config.get("id")
+    if not isinstance(plugin_id, str) or not plugin_id:
+        raise ValueError("Plugin config is missing a valid id.")
 
     # In dev mode, always (re)load and re-instantiate to pick up code changes.
     if _is_dev_mode():
-        return _load_single_plugin_instance(plugin_config)
+        return cast(Any, _load_single_plugin_instance)(plugin_config)
 
     with _registry_lock:
         # Retrieve cached instance if available
@@ -178,7 +189,7 @@ def get_plugin_instance(plugin_config):
 
     # Lazy load: import and cache on first use
     if stored_config:
-        instance = _load_single_plugin_instance(stored_config)
+        instance = cast(Any, _load_single_plugin_instance)(stored_config)
         with _registry_lock:
             PLUGIN_CLASSES[plugin_id] = instance
         return instance
@@ -186,20 +197,20 @@ def get_plugin_instance(plugin_config):
     raise ValueError(f"Plugin '{plugin_id}' is not registered.")
 
 
-def reset_plugin_registry():
+def reset_plugin_registry() -> None:
     """Clear plugin loader caches/config registration (test isolation helper)."""
     with _registry_lock:
         PLUGIN_CLASSES.clear()
         _PLUGIN_CONFIGS.clear()
 
 
-def get_registered_plugin_ids():
+def get_registered_plugin_ids() -> set[str]:
     """Return the set of plugin IDs that are registered (loaded or pending lazy load)."""
     with _registry_lock:
         return set(PLUGIN_CLASSES) | set(_PLUGIN_CONFIGS)
 
 
-def pop_hot_reload_info():
+def pop_hot_reload_info() -> dict[str, object] | None:
     """Return and clear the last hot reload info recorded by the loader.
 
     Returns a dict like {"plugin_id": str, "reloaded": bool} or None.

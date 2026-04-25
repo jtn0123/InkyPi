@@ -9,6 +9,7 @@ from urllib.parse import quote, unquote, urlsplit
 
 from flask import (
     Blueprint,
+    Response,
     current_app,
     redirect,
     render_template,
@@ -110,16 +111,16 @@ def _record_failed_attempt() -> None:
         logger.warning("PIN auth: lockout triggered after %d failed attempts", count)
 
 
-@auth_bp.route("/login", methods=["GET"])
-def login_get():
+@auth_bp.route("/login", methods=["GET"])  # type: ignore
+def login_get() -> str | Response:
     next_url = _safe_next_url(request.args.get("next"))
     if session.get("authed") is True:
         return redirect(next_url)
     return render_template(_LOGIN_TEMPLATE, error=None, next=next_url)
 
 
-@auth_bp.route("/login", methods=["POST"])
-def login_post():
+@auth_bp.route("/login", methods=["POST"])  # type: ignore
+def login_post() -> str | Response:
     """Validate submitted PIN and establish an authenticated session."""
     # CSRF token is checked by the global before_request handler in security_middleware.
     pin_hash = current_app.config.get("AUTH_PIN_HASH")
@@ -149,7 +150,7 @@ def login_post():
     )
 
 
-@auth_bp.route("/logout", methods=["GET"])
-def logout():
+@auth_bp.route("/logout", methods=["GET"])  # type: ignore
+def logout() -> Response:
     session.clear()
     return redirect(url_for("auth.login_get"))

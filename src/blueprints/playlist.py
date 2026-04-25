@@ -2,7 +2,9 @@ import json
 import logging
 import re
 import threading
+from collections.abc import Mapping
 from datetime import UTC, datetime, timedelta
+from typing import Any, cast
 
 from flask import (
     Blueprint,
@@ -63,7 +65,9 @@ DEFAULT_PLAYLIST_NAME = "Default"
 _MSG_CANNOT_DELETE_DEFAULT = "Cannot delete the default playlist"
 
 
-def _validate_playlist_name(name, field="playlist_name"):
+def _validate_playlist_name(
+    name: Any, field: str = "playlist_name"
+) -> tuple[str | None, Any]:
     """Validate playlist name format. Returns (cleaned_name, error_response) tuple.
 
     ``field`` is the form field name echoed back in ``details.field`` so the
@@ -97,19 +101,19 @@ def _validate_playlist_name(name, field="playlist_name"):
 # Simple in-memory cache for ETA computations (per playlist, per-minute)
 # Bounded to prevent unbounded growth; entries expire after 1 minute.
 _ETA_CACHE_MAX_SIZE = 64
-_eta_cache: dict[str, tuple[datetime, dict[str, dict]]] = {}
+_eta_cache: dict[str, tuple[datetime, dict[str, dict[str, Any]]]] = {}
 _eta_cache_lock = threading.Lock()
 
 
-def _safe_now_device_tz(device_config) -> datetime:
+def _safe_now_device_tz(device_config: Any) -> datetime:
     try:
-        return now_device_tz(device_config)
+        return cast(datetime, now_device_tz(device_config))  # type: ignore[redundant-cast, unused-ignore]
     except Exception:
         return datetime.now(UTC)
 
 
 def _to_minutes(time_str: str) -> int:
-    return Playlist._to_minutes(time_str)
+    return int(Playlist._to_minutes(time_str))
 
 
 def _segments(start_min: int, end_min: int) -> list[tuple[int, int]]:
@@ -128,7 +132,9 @@ def _windows_overlap(start_a: int, end_a: int, start_b: int, end_b: int) -> bool
     return False
 
 
-def _default_overlap_warning(start_min, end_min, playlists):
+def _default_overlap_warning(
+    start_min: int, end_min: int, playlists: Any
+) -> str | None:
     """Return an informational warning if the time range overlaps with the Default playlist."""
     try:
         for pl in playlists:
@@ -146,7 +152,9 @@ def _default_overlap_warning(start_min, end_min, playlists):
     return None
 
 
-def _check_playlist_overlap(new_start, new_end, playlists, exclude_name=None):
+def _check_playlist_overlap(
+    new_start: int, new_end: int, playlists: Any, exclude_name: str | None = None
+) -> Any | None:
     """Check for time window overlap with existing playlists.
 
     Returns an error response if an overlap is found, or None if clear.
@@ -168,7 +176,9 @@ def _check_playlist_overlap(new_start, new_end, playlists, exclude_name=None):
     return None
 
 
-def validate_plugin_refresh_settings(refresh_settings):
+def validate_plugin_refresh_settings(
+    refresh_settings: Mapping[str, Any],
+) -> tuple[dict[str, int | str] | None, Any]:
     """Validate the refresh portion of an add_plugin request.
 
     Returns ``(refresh_config, error_response)``.  Exactly one of the two
@@ -183,6 +193,7 @@ def validate_plugin_refresh_settings(refresh_settings):
             details={"field": "refreshType"},
         )
 
+    refresh_config: dict[str, int | str]
     if refresh_type == "interval":
         unit = refresh_settings.get("unit")
         interval = refresh_settings.get("interval")
@@ -249,7 +260,7 @@ def validate_plugin_refresh_settings(refresh_settings):
     return refresh_config, None
 
 
-def _safe_next_index(pl, num: int) -> int:
+def _safe_next_index(pl: Any, num: int) -> int:
     """Return the index of the plugin that will be shown on the next cycle tick."""
     if num == 0:
         return 0
@@ -258,12 +269,14 @@ def _safe_next_index(pl, num: int) -> int:
             return 0
         if not (0 <= pl.current_plugin_index < num):
             return 0
-        return (pl.current_plugin_index + 1) % num
+        return cast(int, pl.current_plugin_index + 1) % num
     except Exception:
         return 0
 
 
-def _safe_until_next_min(is_active, last_dt, cycle_min: int, now) -> int:
+def _safe_until_next_min(
+    is_active: bool, last_dt: datetime | None, cycle_min: int, now: datetime
+) -> int:
     """Return minutes until the next cycle tick for a playlist.
 
     ``is_active`` should be True when ``last_dt`` belongs to this playlist.
@@ -280,12 +293,14 @@ def _safe_until_next_min(is_active, last_dt, cycle_min: int, now) -> int:
         return cycle_min
 
 
-def _compute_playlist_rotation_eta(pl, next_index, until_next_min, cycle_min, now):
+def _compute_playlist_rotation_eta(
+    pl: Any, next_index: int, until_next_min: int, cycle_min: int, now: datetime
+) -> dict[str, dict[str, int | str]]:
     """Compute per-instance rotation ETA for a single playlist.
 
     Returns a dict mapping instance name to ``{"minutes": int, "at": "HH:MM"}``.
     """
-    eta_for_pl: dict[str, dict] = {}
+    eta_for_pl: dict[str, dict[str, int | str]] = {}
     num = len(pl.plugins)
     if num == 0:
         return eta_for_pl
@@ -300,7 +315,7 @@ def _compute_playlist_rotation_eta(pl, next_index, until_next_min, cycle_min, no
     return eta_for_pl
 
 
-def _validate_instance_name(raw_name):
+def _validate_instance_name(raw_name: Any) -> tuple[str | None, Any]:
     """Validate and normalise an instance name.
 
     Returns ``(name, error_response)``.  Exactly one will be non-None.
@@ -330,7 +345,9 @@ def _validate_instance_name(raw_name):
     return name, None
 
 
-def _form_parse_error(message, *, status=400, field="refresh_settings"):
+def _form_parse_error(
+    message: str, *, status: int = 400, field: str = "refresh_settings"
+) -> tuple[None, None, None, Any]:
     """Build a ``(None, None, None, error_response)`` tuple for form parsing."""
     return (
         None,
@@ -342,7 +359,9 @@ def _form_parse_error(message, *, status=400, field="refresh_settings"):
     )
 
 
-def _parse_refresh_settings_json(raw_refresh):
+def _parse_refresh_settings_json(
+    raw_refresh: Any,
+) -> tuple[dict[str, Any] | None, tuple[None, None, None, Any] | None]:
     """Decode *raw_refresh* into a dict.
 
     Returns ``(refresh_settings, error_tuple)``.  On success the error is
@@ -359,13 +378,15 @@ def _parse_refresh_settings_json(raw_refresh):
     return refresh_settings, None
 
 
-def _parse_add_plugin_form(form, files):
+def _parse_add_plugin_form(
+    form: Mapping[str, Any], files: Any
+) -> tuple[str | None, dict[str, Any] | None, dict[str, Any] | None, Any]:
     """Parse and validate the add_plugin form data.
 
     Returns ``(plugin_id, plugin_settings, refresh_settings, error_response)``.
     On success ``error_response`` is None; on failure the first three are None.
     """
-    plugin_settings = parse_form(form)
+    plugin_settings = cast(dict[str, Any], cast(Any, parse_form)(form))
     raw_refresh = plugin_settings.pop("refresh_settings", None)
     refresh_settings, err = _parse_refresh_settings_json(raw_refresh)
     if err:
@@ -373,11 +394,15 @@ def _parse_add_plugin_form(form, files):
     plugin_id = plugin_settings.pop("plugin_id", None)
     if not plugin_id or not isinstance(plugin_id, str):
         return _form_parse_error("plugin_id is required", status=422, field="plugin_id")
-    plugin_settings.update(handle_request_files(files))
+    plugin_settings.update(cast(dict[str, Any], cast(Any, handle_request_files)(files)))
+    if refresh_settings is None:
+        return _form_parse_error("refresh_settings is required")
     return plugin_id, plugin_settings, refresh_settings, None
 
 
-def _validate_plugin_settings_security(device_config, plugin_id, plugin_settings):
+def _validate_plugin_settings_security(
+    device_config: Any, plugin_id: str, plugin_settings: Any
+) -> Any | None:
     """JTN-451: Run plugin-specific validation (e.g. URL scheme checks).
 
     Returns an error response if validation fails, or None on success.
@@ -400,8 +425,8 @@ def _validate_plugin_settings_security(device_config, plugin_id, plugin_settings
     return None
 
 
-@playlist_bp.route("/add_plugin", methods=["POST"])
-def add_plugin():
+@playlist_bp.route("/add_plugin", methods=["POST"])  # type: ignore[untyped-decorator]
+def add_plugin() -> Any:
     device_config = current_app.config["DEVICE_CONFIG"]
     playlist_manager = device_config.get_playlist_manager()
 
@@ -415,6 +440,9 @@ def add_plugin():
         )
         if parse_err:
             return parse_err
+        assert plugin_id is not None
+        assert plugin_settings is not None
+        assert refresh_settings is not None
 
         result = prepare_add_plugin_workflow(
             plugin_id,
@@ -431,13 +459,13 @@ def add_plugin():
     return json_success("Scheduled refresh configured.")
 
 
-@playlist_bp.route("/playlists", methods=["GET"])
-def playlists_redirect():
+@playlist_bp.route("/playlists", methods=["GET"])  # type: ignore[untyped-decorator]
+def playlists_redirect() -> Any:
     return redirect(url_for("playlist.playlists"))
 
 
-@playlist_bp.route("/playlist", methods=["GET"])
-def playlists():
+@playlist_bp.route("/playlist", methods=["GET"])  # type: ignore[untyped-decorator]
+def playlists() -> Any:
     device_config = current_app.config["DEVICE_CONFIG"]
     playlist_manager = device_config.get_playlist_manager()
     refresh_info = device_config.get_refresh_info()
@@ -484,24 +512,26 @@ def playlists():
         )
     except Exception:
         last_dt = None
-    playlist_timing: dict[str, dict] = {}
-    rotation_eta: dict[str, dict] = {}
+    playlist_timing: dict[str, dict[str, int | str | None]] = {}
+    rotation_eta: dict[str, dict[str, dict[str, int | str]]] = {}
     try:
         for pl in playlist_manager.playlists:
             cycle_sec = getattr(pl, "cycle_interval_seconds", None)
             cycle_min = int(
                 (int(cycle_sec) if cycle_sec else device_cycle_minutes * 60) // 60
             )
-            item: dict = {
+            item: dict[str, int | str | None] = {
                 "cycle_minutes": cycle_min,
                 "next_in_minutes": None,
                 "next_at": None,
             }
             try:
-                is_active = last_dt and getattr(ri_obj, "playlist", None) == pl.name
+                is_active = bool(
+                    last_dt and getattr(ri_obj, "playlist", None) == pl.name
+                )
                 if is_active:
                     # compute next time
-                    next_dt = last_dt + timedelta(minutes=cycle_min)
+                    next_dt = cast(datetime, last_dt) + timedelta(minutes=cycle_min)
                     delta_min = int(max(0, (next_dt - now).total_seconds() // 60))
                     item["next_in_minutes"] = delta_min
                     try:
@@ -513,7 +543,7 @@ def playlists():
                     num = len(pl.plugins)
                     next_index = _safe_next_index(pl, num)
                     until_next_min = _safe_until_next_min(
-                        is_active, last_dt, cycle_min, now
+                        is_active, cast(datetime | None, last_dt), cycle_min, now
                     )
                     rotation_eta[pl.name] = _compute_playlist_rotation_eta(
                         pl, next_index, until_next_min, cycle_min, now
@@ -541,7 +571,7 @@ def playlists():
     )
 
 
-def _parse_playlist_request_data():
+def _parse_playlist_request_data() -> tuple[dict[str, Any] | None, Any]:
     """Parse and validate playlist create/update request data.
 
     Returns (data_dict, error_response). If error_response is not None, return it.
@@ -558,7 +588,9 @@ def _parse_playlist_request_data():
     return data, None
 
 
-def _validate_playlist_times(start_time, end_time):
+def _validate_playlist_times(
+    start_time: Any, end_time: Any
+) -> tuple[int | None, int | None, Any]:
     """Validate and convert time strings to minutes.
 
     Returns (start_min, end_min, error_response).
@@ -620,14 +652,16 @@ def _validate_playlist_times(start_time, end_time):
     return start_min, end_min, None
 
 
-@playlist_bp.route("/create_playlist", methods=["POST"])
-def create_playlist():
+@playlist_bp.route("/create_playlist", methods=["POST"])  # type: ignore[untyped-decorator]
+def create_playlist() -> Any:
     device_config = current_app.config["DEVICE_CONFIG"]
     playlist_manager = device_config.get_playlist_manager()
 
     data, err = _parse_playlist_request_data()
     if err:
         return reissue_json_error(err, _MSG_INVALID_PLAYLIST_REQUEST)
+    if data is None:
+        return json_error("Invalid playlist request", status=400)
 
     playlist_name, name_err = _validate_playlist_name(data.get("playlist_name"))
     if name_err:
@@ -637,6 +671,8 @@ def create_playlist():
     )
     if time_err:
         return time_err
+    if start_min is None or end_min is None:
+        return json_error("Invalid playlist times", status=400)
 
     with route_error_boundary(
         "create playlist",
@@ -665,7 +701,7 @@ def create_playlist():
 
         add_pl_result: list[bool] = []
 
-        def _do_add_playlist(cfg):
+        def _do_add_playlist(cfg: Any) -> None:
             add_pl_result.append(
                 playlist_manager.add_playlist(
                     playlist_name, data.get("start_time"), data.get("end_time")
@@ -691,7 +727,7 @@ _CYCLE_MINUTES_MIN = 1
 _CYCLE_MINUTES_MAX = 1440
 
 
-def _validate_cycle_minutes(cycle_minutes):
+def _validate_cycle_minutes(cycle_minutes: Any) -> tuple[int | None, Any]:
     """Validate cycle_minutes value.
 
     Returns ``(int_value, error_response)``.  If cycle_minutes is None/absent,
@@ -718,7 +754,9 @@ def _validate_cycle_minutes(cycle_minutes):
     return cm, None
 
 
-def _apply_cycle_override(playlist_manager, new_name, cycle_minutes_int):
+def _apply_cycle_override(
+    playlist_manager: Any, new_name: str, cycle_minutes_int: int | None
+) -> None:
     """Apply optional cycle interval override to a playlist.
 
     ``cycle_minutes_int`` must already be a validated integer or None.
@@ -730,7 +768,9 @@ def _apply_cycle_override(playlist_manager, new_name, cycle_minutes_int):
         playlist.cycle_interval_seconds = cycle_minutes_int * 60
 
 
-def _validate_update_playlist_payload(data):
+def _validate_update_playlist_payload(
+    data: Mapping[str, Any],
+) -> tuple[dict[str, Any] | None, Any]:
     """Validate an /update_playlist request payload.
 
     Returns ``(parsed, error_response)``; exactly one is non-None.  ``parsed``
@@ -766,8 +806,8 @@ def _validate_update_playlist_payload(data):
     }, None
 
 
-@playlist_bp.route("/update_playlist/<string:playlist_name>", methods=["PUT"])
-def update_playlist(playlist_name):
+@playlist_bp.route("/update_playlist/<string:playlist_name>", methods=["PUT"])  # type: ignore[untyped-decorator]
+def update_playlist(playlist_name: str) -> Any:
     device_config = current_app.config["DEVICE_CONFIG"]
     playlist_manager = device_config.get_playlist_manager()
 
@@ -778,12 +818,16 @@ def update_playlist(playlist_name):
     parsed, err = _validate_update_playlist_payload(data)
     if err:
         return err
+    if not isinstance(parsed, dict):
+        return json_error("Invalid playlist payload", status=400)
     new_name = parsed["new_name"]
     start_time = parsed["start_time"]
     end_time = parsed["end_time"]
     start_min = parsed["start_min"]
     end_min = parsed["end_min"]
     cycle_minutes_int = parsed["cycle_minutes_int"]
+    if start_min is None or end_min is None:
+        return json_error("Invalid playlist times", status=400)
 
     playlist = playlist_manager.get_playlist(playlist_name)
     if not playlist:
@@ -806,7 +850,7 @@ def update_playlist(playlist_name):
 
     upd_result: list[bool] = []
 
-    def _do_update_playlist(cfg):
+    def _do_update_playlist(cfg: Any) -> None:
         upd_result.append(
             playlist_manager.update_playlist(
                 playlist_name, new_name, start_time, end_time
@@ -830,8 +874,8 @@ def update_playlist(playlist_name):
     return json_success("Updated playlist!")
 
 
-@playlist_bp.route("/delete_playlist/<string:playlist_name>", methods=["DELETE"])
-def delete_playlist(playlist_name):
+@playlist_bp.route("/delete_playlist/<string:playlist_name>", methods=["DELETE"])  # type: ignore[untyped-decorator]
+def delete_playlist(playlist_name: str) -> Any:
     device_config = current_app.config["DEVICE_CONFIG"]
     playlist_manager = device_config.get_playlist_manager()
 
@@ -875,8 +919,8 @@ def delete_playlist(playlist_name):
     return json_success("Deleted playlist!")
 
 
-@playlist_bp.route("/update_device_cycle", methods=["PUT"])
-def update_device_cycle():
+@playlist_bp.route("/update_device_cycle", methods=["PUT"])  # type: ignore[untyped-decorator]
+def update_device_cycle() -> Any:
     device_config = current_app.config["DEVICE_CONFIG"]
     refresh_task = current_app.config["REFRESH_TASK"]
     data = request.get_json(silent=True) or {}
@@ -910,8 +954,8 @@ def update_device_cycle():
         return json_success("Device refresh cadence updated.")
 
 
-@playlist_bp.route("/reorder_plugins", methods=["POST"])
-def reorder_plugins():
+@playlist_bp.route("/reorder_plugins", methods=["POST"])  # type: ignore[untyped-decorator]
+def reorder_plugins() -> Any:
     device_config = current_app.config["DEVICE_CONFIG"]
     playlist_manager = device_config.get_playlist_manager()
 
@@ -951,7 +995,7 @@ def reorder_plugins():
 
         reorder_result: list[bool] = []
 
-        def _do_reorder(cfg):
+        def _do_reorder(cfg: Any) -> None:
             reorder_result.append(playlist.reorder_plugins(ordered))
 
         device_config.update_atomic(_do_reorder)
@@ -962,8 +1006,8 @@ def reorder_plugins():
 
 
 # Trigger next eligible instance in a specific playlist immediately
-@playlist_bp.route("/display_next_in_playlist", methods=["POST"])
-def display_next_in_playlist():
+@playlist_bp.route("/display_next_in_playlist", methods=["POST"])  # type: ignore[untyped-decorator]
+def display_next_in_playlist() -> Any:
     device_config = current_app.config["DEVICE_CONFIG"]
     refresh_task = current_app.config["REFRESH_TASK"]
     playlist_manager = device_config.get_playlist_manager()
@@ -1010,7 +1054,7 @@ def display_next_in_playlist():
             PlaylistRefresh(playlist, plugin_instance, force=True)
         )
 
-        def _persist_active_playlist(_cfg):
+        def _persist_active_playlist(_cfg: Any) -> None:
             playlist_manager.active_playlist = playlist.name
 
         device_config.update_atomic(_persist_active_playlist)
@@ -1033,8 +1077,8 @@ def display_next_in_playlist():
         )
 
 
-@playlist_bp.route("/playlist/eta/<string:playlist_name>", methods=["GET"])
-def playlist_eta(playlist_name: str):
+@playlist_bp.route("/playlist/eta/<string:playlist_name>", methods=["GET"])  # type: ignore[untyped-decorator]
+def playlist_eta(playlist_name: str) -> Any:
     """Return per-instance ETA for the named playlist.
 
     Cached per minute to keep route lightweight.
@@ -1093,9 +1137,11 @@ def playlist_eta(playlist_name: str):
         except Exception:
             num = 0
 
-        is_active = last_dt and getattr(ri_obj, "playlist", None) == playlist_name
+        is_active = bool(last_dt and getattr(ri_obj, "playlist", None) == playlist_name)
         next_index = _safe_next_index(pl, num)
-        until_next_min = _safe_until_next_min(is_active, last_dt, cycle_min, now)
+        until_next_min = _safe_until_next_min(
+            is_active, cast(datetime | None, last_dt), cycle_min, now
+        )
         eta_map = _compute_playlist_rotation_eta(
             pl, next_index, until_next_min, cycle_min, now
         )
@@ -1113,8 +1159,8 @@ def playlist_eta(playlist_name: str):
         return json_success("ok", eta=eta_map)
 
 
-@playlist_bp.app_template_filter("format_relative_time")
-def format_relative_time(iso_date_string):
+@playlist_bp.app_template_filter("format_relative_time")  # type: ignore[untyped-decorator]
+def format_relative_time(iso_date_string: str) -> str:
     # Parse the input ISO date string
     dt = datetime.fromisoformat(iso_date_string)
 

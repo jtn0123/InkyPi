@@ -30,7 +30,7 @@ class EventBus:
     def __init__(self, max_subscribers: int = 50) -> None:
         self.max_subscribers = max_subscribers
         self._lock = threading.Lock()
-        self._subscribers: list[queue.Queue] = []
+        self._subscribers: list[queue.Queue[dict[str, Any] | object]] = []
 
     # ------------------------------------------------------------------
     # Public API
@@ -44,7 +44,7 @@ class EventBus:
         """
         payload = {"event": event_type, "ts": time.time(), **data}
         with self._lock:
-            active: list[queue.Queue] = []
+            active: list[queue.Queue[dict[str, Any] | object]] = []
             for q in self._subscribers:
                 try:
                     q.put_nowait(payload)
@@ -58,7 +58,7 @@ class EventBus:
                         pass
             self._subscribers = active
 
-    def subscribe(self) -> queue.Queue | None:
+    def subscribe(self) -> queue.Queue[dict[str, Any] | object] | None:
         """Return a new subscriber queue, or *None* if the cap is reached."""
         with self._lock:
             if len(self._subscribers) >= self.max_subscribers:
@@ -67,11 +67,11 @@ class EventBus:
                     self.max_subscribers,
                 )
                 return None
-            q: queue.Queue = queue.Queue(maxsize=200)
+            q: queue.Queue[dict[str, Any] | object] = queue.Queue(maxsize=200)
             self._subscribers.append(q)
             return q
 
-    def unsubscribe(self, q: queue.Queue) -> None:
+    def unsubscribe(self, q: queue.Queue[dict[str, Any] | object]) -> None:
         """Remove *q* from the subscriber list."""
         with self._lock:
             try:
@@ -89,7 +89,7 @@ class EventBus:
     # ------------------------------------------------------------------
 
     def stream(
-        self, q: queue.Queue, heartbeat_s: float = 15.0
+        self, q: queue.Queue[dict[str, Any] | object], heartbeat_s: float = 15.0
     ) -> Generator[str, None, None]:
         """Yield SSE-formatted strings from *q* until the client disconnects.
 
@@ -115,6 +115,8 @@ class EventBus:
                     continue
                 if item is _SENTINEL:
                     return
+                if not isinstance(item, dict):
+                    continue
                 event_type = item.get("event", "message")
                 data = json.dumps(item, separators=(",", ":"))
                 yield f"event: {event_type}\ndata: {data}\n\n"

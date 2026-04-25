@@ -3,18 +3,28 @@ from __future__ import annotations
 from typing import Any
 
 
-def option(value: Any, label: str, **kwargs: Any) -> dict[str, Any]:
-    data: dict[str, Any] = {"value": value, "label": label}
+def option(value: Any, label: str, **kwargs: Any) -> dict[str, object]:
+    data: dict[str, object] = {"value": value, "label": label}
     data.update(kwargs)
     return data
 
 
-def option_group(label, *options):
-    return {"kind": "option_group", "label": label, "options": list(options)}
+def option_group(label: str, *options: dict[str, object]) -> dict[str, object]:
+    data: dict[str, object] = {
+        "kind": "option_group",
+        "label": label,
+        "options": list(options),
+    }
+    return data
 
 
-def field(name, field_type="text", label=None, **kwargs):
-    data = {
+def field(
+    name: str,
+    field_type: str = "text",
+    label: str | None = None,
+    **kwargs: Any,
+) -> dict[str, object]:
+    data: dict[str, object] = {
         "kind": "field",
         "type": field_type,
         "name": name,
@@ -24,14 +34,20 @@ def field(name, field_type="text", label=None, **kwargs):
     return data
 
 
-def row(*items, **kwargs):
-    data = {"kind": "row", "items": list(items)}
+def row(*items: dict[str, object], **kwargs: Any) -> dict[str, object]:
+    data: dict[str, object] = {"kind": "row", "items": list(items)}
     data.update(kwargs)
     return data
 
 
-def callout(text, tone="info", icon="info", title=None, **kwargs):
-    data = {
+def callout(
+    text: str,
+    tone: str = "info",
+    icon: str = "info",
+    title: str | None = None,
+    **kwargs: Any,
+) -> dict[str, object]:
+    data: dict[str, object] = {
         "kind": "callout",
         "text": text,
         "tone": tone,
@@ -43,19 +59,19 @@ def callout(text, tone="info", icon="info", title=None, **kwargs):
     return data
 
 
-def widget(widget_type, **kwargs):
-    data = {"kind": "widget", "widget_type": widget_type}
+def widget(widget_type: str, **kwargs: Any) -> dict[str, object]:
+    data: dict[str, object] = {"kind": "widget", "widget_type": widget_type}
     data.update(kwargs)
     return data
 
 
-def section(title, *items, **kwargs):
-    data = {"title": title, "items": list(items)}
+def section(title: str, *items: dict[str, object], **kwargs: Any) -> dict[str, object]:
+    data: dict[str, object] = {"title": title, "items": list(items)}
     data.update(kwargs)
     return data
 
 
-def schema(*sections, **kwargs):
-    data = {"version": 1, "sections": list(sections)}
+def schema(*sections: dict[str, object], **kwargs: Any) -> dict[str, object]:
+    data: dict[str, object] = {"version": 1, "sections": list(sections)}
     data.update(kwargs)
     return data

@@ -11,7 +11,7 @@ from time import perf_counter
 
 from flask import Flask, g, url_for as flask_url_for
 from jinja2 import ChoiceLoader, FileSystemLoader
-from waitress import serve  # type: ignore
+from waitress import serve  # type: ignore[import-untyped]
 from werkzeug.serving import is_running_from_reloader
 
 from app_setup.asset_helpers import setup_asset_helpers
@@ -215,7 +215,7 @@ args = None  # Populated by main()
 app: Flask | None = None
 
 
-def _resolve_port(cli_port, dev_mode):
+def _resolve_port(cli_port: int | None, dev_mode: bool) -> int:
     """Determine the port to listen on from CLI arg then env vars then default."""
     if cli_port is not None:
         return cli_port
@@ -228,7 +228,7 @@ def _resolve_port(cli_port, dev_mode):
     return 8080 if dev_mode else 80
 
 
-def _apply_dev_env(args):
+def _apply_dev_env(args: argparse.Namespace) -> None:
     """Persist dev-mode flags to the environment for downstream consumers."""
     os.environ["INKYPI_ENV"] = "dev"
     if args.web_only:
@@ -277,7 +277,7 @@ def _read_version() -> str:
     return "unknown"
 
 
-def main(argv: list[str] | None = None):
+def main(argv: list[str] | None = None) -> Flask:
     """Parse CLI arguments and initialise the application."""
 
     global args, DEV_MODE, WEB_ONLY, FAST_DEV, PORT, app
@@ -332,7 +332,7 @@ def main(argv: list[str] | None = None):
     return app
 
 
-def _init_core_services(app):
+def _init_core_services(app: Flask) -> Config:
     """Create Config, DisplayManager, RefreshTask; store on app.config."""
     try:
         device_config = Config()
@@ -363,7 +363,7 @@ def _init_core_services(app):
     return device_config
 
 
-def _configure_upload_limits(app):
+def _configure_upload_limits(app: Flask) -> None:
     """Set MAX_FORM_PARTS and MAX_CONTENT_LENGTH from env or defaults."""
     app.config["MAX_FORM_PARTS"] = 10_000
     try:
@@ -374,11 +374,11 @@ def _configure_upload_limits(app):
     app.config["MAX_CONTENT_LENGTH"] = _max_len
 
 
-def _register_before_request_hooks(app):
+def _register_before_request_hooks(app: Flask) -> None:
     """Attach before-request hooks for refresh task, timers, and request IDs."""
 
-    @app.before_request
-    def _ensure_refresh_task_started():
+    @app.before_request  # type: ignore[untyped-decorator]
+    def _ensure_refresh_task_started() -> None:
         if WEB_ONLY:
             return
         if os.environ.get("WERKZEUG_RUN_MAIN") == "true":
@@ -387,15 +387,15 @@ def _register_before_request_hooks(app):
                 logger.info("Starting refresh task (flask dev server lazy start)")
                 rt.start()
 
-    @app.before_request
-    def _start_request_timer():
+    @app.before_request  # type: ignore[untyped-decorator]
+    def _start_request_timer() -> None:
         try:
             g._t0 = perf_counter()
         except Exception:
             pass
 
-    @app.before_request
-    def _attach_request_id():
+    @app.before_request  # type: ignore[untyped-decorator]
+    def _attach_request_id() -> None:
         try:
             from utils.http_utils import _get_or_set_request_id
 
@@ -542,7 +542,7 @@ def _register_context_processors(app: Flask) -> None:
         }
 
 
-def create_app():
+def create_app() -> Flask:
     """Build and configure the Flask application.
 
     Middleware, error handlers, health endpoints, and signal handling are
@@ -616,7 +616,7 @@ if __name__ == "__main__":
     ):
         import threading
 
-        def _show_startup():
+        def _show_startup() -> None:
             try:
                 logger.info("Displaying startup image")
                 img = generate_startup_image(device_cfg.get_resolution())

@@ -38,6 +38,7 @@ if [ -n "${INKYPI_LOCKFILE_DIR:-}" ]; then
   LOCKFILE_DIR="$INKYPI_LOCKFILE_DIR"
 fi
 FAILURE_FILE="$LOCKFILE_DIR/.last-update-failure"
+TARGET_VERSION_FILE="$LOCKFILE_DIR/update-target-version"
 
 # Track last command description so the trap can report which phase failed.
 _current_step="startup"
@@ -196,6 +197,9 @@ git_repo fetch origin --tags --prune
 # Determine target tag
 # ---------------------------------------------------------------------------
 TARGET_TAG="${1:-}"
+if [ -z "$TARGET_TAG" ] && [ -r "$TARGET_VERSION_FILE" ]; then
+  TARGET_TAG=$(head -n 1 "$TARGET_VERSION_FILE" | tr -d '\r\n')
+fi
 if [ -z "$TARGET_TAG" ]; then
   # Find the latest semver tag (v1.2.3 format).  Use awk instead of
   # ``grep -E | head -1``: under ``set -euo pipefail`` a no-match grep

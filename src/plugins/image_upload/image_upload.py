@@ -1,10 +1,12 @@
 import logging
 import os
 import random
+from collections.abc import Mapping
+from typing import Any, cast
 
 from PIL import Image, ImageColor, ImageOps
 
-from plugins.base_plugin.base_plugin import BasePlugin
+from plugins.base_plugin.base_plugin import BasePlugin, DeviceConfigLike
 from plugins.base_plugin.settings_schema import (
     field,
     option,
@@ -20,8 +22,8 @@ from utils.security_utils import validate_file_path
 logger = logging.getLogger(__name__)
 
 
-def _get_upload_dir():
-    return resolve_path(os.path.join("static", "images", "saved"))
+def _get_upload_dir() -> str:
+    return cast(str, cast(Any, resolve_path)(os.path.join("static", "images", "saved")))
 
 
 def _resolve_background_color(
@@ -29,14 +31,16 @@ def _resolve_background_color(
 ) -> tuple[int, ...] | int:
     """Return a safe background color, falling back to white on invalid input."""
     try:
-        return ImageColor.getcolor(color_value or "#ffffff", mode)
+        return cast(
+            tuple[int, ...] | int, ImageColor.getcolor(color_value or "#ffffff", mode)
+        )
     except ValueError:
         logger.warning("Invalid background color %r, defaulting to white", color_value)
-        return ImageColor.getcolor("#ffffff", mode)
+        return cast(tuple[int, ...] | int, ImageColor.getcolor("#ffffff", mode))
 
 
 class ImageUpload(BasePlugin):
-    def generate_settings_template(self):
+    def generate_settings_template(self) -> dict[str, object]:
         # JTN-632: Disable the legacy "Style" collapsible. Its hardcoded
         # `backgroundOption` radios collide with the schema-driven Background
         # Fill radio group and cause two options to render as `checked`,
@@ -45,7 +49,7 @@ class ImageUpload(BasePlugin):
         template_params["style_settings"] = False
         return template_params
 
-    def build_settings_schema(self):
+    def build_settings_schema(self) -> dict[str, object]:
         return schema(
             section(
                 "Display Options",
@@ -95,7 +99,7 @@ class ImageUpload(BasePlugin):
             ),
         )
 
-    def open_image(self, img_index: int, image_locations: list) -> Image:
+    def open_image(self, img_index: int, image_locations: list[str]) -> Image:
         if not image_locations:
             raise RuntimeError("No images provided.")
 
@@ -115,10 +119,18 @@ class ImageUpload(BasePlugin):
             raise RuntimeError("Failed to read image file.") from e
         return image
 
-    def generate_image(self, settings, device_config) -> Image:
+    def generate_image(
+        self, settings: Mapping[str, object], device_config: DeviceConfigLike
+    ) -> Image:
         # Get the current index from the device json
-        img_index = settings.get("image_index", 0)
-        image_locations = settings.get("imageFiles[]")
+        img_index_raw = settings.get("image_index")
+        img_index = img_index_raw if isinstance(img_index_raw, int) else 0
+        raw_image_locations = settings.get("imageFiles[]")
+        image_locations = (
+            cast(list[str], raw_image_locations)
+            if isinstance(raw_image_locations, list)
+            else []
+        )
 
         if not image_locations:
             raise RuntimeError("No images provided.")
@@ -134,15 +146,21 @@ class ImageUpload(BasePlugin):
             image = self.open_image(img_index, image_locations)
             img_index = (img_index + 1) % len(image_locations)
 
-        # Write the new index back ot the device json
-        settings["image_index"] = img_index
+        # Write the new index back to the device json
+        if isinstance(settings, dict):
+            settings["image_index"] = img_index
         if settings.get("padImage") == "true":
             dimensions = self.get_oriented_dimensions(device_config)
 
             if settings.get("backgroundOption") == "blur":
                 return pad_image_blur(image, dimensions)
+            raw_background_color = settings.get("backgroundColor")
+            background_color_value = (
+                raw_background_color if isinstance(raw_background_color, str) else None
+            )
             background_color = _resolve_background_color(
-                settings.get("backgroundColor"), "RGB"
+                background_color_value,
+                "RGB",
             )
             return ImageOps.pad(
                 image,
@@ -152,9 +170,14 @@ class ImageUpload(BasePlugin):
             )
         return image
 
-    def cleanup(self, settings):
+    def cleanup(self, settings: Mapping[str, object]) -> None:
         """Delete all uploaded image files associated with this plugin instance."""
-        image_locations = settings.get("imageFiles[]", [])
+        raw_image_locations = settings.get("imageFiles[]", [])
+        image_locations = (
+            cast(list[str], raw_image_locations)
+            if isinstance(raw_image_locations, list)
+            else []
+        )
         if not image_locations:
             return
 

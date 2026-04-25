@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+from typing import Any, cast
 
 from flask import Blueprint, Response, request
 
@@ -53,7 +54,7 @@ class _MalformedReport(ValueError):
     """Raised when a CSP report body cannot be decoded as JSON."""
 
 
-def _parse_report(body: bytes) -> dict:
+def _parse_report(body: bytes) -> dict[str, Any]:
     """Parse a CSP report body.
 
     Returns an empty dict for an empty body (browsers occasionally POST
@@ -64,7 +65,7 @@ def _parse_report(body: bytes) -> dict:
     if not body:
         return {}
     try:
-        data = json.loads(body)
+        data: Any = json.loads(body)
     except ValueError as exc:
         # Note: UnicodeDecodeError is a subclass of ValueError and is
         # covered here too (non-UTF-8 bytes raise it from json.loads).
@@ -72,7 +73,10 @@ def _parse_report(body: bytes) -> dict:
 
     # Legacy format: {"csp-report": {...}}
     if isinstance(data, dict) and "csp-report" in data:
-        return data["csp-report"]
+        value = data.get("csp-report")
+        if isinstance(value, dict):
+            return cast(dict[str, Any], value)
+        return {}
 
     # Modern Reporting API: [{"type": "csp-violation", "body": {...}}, ...]
     if isinstance(data, list):
@@ -81,20 +85,26 @@ def _parse_report(body: bytes) -> dict:
                 "csp-violation",
                 "csp_violation",
             ):
-                return entry.get("body", {})
+                body_obj = entry.get("body", {})
+                if isinstance(body_obj, dict):
+                    return cast(dict[str, Any], body_obj)
+                return {}
         # Fall back to first entry body if no typed entry found
         if data and isinstance(data[0], dict):
-            return data[0].get("body", data[0])
+            fallback_body = data[0].get("body", data[0])
+            if isinstance(fallback_body, dict):
+                return cast(dict[str, Any], fallback_body)
+            return {}
 
     if isinstance(data, dict):
-        return data
+        return cast(dict[str, Any], data)
 
     return {}
 
 
-def _sanitise_report(report: dict) -> dict:
+def _sanitise_report(report: dict[str, Any]) -> dict[str, Any]:
     """Return a copy of the report with URLs redacted."""
-    sanitised = {}
+    sanitised: dict[str, Any] = {}
     url_keys = {"document-uri", "referrer", "source-file", "blocked-uri"}
     for key, value in report.items():
         if key in url_keys and isinstance(value, str):
@@ -104,7 +114,7 @@ def _sanitise_report(report: dict) -> dict:
     return sanitised
 
 
-@csp_report_bp.route("/api/csp-report", methods=["POST"])
+@csp_report_bp.route("/api/csp-report", methods=["POST"])  # type: ignore
 def receive_csp_report() -> Response:
     """Accept a CSP violation report and log it.
 

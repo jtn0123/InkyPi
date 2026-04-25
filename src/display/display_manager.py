@@ -3,24 +3,40 @@ import json
 import logging
 import os
 import threading
+from collections.abc import Callable, Mapping
 from time import perf_counter
+from typing import Any, Protocol, cast
 
+from PIL import Image
+
+from display.abstract_display import AbstractDisplay, DeviceConfigLike
 from display.mock_display import MockDisplay
 from utils.image_utils import apply_image_enhancement, change_orientation, resize_image
 from utils.time_utils import now_device_tz
 
 logger = logging.getLogger(__name__)
 
+
+class _DisplayLike(Protocol):
+    def display_image(
+        self, image: Image.Image, image_settings: list[object] | None = None
+    ) -> None: ...
+
+
 # Try to import hardware displays, but don't fail if they're not available
-InkyDisplay = None
+InkyDisplay: type[AbstractDisplay] | None = None
 try:
-    from display.inky_display import InkyDisplay
+    from display.inky_display import InkyDisplay as _InkyDisplay
+
+    InkyDisplay = _InkyDisplay
 except ImportError:
     logger.info("Inky display not available, hardware support disabled")
 
-WaveshareDisplay = None
+WaveshareDisplay: type[AbstractDisplay] | None = None
 try:
-    from display.waveshare_display import WaveshareDisplay
+    from display.waveshare_display import WaveshareDisplay as _WaveshareDisplay
+
+    WaveshareDisplay = _WaveshareDisplay
 except ImportError:
     logger.info("Waveshare display not available, hardware support disabled")
 
@@ -28,7 +44,7 @@ except ImportError:
 class DisplayManager:
     """Manages the display and rendering of images."""
 
-    def __init__(self, device_config):
+    def __init__(self, device_config: DeviceConfigLike) -> None:
         """
         Initializes the display manager and selects the correct display type
         based on the configuration.
@@ -40,11 +56,12 @@ class DisplayManager:
             ValueError: If an unsupported display type is specified.
         """
 
-        self._last_image_hash = None
+        self._last_image_hash: str | None = None
         self._hash_lock = threading.Lock()
         self.device_config = device_config
+        self.display: _DisplayLike
 
-        display_type = device_config.get_config("display_type", default="inky")
+        display_type = str(device_config.get_config("display_type", default="inky"))
 
         if display_type == "mock":
             self.display = MockDisplay(device_config)
@@ -75,13 +92,13 @@ class DisplayManager:
 
     # Approximate count of history entries to avoid scanning the directory on
     # every save.  Reset to None to force a recount on the next prune cycle.
-    _history_count_estimate = None
+    _history_count_estimate: int | None = None
     # Force a full recount every N increments to correct estimate drift
     _RECOUNT_INTERVAL = 50
     _history_increment_count = 0
     _history_lock = threading.RLock()
 
-    def _prune_history(self, history_dir):
+    def _prune_history(self, history_dir: str) -> None:
         """Remove oldest history entries when the total exceeds HISTORY_MAX_ENTRIES.
 
         Uses an in-memory count estimate to skip the directory scan when the
@@ -100,7 +117,7 @@ class DisplayManager:
                     return
                 self._history_increment_count = 0
             try:
-                png_files = sorted(
+                png_files: list[str] = sorted(
                     (f for f in os.listdir(history_dir) if f.endswith(".png")),
                     key=lambda name: (
                         os.path.getmtime(os.path.join(history_dir, name)),
@@ -128,18 +145,24 @@ class DisplayManager:
             except OSError:
                 logger.debug("Could not prune history directory", exc_info=True)
 
-    def _save_history_entry(self, processed_image, history_meta=None):
+    def _save_history_entry(
+        self,
+        processed_image: Image.Image,
+        history_meta: Mapping[str, object] | None = None,
+    ) -> None:
         """Persist a processed image snapshot and optional JSON sidecar metadata."""
-        history_dir = getattr(self.device_config, "history_image_dir", None)
-        if not history_dir:
+        history_dir_raw = getattr(self.device_config, "history_image_dir", None)
+        if not isinstance(history_dir_raw, str) or not history_dir_raw:
             return
+
+        history_dir = history_dir_raw
         try:
             with self._history_lock:
                 os.makedirs(history_dir, exist_ok=True)
-                timestamp = now_device_tz(self.device_config)
+                timestamp = now_device_tz(cast(Any, self.device_config))
                 base_name = f"display_{timestamp.strftime('%Y%m%d_%H%M%S')}"
 
-                png_path = None
+                png_path: str | None = None
                 for attempt in range(1000):
                     candidate = (
                         base_name if attempt == 0 else f"{base_name}_{attempt:03d}"
@@ -171,8 +194,12 @@ class DisplayManager:
         self._prune_history(history_dir)
 
     def display_image(
-        self, image, image_settings=None, history_meta=None, on_image_saved=None
-    ):
+        self,
+        image: Image.Image,
+        image_settings: list[object] | None = None,
+        history_meta: Mapping[str, object] | None = None,
+        on_image_saved: Callable[[dict[str, int]], object] | None = None,
+    ) -> dict[str, int | str]:
         """
         Delegates image rendering to the appropriate display instance.
 
@@ -199,7 +226,7 @@ class DisplayManager:
 
         from utils.image_utils import compute_image_hash
 
-        image_hash = compute_image_hash(image)
+        image_hash = cast(Any, compute_image_hash)(image)
         with self._hash_lock:
             if image_hash == self._last_image_hash:
                 logger.info("Image unchanged, skipping display writes")
@@ -221,15 +248,16 @@ class DisplayManager:
                 logger.exception("Failed to save current image preview")
 
             # Resize and adjust orientation
+            orientation = self.device_config.get_config("orientation")
             image = change_orientation(
-                image, self.device_config.get_config("orientation")
+                image, orientation if isinstance(orientation, str) else "horizontal"
             )
-            image = resize_image(
+            image = cast(Any, resize_image)(
                 image, self.device_config.get_resolution(), image_settings
             )
             if self.device_config.get_config("inverted_image"):
                 image = image.rotate(180)
-            image = apply_image_enhancement(
+            image = cast(Any, apply_image_enhancement)(
                 image, self.device_config.get_config("image_settings")
             )
             try:
@@ -269,7 +297,7 @@ class DisplayManager:
             "display_driver": self.display.__class__.__name__,
         }
 
-    def display_preprocessed_image(self, image_path):
+    def display_preprocessed_image(self, image_path: str) -> dict[str, int | str]:
         """Display an already-processed image file without applying transforms again."""
         from PIL import Image
 

@@ -32,6 +32,7 @@ import logging
 import sys
 import time
 import subprocess
+from typing import Any
 
 from ctypes import *
 
@@ -48,7 +49,7 @@ class RaspberryPi:
     MOSI_PIN = 10
     SCLK_PIN = 11
 
-    def __init__(self):
+    def __init__(self) -> None:
         import spidev
         import gpiozero
 
@@ -59,7 +60,9 @@ class RaspberryPi:
         self.GPIO_PWR_PIN = gpiozero.LED(self.PWR_PIN)
         self.GPIO_BUSY_PIN = gpiozero.Button(self.BUSY_PIN, pull_up=False)
 
-    def digital_write(self, pin, value):
+        self.DEV_SPI: Any = None
+
+    def digital_write(self, pin: int, value: int | bool) -> None:
         if pin == self.RST_PIN:
             if value:
                 self.GPIO_RST_PIN.on()
@@ -81,37 +84,38 @@ class RaspberryPi:
             else:
                 self.GPIO_PWR_PIN.off()
 
-    def digital_read(self, pin):
+    def digital_read(self, pin: int) -> bool:
         if pin == self.BUSY_PIN:
-            return self.GPIO_BUSY_PIN.value
+            return bool(self.GPIO_BUSY_PIN.value)
         elif pin == self.RST_PIN:
-            return self.GPIO_RST_PIN.value
+            return bool(self.GPIO_RST_PIN.value)
         elif pin == self.DC_PIN:
-            return self.GPIO_DC_PIN.value
+            return bool(self.GPIO_DC_PIN.value)
         # elif pin == self.CS_PIN:
         #     return self.CS_PIN.value
         elif pin == self.PWR_PIN:
-            return self.GPIO_PWR_PIN.value
+            return bool(self.GPIO_PWR_PIN.value)
+        return False
 
-    def delay_ms(self, delaytime):
+    def delay_ms(self, delaytime: int | float) -> None:
         time.sleep(delaytime / 1000.0)
 
-    def spi_writebyte(self, data):
+    def spi_writebyte(self, data: bytes | bytearray) -> None:
         self.SPI.writebytes(data)
 
-    def spi_writebyte2(self, data):
+    def spi_writebyte2(self, data: bytes | bytearray) -> None:
         self.SPI.writebytes2(data)
 
-    def DEV_SPI_write(self, data):
+    def DEV_SPI_write(self, data: bytes | bytearray) -> None:
         self.DEV_SPI.DEV_SPI_SendData(data)
 
-    def DEV_SPI_nwrite(self, data):
+    def DEV_SPI_nwrite(self, data: bytes | bytearray) -> None:
         self.DEV_SPI.DEV_SPI_SendnData(data)
 
-    def DEV_SPI_read(self):
-        return self.DEV_SPI.DEV_SPI_ReadData()
+    def DEV_SPI_read(self) -> int:
+        return int(self.DEV_SPI.DEV_SPI_ReadData())
 
-    def module_init(self, cleanup=False):
+    def module_init(self, cleanup: bool = False) -> int:
         self.GPIO_PWR_PIN.on()
 
         if cleanup:
@@ -143,7 +147,7 @@ class RaspberryPi:
             self.SPI.mode = 0b00
         return 0
 
-    def module_exit(self, cleanup=False):
+    def module_exit(self, cleanup: bool = False) -> None:
         logger.debug("spi end")
         self.SPI.close()
 
@@ -168,7 +172,7 @@ class JetsonNano:
     BUSY_PIN = 24
     PWR_PIN = 18
 
-    def __init__(self):
+    def __init__(self) -> None:
         import ctypes
 
         find_dirs = [
@@ -176,7 +180,7 @@ class JetsonNano:
             "/usr/local/lib",
             "/usr/lib",
         ]
-        self.SPI = None
+        self.SPI: Any = None
         for find_dir in find_dirs:
             so_filename = os.path.join(find_dir, "sysfs_software_spi.so")
             if os.path.exists(so_filename):
@@ -187,25 +191,25 @@ class JetsonNano:
 
         import Jetson.GPIO
 
-        self.GPIO = Jetson.GPIO
+        self.GPIO: Any = Jetson.GPIO
 
-    def digital_write(self, pin, value):
+    def digital_write(self, pin: int, value: int | bool) -> None:
         self.GPIO.output(pin, value)
 
-    def digital_read(self, pin):
-        return self.GPIO.input(self.BUSY_PIN)
+    def digital_read(self, pin: int) -> bool:
+        return bool(self.GPIO.input(self.BUSY_PIN))
 
-    def delay_ms(self, delaytime):
+    def delay_ms(self, delaytime: int | float) -> None:
         time.sleep(delaytime / 1000.0)
 
-    def spi_writebyte(self, data):
+    def spi_writebyte(self, data: bytes | bytearray) -> None:
         self.SPI.SYSFS_software_spi_transfer(data[0])
 
-    def spi_writebyte2(self, data):
+    def spi_writebyte2(self, data: bytes | bytearray) -> None:
         for i in range(len(data)):
             self.SPI.SYSFS_software_spi_transfer(data[i])
 
-    def module_init(self):
+    def module_init(self) -> int:
         self.GPIO.setmode(self.GPIO.BCM)
         self.GPIO.setwarnings(False)
         self.GPIO.setup(self.RST_PIN, self.GPIO.OUT)
@@ -219,7 +223,7 @@ class JetsonNano:
         self.SPI.SYSFS_software_spi_begin()
         return 0
 
-    def module_exit(self):
+    def module_exit(self) -> None:
         logger.debug("spi end")
         self.SPI.SYSFS_software_spi_end()
 
@@ -242,31 +246,31 @@ class SunriseX3:
     PWR_PIN = 18
     Flag = 0
 
-    def __init__(self):
+    def __init__(self) -> None:
         import spidev
         import Hobot.GPIO
 
-        self.GPIO = Hobot.GPIO
-        self.SPI = spidev.SpiDev()
+        self.GPIO: Any = Hobot.GPIO
+        self.SPI: Any = spidev.SpiDev()
 
-    def digital_write(self, pin, value):
+    def digital_write(self, pin: int, value: int | bool) -> None:
         self.GPIO.output(pin, value)
 
-    def digital_read(self, pin):
-        return self.GPIO.input(pin)
+    def digital_read(self, pin: int) -> bool:
+        return bool(self.GPIO.input(pin))
 
-    def delay_ms(self, delaytime):
+    def delay_ms(self, delaytime: int | float) -> None:
         time.sleep(delaytime / 1000.0)
 
-    def spi_writebyte(self, data):
+    def spi_writebyte(self, data: bytes | bytearray) -> None:
         self.SPI.writebytes(data)
 
-    def spi_writebyte2(self, data):
+    def spi_writebyte2(self, data: bytes | bytearray) -> None:
         # for i in range(len(data)):
         #     self.SPI.writebytes([data[i]])
         self.SPI.xfer3(data)
 
-    def module_init(self):
+    def module_init(self) -> int:
         if self.Flag == 0:
             self.Flag = 1
             self.GPIO.setmode(self.GPIO.BCM)
@@ -287,7 +291,7 @@ class SunriseX3:
         else:
             return 0
 
-    def module_exit(self):
+    def module_exit(self) -> None:
         logger.debug("spi end")
         self.SPI.close()
 
@@ -302,13 +306,15 @@ class SunriseX3:
         )
 
 
-def _read_cpuinfo():
+def _read_cpuinfo() -> str:
     try:
         with open("/proc/cpuinfo", "r") as f:
             return f.read()
     except OSError:
         return ""
 
+
+implementation: Any
 
 output = _read_cpuinfo()
 

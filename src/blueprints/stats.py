@@ -16,10 +16,11 @@ the response carries Cache-Control: public, max-age=60.
 from __future__ import annotations
 
 import logging
+from typing import Any, cast
 
 from flask import Blueprint, current_app, jsonify
 
-from schemas.responses import RefreshStatsResponse
+from schemas.responses import RefreshStatsResponse, RefreshStatsWindow
 from utils.http_utils import json_error
 from utils.refresh_stats import compute_stats
 
@@ -32,17 +33,19 @@ _WINDOW_24H = 86_400
 _WINDOW_7D = 604_800
 
 
-@stats_bp.route("/api/stats", methods=["GET"])
-def refresh_stats():
+@stats_bp.route("/api/stats", methods=["GET"])  # type: ignore
+def refresh_stats() -> Any:
     """Return aggregated refresh statistics for 1h, 24h, and 7d windows."""
     device_config = current_app.config.get("DEVICE_CONFIG")
     history_dir: str = getattr(device_config, "history_image_dir", "")
 
     try:
         payload: RefreshStatsResponse = {
-            "last_1h": compute_stats(history_dir, _WINDOW_1H),
-            "last_24h": compute_stats(history_dir, _WINDOW_24H),
-            "last_7d": compute_stats(history_dir, _WINDOW_7D),
+            "last_1h": cast(RefreshStatsWindow, compute_stats(history_dir, _WINDOW_1H)),
+            "last_24h": cast(
+                RefreshStatsWindow, compute_stats(history_dir, _WINDOW_24H)
+            ),
+            "last_7d": cast(RefreshStatsWindow, compute_stats(history_dir, _WINDOW_7D)),
         }
     except Exception:
         logger.exception("Failed to compute refresh stats")

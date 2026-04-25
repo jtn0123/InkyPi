@@ -9,6 +9,7 @@ import threading
 import time
 from collections import deque
 from datetime import UTC, datetime, timedelta
+from typing import Any, TypedDict, cast
 
 from flask import (
     Blueprint,
@@ -22,7 +23,7 @@ from utils.time_utils import get_timezone, now_device_tz
 
 # Try to import cysystemd for journal reading (Linux only)
 try:
-    from cysystemd.reader import (  # type: ignore[import-not-found]
+    from cysystemd.reader import (
         JournalOpenMode,
         JournalReader,
         Rule,
@@ -38,7 +39,7 @@ except ImportError:
 
 
 logger = logging.getLogger(__name__)
-settings_bp = Blueprint("settings", __name__)
+settings_bp: Blueprint = Blueprint("settings", __name__)
 
 LOG_TIMESTAMP_FORMAT = "%b %d %H:%M:%S"
 _PRIORITY_TO_LEVEL = {
@@ -100,6 +101,7 @@ _ROLLBACK_UNIT_PREFIX = "inkypi-rollback"
 # / _get_*_script_path fallbacks), so pull them to module-level constants.
 _DEFAULT_PROJECT_DIR = "/usr/local/inkypi"
 _BASH_INTERPRETER = "/bin/bash"
+_UPDATE_TARGET_VERSION_FILENAME = "update-target-version"
 
 # Guardrails and limits for logs APIs
 MAX_LOG_HOURS = 24
@@ -122,7 +124,7 @@ _logs_limiter = SlidingWindowLimiter(120, 60)
 
 # Dev mode in-memory log buffer (circular buffer)
 DEV_LOG_BUFFER_SIZE = 1000
-_dev_log_buffer: deque = deque(maxlen=DEV_LOG_BUFFER_SIZE)
+_dev_log_buffer: deque[tuple[float, str]] = deque(maxlen=DEV_LOG_BUFFER_SIZE)
 _dev_log_lock = threading.Lock()
 
 
@@ -138,7 +140,7 @@ def _benchmarks_enabled() -> bool:
 def _get_bench_db_path() -> str:
     from benchmarks.benchmark_storage import _get_db_path
 
-    return _get_db_path(current_app.config["DEVICE_CONFIG"])
+    return str(_get_db_path(current_app.config["DEVICE_CONFIG"]))
 
 
 def _ensure_bench_schema(conn: sqlite3.Connection) -> None:
@@ -175,7 +177,7 @@ def _pct(values: list[int], p: float) -> int | None:
 class DevModeLogHandler(logging.Handler):
     """Captures logs in memory for dev mode log viewing."""
 
-    def emit(self, record):
+    def emit(self, record: logging.LogRecord) -> None:
         try:
             msg = self.format(record)
             timestamp = datetime.fromtimestamp(record.created, tz=UTC).strftime(
@@ -192,7 +194,7 @@ def _rate_limit_ok(remote_addr: str | None) -> bool:
     """Thin wrapper kept for test compatibility (monkeypatching)."""
     key = remote_addr or "unknown"
     allowed, _ = _logs_limiter.check(key)
-    return allowed
+    return bool(allowed)
 
 
 def _clamp_int(value: str | None, default: int, min_value: int, max_value: int) -> int:
@@ -205,7 +207,7 @@ def _clamp_int(value: str | None, default: int, min_value: int, max_value: int) 
         return default
 
 
-def _format_journal_line(formatted_ts: str, data: dict) -> str:
+def _format_journal_line(formatted_ts: str, data: dict[str, Any]) -> str:
     priority = str(data.get("PRIORITY", "6"))
     level = _PRIORITY_TO_LEVEL.get(priority, "INFO")
     msg = (data.get("MESSAGE", "") or "").rstrip()
@@ -237,8 +239,8 @@ def _read_log_lines(hours: int) -> list[str]:
 
         cutoff_timestamp = since.timestamp()
         with _dev_log_lock:
-            for ts, log_line in _dev_log_buffer:
-                if ts >= cutoff_timestamp:
+            for entry_ts, log_line in _dev_log_buffer:
+                if entry_ts >= cutoff_timestamp:
                     lines.append(log_line)
 
         if len(lines) == 4:  # Only headers, no actual logs
@@ -254,10 +256,10 @@ def _read_log_lines(hours: int) -> list[str]:
 
         for record in reader:
             try:
-                ts = datetime.fromtimestamp(
+                timestamp = datetime.fromtimestamp(
                     record.get_realtime_usec() / 1_000_000, tz=UTC
                 )
-                formatted_ts = ts.strftime(LOG_TIMESTAMP_FORMAT)
+                formatted_ts = timestamp.strftime(LOG_TIMESTAMP_FORMAT)
             except Exception:
                 formatted_ts = "??? ?? ??:??:??"
 
@@ -294,8 +296,8 @@ def _read_units_log_lines(hours: int, units: list[str]) -> list[str]:
         ]
         cutoff_timestamp = since.timestamp()
         with _dev_log_lock:
-            for ts, log_line in _dev_log_buffer:
-                if ts >= cutoff_timestamp:
+            for entry_ts, log_line in _dev_log_buffer:
+                if entry_ts >= cutoff_timestamp:
                     dev_lines.append(log_line)
 
         if len(dev_lines) == 5:  # Only headers
@@ -314,10 +316,10 @@ def _read_units_log_lines(hours: int, units: list[str]) -> list[str]:
                 if unit_name not in units:
                     continue
                 ts_usec = record.get_realtime_usec()
-                ts = datetime.fromtimestamp(ts_usec / 1_000_000, tz=UTC)
-                formatted_ts = ts.strftime(LOG_TIMESTAMP_FORMAT)
+                log_ts = datetime.fromtimestamp(ts_usec / 1_000_000, tz=UTC)
+                formatted_ts = log_ts.strftime(LOG_TIMESTAMP_FORMAT)
                 line = _format_journal_line(formatted_ts, data)
-                merged.append((ts.timestamp(), line))
+                merged.append((log_ts.timestamp(), line))
             except Exception:
                 # Skip malformed records
                 continue
@@ -430,7 +432,7 @@ def _systemd_available() -> bool:
         return False
 
 
-def _set_update_state(running: bool, unit: str | None):
+def _set_update_state(running: bool, unit: str | None) -> None:
     with _update_lock:
         if not running and _UPDATE_STATE.get("unit"):
             _UPDATE_STATE["last_unit"] = _UPDATE_STATE["unit"]
@@ -520,6 +522,42 @@ def _validate_update_script_path(script_path: str) -> str:
     return real
 
 
+def _validate_target_tag_arg(target_tag: str | None) -> str | None:
+    if target_tag is None:
+        return None
+    if not isinstance(target_tag, str) or not target_tag:
+        raise ValueError(f"Invalid target tag format: {target_tag!r}")
+
+    version = target_tag[1:] if target_tag.startswith("v") else target_tag
+    core, separator, suffix = version.partition("-")
+    parts = core.split(".")
+    if len(parts) != 3 or any(not part.isdigit() for part in parts):
+        raise ValueError(f"Invalid target tag format: {target_tag!r}")
+    if separator and (
+        not suffix or any(not (ch.isalnum() or ch == ".") for ch in suffix)
+    ):
+        raise ValueError(f"Invalid target tag format: {target_tag!r}")
+    return target_tag
+
+
+def _update_target_version_path() -> str:
+    base = os.environ.get("INKYPI_LOCKFILE_DIR") or "/var/lib/inkypi"
+    return os.path.join(base, _UPDATE_TARGET_VERSION_FILENAME)
+
+
+def _write_update_target_version(target_tag: str | None) -> None:
+    path = _update_target_version_path()
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    if target_tag is None:
+        try:
+            os.remove(path)
+        except FileNotFoundError:
+            pass
+        return
+    with open(path, "w", encoding="utf-8") as fh:
+        fh.write(f"{target_tag}\n")
+
+
 def _start_update_via_systemd(target_tag: str | None = None) -> str:
     """Launch the update script in a transient systemd unit.
 
@@ -537,22 +575,22 @@ def _start_update_via_systemd(target_tag: str | None = None) -> str:
         in the same function frame so CodeQL's built-in regex sanitiser
         recognition can see the guard.
     """
-    # 1. Regex sanitiser — ``_TAG_RE`` is a module-level ``re.Pattern`` compiled
-    #    with ``re.ASCII``; CodeQL's Python security model recognises
-    #    ``re.Pattern.fullmatch`` as a sanitiser just like the inline form.
-    if target_tag is not None and not _TAG_RE.fullmatch(target_tag):
-        raise ValueError(f"Invalid target tag format: {target_tag!r}")
+    sanitized_target_tag = _validate_target_tag_arg(target_tag)
+    _write_update_target_version(sanitized_target_tag)
 
     # 2. Resolve PROJECT_DIR from a hardcoded default and validate it has the
     #    shape of an absolute POSIX path.  Anything user-controlled (env var)
     #    falls back to the literal default.
     project_dir = os.getenv("PROJECT_DIR", "/usr/local/inkypi")
-    if (
-        not isinstance(project_dir, str)
-        or not re.fullmatch(r"^/[A-Za-z0-9_./-]{1,255}$", project_dir)
-        or ".." in project_dir.split("/")
-    ):
+    project_dir_match = (
+        re.fullmatch(r"^/[A-Za-z0-9_./-]{1,255}$", project_dir)
+        if isinstance(project_dir, str)
+        else None
+    )
+    if project_dir_match is None or ".." in project_dir.split("/"):
         project_dir = "/usr/local/inkypi"
+    else:
+        project_dir = project_dir_match.group(0)
 
     # 3. Resolve the script path purely from internal candidates (the helper
     #    walks a fixed list under PROJECT_DIR / repo-relative install/) and
@@ -574,11 +612,9 @@ def _start_update_via_systemd(target_tag: str | None = None) -> str:
         "/bin/bash",
         script_path,
     ]
-    if target_tag is not None:
-        cmd.append(target_tag)
-    # All argv elements above are either string literals or have been
-    # validated by the inline ``re.fullmatch`` guards / trusted-root check.
-    subprocess.Popen(cmd)  # noqa: S603  # all inputs sanitized; shell=False
+    # All argv elements above are literals or trusted paths. The optional target
+    # tag is passed via a fixed breadcrumb file read by do_update.sh.
+    subprocess.Popen(cmd)  # noqa: S603
     return f"{unit_name}.service"
 
 
@@ -660,7 +696,7 @@ def _start_rollback_via_systemd() -> str:
     return f"{unit_name}.service"
 
 
-def _log_and_publish(msg: str, level: str = "info"):
+def _log_and_publish(msg: str, level: str = "info") -> None:
     """Log and publish update progress to the SSE bus."""
     getattr(logger, level)("update | %s", msg)
     try:
@@ -671,21 +707,16 @@ def _log_and_publish(msg: str, level: str = "info"):
 
 
 def _run_real_update(script_path: str, target_tag: str | None = None) -> None:
-    # Defense-in-depth (JTN-319): ``_TAG_RE`` (module-level compiled pattern,
-    # ASCII-only) sanitises ``target_tag`` and ``_validate_update_script_path``
-    # resolves ``script_path`` to a canonical trusted-root path — both in the
-    # same frame as the Popen call so CodeQL's sanitiser recognition fires.
-    if target_tag is not None and not _TAG_RE.fullmatch(target_tag):
-        raise ValueError(f"Invalid target tag format: {target_tag!r}")
+    sanitized_target_tag = _validate_target_tag_arg(target_tag)
     # ``_validate_update_script_path`` returns the canonicalised realpath; the
     # original (possibly symlinked) input is dropped so the value flowing into
     # Popen is provably under a trusted install root.
     script_path = _validate_update_script_path(script_path)
 
     cmd: list[str] = ["/bin/bash", script_path]
-    if target_tag is not None:
-        cmd.append(target_tag)
-    proc = subprocess.Popen(  # noqa: S603  # all inputs sanitized; shell=False
+    if sanitized_target_tag is not None:
+        cmd.append(sanitized_target_tag)
+    proc = subprocess.Popen(  # noqa: S603  # shell=False; trusted path/validated tag.
         cmd,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
@@ -768,7 +799,16 @@ def _start_update_fallback_thread(
 
 # --- Version check via GitHub Releases API ---
 _GITHUB_REPO = os.getenv("INKYPI_GITHUB_REPO", "jtn0123/InkyPi")
-_VERSION_CACHE: dict[str, object] = {
+
+
+class _VersionCache(TypedDict):
+    latest: str | None
+    checked_at: float
+    release_notes: str | None
+    last_error: str | None
+
+
+_VERSION_CACHE: _VersionCache = {
     "latest": None,
     "checked_at": 0.0,
     "release_notes": None,
@@ -804,7 +844,9 @@ def _check_latest_version(force_refresh: bool = False) -> str | None:
         and _VERSION_CACHE["latest"]
         and (now - float(_VERSION_CACHE["checked_at"] or 0)) < _VERSION_CACHE_TTL
     ):
-        return _VERSION_CACHE["latest"]  # type: ignore[return-value]
+        cached_latest = _VERSION_CACHE["latest"]
+        if cached_latest is not None:
+            return cached_latest
     try:
         resp = http_get(
             f"https://api.github.com/repos/{_GITHUB_REPO}/releases/latest",
@@ -816,10 +858,13 @@ def _check_latest_version(force_refresh: bool = False) -> str | None:
         data = resp.json()
         tag = data.get("tag_name", "")
         if re.match(r"^v?\d+\.\d+\.\d+$", tag):
-            latest = tag.lstrip("v")
+            latest = cast(str, tag).lstrip("v")
             _VERSION_CACHE["latest"] = latest
             _VERSION_CACHE["checked_at"] = now
-            _VERSION_CACHE["release_notes"] = data.get("body")
+            raw_body = data.get("body")
+            _VERSION_CACHE["release_notes"] = (
+                raw_body if isinstance(raw_body, str) else None
+            )
             _VERSION_CACHE["last_error"] = None
             return latest
         # Response decoded but the tag isn't a stable X.Y.Z release (e.g. a

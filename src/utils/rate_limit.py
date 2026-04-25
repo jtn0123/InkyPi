@@ -111,7 +111,9 @@ _DEFAULT_MUTATING_CAPACITY = 10
 _DEFAULT_MUTATING_REFILL = 10 / 60  # 10 tokens per minute
 
 
-def _parse_rate_env(name: str, capacity_default: int, rate_default: float):
+def _parse_rate_env(
+    name: str, capacity_default: int, rate_default: float
+) -> tuple[float, float]:
     """Parse ``N/Sseconds`` from *name* env var.
 
     Format: ``"5/30"`` → capacity=5, refill_rate=1/30.

@@ -5,8 +5,8 @@ from __future__ import annotations
 import logging
 import os
 from collections.abc import Callable, Mapping
-from datetime import UTC, datetime
-from typing import Any, Protocol, cast
+from datetime import UTC
+from typing import TYPE_CHECKING, Protocol, cast
 
 from utils.metrics import (
     record_refresh_failure,
@@ -16,6 +16,9 @@ from utils.metrics import (
 from utils.time_utils import now_device_tz
 
 logger = logging.getLogger(__name__)
+
+if TYPE_CHECKING:
+    from config import Config
 
 HealthEntry = dict[str, object]
 Metrics = dict[str, object]
@@ -294,9 +297,9 @@ class PluginHealthTracker:
 
     def _now_iso(self) -> str:
         """Return the current device-local timestamp normalized to UTC ISO format."""
-        device_config = cast(Any, self.device_config)
-        current_dt = cast(datetime, now_device_tz(device_config))
-        return current_dt.astimezone(UTC).isoformat()
+        device_config = cast("Config", self.device_config)
+        current_dt = now_device_tz(device_config)
+        return str(current_dt.astimezone(UTC).isoformat())
 
     @staticmethod
     def _entry_int(entry: HealthEntry, key: str) -> int:

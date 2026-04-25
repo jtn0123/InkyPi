@@ -1,3 +1,23 @@
+from typing import Protocol
+
+from PIL import Image
+
+
+class DeviceConfigLike(Protocol):
+    """Subset of config methods/fields used by display backends."""
+
+    def get_config(self, key: str, default: object = ...) -> object: ...
+
+    def update_value(self, key: str, value: object, write: bool = ...) -> None: ...
+
+    def get_resolution(self) -> tuple[int, int]: ...
+
+    BASE_DIR: str
+    current_image_file: str
+    processed_image_file: str
+    history_image_dir: str
+
+
 class AbstractDisplay:
     """
     Abstract base class for all display devices.
@@ -8,17 +28,17 @@ class AbstractDisplay:
     These implementations will be device specific.
     """
 
-    def __init__(self, device_config):
+    def __init__(self, device_config: DeviceConfigLike) -> None:
         """
         Initializes the display manager with the provided device configuration.
 
         Args:
             device_config (object): Configuration object for the display device.
         """
-        self.device_config = device_config
+        self.device_config: DeviceConfigLike = device_config
         self.initialize_display()
 
-    def initialize_display(self):
+    def initialize_display(self) -> None:
         """
         Abstract method to initialize the display hardware.
 
@@ -32,7 +52,9 @@ class AbstractDisplay:
             "Method 'initialize_display(...) must be provided in a subclass."
         )
 
-    def display_image(self, image, image_settings=None):
+    def display_image(
+        self, image: Image.Image, image_settings: list[object] | None = None
+    ) -> None:
         """
         Abstract method to display an image on the screen.  Implementations of this
         method should handle the device specific operations.

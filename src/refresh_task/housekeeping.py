@@ -5,7 +5,9 @@ from __future__ import annotations
 import logging
 import os
 from collections.abc import Mapping
-from typing import Protocol, cast
+from typing import Protocol
+
+from PIL import Image
 
 from utils.fallback_image import render_error_image
 from utils.history_cleanup import cleanup_history
@@ -30,7 +32,7 @@ class SupportsDisplayImage(Protocol):
 
     def display_image(
         self,
-        image: object,
+        image: Image.Image,
         image_settings: object,
         history_meta: dict[str, str | None],
     ) -> object: ...
@@ -97,9 +99,8 @@ class RefreshHousekeeper:
             getattr(self.device_config, "processed_image_file", None),
             getattr(self.device_config, "current_image_file", None),
         ):
-            path_str = cast(str | None, path)
-            if path_str and os.path.exists(path_str):
-                return path_str
+            if isinstance(path, str) and os.path.exists(path):
+                return path
         return None
 
     def push_fallback_image(

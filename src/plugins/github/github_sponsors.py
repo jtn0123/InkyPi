@@ -1,5 +1,9 @@
 import logging
 import os
+from collections.abc import Mapping
+from typing import Any, cast
+
+from PIL import Image
 
 from utils.http_client import get_http_session
 
@@ -34,7 +38,9 @@ query($username: String!) {
 """
 
 
-def sponsors_generate_image(plugin_instance, settings, device_config):
+def sponsors_generate_image(
+    plugin_instance: Any, settings: Mapping[str, object], device_config: Any
+) -> Image.Image:
     dimensions = plugin_instance.get_oriented_dimensions(device_config)
 
     api_key = device_config.load_env_key("GITHUB_SECRET")
@@ -42,7 +48,8 @@ def sponsors_generate_image(plugin_instance, settings, device_config):
         logger.error("GitHub API Key not configured")
         raise RuntimeError("GitHub API Key not configured.")
 
-    github_username = settings.get("githubUsername")
+    raw_username = settings.get("githubUsername")
+    github_username = raw_username if isinstance(raw_username, str) else ""
     if not github_username:
         raise RuntimeError("GitHub username is required.")
 
@@ -68,7 +75,7 @@ def sponsors_generate_image(plugin_instance, settings, device_config):
 _GITHUB_API_BASE = os.getenv("INKYPI_GITHUB_API_URL", "https://api.github.com")
 
 
-def fetch_sponsorships(username, api_key):
+def fetch_sponsorships(username: str, api_key: str) -> dict[str, Any]:
     url = f"{_GITHUB_API_BASE}/graphql"
     headers = {"Authorization": f"Bearer {api_key}"}
     variables = {"username": username}
@@ -80,7 +87,7 @@ def fetch_sponsorships(username, api_key):
         timeout=30,
     )
     resp.raise_for_status()
-    data = resp.json()
+    data = cast(dict[str, Any], resp.json())
 
     if "errors" in data:
         raise RuntimeError(f"GitHub API returned errors: {data['errors']}")
@@ -89,9 +96,9 @@ def fetch_sponsorships(username, api_key):
     return data
 
 
-def calculate_monthly_total(data) -> int:
+def calculate_monthly_total(data: Mapping[str, Any]) -> int:
     sponsorships = data["data"]["user"]["sponsorshipsAsMaintainer"]["nodes"]
     total_cents = sum(
         (s.get("tier") or {}).get("monthlyPriceInCents", 0) for s in sponsorships
     )
-    return round(total_cents / 100)
+    return int(round(total_cents / 100))

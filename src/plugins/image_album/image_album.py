@@ -1,12 +1,16 @@
 import logging
+from collections.abc import Mapping
+from contextlib import AbstractContextManager
 from random import choice
+from typing import Any, cast
 
 from PIL import Image, ImageColor, ImageOps
 
-from plugins.base_plugin.base_plugin import BasePlugin
+from plugins.base_plugin.base_plugin import BasePlugin, DeviceConfigLike
 from plugins.base_plugin.settings_schema import field, option, row, schema, section
 from utils.http_client import get_http_session
 from utils.http_utils import pinned_dns
+from utils.image_loader import AdaptiveImageLoader
 from utils.image_utils import pad_image_blur
 from utils.security_utils import URLValidationError, validate_url_with_ips
 
@@ -18,9 +22,9 @@ class ImmichProvider:
         self,
         base_url: str,
         key: str,
-        image_loader,
+        image_loader: AdaptiveImageLoader,
         pinned_ips: tuple[str, ...] | None = None,
-    ):
+    ) -> None:
         self.base_url = base_url
         self.key = key
         self.headers = {"x-api-key": self.key}
@@ -31,9 +35,12 @@ class ImmichProvider:
 
         self._pin_hostname = _urlparse.urlparse(base_url).hostname or ""
 
-    def _pin(self):
+    def _pin(self) -> AbstractContextManager[None]:
         """Context manager that pins DNS to the validated IPs for this base URL."""
-        return pinned_dns(self._pin_hostname, self.pinned_ips)
+        return cast(
+            AbstractContextManager[None],
+            pinned_dns(self._pin_hostname, self.pinned_ips),
+        )
 
     def get_album_id(self, album: str) -> str:
         logger.debug(f"Fetching albums from {self.base_url}")
@@ -42,18 +49,19 @@ class ImmichProvider:
                 f"{self.base_url}/api/albums", headers=self.headers, timeout=10
             )
         r.raise_for_status()
-        albums = r.json()
+        albums_raw = cast(list[dict[str, object]], r.json())
+        albums = [a for a in albums_raw if isinstance(a, dict)]
 
-        matching_albums = [a for a in albums if a["albumName"] == album]
+        matching_albums = [a for a in albums if a.get("albumName") == album]
         if not matching_albums:
             raise RuntimeError(f"Album '{album}' not found.")
 
-        return matching_albums[0]["id"]
+        return str(matching_albums[0].get("id", ""))
 
-    def get_assets(self, album_id: str) -> list[dict]:
+    def get_assets(self, album_id: str) -> list[dict[str, object]]:
         """Fetch all assets from album."""
-        all_items = []
-        page_items = [1]
+        all_items: list[dict[str, object]] = []
+        page_items: list[dict[str, object]] = [cast(dict[str, object], {})]
         page = 1
 
         logger.debug(f"Fetching assets from album {album_id}")
@@ -67,9 +75,18 @@ class ImmichProvider:
                     timeout=10,
                 )
             r2.raise_for_status()
-            assets_data = r2.json()
+            assets_data = cast(dict[str, object], r2.json())
+            assets_obj = assets_data.get("assets")
+            if isinstance(assets_obj, dict):
+                raw_items = assets_obj.get("items", [])
+            else:
+                raw_items = []
 
-            page_items = assets_data.get("assets", {}).get("items", [])
+            page_items = [
+                cast(dict[str, object], item)
+                for item in raw_items
+                if isinstance(item, dict)
+            ]
             all_items.extend(page_items)
             page += 1
 
@@ -115,7 +132,7 @@ class ImmichProvider:
         # Use adaptive image loader for memory-efficient processing
         # Let loader resize when requested (when no padding will be applied)
         with self._pin():
-            img = self.image_loader.from_url(
+            img = cast(Any, self.image_loader).from_url(
                 asset_url,
                 dimensions,
                 timeout_ms=40000,
@@ -132,7 +149,7 @@ class ImmichProvider:
 
 
 class ImageAlbum(BasePlugin):
-    def build_settings_schema(self):
+    def build_settings_schema(self) -> dict[str, object]:
         return schema(
             section(
                 "Source",
@@ -202,7 +219,7 @@ class ImageAlbum(BasePlugin):
             ),
         )
 
-    def generate_settings_template(self):
+    def generate_settings_template(self) -> dict[str, object]:
         template_params = super().generate_settings_template()
         template_params["api_key"] = {
             "required": True,
@@ -211,30 +228,38 @@ class ImageAlbum(BasePlugin):
         }
         return template_params
 
-    def _fetch_immich_image(self, settings, device_config, dimensions, use_padding):
+    def _fetch_immich_image(
+        self,
+        settings: Mapping[str, object],
+        device_config: DeviceConfigLike,
+        dimensions: tuple[int, int],
+        use_padding: bool,
+    ) -> Image.Image:
         """Validate Immich settings and fetch an image from the provider."""
         key = device_config.load_env_key("IMMICH_KEY")
         if not key:
             logger.error("Immich API Key not configured")
             raise RuntimeError("Immich API Key not configured.")
 
-        url = settings.get("url")
-        if not url:
+        raw_url = settings.get("url")
+        if not isinstance(raw_url, str) or not raw_url:
             logger.error("Immich URL not provided")
             raise RuntimeError("Immich URL is required.")
+        url = raw_url
 
         try:
-            _validated_url, pinned_ips = validate_url_with_ips(url)
+            _, pinned_ips = validate_url_with_ips(url)
         except ValueError as e:
             # URLValidationError is a PermanentPluginError subclass, so the
             # refresh-task retry loop skips extra attempts (JTN-778) and the
             # plugin blueprint maps it to HTTP 422 validation_error (JTN-776).
             raise URLValidationError(f"Invalid URL: {e}") from e
 
-        album = settings.get("album")
-        if not album:
+        raw_album = settings.get("album")
+        if not isinstance(raw_album, str) or not raw_album:
             logger.error("Album name not provided")
             raise RuntimeError("Album name is required.")
+        album = raw_album
 
         logger.info(f"Immich URL: {url}")
         logger.info(f"Album: {album}")
@@ -247,18 +272,22 @@ class ImageAlbum(BasePlugin):
             raise RuntimeError("Failed to load image, please check logs.")
         return img
 
-    def generate_image(self, settings, device_config):
+    def generate_image(
+        self, settings: Mapping[str, object], device_config: DeviceConfigLike
+    ) -> Image.Image:
         logger.info("=== Image Album Plugin: Starting image generation ===")
 
         dimensions = self.get_oriented_dimensions(device_config)
 
-        img = None
+        img: Image.Image | None = None
         album_provider = settings.get("albumProvider")
         logger.info(f"Album provider: {album_provider}")
 
         # Check padding options to determine resize strategy
         use_padding = settings.get("padImage") == "true"
         background_option = settings.get("backgroundOption", "blur")
+        if not isinstance(background_option, str):
+            background_option = "blur"
         logger.debug(
             f"Settings: pad_image={use_padding}, background_option={background_option}"
         )
@@ -282,9 +311,10 @@ class ImageAlbum(BasePlugin):
             if background_option == "blur":
                 img = pad_image_blur(img, dimensions)
             else:
-                background_color = ImageColor.getcolor(
-                    settings.get("backgroundColor") or "white", img.mode
-                )
+                background_color_value = settings.get("backgroundColor", "white")
+                if not isinstance(background_color_value, str):
+                    background_color_value = "white"
+                background_color = ImageColor.getcolor(background_color_value, img.mode)
                 img = ImageOps.pad(
                     img,
                     dimensions,

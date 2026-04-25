@@ -1,12 +1,14 @@
 import logging
 import math
+from collections.abc import Mapping, Sequence
 from datetime import datetime
+from typing import Any, cast
 from zoneinfo import ZoneInfo
 
 import numpy as np
 from PIL import Image, ImageColor, ImageDraw
 
-from plugins.base_plugin.base_plugin import BasePlugin
+from plugins.base_plugin.base_plugin import BasePlugin, DeviceConfigLike
 from plugins.base_plugin.settings_schema import field, row, schema, section, widget
 from utils.app_utils import get_font
 
@@ -44,7 +46,7 @@ DEFAULT_CLOCK_FACE = "Gradient Clock"
 
 
 class Clock(BasePlugin):
-    def build_settings_schema(self):
+    def build_settings_schema(self) -> dict[str, object]:
         return schema(
             section(
                 "Clock Face",
@@ -69,18 +71,32 @@ class Clock(BasePlugin):
             ),
         )
 
-    def generate_settings_template(self):
+    def generate_settings_template(self) -> dict[str, object]:
         template_params = super().generate_settings_template()
         template_params["clock_faces"] = CLOCK_FACES
         return template_params
 
-    def generate_image(self, settings, device_config):
-        clock_face = settings.get("selectedClockFace")
+    def generate_image(
+        self, settings: Mapping[str, object], device_config: DeviceConfigLike
+    ) -> Image.Image:
+        raw_clock_face = settings.get("selectedClockFace")
+        clock_face = raw_clock_face if isinstance(raw_clock_face, str) else ""
+
         primary_color = ImageColor.getcolor(
-            settings.get("primaryColor") or "white", "RGB"
+            (
+                settings.get("primaryColor")
+                if isinstance(settings.get("primaryColor"), str)
+                else "white"
+            ),
+            "RGB",
         )
         secondary_color = ImageColor.getcolor(
-            settings.get("secondaryColor") or "black", "RGB"
+            (
+                settings.get("secondaryColor")
+                if isinstance(settings.get("secondaryColor"), str)
+                else "black"
+            ),
+            "RGB",
         )
         if not clock_face or clock_face not in [face["name"] for face in CLOCK_FACES]:
             clock_face = DEFAULT_CLOCK_FACE
@@ -88,7 +104,8 @@ class Clock(BasePlugin):
         dimensions = self.get_oriented_dimensions(device_config)
 
         timezone_name = device_config.get_config("timezone") or DEFAULT_TIMEZONE
-        tz = ZoneInfo(timezone_name)
+        tz_name = timezone_name if isinstance(timezone_name, str) else DEFAULT_TIMEZONE
+        tz = ZoneInfo(tz_name)
         current_time = datetime.now(tz)
 
         img = None
@@ -115,8 +132,12 @@ class Clock(BasePlugin):
         return img
 
     def draw_digital_clock(
-        self, dimensions, time, primary_color=(255, 255, 255), secondary_color=(0, 0, 0)
-    ):
+        self,
+        dimensions: tuple[int, int],
+        time: datetime,
+        primary_color: tuple[int, int, int] | tuple[int, int, int, int],
+        secondary_color: tuple[int, int, int] | tuple[int, int, int, int],
+    ) -> Image.Image:
         w, h = dimensions
         time_str = Clock.format_time(time.hour, time.minute, zero_pad=True)
 
@@ -124,7 +145,7 @@ class Clock(BasePlugin):
         text = Image.new("RGBA", dimensions, (0, 0, 0, 0))
 
         font_size = w * 0.36
-        fnt = get_font("DS-Digital", font_size)
+        fnt = cast(Any, get_font)("DS-Digital", font_size)
         text_draw = ImageDraw.Draw(text)
 
         # time text
@@ -139,21 +160,41 @@ class Clock(BasePlugin):
 
     def draw_conic_clock(
         self,
-        dimensions,
-        time,
-        primary_color=(219, 50, 70, 255),
-        secondary_color=(0, 0, 0, 255),
-    ):
+        dimensions: tuple[int, int],
+        time: datetime,
+        primary_color: tuple[int, int, int, int] | tuple[int, int, int] = (
+            219,
+            50,
+            70,
+            255,
+        ),
+        secondary_color: tuple[int, int, int, int] | tuple[int, int, int] = (
+            0,
+            0,
+            0,
+            255,
+        ),
+    ) -> Image.Image:
         width, height = dimensions
         hour_angle, minute_angle = Clock.calculate_clock_angles(time)
 
         # Draw the hour hand gradient
         image_hour = Clock.draw_gradient_image(
-            width, height, hour_angle, minute_angle, secondary_color, primary_color
+            width,
+            height,
+            hour_angle,
+            minute_angle,
+            secondary_color,
+            primary_color,
         )
         # Draw the minute hand gradient
         image_minute = Clock.draw_gradient_image(
-            width, height, minute_angle, hour_angle, secondary_color, primary_color
+            width,
+            height,
+            minute_angle,
+            hour_angle,
+            secondary_color,
+            primary_color,
         )
 
         # Combine the images using alpha blending
@@ -203,11 +244,19 @@ class Clock(BasePlugin):
 
     def draw_divided_clock(
         self,
-        dimensions,
-        time,
-        primary_color=(32, 183, 174),
-        secondary_color=(255, 255, 255),
-    ):
+        dimensions: tuple[int, int],
+        time: datetime,
+        primary_color: tuple[int, int, int] | tuple[int, int, int, int] = (
+            32,
+            183,
+            174,
+        ),
+        secondary_color: tuple[int, int, int] | tuple[int, int, int, int] = (
+            255,
+            255,
+            255,
+        ),
+    ) -> Image.Image:
         w, h = dimensions
         bg = Image.new("RGBA", dimensions, primary_color + (255,))
         bg_draw = ImageDraw.Draw(bg)
@@ -272,8 +321,16 @@ class Clock(BasePlugin):
         return Image.alpha_composite(bg, canvas)
 
     def draw_word_clock(
-        self, dimensions, time, primary_color=(0, 0, 0), secondary_color=(255, 255, 255)
-    ):
+        self,
+        dimensions: tuple[int, int],
+        time: datetime,
+        primary_color: tuple[int, int, int] | tuple[int, int, int, int] = (0, 0, 0),
+        secondary_color: tuple[int, int, int] | tuple[int, int, int, int] = (
+            255,
+            255,
+            255,
+        ),
+    ) -> Image.Image:
         w, h = dimensions
 
         bg = Image.new("RGBA", dimensions, primary_color + (255,))
@@ -281,12 +338,12 @@ class Clock(BasePlugin):
         dim = min(w, h)
 
         font_size = dim * 0.05
-        fnt = get_font("Napoli", font_size)
+        fnt = cast(Any, get_font)("Napoli", font_size)
 
         canvas = Image.new("RGBA", dimensions, (0, 0, 0, 0))
         image_draw = ImageDraw.Draw(canvas)
 
-        border = [40, 40]
+        border: list[float] = [40.0, 40.0]
         if w > h:
             border[0] += (w - h) / 2
         elif h > w:
@@ -333,7 +390,7 @@ class Clock(BasePlugin):
         return Image.alpha_composite(bg, canvas)
 
     @staticmethod
-    def format_time(hour, minute, zero_pad=False):
+    def format_time(hour: int, minute: int, zero_pad: bool = False) -> str:
         hour_str = str(hour)
         if zero_pad and hour < 10:
             hour_str = "0" + hour_str
@@ -343,7 +400,14 @@ class Clock(BasePlugin):
         return f"{hour_str}:{minute_str}"
 
     @staticmethod
-    def draw_gradient_image(w, h, start_angle, end_angle, start_color, end_color):
+    def draw_gradient_image(
+        w: int,
+        h: int,
+        start_angle: float,
+        end_angle: float,
+        start_color: Sequence[int],
+        end_color: Sequence[int],
+    ) -> Image.Image:
         """
         Draw a gradient that starts at start_angle and ends at end_angle, using RGBA colors.
         Angles are interpreted for a clock face (0 at 12 o'clock, increasing clockwise).
@@ -364,10 +428,10 @@ class Clock(BasePlugin):
         theta = theta / angle_range  # Normalize to [0, 1] within range
 
         # Interpolate colors between start and end within the mask
-        gradient = np.zeros((h, w, 4), dtype=np.uint8)
-        start_color = Clock.pad_color(start_color)
-        end_color = Clock.pad_color(end_color)
-        for c in range(4):  # Iterate through RGBA channels
+        gradient: np.ndarray = np.zeros((h, w, 4), dtype=np.uint8)
+        start_color = Clock.pad_color(tuple(start_color))
+        end_color = Clock.pad_color(tuple(end_color))
+        for c in range(4):  # Iterate over RGBA channels
             gradient[..., c] = (
                 start_color[c] * (1 - theta) + end_color[c] * (theta)
             ).astype(np.uint8)
@@ -377,24 +441,27 @@ class Clock(BasePlugin):
         return Image.fromarray(gradient, mode="RGBA")
 
     @staticmethod
-    def pad_color(color):
+    def pad_color(color: Sequence[int]) -> tuple[int, ...]:
         # Add 255, until 4 values (RGBA) are in that array
-        return tuple(list(color) + [255] * (4 - len(color)))
+        padded_color = list(color)
+        if len(padded_color) < 4:
+            padded_color.extend([255] * (4 - len(padded_color)))
+        return tuple(padded_color[:4])
 
     @staticmethod
     def draw_clock_hand(
-        image,
-        length,
-        angle,
-        hand_color,
-        hand_length=14,
-        border_color=None,
-        border_width=0,
-        hand_offset=0,
-        round_corners=True,
-        offset_width=4,
-        hand_width=4,
-    ):
+        image: Image.Image,
+        length: int | float,
+        angle: float,
+        hand_color: tuple[int, int, int] | tuple[int, int, int, int],
+        hand_length: int = 14,
+        border_color: tuple[int, int, int] | tuple[int, int, int, int] | None = None,
+        border_width: int = 0,
+        hand_offset: int = 0,
+        round_corners: bool = True,
+        offset_width: int = 4,
+        hand_width: int = 4,
+    ) -> Image.Image:
         draw = ImageDraw.Draw(image)
         # Get the image dimensions
         w, h = image.size
@@ -440,7 +507,9 @@ class Clock(BasePlugin):
         return image
 
     @staticmethod
-    def calculate_rectangle_corners(start, end, half_width):
+    def calculate_rectangle_corners(
+        start: tuple[float, float], end: tuple[float, float], half_width: int
+    ) -> list[tuple[float, float]]:
 
         # Calculate the direction vector (from start to end)
         dir_x = end[0] - start[0]
@@ -466,7 +535,7 @@ class Clock(BasePlugin):
         return [corner1, corner2, corner3, corner4]
 
     @staticmethod
-    def calculate_clock_angles(time):
+    def calculate_clock_angles(time: datetime) -> tuple[float, float]:
         """
         Calculate the angles for the hour and minute hands on a clock face.
 
@@ -495,8 +564,12 @@ class Clock(BasePlugin):
 
     @staticmethod
     def draw_clock_center(
-        image, center_radius, fill_color, outline_color=None, width=None
-    ):
+        image: Image.Image,
+        center_radius: int,
+        fill_color: tuple[int, int, int] | tuple[int, int, int, int],
+        outline_color: tuple[int, int, int] | tuple[int, int, int, int] | None = None,
+        width: int | None = None,
+    ) -> None:
         draw = ImageDraw.Draw(image)
         w, h = image.size
 
@@ -508,8 +581,12 @@ class Clock(BasePlugin):
 
     @staticmethod
     def draw_hour_marks(
-        image, radius, line_color=(255, 255, 255), line_length=25, line_width=3
-    ):
+        image: Image.Image,
+        radius: int,
+        line_color: tuple[int, int, int] | tuple[int, int, int, int] = (255, 255, 255),
+        line_length: int = 25,
+        line_width: int = 3,
+    ) -> Image.Image:
         """
         Draws a circle and lines radiating out every 30 degrees on the given image.
 
@@ -537,9 +614,7 @@ class Clock(BasePlugin):
 
             # Calculate the end point of the line
             end_x = x + radius * math.cos(angle_rad)
-            end_y = y - radius * math.sin(
-                angle_rad
-            )  # Negative y because PIL's y-coordinates increase downward
+            end_y = y - radius * math.sin(angle_rad)
 
             # Draw the line
             draw.line(
@@ -549,14 +624,14 @@ class Clock(BasePlugin):
         return image
 
     @staticmethod
-    def translate_word_grid_positions(hour, minute):
-        letters = [[0, 0], [0, 1], [0, 3], [0, 4]]  # IT IS
+    def translate_word_grid_positions(hour: int, minute: int) -> list[list[int]]:
+        letters: list[list[int]] = [[0, 0], [0, 1], [0, 3], [0, 4]]  # IT IS
 
         _minute = minute
         if minute > 30:
             _minute = 60 - minute
         if _minute >= 3:
-            minute_blocks = [
+            minute_blocks: list[list[list[int]]] = [
                 [[2, 6], [2, 7], [2, 8], [2, 9]],  # FIVE
                 [[3, 5], [3, 6], [3, 7]],  # TEN
                 [

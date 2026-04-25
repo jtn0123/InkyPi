@@ -15,7 +15,6 @@ import uuid
 from collections.abc import Callable
 from concurrent.futures import Future, ThreadPoolExecutor
 from time import monotonic
-from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +58,9 @@ class JobQueue:
     # Public API
     # ------------------------------------------------------------------
 
-    def enqueue(self, fn: Any, *args: Any, **kwargs: Any) -> str:
+    def enqueue(
+        self, fn: Callable[..., object], *args: object, **kwargs: object
+    ) -> str:
         """Submit *fn(*args, **kwargs)* for background execution.
 
         Returns a unique ``job_id`` (UUID4 hex string) that can be passed to
@@ -76,7 +77,7 @@ class JobQueue:
         entry.future = future
         return job_id
 
-    def get_status(self, job_id: str) -> dict[str, Any]:
+    def get_status(self, job_id: str) -> dict[str, object]:
         """Return the current status of *job_id*.
 
         Returns a dict with keys:
@@ -139,7 +140,13 @@ class JobQueue:
     # Internal helpers
     # ------------------------------------------------------------------
 
-    def _run(self, entry: _JobEntry, fn: Any, *args: Any, **kwargs: Any) -> Any:
+    def _run(
+        self,
+        entry: _JobEntry,
+        fn: Callable[..., object],
+        *args: object,
+        **kwargs: object,
+    ) -> object:
         entry.status = STATUS_RUNNING
         try:
             result = fn(*args, **kwargs)
@@ -163,13 +170,13 @@ class _JobEntry:
     def __init__(self, job_id: str) -> None:
         self.job_id = job_id
         self.status: str = STATUS_PENDING
-        self.result: Any = None
+        self.result: object | None = None
         self.error: str | None = None
-        self.future: Future | None = None  # type: ignore[type-arg]
+        self.future: Future[object | None] | None = None
         self.finished_at: float | None = None
 
-    def to_dict(self) -> dict[str, Any]:
-        d: dict[str, Any] = {"status": self.status}
+    def to_dict(self) -> dict[str, object]:
+        d: dict[str, object] = {"status": self.status}
         if self.status == STATUS_DONE and self.result is not None:
             d["result"] = self.result
         if self.status == STATUS_ERROR and self.error is not None:

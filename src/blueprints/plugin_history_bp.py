@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import logging
 import re
+from typing import Any
 
 from flask import Blueprint, current_app, jsonify, request
 
@@ -48,13 +49,16 @@ def _safe_instance_name(name: str) -> str | None:
 _MAX_LIMIT = 100
 
 
-def _config_dir(device_config) -> str:
+def _config_dir(device_config: Any) -> str:
     import os
 
-    return os.path.dirname(device_config.config_file)
+    config_file = getattr(device_config, "config_file", "")
+    if not isinstance(config_file, str):
+        return ""
+    return os.path.dirname(config_file)
 
 
-def _instance_exists(device_config, instance_name: str) -> bool:
+def _instance_exists(device_config: Any, instance_name: str) -> bool:
     """Return True if the named plugin instance exists in any playlist."""
     playlist_manager = device_config.get_playlist_manager()
     for pname in playlist_manager.get_playlist_names():
@@ -69,8 +73,8 @@ def _instance_exists(device_config, instance_name: str) -> bool:
 
 @plugin_history_bp.route(
     "/api/plugins/instance/<string:instance_name>/history", methods=["GET"]
-)
-def plugin_instance_history(instance_name: str):
+)  # type: ignore
+def plugin_instance_history(instance_name: str) -> Any:
     """Return recent config-change history for a plugin instance."""
     safe_name = _safe_instance_name(instance_name)
     if safe_name is None:
@@ -94,8 +98,8 @@ def plugin_instance_history(instance_name: str):
 
 @plugin_history_bp.route(
     "/api/plugins/instance/<string:instance_name>/diff", methods=["GET"]
-)
-def plugin_instance_diff(instance_name: str):
+)  # type: ignore
+def plugin_instance_diff(instance_name: str) -> Any:
     """Return the diff between the two most-recent history entries."""
     safe_name = _safe_instance_name(instance_name)
     if safe_name is None:

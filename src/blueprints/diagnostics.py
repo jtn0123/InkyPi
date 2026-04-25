@@ -95,7 +95,7 @@ def _access_allowed() -> tuple[bool, str | None]:
 def _uptime_seconds() -> int | None:
     """Return system uptime in seconds via psutil; fall back to /proc/uptime."""
     try:
-        import psutil  # type: ignore
+        import psutil
 
         return int(time.time() - psutil.boot_time())
     except Exception:
@@ -110,7 +110,7 @@ def _uptime_seconds() -> int | None:
 def _memory_info() -> dict[str, Any]:
     """Return {total_mb, used_mb, pct} from psutil, else from /proc/meminfo."""
     try:
-        import psutil  # type: ignore
+        import psutil
 
         vm = psutil.virtual_memory()
         total_mb = int(vm.total / (1024 * 1024))
@@ -324,9 +324,7 @@ def _log_tail(max_lines: int = _LOG_TAIL_LINES) -> list[str]:
         # dev mode. 2h of history is ample for a 100-line tail.
         from blueprints import settings as settings_mod
 
-        lines = settings_mod._read_log_lines(hours=2)  # type: ignore[attr-defined]
-        if not isinstance(lines, list):
-            return []
+        lines = settings_mod._read_log_lines(hours=2)
         if len(lines) > cap:
             lines = lines[-cap:]
         return [str(ln) for ln in lines]
@@ -367,8 +365,8 @@ def _recent_client_log_summary() -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 
-@diagnostics_bp.route("/api/diagnostics", methods=["GET"])
-def api_diagnostics():
+@diagnostics_bp.route("/api/diagnostics", methods=["GET"])  # type: ignore
+def api_diagnostics() -> Any:
     """Return a consolidated system + application diagnostics payload.
 
     Response shape (stable — downstream UIs consume this):

@@ -4,7 +4,9 @@ import json
 import logging
 import os
 import shutil
+from collections.abc import Iterator
 from datetime import UTC, datetime
+from typing import Any, cast
 
 from flask import (
     Blueprint,
@@ -48,20 +50,20 @@ _ERRCODE_INVALID_FILENAME = "invalid_filename"
 _ERRCODE_FILE_NOT_FOUND = "file_not_found"
 
 
-def _filename_error_response(code: str):
+def _filename_error_response(code: str) -> tuple[Any, int]:
     """Map helper error codes to standard ``json_error`` responses.
 
     All messages are module-level constants — no request data is interpolated.
     """
     if code == _ERRCODE_INVALID_JSON:
-        return json_error(_ERR_INVALID_JSON, status=400)
+        return cast(tuple[Any, int], json_error(_ERR_INVALID_JSON, status=400))
     if code == _ERRCODE_BODY_NOT_OBJECT:
-        return json_error(_ERR_BODY_NOT_OBJECT, status=400)
+        return cast(tuple[Any, int], json_error(_ERR_BODY_NOT_OBJECT, status=400))
     if code == _ERRCODE_FILENAME_REQUIRED:
-        return json_error(_ERR_FILENAME_REQUIRED, status=400)
+        return cast(tuple[Any, int], json_error(_ERR_FILENAME_REQUIRED, status=400))
     if code == _ERRCODE_FILE_NOT_FOUND:
-        return json_error(_ERR_FILE_NOT_FOUND, status=404)
-    return json_error(_ERR_INVALID_FILENAME, status=400)
+        return cast(tuple[Any, int], json_error(_ERR_FILE_NOT_FOUND, status=404))
+    return cast(tuple[Any, int], json_error(_ERR_INVALID_FILENAME, status=400))
 
 
 def _timestamp_from_history_filename(filename: str) -> float:
@@ -93,7 +95,7 @@ def _format_size(num_bytes: int) -> str:
 
 def _list_history_images(
     history_dir: str, offset: int = 0, limit: int | None = None
-) -> tuple[list[dict], int]:
+) -> tuple[list[dict[str, Any]], int]:
     # Phase 1: cheap directory listing + sort
     try:
         files = [
@@ -128,7 +130,7 @@ def _list_history_images(
     page_files = files[offset : offset + limit] if limit is not None else files
 
     # Phase 2: expensive stat + sidecar load only for the page slice
-    result: list[dict] = []
+    result: list[dict[str, Any]] = []
     for f in page_files:
         full_path = os.path.join(history_dir, f)
         try:
@@ -138,7 +140,7 @@ def _list_history_images(
             # Skip files that were deleted or cannot be accessed
             continue
         # Try to load sidecar metadata (JSON) if present
-        meta: dict = {}
+        meta: dict[str, Any] = {}
         try:
             base, _ = os.path.splitext(f)
             sidecar_path = os.path.join(history_dir, f"{base}{_EXT_JSON}")
@@ -251,7 +253,9 @@ def _resolve_history_path(history_dir: str, filename: str) -> str:
         raise ValueError(_ERR_INVALID_FILENAME) from exc
 
 
-def _validate_and_resolve_history_file(history_dir, filename):
+def _validate_and_resolve_history_file(
+    history_dir: str, filename: str
+) -> tuple[str | None, str | None]:
     """Validate and resolve a history filename to a safe absolute path.
 
     Returns ``(safe_path, None)`` on success, or ``(None, err_code)`` where
@@ -278,7 +282,7 @@ def _validate_and_resolve_history_file(history_dir, filename):
     return safe_path, None
 
 
-def _parse_filename_from_request():
+def _parse_filename_from_request() -> tuple[str | None, str | None]:
     """Parse and validate a ``filename`` field from a JSON POST body.
 
     Returns ``(filename, None)`` on success, or ``(None, err_code)`` where
@@ -299,8 +303,8 @@ def _parse_filename_from_request():
 _DEFAULT_PER_PAGE = 24
 
 
-@history_bp.route("/history", methods=["GET"])
-def history_page():
+@history_bp.route("/history", methods=["GET"])  # type: ignore
+def history_page() -> Response | str:
     device_config = current_app.config[_CONFIG_KEY]
     history_dir = device_config.history_image_dir
 
@@ -394,8 +398,8 @@ def history_page():
     return render_template("history.html", **template_ctx)
 
 
-@history_bp.route("/history/image/<path:filename>", methods=["GET"])
-def history_image(filename: str):
+@history_bp.route("/history/image/<path:filename>", methods=["GET"])  # type: ignore
+def history_image(filename: str) -> Response | tuple[dict[str, Any], int]:
     device_config = current_app.config[_CONFIG_KEY]
     history_dir = device_config.history_image_dir
     try:
@@ -407,8 +411,8 @@ def history_image(filename: str):
     return send_from_directory(history_dir, filename)
 
 
-@history_bp.route("/history/redisplay", methods=["POST"])
-def history_redisplay():
+@history_bp.route("/history/redisplay", methods=["POST"])  # type: ignore
+def history_redisplay() -> tuple[dict[str, Any], int] | Any:
     device_config = current_app.config[_CONFIG_KEY]
     display_manager = current_app.config["DISPLAY_MANAGER"]
     history_dir = device_config.history_image_dir
@@ -418,11 +422,13 @@ def history_redisplay():
         if err_code is not None:
             return _filename_error_response(err_code)
 
+        assert filename is not None
         _safe_path, err_code = _validate_and_resolve_history_file(history_dir, filename)
         if err_code is not None:
             return _filename_error_response(err_code)
 
-        display_manager.display_preprocessed_image(_safe_path)
+        safe_path = cast(str, _safe_path)
+        display_manager.display_preprocessed_image(safe_path)
         return json_success("Display updated")
     except Exception:
         logger.exception("Error redisplaying history image")
@@ -432,8 +438,8 @@ def history_redisplay():
         )
 
 
-@history_bp.route("/history/delete", methods=["POST"])
-def history_delete():
+@history_bp.route("/history/delete", methods=["POST"])  # type: ignore
+def history_delete() -> tuple[dict[str, Any], int] | Any:
     device_config = current_app.config[_CONFIG_KEY]
     history_dir = device_config.history_image_dir
     try:
@@ -441,10 +447,12 @@ def history_delete():
         if err_code is not None:
             return _filename_error_response(err_code)
 
+        assert filename is not None
         safe_path, err_code = _validate_and_resolve_history_file(history_dir, filename)
         if err_code is not None:
             return _filename_error_response(err_code)
 
+        safe_path = cast(str, safe_path)
         _base, ext = os.path.splitext(safe_path)
         if not ext.lower().endswith((_EXT_PNG, _EXT_JSON)):
             return json_error(
@@ -476,8 +484,8 @@ def history_delete():
         )
 
 
-@history_bp.route("/history/clear", methods=["POST"])
-def history_clear():
+@history_bp.route("/history/clear", methods=["POST"])  # type: ignore
+def history_clear() -> tuple[dict[str, Any], int] | Any:
     device_config = current_app.config[_CONFIG_KEY]
     history_dir = device_config.history_image_dir
     try:
@@ -506,7 +514,7 @@ _CSV_HEADERS = [
 ]
 
 
-def _iter_history_csv(history_dir: str):
+def _iter_history_csv(history_dir: str) -> Iterator[bytes]:
     """Yield CSV rows (as bytes) for every history entry, newest first.
 
     Each PNG in *history_dir* produces one row.  The sidecar JSON is read for
@@ -552,7 +560,7 @@ def _iter_history_csv(history_dir: str):
         except Exception:
             continue
 
-        meta: dict = {}
+        meta: dict[str, Any] = {}
         try:
             base, _ = os.path.splitext(f)
             sidecar_path = os.path.join(history_dir, f"{base}{_EXT_JSON}")
@@ -584,8 +592,8 @@ def _iter_history_csv(history_dir: str):
         yield buf.getvalue().encode("utf-8")
 
 
-@history_bp.route("/history/export.csv", methods=["GET"])
-def history_export_csv():
+@history_bp.route("/history/export.csv", methods=["GET"])  # type: ignore
+def history_export_csv() -> Response:
     """Return all history entries as a downloadable CSV file.
 
     Columns: timestamp, plugin_id, instance_name, status, duration_ms,
@@ -608,8 +616,8 @@ def history_export_csv():
     )
 
 
-@history_bp.route("/history/storage", methods=["GET"])
-def history_storage():
+@history_bp.route("/history/storage", methods=["GET"])  # type: ignore
+def history_storage() -> tuple[Any, int]:
     """Return storage stats for the filesystem containing the history directory.
 
     Values returned: free_gb, total_gb, used_gb, pct_free
@@ -641,4 +649,6 @@ def history_storage():
         )
     except Exception:
         logger.exception("Failed to stat filesystem for history directory")
-        return json_error("failed to get storage info", status=500)
+        return cast(
+            tuple[Any, int], json_error("failed to get storage info", status=500)
+        )

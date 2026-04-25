@@ -23,7 +23,7 @@ import os
 import secrets
 from typing import TYPE_CHECKING
 
-from flask import Flask, redirect, request, session, url_for
+from flask import Flask, Response, redirect, request, session, url_for
 
 if TYPE_CHECKING:
     from config import Config
@@ -155,8 +155,8 @@ def init_auth(app: Flask, device_config: Config) -> None:
     app.config["AUTH_PIN_HASH"] = pin_hash
     logger.info("PIN auth enabled")
 
-    @app.before_request
-    def _require_auth():
+    @app.before_request  # type: ignore
+    def _require_auth() -> Response | None:
         if _should_skip_auth():
             return None
         if session.get("authed") is True:

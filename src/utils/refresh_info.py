@@ -21,6 +21,8 @@ class RefreshInfoRepository:
     sub-key) and exposes the resulting model object.
     """
 
+    refresh_info: RefreshInfo
+
     def __init__(self, raw_data: RefreshInfoDict | None = None):
         self.refresh_info = self._load(raw_data)
 
@@ -38,7 +40,31 @@ class RefreshInfoRepository:
 
     def to_dict(self) -> RefreshInfoDict:
         """Serialise the current state for inclusion in the config file."""
-        return self.refresh_info.to_dict()
+        refresh_dict: RefreshInfoDict = {
+            "refresh_time": self.refresh_info.refresh_time,
+            "image_hash": self.refresh_info.image_hash,
+            "refresh_type": self.refresh_info.refresh_type,
+            "plugin_id": self.refresh_info.plugin_id,
+        }
+        if self.refresh_info.playlist:
+            refresh_dict["playlist"] = self.refresh_info.playlist
+        if self.refresh_info.plugin_instance:
+            refresh_dict["plugin_instance"] = self.refresh_info.plugin_instance
+        if self.refresh_info.request_ms is not None:
+            refresh_dict["request_ms"] = self.refresh_info.request_ms
+        if self.refresh_info.display_ms is not None:
+            refresh_dict["display_ms"] = self.refresh_info.display_ms
+        if self.refresh_info.generate_ms is not None:
+            refresh_dict["generate_ms"] = self.refresh_info.generate_ms
+        if self.refresh_info.preprocess_ms is not None:
+            refresh_dict["preprocess_ms"] = self.refresh_info.preprocess_ms
+        if self.refresh_info.used_cached is not None:
+            refresh_dict["used_cached"] = self.refresh_info.used_cached
+        if getattr(self.refresh_info, "benchmark_id", None) is not None:
+            refresh_dict["benchmark_id"] = self.refresh_info.benchmark_id
+        if getattr(self.refresh_info, "plugin_meta", None) is not None:
+            refresh_dict["plugin_meta"] = self.refresh_info.plugin_meta
+        return refresh_dict
 
     # ------------------------------------------------------------------
     # Internal

@@ -1,6 +1,9 @@
 import logging
+from collections.abc import Mapping
 
-from plugins.base_plugin.base_plugin import BasePlugin
+from PIL import Image
+
+from plugins.base_plugin.base_plugin import BasePlugin, DeviceConfigLike
 from plugins.base_plugin.settings_schema import callout, field, schema, section
 from utils.image_utils import fetch_and_resize_remote_image
 from utils.security_utils import URLValidationError, validate_url
@@ -8,7 +11,9 @@ from utils.security_utils import URLValidationError, validate_url
 logger = logging.getLogger(__name__)
 
 
-def grab_image(image_url, dimensions, timeout_ms=40000):
+def grab_image(
+    image_url: str, dimensions: tuple[int, int], timeout_ms: int = 40000
+) -> Image.Image | None:
     """Grab an image from a URL and resize it to the specified dimensions."""
     return fetch_and_resize_remote_image(
         image_url, dimensions, timeout_seconds=timeout_ms / 1000
@@ -16,7 +21,7 @@ def grab_image(image_url, dimensions, timeout_ms=40000):
 
 
 class ImageURL(BasePlugin):
-    def validate_settings(self, settings: dict) -> str | None:
+    def validate_settings(self, settings: Mapping[str, object]) -> str | None:
         """Reject non-URL image URL values at save time."""
         raw = settings.get("url")
         url = (raw or "").strip() if isinstance(raw, str) else ""
@@ -28,7 +33,7 @@ class ImageURL(BasePlugin):
             return str(err)
         return None
 
-    def build_settings_schema(self):
+    def build_settings_schema(self) -> dict[str, object]:
         return schema(
             section(
                 "Source",
@@ -48,10 +53,13 @@ class ImageURL(BasePlugin):
             )
         )
 
-    def generate_image(self, settings, device_config):
-        url = settings.get("url")
-        if not url:
+    def generate_image(
+        self, settings: Mapping[str, object], device_config: DeviceConfigLike
+    ) -> Image.Image:
+        raw_url = settings.get("url")
+        if not isinstance(raw_url, str) or not raw_url:
             raise RuntimeError("URL is required.")
+        url = raw_url
 
         try:
             validate_url(url)

@@ -2,7 +2,7 @@
 
 import subprocess
 
-from flask import request
+from flask import Response, request
 
 import blueprints.settings as _mod
 from utils.http_utils import json_error, json_internal_error, json_success
@@ -13,8 +13,8 @@ def _sanitize_log_value(value: str, max_len: int = 500) -> str:
     return value.replace("\n", "").replace("\r", "").replace("\x00", "")[:max_len]
 
 
-@_mod.settings_bp.route("/settings/client_log", methods=["POST"])
-def client_log():
+@_mod.settings_bp.route("/settings/client_log", methods=["POST"])  # type: ignore
+def client_log() -> tuple[object, int] | Response:
     """Accept lightweight client logs and emit them to server logs.
 
     Intended for front-end flows (e.g., browser geolocation) where we need
@@ -57,8 +57,8 @@ def client_log():
         )
 
 
-@_mod.settings_bp.route("/shutdown", methods=["POST"])
-def shutdown():
+@_mod.settings_bp.route("/shutdown", methods=["POST"])  # type: ignore
+def shutdown() -> tuple[object, int] | Response:
     """Reboot or shut down the device.
 
     Rate-limited to one call per 30 seconds to prevent accidental repeats.

@@ -11,6 +11,7 @@ import logging
 import os
 import tempfile
 import threading
+from collections.abc import Mapping
 from io import BytesIO
 
 import psutil
@@ -40,8 +41,6 @@ def _ensure_heif_opener() -> None:
     pattern so concurrent uploads don't race on first registration.
     """
     global _HEIF_OPENER_REGISTERED
-    if _HEIF_OPENER_REGISTERED:
-        return
     with _HEIF_OPENER_LOCK:
         if _HEIF_OPENER_REGISTERED:
             return
@@ -56,18 +55,18 @@ def _ensure_heif_opener() -> None:
         _HEIF_OPENER_REGISTERED = True
 
 
-def _is_low_resource_device():
+def _is_low_resource_device() -> bool:
     """
     Detect if running on a low-resource device (e.g., Raspberry Pi Zero).
     Returns True if device has less than 1GB RAM, False otherwise.
     """
     try:
-        total_memory_gb = psutil.virtual_memory().total / (1024**3)
-        is_low_resource = total_memory_gb < 1.0
+        total_memory_gb = float(psutil.virtual_memory().total) / (1024**3)
+        is_low_resource = bool(total_memory_gb < 1.0)
         logger.debug(
             f"Device RAM: {total_memory_gb:.2f}GB - Low resource mode: {is_low_resource}"
         )
-        return is_low_resource
+        return bool(is_low_resource)
     except Exception as e:
         # If we can't detect, assume low resource to be safe
         logger.warning(
@@ -95,14 +94,21 @@ class AdaptiveImageLoader:
     """
 
     # Default headers to avoid 403 errors from sites that block requests without User-Agent
-    DEFAULT_HEADERS = {
+    DEFAULT_HEADERS: dict[str, str] = {
         "User-Agent": "InkyPi/1.0 (https://github.com/fatihak/InkyPi/) Python-requests"
     }
 
-    def __init__(self):
-        self.is_low_resource = _is_low_resource_device()
+    def __init__(self) -> None:
+        self.is_low_resource: bool = _is_low_resource_device()
 
-    def from_url(self, url, dimensions, timeout_ms=40000, resize=True, headers=None):
+    def from_url(
+        self,
+        url: str,
+        dimensions: tuple[int, int],
+        timeout_ms: int = 40000,
+        resize: bool = True,
+        headers: Mapping[str, str] | None = None,
+    ) -> Image.Image | None:
         """
         Load an image from a URL and optionally resize it.
 
@@ -125,7 +131,9 @@ class AdaptiveImageLoader:
             )
         return self._load_from_url_fast(url, dimensions, timeout_ms, resize, headers)
 
-    def from_file(self, path, dimensions, resize=True):
+    def from_file(
+        self, path: str, dimensions: tuple[int, int], resize: bool = True
+    ) -> Image.Image | None:
         """
         Load an image from a local file and optionally resize it.
 
@@ -152,7 +160,9 @@ class AdaptiveImageLoader:
             logger.error(f"Error loading image from {path}: {e}")
             return None
 
-    def from_bytesio(self, data, dimensions, resize=True):
+    def from_bytesio(
+        self, data: BytesIO, dimensions: tuple[int, int], resize: bool = True
+    ) -> Image.Image | None:
         """
         Load an image from BytesIO object and optionally resize it.
 
@@ -192,7 +202,14 @@ class AdaptiveImageLoader:
 
     # ========== LOW-RESOURCE IMPLEMENTATIONS ==========
 
-    def _load_from_url_lowmem(self, url, dimensions, timeout_ms, resize, headers=None):
+    def _load_from_url_lowmem(
+        self,
+        url: str,
+        dimensions: tuple[int, int],
+        timeout_ms: int,
+        resize: bool,
+        headers: Mapping[str, str] | None = None,
+    ) -> Image.Image | None:
         """Low-memory URL loading using temp file + draft mode."""
         tmp_path = None
 
@@ -200,7 +217,9 @@ class AdaptiveImageLoader:
             logger.debug("Using disk-based streaming (low-resource mode)")
 
             # Merge provided headers with defaults
-            request_headers = {**self.DEFAULT_HEADERS, **(headers or {})}
+            request_headers = dict(self.DEFAULT_HEADERS)
+            if headers:
+                request_headers.update(headers)
 
             # Create temp file and stream download
             with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp:
@@ -238,7 +257,9 @@ class AdaptiveImageLoader:
                 except Exception as e:
                     logger.warning(f"Could not delete temp file {tmp_path}: {e}")
 
-    def _load_from_file_lowmem(self, path, dimensions, resize):
+    def _load_from_file_lowmem(
+        self, path: str, dimensions: tuple[int, int], resize: bool
+    ) -> Image.Image | None:
         """Low-memory file loading using draft mode."""
         try:
             img = Image.open(path)
@@ -284,13 +305,22 @@ class AdaptiveImageLoader:
 
     # ========== HIGH-PERFORMANCE IMPLEMENTATIONS ==========
 
-    def _load_from_url_fast(self, url, dimensions, timeout_ms, resize, headers=None):
+    def _load_from_url_fast(
+        self,
+        url: str,
+        dimensions: tuple[int, int],
+        timeout_ms: int,
+        resize: bool,
+        headers: Mapping[str, str] | None = None,
+    ) -> Image.Image | None:
         """High-performance URL loading using in-memory processing."""
         try:
             logger.debug("Using in-memory processing (high-performance mode)")
 
             # Merge provided headers with defaults
-            request_headers = {**self.DEFAULT_HEADERS, **(headers or {})}
+            request_headers = dict(self.DEFAULT_HEADERS)
+            if headers:
+                request_headers.update(headers)
 
             session = get_http_session()
             response = session.get(
@@ -324,7 +354,9 @@ class AdaptiveImageLoader:
             logger.error(f"Error processing image from {url}: {e}")
             return None
 
-    def _load_from_file_fast(self, path, dimensions, resize):
+    def _load_from_file_fast(
+        self, path: str, dimensions: tuple[int, int], resize: bool
+    ) -> Image.Image | None:
         """High-performance file loading using in-memory processing."""
         try:
             img = Image.open(path)
@@ -353,7 +385,12 @@ class AdaptiveImageLoader:
 
     # ========== SHARED PROCESSING LOGIC ==========
 
-    def _process_and_resize(self, img, dimensions, original_size):
+    def _process_and_resize(
+        self,
+        img: Image.Image,
+        dimensions: tuple[int, int],
+        original_size: tuple[int, int],
+    ) -> Image.Image:
         """
         Process and resize image with device-appropriate optimizations.
 
@@ -389,7 +426,9 @@ class AdaptiveImageLoader:
         logger.info(f"Image processing complete: {dimensions[0]}x{dimensions[1]}")
         return img
 
-    def _resize_low_resource(self, img, dimensions):
+    def _resize_low_resource(
+        self, img: Image.Image, dimensions: tuple[int, int]
+    ) -> Image.Image:
         """Memory-efficient resize for low-resource devices."""
         logger.debug("Using memory-efficient processing (BICUBIC filter)")
 
@@ -432,7 +471,9 @@ class AdaptiveImageLoader:
 
         return img
 
-    def _resize_high_performance(self, img, dimensions):
+    def _resize_high_performance(
+        self, img: Image.Image, dimensions: tuple[int, int]
+    ) -> Image.Image:
         """High-quality resize for powerful devices."""
         logger.debug("Using high-quality processing (LANCZOS filter)")
         logger.debug(

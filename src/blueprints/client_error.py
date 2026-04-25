@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import logging
+from typing import Any
 
 from flask import Blueprint, Response, request
 
@@ -51,8 +52,8 @@ def _strip_newlines(value: str) -> str:
     return value.replace("\r", " ").replace("\n", " ")
 
 
-@client_error_bp.route("/api/client-error", methods=["POST"])
-def receive_client_error() -> tuple[Response, int] | Response:
+@client_error_bp.route("/api/client-error", methods=["POST"])  # type: ignore
+def receive_client_error() -> Any:
     """Accept a browser JS error report and emit it as a WARNING log entry.
 
     Returns 204 on success so the browser-side script has a cheap ack with
@@ -100,7 +101,7 @@ def receive_client_error() -> tuple[Response, int] | Response:
     return Response(status=204)
 
 
-@client_error_bp.route("/api/client-error", methods=["GET"])
-def receive_client_error_get() -> tuple[Response, int]:
+@client_error_bp.route("/api/client-error", methods=["GET"])  # type: ignore
+def receive_client_error_get() -> Any:
     """Explicitly reject GET to provide a clear error instead of 405 from Flask."""
     return json_error("Method not allowed", status=405)

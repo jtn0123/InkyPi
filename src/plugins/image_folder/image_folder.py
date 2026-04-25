@@ -1,10 +1,12 @@
 import logging
 import os
 import random
+from collections.abc import Mapping
+from typing import Any, cast
 
 from PIL import Image, ImageColor, ImageOps
 
-from plugins.base_plugin.base_plugin import BasePlugin
+from plugins.base_plugin.base_plugin import BasePlugin, DeviceConfigLike
 from plugins.base_plugin.settings_schema import field, option, row, schema, section
 from utils.image_utils import pad_image_blur
 
@@ -16,13 +18,15 @@ def _resolve_background_color(
 ) -> tuple[int, ...] | int:
     """Return a safe background color, falling back to white on invalid input."""
     try:
-        return ImageColor.getcolor(color_value or "#ffffff", mode)
+        return cast(
+            tuple[int, ...] | int, ImageColor.getcolor(color_value or "#ffffff", mode)
+        )
     except ValueError:
         logger.warning("Invalid background color %r, defaulting to white", color_value)
-        return ImageColor.getcolor("#ffffff", mode)
+        return cast(tuple[int, ...] | int, ImageColor.getcolor("#ffffff", mode))
 
 
-def list_files_in_folder(folder_path):
+def list_files_in_folder(folder_path: str) -> list[str]:
     """Return a list of image file paths in the given folder, excluding hidden files."""
     image_extensions = (
         ".avif",
@@ -45,7 +49,7 @@ def list_files_in_folder(folder_path):
 
 
 class ImageFolder(BasePlugin):
-    def generate_settings_template(self):
+    def generate_settings_template(self) -> dict[str, object]:
         # JTN-632: Disable the legacy "Style" collapsible. Its hardcoded
         # `backgroundOption` radios collide with the schema-driven Background
         # Fill radio group and cause two options to render as `checked`,
@@ -54,14 +58,17 @@ class ImageFolder(BasePlugin):
         template_params["style_settings"] = False
         return template_params
 
-    def validate_settings(self, settings: dict) -> str | None:
+    def validate_settings(self, settings: Mapping[str, object]) -> str | None:
         """Reject missing/unreadable/empty folder paths at save time.
 
         Without this, a bad ``folder_path`` persists in config and only
         surfaces later when ``generate_image`` runs — far from where the
         user can fix the typo. See JTN-355.
         """
-        folder_path = (settings.get("folder_path") or "").strip()
+        raw_folder_path = settings.get("folder_path")
+        folder_path = (
+            raw_folder_path.strip() if isinstance(raw_folder_path, str) else ""
+        )
         if not folder_path:
             return "Folder path is required."
         if not os.path.isdir(folder_path):
@@ -72,7 +79,7 @@ class ImageFolder(BasePlugin):
             return "Folder contains no image files."
         return None
 
-    def build_settings_schema(self):
+    def build_settings_schema(self) -> dict[str, object]:
         return schema(
             section(
                 "Source",
@@ -117,11 +124,13 @@ class ImageFolder(BasePlugin):
             ),
         )
 
-    def generate_image(self, settings, device_config):
+    def generate_image(
+        self, settings: Mapping[str, object], device_config: DeviceConfigLike
+    ) -> Image.Image:
         logger.info("=== Image Folder Plugin: Starting image generation ===")
 
         folder_path = settings.get("folder_path")
-        if not folder_path:
+        if not isinstance(folder_path, str):
             logger.error("No folder path provided in settings")
             raise RuntimeError("Folder path is required.")
 
@@ -149,7 +158,9 @@ class ImageFolder(BasePlugin):
 
         # Check padding options
         use_padding = settings.get("padImage") == "true"
-        background_option = settings.get("backgroundOption", "blur")
+        background_option = settings.get("backgroundOption")
+        if not isinstance(background_option, str):
+            background_option = "blur"
         logger.debug(
             f"Settings: pad_image={use_padding}, background_option={background_option}"
         )
@@ -158,7 +169,9 @@ class ImageFolder(BasePlugin):
             # Use adaptive loader for memory-efficient processing
             # Load without auto-resize first to handle padding options
             # Note: Loader automatically handles EXIF orientation correction
-            img = self.image_loader.from_file(image_url, dimensions, resize=False)
+            img = cast(Any, self.image_loader).from_file(
+                image_url, dimensions, resize=False
+            )
 
             if not img:
                 raise RuntimeError("Failed to load image from file")
@@ -168,8 +181,15 @@ class ImageFolder(BasePlugin):
                 if background_option == "blur":
                     img = pad_image_blur(img, dimensions)
                 else:
+                    raw_background_color = settings.get("backgroundColor")
+                    background_color_value = (
+                        raw_background_color
+                        if isinstance(raw_background_color, str)
+                        else None
+                    )
                     background_color = _resolve_background_color(
-                        settings.get("backgroundColor"), img.mode
+                        background_color_value,
+                        img.mode,
                     )
                     img = ImageOps.pad(
                         img,

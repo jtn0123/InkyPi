@@ -231,8 +231,8 @@ def _emit(report: dict[str, object]) -> None:
             _captured_reports.append(dict(report))
 
 
-@client_log_bp.route("/api/client-log", methods=["POST"])
-def receive_client_log() -> tuple[Response, int] | Response:
+@client_log_bp.route("/api/client-log", methods=["POST"])  # type: ignore
+def receive_client_log() -> tuple[Response, int] | Response | Any:
     """Accept a single entry OR an array of entries and log each as WARNING.
 
     * Single object payload: legacy shape, still supported (JTN-481).
@@ -282,9 +282,9 @@ def receive_client_log() -> tuple[Response, int] | Response:
     validated: list[dict[str, Any]] = []
     errors: list[dict[str, object]] = []
     for idx, entry in enumerate(entries):
-        normalized, err = _validate_and_normalize(entry)
-        if err is not None:
-            errors.append({"index": idx, "error": err})
+        normalized, validation_error = _validate_and_normalize(entry)
+        if validation_error is not None:
+            errors.append({"index": idx, "error": validation_error})
         else:
             assert normalized is not None
             validated.append(normalized)
@@ -311,7 +311,7 @@ def receive_client_log() -> tuple[Response, int] | Response:
     return Response(status=204)
 
 
-@client_log_bp.route("/api/client-log", methods=["GET"])
-def receive_client_log_get() -> tuple[Response, int]:
+@client_log_bp.route("/api/client-log", methods=["GET"])  # type: ignore
+def receive_client_log_get() -> tuple[Response, int] | Response | Any:
     """Explicitly reject GET to provide a clear error instead of 405 from Flask."""
     return json_error("Method not allowed", status=405)

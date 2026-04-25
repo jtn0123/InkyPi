@@ -3,7 +3,7 @@
 import os
 import time
 
-from flask import current_app, jsonify, request
+from flask import Response, current_app, jsonify, request
 from werkzeug.exceptions import BadRequest
 
 import blueprints.settings as _mod
@@ -14,6 +14,13 @@ from utils.backend_errors import (
     route_error_boundary,
 )
 from utils.http_utils import json_error, json_success
+
+
+def _json_payload(response: Response | dict[str, object]) -> dict[str, object]:
+    if isinstance(response, dict):
+        return dict(response)
+    payload = response.get_json()
+    return dict(payload) if isinstance(payload, dict) else {}
 
 
 def _prev_version_path() -> str:
@@ -45,8 +52,8 @@ def _read_prev_version() -> str | None:
     return raw
 
 
-@_mod.settings_bp.route("/settings/update", methods=["POST"])  # start update
-def start_update():
+@_mod.settings_bp.route("/settings/update", methods=["POST"])  # type: ignore
+def start_update() -> tuple[object, int] | Response:
     """Trigger InkyPi update via systemd-run when available, with dev fallback.
 
     Accepts optional JSON body ``{"target_version": "v1.2.0"}`` to update to a
@@ -124,7 +131,7 @@ def start_update():
                 # NOTE: ``running`` and ``unit`` are kept at the top level for
                 # backward compatibility with existing clients and tests.
                 response, _ = json_error("Update already in progress.", status=409)
-                payload = response.get_json()
+                payload = _json_payload(response)
                 payload["running"] = True
                 payload["unit"] = _mod._UPDATE_STATE.get("unit")
                 return jsonify(payload), 409
@@ -292,7 +299,7 @@ def _auto_clear_stale_update_state() -> tuple[str | None, bool]:
     unit_failed = False
 
     cleared = False
-    if unit and _mod._systemd_available():
+    if isinstance(unit, str) and unit and _mod._systemd_available():
         probe_cleared, unit_failed = _probe_finished_unit(unit)
         if probe_cleared:
             cleared = _compare_and_clear_update_state(unit, started_at)
@@ -303,7 +310,7 @@ def _auto_clear_stale_update_state() -> tuple[str | None, bool]:
     # compare-and-clear discipline so we never stomp on a fresh start.
     if (
         not cleared
-        and started_at
+        and isinstance(started_at, (int, float, str))
         and (time.time() - float(started_at)) > _mod._UPDATE_TIMEOUT_SECONDS
     ):
         _compare_and_clear_update_state(unit, started_at)
@@ -311,8 +318,8 @@ def _auto_clear_stale_update_state() -> tuple[str | None, bool]:
     return failed_name, unit_failed
 
 
-@_mod.settings_bp.route("/settings/update_status", methods=["GET"])
-def update_status():
+@_mod.settings_bp.route("/settings/update_status", methods=["GET"])  # type: ignore
+def update_status() -> Response:
     with route_error_boundary(
         "update status",
         logger=_mod.logger,
@@ -355,8 +362,8 @@ def update_status():
         )
 
 
-@_mod.settings_bp.route("/settings/update/rollback", methods=["POST"])
-def start_rollback():
+@_mod.settings_bp.route("/settings/update/rollback", methods=["POST"])  # type: ignore
+def start_rollback() -> tuple[object, int] | Response:
     """Trigger a rollback to the tag recorded in ``/var/lib/inkypi/prev_version``.
 
     JTN-708: completes the failed-update recovery loop.
@@ -412,7 +419,7 @@ def start_rollback():
                     response, _ = json_error(
                         "Update or rollback already in progress.", status=409
                     )
-                    payload = response.get_json()
+                    payload = _json_payload(response)
                     payload["running"] = True
                     payload["unit"] = _mod._UPDATE_STATE.get("unit")
                     return jsonify(payload), 409
@@ -455,8 +462,8 @@ def start_rollback():
         raise
 
 
-@_mod.settings_bp.route("/api/version", methods=["GET"])
-def api_version():
+@_mod.settings_bp.route("/api/version", methods=["GET"])  # type: ignore
+def api_version() -> Response:
     """Return current and latest version info.
 
     Accepts ``?force=1`` to bypass the in-process cache so the "Check for

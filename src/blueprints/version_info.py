@@ -21,7 +21,7 @@ import time
 from datetime import UTC, datetime
 from pathlib import Path
 
-from flask import Blueprint, jsonify
+from flask import Blueprint, Response, jsonify
 
 from schemas.responses import UptimeResponse, VersionInfoResponse
 
@@ -107,8 +107,8 @@ _PYTHON_VERSION: str = sys.version
 # ---------------------------------------------------------------------------
 
 
-@version_info_bp.route("/api/version/info", methods=["GET"])
-def api_version_info():
+@version_info_bp.route("/api/version/info", methods=["GET"])  # type: ignore
+def api_version_info() -> Response:
     """Return build and runtime version metadata.
 
     All fields are read-only. git_sha and git_branch may be 'unknown' in
@@ -137,8 +137,8 @@ def _system_uptime_seconds() -> int | None:
         return None
 
 
-@version_info_bp.route("/api/uptime", methods=["GET"])
-def api_uptime():
+@version_info_bp.route("/api/uptime", methods=["GET"])  # type: ignore
+def api_uptime() -> Response:
     """Return process and system uptime information."""
     process_uptime = time.monotonic() - _PROCESS_START_TIME
     payload: UptimeResponse = {

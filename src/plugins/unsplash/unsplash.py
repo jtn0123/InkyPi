@@ -1,10 +1,13 @@
 import logging
 import os
-import random
+import secrets
+from collections.abc import Mapping
+from typing import Any, cast
 
+from PIL import Image
 from requests.exceptions import RequestException
 
-from plugins.base_plugin.base_plugin import BasePlugin
+from plugins.base_plugin.base_plugin import BasePlugin, DeviceConfigLike
 from plugins.base_plugin.settings_schema import (
     callout,
     field,
@@ -19,7 +22,9 @@ from utils.image_utils import fetch_and_resize_remote_image
 logger = logging.getLogger(__name__)
 
 
-def grab_image(image_url, dimensions, timeout_ms=40000):
+def grab_image(
+    image_url: str, dimensions: tuple[int, int], timeout_ms: int = 40000
+) -> Image.Image | None:
     """Grab an image from a URL and resize it to the specified dimensions."""
     return fetch_and_resize_remote_image(
         image_url, dimensions, timeout_seconds=timeout_ms / 1000
@@ -27,7 +32,7 @@ def grab_image(image_url, dimensions, timeout_ms=40000):
 
 
 class Unsplash(BasePlugin):
-    def build_settings_schema(self):
+    def build_settings_schema(self) -> dict[str, object]:
         return schema(
             section(
                 "Search",
@@ -96,7 +101,7 @@ class Unsplash(BasePlugin):
             ),
         )
 
-    def generate_settings_template(self):
+    def generate_settings_template(self) -> dict[str, object]:
         template_params = super().generate_settings_template()
         template_params["api_key"] = {
             "required": True,
@@ -111,19 +116,35 @@ class Unsplash(BasePlugin):
         except (ValueError, TypeError):
             return 20.0
 
-    def generate_image(self, settings, device_config):
+    def generate_image(
+        self, settings: Mapping[str, object], device_config: DeviceConfigLike
+    ) -> Image.Image:
         access_key = device_config.load_env_key("UNSPLASH_ACCESS_KEY")
         if not access_key:
             logger.error("Unsplash API Key not configured")
             raise RuntimeError("Unsplash API Key not configured.")
 
         search_query = settings.get("search_query")
-        collections = settings.get("collections")
-        content_filter = settings.get("content_filter", "low")
-        color = settings.get("color")
-        orientation = settings.get("orientation")
+        if not isinstance(search_query, str):
+            search_query = None
 
-        params = {
+        collections = settings.get("collections")
+        if not isinstance(collections, str):
+            collections = None
+
+        content_filter = settings.get("content_filter", "low")
+        if not isinstance(content_filter, str):
+            content_filter = "low"
+
+        color = settings.get("color")
+        if not isinstance(color, str):
+            color = None
+
+        orientation = settings.get("orientation")
+        if not isinstance(orientation, str):
+            orientation = None
+
+        params: dict[str, object] = {
             "client_id": access_key,
             "content_filter": content_filter,
             "per_page": 100,
@@ -145,17 +166,26 @@ class Unsplash(BasePlugin):
 
         try:
             response = get_http_session().get(
-                url, params=params, timeout=self._request_timeout()
+                url, params=cast(Any, params), timeout=self._request_timeout()
             )
             response.raise_for_status()
-            data = response.json()
+            data = cast(dict[str, object], response.json())
             if search_query:
                 results = data.get("results")
+                if not isinstance(results, list):
+                    results = []
                 if not results:
                     raise RuntimeError("No images found for the given search query.")
-                image_url = random.choice(results)["urls"]["full"]
+                first_result = secrets.choice(cast(list[dict[str, object]], results))
+                urls = first_result.get("urls")
+                if not isinstance(urls, dict):
+                    raise KeyError("urls")
+                image_url = cast(str, urls["full"])
             else:
-                image_url = data["urls"]["full"]
+                urls = data.get("urls")
+                if not isinstance(urls, dict):
+                    raise KeyError("urls")
+                image_url = cast(str, urls["full"])
         except RequestException as e:
             logger.error(f"Error fetching image from Unsplash API: {e}")
             raise RuntimeError(

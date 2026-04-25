@@ -9,6 +9,7 @@ returns HTTP 503 so the client can fall back to polling.
 from __future__ import annotations
 
 import logging
+from typing import Any
 
 from flask import Blueprint, Response, stream_with_context
 
@@ -19,8 +20,9 @@ logger = logging.getLogger(__name__)
 events_bp = Blueprint("events", __name__)
 
 
-@events_bp.route("/api/events", methods=["GET"])
-def sse_events():
+@events_bp.route("/api/events", methods=["GET"])  # type: ignore
+@events_bp.route("/api/events", methods=["GET"])  # type: ignore
+def sse_events() -> Response:
     """Stream SSE events to the client.
 
     Yields ``event: <type>`` / ``data: <json>`` pairs for each refresh
@@ -36,8 +38,8 @@ def sse_events():
         logger.warning("/api/events: subscriber cap reached, returning 503")
         return Response("Too many SSE connections", status=503, mimetype="text/plain")
 
-    @stream_with_context
-    def generate():
+    @stream_with_context  # type: ignore
+    def generate() -> Any:
         try:
             yield from bus.stream(q)
         finally:

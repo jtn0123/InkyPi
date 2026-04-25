@@ -2,6 +2,7 @@
 
 import io
 import re
+from typing import Any
 
 from flask import Response, current_app, jsonify, request
 
@@ -10,8 +11,8 @@ from utils.http_utils import json_error
 from utils.time_utils import now_device_tz
 
 
-@_mod.settings_bp.route("/download-logs", methods=["GET"])
-def download_logs():
+@_mod.settings_bp.route("/download-logs", methods=["GET"])  # type: ignore[untyped-decorator]
+def download_logs() -> Response:
     try:
         # Guardrail hours clamp
         hours = _mod._clamp_int(
@@ -36,7 +37,9 @@ def download_logs():
         return Response("Error reading logs", status=500, mimetype="text/plain")
 
 
-def _parse_log_params(args):
+def _parse_log_params(
+    args: dict[str, str | None],
+) -> tuple[int, int, str, bool, str, int, int]:
     raw_hours = args.get("hours")
     raw_limit = args.get("limit")
     raw_contains_full = args.get("contains") or ""
@@ -64,7 +67,7 @@ def _parse_log_params(args):
     return hours, limit, contains, contains_trimmed, level, pre_hours, pre_limit
 
 
-def _filter_log_lines(lines, contains, level):
+def _filter_log_lines(lines: list[str], contains: str, level: str) -> list[str]:
     if contains:
         lc = contains.lower()
         lines = [ln for ln in lines if lc in ln.lower()]
@@ -80,8 +83,8 @@ def _filter_log_lines(lines, contains, level):
     return lines
 
 
-@_mod.settings_bp.route("/api/logs", methods=["GET"])
-def api_logs():
+@_mod.settings_bp.route("/api/logs", methods=["GET"])  # type: ignore[untyped-decorator]
+def api_logs() -> Response | tuple[Any, int]:
     """JSON logs API with server-side filter, level selection and limits."""
     try:
         if not _mod._rate_limit_ok(request.remote_addr):

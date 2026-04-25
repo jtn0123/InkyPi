@@ -1,7 +1,10 @@
 import logging
+from collections.abc import Mapping
 from datetime import UTC, datetime
+from typing import Any
 
 from openai import OpenAI
+from PIL.Image import Image as ImageType
 
 from plugins.base_plugin.base_plugin import (
     BasePlugin,
@@ -21,18 +24,23 @@ logger = logging.getLogger(__name__)
 
 
 class AIText(BasePlugin):
-    def validate_settings(self, settings: dict) -> str | None:
+    def validate_settings(self, settings: Mapping[str, object]) -> str | None:
         """Reject empty prompts and missing model at save time."""
-        if err := validate_required_text(settings, "textPrompt", "Prompt"):
+        err: str | None = validate_required_text(settings, "textPrompt", "Prompt")
+        if err:
             return err
-        if err := validate_required_text(settings, "textModel", "Text Model"):
+
+        err = validate_required_text(settings, "textModel", "Text Model")
+        if err:
             return err
-        if err := validate_provider(settings):
+
+        err = validate_provider(settings)
+        if err:
             return err
         return None
 
-    def build_settings_schema(self):
-        return schema(
+    def build_settings_schema(self) -> dict[str, object]:
+        schema_payload: dict[str, object] = schema(
             section(
                 "Prompt",
                 row(
@@ -95,7 +103,7 @@ class AIText(BasePlugin):
                                 ),
                             ],
                         },
-                    ),
+                    )
                 ),
                 field(
                     "textPrompt",
@@ -110,11 +118,13 @@ class AIText(BasePlugin):
                     "Output tokens are typically 3\u20134\u00d7 the input rate. "
                     "A typical response costs fractions of a cent."
                 ),
-            )
+            ),
         )
+        return schema_payload
 
-    def generate_settings_template(self):
+    def generate_settings_template(self) -> dict[str, object]:
         template_params = super().generate_settings_template()
+        settings_template: dict[str, object] = template_params
         template_params["api_key"] = {
             "required": True,
             "services": [
@@ -123,18 +133,26 @@ class AIText(BasePlugin):
             ],
         }
         template_params["style_settings"] = True
-        return template_params
+        return settings_template
 
-    def generate_image(self, settings, device_config):
+    def generate_image(
+        self, settings: Mapping[str, object], device_config: Any
+    ) -> ImageType:
         provider = settings.get("provider", "openai")
+        if not isinstance(provider, str):
+            provider = "openai"
+        if not provider:
+            provider = "openai"
         title = settings.get("title")
+        if title is not None and not isinstance(title, str):
+            title = None
 
         text_model = settings.get("textModel")
-        if not text_model:
+        if not isinstance(text_model, str) or not text_model:
             raise RuntimeError("Text Model is required.")
 
         text_prompt = settings.get("textPrompt", "")
-        if not text_prompt.strip():
+        if not isinstance(text_prompt, str) or not text_prompt.strip():
             raise RuntimeError("Text Prompt is required.")
 
         try:
@@ -168,7 +186,7 @@ class AIText(BasePlugin):
 
         dimensions = self.get_oriented_dimensions(device_config)
 
-        image_template_params = {
+        image_template_params: dict[str, object] = {
             "title": title,
             "content": prompt_response,
             "plugin_settings": settings,
@@ -179,7 +197,7 @@ class AIText(BasePlugin):
         )
 
     @staticmethod
-    def fetch_text_prompt(ai_client, model, text_prompt):
+    def fetch_text_prompt(ai_client: Any, model: str, text_prompt: str) -> str:
         logger.info(
             f"Getting random text prompt from input {text_prompt}, model: {model}"
         )
@@ -206,12 +224,13 @@ class AIText(BasePlugin):
             temperature=1,
         )
 
-        prompt = response.choices[0].message.content.strip()
+        prompt = str(response.choices[0].message.content or "")
+        prompt = prompt.strip()
         logger.info(f"Generated random text prompt: {prompt}")
         return prompt
 
     @staticmethod
-    def fetch_text_prompt_google(client, model, text_prompt):
+    def fetch_text_prompt_google(client: Any, model: str, text_prompt: str) -> str:
         """Fetch text response from Google Gemini API."""
         from google.genai import types
 
@@ -240,6 +259,7 @@ class AIText(BasePlugin):
             ),
         )
 
-        prompt = response.text.strip()
+        prompt = str(response.text or "")
+        prompt = prompt.strip()
         logger.info(f"Generated text prompt via Google: {prompt}")
         return prompt

@@ -6,11 +6,11 @@ import shutil
 import tempfile
 import threading
 from collections.abc import Callable
-from typing import Any
+from typing import Any, cast
 
 from dotenv import load_dotenv, set_key, unset_key
 
-from model import PlaylistManager
+from model import PlaylistManager, RefreshInfo
 from utils.config_schema import validate_device_config
 from utils.paths import (
     BASE_DIR as _PATHS_BASE_DIR,
@@ -102,7 +102,7 @@ def _coerce_device_name(config: dict[str, Any]) -> bool:
     return True
 
 
-def _summarize_playlist(pl: Any) -> dict:
+def _summarize_playlist(pl: dict[str, Any]) -> dict[str, Any]:
     """Summarize a single playlist entry, stripping per-plugin settings."""
     try:
         plugins = pl.get("plugins", []) if isinstance(pl.get("plugins"), list) else []
@@ -137,7 +137,7 @@ class Config:
     plugin_image_dir = _DEFAULT_PLUGIN_DIR
     history_image_dir = _DEFAULT_HISTORY_DIR
 
-    def __getstate__(self):
+    def __getstate__(self) -> dict[str, Any]:
         """Support pickling by excluding the unpicklable RLock.
 
         This is required on Linux where multiprocessing uses the 'spawn' or
@@ -148,18 +148,18 @@ class Config:
         state.pop("_config_lock", None)
         return state
 
-    def __setstate__(self, state):
+    def __setstate__(self, state: dict[str, Any]) -> None:
         """Restore the RLock when unpickling."""
         self.__dict__.update(state)
         self._config_lock = threading.RLock()
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._config_lock = threading.RLock()
-        self._last_written_hash = None
+        self._last_written_hash: str | None = None
         # mtime-based read cache: skip JSON parse + schema validation when the
         # file has not changed.  Stored as (mtime_ns: int, data: dict).
         self._config_cache_mtime: int | None = None
-        self._config_cache_data: dict | None = None
+        self._config_cache_data: dict[str, Any] | None = None
         self._resolve_runtime_paths()
         # Resolve which config file to use (env/CLI overrides with safe fallbacks)
         self.config_file = self._determine_config_path()
@@ -180,12 +180,13 @@ class Config:
         except OSError as e:
             logger.warning("Could not initialize preview images: %s", e)
 
-        self.config = self.read_config()
-        self.plugins_list = self.read_plugins_list()
-        self.playlist_manager = self.load_playlist_manager()
-        self.refresh_info = self.load_refresh_info()
+        self.config: dict[str, Any] = self.read_config()
+        self.plugins_list: list[dict[str, Any]] = self.read_plugins_list()
+        self.playlist_manager: PlaylistManager = self.load_playlist_manager()
+        self.refresh_info: RefreshInfo = self.load_refresh_info()
+        self._refresh_info_repo: RefreshInfoRepository | None = None
 
-    def _resolve_runtime_paths(self):
+    def _resolve_runtime_paths(self) -> None:
         runtime_dir = (os.getenv("INKYPI_RUNTIME_DIR") or "").strip() or None
         if not runtime_dir:
             # No runtime override — use class-level defaults (may have been
@@ -202,7 +203,7 @@ class Config:
         self.plugin_image_dir = paths["plugin_image_dir"]
         self.history_image_dir = paths["history_image_dir"]
 
-    def _determine_config_path(self):
+    def _determine_config_path(self) -> str:
         """Determine which device config file to load.
 
         Precedence:
@@ -234,7 +235,7 @@ class Config:
         # the INKYPI_ENV check (step 3).  Only treat config_file as an explicit override
         # when it has been changed from the original default (e.g. by CLI or a subclass).
         _base_default = os.path.join(base_dir, "config", _DEVICE_JSON)
-        class_override = getattr(type(self), "config_file", None)
+        class_override = cast(str, getattr(type(self), "config_file", ""))
         if (
             class_override is not None
             and class_override != _base_default
@@ -307,7 +308,7 @@ class Config:
             self._config_cache_mtime = None
             self._config_cache_data = None
 
-    def read_config(self) -> dict:
+    def read_config(self) -> dict[str, Any]:
         """Reads the device config JSON file and returns it as a dictionary.
 
         Uses an mtime-based in-memory cache so that repeated calls skip the
@@ -342,7 +343,7 @@ class Config:
 
             logger.debug("Reading device config from %s", self.config_file)
             with open(self.config_file) as f:
-                config = json.load(f)
+                config = cast(dict[str, Any], json.load(f))
 
             # Validate against JSON Schema — raises ConfigValidationError on failure
             validate_device_config(config)
@@ -368,10 +369,10 @@ class Config:
 
             return config
 
-    def read_plugins_list(self):
+    def read_plugins_list(self) -> list[dict[str, Any]]:
         """Reads the plugin-info.json config JSON from each plugin folder. Excludes the base plugin."""
         # Iterate over all plugin folders
-        plugins_list: list[dict] = []
+        plugins_list: list[dict[str, Any]] = []
         plugins_root = os.path.join(self.BASE_DIR, "plugins")
         if not os.path.isdir(plugins_root):
             return plugins_list
@@ -383,12 +384,12 @@ class Config:
                 if os.path.isfile(plugin_info_file):
                     logger.debug(f"Reading plugin info from {plugin_info_file}")
                     with open(plugin_info_file) as f:
-                        plugin_info = json.load(f)
+                        plugin_info = cast(dict[str, Any], json.load(f))
                     plugins_list.append(plugin_info)
 
         return plugins_list
 
-    def write_config(self):
+    def write_config(self) -> None:
         """Updates the cached config from the model objects and writes to the config file.
 
         Skips the disk write when the serialized content is identical to the
@@ -434,7 +435,7 @@ class Config:
                 except OSError:
                     pass
 
-    def get_config(self, key=None, default=None):
+    def get_config(self, key: str | None = None, default: Any | None = None) -> Any:
         """Gets the value of a specific configuration key or returns the entire config if none provided.
 
         If the key is absent and no default is supplied, ``None`` is returned.
@@ -443,15 +444,19 @@ class Config:
             return self.config.get(key, default)
         return self.config.copy()
 
-    def get_plugins(self):
+    def get_plugins(self) -> list[dict[str, Any]]:
         """Returns the list of plugin configurations, sorted by custom order if set."""
         plugin_order = self.config.get("plugin_order", [])
+        if not isinstance(plugin_order, list):
+            plugin_order = []
 
         if not plugin_order:
             return self.plugins_list
 
         # Create a dict for quick lookup
-        plugins_dict = {p["id"]: p for p in self.plugins_list}
+        plugins_dict = {
+            str(p["id"]): p for p in self.plugins_list if isinstance(p.get("id"), str)
+        }
 
         # Build ordered list
         ordered = []
@@ -469,36 +474,36 @@ class Config:
 
         return ordered
 
-    def set_plugin_order(self, order):
+    def set_plugin_order(self, order: list[str]) -> None:
         """Sets the custom plugin display order."""
         self.update_value("plugin_order", order, write=True)
 
-    def get_plugin(self, plugin_id):
+    def get_plugin(self, plugin_id: str) -> dict[str, Any] | None:
         """Finds and returns a plugin config by its ID."""
         return next(
             (plugin for plugin in self.plugins_list if plugin["id"] == plugin_id), None
         )
 
-    def get_resolution(self):
+    def get_resolution(self) -> tuple[int, int]:
         """Returns the display resolution as a tuple (width, height) from the configuration."""
         resolution = self.get_config("resolution", default=[800, 480])
         width, height = resolution
         return (int(width), int(height))
 
-    def update_config(self, config):
+    def update_config(self, config: dict[str, Any]) -> None:
         """Updates the config with the new values provided and writes to the config file."""
         with self._config_lock:
             self.config.update(config)
             self.write_config()
 
-    def update_value(self, key, value, write=False):
+    def update_value(self, key: str, value: Any, write: bool = False) -> None:
         """Updates a specific key in the configuration with a new value and optionally writes it to the config file."""
         with self._config_lock:
             self.config[key] = value
             if write:
                 self.write_config()
 
-    def update_atomic(self, update_fn: Callable[[dict], None]) -> None:
+    def update_atomic(self, update_fn: Callable[[dict[str, Any]], None]) -> None:
         """Run update_fn(self._config) while holding the config lock and atomically write.
 
         This ensures the full read-modify-write cycle is performed under the
@@ -511,7 +516,7 @@ class Config:
             update_fn(self.config)
             self.write_config()
 
-    def get_env_file_path(self):
+    def get_env_file_path(self) -> str:
         """Return absolute path to the .env file used for secrets.
 
         Precedence:
@@ -524,12 +529,12 @@ class Config:
             project_dir = os.path.abspath(os.path.join(self.BASE_DIR, ".."))
         return os.path.join(project_dir, ".env")
 
-    def load_env_key(self, key):
+    def load_env_key(self, key: str) -> str | None:
         """Loads an environment variable from the managed .env and returns its value."""
         load_dotenv(dotenv_path=self.get_env_file_path(), override=True)
         return os.getenv(key)
 
-    def set_env_key(self, key, value):
+    def set_env_key(self, key: str, value: str) -> bool:
         """Safely set/update a key in the managed .env file and current process env."""
         env_path = self.get_env_file_path()
         # Ensure directory exists and file is present with safe permissions
@@ -565,7 +570,7 @@ class Config:
         os.environ[key] = value
         return True
 
-    def unset_env_key(self, key):
+    def unset_env_key(self, key: str) -> bool:
         """Remove a key from the managed .env file and current process env."""
         env_path = self.get_env_file_path()
         if os.path.exists(env_path):
@@ -576,7 +581,7 @@ class Config:
         os.environ.pop(key, None)
         return True
 
-    def load_playlist_manager(self):
+    def load_playlist_manager(self) -> PlaylistManager:
         """Loads the playlist manager object from the config."""
         playlist_manager = PlaylistManager.from_dict(
             self.get_config("playlist_config", {})
@@ -585,7 +590,7 @@ class Config:
             playlist_manager.add_default_playlist()
         return playlist_manager
 
-    def load_refresh_info(self):
+    def load_refresh_info(self) -> RefreshInfo:
         """Loads the refresh information from the config.
 
         Delegates to :class:`~utils.refresh_info.RefreshInfoRepository`.
@@ -594,24 +599,28 @@ class Config:
         self._refresh_info_repo = RefreshInfoRepository(data)
         return self._refresh_info_repo.get()
 
-    def get_playlist_manager(self):
+    def get_playlist_manager(self) -> PlaylistManager:
         """Returns the playlist manager."""
         return self.playlist_manager
 
-    def get_refresh_info(self):
+    def get_refresh_info(self) -> RefreshInfo:
         """Returns the refresh information."""
         return self.refresh_info
 
-    def get_plugin_image_path(self, plugin_id, instance_name):
+    def get_plugin_image_path(self, plugin_id: str, instance_name: str) -> str:
         """Returns the full path for a plugin instance's image file."""
         from model import PluginInstance
 
         # Create a temporary plugin instance to get the image path
         plugin_instance = PluginInstance(plugin_id, instance_name, {}, {})
-        return os.path.join(self.plugin_image_dir, plugin_instance.get_image_path())
+        return str(
+            os.path.join(self.plugin_image_dir, plugin_instance.get_image_path())
+        )
 
     @staticmethod
-    def _sanitize_config_for_log(config_dict):
+    def _sanitize_config_for_log(
+        config_dict: dict[str, Any] | None,
+    ) -> dict[str, Any]:
         """Return a sanitized copy of the config for logging.
 
         - Masks values for any keys that look secret-ish: contains one of

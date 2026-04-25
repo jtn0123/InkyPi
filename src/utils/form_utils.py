@@ -125,9 +125,9 @@ def validate_int_range(
 # ---------------------------------------------------------------------------
 
 try:
-    import jsonschema as _jsonschema  # type: ignore[assignment]
+    import jsonschema as _jsonschema
 except ImportError:  # pragma: no cover
-    _jsonschema = None  # type: ignore[assignment]
+    _jsonschema = None
 
 
 def validate_json_schema(data: dict[str, Any], schema: dict[str, Any]) -> list[str]:
