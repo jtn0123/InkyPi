@@ -153,6 +153,11 @@
     );
   }
 
+  function appendForceParam(versionUrl) {
+    const separator = versionUrl.includes("?") ? "&" : "?";
+    return versionUrl + separator + "force=1";
+  }
+
   async function fetchVersionData(versionUrl, { force = false } = {}) {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 8000);
@@ -160,9 +165,7 @@
       // Manual "Check for updates" clicks pass ?force=1 so the server
       // bypasses its 1h cache and actually hits GitHub. Silent/background
       // checks leave the cache alone.
-      const url = force
-        ? versionUrl + (versionUrl.includes("?") ? "&" : "?") + "force=1"
-        : versionUrl;
+      const url = force ? appendForceParam(versionUrl) : versionUrl;
       const response = await fetch(url, {
         cache: "no-store",
         signal: controller.signal,

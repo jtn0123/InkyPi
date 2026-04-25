@@ -29,6 +29,18 @@
     return copyTextViaExecCommand(text);
   }
 
+  function restoreFocus(prevActive) {
+    if (!prevActive || typeof prevActive.focus !== "function") return;
+    try {
+      prevActive.focus({ preventScroll: true });
+    } catch (err) {
+      // Non-fatal — the previously-focused element may have been removed
+      // from the DOM between selecting our temporary textarea and now.
+      // Log at debug so the failure is diagnosable without spamming users.
+      console.debug("Failed to restore focus after copy:", err);
+    }
+  }
+
   function copyTextViaExecCommand(text) {
     if (typeof document === "undefined" || !document.body) return false;
     const ta = document.createElement("textarea");
@@ -52,19 +64,18 @@
       ta.focus({ preventScroll: true });
       ta.select();
       ta.setSelectionRange(0, text.length);
-      return document.execCommand("copy");
+      // execCommand("copy") is deprecated but is still the only way to copy
+      // text to the clipboard from a non-secure context. The async Clipboard
+      // API requires HTTPS / localhost, and InkyPi is commonly served over
+      // plain HTTP on the LAN. Keep this fallback until browsers ship a
+      // non-secure-context replacement. NOSONAR javascript:S1874
+      return document.execCommand("copy"); // NOSONAR
     } catch (e) {
       console.warn("execCommand copy failed:", e);
       return false;
     } finally {
       ta.remove();
-      if (prevActive && typeof prevActive.focus === "function") {
-        try {
-          prevActive.focus({ preventScroll: true });
-        } catch (_) {
-          /* ignore */
-        }
-      }
+      restoreFocus(prevActive);
     }
   }
 
