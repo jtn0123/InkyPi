@@ -4,6 +4,7 @@ on:
   pull_request:
   push:
     branches: [ main ]
+  workflow_dispatch:
   schedule:
     - cron: '0 9 * * *'
     - cron: '0 3 * * 0'
@@ -560,27 +561,28 @@ jobs:
         run: |
           scripts/preflash_validate.sh
 
-  # Mutation nightly — runs daily at 09:00 UTC and weekly on Sunday 03:00 UTC
-  # via the workflow-level ``schedule:`` trigger. See docs/mutation_testing.md.
+  # Mutation nightly — runs via the workflow-level ``schedule:`` trigger
+  # (daily 09:00 UTC and weekly Sunday 03:00 UTC) and manual
+  # ``workflow_dispatch`` for ad-hoc artifact collection. Sharded by package
+  # so each shard fits in the 120-minute budget. See docs/mutation_testing.md.
   #
-  # JTN-595 (2026-04-19) finding: every nightly run since the JTN-508 scope
-  # expansion has hit the 120-minute timeout without finishing, producing no
-  # ``mutmut-cache`` artifact. Two bugs compound the problem:
-  #   1. Full-scope mutmut on src/app_setup/+blueprints/+utils/+refresh_task/
-  #      does not complete inside 120 minutes on ubuntu-latest.
-  #   2. The previous upload step did not set ``include-hidden-files: true``,
-  #      so even a successful run would have silently dropped the hidden
-  #      ``.mutmut-cache`` directory (actions/upload-artifact@v4 excludes
-  #      hidden paths by default).
-  # The hidden-files flag below is the minimum fix so a successful run can
-  # publish an artifact. Sharding the mutmut scope across a matrix of
-  # directories (or tightening the runner) is tracked for follow-up —
-  # otherwise the nightly will keep producing no actionable signal.
   mutation-nightly:
-    name: Mutation nightly
-    if: github.event_name == 'schedule'
+    name: Mutation nightly (${{ matrix.label }})
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: app-setup
+            path: src/app_setup/
+          - label: blueprints
+            path: src/blueprints/
+          - label: utils
+            path: src/utils/
+          - label: refresh-task
+            path: src/refresh_task/
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -608,7 +610,7 @@ jobs:
           INKYPI_NO_REFRESH: '1'
           PYTHONPATH: src
         run: |
-          mutmut run --CI
+          mutmut run --CI --paths-to-mutate "${{ matrix.path }}"
       - name: Show mutation results
         if: always()
         run: |
@@ -617,7 +619,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: mutmut-cache
+          name: mutmut-cache-${{ matrix.label }}
           path: .mutmut-cache
           if-no-files-found: ignore
           # ``.mutmut-cache`` is a hidden directory; without this flag

@@ -3,7 +3,6 @@ import math
 from collections.abc import Mapping, Sequence
 from datetime import datetime
 from typing import Any, cast
-from zoneinfo import ZoneInfo
 
 import numpy as np
 from PIL import Image, ImageColor, ImageDraw
@@ -11,6 +10,7 @@ from PIL import Image, ImageColor, ImageDraw
 from plugins.base_plugin.base_plugin import BasePlugin, DeviceConfigLike
 from plugins.base_plugin.settings_schema import field, row, schema, section, widget
 from utils.app_utils import get_font
+from utils.time_utils import get_timezone
 
 logger = logging.getLogger(__name__)
 
@@ -58,22 +58,24 @@ class Clock(BasePlugin):
                     field(
                         "primaryColor",
                         "color",
-                        label="Primary Color",
+                        label="Face accent color",
                         default=CLOCK_FACES[0]["primary_color"],
                     ),
                     field(
                         "secondaryColor",
                         "color",
-                        label="Secondary Color",
+                        label="Face background color",
                         default=CLOCK_FACES[0]["secondary_color"],
                     ),
                 ),
+                description="These colors are used by the clock face itself.",
             ),
         )
 
     def generate_settings_template(self) -> dict[str, object]:
         template_params = super().generate_settings_template()
         template_params["clock_faces"] = CLOCK_FACES
+        template_params["style_settings"] = False
         return template_params
 
     def generate_image(
@@ -105,7 +107,7 @@ class Clock(BasePlugin):
 
         timezone_name = device_config.get_config("timezone") or DEFAULT_TIMEZONE
         tz_name = timezone_name if isinstance(timezone_name, str) else DEFAULT_TIMEZONE
-        tz = ZoneInfo(tz_name)
+        tz = get_timezone(tz_name)
         current_time = datetime.now(tz)
 
         img = None

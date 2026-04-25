@@ -184,7 +184,7 @@ class Apod(BasePlugin):
                 image_url,
                 dimensions=dimensions,
                 timeout_ms=timeout_ms,
-                resize=False,
+                resize=True,
             )
             if image is not None:
                 selected_image_url = image_url

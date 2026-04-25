@@ -206,7 +206,10 @@
     document.getElementById("end_time").value = "17:00";
     const cycleInput = document.getElementById("cycle_minutes");
     if (cycleInput) cycleInput.value = "";
-    if (modal) modal.dataset.mode = "create";
+    if (modal) {
+      modal.dataset.mode = "create";
+      delete modal.dataset.originalEndTime;
+    }
     document.getElementById("deleteButton").classList.add("hidden");
     setModalOpen("playlistModal", true, triggerEl);
   }
@@ -228,7 +231,10 @@
     document.getElementById("end_time").value = ns.normaliseTimeForInput(endTime);
     const cycleInput = document.getElementById("cycle_minutes");
     if (cycleInput) cycleInput.value = cycleMinutes || "";
-    if (modal) modal.dataset.mode = "edit";
+    if (modal) {
+      modal.dataset.mode = "edit";
+      modal.dataset.originalEndTime = endTime || "";
+    }
     document.getElementById("deleteButton").classList.remove("hidden");
     setModalOpen("playlistModal", true, triggerEl);
   }

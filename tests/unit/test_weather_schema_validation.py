@@ -25,7 +25,7 @@ def _validate_openmeteo_schema(payload: dict[str, Any]) -> None:
     assert "hourly" in payload and isinstance(payload["hourly"], dict)
 
 
-def test_openweather_schema_loose_example():
+def test_openweather_schema_loose_example() -> None:
     # Example minimal valid structure
     payload = {
         "timezone": "UTC",
@@ -40,7 +40,7 @@ def test_openweather_schema_loose_example():
     _validate_openweather_schema(payload)
 
 
-def test_openmeteo_schema_loose_example():
+def test_openmeteo_schema_loose_example() -> None:
     payload = {
         "current_weather": {
             "time": "2025-01-01T12:00",

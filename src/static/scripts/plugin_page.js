@@ -161,10 +161,12 @@
       const active = btn.dataset.pluginSubtab === id;
       btn.classList.toggle("active", active);
       btn.setAttribute("aria-selected", active ? "true" : "false");
+      btn.setAttribute("tabindex", active ? "0" : "-1");
     });
     document.querySelectorAll("[data-plugin-subpanel]").forEach((panel) => {
       const active = panel.dataset.pluginSubpanel === id;
       panel.hidden = !active;
+      panel.setAttribute("aria-hidden", active ? "false" : "true");
     });
   }
 
@@ -564,7 +566,9 @@
     }
 
     function selectedFrame(element) {
-      const previous = document.querySelector(".image-option.selected");
+      const previous = document.querySelector(
+        "#frame-selection .image-option.selected"
+      );
       if (previous) previous.classList.remove("selected");
       element.classList.add("selected");
       document.getElementById("selected-frame").value =
@@ -606,6 +610,20 @@
       if (!config.styleSettings || !config.loadPluginSettings) return;
       const settings = config.pluginSettings || {};
       Object.entries(settings).forEach(([key, value]) => {
+        if (key === "selectedFrame") {
+          const frameOption = document.querySelector(
+            `#frame-selection .image-option[data-face-name="${CSS.escape(String(value))}"]`
+          );
+          if (frameOption) selectedFrame(frameOption);
+          return;
+        }
+        if (key === "backgroundOption") {
+          const radio = document.querySelector(
+            `[name="backgroundOption"][value="${CSS.escape(String(value))}"]`
+          );
+          if (radio) radio.checked = true;
+          return;
+        }
         const input = document.getElementById(key);
         if (!input || value == null || value === "") return;
         if (input.type === "checkbox") {
@@ -908,10 +926,37 @@
       setPluginSubtab(event.currentTarget.dataset.pluginSubtab);
     }
 
+    function onSubtabButtonKeydown(event) {
+      if (
+        event.key !== "ArrowRight" &&
+        event.key !== "ArrowLeft" &&
+        event.key !== "Home" &&
+        event.key !== "End"
+      ) {
+        return;
+      }
+      const buttons = Array.from(document.querySelectorAll("[data-plugin-subtab]"));
+      const currentIndex = buttons.indexOf(event.currentTarget);
+      if (currentIndex < 0) return;
+      event.preventDefault();
+      let nextIndex = currentIndex;
+      if (event.key === "ArrowRight") nextIndex = (currentIndex + 1) % buttons.length;
+      if (event.key === "ArrowLeft")
+        nextIndex = (currentIndex - 1 + buttons.length) % buttons.length;
+      if (event.key === "Home") nextIndex = 0;
+      if (event.key === "End") nextIndex = buttons.length - 1;
+      const nextButton = buttons[nextIndex];
+      setPluginSubtab(nextButton.dataset.pluginSubtab);
+      nextButton.focus();
+    }
+
     function bindPluginSubtabs() {
       const buttons = document.querySelectorAll("[data-plugin-subtab]");
       if (!buttons.length) return;
       buttons.forEach((btn) => btn.addEventListener("click", onSubtabButtonClick));
+      buttons.forEach((btn) =>
+        btn.addEventListener("keydown", onSubtabButtonKeydown)
+      );
       setPluginSubtab("configure");
     }
 

@@ -60,6 +60,25 @@ def test_generate_settings_template():
     assert template["clock_faces"] == CLOCK_FACES
     assert len(template["clock_faces"]) == 4
     assert template["clock_faces"][0]["name"] == "Gradient Clock"
+    assert template["style_settings"] is False
+
+
+def test_clock_color_schema_labels_explain_face_colors() -> None:
+    from plugins.clock.clock import Clock
+
+    schema = Clock({"id": "clock"}).build_settings_schema()
+    colors = next(
+        section for section in schema["sections"] if section["title"] == "Colors"
+    )
+
+    assert colors["description"] == "These colors are used by the clock face itself."
+    labels = [
+        field["label"]
+        for row in colors["items"]
+        for field in row["items"]
+        if field["type"] == "color"
+    ]
+    assert labels == ["Face accent color", "Face background color"]
 
 
 def test_generate_image_exception_handling():
@@ -160,6 +179,29 @@ def test_timezone_handling():
     device_config.get_resolution.return_value = (400, 300)
     device_config.get_config.side_effect = lambda key: {
         "timezone": "UTC",
+        "orientation": "horizontal",
+    }.get(key)
+
+    img = clock.generate_image(settings, device_config)
+    assert img is not None
+
+
+def test_invalid_timezone_falls_back_in_generate_image() -> None:
+    """Imported or migrated bad timezone values should not crash rendering."""
+    from unittest.mock import MagicMock
+
+    from plugins.clock.clock import Clock
+
+    clock = Clock({"id": "clock"})
+    settings = {
+        "selectedClockFace": "Digital Clock",
+        "primaryColor": "#ffffff",
+        "secondaryColor": "#000000",
+    }
+    device_config = MagicMock()
+    device_config.get_resolution.return_value = (400, 300)
+    device_config.get_config.side_effect = lambda key: {
+        "timezone": "Not/A_Real_Zone",
         "orientation": "horizontal",
     }.get(key)
 

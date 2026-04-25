@@ -1,6 +1,7 @@
 # pyright: reportMissingImports=false
 import base64
 from io import BytesIO
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -96,13 +97,48 @@ def test_ai_image_validate_settings_rejects_provider_model_mismatch():
     assert "google" in error
 
 
-def test_ai_image_validate_settings_uses_default_model_for_openai():
+def test_ai_image_validate_settings_uses_default_model_for_openai() -> None:
     from plugins.ai_image.ai_image import AIImage
 
     plugin = AIImage({"id": "ai_image"})
     assert (
         plugin.validate_settings({"textPrompt": "a cat", "provider": "openai"}) is None
     )
+
+
+def test_ai_image_validate_settings_allows_blank_prompt_when_vivid_remix_enabled() -> (
+    None
+):
+    from plugins.ai_image.ai_image import AIImage
+
+    plugin = AIImage({"id": "ai_image"})
+
+    assert (
+        plugin.validate_settings(
+            {
+                "textPrompt": "",
+                "randomizePrompt": "true",
+                "provider": "openai",
+            }
+        )
+        is None
+    )
+
+
+def test_ai_image_validate_settings_rejects_blank_prompt_without_vivid_remix() -> None:
+    from plugins.ai_image.ai_image import AIImage
+
+    plugin = AIImage({"id": "ai_image"})
+
+    error = plugin.validate_settings(
+        {
+            "textPrompt": " ",
+            "randomizePrompt": "false",
+            "provider": "openai",
+        }
+    )
+
+    assert error == "Prompt is required."
 
 
 def test_ai_image_generate_image_success(client, monkeypatch, mock_openai):
@@ -335,6 +371,26 @@ def test_ai_image_randomize_prompt_blank_input(device_config_dev, monkeypatch):
         assert result is not None
 
 
+def test_ai_image_blank_prompt_without_randomize_raises(
+    device_config_dev: Any, monkeypatch: Any
+) -> None:
+    from plugins.ai_image.ai_image import AIImage
+
+    p = AIImage({"id": "ai_image"})
+    monkeypatch.setattr(device_config_dev, "load_env_key", lambda key: "fake_key")
+
+    with pytest.raises(RuntimeError, match="Prompt is required"):
+        p.generate_image(
+            {
+                "textPrompt": "",
+                "imageModel": "gpt-image-2",
+                "quality": "medium",
+                "randomizePrompt": "false",
+            },
+            device_config_dev,
+        )
+
+
 def test_fetch_image_prompt_basic(monkeypatch):
     """Test fetch_image_prompt with basic functionality."""
     from plugins.ai_image.ai_image import AIImage
@@ -522,16 +578,77 @@ def test_ai_image_prompt_field_is_textarea():
     assert prompt_field is not None, "textPrompt field missing from schema"
     assert prompt_field["type"] == "textarea"
     assert prompt_field.get("rows") == 4
-    assert prompt_field.get("required") is True
+    assert prompt_field.get("required") is not True
 
 
-def test_ai_image_prompt_renders_as_textarea(client):
+def test_ai_image_schema_includes_random_prompt_widget() -> None:
+    from plugins.ai_image.ai_image import AIImage
+
+    p = AIImage({"id": "ai_image"})
+    schema = p.build_settings_schema()
+
+    widgets = [
+        item
+        for section in schema["sections"]
+        for item in section["items"]
+        if item.get("kind") == "widget"
+    ]
+
+    assert any(item.get("widget_type") == "ai-image-prompt-tools" for item in widgets)
+
+
+def test_ai_image_prompt_renders_as_textarea(client: Any) -> None:
     """Settings page should render the prompt as a <textarea> (JTN-377)."""
     resp = client.get("/plugin/ai_image")
     assert resp.status_code == 200
     body = resp.data.decode("utf-8")
     assert "<textarea" in body
     assert 'name="textPrompt"' in body
+    assert "Surprise me" in body
+    assert "data-ai-image-random-prompt" in body
+
+
+def test_ai_image_random_prompt_endpoint_openai(client: Any, monkeypatch: Any) -> None:
+    from plugins.ai_image.ai_image import AIImage
+
+    monkeypatch.setenv("OPEN_AI_SECRET", "test")
+
+    with patch.object(AIImage, "fetch_image_prompt", return_value="a glass city"):
+        resp = client.post(
+            "/plugin/ai_image/random_prompt",
+            json={"provider": "openai", "prompt": ""},
+        )
+
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["success"] is True
+    assert body["prompt"] == "a glass city"
+
+
+def test_ai_image_random_prompt_endpoint_missing_key(
+    client: Any, monkeypatch: Any
+) -> None:
+    monkeypatch.delenv("OPEN_AI_SECRET", raising=False)
+
+    resp = client.post(
+        "/plugin/ai_image/random_prompt",
+        json={"provider": "openai", "prompt": ""},
+    )
+
+    assert resp.status_code == 400
+    assert "OpenAI API Key" in resp.get_json()["error"]
+
+
+def test_ai_image_random_prompt_endpoint_rejects_unknown_provider(client: Any) -> None:
+    resp = client.post(
+        "/plugin/ai_image/random_prompt",
+        json={"provider": "opneai", "prompt": ""},
+    )
+
+    assert resp.status_code == 400
+    body = resp.get_json()
+    assert "Unsupported provider" in body["error"]
+    assert body["details"]["field"] == "provider"
 
 
 def test_fetch_image_prompt_api_error_handling():
@@ -735,6 +852,35 @@ def test_maybe_randomize_openai_prompt_uses_original_when_empty(monkeypatch):
             plugin._maybe_randomize_openai_prompt(MagicMock(), "keep me", True)
             == "keep me"
         )
+
+
+def test_openai_blank_random_prompt_uses_fallback_before_image_call(
+    device_config_dev: Any, monkeypatch: Any
+) -> None:
+    from plugins.ai_image.ai_image import FALLBACK_IMAGE_PROMPT, AIImage
+
+    plugin = AIImage({"id": "ai_image"})
+    monkeypatch.setattr(device_config_dev, "load_env_key", lambda key: "fake_key")
+
+    with (
+        patch(
+            "plugins.ai_image.ai_image.AIImage.fetch_image_prompt",
+            return_value="",
+        ),
+        patch.object(plugin, "fetch_image", return_value=MagicMock()) as mock_fetch,
+    ):
+        plugin.generate_image(
+            {
+                "textPrompt": "",
+                "provider": "openai",
+                "imageModel": "gpt-image-2",
+                "quality": "medium",
+                "randomizePrompt": "true",
+            },
+            device_config_dev,
+        )
+
+    assert mock_fetch.call_args.args[1] == FALLBACK_IMAGE_PROMPT
 
 
 def test_maybe_randomize_google_prompt_success(monkeypatch):

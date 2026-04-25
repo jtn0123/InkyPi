@@ -1,4 +1,5 @@
 # pyright: reportMissingImports=false
+from typing import Any
 
 
 def test_plugin_page_ai_text(client):
@@ -10,11 +11,39 @@ def test_plugin_page_ai_text(client):
     assert b"/preview" in resp.data
 
 
-def test_plugin_page_ai_image(client):
+def test_plugin_page_ai_image(client: Any) -> None:
     resp = client.get("/plugin/ai_image")
     assert resp.status_code == 200
     assert b"AI Image" in resp.data or b"Image Model" in resp.data
     assert b"/preview" in resp.data
+    assert b"Surprise me" in resp.data
+    assert b"data-ai-image-random-prompt" in resp.data
+
+
+def test_clock_page_hides_generic_style_tab_and_labels_face_colors(
+    client: Any,
+) -> None:
+    resp = client.get("/plugin/clock")
+    assert resp.status_code == 200
+    body = resp.data.decode("utf-8")
+
+    assert 'data-plugin-subtab="style"' not in body
+    assert "Face accent color" in body
+    assert "Face background color" in body
+    assert "These colors are used by the clock face itself." in body
+    assert 'aria-pressed="false"' in body
+
+
+def test_plugin_tabs_have_tabpanel_wiring(client: Any) -> None:
+    resp = client.get("/plugin/ai_text")
+    assert resp.status_code == 200
+    body = resp.data.decode("utf-8")
+
+    assert 'id="pluginConfigureTab"' in body
+    assert 'aria-controls="pluginConfigurePanel"' in body
+    assert 'id="pluginConfigurePanel"' in body
+    assert 'role="tabpanel"' in body
+    assert 'aria-labelledby="pluginConfigureTab"' in body
 
 
 def test_plugin_page_apod(client):

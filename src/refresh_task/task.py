@@ -64,6 +64,18 @@ except Exception:
 
 logger = logging.getLogger(__name__)
 
+_PLUGIN_TIMEOUT_DEFAULTS_S = {
+    # OpenAI/Google image generation routinely takes longer than the generic
+    # 60s guard, especially when a prompt remix runs first.
+    "ai_image": 180.0,
+}
+_MANUAL_WAIT_DEFAULTS_S = {
+    # Wait for the generated image to be saved, not the slow e-paper write.
+    # Keep this slightly above the plugin timeout so the caller sees the
+    # plugin's real result instead of a queue wait timeout.
+    "ai_image": 210.0,
+}
+
 
 class RefreshTask:
     """Handles the logic for refreshing the display using a background thread."""
@@ -904,6 +916,41 @@ class RefreshTask:
             raise exc
         raise RuntimeError(str(exc))
 
+    @staticmethod
+    def _plugin_env_suffix(plugin_id: str) -> str:
+        return "".join(ch if ch.isalnum() else "_" for ch in plugin_id).upper()
+
+    @classmethod
+    def _env_seconds_with_precedence(
+        cls,
+        plugin_id: str,
+        env_key: str,
+        defaults: Mapping[str, float],
+    ) -> float:
+        suffix = cls._plugin_env_suffix(plugin_id)
+        specific_key = f"{env_key}_{suffix}"
+        if specific_key in os.environ:
+            return float(os.getenv(specific_key) or "60")
+        if env_key in os.environ:
+            return float(os.getenv(env_key) or "60")
+        return defaults.get(plugin_id, 60.0)
+
+    @classmethod
+    def _plugin_timeout_seconds(cls, plugin_id: str) -> float:
+        return cls._env_seconds_with_precedence(
+            plugin_id,
+            "INKYPI_PLUGIN_TIMEOUT_S",
+            _PLUGIN_TIMEOUT_DEFAULTS_S,
+        )
+
+    @classmethod
+    def _manual_update_wait_seconds(cls, plugin_id: str) -> float:
+        return cls._env_seconds_with_precedence(
+            plugin_id,
+            "INKYPI_MANUAL_UPDATE_WAIT_S",
+            _MANUAL_WAIT_DEFAULTS_S,
+        )
+
     def manual_update(self, refresh_action: RefreshAction) -> dict[str, Any] | None:
         """Manually triggers an update for the specified plugin id and plugin settings by notifying the background process."""
         if not self.running:
@@ -914,7 +961,7 @@ class RefreshTask:
 
         request = self._enqueue_manual_request(refresh_action)
 
-        wait_s = float(os.getenv("INKYPI_MANUAL_UPDATE_WAIT_S", "60") or "60")
+        wait_s = self._manual_update_wait_seconds(refresh_action.get_plugin_id())
         # JTN-786: wait for the image to hit disk rather than for the full
         # refresh (including the slow e-paper SPI write) to finish.
         # ``image_saved`` is also set by ``_complete_manual_request`` on any
@@ -1145,7 +1192,7 @@ class RefreshTask:
         plugin_id = refresh_action.get_plugin_id()
         retries = int(os.getenv("INKYPI_PLUGIN_RETRY_MAX", "1") or "1")
         backoff_ms = int(os.getenv("INKYPI_PLUGIN_RETRY_BACKOFF_MS", "500") or "500")
-        timeout_s = float(os.getenv("INKYPI_PLUGIN_TIMEOUT_S", "60") or "60")
+        timeout_s = self._plugin_timeout_seconds(plugin_id)
         attempts = max(1, retries + 1)
 
         # When isolation is disabled (e.g. in tests or on constrained devices),
@@ -1305,7 +1352,7 @@ class RefreshTask:
         plugin_id = refresh_action.get_plugin_id()
         retries = int(os.getenv("INKYPI_PLUGIN_RETRY_MAX", "1") or "1")
         backoff_ms = int(os.getenv("INKYPI_PLUGIN_RETRY_BACKOFF_MS", "500") or "500")
-        timeout_s = float(os.getenv("INKYPI_PLUGIN_TIMEOUT_S", "60") or "60")
+        timeout_s = self._plugin_timeout_seconds(plugin_id)
         attempts = max(1, retries + 1)
 
         last_exc: BaseException | None = None

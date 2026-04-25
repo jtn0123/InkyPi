@@ -9,7 +9,7 @@ headings below for the specific sections.
 See `docs/mutation_testing.md` for the mutation-testing setup, CI schedule,
 and triage workflow. The source tracking issue is **JTN-595**.
 
-## Status of the nightly artifact (JTN-595, 2026-04-19)
+## Status of the nightly artifact (JTN-595, 2026-04-19 through 2026-04-25)
 
 The `mutation-nightly` job in `.github/workflows/ci.yml` has **never produced
 a usable `mutmut-cache` artifact** since the JTN-508 `paths_to_mutate`
@@ -32,9 +32,10 @@ artifact. That bug is fixed in the same PR that landed this file — see
   files in the expanded scope (`src/utils/`, `src/blueprints/`), targeting
   patterns that a surface-level mutmut run would obviously surface.
 
-Once the nightly workflow is sharded so it fits in budget, a follow-up
-triage pass can replace the entries here with real mutant IDs drawn from
-the artifact.
+The nightly workflow is now sharded by package (`app-setup`, `blueprints`,
+`utils`, `refresh-task`) so future scheduled runs can produce package-scoped
+artifacts instead of timing out as one monolithic pass. A follow-up triage pass
+can replace the entries here with real mutant IDs drawn from those artifacts.
 
 ## Killed in JTN-595 (2026-04-19)
 
@@ -66,13 +67,12 @@ to `"CSP violation %s"`. We deliberately do not assert on log-line
 punctuation because doing so would couple tests to cosmetic details and
 add noise without catching real regressions.
 
-### Deferred — full nightly triage pending workflow fix
+### Deferred — sharded nightly triage pending artifact review
 
-The substantive deferred work is running a full, budgeted nightly pass
-once the mutation-nightly job is sharded and its artifact is published.
-At that point, a follow-up issue should:
+The substantive deferred work is reviewing the first successful sharded
+nightly artifacts. At that point, a follow-up issue should:
 
-1. Download the `mutmut-cache` artifact from the nightly run.
+1. Download the `mutmut-cache-<shard>` artifacts from the nightly run.
 2. Iterate `mutmut results` → `mutmut show <id>` for each survivor.
 3. Append each survivor here under a **Deferred** heading, or kill it.
 

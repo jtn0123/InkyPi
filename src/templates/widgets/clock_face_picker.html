@@ -8,6 +8,7 @@
             data-face-name="{{ face.name }}"
             data-primary-color="{{ face.primary_color }}"
             data-secondary-color="{{ face.secondary_color }}"
+            aria-pressed="false"
             aria-label="Select {{ face.name }}"
         >
             <img src="{{ url_for('plugin.image', plugin_id='clock', filename=face.icon) }}" alt="{{ face.name }}">

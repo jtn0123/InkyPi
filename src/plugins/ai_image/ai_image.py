@@ -19,6 +19,7 @@ from plugins.base_plugin.settings_schema import (
     row,
     schema,
     section,
+    widget,
 )
 
 logger = logging.getLogger(__name__)
@@ -38,14 +39,17 @@ IMAGE_MODELS = [
 ]
 DEFAULT_IMAGE_MODEL = OPENAI_IMAGE_MODEL_2
 DEFAULT_IMAGE_QUALITY = "medium"
+FALLBACK_IMAGE_PROMPT = "A vivid imaginative scene, high detail."
 
 
 class AIImage(BasePlugin):
     def validate_settings(self, settings: Mapping[str, object]) -> str | None:
-        """Reject empty prompts at save time so bad input does not persist."""
-        err: str | None = validate_required_text(settings, "textPrompt", "Prompt")
-        if err:
-            return err
+        """Validate provider/model choices and prompt requirements."""
+        randomize_prompt = settings.get("randomizePrompt") == "true"
+        if not randomize_prompt:
+            err: str | None = validate_required_text(settings, "textPrompt", "Prompt")
+            if err:
+                return err
 
         err = validate_provider(settings)
         if err:
@@ -70,15 +74,18 @@ class AIImage(BasePlugin):
                     "textarea",
                     label="Prompt",
                     placeholder="A surreal breakfast floating through a neon sky.",
-                    hint="Describe the scene you want the model to render. Bold, simple compositions read best on e-ink.",
-                    required=True,
+                    hint="Describe the scene you want, or use Surprise me to draft one automatically. Bold, simple compositions read best on e-ink.",
                     rows=4,
+                ),
+                widget(
+                    "ai-image-prompt-tools",
+                    template="widgets/ai_image_prompt_tools.html",
                 ),
                 field(
                     "randomizePrompt",
                     "checkbox",
-                    label="Remix prompt before generating",
-                    hint="Pass your prompt through a writing model first to add vivid detail and unexpected styling.",
+                    label="Vivid remix",
+                    hint="Before image generation, let the selected provider turn your prompt into a more vivid version. If the prompt is blank, it will invent one.",
                     submit_unchecked=True,
                     checked_value="true",
                     unchecked_value="false",
@@ -227,6 +234,13 @@ class AIImage(BasePlugin):
         logger.info(f"Remixed prompt: '{randomized}'")
         return randomized
 
+    def _ensure_image_prompt(self, text_prompt: str) -> str:
+        prompt = text_prompt.strip()
+        if prompt:
+            return prompt
+        logger.warning("Prompt remix returned no usable prompt; using fallback prompt.")
+        return FALLBACK_IMAGE_PROMPT
+
     def _generate_google_image(
         self, device_config: Any, text_prompt: str, image_model: str, randomize: bool
     ) -> ImageType:
@@ -241,6 +255,7 @@ class AIImage(BasePlugin):
         prompt = self._maybe_randomize_google_prompt(
             google_client, text_prompt, randomize
         )
+        prompt = self._ensure_image_prompt(prompt)
         logger.info(f"Generating image with {image_model}...")
         return self.fetch_image_google(google_client, prompt, image_model)
 
@@ -260,6 +275,7 @@ class AIImage(BasePlugin):
 
         ai_client = OpenAI(api_key=api_key)
         prompt = self._maybe_randomize_openai_prompt(ai_client, text_prompt, randomize)
+        prompt = self._ensure_image_prompt(prompt)
         logger.info(f"Generating image with {image_model}...")
         return self.fetch_image(
             ai_client,
@@ -283,6 +299,8 @@ class AIImage(BasePlugin):
             text_prompt = ""
         image_model, image_quality = self._validate_generate_inputs(settings, provider)
         randomize_prompt = settings.get("randomizePrompt") == "true"
+        if not text_prompt.strip() and not randomize_prompt:
+            raise RuntimeError("Prompt is required unless Vivid remix is enabled.")
         orientation = device_config.get_config("orientation")
         if not isinstance(orientation, str):
             orientation = "horizontal"

@@ -1,4 +1,5 @@
 # pyright: reportMissingImports=false
+from typing import Any
 
 
 def test_playlist_page_renders(client):
@@ -28,6 +29,23 @@ def test_create_update_delete_playlist_flow(client):
     # Delete
     resp = client.delete("/delete_playlist/EarlyMorning")
     assert resp.status_code == 200
+
+
+def test_create_playlist_persists_cycle_override(
+    client: Any, device_config_dev: Any
+) -> None:
+    payload = {
+        "playlist_name": "FastLoop",
+        "start_time": "06:00",
+        "end_time": "09:00",
+        "cycle_minutes": 12,
+    }
+
+    resp = client.post("/create_playlist", json=payload)
+
+    assert resp.status_code == 200
+    playlist = device_config_dev.get_playlist_manager().get_playlist("FastLoop")
+    assert playlist.cycle_interval_seconds == 12 * 60
 
 
 def test_delete_default_playlist_is_refused(client, device_config_dev):

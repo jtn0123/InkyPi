@@ -1,5 +1,6 @@
 # pyright: reportMissingImports=false
 
+from typing import Any
 
 from PIL import Image
 
@@ -148,6 +149,46 @@ def test_timeout_msg_truncates_float():
 
     msg = RefreshTask._timeout_msg("clock", 10.7)
     assert "10s" in msg
+
+
+def test_ai_image_timeout_defaults_are_longer(monkeypatch: Any) -> None:
+    from refresh_task import RefreshTask
+
+    monkeypatch.delenv("INKYPI_PLUGIN_TIMEOUT_S", raising=False)
+    monkeypatch.delenv("INKYPI_PLUGIN_TIMEOUT_S_AI_IMAGE", raising=False)
+    monkeypatch.delenv("INKYPI_MANUAL_UPDATE_WAIT_S", raising=False)
+    monkeypatch.delenv("INKYPI_MANUAL_UPDATE_WAIT_S_AI_IMAGE", raising=False)
+
+    assert RefreshTask._plugin_timeout_seconds("ai_image") == 180.0
+    assert RefreshTask._manual_update_wait_seconds("ai_image") == 210.0
+    assert RefreshTask._plugin_timeout_seconds("clock") == 60.0
+    assert RefreshTask._manual_update_wait_seconds("clock") == 60.0
+
+
+def test_plugin_specific_timeout_env_overrides_global(monkeypatch: Any) -> None:
+    from refresh_task import RefreshTask
+
+    monkeypatch.setenv("INKYPI_PLUGIN_TIMEOUT_S", "70")
+    monkeypatch.setenv("INKYPI_PLUGIN_TIMEOUT_S_AI_IMAGE", "240")
+    monkeypatch.setenv("INKYPI_MANUAL_UPDATE_WAIT_S", "75")
+    monkeypatch.setenv("INKYPI_MANUAL_UPDATE_WAIT_S_AI_IMAGE", "260")
+
+    assert RefreshTask._plugin_timeout_seconds("ai_image") == 240.0
+    assert RefreshTask._manual_update_wait_seconds("ai_image") == 260.0
+    assert RefreshTask._plugin_timeout_seconds("clock") == 70.0
+    assert RefreshTask._manual_update_wait_seconds("clock") == 75.0
+
+
+def test_global_timeout_env_overrides_plugin_default(monkeypatch: Any) -> None:
+    from refresh_task import RefreshTask
+
+    monkeypatch.delenv("INKYPI_PLUGIN_TIMEOUT_S_AI_IMAGE", raising=False)
+    monkeypatch.delenv("INKYPI_MANUAL_UPDATE_WAIT_S_AI_IMAGE", raising=False)
+    monkeypatch.setenv("INKYPI_PLUGIN_TIMEOUT_S", "70")
+    monkeypatch.setenv("INKYPI_MANUAL_UPDATE_WAIT_S", "75")
+
+    assert RefreshTask._plugin_timeout_seconds("ai_image") == 70.0
+    assert RefreshTask._manual_update_wait_seconds("ai_image") == 75.0
 
 
 def test_cleanup_subprocess_terminates(monkeypatch):

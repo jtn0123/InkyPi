@@ -25,6 +25,7 @@ from utils.display_names import (
 from utils.http_utils import json_error, json_success
 from utils.image_serving import maybe_serve_webp
 from utils.rate_limiter import CooldownLimiter
+from utils.request_models import parse_plugin_order_request
 
 logger = logging.getLogger(__name__)
 
@@ -423,14 +424,13 @@ def next_up() -> Any:
 def save_plugin_order() -> Any:
     """Save custom plugin order from dashboard drag-and-drop."""
     device_config = current_app.config["DEVICE_CONFIG"]
-    data = request.get_json(silent=True)
-    if not isinstance(data, dict):
+    parsed, parse_error = parse_plugin_order_request(request.get_json(silent=True))
+    if parse_error is not None:
+        return json_error(parse_error.message, status=parse_error.status)
+    if parsed is None:
         return json_error("Invalid JSON payload", status=400)
-    order = data.get("order", [])
-    if not isinstance(order, list):
-        return json_error("Order must be a list", status=400)
-    if any(not isinstance(item, str) for item in order):
-        return json_error("Order entries must be strings", status=400)
+
+    order = parsed.order
     registered_ids = {p["id"] for p in device_config.get_plugins()}
     if len(order) != len(set(order)):
         return json_error("Order must not contain duplicate plugin IDs", status=400)

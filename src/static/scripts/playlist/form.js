@@ -180,7 +180,13 @@
     if (!newName) return;
     if (!validateCycleMinutes()) return;
     const startTime = document.getElementById("start_time").value;
-    const endTime = document.getElementById("end_time").value;
+    const endInput = document.getElementById("end_time");
+    const originalEndTime =
+      document.getElementById("playlistModal")?.dataset.originalEndTime || "";
+    const endTime =
+      originalEndTime === "24:00" && endInput.value === "23:59"
+        ? "24:00"
+        : endInput.value;
     const cycleMinutes = document.getElementById("cycle_minutes").value;
 
     const submit = async () => {

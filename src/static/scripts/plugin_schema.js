@@ -154,7 +154,11 @@
     };
 
     const selectOption = (option) => {
-      options.forEach((item) => item.classList.toggle("selected", item === option));
+      options.forEach((item) => {
+        const selected = item === option;
+        item.classList.toggle("selected", selected);
+        item.setAttribute("aria-pressed", selected ? "true" : "false");
+      });
       hidden.value = option.dataset.faceName || "";
       setColor(primary, option.dataset.primaryColor);
       setColor(secondary, option.dataset.secondaryColor);
@@ -170,6 +174,52 @@
 
     if (config.primaryColor) setColor(primary, config.primaryColor);
     if (config.secondaryColor) setColor(secondary, config.secondaryColor);
+  }
+
+  function initAIImagePromptTools(widget) {
+    const button = widget.querySelector("[data-ai-image-random-prompt]");
+    const promptInput = document.querySelector("[name='textPrompt']");
+    if (!button || !promptInput) return;
+
+    button.addEventListener("click", async () => {
+      const provider = document.querySelector("[name='provider']")?.value || "openai";
+      const originalText = button.textContent;
+      button.disabled = true;
+      button.textContent = "Thinking...";
+      try {
+        const response = await fetch(
+          window.__INKYPI_PLUGIN_BOOT__?.urls?.random_prompt ||
+            "/plugin/ai_image/random_prompt",
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              provider,
+              prompt: promptInput.value || "",
+            }),
+          }
+        );
+        const result = await response.json();
+        if (!response.ok || !result?.success || !result.prompt) {
+          throw new Error(result?.error || "Failed to generate a prompt");
+        }
+        promptInput.value = result.prompt;
+        promptInput.dispatchEvent(new Event("input", { bubbles: true }));
+        promptInput.dispatchEvent(new Event("change", { bubbles: true }));
+        promptInput.focus();
+      } catch (error) {
+        console.debug("AI image random prompt failed:", error);
+        if (window.showResponseModal) {
+          window.showResponseModal(
+            "failure",
+            error.message || "Failed to generate a prompt"
+          );
+        }
+      } finally {
+        button.disabled = false;
+        button.textContent = originalText;
+      }
+    });
   }
 
   function initNewspaperSearch(widget, config) {
@@ -548,6 +598,7 @@
 
   const widgetInitializers = {
     "clock-face-picker": initClockFacePicker,
+    "ai-image-prompt-tools": initAIImagePromptTools,
     "newspaper-search": initNewspaperSearch,
     "calendar-repeater": initCalendarRepeater,
     "todo-repeater": initTodoRepeater,

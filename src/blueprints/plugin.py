@@ -34,7 +34,6 @@ from utils.form_utils import (
     validate_plugin_required_fields,
 )
 from utils.http_utils import json_error, json_success
-from utils.messages import PLAYLIST_NAME_REQUIRED_ERROR
 from utils.plugin_errors import (
     MANUAL_UPDATE_TIMEOUT_MSG,
     SCREENSHOT_BACKEND_UNAVAILABLE_MSG,
@@ -42,6 +41,7 @@ from utils.plugin_errors import (
 )
 from utils.plugin_history import record_change as _record_plugin_change
 from utils.progress import track_progress
+from utils.request_models import parse_plugin_instance_action_request
 from utils.security_utils import URLValidationError, validate_file_path
 
 logger = logging.getLogger(__name__)
@@ -199,6 +199,57 @@ def plugin_page(plugin_id: str) -> Any:
         active_nav="plugins",
         **template_params,
     )
+
+
+@plugin_bp.route("/plugin/ai_image/random_prompt", methods=["POST"])  # type: ignore[untyped-decorator]
+def ai_image_random_prompt() -> Any:
+    """Generate a prompt suggestion for the AI Image plugin."""
+    device_config = current_app.config[_CONFIG_KEY]
+    data = request.get_json(silent=True) or {}
+    if not isinstance(data, dict):
+        return json_error("Invalid JSON payload", status=400)
+
+    provider = str(data.get("provider") or "openai").strip().lower()
+    if provider not in ("openai", "google"):
+        raise ClientInputError(
+            f"Unsupported provider: {provider!r}",
+            status=400,
+            code="validation_error",
+            field="provider",
+        )
+    seed_prompt = str(data.get("prompt") or "")
+
+    with route_error_boundary(
+        "generate AI image prompt",
+        logger=logger,
+        hint="Ensure the selected provider API key is configured.",
+    ):
+        if provider == "google":
+            api_key = device_config.load_env_key("GOOGLE_AI_SECRET")
+            if not api_key:
+                raise ClientInputError("Google AI API Key not configured.", status=400)
+            from google import genai
+
+            from plugins.ai_image.ai_image import AIImage
+
+            client = genai.Client(api_key=api_key)
+            prompt = AIImage.fetch_image_prompt_google(client, seed_prompt)
+        else:
+            api_key = device_config.load_env_key("OPEN_AI_SECRET")
+            if not api_key:
+                raise ClientInputError("OpenAI API Key not configured.", status=400)
+            from openai import OpenAI
+
+            from plugins.ai_image.ai_image import AIImage
+
+            client = OpenAI(api_key=api_key)
+            prompt = AIImage.fetch_image_prompt(client, seed_prompt)
+
+        if not prompt:
+            raise ClientInputError(
+                "Prompt generator returned an empty prompt.", status=502
+            )
+        return json_success("Generated prompt.", prompt=prompt)
 
 
 @plugin_bp.route("/plugins", methods=["GET"])  # type: ignore[untyped-decorator]
@@ -384,42 +435,46 @@ def delete_plugin_instance() -> Any:
 
     if not request.is_json:
         raise UnsupportedMediaTypeRouteError
-    data = request.json or {}
-
-    playlist_name = data.get("playlist_name")
-    plugin_id = data.get(_PLUGIN_ID)
-    plugin_instance = data.get("plugin_instance")
-
-    if (
-        not playlist_name
-        or not isinstance(playlist_name, str)
-        or not playlist_name.strip()
-    ):
-        raise ClientInputError(PLAYLIST_NAME_REQUIRED_ERROR, status=400)
-    playlist_name = playlist_name.strip()
+    parsed, parse_error = parse_plugin_instance_action_request(
+        request.get_json(silent=True)
+    )
+    if parse_error is not None:
+        raise ClientInputError(
+            parse_error.message,
+            status=parse_error.status,
+            code=parse_error.code,
+            field=parse_error.field,
+        )
+    if parsed is None:
+        raise ClientInputError("Invalid or missing JSON payload", status=400)
 
     with route_error_boundary(
         "delete plugin instance",
         logger=logger,
         hint="Ensure the playlist and plugin instance exist before deleting.",
     ):
-        playlist = playlist_manager.get_playlist(playlist_name)
+        playlist = playlist_manager.get_playlist(parsed.playlist_name)
         if not playlist:
             raise ResourceLookupError("Playlist not found", status=400)
 
-        existing = playlist.find_plugin(plugin_id, plugin_instance)
+        existing = playlist.find_plugin(parsed.plugin_id, parsed.plugin_instance)
         plugin_settings = dict(existing.settings) if existing else {}
 
         del_result: list[bool] = []
 
         def _do_delete(cfg: Any) -> None:
-            del_result.append(playlist.delete_plugin(plugin_id, plugin_instance))
+            del_result.append(
+                playlist.delete_plugin(parsed.plugin_id, parsed.plugin_instance)
+            )
 
         device_config.update_atomic(_do_delete)
         if not del_result or not del_result[0]:
             raise ResourceLookupError("Plugin instance not found", status=400)
         _cleanup_plugin_resources(
-            device_config, plugin_id, plugin_instance, plugin_settings
+            device_config,
+            parsed.plugin_id,
+            parsed.plugin_instance,
+            plugin_settings,
         )
 
     return json_success(message="Deleted plugin instance.")
@@ -570,33 +625,40 @@ def display_plugin_instance() -> Any:
 
     if not request.is_json:
         raise UnsupportedMediaTypeRouteError
-    data = request.json or {}
-
-    playlist_name = data.get("playlist_name")
-    plugin_id = data.get(_PLUGIN_ID)
-    plugin_instance_name = data.get("plugin_instance")
+    parsed, parse_error = parse_plugin_instance_action_request(
+        request.get_json(silent=True)
+    )
+    if parse_error is not None:
+        raise ClientInputError(
+            parse_error.message,
+            status=parse_error.status,
+            code=parse_error.code,
+            field=parse_error.field,
+        )
+    if parsed is None:
+        raise ClientInputError("Invalid or missing JSON payload", status=400)
 
     with route_error_boundary(
         "display plugin instance",
         logger=logger,
         hint="Ensure the playlist exists and the refresh task can run the instance.",
     ):
-        playlist = playlist_manager.get_playlist(playlist_name)
+        playlist = playlist_manager.get_playlist(parsed.playlist_name)
         if not playlist:
             logger.warning(
                 "display_plugin_instance: playlist not found name=%s",
-                sanitize_log_field(playlist_name),
+                sanitize_log_field(parsed.playlist_name),
             )
             raise ResourceLookupError(_ERR_PLAYLIST_NOT_FOUND, status=400)
 
-        plugin_instance = playlist.find_plugin(plugin_id, plugin_instance_name)
+        plugin_instance = playlist.find_plugin(parsed.plugin_id, parsed.plugin_instance)
         if not plugin_instance:
             logger.warning(
                 "display_plugin_instance: plugin instance not found "
                 "playlist=%s plugin_id=%s instance=%s",
-                sanitize_log_field(playlist_name),
-                sanitize_log_field(plugin_id),
-                sanitize_log_field(plugin_instance_name),
+                sanitize_log_field(parsed.playlist_name),
+                sanitize_log_field(parsed.plugin_id),
+                sanitize_log_field(parsed.plugin_instance),
             )
             raise ResourceLookupError(
                 _ERR_PLUGIN_INSTANCE_NOT_FOUND,

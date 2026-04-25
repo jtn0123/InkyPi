@@ -9,31 +9,31 @@ exercise the direct function entry point.
 from utils.logging_utils import redact_secrets
 
 
-def test_redact_secrets_masks_api_key_assignment():
+def test_redact_secrets_masks_api_key_assignment() -> None:
     out = redact_secrets("api_key=supersecret123")
     assert "supersecret123" not in out
     assert "***REDACTED***" in out
 
 
-def test_redact_secrets_masks_bearer_token():
+def test_redact_secrets_masks_bearer_token() -> None:
     out = redact_secrets("Authorization: Bearer abc.def-XYZ_123=")
     assert "abc.def-XYZ_123=" not in out
     assert "***REDACTED***" in out
 
 
-def test_redact_secrets_masks_long_hex_string():
+def test_redact_secrets_masks_long_hex_string() -> None:
     token = "a" * 40
     out = redact_secrets(f"token value {token} trailing")
     assert token not in out
     assert "***REDACTED***" in out
 
 
-def test_redact_secrets_leaves_benign_string_unchanged():
+def test_redact_secrets_leaves_benign_string_unchanged() -> None:
     text = "/opt/inkypi/plugins/foo/render/style.css"
     assert redact_secrets(text) == text
 
 
-def test_redact_secrets_coerces_non_string_input():
+def test_redact_secrets_coerces_non_string_input() -> None:
     err = FileNotFoundError("missing: /tmp/style.css")
     out = redact_secrets(err)
     assert isinstance(out, str)
