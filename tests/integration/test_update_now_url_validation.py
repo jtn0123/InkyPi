@@ -155,10 +155,13 @@ class TestImageUrlValidation:
             f"would inflate Dashboard refresh/error counts. New: {new_sidecars}"
         )
 
-        # And just to double-check: any sidecar that *would* have been
-        # written would have included a Manual Update + URLValidationError
-        # marker.  Make sure nothing matching that ended up on disk either.
-        for name in sidecars_after:
+        # And just to double-check: any sidecar this request *could* have
+        # written would have included a URLValidationError marker.  Scope the
+        # loop to *new* sidecars only — iterating over `sidecars_after` would
+        # also read pre-existing fixture files unrelated to this request,
+        # making this guard either toothless (nothing in scope) or fragile
+        # to unrelated fixture state.
+        for name in new_sidecars:
             with open(os.path.join(history_dir, name), encoding="utf-8") as fh:
                 payload = json.load(fh)
             assert payload.get("error_class") != "URLValidationError"

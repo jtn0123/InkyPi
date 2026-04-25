@@ -18,15 +18,41 @@ ACTIONS_JS = ROOT / "src" / "static" / "scripts" / "settings" / "actions.js"
 
 
 def _import_config_body() -> str:
-    """Return the JS source text of `async function importConfig() { ... }`."""
+    """Return the JS source text of `async function importConfig() { ... }`.
+
+    Uses brace counting rather than a hard-coded ``\\n {4}\\}\\n`` tail so
+    the test isn't coupled to the formatter's chosen indentation or to the
+    presence of a trailing newline. Skips braces inside `'…'`, `"…"`, and
+    template strings ``…`` so embedded ``{`` / ``}`` literals don't throw
+    the depth counter off.
+    """
     src = ACTIONS_JS.read_text(encoding="utf-8")
-    match = re.search(
-        r"async function importConfig\(\)\s*\{(?P<body>.*?)\n {4}\}\n",
-        src,
-        flags=re.S,
-    )
-    assert match, "importConfig function not found in actions.js"
-    return match.group("body")
+    head = re.search(r"async function importConfig\(\)\s*\{", src)
+    assert head, "importConfig function not found in actions.js"
+    i = head.end()  # cursor sits just past the opening `{`
+    depth = 1
+    in_str: str | None = None  # which quote char are we inside, if any
+    escape = False
+    body_start = i
+    while i < len(src) and depth > 0:
+        ch = src[i]
+        if in_str:
+            if escape:
+                escape = False
+            elif ch == "\\":
+                escape = True
+            elif ch == in_str:
+                in_str = None
+        elif ch in ("'", '"', "`"):
+            in_str = ch
+        elif ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                return src[body_start:i]
+        i += 1
+    raise AssertionError("unbalanced braces in importConfig — could not find end")
 
 
 def test_import_config_validates_file_before_disabling_button():

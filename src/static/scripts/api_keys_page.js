@@ -248,7 +248,11 @@
         const key = row.querySelector(".apikey-key")?.value.trim() || "";
         if (!key) continue;
         providers += 1;
-        const value = row.querySelector(".apikey-value")?.value || "";
+        // Use the trimmed value so a whitespace-only field does NOT bump
+        // the "saved" badge — `saveGenericKeys` rejects whitespace-only
+        // entries the same way; keeping all three in sync (badge,
+        // input-listener clear, validator) avoids false reassurance.
+        const value = row.querySelector(".apikey-value")?.value.trim() || "";
         const wasSaved = row.dataset.existing === "true";
         if (wasSaved || value.length > 0) configured += 1;
       }
@@ -411,10 +415,14 @@
         updateRowAriaLabels(row, keyInput.value);
         refreshKeyCounts();
       });
-      // Clear inline aria-invalid as soon as the user types into a previously
-      // flagged-empty value field, and also bump the "configured" count.
+      // Clear inline aria-invalid as soon as the user types real (non-
+      // whitespace) content into a previously flagged-empty value field,
+      // and also bump the "configured" count. Trim so this stays in sync
+      // with `saveGenericKeys` and `refreshKeyCounts`, which both reject
+      // whitespace-only — otherwise typing spaces would falsely clear the
+      // error state right before the validator re-flags the field on save.
       valInput.addEventListener("input", () => {
-        if (valInput.value.length > 0 && valInput.getAttribute("aria-invalid") === "true") {
+        if (valInput.value.trim().length > 0 && valInput.getAttribute("aria-invalid") === "true") {
           valInput.setAttribute("aria-invalid", "false");
           const errorId = valInput.getAttribute("aria-describedby");
           if (errorId) {

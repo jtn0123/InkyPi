@@ -26,19 +26,43 @@ def _device_name_input_tag() -> str:
     return match.group(0)
 
 
-def test_device_name_pattern_requires_non_whitespace_character():
-    """The HTML pattern must require at least one non-whitespace char.
-    Otherwise `"   "` is accepted client-side and only the server rejects it."""
+def _make_pattern_regex(pattern: str) -> re.Pattern[str]:
+    """Translate the HTML5 `pattern` attribute into a fullmatch Python regex.
+
+    HTML5 anchors `pattern` implicitly at both ends; `re.fullmatch` mirrors
+    that. The `\\u####` escapes inside the attribute string are real two-char
+    sequences (`\\` + `u####`); decode them to actual code points so Python's
+    regex engine sees the same character classes the browser sees.
+    """
+    decoded = pattern.encode("utf-8").decode("unicode_escape")
+    return re.compile(decoded, re.S)
+
+
+def test_device_name_pattern_rejects_whitespace_only_and_lone_control_chars():
+    """The HTML pattern must reject:
+       - empty / whitespace-only input  (ISSUE-008)
+       - a single control character     (CodeRabbit follow-up — closes a
+         consistency gap with the server's `_validate_device_name`
+         `unicodedata.category(ch) == "Cc"` check)
+    while still accepting normal names.
+    """
     tag = _device_name_input_tag()
     pattern_match = re.search(r'pattern="([^"]*)"', tag)
     assert pattern_match, "device name input has no pattern attribute"
     pattern = pattern_match.group(1)
-    # The simplest reliable signal: the pattern must contain `\S` somewhere
-    # (anchored or otherwise). Without it, whitespace-only is admissible.
-    assert r"\S" in pattern, (
-        f"device name pattern {pattern!r} does not require any non-whitespace "
-        "character — whitespace-only input would pass client validation"
+    rx = _make_pattern_regex(pattern)
+    # Negative cases — must fail client validation:
+    assert rx.fullmatch("") is None, "empty value must not match"
+    assert rx.fullmatch("   ") is None, "whitespace-only must not match"
+    assert rx.fullmatch("\t\t") is None, "tab-only must not match"
+    assert rx.fullmatch("\x01") is None, (
+        "a lone control character must not match — would otherwise pass the "
+        "client and only fail server-side at unicodedata.category 'Cc'"
     )
+    # Positive cases — normal names must match:
+    assert rx.fullmatch("InkyPi Development") is not None
+    assert rx.fullmatch("Kitchen #2") is not None
+    assert rx.fullmatch("a") is not None, "single non-space char is fine"
 
 
 def test_device_name_title_documents_non_space_requirement():

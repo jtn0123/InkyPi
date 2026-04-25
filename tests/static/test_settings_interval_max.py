@@ -36,8 +36,16 @@ def test_form_js_caps_interval_max_per_unit():
     body = fn_match.group("body")
     assert '"hour"' in body, "must distinguish hours specifically"
     # Hours: 23 (server allows < 24 hours). Minutes: 1439 (= 23h59).
-    assert " 23" in body
-    assert "1439" in body
+    # Match the actual return statements rather than a bare `" 23"` /
+    # `"1439"` substring, because comments inside the helper happen to
+    # mention "23h59" / "1439" — a regression that dropped the literal
+    # `return 23;` would otherwise still pass on comment text alone.
+    assert re.search(
+        r"return\s+23\b", body
+    ), "hour branch must `return 23` (server cap is < 24 hours)"
+    assert re.search(
+        r"return\s+1439\b", body
+    ), "minute branch must `return 1439` (server cap is < 24h = 1440 min)"
 
 
 def test_unit_change_listener_refreshes_max():
