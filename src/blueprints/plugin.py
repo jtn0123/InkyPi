@@ -650,7 +650,7 @@ def _safe_display_image(
     display_manager: Any,
     image: Any,
     image_settings: Any,
-    history_meta: Mapping[str, Any],
+    history_meta: Mapping[str, Any] | None,
 ) -> Any:
     """Invoke display_manager.display_image, tolerating older stubs without ``history_meta``.
 
@@ -706,8 +706,17 @@ def _update_now_direct(
                 sanitize_log_field(plugin_id),
                 sanitize_log_field(safe_msg),
             )
+            # ISSUE-006: still surface the error image on the device, but
+            # do NOT write a history sidecar — the user just typed an
+            # invalid URL, no render was actually attempted, and we
+            # shouldn't bump Dashboard "Refreshes / Errors" for a typo.
             _push_update_now_fallback(
-                plugin_id, plugin_config, device_config, display_manager, e
+                plugin_id,
+                plugin_config,
+                device_config,
+                display_manager,
+                e,
+                record_history=False,
             )
             return json_error(
                 safe_msg,
@@ -824,8 +833,19 @@ def _push_update_now_fallback(
     device_config: Any,
     display_manager: Any,
     exc: BaseException,
+    *,
+    record_history: bool = True,
 ) -> None:
-    """Best-effort: render and push an error-card image so the display updates on failure."""
+    """Best-effort: render and push an error-card image so the display updates on failure.
+
+    ``record_history``: when False, the fallback is *displayed* but no
+    history sidecar is written, so the failure does not get counted by
+    :mod:`utils.refresh_stats` toward the dashboard "Refreshes / Errors"
+    KPIs. Use False for failures that are pre-render input rejections
+    (e.g. URLValidationError) — those didn't actually attempt a real
+    render, and counting them inflates both the refresh and error
+    counters for what was just a typo (ISSUE-006).
+    """
     try:
         w, h = device_config.get_resolution()
         fallback = render_error_image(
@@ -836,17 +856,22 @@ def _push_update_now_fallback(
             error_class=type(exc).__name__,
             error_message=str(exc),
         )
-        _safe_display_image(
-            display_manager,
-            fallback,
-            plugin_config.get("image_settings", []),
+        history_meta = (
             {
                 "refresh_type": "Manual Update",
                 "plugin_id": plugin_id,
                 "playlist": None,
                 "plugin_instance": None,
                 "error_class": type(exc).__name__,
-            },
+            }
+            if record_history
+            else None
+        )
+        _safe_display_image(
+            display_manager,
+            fallback,
+            plugin_config.get("image_settings", []),
+            history_meta,
         )
     except Exception:
         logger.warning(

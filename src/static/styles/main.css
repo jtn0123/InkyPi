@@ -1625,9 +1625,15 @@ main[data-page-shell="workflow"] .frame {
   .mobile-site-nav-panel {
     position: absolute;
     top: calc(100% + 8px);
-    left: 0;
+    /* Anchor to the right edge of the (narrow, middle-column) Menu button
+     * and let the dropdown grow leftward into the brand column. With only
+     * `left: 0; right: 0` the panel was constrained to the middle grid
+     * column at 390px viewports, clipping item labels (e.g. "API Keys"). */
     right: 0;
+    min-width: max(100%, 220px);
+    max-width: calc(100vw - 28px);
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: 6px;
     padding: 8px;
     border: 1px solid var(--surface-border);
@@ -5607,6 +5613,15 @@ body[data-page="plugin"] .workflow-help p {
     font-weight: 600;
     color: var(--text);
     letter-spacing: -0.01em;
+    /* Long names (up to maxlength=64) must visibly truncate at narrow widths
+     * — otherwise they overflow the card without ellipsis. The Dashboard's
+     * Quick switch panel already truncates the same value; keep parity here.
+     * `min-width: 0` lets the heading shrink below content size when nested
+     * in flex/grid parents (.playlist-heading, .playlist-title-row). */
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .playlist-heading {

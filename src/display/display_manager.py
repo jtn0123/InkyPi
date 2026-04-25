@@ -150,7 +150,15 @@ class DisplayManager:
         processed_image: Image.Image,
         history_meta: Mapping[str, object] | None = None,
     ) -> None:
-        """Persist a processed image snapshot and optional JSON sidecar metadata."""
+        """Persist a processed image snapshot and optional JSON sidecar metadata.
+
+        When ``history_meta`` is None (or empty) we still write the PNG -
+        callers like the URL-validation fallback path want the device to
+        show the error image - but we skip the JSON sidecar so the
+        non-render does NOT count toward Dashboard "Refreshes / Errors"
+        KPIs (ISSUE-006). ``utils.refresh_stats.compute_stats`` derives
+        those numbers by counting sidecar files; no sidecar = no count.
+        """
         history_dir_raw = getattr(self.device_config, "history_image_dir", None)
         if not isinstance(history_dir_raw, str) or not history_dir_raw:
             return
@@ -180,8 +188,13 @@ class DisplayManager:
         except (OSError, ValueError, RuntimeError):
             logger.exception("Failed to save history snapshot image")
             return
+        # Skip the sidecar entirely when there's no metadata to record
+        # (callers explicitly opting out). The PNG above is still on disk.
+        if not history_meta:
+            self._prune_history(history_dir)
+            return
         try:
-            meta_payload = dict(history_meta or {})
+            meta_payload = dict(history_meta)
             meta_payload.setdefault("refresh_time", timestamp.isoformat())
             with open(
                 os.path.join(history_dir, f"{base_name}.json"),

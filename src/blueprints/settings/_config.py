@@ -247,14 +247,18 @@ def import_settings() -> Any:
         if payload is None:
             raise ClientInputError("Invalid import payload", status=400)
 
+        cfg_keys_applied = 0
         cfg = payload.get("config")
         if isinstance(cfg, dict):
             # Filter to allowed keys only
             filtered_cfg = {
                 k: v for k, v in cfg.items() if k in _mod._ALLOWED_IMPORT_CONFIG_KEYS
             }
-            device_config.update_config(filtered_cfg)
+            if filtered_cfg:
+                device_config.update_config(filtered_cfg)
+                cfg_keys_applied = len(filtered_cfg)
 
+        env_keys_applied = 0
         env_keys = payload.get("env_keys") or {}
         if isinstance(env_keys, dict):
             for k, v in env_keys.items():
@@ -262,10 +266,26 @@ def import_settings() -> Any:
                     continue
                 try:
                     device_config.set_env_key(k, str(v))
+                    env_keys_applied += 1
                 except Exception:
                     _mod.logger.exception("Failed setting env key during import: %s", k)
 
-        return json_success(message="Import completed")
+        if cfg_keys_applied == 0 and env_keys_applied == 0:
+            raise ClientInputError(
+                "Backup contained no recognizable settings or API keys",
+                status=400,
+            )
+
+        parts = []
+        if cfg_keys_applied:
+            parts.append(
+                f"{cfg_keys_applied} setting{'s' if cfg_keys_applied != 1 else ''}"
+            )
+        if env_keys_applied:
+            parts.append(
+                f"{env_keys_applied} API key{'s' if env_keys_applied != 1 else ''}"
+            )
+        return json_success(message=f"Restored {' and '.join(parts)}")
 
 
 @_mod.settings_bp.route("/settings/api-keys", methods=["GET"])  # type: ignore[untyped-decorator]

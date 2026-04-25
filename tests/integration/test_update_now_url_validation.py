@@ -121,6 +121,51 @@ class TestImageUrlValidation:
         details = body.get("details") or {}
         assert details.get("field") == "url"
 
+    def test_url_validation_failure_does_not_record_history_sidecar(
+        self, client, device_config_dev
+    ):
+        """ISSUE-006 — a rejected URL must NOT bump Dashboard "Refreshes" /
+        "Errors" KPIs.  The dashboard derives those numbers by counting
+        history JSON sidecars in ``device_config.history_image_dir``;
+        URL validation errors are user input rejected pre-render, so we
+        push a fallback image to the device but skip the sidecar.
+        """
+        import json
+        import os
+
+        history_dir = device_config_dev.history_image_dir
+        os.makedirs(history_dir, exist_ok=True)
+        # Snapshot existing sidecars so the test isn't fragile to fixture state.
+        sidecars_before = {
+            name for name in os.listdir(history_dir) if name.endswith(".json")
+        }
+
+        resp = client.post(
+            "/update_now",
+            data={"plugin_id": "image_url", "url": "javascript:alert(1)"},
+        )
+        assert resp.status_code == 422
+
+        sidecars_after = {
+            name for name in os.listdir(history_dir) if name.endswith(".json")
+        }
+        new_sidecars = sidecars_after - sidecars_before
+        assert not new_sidecars, (
+            f"URL validation failure should not write a history sidecar — "
+            f"would inflate Dashboard refresh/error counts. New: {new_sidecars}"
+        )
+
+        # And just to double-check: any sidecar this request *could* have
+        # written would have included a URLValidationError marker.  Scope the
+        # loop to *new* sidecars only — iterating over `sidecars_after` would
+        # also read pre-existing fixture files unrelated to this request,
+        # making this guard either toothless (nothing in scope) or fragile
+        # to unrelated fixture state.
+        for name in new_sidecars:
+            with open(os.path.join(history_dir, name), encoding="utf-8") as fh:
+                payload = json.load(fh)
+            assert payload.get("error_class") != "URLValidationError"
+
 
 # ---------------------------------------------------------------------------
 # screenshot plugin
