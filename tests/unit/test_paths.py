@@ -2,16 +2,17 @@
 """Tests for the utils.paths module."""
 
 import os
+from pathlib import Path
 
 
-def test_base_dir_points_to_src():
+def test_base_dir_points_to_src() -> None:
     from utils.paths import BASE_DIR
 
     assert os.path.isdir(BASE_DIR)
     assert os.path.basename(BASE_DIR) == "src"
 
 
-def test_default_constants_exist():
+def test_default_constants_exist() -> None:
     from utils.paths import (
         CURRENT_IMAGE_FILE,
         DEFAULT_PREVIEW_IMAGE,
@@ -32,7 +33,7 @@ def test_default_constants_exist():
         assert "static" in p or "images" in p
 
 
-def test_resolve_runtime_paths_no_override():
+def test_resolve_runtime_paths_no_override() -> None:
     from utils.paths import (
         CURRENT_IMAGE_FILE,
         HISTORY_IMAGE_DIR,
@@ -48,14 +49,14 @@ def test_resolve_runtime_paths_no_override():
     assert result["history_image_dir"] == HISTORY_IMAGE_DIR
 
 
-def test_resolve_runtime_paths_empty_string():
+def test_resolve_runtime_paths_empty_string() -> None:
     from utils.paths import CURRENT_IMAGE_FILE, resolve_runtime_paths
 
     result = resolve_runtime_paths("")
     assert result["current_image_file"] == CURRENT_IMAGE_FILE
 
 
-def test_resolve_runtime_paths_with_override(tmp_path):
+def test_resolve_runtime_paths_with_override(tmp_path: Path) -> None:
     from utils.paths import resolve_runtime_paths
 
     result = resolve_runtime_paths(str(tmp_path))

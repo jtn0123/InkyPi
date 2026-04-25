@@ -8,6 +8,7 @@ from dotenv import dotenv_values
 from flask import Blueprint, Response, render_template, request
 
 from utils.http_utils import json_error, json_internal_error, json_success
+from utils.request_models import parse_api_keys_save_request
 
 logger = logging.getLogger(__name__)
 apikeys_bp = Blueprint("apikeys", __name__)
@@ -197,20 +198,19 @@ def apikeys_page() -> Response | str:
 def save_apikeys() -> tuple[Response | dict[str, Any], int] | Response | dict[str, Any]:
     """Save API keys to .env file."""
     try:
-        data = request.get_json(silent=True)
-        if not isinstance(data, dict):
+        parsed, parse_error = parse_api_keys_save_request(request.get_json(silent=True))
+        if parse_error is not None:
+            return json_error(parse_error.message, status=parse_error.status)
+        if parsed is None:
             return json_error("Invalid JSON payload", status=400)
-        entries = data.get("entries", [])
-        if not isinstance(entries, list):
-            return json_error("Invalid entries format", status=400)
 
         # Load existing values for keys marked as keepExisting
         env_path = get_env_path()
         existing_values = dict(parse_env_file(env_path))
 
         # Validate and process entries
-        valid_entries = []
-        for entry in entries:
+        valid_entries: list[tuple[str, str]] = []
+        for entry in parsed.entries:
             key, value, err = _validate_api_key_entry(entry, existing_values)
             if err is not None:
                 return json_error(API_KEY_VALIDATION_ERROR, status=400)

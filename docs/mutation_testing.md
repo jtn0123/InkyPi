@@ -46,6 +46,13 @@ Run the mutation pass against the configured files:
 INKYPI_ENV=dev INKYPI_NO_REFRESH=1 PYTHONPATH=src mutmut run
 ```
 
+Run a narrower shard when you are triaging one package locally:
+
+```bash
+INKYPI_ENV=dev INKYPI_NO_REFRESH=1 PYTHONPATH=src \
+  mutmut run --paths-to-mutate src/utils/
+```
+
 Check the summary after the run completes:
 
 ```bash
@@ -83,13 +90,21 @@ mutmut unapply
 
 ## CI schedule
 
-The `mutation-nightly` job in `.github/workflows/ci.yml` runs every **Sunday at
-03:00 UTC** (`cron: '0 3 * * 0'`). It is gated by
-`if: github.event_name == 'schedule'` and will never trigger on a push or pull
-request.
+The `mutation-nightly` job in `.github/workflows/ci.yml` runs on scheduled
+workflow events and can be started manually with `workflow_dispatch`. It will
+never trigger on a push or pull request.
 
-Results are uploaded as the `mutmut-cache` artifact and can be downloaded from
-the GitHub Actions run summary.
+The job is sharded by package so each package has its own runtime budget:
+
+| Shard | Path |
+|-------|------|
+| `app-setup` | `src/app_setup/` |
+| `blueprints` | `src/blueprints/` |
+| `utils` | `src/utils/` |
+| `refresh-task` | `src/refresh_task/` |
+
+Results are uploaded as `mutmut-cache-<shard>` artifacts and can be downloaded
+from the GitHub Actions run summary.
 
 ## Interpreting results
 
