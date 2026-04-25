@@ -1,6 +1,78 @@
 # CHANGELOG
 
 
+## v1.0.5 (2026-04-25)
+
+### Bug Fixes
+
+- Post-pr589 dogfood — restore flow, mobile/light-theme polish, validation gaps
+  ([#591](https://github.com/jtn0123/InkyPi/pull/591),
+  [`4f696bb`](https://github.com/jtn0123/InkyPi/commit/4f696bbd5487619f1dcbc536666c17744399beb6))
+
+* fix: post-PR589 dogfood findings — restore flow, mobile/light-theme polish, validation gaps
+
+Bundle of fixes for 10 issues surfaced during a /dogfood pass run after PR 589 landed. Each fix has
+  a regression test (18 new test cases across 7 files).
+
+What changed: - ISSUE-007a/b: Restore from file UX * actions.js: validate the file presence BEFORE
+  relabeling the button so an empty-file early-return doesn't strand it in "Restoring…" disabled
+  state * settings/_config.py: /settings/import now rejects payloads with no recognized config or
+  env keys (prev. silently returned "Import completed" on garbage JSON), and reports counts on
+  success ("Restored 5 settings"). - ISSUE-001: long playlist names now truncate with ellipsis on
+  .playlist-title (Dashboard "Quick switch" already did this — surfaces are consistent now). -
+  ISSUE-002: mobile-site-nav dropdown anchored right + viewport-bounded so item labels (notably "API
+  Keys") no longer clip at 390px viewports. - ISSUE-003/004/005: API Keys page (generic mode) *
+  refreshKeyCounts() recomputes "X providers / Y saved" from the DOM on add/delete/value-input —
+  badges now distinguish in-progress edits from persisted state instead of staying redundantly
+  identical. * Empty-value submit now sets aria-invalid + inserts a validation-message element +
+  focuses the offending input — not just a corner toast. - ISSUE-006: rejected-URL plugin previews
+  no longer write a history sidecar, so they don't bump the Dashboard "Refreshes / Errors" KPIs. The
+  error image still surfaces on the device. display_manager._save_history_entry skips the JSON
+  sidecar when history_meta is None/empty. - ISSUE-008: device-name pattern requires at least one
+  non-whitespace char so " " fails client-side instead of round-tripping to the server backstop. -
+  ISSUE-009: plugin cycle interval gets a unit-aware client max (23 hours / 1439 minutes), updated
+  whenever the unit <select> changes — matches the server's "less than 24h" cap. - ISSUE-010: empty
+  playlist-instance thumb wrapper omitted from DOM when there's no refresh image; the `:empty` hide
+  rule was defeated by Jinja whitespace, so the wrapper rendered as a hardcoded-black box in the
+  light theme.
+
+Test plan: - 18 new regression tests in tests/static + tests/unit + tests/integration - 2,744 unit
+  tests pass - 1,021 / 1,029 integration tests pass; 8 failures all confirmed pre-existing on
+  origin/main before any of these changes (verified via git stash). - Visual verification at 390x844
+  and 1280x720 in dark + light themes via agent-browser. Co-Authored-By: Claude Opus 4.7
+  <noreply@anthropic.com>
+
+* style: apply black formatting to dogfood-fix files
+
+CI's "Lint and type-check" job reported 5 files needed Black 26.3.1 reformatting after the prior
+  commit. Pure formatting — no logic change.
+
+Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>
+
+* fix: address CodeRabbit review on PR 591
+
+5 review-comment fixes: - src/static/scripts/api_keys_page.js: trim consistency. `refreshKeyCounts`
+  and the value-input listener now check `value.trim().length` so a whitespace-only field doesn't
+  bump the "saved" badge or falsely clear aria-invalid right before `saveGenericKeys` re-flags it on
+  submit. - src/templates/settings.html: device-name pattern's central required char now excludes
+  both whitespace AND Cc control characters, so a lone `\\x01` fails client-side instead of
+  round-tripping to the server's `unicodedata.category == "Cc"` check. Also broadened the regression
+  test to fullmatch the pattern against multiple negative + positive cases instead of just asserting
+  `\\S` is present. - tests/integration/test_update_now_url_validation.py: scope the "no
+  URLValidationError sidecar" loop to `new_sidecars` so we only inspect files this request could
+  have written, not pre-existing fixture state. - tests/static/test_settings_interval_max.py: use
+  `re.search(r"return\\s+23\\b")` instead of a `" 23"` substring — the helper's comment mentions
+  "23h59" so the substring would match the comment alone if the return statement regressed. -
+  tests/static/test_settings_restore_button_state.py: replace the `\\n {4}\\}\\n` brittle regex tail
+  with a brace-counting walker that skips quoted strings and template literals, so the helper
+  survives formatter changes without producing the unhelpful "importConfig function not found"
+  failure.
+
+---------
+
+Co-authored-by: Claude Opus 4.7 <noreply@anthropic.com>
+
+
 ## v1.0.4 (2026-04-25)
 
 ### Bug Fixes
