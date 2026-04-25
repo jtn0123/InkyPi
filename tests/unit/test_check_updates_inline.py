@@ -118,7 +118,49 @@ class TestApiVersionInlineResult:
             assert "current" in data
             assert data["check_succeeded"] is False
             assert data["check_error"]
+            # The message should be user-facing and distinguish a network
+            # failure from a "rejected tag" outcome (JTN PR #590 review).
+            assert data["check_error"].startswith("Couldn't reach GitHub")
             assert "network down" in data["check_error"]
+        finally:
+            mod._VERSION_CACHE["latest"] = None
+            mod._VERSION_CACHE["checked_at"] = 0.0
+            mod._VERSION_CACHE["last_error"] = None
+
+    def test_pre_release_tag_is_not_reported_as_network_failure(
+        self, client, monkeypatch
+    ):
+        """A pre-release tag (v1.2.3-rc1) should produce a "not a stable
+        release" message, not a misleading "Couldn't reach GitHub" one
+        (JTN PR #590 review feedback)."""
+        import blueprints.settings as mod
+
+        mod._VERSION_CACHE["latest"] = None
+        mod._VERSION_CACHE["checked_at"] = 0.0
+        mod._VERSION_CACHE["last_error"] = None
+
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = {
+            "tag_name": "v1.2.3-rc1",
+            "body": "release candidate",
+        }
+        mock_resp.raise_for_status = MagicMock()
+        monkeypatch.setattr(
+            "blueprints.settings.http_get", MagicMock(return_value=mock_resp)
+        )
+
+        try:
+            resp = client.get("/api/version")
+            data = resp.get_json()
+            assert data["check_succeeded"] is False
+            assert data["check_error"]
+            msg = data["check_error"]
+            # Must NOT misreport this as a network failure.
+            assert "Couldn't reach GitHub" not in msg
+            assert "network" not in msg.lower()
+            # Should identify the situation accurately.
+            assert "stable" in msg.lower()
+            assert "v1.2.3-rc1" in msg
         finally:
             mod._VERSION_CACHE["latest"] = None
             mod._VERSION_CACHE["checked_at"] = 0.0

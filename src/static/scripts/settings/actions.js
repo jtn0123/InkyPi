@@ -224,13 +224,15 @@
           } else if (data.latest) {
             showResponseModal("success", "You're on the latest version.");
           } else {
-            const detail = data.check_error
-              ? ` (${data.check_error})`
-              : "";
-            showResponseModal(
-              "failure",
-              `Unable to reach GitHub to check for updates${detail}. Try again in a moment.`
-            );
+            // Server produces a complete, self-contained reason in
+            // `check_error` (e.g. "Couldn't reach GitHub: timeout" or
+            // "Latest GitHub release (...) is not a stable X.Y.Z tag ..."),
+            // so show it verbatim instead of prepending a possibly-wrong
+            // "couldn't reach GitHub" preamble.
+            const message = data.check_error
+              ? data.check_error
+              : "Unable to check for updates. Try again later.";
+            showResponseModal("failure", message);
           }
         }
       } catch (e) {

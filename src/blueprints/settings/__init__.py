@@ -822,20 +822,26 @@ def _check_latest_version(force_refresh: bool = False) -> str | None:
             _VERSION_CACHE["release_notes"] = data.get("body")
             _VERSION_CACHE["last_error"] = None
             return latest
-        # Response decoded but the tag doesn't look like a semver release.
-        # Record that so the UI can explain what went wrong.
+        # Response decoded but the tag isn't a stable X.Y.Z release (e.g. a
+        # pre-release tag like v1.2.3-rc1). That's not a network failure, it
+        # just means there's nothing auto-installable. Record a message the
+        # client can show verbatim so we don't misreport this as "couldn't
+        # reach GitHub".
         logger.warning(
-            "Latest GitHub release tag %r does not match semver format; skipping.",
+            "Latest GitHub release tag %r is not a stable X.Y.Z release; "
+            "auto-update skipped.",
             tag,
         )
         _VERSION_CACHE["last_error"] = (
-            f"Latest GitHub release tag {tag!r} is not a semver version."
+            f"Latest GitHub release ({tag!r}) is not a stable X.Y.Z tag — "
+            "nothing to auto-install yet."
         )
     except Exception as exc:
         # Bubble up a short reason to the client. Log at INFO so it lands in
         # the in-app log panel without spamming errors on every check.
-        logger.info("Version check via GitHub API failed: %s", exc)
-        _VERSION_CACHE["last_error"] = str(exc) or exc.__class__.__name__
+        reason = str(exc) or exc.__class__.__name__
+        logger.info("Version check via GitHub API failed: %s", reason)
+        _VERSION_CACHE["last_error"] = f"Couldn't reach GitHub: {reason}"
     return None
 
 

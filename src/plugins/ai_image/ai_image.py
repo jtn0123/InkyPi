@@ -153,8 +153,6 @@ class AIImage(BasePlugin):
         template_params = super().generate_settings_template()
         template_params["api_key"] = {
             "required": True,
-            "expected_key": "OPEN_AI_SECRET",
-            "alt_key": "GOOGLE_AI_SECRET",
             "services": [
                 {"name": "OpenAI", "env_var": "OPEN_AI_SECRET"},
                 {"name": "Google", "env_var": "GOOGLE_AI_SECRET"},
