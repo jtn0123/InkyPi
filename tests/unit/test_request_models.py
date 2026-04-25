@@ -152,6 +152,27 @@ def test_parse_device_cycle_request_rejects_out_of_range() -> None:
     assert parsed is None
     assert error is not None
     assert error.field == "minutes"
+    assert "between" in error.message
+
+
+def test_parse_device_cycle_request_requires_minutes() -> None:
+    parsed, error = parse_device_cycle_request({})
+
+    assert parsed is None
+    assert error is not None
+    assert error.field == "minutes"
+    assert error.message == "Minutes is required"
+
+
+def test_parse_playlist_update_request_uses_shared_missing_time_error() -> None:
+    parsed, error = parse_playlist_update_request(
+        {"new_name": "Focus", "end_time": "12:00"}
+    )
+
+    assert parsed is None
+    assert error is not None
+    assert error.field == "start_time"
+    assert error.message == "Start time and End time are required"
 
 
 def test_parse_playlist_reorder_request_returns_ordered_payload() -> None:

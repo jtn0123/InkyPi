@@ -6,7 +6,6 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
-from model import Playlist
 from utils.messages import PLAYLIST_NAME_REQUIRED_ERROR
 
 CODE_VALIDATION = "validation_error"
@@ -140,7 +139,12 @@ def validate_playlist_name(
 
 
 def _to_minutes(time_str: str) -> int:
-    return int(Playlist._to_minutes(time_str))
+    if time_str == "24:00":
+        return 24 * 60
+    hour, minute = map(int, time_str.split(":"))
+    if hour < 0 or hour > 23 or minute < 0 or minute > 59:
+        raise ValueError("Invalid time")
+    return hour * 60 + minute
 
 
 def validate_playlist_times(
@@ -244,7 +248,9 @@ def parse_device_cycle_request(
     """Parse and validate a device refresh cadence payload."""
     if not isinstance(data, dict):
         return None, RequestModelError("Invalid minutes", field="minutes")
-    minutes = data.get("minutes") or 0
+    if "minutes" not in data or data.get("minutes") is None:
+        return None, RequestModelError("Minutes is required", field="minutes")
+    minutes = data["minutes"]
     try:
         minutes_int = int(minutes)
     except (ValueError, TypeError):
@@ -298,10 +304,6 @@ def parse_playlist_update_request(
 
     start_time = data.get("start_time")
     end_time = data.get("end_time")
-    if not start_time or not end_time:
-        missing_field = "start_time" if not start_time else "end_time"
-        return None, RequestModelError("Missing required fields", field=missing_field)
-
     start_min, end_min, time_err = validate_playlist_times(start_time, end_time)
     if time_err is not None or start_min is None or end_min is None:
         return None, time_err

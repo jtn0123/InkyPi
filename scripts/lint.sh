@@ -207,6 +207,12 @@ enforce_mypy_tests_ratchet() {
         return
     fi
 
+    if [ "$MYPY_TESTS_BASELINE" -eq 0 ] && [ "$MYPY_TESTS_EXIT" -ne 0 ]; then
+        echo "❌ mypy tests/ must remain clean now that the baseline is zero"
+        MYPY_TESTS_RATCHET_EXIT=1
+        return
+    fi
+
     if [ "$MYPY_TESTS_COUNT" -lt "$MYPY_TESTS_BASELINE" ]; then
         echo "✅ mypy tests/ ratchet improved: ${MYPY_TESTS_COUNT} issue(s) vs baseline ${MYPY_TESTS_BASELINE}"
         echo "ℹ️  Lower ${display_baseline_file} when that reduced count is ready to become the new floor."

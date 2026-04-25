@@ -561,8 +561,10 @@ jobs:
         run: |
           scripts/preflash_validate.sh
 
-  # Mutation nightly — runs daily at 09:00 UTC and weekly on Sunday 03:00 UTC
-  # via the workflow-level ``schedule:`` trigger. See docs/mutation_testing.md.
+  # Mutation nightly — runs via the workflow-level ``schedule:`` trigger
+  # (daily 09:00 UTC and weekly Sunday 03:00 UTC) and manual
+  # ``workflow_dispatch`` for ad-hoc artifact collection. Sharded by package
+  # so each shard fits in the 120-minute budget. See docs/mutation_testing.md.
   #
   mutation-nightly:
     name: Mutation nightly (${{ matrix.label }})
