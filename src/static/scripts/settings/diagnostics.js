@@ -376,21 +376,30 @@
 
     function initProgressSSE() {
       try {
-        if (!globalThis.EventSource) return;
+        if (!globalThis.EventSource || progressES) return;
         progressES = new EventSource("/api/progress/stream");
         const refresh = () => refreshHealth();
         progressES.addEventListener("done", refresh);
-        progressES.addEventListener("error", refresh);
+        progressES.addEventListener("error", () => {
+          refresh();
+          if (progressES?.readyState === globalThis.EventSource.CLOSED) {
+            stopProgressSSE();
+          }
+        });
       } catch (e) {
         console.warn("Progress SSE unavailable:", e);
       }
     }
 
-    function teardown() {
+    function stopProgressSSE() {
       if (progressES) {
         progressES.close();
         progressES = null;
       }
+    }
+
+    function teardown() {
+      stopProgressSSE();
     }
 
     function bind() {
@@ -426,6 +435,7 @@
       refreshHealth,
       refreshIsolation,
       safeReset,
+      stopProgressSSE,
       teardown,
       unIsolatePlugin,
     };

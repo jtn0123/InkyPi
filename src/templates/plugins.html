@@ -1,5 +1,8 @@
 {% extends "base.html" %}
 {% block title %}Plugins - InkyPi{% endblock %}
+{% block head %}
+    <meta name="status-badge-disabled" content="1">
+{% endblock %}
 {% block body %}
     <div class="frame">
         {% from 'macros/icons.html' import breadcrumb %}
@@ -17,7 +20,7 @@
                 eyebrow='Library',
                 chips=[{'label': plugins|length ~ ' installed', 'variant': 'accent'}]
             ) %}
-                <a href="{{ url_for('playlist.playlists') }}" class="action-button is-secondary">Open playlists</a>
+                <a href="{{ url_for('playlist.playlists') }}" class="header-button is-secondary plugins-pageheader-link">Open playlists</a>
             {% endcall %}
 
             {{ plugin_catalog(

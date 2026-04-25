@@ -278,6 +278,18 @@ button:disabled {
     opacity: 0.5;
     cursor: not-allowed;
     pointer-events: none;
+    background: var(--surface-3);
+    border-color: var(--surface-border);
+    color: var(--text-3);
+    box-shadow: none;
+    filter: none;
+    transform: none;
+}
+
+.action-button:disabled:hover,
+.header-button:disabled:hover {
+    background: var(--surface-3);
+    transform: none;
 }
 
 /* Global focus-visible outline for interactive elements */

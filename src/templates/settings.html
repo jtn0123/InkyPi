@@ -162,13 +162,14 @@
                             </div>
                             <div class="form-group">
                                 <span class="form-label" id="timeFormatLabel">Time format</span>
+                                {% set selected_time_format = device_settings.time_format if device_settings.time_format in ("12h", "24h") else "24h" %}
                                 <div class="seg seg-radio" role="radiogroup" aria-labelledby="timeFormatLabel">
                                     <label class="seg-btn">
-                                        <input type="radio" id="timeFormat" name="timeFormat" value="12h" {% if device_settings.time_format == "12h" %}checked{% endif %}>
+                                        <input type="radio" id="timeFormat" name="timeFormat" value="12h" {% if selected_time_format == "12h" %}checked{% endif %}>
                                         12 h
                                     </label>
                                     <label class="seg-btn">
-                                        <input type="radio" name="timeFormat" value="24h" {% if device_settings.time_format == "24h" %}checked{% endif %}>
+                                        <input type="radio" name="timeFormat" value="24h" {% if selected_time_format == "24h" %}checked{% endif %}>
                                         24 h
                                     </label>
                                 </div>

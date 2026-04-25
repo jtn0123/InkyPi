@@ -11,6 +11,28 @@
     background-color: var(--modal-overlay, rgba(0, 0, 0, 0.5)); /* Semi-transparent background */
 }
 
+.modal.is-open {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    background-color: var(--modal-overlay-strong, rgba(5, 8, 12, 0.72));
+    backdrop-filter: blur(3px);
+}
+
+#deletePlaylistModal,
+#deleteInstanceModal,
+#deleteHistoryModal,
+#clearHistoryModal {
+    background-color: var(--modal-overlay-destructive, rgba(5, 8, 12, 0.82));
+}
+
+#deleteHistoryModal.is-open,
+#clearHistoryModal.is-open {
+    background-color: rgba(5, 8, 12, 0.9);
+    backdrop-filter: blur(7px);
+}
+
 body.modal-open {
     overflow: hidden;
 }
@@ -19,7 +41,7 @@ body.modal-open {
    10px radius matches --radius-2 / --border-radius-lg. */
 .modal-content {
     background-color: var(--surface);
-    margin: 15% auto; /* Center the modal */
+    margin: 0 auto;
     padding: 16px;
     border-radius: var(--border-radius-lg);
     width: 90%;
@@ -230,7 +252,8 @@ body.modal-open {
 /* Enhanced Toast Notification System */
 .toast-container {
     position: fixed;
-    top: 20px;
+    top: auto;
+    bottom: 20px;
     right: 20px;
     z-index: 10000;
     display: flex;
@@ -238,6 +261,10 @@ body.modal-open {
     gap: 12px;
     pointer-events: none;
     max-width: 400px;
+}
+
+body.success-failure-modal-open .toast-container {
+    bottom: 84px;
 }
 
 .toast {
@@ -565,9 +592,11 @@ details[open] > .update-release-notes-toggle::before {
 .success-failure-modal {
     display: none;
     position: fixed;
-    top: 20px;
-    left: 50%;
-    transform: translateX(-50%);
+    top: auto;
+    right: 20px;
+    bottom: 20px;
+    left: auto;
+    transform: none;
     z-index: 1000;
     max-width: 400px;
     border-radius: 8px;
@@ -602,4 +631,3 @@ details[open] > .update-release-notes-toggle::before {
 .success-failure-modal.failure {
     background-color: var(--error);
 }
-

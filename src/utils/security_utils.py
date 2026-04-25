@@ -83,6 +83,13 @@ def validate_url_with_ips(url: str) -> tuple[str, tuple[str, ...]]:
     if hostname.lower() == "localhost":
         raise ValueError(_URL_ERR_LOCALHOST)
 
+    # DNS libraries can raise low-level IDNA/Unicode errors for malformed
+    # hostnames (for example a single label over 63 octets). Treat those as
+    # ordinary unresolvable hosts so users see one consistent validation error.
+    labels = hostname.rstrip(".").split(".")
+    if len(hostname) > 253 or any(not label or len(label) > 63 for label in labels):
+        raise ValueError(_URL_ERR_UNRESOLVABLE)
+
     # Reject bare IP addresses that are private/loopback/etc. before DNS
     try:
         addr = ipaddress.ip_address(hostname)
@@ -96,7 +103,7 @@ def validate_url_with_ips(url: str) -> tuple[str, tuple[str, ...]]:
     # Resolve hostname and check all resulting IPs
     try:
         addr_infos = socket.getaddrinfo(hostname, None)
-    except socket.gaierror as exc:
+    except (UnicodeError, OSError) as exc:
         raise ValueError(_URL_ERR_UNRESOLVABLE) from exc
 
     resolved: list[str] = []

@@ -42,6 +42,54 @@
     return { setStep, start, stop };
   }
 
+  function surfaceFieldError(result) {
+    const message = result?.error || result?.message || "";
+    const field = String(result?.field || "").toLowerCase();
+    if (!message) return false;
+    if (field && field !== "url") return false;
+    if (!field && !/url/i.test(message)) return false;
+    const input = document.querySelector("#settingsForm [name='url']");
+    if (!input) return false;
+    const group = input.closest(".form-group") || input.parentElement;
+    const describedByTokens = (input.getAttribute("aria-describedby") || "")
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean);
+    const fallbackId = input.id ? input.id + "-error" : "";
+    let messageEl = null;
+    for (const token of describedByTokens) {
+      const candidate = document.getElementById(token);
+      if (candidate?.classList.contains("validation-message")) {
+        messageEl = candidate;
+        break;
+      }
+    }
+    if (!messageEl && fallbackId) messageEl = document.getElementById(fallbackId);
+    input.setAttribute("aria-invalid", "true");
+    group?.classList.add("has-error");
+    group?.classList.remove("has-success");
+    if (messageEl) {
+      if (messageEl.id && !describedByTokens.includes(messageEl.id)) {
+        describedByTokens.push(messageEl.id);
+        input.setAttribute("aria-describedby", describedByTokens.join(" "));
+      }
+      messageEl.textContent = message;
+      messageEl.style.display = "";
+    } else if (group) {
+      const fallback = document.createElement("span");
+      fallback.className = "validation-message";
+      fallback.setAttribute("role", "alert");
+      if (fallbackId) {
+        fallback.id = fallbackId;
+        input.setAttribute("aria-describedby", fallback.id);
+      }
+      fallback.textContent = message;
+      group.appendChild(fallback);
+    }
+    try { input.focus(); } catch(e){}
+    return true;
+  }
+
   async function sendForm({ action, urls, uploadedFiles, onAfterSuccess }){
     const loadingIndicator = $('loadingIndicator');
     const progress = initProgress();
@@ -111,6 +159,7 @@
               break;
             } else if (jobInfo.status === 'error') {
               result = { error: jobInfo.error || 'Plugin render failed' };
+              surfaceFieldError(result);
               if (window.showResponseModal) window.showResponseModal('failure', `Error! ${result.error}`);
               jobDone = true;
               break;
@@ -142,6 +191,7 @@
             try { onAfterSuccess(); } catch(e){ console.error('onAfterSuccess callback error:', e); }
           }
         } else {
+          surfaceFieldError(result);
           if (window.showResponseModal) window.showResponseModal('failure', `Error!  ${result.error}`);
         }
       }
@@ -187,4 +237,3 @@
     sendForm
   };
 })();
-

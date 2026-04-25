@@ -29,6 +29,24 @@
     if (focusable) setTimeout(() => focusable.focus(), 0);
   }
 
+  function syncMobileTimeInputs() {
+    const mobile = global.matchMedia?.("(max-width: 640px)")?.matches;
+    ["start_time", "end_time"].forEach((id) => {
+      const input = document.getElementById(id);
+      if (!input) return;
+      input.type = mobile ? "text" : "time";
+      if (mobile) {
+        input.inputMode = "numeric";
+        input.pattern = "([01][0-9]|2[0-3]):[0-5][0-9]";
+        input.placeholder = "HH:MM";
+      } else {
+        input.removeAttribute("inputmode");
+        input.removeAttribute("pattern");
+        input.removeAttribute("placeholder");
+      }
+    });
+  }
+
   function restoreLastModalTrigger() {
     const lastModalTrigger = ns.runtime.lastModalTrigger;
     if (
@@ -180,6 +198,7 @@
 
   function openCreateModal(triggerEl) {
     const modal = document.getElementById("playlistModal");
+    syncMobileTimeInputs();
     document.getElementById("modalTitle").textContent = "New Playlist";
     document.getElementById("playlist_name").value = "";
     document.getElementById("editingPlaylistName").value = "";
@@ -200,6 +219,7 @@
     triggerEl
   ) {
     const modal = document.getElementById("playlistModal");
+    syncMobileTimeInputs();
     document.getElementById("modalTitle").textContent = "Update Playlist";
     document.getElementById("playlist_name").value = playlistName;
     document.getElementById("editingPlaylistName").value = playlistName;

@@ -272,20 +272,6 @@
   font-size: 0.85rem;
 }
 
-/* Visually-hidden status text is still exposed to assistive tech so screen
-   readers hear "Status: Configured (mask)" / "Status: Not configured". */
-.api-key-status {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 0.85rem;
-  color: var(--text-secondary);
-}
-
-.api-key-status strong {
-  color: var(--text);
-}
-
 .api-key-usage {
   font-size: 0.82rem;
   color: var(--text-secondary);
@@ -318,6 +304,22 @@
 .api-keys-frame .pageheader-actions .action-button {
   min-height: 40px;
   padding: 8px 14px;
+}
+
+.api-keys-save-action:disabled {
+  background: var(--surface-3);
+  color: var(--text-3);
+}
+
+@media (max-width: 640px) {
+  .api-keys-frame .pageheader-actions {
+    order: 3;
+    margin-top: 10px;
+  }
+
+  .api-keys-frame .pageheader-actions .api-keys-save-action {
+    width: 100%;
+  }
 }
 
 .settings-container.api-keys-grid {

@@ -74,22 +74,10 @@
   function _updateKeyToggle(card, configured) {
     const toggle = card.querySelector(".api-key-toggle");
     if (!toggle) return;
-    const visibleLabel = configured ? "Change" : "Add key";
-    // Keep the accessible name in sync with the visible label so
-    // screen-reader users and tooltip consumers don't see stale copy
-    // after a save/delete transition.
-    const actionLabel = configured ? "Change" : "Add";
-    const providerLabel = _labelForCard(card);
-    const accessibleLabel = providerLabel
-      ? `${actionLabel} ${providerLabel} key`
-      : visibleLabel;
+    const visibleLabel = configured ? "Change key" : "Add key";
     setToggleLabel(toggle, visibleLabel);
-    if (toggle.hasAttribute("aria-label")) {
-      toggle.setAttribute("aria-label", accessibleLabel);
-    }
-    if (toggle.hasAttribute("title")) {
-      toggle.title = accessibleLabel;
-    }
+    toggle.removeAttribute("aria-label");
+    toggle.removeAttribute("title");
     toggle.classList.toggle("is-secondary", !!configured);
     toggle.setAttribute("aria-expanded", "false");
   }
@@ -158,11 +146,7 @@
       const inputElement = document.getElementById(inputId);
       const value = inputElement ? inputElement.value : "";
       if (statusElement && value) {
-        statusElement.textContent = "";
-        const strong1 = document.createElement("strong");
-        strong1.textContent = "Status:";
-        statusElement.appendChild(strong1);
-        statusElement.appendChild(document.createTextNode(" Configured"));
+        statusElement.textContent = `Status: Configured (${_maskApiKeyValue(value)})`;
         // Insert/update the masked-key preview pill so the card's transient
         // state matches the server-rendered version after a reload.
         _upsertMaskChip(_cardForSection(sectionId), _maskApiKeyValue(value));
@@ -183,11 +167,7 @@
     const statusElement = document.getElementById(statusId);
     const inputElement = document.getElementById(inputId);
     if (statusElement) {
-      statusElement.textContent = "";
-      const strong3 = document.createElement("strong");
-      strong3.textContent = "Status:";
-      statusElement.appendChild(strong3);
-      statusElement.appendChild(document.createTextNode(" Not configured"));
+      statusElement.textContent = "Status: Not configured";
     }
     if (inputElement) {
       inputElement.value = "";
@@ -215,6 +195,12 @@
     if (!actions) return;
     actions.removeAttribute("hidden");
     button.setAttribute("aria-expanded", "true");
+    setToggleLabel(button, "Editing");
+    const providerLabel = _labelForCard(button.closest(".api-key-card"));
+    button.setAttribute(
+      "aria-label",
+      providerLabel ? `Editing ${providerLabel} API key value` : "Editing API key value"
+    );
     try {
       input.focus();
     } catch {

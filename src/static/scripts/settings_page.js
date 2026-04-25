@@ -74,11 +74,22 @@
       "createActionsModule"
     )({ config, state, shared, logs: logsModule, modals: modalModule });
 
+    function syncProgressStreamForTab(tab) {
+      if (tab === "maintenance") {
+        diagnosticsModule.initProgressSSE();
+      } else if (diagnosticsModule.stopProgressSSE) {
+        diagnosticsModule.stopProgressSSE();
+      }
+    }
+
     function init() {
       formModule.populateIntervalFields();
       formModule.bind();
       actionsModule.bind();
       diagnosticsModule.bind();
+      document.addEventListener("settingsTabChanged", (event) =>
+        syncProgressStreamForTab(event.detail?.tab)
+      );
       navigationModule.initializeTabs();
       logsModule.initializeControls();
       navigationModule.initializeCollapsibles();
@@ -87,17 +98,25 @@
       diagnosticsModule.refreshBenchmarks();
       diagnosticsModule.refreshHealth();
       diagnosticsModule.refreshIsolation();
-      diagnosticsModule.initProgressSSE();
-      setTimeout(actionsModule.checkForUpdates, 5000);
+      syncProgressStreamForTab(state.activeTab);
+      actionsModule.hydrateVersionCheckFromCache();
+      setTimeout(() => actionsModule.checkForUpdates({ silent: true }), 5000);
       actionsModule.refreshUpdateStatus();
       if (mobileQuery && typeof mobileQuery.addEventListener === "function") {
         mobileQuery.addEventListener("change", () =>
           navigationModule.setActiveTab(state.activeTab)
         );
       }
-      globalThis.addEventListener("beforeunload", () => {
+      const teardown = () => {
         actionsModule.stop();
         diagnosticsModule.teardown();
+      };
+      globalThis.addEventListener("beforeunload", teardown);
+      globalThis.addEventListener("pagehide", teardown);
+      globalThis.addEventListener("pageshow", (event) => {
+        if (event.persisted) {
+          syncProgressStreamForTab(state.activeTab);
+        }
       });
     }
 

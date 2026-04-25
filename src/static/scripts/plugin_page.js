@@ -63,6 +63,93 @@
     combined.style.color = textPicker.value;
   }
 
+  function ensureInlineValidationMessages(result) {
+    if (!result || !Array.isArray(result.invalid)) return;
+    result.invalid.forEach(({ input, message }) => {
+      if (!input) return;
+      const group = input.closest(".form-group") || input.parentElement;
+      if (!group) return;
+      let messageEl = null;
+      const describedByTokens = (input.getAttribute("aria-describedby") || "")
+        .trim()
+        .split(/\s+/)
+        .filter(Boolean);
+      for (const token of describedByTokens) {
+        const candidate = document.getElementById(token);
+        if (candidate?.classList.contains("validation-message")) {
+          messageEl = candidate;
+          break;
+        }
+      }
+      if (!messageEl) {
+        messageEl = document.createElement("span");
+        messageEl.className = "validation-message";
+        messageEl.setAttribute("role", "alert");
+        const baseId = input.id || input.name || "field";
+        messageEl.id = `${baseId}-error`;
+        group.appendChild(messageEl);
+        if (!describedByTokens.includes(messageEl.id)) {
+          describedByTokens.push(messageEl.id);
+        }
+        input.setAttribute("aria-describedby", describedByTokens.join(" "));
+      }
+      input.setAttribute("aria-invalid", "true");
+      messageEl.textContent = message || "This field is invalid";
+      messageEl.style.display = "";
+    });
+  }
+
+  function setCurrentDisplayRefresh(value) {
+    const currTime = document.getElementById("currentDisplayTime");
+    if (!currTime) return;
+    currTime.textContent = value ? new Date(value).toLocaleString() : "—";
+  }
+
+  function initScheduleFormState() {
+    const form = document.getElementById("scheduleForm");
+    if (!form) return;
+    const button = form.querySelector("[data-schedule-submit]");
+    const instanceInput = document.getElementById("instance");
+    const intervalRadio = document.getElementById("refreshTypeInterval");
+    const scheduledRadio = document.getElementById("refreshTypeScheduled");
+    const intervalInput = document.getElementById("scheduleInterval");
+    const unitInput = document.getElementById("scheduleUnit");
+    const timeInput = document.getElementById("scheduleTime");
+    const apiKeyMissing = button?.dataset.apiKeyMissing === "true";
+
+    function isInstanceValid() {
+      const value = (instanceInput?.value || "").trim();
+      return !!value && /^[A-Za-z0-9 _-]+$/.test(value);
+    }
+
+    function isCadenceValid() {
+      if (scheduledRadio?.checked) return !!timeInput?.value;
+      const min = Number(intervalInput?.min || 1);
+      return Number(intervalInput?.value) >= min;
+    }
+
+    function sync() {
+      const scheduled = !!scheduledRadio?.checked;
+      if (intervalInput) intervalInput.disabled = scheduled;
+      if (unitInput) unitInput.disabled = scheduled;
+      if (timeInput) timeInput.disabled = !scheduled;
+      if (!button || apiKeyMissing) return;
+      const valid = isInstanceValid() && isCadenceValid();
+      button.disabled = !valid;
+      button.setAttribute("aria-disabled", valid ? "false" : "true");
+      button.title = valid ? "" : "Complete the schedule fields first";
+    }
+
+    [instanceInput, intervalInput, unitInput, timeInput].forEach((input) => {
+      input?.addEventListener("input", sync);
+      input?.addEventListener("change", sync);
+    });
+    [intervalRadio, scheduledRadio].forEach((input) => {
+      input?.addEventListener("change", sync);
+    });
+    sync();
+  }
+
   /**
    * Toggle visibility of the Configure / Style / Schedule sub-panels.
    * Mirrors the React `tabline` design from the UI handoff (JTN design refresh).
@@ -110,28 +197,47 @@
         };
         localStorage.setItem(buildProgressKey(data.ctx, config), JSON.stringify(data));
         localStorage.setItem("INKYPI_LAST_PROGRESS", JSON.stringify(data));
+        syncLastProgressButton();
       } catch (e) { console.warn("Failed to save progress snapshot:", e); }
+    }
+
+    function getLastProgressSnapshot() {
+      const keys = [
+        buildProgressKey(config.progressContext, config),
+        `INKYPI_LAST_PROGRESS:plugin:${config.pluginId}:_`,
+      ];
+      for (const key of keys) {
+        const raw = localStorage.getItem(key);
+        if (!raw) continue;
+        try {
+          return JSON.parse(raw);
+        } catch (e) {
+          console.warn("Corrupt progress data, removing key:", key, e);
+          localStorage.removeItem(key);
+        }
+      }
+      return null;
+    }
+
+    function syncLastProgressButton() {
+      const button = document.getElementById("showLastProgressBtn");
+      if (!button) return;
+      try {
+        const hasSnapshot = !!getLastProgressSnapshot();
+        button.disabled = !hasSnapshot;
+        button.setAttribute("aria-disabled", hasSnapshot ? "false" : "true");
+        button.title = hasSnapshot
+          ? "Show the most recent saved progress log"
+          : "Run Update Preview first to save progress";
+      } catch {
+        button.disabled = true;
+        button.setAttribute("aria-disabled", "true");
+      }
     }
 
     function showLastProgress() {
       try {
-        const keys = [
-          buildProgressKey(config.progressContext, config),
-          `INKYPI_LAST_PROGRESS:plugin:${config.pluginId}:_`,
-        ];
-        let data = null;
-        for (const key of keys) {
-          const raw = localStorage.getItem(key);
-          if (raw) {
-            try {
-              data = JSON.parse(raw);
-              break;
-            } catch (e) {
-              console.warn("Corrupt progress data, removing key:", key, e);
-              localStorage.removeItem(key);
-            }
-          }
-        }
+        const data = getLastProgressSnapshot();
         const progress = document.getElementById("requestProgress");
         const textEl = document.getElementById("requestProgressText");
         const clockEl = document.getElementById("requestProgressClock");
@@ -201,6 +307,13 @@
           progress.style.display = "";
         }
       } catch (e) { console.warn("Failed to show last progress:", e); }
+    }
+
+    function setLatestRefresh(value) {
+      if (!value) return;
+      config.lastRefresh = value;
+      const instTimeEl = document.getElementById("instanceLastTime");
+      if (instTimeEl) instTimeEl.textContent = new Date(value).toLocaleString();
     }
 
     function renderMetaBlock(metaDiv, metaContent, info) {
@@ -286,6 +399,18 @@
     }
 
     async function handleAction(action, triggerButton) {
+      if (
+        action === "add_to_playlist" &&
+        triggerButton?.dataset.apiKeyMissing === "true"
+      ) {
+        const reasonId = triggerButton.getAttribute("aria-describedby");
+        const reason = reasonId ? document.getElementById(reasonId)?.textContent : "";
+        showResponseModal(
+          "failure",
+          (reason || "Configure the required API key first.").trim()
+        );
+        return;
+      }
       if (action === "add_to_playlist") {
         // If the schedule panel is already visible (e.g. the user clicked the
         // inline "Add to Playlist" button that lives at the bottom of
@@ -315,6 +440,7 @@
       if (settingsForm && globalThis.FormValidator) {
         const result = globalThis.FormValidator.validateAllInputsDetailed(settingsForm);
         if (result.count > 0) {
+          ensureInlineValidationMessages(result);
           showResponseModal(
             "failure",
             globalThis.FormValidator.buildValidationMessage(result)
@@ -329,6 +455,7 @@
         if (scheduleForm && globalThis.FormValidator) {
           const scheduleResult = globalThis.FormValidator.validateAllInputsDetailed(scheduleForm);
           if (scheduleResult.count > 0) {
+            ensureInlineValidationMessages(scheduleResult);
             showResponseModal(
               "failure",
               globalThis.FormValidator.buildValidationMessage(scheduleResult)
@@ -351,8 +478,7 @@
           uploadedFiles,
           onAfterSuccess: () => {
             setTimeout(() => {
-              refreshPreviewImage();
-              refreshInstancePreview();
+              refreshPreviewsAfterSuccess();
             }, 250);
             closeModal("scheduleModal");
           },
@@ -378,10 +504,30 @@
         const ts = info?.refresh_time ? new Date(info.refresh_time) : null;
         const currTime = document.getElementById("currentDisplayTime");
         if (currTime) currTime.textContent = ts ? ts.toLocaleString() : "—";
+        const pluginRefreshTime =
+          info?.plugin_id === config.pluginId ? info.refresh_time : null;
+        if (pluginRefreshTime) {
+          setLatestRefresh(info.refresh_time);
+        }
         const metaDiv = document.getElementById("pluginMeta");
         const metaContent = document.getElementById("pluginMetaContent");
         renderMetaBlock(metaDiv, metaContent, info);
+        return pluginRefreshTime || null;
       } catch (e) { console.warn("Failed to refresh preview info:", e); }
+      return null;
+    }
+
+    async function refreshPreviewsAfterSuccess() {
+      let refreshedAt = null;
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        refreshedAt = await refreshPreviewImage();
+        if (refreshedAt) break;
+        if (attempt < 2) await new Promise((resolve) => setTimeout(resolve, 350));
+      }
+      const resolvedRefresh = refreshedAt || new Date().toISOString();
+      setLatestRefresh(resolvedRefresh);
+      setCurrentDisplayRefresh(resolvedRefresh);
+      await refreshInstancePreview({ force: true });
     }
 
     // Track the element that triggered the most-recently opened modal so focus
@@ -483,7 +629,7 @@
       return null;
     }
 
-    async function refreshInstancePreview() {
+    async function refreshInstancePreview({ force = false } = {}) {
       const instImgEl = document.getElementById("instancePreviewImage");
       if (!instImgEl) return;
       const skeleton = instImgEl.previousElementSibling;
@@ -495,7 +641,7 @@
       // Avoid probing image endpoints before the backend has ever produced
       // output for this plugin or instance. That state is expected on a fresh
       // page and should render the empty fallback without console noise.
-      if (!config.lastRefresh) {
+      if (!config.lastRefresh && !force) {
         setHidden(instImgEl, true);
         setHidden(skeleton, true);
         setHidden(fallback, false);
@@ -547,8 +693,7 @@
         } else {
           showResponseModal("success", `Success! ${result.message}`);
           setTimeout(() => {
-            refreshPreviewImage();
-            refreshInstancePreview();
+            refreshPreviewsAfterSuccess();
           }, 400);
         }
       } catch (e) {
@@ -812,6 +957,7 @@
         if (settingsForm && globalThis.FormValidator) {
           const result = globalThis.FormValidator.validateAllInputsDetailed(settingsForm);
           if (result.count > 0) {
+            ensureInlineValidationMessages(result);
             showResponseModal(
               "failure",
               globalThis.FormValidator.buildValidationMessage(result)
@@ -866,6 +1012,7 @@
         });
       });
       document.getElementById("showLastProgressBtn")?.addEventListener("click", showLastProgress);
+      syncLastProgressButton();
       // Persistent progress card: render whatever the last snapshot is
       // (or the empty-state) on first load so the aside card always has content.
       // showLastProgress reads cached snapshot JSON from localStorage and can
@@ -914,6 +1061,7 @@
     function init() {
       populateStyleSettings();
       bindControls();
+      initScheduleFormState();
       const scheduleForm = document.getElementById("scheduleForm");
       if (scheduleForm && globalThis.FormValidator?.initFormValidation) {
         globalThis.FormValidator.initFormValidation(scheduleForm);

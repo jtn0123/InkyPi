@@ -76,6 +76,15 @@ def test_secondary_button_styles_share_surface_treatment_and_compact_scale():
     assert "border: 1px solid var(--surface-border)" in header_secondary
 
 
+def test_disabled_buttons_do_not_keep_primary_fill():
+    button_css = BUTTON_CSS.read_text(encoding="utf-8")
+    disabled_block = _css_block(button_css, ".action-button:disabled")
+
+    assert "background: var(--surface-3)" in disabled_block
+    assert "color: var(--text-3)" in disabled_block
+    assert "transform: none" in disabled_block
+
+
 def test_playlist_add_row_reads_as_clickable_recovery_action():
     css = PLAYLIST_ITEM_CSS.read_text(encoding="utf-8")
     add_row = _css_block(css, ".pl-add-row")

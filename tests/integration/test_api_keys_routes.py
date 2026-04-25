@@ -136,6 +136,23 @@ def test_api_keys_page_configured_fields_have_leave_blank_placeholder(
     assert "enter unsplash" in unsplash_input.group(0).lower()
 
 
+def test_api_key_toggle_buttons_keep_accessible_names(client, device_config_dev):
+    """Icon-only responsive states must still expose unique button names."""
+    device_config_dev.set_env_key("OPEN_AI_SECRET", "real-openai-key-abc123")
+
+    resp = client.get("/settings/api-keys")
+
+    assert resp.status_code == 200
+    body = resp.data.decode("utf-8")
+    assert '<span data-role="toggle-label">Change key</span>' in body
+    assert '<span data-role="toggle-label">Add key</span>' in body
+    assert '<span class="sr-only" data-role="toggle-context"> for OpenAI</span>' in body
+    assert '<span class="sr-only" data-role="toggle-context"> for GitHub</span>' in body
+    assert (
+        '<span class="sr-only" data-role="toggle-context"> for Google AI</span>' in body
+    )
+
+
 def test_save_api_keys_whitespace_padded_bullets_are_rejected(
     client, monkeypatch, tmp_path
 ):

@@ -31,12 +31,12 @@
             {% if masked[key_name] %}
                 <span class="api-mask mono" aria-hidden="true">{{ masked[key_name] }}</span>
                 <span class="status-chip success has-dot" data-role="key-chip">Configured</span>
-                <div id="{{ status_id }}" class="api-key-status sr-only"><strong>Status:</strong> Configured ({{ masked[key_name] }})</div>
-                <button type="button" class="header-button is-secondary api-key-toggle" data-api-action="reveal-input" data-input-id="{{ input_id }}" aria-expanded="false" aria-controls="{{ input_id }}-actions">{{ icon('pencil-simple', 'btn-leading-icon') | safe }}<span data-role="toggle-label">Change</span></button>
+                <div id="{{ status_id }}" class="api-key-status sr-only">Status: Configured ({{ masked[key_name] }})</div>
+                <button type="button" class="header-button is-secondary api-key-toggle" data-api-action="reveal-input" data-input-id="{{ input_id }}" aria-expanded="false" aria-controls="{{ input_id }}-actions">{{ icon('pencil-simple', 'btn-leading-icon') | safe }}<span data-role="toggle-label">Change key</span><span class="sr-only" data-role="toggle-context"> for {{ label }}</span></button>
             {% else %}
                 <span class="status-chip warning has-dot" data-role="key-chip">Not set</span>
-                <div id="{{ status_id }}" class="api-key-status sr-only"><strong>Status:</strong> Not configured</div>
-                <button type="button" class="header-button api-key-toggle" data-api-action="reveal-input" data-input-id="{{ input_id }}" aria-expanded="false" aria-controls="{{ input_id }}-actions"><span data-role="toggle-label">Add key</span></button>
+                <div id="{{ status_id }}" class="api-key-status sr-only">Status: Not configured</div>
+                <button type="button" class="header-button api-key-toggle" data-api-action="reveal-input" data-input-id="{{ input_id }}" aria-expanded="false" aria-controls="{{ input_id }}-actions"><span data-role="toggle-label">Add key</span><span class="sr-only" data-role="toggle-context"> for {{ label }}</span></button>
             {% endif %}
         </div>
     </div>

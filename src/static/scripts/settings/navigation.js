@@ -52,6 +52,9 @@
         panel.setAttribute("aria-hidden", isActive ? "false" : "true");
       }
       initializeMobilePanelState();
+      document.dispatchEvent(
+        new CustomEvent("settingsTabChanged", { detail: { tab } })
+      );
     }
 
     function activateTabForHash() {

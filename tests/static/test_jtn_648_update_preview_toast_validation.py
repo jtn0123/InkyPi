@@ -92,8 +92,12 @@ def test_plugin_page_update_preview_handler_still_uses_detailed_validator(client
     assert handle_idx != -1, "handleAction must exist in plugin_page.js"
 
     # Inside handleAction we expect the detailed validator + buildValidationMessage
-    # + focusFirstInvalid for settingsForm (JTN-378 contract).
-    handle_body = js[handle_idx : handle_idx + 2000]
+    # + focusFirstInvalid for settingsForm (JTN-378 contract). Bound the slice
+    # to the next nested function so this guard does not depend on an arbitrary
+    # character window as nearby branches grow.
+    next_function_idx = js.find("async function refreshPreviewImage(", handle_idx)
+    assert next_function_idx != -1, "refreshPreviewImage must follow handleAction"
+    handle_body = js[handle_idx:next_function_idx]
     assert "validateAllInputsDetailed(settingsForm)" in handle_body
     assert "buildValidationMessage(result)" in handle_body
     assert "focusFirstInvalid(settingsForm)" in handle_body

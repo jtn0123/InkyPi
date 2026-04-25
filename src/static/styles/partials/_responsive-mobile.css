@@ -400,7 +400,7 @@
         gap: 8px;
     }
 
-    .api-key-status {
+    .api-key-status:not(.sr-only) {
         font-size: 0.8rem;
     }
 
@@ -459,4 +459,3 @@
         padding-bottom: 8px;
     }
 }
-

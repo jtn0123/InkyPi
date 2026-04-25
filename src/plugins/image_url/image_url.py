@@ -34,9 +34,12 @@ class ImageURL(BasePlugin):
                 "Source",
                 field(
                     "url",
+                    "url",
                     label="Image URL",
                     placeholder="https://example.com/image.jpg",
+                    pattern="https?://.+",
                     required=True,
+                    validation_id="url-error",
                 ),
                 callout(
                     "Use trusted image URLs only. Remote images can fail if the source is slow, blocked, or returns unsupported formats.",

@@ -347,7 +347,8 @@
     .toast-container {
         right: 12px;
         left: 12px;
-        top: 16px;
+        top: auto;
+        bottom: max(16px, calc(env(safe-area-inset-bottom, 0px) + 16px));
         max-width: none;
     }
 
@@ -361,4 +362,3 @@
         width: 95%;
     }
 }
-

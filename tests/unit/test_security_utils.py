@@ -184,6 +184,22 @@ class TestValidateUrlDns:
         with pytest.raises(ValueError, match="Cannot resolve hostname"):
             validate_url("http://nonexistent.invalid")
 
+    def test_overlong_hostname_rejected_before_dns(self, monkeypatch):
+        def fail_getaddrinfo(*args, **kwargs):
+            pytest.fail("overlong hostnames should be rejected before DNS lookup")
+
+        monkeypatch.setattr(socket, "getaddrinfo", fail_getaddrinfo)
+        with pytest.raises(ValueError, match="Cannot resolve hostname"):
+            validate_url(f"https://{'a' * 64}.example.com/image.jpg")
+
+    def test_idna_resolution_error_is_normalized(self, monkeypatch):
+        def raise_unicode_error(*args, **kwargs):
+            raise UnicodeError("label too long")
+
+        monkeypatch.setattr(socket, "getaddrinfo", raise_unicode_error)
+        with pytest.raises(ValueError, match="Cannot resolve hostname"):
+            validate_url("https://example.com/image.jpg")
+
 
 # ---------------------------------------------------------------------------
 # File path validation — happy paths

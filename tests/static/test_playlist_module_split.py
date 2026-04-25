@@ -50,3 +50,16 @@ def test_playlist_bootstrap_stays_thin_and_boot_oriented():
 def test_playlist_page_drops_dead_next_in_timer():
     js = PLAYLIST_PAGE_JS.read_text()
     assert "renderNextIn" not in js
+
+
+def test_playlist_name_input_matches_client_validation_limits():
+    html = PLAYLIST_HTML.read_text(encoding="utf-8")
+    assert 'id="playlist_name"' in html
+    assert 'maxlength="64"' in html
+    assert 'pattern="[A-Za-z0-9 _-]+"' in html
+
+    form_js = (ROOT / "src" / "static" / "scripts" / "playlist" / "form.js").read_text(
+        encoding="utf-8"
+    )
+    assert 'event.inputType !== "insertFromPaste"' in form_js
+    assert "Name must be 64 characters or fewer" in form_js

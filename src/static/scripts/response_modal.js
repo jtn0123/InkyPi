@@ -150,6 +150,8 @@ function showResponseModal(status, message, useToast = true) {
     // Display Modal
     modal.hidden = false;
     modal.style.display = 'block';
+    modal.classList.add('is-visible');
+    document.body.classList.add('success-failure-modal-open');
     if (closeButton) {
         setTimeout(() => closeButton.focus(), 0);
     }
@@ -166,7 +168,9 @@ function closeResponseModal() {
     if (modal) {
         modal.hidden = true;
         modal.style.display = 'none';
+        modal.classList.remove('is-visible');
     }
+    document.body.classList.remove('success-failure-modal-open');
     if (lastResponseModalTrigger) {
         try {
             lastResponseModalTrigger.focus();
