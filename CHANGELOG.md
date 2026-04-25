@@ -1,6 +1,106 @@
 # CHANGELOG
 
 
+## v1.0.4 (2026-04-25)
+
+### Bug Fixes
+
+- Unblock segmented radios, update check, and copy logs
+  ([#590](https://github.com/jtn0123/InkyPi/pull/590),
+  [`e7f653f`](https://github.com/jtn0123/InkyPi/commit/e7f653fedca36a5dd235d298f0deb827f83bc2e3))
+
+* fix: unblock segmented radios, update check, and copy logs
+
+Three user-reported papercuts in the Settings console plus an ai_image polish pass:
+
+Segmented radios - .seg-radio positioned each invisible radio at inset:0 of the shared group, so the
+  last radio in DOM order stacked on top and stole every click. Clicking "Horizontal", "Fit to
+  container", or "12 h" actually selected the sibling. Scope position:relative to each .seg-btn so
+  every radio is bounded by its own label.
+
+Check for updates - /api/version cached for 1h and silently returned None on failure, so
+  stale/failed state served "You're on the latest version" forever. Add force_refresh=True path
+  (?force=1), record last_error in the cache, surface check_succeeded + check_error in the JSON, and
+  have the manual Check button force-refresh + render the real failure reason instead of a false "up
+  to date".
+
+Copy logs - navigator.clipboard requires a secure context; InkyPi on HTTP LAN doesn't get one, so
+  copyText returned false before trying. Add a hidden-textarea + document.execCommand('copy')
+  fallback so the button works over HTTP.
+
+ai_image polish - Add GPT Image 2 option (now default) alongside 1.5, with matching quality presets.
+  - Replace the shared "OpenAI / Google" service label with a structured services list. The
+  blueprint computes presence per provider so the chip/card only advertise the provider(s) actually
+  configured. - Tighten field copy and remix-prompt resilience: randomize failures now fall back to
+  the original prompt instead of aborting generation.
+
+Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>
+
+* style: Black format + type option() so mypy ratchet stays under baseline
+
+Lint-and-type-check CI surfaced two issues on the prior commit:
+
+1. Black wanted to reformat four files (no logic change). Apply the formatting Black asked for. 2.
+  Each of the four new option() calls I added for GPT Image 2 landed on "Call to untyped function
+  'option' in typed context", pushing the mypy ratchet from 1446 to 1450 (limit 1447). Annotate
+  option() itself so every call site becomes a typed call; drops the src/ mypy total from 1450 to
+  1349, well below the baseline.
+
+* fix(review): accurate pre-release wording + drop dead expected_key/alt_key
+
+CodeRabbit review feedback on PR #590:
+
+- Pre-release tags like v1.2.3-rc1 fired the tag-filter branch of _check_latest_version and the user
+  saw a misleading toast reading "Unable to reach GitHub to check for updates (... is not a semver
+  version). Try again in a moment." — but v1.2.3-rc1 *is* semver and GitHub *was* reached. Rewrite
+  the server-side message to accurately describe "not a stable X.Y.Z tag — nothing to auto-install
+  yet", and reshape the exception-path message to a self-contained "Couldn't reach GitHub:
+  <reason>". Update the client to render check_error verbatim instead of prepending a "couldn't
+  reach GitHub" preamble that may not be true.
+
+- With `services` now the source of truth in the blueprint's api_key resolver, the `expected_key` /
+  `alt_key` fields in ai_image and ai_text were dead — the `else` branch never runs for these
+  plugins. Drop both fields and update the tests that asserted them. Added a new unit test locking
+  in the pre-release wording fix.
+
+* refactor(sonar): trim plugin_page complexity and clean up JS smells
+
+SonarCloud findings on PR #590:
+
+- src/blueprints/plugin.py:83 — plugin_page cognitive complexity was 30 after the new api_key
+  services block (limit 15). Extract the resolver into _resolve_api_key_presence +
+  _resolve_multi_service_api_key helpers. Same behavior; plugin_page stays well under the threshold.
+
+- src/static/scripts/settings/actions.js — nested ternary on the fetchVersionData force-param line.
+  Split into an appendForceParam helper so the outer ternary is the only conditional left.
+
+- src/static/scripts/settings/shared.js — document.execCommand is deprecated but is the only
+  clipboard path from a non-secure context (InkyPi on LAN-over-HTTP). Annotate the call site with
+  NOSONAR + rationale comment so the deprecation warning doesn't drown real signal. Extract the
+  focus-restore try/catch into restoreFocus() and replace the `/* ignore */` swallow with a
+  console.debug that explains why the failure is non-fatal.
+
+* test(ai_image): cover remix fallbacks + GPT Image 2 schema
+
+SonarCloud gated the PR on new-code coverage (76.3% vs 80% required). The uncovered lines were
+  concentrated in ai_image.py — the Gemini remix fallback paths and the GPT Image 2 schema additions
+  weren't exercised by any existing test, so the new-code coverage for that file sat at 47.5%.
+
+Adds tests for:
+
+- _maybe_randomize_openai_prompt with empty remix output - _maybe_randomize_google_prompt success
+  path - _maybe_randomize_google_prompt exception path - _maybe_randomize_google_prompt empty-output
+  path - Randomize disabled → remixer is never called (both providers) - fetch_image_prompt_google
+  with None and whitespace-only text - build_settings_schema exposes gpt-image-2 and its quality
+  presets - End-to-end Google randomize + remix failure → original prompt still reaches Imagen
+
+ai_image.py coverage: 47.5% → 95% (5% remaining is pre-existing validate_settings error paths).
+
+---------
+
+Co-authored-by: Claude Opus 4.7 <noreply@anthropic.com>
+
+
 ## v1.0.3 (2026-04-25)
 
 ### Bug Fixes
