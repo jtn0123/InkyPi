@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import os
 import queue
+import signal
 import threading
 from collections.abc import Callable, Mapping
 from datetime import datetime
@@ -72,15 +73,13 @@ class RefreshExecutor:
     @staticmethod
     def cleanup_subprocess(proc: Any, plugin_id: str) -> None:
         """Terminate a subprocess that is still alive after its timeout."""
-        import signal as _signal
-
         getpgid = getattr(os, "getpgid", None)
         killpg = getattr(os, "killpg", None)
         if callable(getpgid) and callable(killpg):
             try:
                 pgid = getpgid(proc.pid)
                 if pgid != getpgid(0):
-                    killpg(pgid, _signal.SIGKILL)  # NOSONAR
+                    killpg(pgid, signal.SIGKILL)  # NOSONAR
             except OSError:
                 pass
 
@@ -105,11 +104,28 @@ class RefreshExecutor:
         attempt: int,
     ) -> tuple[Any, Any]:
         """Read and validate the result queue from a finished subprocess."""
+        return self.handle_process_result_payload(
+            result_queue,
+            proc,
+            plugin_id,
+            attempt,
+            remote_exception_factory=self.remote_exception_factory,
+        )
+
+    @staticmethod
+    def handle_process_result_payload(
+        result_queue: Any,
+        proc: Any,
+        plugin_id: str,
+        attempt: int,
+        remote_exception_factory: RemoteExceptionFactory = _remote_exception,
+    ) -> tuple[Any, Any]:
+        """Read and validate the result queue from a finished subprocess."""
         try:
             payload = result_queue.get_nowait()
         except queue.Empty:
             payload = None
-        if not payload:
+        if payload is None:
             if proc.exitcode == 0:
                 raise RuntimeError(
                     f"Plugin '{plugin_id}' exited without returning a result"
@@ -131,7 +147,7 @@ class RefreshExecutor:
                 attempt,
             )
             return result_image, payload.get("plugin_meta")
-        return None, self.remote_exception_factory(
+        return None, remote_exception_factory(
             str(payload.get("error_type") or "RuntimeError"),
             str(payload.get("error_message") or "unknown error"),
         )
@@ -189,14 +205,17 @@ class RefreshExecutor:
     ) -> tuple[Any, Any]:
         """Run a plugin with the configured retry and isolation policy."""
         plugin_id = refresh_action.get_plugin_id()
-        retries = int(os.getenv("INKYPI_PLUGIN_RETRY_MAX", "1") or "1")
-        backoff_ms = int(os.getenv("INKYPI_PLUGIN_RETRY_BACKOFF_MS", "500") or "500")
+        _retries, backoff_ms, attempts = self.retry_policy()
         timeout_s = self.plugin_timeout_seconds(plugin_id)
-        attempts = max(1, retries + 1)
 
         isolation = (os.getenv("INKYPI_PLUGIN_ISOLATION") or "process").strip().lower()
         if isolation == "none":
-            return self.execute_inprocess(refresh_action, plugin_config, current_dt)
+            return self.execute_inprocess(
+                refresh_action,
+                plugin_config,
+                current_dt,
+                request_id=request_id,
+            )
 
         last_exc: BaseException | None = None
         for attempt in range(1, attempts + 1):
@@ -246,16 +265,37 @@ class RefreshExecutor:
         plugin_id: str,
     ) -> tuple[Callable[[], None], dict[str, Any], threading.Event]:
         """Return a worker function plus result holder and cancel event."""
+        return self.make_inprocess_worker_for(
+            refresh_action=refresh_action,
+            plugin_config=plugin_config,
+            device_config=device_config,
+            current_dt=current_dt,
+            plugin_id=plugin_id,
+            zombie_owner=self.zombie_owner,
+            get_plugin_instance=self.get_plugin_instance,
+        )
+
+    @staticmethod
+    def make_inprocess_worker_for(
+        *,
+        refresh_action: RefreshAction,
+        plugin_config: Mapping[str, Any],
+        device_config: Any,
+        current_dt: datetime,
+        plugin_id: str,
+        zombie_owner: ZombieStateOwner,
+        get_plugin_instance: GetPluginInstance,
+    ) -> tuple[Callable[[], None], dict[str, Any], threading.Event]:
+        """Return a worker function plus result holder and cancel event."""
         result_holder: dict[str, Any] = {}
         cancel_event = threading.Event()
-        result_holder["cancel_event"] = cancel_event
 
         def _worker(
             holder: dict[str, Any] = result_holder,
             _cancel: threading.Event = cancel_event,
         ) -> None:
             try:
-                plugin = self.get_plugin_instance(dict(plugin_config))
+                plugin = get_plugin_instance(dict(plugin_config))
                 image = refresh_action.execute(plugin, device_config, current_dt)
                 meta = None
                 if hasattr(plugin, "get_latest_metadata"):
@@ -266,15 +306,15 @@ class RefreshExecutor:
                 holder["error"] = exc
             finally:
                 if _cancel.is_set():
-                    with self.zombie_owner._zombie_thread_lock:
-                        self.zombie_owner._zombie_thread_count = max(
-                            0, self.zombie_owner._zombie_thread_count - 1
+                    with zombie_owner._zombie_thread_lock:
+                        zombie_owner._zombie_thread_count = max(
+                            0, zombie_owner._zombie_thread_count - 1
                         )
                     logger.info(
                         "Zombie thread for plugin '%s' has finished. "
                         "Active zombie threads: %d",
                         plugin_id,
-                        self.zombie_owner._zombie_thread_count,
+                        zombie_owner._zombie_thread_count,
                     )
 
         return _worker, result_holder, cancel_event
@@ -283,10 +323,26 @@ class RefreshExecutor:
         self, plugin_id: str, timeout_s: float, cancel_event: threading.Event
     ) -> TimeoutError:
         """Mark a timed-out worker thread as a zombie and return a TimeoutError."""
+        return self.handle_thread_timeout_for(
+            plugin_id,
+            timeout_s,
+            cancel_event,
+            zombie_owner=self.zombie_owner,
+        )
+
+    @staticmethod
+    def handle_thread_timeout_for(
+        plugin_id: str,
+        timeout_s: float,
+        cancel_event: threading.Event,
+        *,
+        zombie_owner: ZombieStateOwner,
+    ) -> TimeoutError:
+        """Mark a timed-out worker thread as a zombie and return a TimeoutError."""
         cancel_event.set()
-        with self.zombie_owner._zombie_thread_lock:
-            self.zombie_owner._zombie_thread_count += 1
-            zombie_count = self.zombie_owner._zombie_thread_count
+        with zombie_owner._zombie_thread_lock:
+            zombie_owner._zombie_thread_count += 1
+            zombie_count = zombie_owner._zombie_thread_count
         logger.warning(
             "Plugin '%s' timed out after %ds — cancellation event set. "
             "Thread cannot be force-killed; it will run until completion. "
@@ -295,20 +351,19 @@ class RefreshExecutor:
             int(timeout_s),
             zombie_count,
         )
-        return TimeoutError(self.timeout_msg(plugin_id, timeout_s))
+        return TimeoutError(RefreshExecutor.timeout_msg(plugin_id, timeout_s))
 
     def execute_inprocess(
         self,
         refresh_action: RefreshAction,
         plugin_config: Mapping[str, Any],
         current_dt: datetime,
+        request_id: str | None = None,
     ) -> tuple[Any, Any]:
         """Run a plugin directly in the current process with retries and timeout."""
         plugin_id = refresh_action.get_plugin_id()
-        retries = int(os.getenv("INKYPI_PLUGIN_RETRY_MAX", "1") or "1")
-        backoff_ms = int(os.getenv("INKYPI_PLUGIN_RETRY_BACKOFF_MS", "500") or "500")
+        _retries, backoff_ms, attempts = self.retry_policy()
         timeout_s = self.plugin_timeout_seconds(plugin_id)
-        attempts = max(1, retries + 1)
 
         last_exc: BaseException | None = None
         for attempt in range(1, attempts + 1):
@@ -337,11 +392,31 @@ class RefreshExecutor:
                 raise last_exc
 
             if attempt < attempts:
+                logger.warning(
+                    "plugin_lifecycle: attempt_retry | plugin_id=%s attempt=%s/%s backoff_ms=%s error=%s",
+                    plugin_id,
+                    attempt,
+                    attempts,
+                    backoff_ms,
+                    last_exc,
+                )
                 sleep(max(0.0, backoff_ms / 1000.0))
+                self.recorder.publish_step(
+                    plugin_id=plugin_id,
+                    request_id=request_id,
+                    step=f"retry {attempt}/{attempts - 1}",
+                )
 
         if last_exc is not None:
             raise last_exc
         raise RuntimeError(f"Plugin '{plugin_id}' failed with unknown error")
+
+    @staticmethod
+    def retry_policy() -> tuple[int, int, int]:
+        retries = int(os.getenv("INKYPI_PLUGIN_RETRY_MAX", "1") or "1")
+        backoff_ms = int(os.getenv("INKYPI_PLUGIN_RETRY_BACKOFF_MS", "500") or "500")
+        attempts = max(1, retries + 1)
+        return retries, backoff_ms, attempts
 
     @staticmethod
     def _normalize_timeout(

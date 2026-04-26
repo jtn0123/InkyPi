@@ -109,6 +109,7 @@ class RefreshTask:
             get_plugin_instance=lambda cfg: get_plugin_instance(cfg),
             mp_context_factory=lambda: _get_mp_context(),
         )
+        self._executor_run_subprocess_attempt = self.executor.run_subprocess_attempt
         self._tick_count: int = 0
         self.watchdog_thread: threading.Thread | None = None
 
@@ -864,15 +865,12 @@ class RefreshTask:
         attempt: int,
     ) -> tuple[Any, Any]:
         """Read and validate the result queue from a finished subprocess."""
-        executor = RefreshExecutor(
-            device_config=None,
-            refresh_context=cast(Any, None),
-            recorder=cast(Any, None),
-            plugin_timeout_seconds=lambda _plugin_id: 60.0,
-            zombie_owner=RefreshTask,
-            get_plugin_instance=lambda _cfg: None,
+        return RefreshExecutor.handle_process_result_payload(
+            result_queue,
+            proc,
+            plugin_id,
+            attempt,
         )
-        return executor.handle_process_result(result_queue, proc, plugin_id, attempt)
 
     def _run_subprocess_attempt(
         self,
@@ -884,7 +882,7 @@ class RefreshTask:
         attempt: int,
     ) -> tuple[Any, Any]:
         """Spawn a subprocess for one plugin execution attempt."""
-        return self.executor.run_subprocess_attempt(
+        return self._executor_run_subprocess_attempt(
             refresh_action,
             plugin_config,
             current_dt,
@@ -901,23 +899,8 @@ class RefreshTask:
         request_id: str | None = None,
     ) -> tuple[Any, Any]:
         """Run a plugin with the configured retry and isolation policy."""
-        # Preserve existing private-test hooks that monkeypatch
-        # ``task._run_subprocess_attempt`` while the real policy lives in the
-        # executor collaborator.
-        attempt_runner = self._run_subprocess_attempt
-        if (
-            getattr(attempt_runner, "__func__", None)
-            is RefreshTask._run_subprocess_attempt
-        ):
-            return self.executor.execute_with_policy(
-                refresh_action,
-                plugin_config,
-                current_dt,
-                request_id=request_id,
-            )
-
         original_runner = self.executor.run_subprocess_attempt
-        cast(Any, self.executor).run_subprocess_attempt = attempt_runner
+        cast(Any, self.executor).run_subprocess_attempt = self._run_subprocess_attempt
         try:
             return self.executor.execute_with_policy(
                 refresh_action,
@@ -929,8 +912,8 @@ class RefreshTask:
             cast(Any, self.executor).run_subprocess_attempt = original_runner
 
     # Class-level counter tracking threads that timed out but could not be stopped.
-    # Python threads cannot be force-killed; cooperative plugins should check the
-    # cancel_event passed via result_holder["cancel_event"] and exit early.
+    # Python threads cannot be force-killed; the cancel event is internal
+    # lifecycle bookkeeping that lets the worker decrement this count on exit.
     _zombie_thread_count: ClassVar[int] = 0
     _zombie_thread_lock: ClassVar[threading.Lock] = threading.Lock()
 
@@ -943,20 +926,14 @@ class RefreshTask:
         plugin_id: str,
     ) -> tuple[Callable[[], None], dict[str, Any], threading.Event]:
         """Return a ``(worker_fn, result_holder, cancel_event)`` tuple."""
-        executor = RefreshExecutor(
+        return RefreshExecutor.make_inprocess_worker_for(
+            refresh_action=refresh_action,
+            plugin_config=plugin_config,
             device_config=device_config,
-            refresh_context=cast(Any, None),
-            recorder=cast(Any, None),
-            plugin_timeout_seconds=lambda _plugin_id: 60.0,
+            current_dt=current_dt,
+            plugin_id=plugin_id,
             zombie_owner=RefreshTask,
             get_plugin_instance=lambda cfg: get_plugin_instance(cfg),
-        )
-        return executor.make_inprocess_worker(
-            refresh_action,
-            plugin_config,
-            device_config,
-            current_dt,
-            plugin_id,
         )
 
     @staticmethod
@@ -964,15 +941,12 @@ class RefreshTask:
         plugin_id: str, timeout_s: float, cancel_event: threading.Event
     ) -> TimeoutError:
         """Mark a timed-out worker thread as a zombie and return a TimeoutError."""
-        executor = RefreshExecutor(
-            device_config=None,
-            refresh_context=cast(Any, None),
-            recorder=cast(Any, None),
-            plugin_timeout_seconds=lambda _plugin_id: timeout_s,
+        return RefreshExecutor.handle_thread_timeout_for(
+            plugin_id,
+            timeout_s,
+            cancel_event,
             zombie_owner=RefreshTask,
-            get_plugin_instance=lambda _cfg: None,
         )
-        return executor.handle_thread_timeout(plugin_id, timeout_s, cancel_event)
 
     def _execute_inprocess(
         self,

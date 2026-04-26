@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import threading
+import time
 from datetime import UTC, datetime
+from types import MethodType
 from typing import Any
 
 import pytest
@@ -53,7 +55,15 @@ def test_executor_policy_retries_transient_subprocess_error(monkeypatch: Any) ->
     image = Image.new("RGB", (4, 4), "blue")
     calls = {"count": 0}
 
-    def attempt(*args: Any, **kwargs: Any) -> tuple[Any, Any]:
+    def attempt(
+        self: RefreshExecutor,
+        refresh_action: Any,
+        plugin_config: Any,
+        current_dt: datetime,
+        plugin_id: str,
+        timeout_s: float,
+        attempt_number: int,
+    ) -> tuple[Any, Any]:
         calls["count"] += 1
         if calls["count"] == 1:
             return None, RuntimeError("temporary")
@@ -62,7 +72,7 @@ def test_executor_policy_retries_transient_subprocess_error(monkeypatch: Any) ->
     monkeypatch.setenv("INKYPI_PLUGIN_ISOLATION", "process")
     monkeypatch.setenv("INKYPI_PLUGIN_RETRY_MAX", "1")
     monkeypatch.setenv("INKYPI_PLUGIN_RETRY_BACKOFF_MS", "0")
-    executor.run_subprocess_attempt = attempt
+    executor.run_subprocess_attempt = MethodType(attempt, executor)
 
     result, meta = executor.execute_with_policy(
         _Action(), {}, datetime.now(UTC), request_id="req-1"
@@ -84,13 +94,21 @@ def test_executor_policy_skips_retry_for_permanent_error(monkeypatch: Any) -> No
     executor, _recorder = _make_executor()
     calls = {"count": 0}
 
-    def attempt(*args: Any, **kwargs: Any) -> tuple[Any, Any]:
+    def attempt(
+        self: RefreshExecutor,
+        refresh_action: Any,
+        plugin_config: Any,
+        current_dt: datetime,
+        plugin_id: str,
+        timeout_s: float,
+        attempt_number: int,
+    ) -> tuple[Any, Any]:
         calls["count"] += 1
         return None, PermanentPluginError("bad URL")
 
     monkeypatch.setenv("INKYPI_PLUGIN_ISOLATION", "process")
     monkeypatch.setenv("INKYPI_PLUGIN_RETRY_MAX", "3")
-    executor.run_subprocess_attempt = attempt
+    executor.run_subprocess_attempt = MethodType(attempt, executor)
 
     with pytest.raises(PermanentPluginError, match="bad URL"):
         executor.execute_with_policy(_Action(), {}, datetime.now(UTC))
@@ -119,6 +137,37 @@ def test_executor_inprocess_success_returns_image_and_metadata(
     assert meta == {"source": "test"}
 
 
+def test_executor_inprocess_retry_publishes_request_step(monkeypatch: Any) -> None:
+    image = Image.new("RGB", (4, 4), "purple")
+    calls = {"count": 0}
+
+    class Plugin:
+        def generate_image(self, settings: Any, device_config: Any) -> Image.Image:
+            calls["count"] += 1
+            if calls["count"] == 1:
+                raise RuntimeError("temporary")
+            return image
+
+    executor, recorder = _make_executor(get_plugin_instance=lambda _cfg: Plugin())
+    monkeypatch.setenv("INKYPI_PLUGIN_RETRY_MAX", "1")
+    monkeypatch.setenv("INKYPI_PLUGIN_RETRY_BACKOFF_MS", "0")
+
+    result, meta = executor.execute_inprocess(
+        _Action(), {}, datetime.now(UTC), request_id="req-2"
+    )
+
+    assert result is image
+    assert meta is None
+    assert calls["count"] == 2
+    assert recorder.steps == [
+        {
+            "plugin_id": "clock",
+            "request_id": "req-2",
+            "step": "retry 1/1",
+        }
+    ]
+
+
 def test_executor_thread_timeout_tracks_zombie(monkeypatch: Any) -> None:
     _ZombieOwner._zombie_thread_count = 0
     release = threading.Event()
@@ -136,3 +185,7 @@ def test_executor_thread_timeout_tracks_zombie(monkeypatch: Any) -> None:
 
     assert _ZombieOwner._zombie_thread_count == 1
     release.set()
+    deadline = time.monotonic() + 5
+    while _ZombieOwner._zombie_thread_count > 0 and time.monotonic() < deadline:
+        time.sleep(0.05)
+    assert _ZombieOwner._zombie_thread_count == 0
