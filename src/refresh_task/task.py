@@ -6,13 +6,14 @@ import queue
 import threading
 from collections import deque
 from collections.abc import Callable, Mapping
-from datetime import UTC, datetime
+from datetime import datetime
 from time import perf_counter, sleep
 from typing import Any, NoReturn, cast
 from uuid import uuid4
 
 from model import PlaylistManager, RefreshInfo
 from plugins.plugin_registry import get_plugin_instance
+from refresh_task import recorder as refresh_recorder
 from refresh_task.actions import ManualUpdateRequest, PlaylistRefresh, RefreshAction
 from refresh_task.context import RefreshContext
 from refresh_task.health import PluginHealthTracker
@@ -24,28 +25,15 @@ from refresh_task.worker import (
     _remote_exception,
     sweep_orphan_render_tempfiles,
 )
-from utils.event_bus import get_event_bus
 from utils.image_utils import compute_image_hash
 from utils.output_validator import OutputDimensionMismatch, validate_image_dimensions
 from utils.plugin_errors import PermanentPluginError
 from utils.progress import ProgressTracker, track_progress
-from utils.progress_events import get_progress_bus
 from utils.time_utils import now_device_tz
 from utils.webhooks import send_failure_webhook
 
 _sd_notify: Callable[[str], None] | None
-try:
-    # Optional import; code must continue if unavailable
-    from benchmarks.benchmark_storage import save_refresh_event, save_stage_event
-except Exception:  # pragma: no cover
-
-    def save_refresh_event(*args, **kwargs):  # type: ignore
-        return None
-
-    def save_stage_event(*args, **kwargs):  # type: ignore
-        return None
-
-
+save_refresh_event = refresh_recorder.save_refresh_event
 try:
     from cysystemd.daemon import (
         Notification as _sd_Notification,
@@ -90,8 +78,9 @@ class RefreshTask:
         self.condition = threading.Condition(self.lock)
         self.running = False
         self.manual_update_requests: deque[ManualUpdateRequest] = deque(maxlen=50)
-        self.progress_bus = get_progress_bus()
-        self.event_bus = get_event_bus()
+        self.recorder = refresh_recorder.RefreshRecorder(self.device_config)
+        self.progress_bus = self.recorder.progress_bus
+        self.event_bus = self.recorder.event_bus
         self.plugin_health: dict[str, dict[str, Any]] = {}
         self.scheduler = RefreshScheduler(
             device_config=self.device_config,
@@ -366,7 +355,7 @@ class RefreshTask:
 
         _t_req_start = perf_counter()
         # Correlate this refresh with a benchmark id so parallel stage events can attach
-        benchmark_id = request_id or str(uuid4())
+        benchmark_id = self.recorder.refresh_id(request_id)
         plugin_id = refresh_action.get_plugin_id()
         instance_name = refresh_action.get_refresh_info().get("plugin_instance")
 
@@ -385,22 +374,11 @@ class RefreshTask:
         tracker: ProgressTracker
         with track_progress() as tracker:
             stage_t0 = perf_counter()
-            self.progress_bus.publish(
-                {
-                    "state": "running",
-                    "plugin_id": plugin_id,
-                    "instance": instance_name,
-                    "refresh_id": benchmark_id,
-                    "request_id": request_id,
-                }
-            )
-            self.event_bus.publish(
-                "refresh_started",
-                {
-                    "plugin": instance_name or plugin_id,
-                    "plugin_id": plugin_id,
-                    "ts": datetime.now(UTC).isoformat(),
-                },
+            self.recorder.publish_running(
+                plugin_id=plugin_id,
+                instance=instance_name,
+                refresh_id=benchmark_id,
+                request_id=request_id,
             )
             try:
                 image, plugin_meta = self._execute_with_policy(
@@ -429,24 +407,14 @@ class RefreshTask:
                     metrics={"retained_display": bool(retain_path)},
                     error=str(exc),
                 )
-                self.progress_bus.publish(
-                    {
-                        "state": "error",
-                        "plugin_id": plugin_id,
-                        "instance": instance_name,
-                        "refresh_id": benchmark_id,
-                        "request_id": request_id,
-                        "error": str(exc),
-                        "retained_display": bool(retain_path),
-                    }
-                )
-                self.event_bus.publish(
-                    "plugin_failed",
-                    {
-                        "plugin": instance_name or plugin_id,
-                        "plugin_id": plugin_id,
-                        "error": str(exc),
-                    },
+                self.recorder.publish_error(
+                    plugin_id=plugin_id,
+                    instance=instance_name,
+                    refresh_id=benchmark_id,
+                    request_id=request_id,
+                    error=str(exc),
+                    retained_display=bool(retain_path),
+                    plugin_failed=True,
                 )
                 self._push_fallback_image(
                     plugin_id=plugin_id,
@@ -456,17 +424,11 @@ class RefreshTask:
                     refresh_action=refresh_action,
                 )
                 raise
-            try:
-                save_stage_event(
-                    self.device_config,
-                    benchmark_id,
-                    "generate_image",
-                    int((perf_counter() - stage_t0) * 1000),
-                )
-            except Exception:
-                logger.debug(
-                    "Failed to save generate_image benchmark event", exc_info=True
-                )
+            self.recorder.save_stage(
+                benchmark_id,
+                "generate_image",
+                int((perf_counter() - stage_t0) * 1000),
+            )
         generate_ms = int((perf_counter() - _t_gen_start) * 1000)
         # Plugin lifecycle: generate_complete
         logger.info(
@@ -510,24 +472,14 @@ class RefreshTask:
                 metrics={"retained_display": bool(self._stale_display_path())},
                 error=str(exc),
             )
-            self.progress_bus.publish(
-                {
-                    "state": "error",
-                    "plugin_id": plugin_id,
-                    "instance": instance_name,
-                    "refresh_id": benchmark_id,
-                    "request_id": request_id,
-                    "error": str(exc),
-                    "retained_display": bool(self._stale_display_path()),
-                }
-            )
-            self.event_bus.publish(
-                "plugin_failed",
-                {
-                    "plugin": instance_name or plugin_id,
-                    "plugin_id": plugin_id,
-                    "error": str(exc),
-                },
+            self.recorder.publish_error(
+                plugin_id=plugin_id,
+                instance=instance_name,
+                refresh_id=benchmark_id,
+                request_id=request_id,
+                error=str(exc),
+                retained_display=bool(self._stale_display_path()),
+                plugin_failed=True,
             )
             return None, False, {}
 
@@ -570,23 +522,13 @@ class RefreshTask:
             metrics=metrics,
             error=None,
         )
-        self.progress_bus.publish(
-            {
-                "state": "done",
-                "plugin_id": plugin_id,
-                "instance": instance_name,
-                "refresh_id": benchmark_id,
-                "request_id": request_id,
-                "metrics": metrics,
-            }
-        )
-        self.event_bus.publish(
-            "refresh_complete",
-            {
-                "plugin": instance_name or plugin_id,
-                "plugin_id": plugin_id,
-                "duration_ms": request_ms,
-            },
+        self.recorder.publish_done(
+            plugin_id=plugin_id,
+            instance=instance_name,
+            refresh_id=benchmark_id,
+            request_id=request_id,
+            metrics=metrics,
+            duration_ms=request_ms,
         )
         return refresh_info | {"benchmark_id": benchmark_id}, used_cached, metrics
 
@@ -704,16 +646,13 @@ class RefreshTask:
                 metrics={"retained_display": bool(self._stale_display_path())},
                 error=str(exc),
             )
-            self.progress_bus.publish(
-                {
-                    "state": "error",
-                    "plugin_id": plugin_id,
-                    "instance": instance_name,
-                    "refresh_id": benchmark_id,
-                    "request_id": request_id,
-                    "error": str(exc),
-                    "retained_display": bool(self._stale_display_path()),
-                }
+            self.recorder.publish_error(
+                plugin_id=plugin_id,
+                instance=instance_name,
+                refresh_id=benchmark_id,
+                request_id=request_id,
+                error=str(exc),
+                retained_display=bool(self._stale_display_path()),
             )
             raise
         finally:
@@ -730,24 +669,17 @@ class RefreshTask:
                     "request_id": request_id,
                 },
             )
-            try:
-                save_stage_event(
-                    self.device_config,
+            self.recorder.save_stage(
+                benchmark_id or "",
+                "display_pipeline",
+                display_duration_ms,
+            )
+            if display_driver:
+                self.recorder.save_stage(
                     benchmark_id or "",
-                    "display_pipeline",
+                    "display_driver",
                     display_duration_ms,
-                )
-                if display_driver:
-                    save_stage_event(
-                        self.device_config,
-                        benchmark_id or "",
-                        "display_driver",
-                        display_duration_ms,
-                        extra={"driver": display_driver},
-                    )
-            except Exception:
-                logger.debug(
-                    "Failed to save display_pipeline benchmark event", exc_info=True
+                    extra={"driver": display_driver},
                 )
         return display_duration_ms, preprocess_ms
 
@@ -759,35 +691,12 @@ class RefreshTask:
         metrics: Mapping[str, Any],
     ) -> None:
         """Persist a refresh_event row best-effort."""
-        try:
-            cpu_percent = memory_percent = None
-            try:
-                import psutil
-
-                cpu_percent = psutil.cpu_percent(interval=None)
-                memory_percent = psutil.virtual_memory().percent
-            except Exception:
-                logger.debug("psutil metrics unavailable", exc_info=True)
-            save_refresh_event(
-                self.device_config,
-                {
-                    "refresh_id": benchmark_id,
-                    "ts": None,
-                    "plugin_id": refresh_info.get("plugin_id"),
-                    "instance": refresh_info.get("plugin_instance"),
-                    "playlist": refresh_info.get("playlist"),
-                    "used_cached": used_cached,
-                    "request_ms": metrics.get("request_ms"),
-                    "generate_ms": metrics.get("generate_ms"),
-                    "preprocess_ms": metrics.get("preprocess_ms"),
-                    "display_ms": metrics.get("display_ms"),
-                    "cpu_percent": cpu_percent,
-                    "memory_percent": memory_percent,
-                    "notes": None,
-                },
-            )
-        except Exception:
-            logger.debug("Failed to save refresh benchmark event", exc_info=True)
+        self.recorder.save_refresh(
+            refresh_id=benchmark_id,
+            refresh_info=refresh_info,
+            used_cached=used_cached,
+            metrics=metrics,
+        )
 
     def _stale_display_path(self) -> str | None:
         """Return the path to an existing display image file, or ``None``.
@@ -856,12 +765,9 @@ class RefreshTask:
                 raise RuntimeError(
                     "Manual update queue is full. Please wait for pending requests to complete."
                 )
-            self.progress_bus.publish(
-                {
-                    "state": "queued",
-                    "plugin_id": refresh_action.get_plugin_id(),
-                    "request_id": request.request_id,
-                }
+            self.recorder.publish_queued(
+                plugin_id=refresh_action.get_plugin_id(),
+                request_id=request.request_id,
             )
             self.manual_update_requests.append(request)
             self.condition.notify_all()
@@ -887,13 +793,10 @@ class RefreshTask:
             metrics=None,
             error=str(timeout_exc),
         )
-        self.progress_bus.publish(
-            {
-                "state": "error",
-                "plugin_id": refresh_action.get_plugin_id(),
-                "request_id": request.request_id,
-                "error": str(timeout_exc),
-            }
+        self.recorder.publish_error(
+            plugin_id=refresh_action.get_plugin_id(),
+            request_id=request.request_id,
+            error=str(timeout_exc),
         )
         raise timeout_exc
 
@@ -904,13 +807,10 @@ class RefreshTask:
         exc = request.exception
         if exc is None:
             return cast(dict[str, Any], request.metrics)
-        self.progress_bus.publish(
-            {
-                "state": "error",
-                "plugin_id": refresh_action.get_plugin_id(),
-                "request_id": request.request_id,
-                "error": str(exc),
-            }
+        self.recorder.publish_error(
+            plugin_id=refresh_action.get_plugin_id(),
+            request_id=request.request_id,
+            error=str(exc),
         )
         if isinstance(exc, BaseException):
             raise exc
@@ -1245,13 +1145,10 @@ class RefreshTask:
                     last_exc,
                 )
                 sleep(max(0.0, backoff_ms / 1000.0))
-                self.progress_bus.publish(
-                    {
-                        "state": "step",
-                        "plugin_id": plugin_id,
-                        "request_id": request_id,
-                        "step": f"retry {attempt}/{attempts - 1}",
-                    }
+                self.recorder.publish_step(
+                    plugin_id=plugin_id,
+                    request_id=request_id,
+                    step=f"retry {attempt}/{attempts - 1}",
                 )
 
         if last_exc is not None:
@@ -1468,7 +1365,7 @@ class RefreshTask:
 
     def _get_current_datetime(self) -> datetime:
         """Retrieves the current datetime based on the device's configured timezone."""
-        return now_device_tz(self.device_config)
+        return cast(datetime, now_device_tz(self.device_config))
 
     def _determine_next_plugin(
         self, playlist_manager: Any, latest_refresh_info: Any, current_dt: datetime
