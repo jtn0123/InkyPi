@@ -22,7 +22,6 @@ from refresh_task.worker import (
     _get_mp_context,
     _remote_exception,
 )
-from utils.plugin_errors import PermanentPluginError
 
 logger = logging.getLogger(__name__)
 
@@ -432,7 +431,8 @@ class RefreshExecutor:
     def _raise_if_permanent(
         exc: BaseException, plugin_id: str, attempt: int, attempts: int
     ) -> bool:
-        if not isinstance(exc, PermanentPluginError):
+        error_class_names = {cls.__name__ for cls in type(exc).__mro__}
+        if "PermanentPluginError" not in error_class_names:
             return False
         logger.info(
             "plugin_lifecycle: attempt_terminal | plugin_id=%s attempt=%s/%s error=%s",

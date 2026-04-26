@@ -9,9 +9,6 @@ from typing import Any
 import pytest
 from PIL import Image
 
-from refresh_task.executor import RefreshExecutor
-from utils.plugin_errors import PermanentPluginError
-
 
 class _Recorder:
     def __init__(self) -> None:
@@ -37,7 +34,9 @@ class _Action:
         return plugin.generate_image({}, device_config)
 
 
-def _make_executor(**kwargs: Any) -> tuple[RefreshExecutor, _Recorder]:
+def _make_executor(**kwargs: Any) -> tuple[Any, _Recorder]:
+    from refresh_task.executor import RefreshExecutor
+
     recorder = _Recorder()
     executor = RefreshExecutor(
         device_config=object(),
@@ -54,6 +53,7 @@ def test_executor_policy_retries_transient_subprocess_error(monkeypatch: Any) ->
     executor, recorder = _make_executor()
     image = Image.new("RGB", (4, 4), "blue")
     calls = {"count": 0}
+    from refresh_task.executor import RefreshExecutor
 
     def attempt(
         self: RefreshExecutor,
@@ -93,6 +93,8 @@ def test_executor_policy_retries_transient_subprocess_error(monkeypatch: Any) ->
 def test_executor_policy_skips_retry_for_permanent_error(monkeypatch: Any) -> None:
     executor, _recorder = _make_executor()
     calls = {"count": 0}
+    from refresh_task.executor import RefreshExecutor
+    from utils.plugin_errors import PermanentPluginError
 
     def attempt(
         self: RefreshExecutor,
