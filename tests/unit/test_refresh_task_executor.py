@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib
 import threading
 import time
 from datetime import UTC, datetime
@@ -35,10 +36,9 @@ class _Action:
 
 
 def _make_executor(**kwargs: Any) -> tuple[Any, _Recorder]:
-    from refresh_task.executor import RefreshExecutor
-
+    refresh_executor = importlib.import_module("refresh_task.executor")
     recorder = _Recorder()
-    executor = RefreshExecutor(
+    executor = refresh_executor.RefreshExecutor(
         device_config=object(),
         refresh_context=kwargs.get("refresh_context"),
         recorder=recorder,
@@ -53,10 +53,9 @@ def test_executor_policy_retries_transient_subprocess_error(monkeypatch: Any) ->
     executor, recorder = _make_executor()
     image = Image.new("RGB", (4, 4), "blue")
     calls = {"count": 0}
-    from refresh_task.executor import RefreshExecutor
 
     def attempt(
-        self: RefreshExecutor,
+        self: Any,
         refresh_action: Any,
         plugin_config: Any,
         current_dt: datetime,
@@ -93,11 +92,11 @@ def test_executor_policy_retries_transient_subprocess_error(monkeypatch: Any) ->
 def test_executor_policy_skips_retry_for_permanent_error(monkeypatch: Any) -> None:
     executor, _recorder = _make_executor()
     calls = {"count": 0}
-    from refresh_task.executor import RefreshExecutor
-    from utils.plugin_errors import PermanentPluginError
+    plugin_errors = importlib.import_module("utils.plugin_errors")
+    permanent_error = plugin_errors.PermanentPluginError
 
     def attempt(
-        self: RefreshExecutor,
+        self: Any,
         refresh_action: Any,
         plugin_config: Any,
         current_dt: datetime,
@@ -106,13 +105,13 @@ def test_executor_policy_skips_retry_for_permanent_error(monkeypatch: Any) -> No
         attempt_number: int,
     ) -> tuple[Any, Any]:
         calls["count"] += 1
-        return None, PermanentPluginError("bad URL")
+        return None, permanent_error("bad URL")
 
     monkeypatch.setenv("INKYPI_PLUGIN_ISOLATION", "process")
     monkeypatch.setenv("INKYPI_PLUGIN_RETRY_MAX", "3")
     executor.run_subprocess_attempt = MethodType(attempt, executor)
 
-    with pytest.raises(PermanentPluginError, match="bad URL"):
+    with pytest.raises(permanent_error, match="bad URL"):
         executor.execute_with_policy(_Action(), {}, datetime.now(UTC))
 
     assert calls["count"] == 1
