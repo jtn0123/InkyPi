@@ -190,3 +190,33 @@ def test_executor_thread_timeout_tracks_zombie(monkeypatch: Any) -> None:
     while _ZombieOwner._zombie_thread_count > 0 and time.monotonic() < deadline:
         time.sleep(0.05)
     assert _ZombieOwner._zombie_thread_count == 0
+
+
+def test_executor_inprocess_timeout_does_not_retry(monkeypatch: Any) -> None:
+    _ZombieOwner._zombie_thread_count = 0
+    release = threading.Event()
+    calls = {"count": 0}
+
+    class Plugin:
+        def generate_image(self, settings: Any, device_config: Any) -> Image.Image:
+            calls["count"] += 1
+            release.wait(timeout=5)
+            return Image.new("RGB", (4, 4), "green")
+
+    executor, recorder = _make_executor(get_plugin_instance=lambda _cfg: Plugin())
+    monkeypatch.setenv("INKYPI_PLUGIN_RETRY_MAX", "1")
+    monkeypatch.setenv("INKYPI_PLUGIN_RETRY_BACKOFF_MS", "0")
+
+    with pytest.raises(TimeoutError, match="timed out"):
+        executor.execute_inprocess(
+            _Action("slow"), {}, datetime.now(UTC), request_id="req-timeout"
+        )
+
+    assert calls["count"] == 1
+    assert recorder.steps == []
+    assert _ZombieOwner._zombie_thread_count == 1
+    release.set()
+    deadline = time.monotonic() + 5
+    while _ZombieOwner._zombie_thread_count > 0 and time.monotonic() < deadline:
+        time.sleep(0.05)
+    assert _ZombieOwner._zombie_thread_count == 0

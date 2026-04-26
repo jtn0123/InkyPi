@@ -369,10 +369,8 @@ class RefreshExecutor:
             worker_thread.join(timeout=timeout_s)
 
             if worker_thread.is_alive():
-                last_exc = self.handle_thread_timeout(
-                    plugin_id, timeout_s, cancel_event
-                )
-            elif "error" in result_holder:
+                raise self.handle_thread_timeout(plugin_id, timeout_s, cancel_event)
+            if "error" in result_holder:
                 last_exc = result_holder["error"]
             else:
                 return result_holder["image"], result_holder.get("meta")
