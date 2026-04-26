@@ -1,6 +1,24 @@
 # CHANGELOG
 
 
+## v1.0.7 (2026-04-26)
+
+### Bug Fixes
+
+- Patch GitPython dev dependency alerts ([#594](https://github.com/jtn0123/InkyPi/pull/594),
+  [`dcb4f4b`](https://github.com/jtn0123/InkyPi/commit/dcb4f4ba39d9382bafa6f0530bb815821c8eb513))
+
+* docs: add codebase grade report
+
+* docs: address grade report review and dependency alerts
+
+* docs: add codebase direction checklist
+
+* docs: address codebase report review follow-up
+
+* docs: remove grade report artifacts from pr
+
+
 ## v1.0.6 (2026-04-25)
 
 ### Bug Fixes
