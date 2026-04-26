@@ -28,6 +28,8 @@ def test_plugin_add_to_playlist_flow(client):
             "src/static/scripts/response_modal.js",
             "src/static/scripts/form_validator.js",
             "src/static/scripts/plugin_form.js",
+            "src/static/scripts/plugin_page/shared.js",
+            "src/static/scripts/plugin_page/progress.js",
             "src/static/scripts/plugin_page.js",
         ):
             with open(path, encoding="utf-8") as f:

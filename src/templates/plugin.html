@@ -483,6 +483,8 @@
     </div>
     {% endif %}
     <script src="{{ url_for('static', filename='scripts/ui_helpers.js') }}"></script>
+    <script src="{{ url_for('static', filename='scripts/plugin_page/shared.js') }}"></script>
+    <script src="{{ url_for('static', filename='scripts/plugin_page/progress.js') }}"></script>
     <script src="{{ url_for('static', filename='scripts/plugin_page.js') }}"></script>
     <script nonce="{{ csp_nonce }}">
         window.__INKYPI_PLUGIN_BOOT__ = {

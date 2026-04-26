@@ -5,6 +5,22 @@ test_icons_loader_js.py, test_lightbox_js.py, test_response_modal_js.py,
 test_response_modal_more.py, test_theme_js.py
 """
 
+from pathlib import Path
+
+_SCRIPTS_DIR = Path(__file__).resolve().parents[2] / "src" / "static" / "scripts"
+
+
+def _plugin_page_source() -> str:
+    return "\n".join(
+        path.read_text(encoding="utf-8")
+        for path in [
+            _SCRIPTS_DIR / "plugin_page" / "shared.js",
+            _SCRIPTS_DIR / "plugin_page" / "progress.js",
+            _SCRIPTS_DIR / "plugin_page.js",
+        ]
+    )
+
+
 # --- API Validator ---
 
 
@@ -271,7 +287,7 @@ def test_history_page_script_uses_outer_scope_modal_helper(client):
 def test_plugin_page_script_uses_globalthis_for_plugin_hooks(client):
     resp = client.get("/static/scripts/plugin_page.js")
     assert resp.status_code == 200
-    js = resp.get_data(as_text=True)
+    js = _plugin_page_source()
 
     assert "function validateAddToPlaylistAction(action)" in js
     assert 'typeof globalThis.validatePluginSettings === "function"' in js
@@ -287,7 +303,7 @@ def test_show_last_progress_does_not_use_global_fallback_key(client):
     """
     resp = client.get("/static/scripts/plugin_page.js")
     assert resp.status_code == 200
-    js = resp.get_data(as_text=True)
+    js = _plugin_page_source()
 
     # The plugin-specific key prefix must still be present
     assert "INKYPI_LAST_PROGRESS:plugin:" in js
