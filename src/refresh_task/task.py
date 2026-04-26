@@ -2,13 +2,12 @@
 
 import logging
 import os
-import queue
 import threading
 from collections import deque
 from collections.abc import Callable, Mapping
 from datetime import datetime
-from time import perf_counter, sleep
-from typing import Any, NoReturn, cast
+from time import perf_counter
+from typing import Any, ClassVar, NoReturn, cast
 from uuid import uuid4
 
 from model import PlaylistManager, RefreshInfo
@@ -17,18 +16,16 @@ from refresh_task import recorder as refresh_recorder
 from refresh_task.actions import ManualUpdateRequest, PlaylistRefresh, RefreshAction
 from refresh_task.context import RefreshContext
 from refresh_task.display_pipeline import DisplayPipeline
+from refresh_task.executor import RefreshExecutor
 from refresh_task.health import PluginHealthTracker
 from refresh_task.housekeeping import RefreshHousekeeper
 from refresh_task.scheduler import RefreshScheduler
 from refresh_task.worker import (
-    _execute_refresh_attempt_worker,
     _get_mp_context,
-    _remote_exception,
     sweep_orphan_render_tempfiles,
 )
 from utils.image_utils import compute_image_hash
 from utils.output_validator import OutputDimensionMismatch, validate_image_dimensions
-from utils.plugin_errors import PermanentPluginError
 from utils.progress import ProgressTracker, track_progress
 from utils.time_utils import now_device_tz
 from utils.webhooks import send_failure_webhook
@@ -102,6 +99,15 @@ class RefreshTask:
             housekeeper=self.housekeeper,
             recorder=self.recorder,
             update_plugin_health=self._update_plugin_health_positional,
+        )
+        self.executor = RefreshExecutor(
+            device_config=self.device_config,
+            refresh_context=self.refresh_context,
+            recorder=self.recorder,
+            plugin_timeout_seconds=self._plugin_timeout_seconds,
+            zombie_owner=type(self),
+            get_plugin_instance=lambda cfg: get_plugin_instance(cfg),
+            mp_context_factory=lambda: _get_mp_context(),
         )
         self._tick_count: int = 0
         self.watchdog_thread: threading.Thread | None = None
@@ -843,64 +849,12 @@ class RefreshTask:
     @staticmethod
     def _timeout_msg(plugin_id: str, timeout_s: float) -> str:
         """Return a canonical timeout error message string."""
-        return f"Plugin '{plugin_id}' timed out after {int(timeout_s)}s"
+        return RefreshExecutor.timeout_msg(plugin_id, timeout_s)
 
     @staticmethod
     def _cleanup_subprocess(proc: Any, plugin_id: str) -> None:
-        """Terminate a subprocess that is still alive after its timeout.
-
-        JTN-S2: ``killpg(SIGKILL)`` the worker's process group up front,
-        before any terminate/join dance.  The worker calls ``os.setsid()``
-        at startup, so it is a session leader and its pgid equals its
-        pid; the chromium screenshot subprocess plus chromium's zygote /
-        renderer / utility descendants all inherit that same pgid.  Doing
-        the killpg BEFORE checking ``proc.is_alive()`` is critical — if
-        we only killpg "when the worker survives terminate", a worker
-        that exits gracefully on SIGTERM would skip the killpg entirely
-        and leave its chromium descendants reparented to PID 1.  That
-        was the on-device leak: 9 chromium processes survived per
-        timeout because the worker's own SIGTERM handler returned cleanly.
-
-        ``getpgid(0) != pgid`` guards against signaling our own group in
-        the (impossible-in-production) case where the worker never made
-        it past setsid.
-        """
-        import signal as _signal
-
-        # 1. Take down the whole worker session up front — catches the
-        #    chromium tree before any of it can be reparented.
-        #    ``getpgid``/``killpg`` are POSIX-only; ``getattr`` guards the
-        #    Windows case so we silently fall through to the
-        #    terminate()/kill() fallback instead of raising AttributeError
-        #    (which the except below would not catch).
-        getpgid = getattr(os, "getpgid", None)
-        killpg = getattr(os, "killpg", None)
-        if callable(getpgid) and callable(killpg):
-            try:
-                pgid = getpgid(proc.pid)
-                # Signal is scoped to the worker's own session (the worker
-                # called ``setsid`` at startup) and guarded against our
-                # own pgid, so the only processes affected are the ones
-                # this refresh task spawned.  SonarCloud python:S4828.
-                if pgid != getpgid(0):
-                    killpg(pgid, _signal.SIGKILL)  # NOSONAR
-            except OSError:
-                # ProcessLookupError / PermissionError are OSError subclasses.
-                pass
-
-        # 2. Standard terminate/kill dance to reap the worker entry.
-        proc.terminate()
-        proc.join(timeout=2)
-        if proc.is_alive():
-            proc.kill()
-            proc.join(timeout=2)
-        if proc.is_alive():
-            logger.warning(
-                "plugin_lifecycle: zombie_process | plugin_id=%s pid=%s "
-                "- process did not exit after kill",
-                plugin_id,
-                proc.pid,
-            )
+        """Terminate a subprocess that is still alive after its timeout."""
+        RefreshExecutor.cleanup_subprocess(proc, plugin_id)
 
     @staticmethod
     def _handle_process_result(
@@ -909,49 +863,16 @@ class RefreshTask:
         plugin_id: str,
         attempt: int,
     ) -> tuple[Any, Any]:
-        """Read and validate the result queue from a finished subprocess.
-
-        Returns ``(image, metadata)`` on success, or ``(None, exception)``
-        on failure.  Raises ``RuntimeError`` directly for unrecoverable exit
-        conditions.
-        """
-        try:
-            payload = result_queue.get_nowait()
-        except queue.Empty:
-            payload = None
-        if not payload:
-            if proc.exitcode == 0:
-                raise RuntimeError(
-                    f"Plugin '{plugin_id}' exited without returning a result"
-                )
-            raise RuntimeError(f"Plugin '{plugin_id}' exited with code {proc.exitcode}")
-        if payload.get("ok"):
-            from PIL import Image
-
-            # Worker writes PNG to a tempfile and passes the path via the
-            # queue (see worker.py for the pipe-buffer-deadlock rationale).
-            # Load into memory with image.copy() so we can unlink the
-            # underlying file immediately; the in-memory PIL.Image does
-            # not retain a reference to it.
-            image_path = payload["image_path"]
-            try:
-                with Image.open(image_path) as image:
-                    result_image = image.copy()
-            finally:
-                try:
-                    os.unlink(image_path)
-                except OSError:
-                    pass
-            logger.info(
-                "plugin_lifecycle: attempt_success | plugin_id=%s attempt=%s",
-                plugin_id,
-                attempt,
-            )
-            return result_image, payload.get("plugin_meta")
-        return None, _remote_exception(
-            str(payload.get("error_type") or "RuntimeError"),
-            str(payload.get("error_message") or "unknown error"),
+        """Read and validate the result queue from a finished subprocess."""
+        executor = RefreshExecutor(
+            device_config=None,
+            refresh_context=cast(Any, None),
+            recorder=cast(Any, None),
+            plugin_timeout_seconds=lambda _plugin_id: 60.0,
+            zombie_owner=RefreshTask,
+            get_plugin_instance=lambda _cfg: None,
         )
+        return executor.handle_process_result(result_queue, proc, plugin_id, attempt)
 
     def _run_subprocess_attempt(
         self,
@@ -962,44 +883,15 @@ class RefreshTask:
         timeout_s: float,
         attempt: int,
     ) -> tuple[Any, Any]:
-        """Spawn a subprocess for one plugin execution attempt.
-
-        Returns ``(image, exc_or_meta)`` on success, or raises/returns an exception
-        as the second element when the attempt fails.
-        """
-        ctx = _get_mp_context()
-        result_queue = ctx.Queue(maxsize=1)
-        proc = cast(Any, ctx).Process(
-            target=_execute_refresh_attempt_worker,
-            args=(
-                result_queue,
-                plugin_config,
-                refresh_action,
-                self.refresh_context,
-                current_dt,
-            ),
-            daemon=True,
+        """Spawn a subprocess for one plugin execution attempt."""
+        return self.executor.run_subprocess_attempt(
+            refresh_action,
+            plugin_config,
+            current_dt,
+            plugin_id,
+            timeout_s,
+            attempt,
         )
-        try:
-            proc.start()
-            proc.join(timeout=timeout_s)
-            if proc.is_alive():
-                self._cleanup_subprocess(proc, plugin_id)
-                return None, TimeoutError(self._timeout_msg(plugin_id, timeout_s))
-            return self._handle_process_result(result_queue, proc, plugin_id, attempt)
-        except TimeoutError:
-            return None, TimeoutError(self._timeout_msg(plugin_id, timeout_s))
-        except Exception as exc:
-            return None, exc
-        finally:
-            try:
-                result_queue.close()
-            except OSError:
-                pass
-            try:
-                result_queue.join_thread()
-            except OSError:
-                pass
 
     def _execute_with_policy(
         self,
@@ -1008,101 +900,39 @@ class RefreshTask:
         current_dt: datetime,
         request_id: str | None = None,
     ) -> tuple[Any, Any]:
-        """Run a plugin with the configured retry and isolation policy.
-
-        Reads environment variables to determine the execution strategy:
-        - ``INKYPI_PLUGIN_ISOLATION``: ``"process"`` (default) spawns a
-          subprocess per attempt; ``"none"`` runs in-process via a worker thread.
-        - ``INKYPI_PLUGIN_RETRY_MAX``: Maximum number of retries (default 1).
-        - ``INKYPI_PLUGIN_RETRY_BACKOFF_MS``: Sleep between retries (default 500 ms).
-        - ``INKYPI_PLUGIN_TIMEOUT_S``: Per-attempt timeout in seconds (default 60).
-
-        Args:
-            refresh_action: The :class:`RefreshAction` describing what to run.
-            plugin_config: The raw plugin configuration dict from device.json.
-            current_dt: The current device-timezone datetime used by the plugin.
-            request_id: Optional correlation ID for logging and benchmarking.
-
-        Returns:
-            A ``(image, plugin_meta)`` tuple where *image* is a
-            ``PIL.Image.Image`` and *plugin_meta* is optional metadata from the
-            plugin.
-
-        Raises:
-            TimeoutError: If all attempts time out.
-            RuntimeError: If all attempts fail with an unrecoverable error.
-        """
-        plugin_id = refresh_action.get_plugin_id()
-        retries = int(os.getenv("INKYPI_PLUGIN_RETRY_MAX", "1") or "1")
-        backoff_ms = int(os.getenv("INKYPI_PLUGIN_RETRY_BACKOFF_MS", "500") or "500")
-        timeout_s = self._plugin_timeout_seconds(plugin_id)
-        attempts = max(1, retries + 1)
-
-        # When isolation is disabled (e.g. in tests or on constrained devices),
-        # run the plugin directly in the current process instead of spawning a
-        # subprocess.  This avoids pickling issues that arise with the ``spawn``
-        # and ``forkserver`` multiprocessing start methods on Linux.
-        isolation = (os.getenv("INKYPI_PLUGIN_ISOLATION") or "process").strip().lower()
-        if isolation == "none":
-            return self._execute_inprocess(refresh_action, plugin_config, current_dt)
-
-        last_exc: BaseException | None = None
-        for attempt in range(1, attempts + 1):
-            logger.info(
-                "plugin_lifecycle: attempt_start | plugin_id=%s attempt=%s attempts=%s timeout_s=%s",
-                plugin_id,
-                attempt,
-                attempts,
-                timeout_s,
+        """Run a plugin with the configured retry and isolation policy."""
+        # Preserve existing private-test hooks that monkeypatch
+        # ``task._run_subprocess_attempt`` while the real policy lives in the
+        # executor collaborator.
+        attempt_runner = self._run_subprocess_attempt
+        if (
+            getattr(attempt_runner, "__func__", None)
+            is RefreshTask._run_subprocess_attempt
+        ):
+            return self.executor.execute_with_policy(
+                refresh_action,
+                plugin_config,
+                current_dt,
+                request_id=request_id,
             )
-            image, exc_or_meta = self._run_subprocess_attempt(
-                refresh_action, plugin_config, current_dt, plugin_id, timeout_s, attempt
+
+        original_runner = self.executor.run_subprocess_attempt
+        cast(Any, self.executor).run_subprocess_attempt = attempt_runner
+        try:
+            return self.executor.execute_with_policy(
+                refresh_action,
+                plugin_config,
+                current_dt,
+                request_id=request_id,
             )
-            if image is not None:
-                return image, exc_or_meta
-
-            last_exc = exc_or_meta
-            if isinstance(last_exc, TimeoutError):
-                last_exc = TimeoutError(self._timeout_msg(plugin_id, timeout_s))
-
-            # JTN-778: permanent errors (bad URL, malformed config) will fail
-            # identically on retry — skip remaining attempts to avoid burning
-            # CPU and log lines on every scheduled playlist tick.
-            if isinstance(last_exc, PermanentPluginError):
-                logger.info(
-                    "plugin_lifecycle: attempt_terminal | plugin_id=%s attempt=%s/%s error=%s",
-                    plugin_id,
-                    attempt,
-                    attempts,
-                    last_exc,
-                )
-                raise last_exc
-
-            if attempt < attempts:
-                logger.warning(
-                    "plugin_lifecycle: attempt_retry | plugin_id=%s attempt=%s/%s backoff_ms=%s error=%s",
-                    plugin_id,
-                    attempt,
-                    attempts,
-                    backoff_ms,
-                    last_exc,
-                )
-                sleep(max(0.0, backoff_ms / 1000.0))
-                self.recorder.publish_step(
-                    plugin_id=plugin_id,
-                    request_id=request_id,
-                    step=f"retry {attempt}/{attempts - 1}",
-                )
-
-        if last_exc is not None:
-            raise last_exc
-        raise RuntimeError(f"Plugin '{plugin_id}' failed with unknown error")
+        finally:
+            cast(Any, self.executor).run_subprocess_attempt = original_runner
 
     # Class-level counter tracking threads that timed out but could not be stopped.
     # Python threads cannot be force-killed; cooperative plugins should check the
     # cancel_event passed via result_holder["cancel_event"] and exit early.
-    _zombie_thread_count: int = 0
-    _zombie_thread_lock: threading.Lock = threading.Lock()
+    _zombie_thread_count: ClassVar[int] = 0
+    _zombie_thread_lock: ClassVar[threading.Lock] = threading.Lock()
 
     @staticmethod
     def _make_inprocess_worker(
@@ -1112,61 +942,37 @@ class RefreshTask:
         current_dt: datetime,
         plugin_id: str,
     ) -> tuple[Callable[[], None], dict[str, Any], threading.Event]:
-        """Return a ``(worker_fn, result_holder, cancel_event)`` tuple.
-
-        The returned *worker_fn* is suitable for ``threading.Thread(target=...)``.
-        """
-        result_holder: dict[str, Any] = {}
-        cancel_event = threading.Event()
-        result_holder["cancel_event"] = cancel_event
-
-        def _worker(
-            holder: dict[str, Any] = result_holder,
-            _cancel: threading.Event = cancel_event,
-        ) -> None:
-            try:
-                plugin = get_plugin_instance(dict(plugin_config))
-                image = refresh_action.execute(plugin, device_config, current_dt)
-                meta = None
-                if hasattr(plugin, "get_latest_metadata"):
-                    meta = plugin.get_latest_metadata()
-                holder["image"] = image
-                holder["meta"] = meta
-            except Exception as exc:
-                holder["error"] = exc
-            finally:
-                if _cancel.is_set():
-                    with RefreshTask._zombie_thread_lock:
-                        RefreshTask._zombie_thread_count = max(
-                            0, RefreshTask._zombie_thread_count - 1
-                        )
-                    logging.getLogger(__name__).info(
-                        "Zombie thread for plugin '%s' has finished. "
-                        "Active zombie threads: %d",
-                        plugin_id,
-                        RefreshTask._zombie_thread_count,
-                    )
-
-        return _worker, result_holder, cancel_event
+        """Return a ``(worker_fn, result_holder, cancel_event)`` tuple."""
+        executor = RefreshExecutor(
+            device_config=device_config,
+            refresh_context=cast(Any, None),
+            recorder=cast(Any, None),
+            plugin_timeout_seconds=lambda _plugin_id: 60.0,
+            zombie_owner=RefreshTask,
+            get_plugin_instance=lambda cfg: get_plugin_instance(cfg),
+        )
+        return executor.make_inprocess_worker(
+            refresh_action,
+            plugin_config,
+            device_config,
+            current_dt,
+            plugin_id,
+        )
 
     @staticmethod
     def _handle_thread_timeout(
         plugin_id: str, timeout_s: float, cancel_event: threading.Event
     ) -> TimeoutError:
         """Mark a timed-out worker thread as a zombie and return a TimeoutError."""
-        cancel_event.set()
-        with RefreshTask._zombie_thread_lock:
-            RefreshTask._zombie_thread_count += 1
-            zombie_count = RefreshTask._zombie_thread_count
-        logging.getLogger(__name__).warning(
-            "Plugin '%s' timed out after %ds — cancellation event set. "
-            "Thread cannot be force-killed; it will run until completion. "
-            "Active zombie threads: %d",
-            plugin_id,
-            int(timeout_s),
-            zombie_count,
+        executor = RefreshExecutor(
+            device_config=None,
+            refresh_context=cast(Any, None),
+            recorder=cast(Any, None),
+            plugin_timeout_seconds=lambda _plugin_id: timeout_s,
+            zombie_owner=RefreshTask,
+            get_plugin_instance=lambda _cfg: None,
         )
-        return TimeoutError(f"Plugin '{plugin_id}' timed out after {int(timeout_s)}s")
+        return executor.handle_thread_timeout(plugin_id, timeout_s, cancel_event)
 
     def _execute_inprocess(
         self,
@@ -1174,67 +980,10 @@ class RefreshTask:
         plugin_config: Mapping[str, Any],
         current_dt: datetime,
     ) -> tuple[Any, Any]:
-        """Run a plugin directly in the current process (no subprocess isolation).
-
-        Used when ``INKYPI_PLUGIN_ISOLATION=none`` to avoid pickling constraints
-        imposed by the ``spawn``/``forkserver`` multiprocessing start methods.
-
-        Supports retries and timeouts via a worker thread so the behaviour
-        mirrors the subprocess path as closely as possible.
-
-        On timeout a ``threading.Event`` (``cancel_event``) is set so that
-        cooperative plugins can detect cancellation and exit early.  Because
-        Python threads cannot be force-killed, a timed-out thread becomes a
-        "zombie" daemon thread.  The class-level ``_zombie_thread_count``
-        counter is incremented for each such thread and decremented when the
-        thread eventually finishes, enabling monitoring.
-        """
-        plugin_id = refresh_action.get_plugin_id()
-        retries = int(os.getenv("INKYPI_PLUGIN_RETRY_MAX", "1") or "1")
-        backoff_ms = int(os.getenv("INKYPI_PLUGIN_RETRY_BACKOFF_MS", "500") or "500")
-        timeout_s = self._plugin_timeout_seconds(plugin_id)
-        attempts = max(1, retries + 1)
-
-        last_exc: BaseException | None = None
-        for attempt in range(1, attempts + 1):
-            _worker, result_holder, cancel_event = self._make_inprocess_worker(
-                refresh_action,
-                plugin_config,
-                self.device_config,
-                current_dt,
-                plugin_id,
-            )
-
-            worker_thread = threading.Thread(target=_worker, daemon=True)
-            worker_thread.start()
-            worker_thread.join(timeout=timeout_s)
-
-            if worker_thread.is_alive():
-                last_exc = self._handle_thread_timeout(
-                    plugin_id, timeout_s, cancel_event
-                )
-            elif "error" in result_holder:
-                last_exc = result_holder["error"]
-            else:
-                return result_holder["image"], result_holder.get("meta")
-
-            # JTN-778: permanent errors are terminal — skip retries.
-            if isinstance(last_exc, PermanentPluginError):
-                logger.info(
-                    "plugin_lifecycle: attempt_terminal | plugin_id=%s attempt=%s/%s error=%s",
-                    plugin_id,
-                    attempt,
-                    attempts,
-                    last_exc,
-                )
-                raise last_exc
-
-            if attempt < attempts:
-                sleep(max(0.0, backoff_ms / 1000.0))
-
-        if last_exc is not None:
-            raise last_exc
-        raise RuntimeError(f"Plugin '{plugin_id}' failed with unknown error")
+        """Run a plugin directly in the current process."""
+        return self.executor.execute_inprocess(
+            refresh_action, plugin_config, current_dt
+        )
 
     def _update_plugin_health(
         self,
@@ -1302,6 +1051,7 @@ class RefreshTask:
         subprocess launches pick up the latest configuration values.
         """
         self.refresh_context = RefreshContext.from_config(self.device_config)
+        self.executor.refresh_context = self.refresh_context
         if self.running:
             with self.condition:
                 self.condition.notify_all()
