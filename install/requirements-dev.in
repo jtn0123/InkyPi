@@ -69,6 +69,8 @@ pip-audit>=2.0,<3
 cyclonedx-bom>=6.0,<7
 pre-commit>=4.0,<5
 python-semantic-release>=9.0,<10
+# Patched floor for transitive python-semantic-release dependency.
+GitPython>=3.1.47,<4
 pip-licenses>=5.0,<6
 
 # Mutation testing (optional — slow; run with: mutmut run)
