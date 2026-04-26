@@ -1,13 +1,32 @@
 # pyright: reportMissingImports=false
 """Tests for progressive disclosure JavaScript functionality."""
 
+from pathlib import Path
+from typing import Any
 
-def test_progressive_disclosure_script_exists(client):
+_SCRIPTS_DIR = Path(__file__).resolve().parents[2] / "src" / "static" / "scripts"
+_PROGRESSIVE_DISCLOSURE_FILES = [
+    _SCRIPTS_DIR / "progressive_disclosure.js",
+    _SCRIPTS_DIR / "progressive_disclosure" / "utils.js",
+    _SCRIPTS_DIR / "progressive_disclosure" / "mode.js",
+    _SCRIPTS_DIR / "progressive_disclosure" / "validation_tooltips.js",
+    _SCRIPTS_DIR / "progressive_disclosure" / "wizard.js",
+    _SCRIPTS_DIR / "progressive_disclosure" / "live_preview.js",
+]
+
+
+def _combined_progressive_disclosure_source() -> str:
+    return "\n".join(
+        path.read_text(encoding="utf-8") for path in _PROGRESSIVE_DISCLOSURE_FILES
+    )
+
+
+def test_progressive_disclosure_script_exists(client: Any) -> None:
     """Test that progressive disclosure script is accessible."""
     resp = client.get("/static/scripts/progressive_disclosure.js")
     assert resp.status_code == 200
 
-    script_content = resp.get_data(as_text=True)
+    script_content = _combined_progressive_disclosure_source()
 
     # Check for main class definition
     assert "class ProgressiveDisclosure" in script_content
@@ -15,12 +34,12 @@ def test_progressive_disclosure_script_exists(client):
     assert "init()" in script_content
 
 
-def test_progressive_disclosure_contains_mode_selector(client):
+def test_progressive_disclosure_contains_mode_selector(client: Any) -> None:
     """Test that progressive disclosure script contains mode selector functionality."""
     resp = client.get("/static/scripts/progressive_disclosure.js")
     assert resp.status_code == 200
 
-    script_content = resp.get_data(as_text=True)
+    script_content = _combined_progressive_disclosure_source()
 
     # Check for mode selector creation
     assert "createModeSelector()" in script_content
@@ -30,12 +49,12 @@ def test_progressive_disclosure_contains_mode_selector(client):
     assert "Advanced Options" in script_content
 
 
-def test_progressive_disclosure_contains_validation_system(client):
+def test_progressive_disclosure_contains_validation_system(client: Any) -> None:
     """Test that progressive disclosure script contains validation functionality."""
     resp = client.get("/static/scripts/progressive_disclosure.js")
     assert resp.status_code == 200
 
-    script_content = resp.get_data(as_text=True)
+    script_content = _combined_progressive_disclosure_source()
 
     # Check for validation methods
     assert "setupValidation()" in script_content
@@ -49,12 +68,12 @@ def test_progressive_disclosure_contains_validation_system(client):
     assert "validation-message warning" in script_content
 
 
-def test_progressive_disclosure_contains_tooltip_system(client):
+def test_progressive_disclosure_contains_tooltip_system(client: Any) -> None:
     """Test that progressive disclosure script contains tooltip functionality."""
     resp = client.get("/static/scripts/progressive_disclosure.js")
     assert resp.status_code == 200
 
-    script_content = resp.get_data(as_text=True)
+    script_content = _combined_progressive_disclosure_source()
 
     # Check for tooltip methods
     assert "setupTooltips()" in script_content
@@ -63,12 +82,12 @@ def test_progressive_disclosure_contains_tooltip_system(client):
     assert "data-tooltip" in script_content
 
 
-def test_progressive_disclosure_contains_wizard_system(client):
+def test_progressive_disclosure_contains_wizard_system(client: Any) -> None:
     """Test that progressive disclosure script contains wizard functionality."""
     resp = client.get("/static/scripts/progressive_disclosure.js")
     assert resp.status_code == 200
 
-    script_content = resp.get_data(as_text=True)
+    script_content = _combined_progressive_disclosure_source()
 
     # Check for wizard methods
     assert "setupWizard()" in script_content
@@ -81,12 +100,12 @@ def test_progressive_disclosure_contains_wizard_system(client):
     assert "wizard-step-dot" in script_content
 
 
-def test_progressive_disclosure_contains_live_preview(client):
+def test_progressive_disclosure_contains_live_preview(client: Any) -> None:
     """Test that progressive disclosure script contains live preview functionality."""
     resp = client.get("/static/scripts/progressive_disclosure.js")
     assert resp.status_code == 200
 
-    script_content = resp.get_data(as_text=True)
+    script_content = _combined_progressive_disclosure_source()
 
     # Check for live preview methods
     assert "initLivePreview()" in script_content
@@ -99,12 +118,12 @@ def test_progressive_disclosure_contains_live_preview(client):
     assert "preview-modified" in script_content
 
 
-def test_progressive_disclosure_contains_form_organization(client):
+def test_progressive_disclosure_contains_form_organization(client: Any) -> None:
     """Test that progressive disclosure script contains form organization functionality."""
     resp = client.get("/static/scripts/progressive_disclosure.js")
     assert resp.status_code == 200
 
-    script_content = resp.get_data(as_text=True)
+    script_content = _combined_progressive_disclosure_source()
 
     # Check for form organization methods
     assert "organizeFormSections()" in script_content
@@ -113,12 +132,12 @@ def test_progressive_disclosure_contains_form_organization(client):
     assert "advanced-only" in script_content
 
 
-def test_progressive_disclosure_contains_event_handling(client):
+def test_progressive_disclosure_contains_event_handling(client: Any) -> None:
     """Test that progressive disclosure script contains proper event handling."""
     resp = client.get("/static/scripts/progressive_disclosure.js")
     assert resp.status_code == 200
 
-    script_content = resp.get_data(as_text=True)
+    script_content = _combined_progressive_disclosure_source()
 
     # Check for event listeners
     assert "addEventListener" in script_content
@@ -131,12 +150,12 @@ def test_progressive_disclosure_contains_event_handling(client):
     assert "wizardCompleted" in script_content
 
 
-def test_progressive_disclosure_contains_localStorage_integration(client):
+def test_progressive_disclosure_contains_localStorage_integration(client: Any) -> None:
     """Test that progressive disclosure script contains localStorage functionality."""
     resp = client.get("/static/scripts/progressive_disclosure.js")
     assert resp.status_code == 200
 
-    script_content = resp.get_data(as_text=True)
+    script_content = _combined_progressive_disclosure_source()
 
     # Check for localStorage usage
     assert "localStorage" in script_content
@@ -144,12 +163,12 @@ def test_progressive_disclosure_contains_localStorage_integration(client):
     assert "loadSavedMode()" in script_content
 
 
-def test_progressive_disclosure_contains_accessibility_features(client):
+def test_progressive_disclosure_contains_accessibility_features(client: Any) -> None:
     """Test that progressive disclosure script contains accessibility features."""
     resp = client.get("/static/scripts/progressive_disclosure.js")
     assert resp.status_code == 200
 
-    script_content = resp.get_data(as_text=True)
+    script_content = _combined_progressive_disclosure_source()
 
     # Check for ARIA attributes
     assert "aria-live" in script_content
@@ -159,12 +178,12 @@ def test_progressive_disclosure_contains_accessibility_features(client):
     assert "tabindex" in script_content
 
 
-def test_progressive_disclosure_contains_error_handling(client):
+def test_progressive_disclosure_contains_error_handling(client: Any) -> None:
     """Test that progressive disclosure script contains error handling."""
     resp = client.get("/static/scripts/progressive_disclosure.js")
     assert resp.status_code == 200
 
-    script_content = resp.get_data(as_text=True)
+    script_content = _combined_progressive_disclosure_source()
 
     # Check for try-catch blocks
     assert "try {" in script_content
@@ -175,12 +194,12 @@ def test_progressive_disclosure_contains_error_handling(client):
     assert "// Ignore localStorage errors" in script_content
 
 
-def test_progressive_disclosure_contains_validation_rules(client):
+def test_progressive_disclosure_contains_validation_rules(client: Any) -> None:
     """Test that progressive disclosure script contains validation rule examples."""
     resp = client.get("/static/scripts/progressive_disclosure.js")
     assert resp.status_code == 200
 
-    script_content = resp.get_data(as_text=True)
+    script_content = _combined_progressive_disclosure_source()
 
     # Check for validation rule structure
     assert "validate: (value)" in script_content
@@ -189,12 +208,12 @@ def test_progressive_disclosure_contains_validation_rules(client):
     assert "message:" in script_content
 
 
-def test_progressive_disclosure_contains_preview_styling(client):
+def test_progressive_disclosure_contains_preview_styling(client: Any) -> None:
     """Test that progressive disclosure script contains preview styling functionality."""
     resp = client.get("/static/scripts/progressive_disclosure.js")
     assert resp.status_code == 200
 
-    script_content = resp.get_data(as_text=True)
+    script_content = _combined_progressive_disclosure_source()
 
     # Check for style application methods
     assert "applyPreviewStyles(" in script_content
@@ -206,12 +225,12 @@ def test_progressive_disclosure_contains_preview_styling(client):
     assert "padding" in script_content
 
 
-def test_progressive_disclosure_contains_wizard_completion(client):
+def test_progressive_disclosure_contains_wizard_completion(client: Any) -> None:
     """Test that progressive disclosure script contains wizard completion handling."""
     resp = client.get("/static/scripts/progressive_disclosure.js")
     assert resp.status_code == 200
 
-    script_content = resp.get_data(as_text=True)
+    script_content = _combined_progressive_disclosure_source()
 
     # Check for completion logic
     assert "completeWizard(" in script_content
@@ -219,34 +238,34 @@ def test_progressive_disclosure_contains_wizard_completion(client):
     assert "Setup wizard completed" in script_content
 
 
-def test_progressive_disclosure_revokes_blob_urls(client):
+def test_progressive_disclosure_revokes_blob_urls(client: Any) -> None:
     """Bug 14: Script should call revokeObjectURL to prevent memory leaks."""
     resp = client.get("/static/scripts/progressive_disclosure.js")
     assert resp.status_code == 200
 
-    script_content = resp.get_data(as_text=True)
+    script_content = _combined_progressive_disclosure_source()
     assert "revokeObjectURL" in script_content
     assert "_lastPreviewBlobUrl" in script_content
 
 
-def test_progressive_disclosure_module_export(client):
+def test_progressive_disclosure_module_export(client: Any) -> None:
     """Test that progressive disclosure script can be used as a module."""
     resp = client.get("/static/scripts/progressive_disclosure.js")
     assert resp.status_code == 200
 
-    script_content = resp.get_data(as_text=True)
+    script_content = _combined_progressive_disclosure_source()
 
     # Check for module export
     assert "module.exports" in script_content
     assert "typeof module !== 'undefined'" in script_content
 
 
-def test_progressive_disclosure_dom_ready_initialization(client):
+def test_progressive_disclosure_dom_ready_initialization(client: Any) -> None:
     """Test that progressive disclosure script initializes on DOM ready."""
     resp = client.get("/static/scripts/progressive_disclosure.js")
     assert resp.status_code == 200
 
-    script_content = resp.get_data(as_text=True)
+    script_content = _combined_progressive_disclosure_source()
 
     # Check for DOM ready initialization
     assert "DOMContentLoaded" in script_content
@@ -254,12 +273,12 @@ def test_progressive_disclosure_dom_ready_initialization(client):
     assert "new ProgressiveDisclosure" in script_content
 
 
-def test_progressive_disclosure_contains_color_utility(client):
+def test_progressive_disclosure_contains_color_utility(client: Any) -> None:
     """Test that progressive disclosure script contains color utility functions."""
     resp = client.get("/static/scripts/progressive_disclosure.js")
     assert resp.status_code == 200
 
-    script_content = resp.get_data(as_text=True)
+    script_content = _combined_progressive_disclosure_source()
 
     # Check for color processing
     assert "getHueFromColor(" in script_content
@@ -267,12 +286,12 @@ def test_progressive_disclosure_contains_color_utility(client):
     assert "hue-rotate" in script_content
 
 
-def test_progressive_disclosure_form_field_detection(client):
+def test_progressive_disclosure_form_field_detection(client: Any) -> None:
     """Test that progressive disclosure script can detect form fields properly."""
     resp = client.get("/static/scripts/progressive_disclosure.js")
     assert resp.status_code == 200
 
-    script_content = resp.get_data(as_text=True)
+    script_content = _combined_progressive_disclosure_source()
 
     # Check for form field selectors
     assert ".form-input" in script_content
@@ -280,7 +299,7 @@ def test_progressive_disclosure_form_field_detection(client):
     assert "settings-container" in script_content
 
 
-def test_progressive_disclosure_escapes_change_items_in_innerHTML(client):
+def test_progressive_disclosure_escapes_change_items_in_innerHTML(client: Any) -> None:
     """Verify that change-item values are HTML-escaped before being set as innerHTML.
 
     JTN-243: form field values are user-controlled and must be escaped to prevent XSS.
@@ -288,7 +307,7 @@ def test_progressive_disclosure_escapes_change_items_in_innerHTML(client):
     """
     resp = client.get("/static/scripts/progressive_disclosure.js")
     assert resp.status_code == 200
-    js = resp.get_data(as_text=True)
+    js = _combined_progressive_disclosure_source()
 
     # escapeHtml helper must be defined as a standalone function
     assert "function escapeHtml(" in js
