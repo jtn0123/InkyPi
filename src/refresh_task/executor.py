@@ -232,24 +232,14 @@ class RefreshExecutor:
                 return image, exc_or_meta
 
             last_exc = self._normalize_timeout(plugin_id, timeout_s, exc_or_meta)
-            if self._raise_if_permanent(last_exc, plugin_id, attempt, attempts):
-                raise last_exc
-
-            if attempt < attempts:
-                logger.warning(
-                    "plugin_lifecycle: attempt_retry | plugin_id=%s attempt=%s/%s backoff_ms=%s error=%s",
-                    plugin_id,
-                    attempt,
-                    attempts,
-                    backoff_ms,
-                    last_exc,
-                )
-                sleep(max(0.0, backoff_ms / 1000.0))
-                self.recorder.publish_step(
-                    plugin_id=plugin_id,
-                    request_id=request_id,
-                    step=f"retry {attempt}/{attempts - 1}",
-                )
+            self._handle_attempt_failure(
+                last_exc,
+                plugin_id=plugin_id,
+                attempt=attempt,
+                attempts=attempts,
+                backoff_ms=backoff_ms,
+                request_id=request_id,
+            )
 
         if last_exc is not None:
             raise last_exc
@@ -387,24 +377,14 @@ class RefreshExecutor:
             else:
                 return result_holder["image"], result_holder.get("meta")
 
-            if self._raise_if_permanent(last_exc, plugin_id, attempt, attempts):
-                raise last_exc
-
-            if attempt < attempts:
-                logger.warning(
-                    "plugin_lifecycle: attempt_retry | plugin_id=%s attempt=%s/%s backoff_ms=%s error=%s",
-                    plugin_id,
-                    attempt,
-                    attempts,
-                    backoff_ms,
-                    last_exc,
-                )
-                sleep(max(0.0, backoff_ms / 1000.0))
-                self.recorder.publish_step(
-                    plugin_id=plugin_id,
-                    request_id=request_id,
-                    step=f"retry {attempt}/{attempts - 1}",
-                )
+            self._handle_attempt_failure(
+                last_exc,
+                plugin_id=plugin_id,
+                attempt=attempt,
+                attempts=attempts,
+                backoff_ms=backoff_ms,
+                request_id=request_id,
+            )
 
         if last_exc is not None:
             raise last_exc
@@ -416,6 +396,37 @@ class RefreshExecutor:
         backoff_ms = int(os.getenv("INKYPI_PLUGIN_RETRY_BACKOFF_MS", "500") or "500")
         attempts = max(1, retries + 1)
         return retries, backoff_ms, attempts
+
+    def _handle_attempt_failure(
+        self,
+        exc: BaseException,
+        *,
+        plugin_id: str,
+        attempt: int,
+        attempts: int,
+        backoff_ms: int,
+        request_id: str | None,
+    ) -> None:
+        if self._raise_if_permanent(exc, plugin_id, attempt, attempts):
+            raise exc
+
+        if attempt >= attempts:
+            return
+
+        logger.warning(
+            "plugin_lifecycle: attempt_retry | plugin_id=%s attempt=%s/%s backoff_ms=%s error=%s",
+            plugin_id,
+            attempt,
+            attempts,
+            backoff_ms,
+            exc,
+        )
+        sleep(max(0.0, backoff_ms / 1000.0))
+        self.recorder.publish_step(
+            plugin_id=plugin_id,
+            request_id=request_id,
+            step=f"retry {attempt}/{attempts - 1}",
+        )
 
     @staticmethod
     def _normalize_timeout(
