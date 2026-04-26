@@ -6,6 +6,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 _STYLES_DIR = Path(__file__).resolve().parents[2] / "src" / "static" / "styles"
+_SCRIPTS_DIR = Path(__file__).resolve().parents[2] / "src" / "static" / "scripts"
 SETTINGS_HTML = ROOT / "src" / "templates" / "settings.html"
 SIDEBAR_HTML = ROOT / "src" / "templates" / "macros" / "sidebar.html"
 
@@ -17,6 +18,17 @@ def _read_all_css() -> str:
         for p in sorted(_STYLES_DIR.glob("partials/_*.css"))
     ]
     return "\n".join(parts)
+
+
+def _plugin_page_source() -> str:
+    return "\n".join(
+        path.read_text(encoding="utf-8")
+        for path in [
+            _SCRIPTS_DIR / "plugin_page" / "shared.js",
+            _SCRIPTS_DIR / "plugin_page" / "progress.js",
+            _SCRIPTS_DIR / "plugin_page.js",
+        ]
+    )
 
 
 def test_settings_page_contains_section_nav_and_loading_panels(client):
@@ -97,13 +109,17 @@ def test_settings_time_format_defaults_to_24h_when_config_is_missing():
 def test_plugin_page_updates_generated_preview_after_success(client):
     resp = client.get("/static/scripts/plugin_page.js")
     assert resp.status_code == 200
-    js = resp.get_data(as_text=True)
+    js = _plugin_page_source()
 
     assert "function refreshPreviewsAfterSuccess()" in js
     assert "await refreshInstancePreview({ force: true })" in js
     assert "setLatestRefresh(resolvedRefresh)" in js
     assert "setCurrentDisplayRefresh(resolvedRefresh)" in js
-    assert "button.disabled = !hasSnapshot" in js
+    assert (
+        'button.title = hasSnapshot\n          ? "Show the most recent saved progress log"'
+        in js
+    )
+    assert "button.disabled = false" in js
 
 
 def test_settings_logs_toggle_shares_action_bar_and_mobile_stays_in_flow(client):

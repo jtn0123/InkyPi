@@ -8,7 +8,23 @@ JTN-347/348/331/332: "Show last progress" button must produce visible feedback
          on Clock, To-Do List, Calendar, and Screenshot plugin pages.
 """
 
+from pathlib import Path
+
 import pytest
+
+_SCRIPTS_DIR = Path(__file__).resolve().parents[2] / "src" / "static" / "scripts"
+
+
+def _plugin_page_source() -> str:
+    return "\n".join(
+        path.read_text(encoding="utf-8")
+        for path in [
+            _SCRIPTS_DIR / "plugin_page" / "shared.js",
+            _SCRIPTS_DIR / "plugin_page" / "progress.js",
+            _SCRIPTS_DIR / "plugin_page.js",
+        ]
+    )
+
 
 # ---------------------------------------------------------------------------
 # JTN-311: Remove calendar button disabled when only one row
@@ -132,7 +148,7 @@ def test_show_last_progress_uses_set_hidden(client):
     HTML attribute."""
     resp = client.get("/static/scripts/plugin_page.js")
     assert resp.status_code == 200
-    js = resp.get_data(as_text=True)
+    js = _plugin_page_source()
 
     assert "setHidden(progress, false)" in js, (
         "showLastProgress must call setHidden(progress, false) to clear the "
@@ -146,7 +162,7 @@ def test_show_last_progress_does_not_use_style_display(client):
     progress block — the HTML `hidden` attribute overrides inline styles."""
     resp = client.get("/static/scripts/plugin_page.js")
     assert resp.status_code == 200
-    js = resp.get_data(as_text=True)
+    js = _plugin_page_source()
 
     # Verify the old broken pattern is gone
     assert 'progress.style.display = "block"' not in js, (
@@ -174,7 +190,7 @@ def test_show_last_progress_no_data_shows_modal(client):
     happens before any Update Now still get clearly anchored feedback."""
     resp = client.get("/static/scripts/plugin_page.js")
     assert resp.status_code == 200
-    js = resp.get_data(as_text=True)
+    js = _plugin_page_source()
 
     assert "No progress data yet" in js, (
         "showLastProgress must render 'No progress data yet' empty-state "
@@ -207,7 +223,7 @@ def test_show_last_progress_clears_inline_display_style(client):
     after the hidden attribute is removed."""
     resp = client.get("/static/scripts/plugin_page.js")
     assert resp.status_code == 200
-    js = resp.get_data(as_text=True)
+    js = _plugin_page_source()
 
     assert 'progress.style.display = ""' in js, (
         "showLastProgress must reset progress.style.display to '' so inline "
@@ -305,7 +321,7 @@ def test_show_last_progress_no_data_reveals_progress_block(client):
     was reported as 'no feedback')."""
     resp = client.get("/static/scripts/plugin_page.js")
     assert resp.status_code == 200
-    js = resp.get_data(as_text=True)
+    js = _plugin_page_source()
 
     fn_start = js.find("function showLastProgress()")
     assert fn_start != -1, "showLastProgress function not found"
