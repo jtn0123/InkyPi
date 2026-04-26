@@ -16,6 +16,7 @@ from plugins.plugin_registry import get_plugin_instance
 from refresh_task import recorder as refresh_recorder
 from refresh_task.actions import ManualUpdateRequest, PlaylistRefresh, RefreshAction
 from refresh_task.context import RefreshContext
+from refresh_task.display_pipeline import DisplayPipeline
 from refresh_task.health import PluginHealthTracker
 from refresh_task.housekeeping import RefreshHousekeeper
 from refresh_task.scheduler import RefreshScheduler
@@ -95,6 +96,12 @@ class RefreshTask:
         self.health_tracker = PluginHealthTracker(
             device_config=self.device_config,
             plugin_health=self.plugin_health,
+        )
+        self.display_pipeline = DisplayPipeline(
+            display_manager=self.display_manager,
+            housekeeper=self.housekeeper,
+            recorder=self.recorder,
+            update_plugin_health=self._update_plugin_health_positional,
         )
         self._tick_count: int = 0
         self.watchdog_thread: threading.Thread | None = None
@@ -554,25 +561,28 @@ class RefreshTask:
         """
         if not used_cached:
             return self._push_to_display(
-                image,
-                plugin_config,
-                refresh_action,
-                refresh_info,
-                benchmark_id,
-                plugin_id,
-                instance_name,
-                request_id,
+                image=image,
+                plugin_config=plugin_config,
+                refresh_action=refresh_action,
+                refresh_info=refresh_info,
+                benchmark_id=benchmark_id,
+                plugin_id=plugin_id,
+                instance_name=instance_name,
+                request_id=request_id,
                 manual_request=manual_request,
             )
-        logger.info(
-            f"Image already displayed, skipping refresh. | refresh_info: {refresh_info}"
+        return self.display_pipeline.push_or_skip_display(
+            used_cached=used_cached,
+            image=image,
+            plugin_config=plugin_config,
+            refresh_action=refresh_action,
+            refresh_info=refresh_info,
+            benchmark_id=benchmark_id,
+            plugin_id=plugin_id,
+            instance_name=instance_name,
+            request_id=request_id,
+            manual_request=manual_request,
         )
-        # JTN-786: no display push means no ``on_image_saved`` callback, but
-        # the image-on-disk invariant still holds (the previous refresh
-        # already wrote it), so unblock the manual-update waiter immediately.
-        if manual_request is not None:
-            manual_request.image_saved.set()
-        return None, None
 
     def _push_to_display(
         self,
@@ -587,101 +597,17 @@ class RefreshTask:
         manual_request: ManualUpdateRequest | None = None,
     ) -> tuple[int | None, int | None]:
         """Push image to the display hardware and record benchmark stages."""
-        logger.info(f"Updating display. | refresh_info: {refresh_info}")
-        history_meta = self.housekeeper.build_history_meta(refresh_action)
-        logger.info(
-            "plugin_lifecycle: display_start",
-            extra={
-                "stage": "display_start",
-                "plugin_id": plugin_id,
-                "instance": instance_name,
-                "refresh_id": benchmark_id,
-                "request_id": request_id,
-            },
+        return self.display_pipeline.push_to_display(
+            image=image,
+            plugin_config=plugin_config,
+            refresh_action=refresh_action,
+            refresh_info=refresh_info,
+            benchmark_id=benchmark_id,
+            plugin_id=plugin_id,
+            instance_name=instance_name,
+            request_id=request_id,
+            manual_request=manual_request,
         )
-        stage_t1 = perf_counter()
-        display_duration_ms = None
-        preprocess_ms = None
-        display_driver = None
-        # JTN-786: wire a callback so ``manual_update`` can return once the
-        # processed image is persisted to disk — the hardware write that
-        # follows can take ~27s on an Inky 7.3" Impression and was tripping
-        # the 60s manual-update cap for renders with a slow generate phase.
-        on_image_saved = None
-        if manual_request is not None:
-
-            def on_image_saved(save_metrics: Mapping[str, Any]) -> None:
-                manual_request.image_saved_metrics = {
-                    "generate_ms": None,  # filled in by the waiter if needed
-                    "preprocess_ms": save_metrics.get("preprocess_ms"),
-                    "display_ms": None,  # still running
-                    "stage": "image_saved",
-                }
-                manual_request.image_saved.set()
-
-        try:
-            display_metrics = self.display_manager.display_image(
-                image,
-                image_settings=plugin_config.get("image_settings", []),
-                history_meta=history_meta,
-                on_image_saved=on_image_saved,
-            )
-            if isinstance(display_metrics, dict):
-                preprocess_ms = display_metrics.get("preprocess_ms")
-                display_duration_ms = display_metrics.get("display_ms")
-                display_driver = display_metrics.get("display_driver")
-            else:
-                display_driver = None
-        except Exception as exc:
-            logger.error(
-                "plugin_lifecycle: display_failure | plugin_id=%s instance=%s error=%s",
-                plugin_id,
-                instance_name,
-                exc,
-            )
-            self._update_plugin_health(
-                plugin_id=plugin_id,
-                instance=instance_name,
-                ok=False,
-                metrics={"retained_display": bool(self._stale_display_path())},
-                error=str(exc),
-            )
-            self.recorder.publish_error(
-                plugin_id=plugin_id,
-                instance=instance_name,
-                refresh_id=benchmark_id,
-                request_id=request_id,
-                error=str(exc),
-                retained_display=bool(self._stale_display_path()),
-            )
-            raise
-        finally:
-            if display_duration_ms is None:
-                display_duration_ms = int((perf_counter() - stage_t1) * 1000)
-            logger.info(
-                "plugin_lifecycle: display_complete",
-                extra={
-                    "stage": "display_complete",
-                    "plugin_id": plugin_id,
-                    "instance": instance_name,
-                    "duration_ms": display_duration_ms,
-                    "refresh_id": benchmark_id,
-                    "request_id": request_id,
-                },
-            )
-            self.recorder.save_stage(
-                benchmark_id or "",
-                "display_pipeline",
-                display_duration_ms,
-            )
-            if display_driver:
-                self.recorder.save_stage(
-                    benchmark_id or "",
-                    "display_driver",
-                    display_duration_ms,
-                    extra={"driver": display_driver},
-                )
-        return display_duration_ms, preprocess_ms
 
     def _save_benchmark(
         self,
@@ -724,7 +650,7 @@ class RefreshTask:
         changed rather than stale content.  Best-effort: any error here is
         logged but never re-raised.
         """
-        self.housekeeper.push_fallback_image(
+        self.display_pipeline.push_fallback_image(
             plugin_id=plugin_id,
             instance_name=instance_name,
             exc=exc,
@@ -752,6 +678,23 @@ class RefreshTask:
             used_cached=used_cached,
         )
         self.device_config.write_config()
+
+    def _update_plugin_health_positional(
+        self,
+        plugin_id: str,
+        instance: str | None,
+        ok: bool,
+        metrics: Mapping[str, Any] | None,
+        error: str | None,
+    ) -> None:
+        """Positional adapter for collaborators that update plugin health."""
+        self._update_plugin_health(
+            plugin_id=plugin_id,
+            instance=instance,
+            ok=ok,
+            metrics=dict(metrics) if metrics is not None else None,
+            error=error,
+        )
 
     def _enqueue_manual_request(self, refresh_action: Any) -> ManualUpdateRequest:
         """Create and queue a ManualUpdateRequest; wake the background thread."""
