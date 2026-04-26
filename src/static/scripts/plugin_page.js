@@ -1,4 +1,10 @@
 (function () {
+  if (!globalThis.InkyPiPluginPageShared || !globalThis.InkyPiPluginPageProgress) {
+    throw new Error(
+      "InkyPiPluginPage requires InkyPiPluginPageShared and InkyPiPluginPageProgress to load before plugin_page.js"
+    );
+  }
+
   const {
     buildProgressKey,
     ensureInlineValidationMessages,

@@ -68,13 +68,16 @@
     function showLastProgress() {
       try {
         const data = getLastProgressSnapshot();
+        const finishedAt = new Date(data?.finishedAtIso || "");
+        const hasSnapshotData =
+          data && Array.isArray(data.lines) && !Number.isNaN(finishedAt.getTime());
         const progress = document.getElementById("requestProgress");
         const textEl = document.getElementById("requestProgressText");
         const clockEl = document.getElementById("requestProgressClock");
         const elapsedEl = document.getElementById("requestProgressElapsed");
         const list = document.getElementById("requestProgressList");
         const bar = document.getElementById("requestProgressBar");
-        if (!data) {
+        if (!hasSnapshotData) {
           if (list) {
             list.innerHTML = "";
             const li = document.createElement("li");
@@ -100,13 +103,13 @@
         if (list) {
           list.innerHTML = "";
           data.lines.forEach((rawLine) => {
-            const line = rawLine.replace(
+            const line = String(rawLine ?? "").replace(
               /^\s*\d{1,2}:\d{2}(?::\d{2})?\s*(AM|PM)?\s*/i,
               ""
             );
             const li = document.createElement("li");
             const ts = document.createElement("time");
-            ts.textContent = new Date(data.finishedAtIso).toLocaleTimeString();
+            ts.textContent = finishedAt.toLocaleTimeString();
             li.appendChild(ts);
             li.appendChild(document.createTextNode(` ${line}`));
             list.appendChild(li);
@@ -114,7 +117,7 @@
         }
         if (textEl) textEl.textContent = data.summary || "Last run";
         if (clockEl) {
-          clockEl.textContent = new Date(data.finishedAtIso).toLocaleTimeString();
+          clockEl.textContent = finishedAt.toLocaleTimeString();
         }
         if (elapsedEl) elapsedEl.textContent = "—";
         if (bar) {
