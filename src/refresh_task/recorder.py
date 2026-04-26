@@ -5,21 +5,40 @@ from __future__ import annotations
 import logging
 from collections.abc import Mapping
 from datetime import UTC, datetime
-from typing import Any, Protocol
+from typing import TYPE_CHECKING, Any, Protocol
 from uuid import uuid4
 
 from utils.event_bus import EventBus, get_event_bus
 from utils.progress_events import ProgressEventBus, get_progress_bus
+
+if TYPE_CHECKING:
+    from benchmarks.benchmark_storage import DeviceConfigLike
+else:
+
+    class DeviceConfigLike(Protocol):
+        BASE_DIR: str
+
+        def get_config(self, key: str, default: Any = None) -> Any: ...
+
 
 try:
     # Optional import; code must continue if benchmarking is unavailable.
     from benchmarks.benchmark_storage import save_refresh_event, save_stage_event
 except Exception:  # pragma: no cover
 
-    def save_refresh_event(*args: Any, **kwargs: Any) -> None:
+    def save_refresh_event(
+        device_config: DeviceConfigLike,
+        refresh_event: dict[str, Any],
+    ) -> None:
         return None
 
-    def save_stage_event(*args: Any, **kwargs: Any) -> None:
+    def save_stage_event(
+        device_config: DeviceConfigLike,
+        refresh_id: str,
+        stage: str,
+        duration_ms: int | None = None,
+        extra: dict[str, Any] | None = None,
+    ) -> None:
         return None
 
 
@@ -28,16 +47,12 @@ logger = logging.getLogger(__name__)
 __all__ = ["RefreshRecorder", "save_refresh_event", "save_stage_event"]
 
 
-class SupportsBenchmarkConfig(Protocol):
-    """Config surface needed by benchmark storage helpers."""
-
-
 class RefreshRecorder:
     """Owns refresh progress, SSE events, and best-effort benchmark writes."""
 
     def __init__(
         self,
-        device_config: SupportsBenchmarkConfig,
+        device_config: DeviceConfigLike,
         *,
         progress_bus: ProgressEventBus | None = None,
         event_bus: EventBus | None = None,

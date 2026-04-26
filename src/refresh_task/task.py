@@ -1365,7 +1365,7 @@ class RefreshTask:
 
     def _get_current_datetime(self) -> datetime:
         """Retrieves the current datetime based on the device's configured timezone."""
-        return cast(datetime, now_device_tz(self.device_config))
+        return now_device_tz(self.device_config)
 
     def _determine_next_plugin(
         self, playlist_manager: Any, latest_refresh_info: Any, current_dt: datetime
