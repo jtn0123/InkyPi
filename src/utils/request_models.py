@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 from dataclasses import dataclass
 from typing import Any
@@ -120,6 +121,32 @@ class PluginInstanceActionRequest:
     plugin_instance: str | None
 
 
+@dataclass(frozen=True, slots=True)
+class PluginSettingsFormRequest:
+    """Validated form payload for saving plugin settings."""
+
+    plugin_id: str
+    plugin_settings: dict[str, Any]
+
+
+@dataclass(frozen=True, slots=True)
+class PluginUpdateInstanceRequest:
+    """Validated form payload for updating an existing plugin instance."""
+
+    plugin_id: str
+    plugin_settings: dict[str, Any]
+    refresh_settings: dict[str, Any] | None
+
+
+@dataclass(frozen=True, slots=True)
+class PluginUpdateNowRequest:
+    """Validated form payload for rendering a plugin immediately."""
+
+    plugin_id: str
+    plugin_settings: dict[str, Any]
+    want_async: bool
+
+
 def validate_playlist_name(
     name: Any, *, field: str = "playlist_name"
 ) -> tuple[str | None, RequestModelError | None]:
@@ -214,6 +241,60 @@ def validate_cycle_minutes(
             field="cycle_minutes",
         )
     return cycle_minutes_int, None
+
+
+def validate_plugin_id(
+    value: Any,
+    *,
+    field: str = "plugin_id",
+    missing_message: str = "plugin_id is required",
+) -> tuple[str | None, RequestModelError | None]:
+    """Validate a required plugin identifier and return its stripped value."""
+    if not isinstance(value, str) or not value.strip():
+        return None, RequestModelError(missing_message, status=422, field=field)
+    return value.strip(), None
+
+
+def _copy_mapping(data: Any) -> dict[str, Any] | None:
+    if not isinstance(data, dict):
+        return None
+    return dict(data)
+
+
+def _pop_required_plugin_id(
+    data: Any,
+) -> tuple[str | None, dict[str, Any] | None, RequestModelError | None]:
+    copied = _copy_mapping(data)
+    if copied is None:
+        return None, None, RequestModelError("Invalid form payload")
+    plugin_id, error = validate_plugin_id(copied.pop("plugin_id", None))
+    if error is not None or plugin_id is None:
+        return None, None, error
+    return plugin_id, copied, None
+
+
+def _parse_optional_refresh_settings(
+    raw_refresh: Any,
+) -> tuple[dict[str, Any] | None, RequestModelError | None]:
+    if raw_refresh is None:
+        return None, None
+    try:
+        refresh_payload = json.loads(raw_refresh)
+    except (TypeError, ValueError):
+        return None, RequestModelError(
+            "Refresh settings must be valid JSON",
+            field="refresh_settings",
+        )
+    if not isinstance(refresh_payload, dict):
+        return None, RequestModelError(
+            "Refresh settings must be an object",
+            field="refresh_settings",
+        )
+    return refresh_payload, None
+
+
+def _truthy_async_flag(value: Any) -> bool:
+    return isinstance(value, str) and value.lower() in ("1", "true")
 
 
 def parse_api_keys_save_request(
@@ -385,6 +466,68 @@ def parse_playlist_name_request(
     if not isinstance(playlist_name, str) or not playlist_name.strip():
         return None, RequestModelError(missing_message, field="playlist_name")
     return PlaylistNameRequest(playlist_name=playlist_name.strip()), None
+
+
+def parse_plugin_settings_form_request(
+    data: Any,
+) -> tuple[PluginSettingsFormRequest | None, RequestModelError | None]:
+    """Parse a plugin settings form body that must include ``plugin_id``."""
+    plugin_id, plugin_settings, error = _pop_required_plugin_id(data)
+    if error is not None or plugin_id is None or plugin_settings is None:
+        return None, error
+    return (
+        PluginSettingsFormRequest(
+            plugin_id=plugin_id,
+            plugin_settings=plugin_settings,
+        ),
+        None,
+    )
+
+
+def parse_plugin_update_instance_request(
+    data: Any,
+) -> tuple[PluginUpdateInstanceRequest | None, RequestModelError | None]:
+    """Parse an update-plugin-instance form body."""
+    plugin_id, plugin_settings, error = _pop_required_plugin_id(data)
+    if error is not None or plugin_id is None or plugin_settings is None:
+        return None, error
+
+    refresh_settings, refresh_error = _parse_optional_refresh_settings(
+        plugin_settings.pop("refresh_settings", None)
+    )
+    if refresh_error is not None:
+        return None, refresh_error
+
+    return (
+        PluginUpdateInstanceRequest(
+            plugin_id=plugin_id,
+            plugin_settings=plugin_settings,
+            refresh_settings=refresh_settings,
+        ),
+        None,
+    )
+
+
+def parse_plugin_update_now_request(
+    data: Any,
+    *,
+    async_header: Any = "",
+    async_query: Any = "",
+) -> tuple[PluginUpdateNowRequest | None, RequestModelError | None]:
+    """Parse a manual plugin render form body."""
+    plugin_id, plugin_settings, error = _pop_required_plugin_id(data)
+    if error is not None or plugin_id is None or plugin_settings is None:
+        return None, error
+
+    return (
+        PluginUpdateNowRequest(
+            plugin_id=plugin_id,
+            plugin_settings=plugin_settings,
+            want_async=_truthy_async_flag(async_header)
+            or _truthy_async_flag(async_query),
+        ),
+        None,
+    )
 
 
 def parse_plugin_instance_action_request(
