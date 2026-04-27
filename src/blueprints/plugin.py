@@ -3,7 +3,7 @@ import logging
 import os
 from collections.abc import Mapping
 from time import perf_counter
-from typing import Any, cast
+from typing import Any, NoReturn, cast
 
 from flask import (
     Blueprint,
@@ -66,7 +66,7 @@ _ERR_PLAYLIST_NOT_FOUND = "Playlist not found"
 _MSG_CIRCUIT_BREAKER_RESET = "Circuit-breaker reset for plugin instance."
 
 
-def _raise_request_model_error(error: RequestModelError) -> None:
+def _raise_request_model_error(error: RequestModelError) -> NoReturn:
     raise ClientInputError(
         error.message,
         status=error.status,
@@ -76,13 +76,13 @@ def _raise_request_model_error(error: RequestModelError) -> None:
 
 
 def _plugin_form_data(*, include_form_for_files: bool = False) -> dict[str, Any]:
-    form_data = cast(dict[str, Any], cast(Any, parse_form)(request.form))
+    form_data = parse_form(request.form)
     file_args: tuple[Any, ...]
     if include_form_for_files:
         file_args = (request.files, request.form)
     else:
         file_args = (request.files,)
-    form_data.update(cast(dict[str, Any], cast(Any, handle_request_files)(*file_args)))
+    form_data.update(handle_request_files(*file_args))
     return form_data
 
 
@@ -465,14 +465,11 @@ def delete_plugin_instance() -> Any:
         request.get_json(silent=True)
     )
     if parse_error is not None:
-        raise ClientInputError(
-            parse_error.message,
-            status=parse_error.status,
-            code=parse_error.code,
-            field=parse_error.field,
-        )
+        _raise_request_model_error(parse_error)
     if parsed is None:
-        raise ClientInputError("Invalid or missing JSON payload", status=400)
+        _raise_request_model_error(
+            RequestModelError(message="Invalid or missing JSON payload", status=400)
+        )
 
     with route_error_boundary(
         "delete plugin instance",
@@ -630,14 +627,11 @@ def display_plugin_instance() -> Any:
         request.get_json(silent=True)
     )
     if parse_error is not None:
-        raise ClientInputError(
-            parse_error.message,
-            status=parse_error.status,
-            code=parse_error.code,
-            field=parse_error.field,
-        )
+        _raise_request_model_error(parse_error)
     if parsed is None:
-        raise ClientInputError("Invalid or missing JSON payload", status=400)
+        _raise_request_model_error(
+            RequestModelError(message="Invalid or missing JSON payload", status=400)
+        )
 
     with route_error_boundary(
         "display plugin instance",
@@ -1066,14 +1060,11 @@ def update_now() -> Any:
             async_query=request.args.get("async", ""),
         )
         if parse_error is not None:
-            return json_error(
-                parse_error.message,
-                status=parse_error.status,
-                code=parse_error.code,
-                details=parse_error.details,
-            )
+            _raise_request_model_error(parse_error)
         if parsed is None:
-            return json_error("Invalid form payload", status=400)
+            _raise_request_model_error(
+                RequestModelError(message="Invalid form payload", status=400)
+            )
         plugin_id = parsed.plugin_id
         plugin_settings = parsed.plugin_settings
 
@@ -1147,6 +1138,13 @@ def update_now() -> Any:
             status=504,
             code="manual_update_timeout",
         )
+    except ClientInputError as e:
+        return json_error(
+            e.message,
+            status=e.status,
+            code=e.code,
+            details=e.details,
+        )
     except Exception as e:
         logger.exception("Error in update_now: %s", e)
         return json_error(_ERR_INTERNAL, status=500, code="internal_error")
@@ -1195,10 +1193,8 @@ def save_plugin_settings_alias(plugin_id: str) -> Any:
     playlist_manager = device_config.get_playlist_manager()
 
     try:
-        plugin_settings = cast(dict[str, Any], cast(Any, parse_form)(request.form))
-        plugin_settings.update(
-            cast(dict[str, Any], cast(Any, handle_request_files)(request.files))
-        )
+        plugin_settings = _plugin_form_data()
+        plugin_settings.pop(_PLUGIN_ID, None)
         return _save_plugin_settings_common(
             plugin_id=plugin_id,
             plugin_settings=plugin_settings,

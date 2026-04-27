@@ -250,7 +250,11 @@ def validate_plugin_id(
     missing_message: str = "plugin_id is required",
 ) -> tuple[str | None, RequestModelError | None]:
     """Validate a required plugin identifier and return its stripped value."""
-    if not isinstance(value, str) or not value.strip():
+    if not isinstance(value, str):
+        return None, RequestModelError(
+            "plugin_id must be a string", status=422, field=field
+        )
+    if not value.strip():
         return None, RequestModelError(missing_message, status=422, field=field)
     return value.strip(), None
 
@@ -276,7 +280,7 @@ def _pop_required_plugin_id(
 def _parse_optional_refresh_settings(
     raw_refresh: Any,
 ) -> tuple[dict[str, Any] | None, RequestModelError | None]:
-    if raw_refresh is None:
+    if not raw_refresh:
         return None, None
     try:
         refresh_payload = json.loads(raw_refresh)
@@ -294,7 +298,14 @@ def _parse_optional_refresh_settings(
 
 
 def _truthy_async_flag(value: Any) -> bool:
-    return isinstance(value, str) and value.lower() in ("1", "true")
+    return isinstance(value, str) and value.strip().lower() in {
+        "1",
+        "true",
+        "t",
+        "yes",
+        "y",
+        "on",
+    }
 
 
 def parse_api_keys_save_request(

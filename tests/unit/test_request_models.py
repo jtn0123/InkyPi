@@ -283,6 +283,16 @@ def test_validate_plugin_id_rejects_missing_with_field() -> None:
     assert error.message == "plugin_id is required"
 
 
+def test_validate_plugin_id_rejects_non_string_with_field() -> None:
+    plugin_id, error = validate_plugin_id(123)
+
+    assert plugin_id is None
+    assert error is not None
+    assert error.status == 422
+    assert error.field == "plugin_id"
+    assert error.message == "plugin_id must be a string"
+
+
 def test_parse_plugin_settings_form_request_pops_plugin_id() -> None:
     parsed, error = parse_plugin_settings_form_request(
         {"plugin_id": "  clock  ", "timezone": "UTC"}
@@ -341,6 +351,17 @@ def test_parse_plugin_update_instance_request_rejects_non_object_refresh() -> No
     assert error.field == "refresh_settings"
 
 
+def test_parse_plugin_update_instance_request_ignores_empty_refresh_settings() -> None:
+    parsed, error = parse_plugin_update_instance_request(
+        {"plugin_id": "clock", "refresh_settings": ""}
+    )
+
+    assert error is None
+    assert parsed is not None
+    assert parsed.refresh_settings is None
+    assert parsed.plugin_settings == {}
+
+
 def test_parse_plugin_update_now_request_extracts_async_flag() -> None:
     parsed, error = parse_plugin_update_now_request(
         {"plugin_id": "clock", "timezone": "UTC"},
@@ -352,6 +373,39 @@ def test_parse_plugin_update_now_request_extracts_async_flag() -> None:
     assert parsed.plugin_id == "clock"
     assert parsed.plugin_settings == {"timezone": "UTC"}
     assert parsed.want_async is True
+
+
+def test_parse_plugin_update_now_request_extracts_header_async_flag() -> None:
+    parsed, error = parse_plugin_update_now_request(
+        {"plugin_id": "clock"},
+        async_header="true",
+    )
+
+    assert error is None
+    assert parsed is not None
+    assert parsed.want_async is True
+
+
+def test_parse_plugin_update_now_request_accepts_html_on_async_flag() -> None:
+    parsed, error = parse_plugin_update_now_request(
+        {"plugin_id": "clock"},
+        async_query="on",
+    )
+
+    assert error is None
+    assert parsed is not None
+    assert parsed.want_async is True
+
+
+def test_parse_plugin_update_now_request_treats_empty_async_as_false() -> None:
+    parsed, error = parse_plugin_update_now_request(
+        {"plugin_id": "clock"},
+        async_query="",
+    )
+
+    assert error is None
+    assert parsed is not None
+    assert parsed.want_async is False
 
 
 def test_parse_plugin_instance_action_request_requires_playlist_name() -> None:
