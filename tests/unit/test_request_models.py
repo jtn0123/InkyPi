@@ -68,6 +68,14 @@ def test_parse_playlist_create_request_rejects_matching_times() -> None:
     assert error.field == "end_time"
 
 
+def test_parse_playlist_create_request_rejects_non_object_payload() -> None:
+    parsed, error = parse_playlist_create_request(["not", "an", "object"])
+
+    assert parsed is None
+    assert error is not None
+    assert error.message == "Invalid JSON data"
+
+
 def test_validate_cycle_minutes_accepts_optional_and_range() -> None:
     missing_value, missing_error = validate_cycle_minutes(None)
     value, error = validate_cycle_minutes("15")
@@ -102,6 +110,14 @@ def test_parse_playlist_update_request_returns_typed_model() -> None:
     assert parsed.start_min == 8 * 60
     assert parsed.end_min == 12 * 60
     assert parsed.cycle_minutes_int == 30
+
+
+def test_parse_playlist_update_request_rejects_non_object_payload() -> None:
+    parsed, error = parse_playlist_update_request("bad")
+
+    assert parsed is None
+    assert error is not None
+    assert error.message == "Invalid JSON data"
 
 
 def test_parse_api_keys_save_request_accepts_entries_list() -> None:
@@ -178,8 +194,8 @@ def test_parse_playlist_update_request_uses_shared_missing_time_error() -> None:
 def test_parse_playlist_reorder_request_returns_ordered_payload() -> None:
     parsed, error = parse_playlist_reorder_request(
         {
-            "playlist_name": "Default",
-            "ordered": [{"plugin_id": "clock", "name": "Clock"}],
+            "playlist_name": " Default ",
+            "ordered": [{"plugin_id": " clock ", "name": " Clock "}],
         }
     )
 
@@ -192,6 +208,16 @@ def test_parse_playlist_reorder_request_returns_ordered_payload() -> None:
 def test_parse_playlist_reorder_request_rejects_wrong_item_shape() -> None:
     parsed, error = parse_playlist_reorder_request(
         {"playlist_name": "Default", "ordered": [{"pid": "clock"}]}
+    )
+
+    assert parsed is None
+    assert error is not None
+    assert error.field == "ordered"
+
+
+def test_parse_playlist_reorder_request_rejects_empty_plugin_id() -> None:
+    parsed, error = parse_playlist_reorder_request(
+        {"playlist_name": "Default", "ordered": [{"plugin_id": " ", "name": "Clock"}]}
     )
 
     assert parsed is None

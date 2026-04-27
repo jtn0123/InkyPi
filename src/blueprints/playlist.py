@@ -29,18 +29,17 @@ from utils.backend_errors import (
 from utils.http_utils import (
     json_error,
     json_success,
-    reissue_json_error,
 )
 from utils.messages import PLAYLIST_NAME_REQUIRED_ERROR
 from utils.request_models import (
     CODE_VALIDATION,
+    PlaylistUpdateRequest,
     RequestModelError,
     parse_device_cycle_request,
     parse_playlist_create_request,
     parse_playlist_name_request,
     parse_playlist_reorder_request,
     parse_playlist_update_request,
-    validate_playlist_name as validate_playlist_name_request,
 )
 from utils.time_utils import calculate_seconds, now_device_tz
 
@@ -74,20 +73,6 @@ def _request_model_error_response(error: RequestModelError) -> Any:
         code=error.code,
         details=error.details or None,
     )
-
-
-def _validate_playlist_name(
-    name: Any, field: str = "playlist_name"
-) -> tuple[str | None, Any]:
-    """Validate playlist name format. Returns (cleaned_name, error_response) tuple.
-
-    ``field`` is the form field name echoed back in ``details.field`` so the
-    frontend can highlight the offending input.
-    """
-    normalized, error = validate_playlist_name_request(name, field=field)
-    if error is not None:
-        return None, _request_model_error_response(error)
-    return normalized, None
 
 
 # Simple in-memory cache for ETA computations (per playlist, per-minute)
@@ -563,21 +548,38 @@ def playlists() -> Any:
     )
 
 
-def _parse_playlist_request_data() -> tuple[dict[str, Any] | None, Any]:
+def _parse_playlist_request_data(
+    *,
+    form_fields: tuple[str, ...],
+    unsupported_message: str = "Unsupported media type",
+    unsupported_status: int = 415,
+) -> tuple[dict[str, Any] | None, RequestModelError | None]:
     """Parse and validate playlist create/update request data.
 
     Returns (data_dict, error_response). If error_response is not None, return it.
     """
-    data = request.get_json(silent=True)
-    if data is None:
-        form_data = request.form.to_dict()
-        if any(k in form_data for k in ("playlist_name", "start_time", "end_time")):
-            data = form_data
-        else:
-            return None, json_error("Unsupported media type", status=415)
-    if not isinstance(data, dict):
-        return None, json_error("Invalid JSON data", status=400)
-    return data, None
+    if request.is_json:
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict):
+            return None, RequestModelError("Invalid JSON data")
+        return data, None
+
+    form_data = request.form.to_dict()
+    if any(k in form_data for k in form_fields):
+        return form_data, None
+    return None, RequestModelError(unsupported_message, status=unsupported_status)
+
+
+def _parse_playlist_update_payload(
+    data: Any,
+) -> tuple[PlaylistUpdateRequest | None, Any]:
+    """Validate an /update_playlist request payload."""
+    parsed, error = parse_playlist_update_request(data)
+    if error is not None:
+        return None, _request_model_error_response(error)
+    if parsed is None:
+        return None, json_error("Invalid playlist payload", status=400)
+    return parsed, None
 
 
 @playlist_bp.route("/create_playlist", methods=["POST"])  # type: ignore[untyped-decorator]
@@ -585,9 +587,11 @@ def create_playlist() -> Any:
     device_config = current_app.config["DEVICE_CONFIG"]
     playlist_manager = device_config.get_playlist_manager()
 
-    data, err = _parse_playlist_request_data()
+    data, err = _parse_playlist_request_data(
+        form_fields=("playlist_name", "start_time", "end_time", "cycle_minutes")
+    )
     if err:
-        return reissue_json_error(err, _MSG_INVALID_PLAYLIST_REQUEST)
+        return _request_model_error_response(err)
     if data is None:
         return json_error("Invalid playlist request", status=400)
 
@@ -663,52 +667,26 @@ def _apply_cycle_override(
         playlist.cycle_interval_seconds = cycle_minutes_int * 60
 
 
-def _validate_update_playlist_payload(
-    data: Mapping[str, Any],
-) -> tuple[dict[str, Any] | None, Any]:
-    """Validate an /update_playlist request payload.
-
-    Returns ``(parsed, error_response)``; exactly one is non-None.  ``parsed``
-    is a dict with ``new_name``, ``start_time``, ``end_time``, ``start_min``,
-    ``end_min``, ``cycle_minutes_int``.
-    """
-    parsed, error = parse_playlist_update_request(dict(data))
-    if error is not None:
-        return None, _request_model_error_response(error)
-    if parsed is None:
-        return None, json_error("Invalid playlist payload", status=400)
-    return {
-        "new_name": parsed.new_name,
-        "start_time": parsed.start_time,
-        "end_time": parsed.end_time,
-        "start_min": parsed.start_min,
-        "end_min": parsed.end_min,
-        "cycle_minutes_int": parsed.cycle_minutes_int,
-    }, None
-
-
 @playlist_bp.route("/update_playlist/<string:playlist_name>", methods=["PUT"])  # type: ignore[untyped-decorator]
 def update_playlist(playlist_name: str) -> Any:
     device_config = current_app.config["DEVICE_CONFIG"]
     playlist_manager = device_config.get_playlist_manager()
 
-    data = request.get_json(silent=True)
-    if not isinstance(data, dict):
-        return json_error("Invalid JSON data", status=400)
+    data, body_err = _parse_playlist_request_data(
+        form_fields=("new_name", "start_time", "end_time", "cycle_minutes"),
+        unsupported_message="Invalid JSON data",
+        unsupported_status=400,
+    )
+    if body_err:
+        return _request_model_error_response(body_err)
+    if data is None:
+        return json_error("Invalid playlist request", status=400)
 
-    parsed, err = _validate_update_playlist_payload(data)
+    parsed, err = _parse_playlist_update_payload(data)
     if err:
         return err
-    if not isinstance(parsed, dict):
+    if parsed is None:
         return json_error("Invalid playlist payload", status=400)
-    new_name = parsed["new_name"]
-    start_time = parsed["start_time"]
-    end_time = parsed["end_time"]
-    start_min = parsed["start_min"]
-    end_min = parsed["end_min"]
-    cycle_minutes_int = parsed["cycle_minutes_int"]
-    if start_min is None or end_min is None:
-        return json_error("Invalid playlist times", status=400)
 
     playlist = playlist_manager.get_playlist(playlist_name)
     if not playlist:
@@ -722,7 +700,10 @@ def update_playlist(playlist_name: str) -> Any:
     # Prevent overlapping (exclude the playlist being updated)
     try:
         overlap_err = _check_playlist_overlap(
-            start_min, end_min, playlist_manager.playlists, exclude_name=playlist_name
+            parsed.start_min,
+            parsed.end_min,
+            playlist_manager.playlists,
+            exclude_name=playlist_name,
         )
         if overlap_err:
             return overlap_err
@@ -733,7 +714,7 @@ def update_playlist(playlist_name: str) -> Any:
     duplicate_name_result: list[bool] = []
 
     def _do_update_playlist(cfg: Any) -> None:
-        existing_with_new_name = playlist_manager.get_playlist(new_name)
+        existing_with_new_name = playlist_manager.get_playlist(parsed.new_name)
         if (
             existing_with_new_name is not None
             and existing_with_new_name is not playlist
@@ -742,10 +723,12 @@ def update_playlist(playlist_name: str) -> Any:
             return
         upd_result.append(
             playlist_manager.update_playlist(
-                playlist_name, new_name, start_time, end_time
+                playlist_name, parsed.new_name, parsed.start_time, parsed.end_time
             )
         )
-        _apply_cycle_override(playlist_manager, new_name, cycle_minutes_int)
+        _apply_cycle_override(
+            playlist_manager, parsed.new_name, parsed.cycle_minutes_int
+        )
 
     device_config.update_atomic(_do_update_playlist)
     if duplicate_name_result:
@@ -760,9 +743,9 @@ def update_playlist(playlist_name: str) -> Any:
 
     # Warn if the updated playlist overlaps with Default.
     warning = None
-    if playlist_name != "Default" and new_name != "Default":
+    if playlist_name != "Default" and parsed.new_name != "Default":
         warning = _default_overlap_warning(
-            start_min, end_min, playlist_manager.playlists
+            parsed.start_min, parsed.end_min, playlist_manager.playlists
         )
 
     if warning:

@@ -264,9 +264,12 @@ def parse_device_cycle_request(
 
 
 def parse_playlist_create_request(
-    data: dict[str, Any],
+    data: Any,
 ) -> tuple[PlaylistCreateRequest | None, RequestModelError | None]:
     """Parse and validate a create-playlist payload."""
+    if not isinstance(data, dict):
+        return None, RequestModelError("Invalid JSON data")
+
     playlist_name, name_err = validate_playlist_name(data.get("playlist_name"))
     if name_err is not None or playlist_name is None:
         return None, name_err
@@ -295,9 +298,12 @@ def parse_playlist_create_request(
 
 
 def parse_playlist_update_request(
-    data: dict[str, Any],
+    data: Any,
 ) -> tuple[PlaylistUpdateRequest | None, RequestModelError | None]:
     """Parse and validate an update-playlist payload."""
+    if not isinstance(data, dict):
+        return None, RequestModelError("Invalid JSON data")
+
     new_name, name_err = validate_playlist_name(data.get("new_name"), field="new_name")
     if name_err is not None or new_name is None:
         return None, name_err
@@ -332,12 +338,9 @@ def parse_playlist_reorder_request(
     if not isinstance(data, dict):
         return None, RequestModelError("Invalid or missing JSON payload")
 
-    playlist_name = data.get("playlist_name")
-    if not isinstance(playlist_name, str) or not playlist_name.strip():
-        return None, RequestModelError(
-            "playlist_name and ordered list are required",
-            field="playlist_name",
-        )
+    playlist_name, name_err = validate_playlist_name(data.get("playlist_name"))
+    if name_err is not None or playlist_name is None:
+        return None, name_err
 
     ordered = data.get("ordered")
     if not isinstance(ordered, list):
@@ -352,13 +355,20 @@ def parse_playlist_reorder_request(
             return None, RequestModelError("Invalid order payload", field="ordered")
         plugin_id = item.get("plugin_id")
         name = item.get("name")
-        if not isinstance(plugin_id, str) or not isinstance(name, str):
+        if (
+            not isinstance(plugin_id, str)
+            or not plugin_id.strip()
+            or not isinstance(name, str)
+            or not name.strip()
+        ):
             return None, RequestModelError("Invalid order payload", field="ordered")
-        parsed_ordered.append(PlaylistPluginOrderItem(plugin_id=plugin_id, name=name))
+        parsed_ordered.append(
+            PlaylistPluginOrderItem(plugin_id=plugin_id.strip(), name=name.strip())
+        )
 
     return (
         PlaylistReorderRequest(
-            playlist_name=playlist_name.strip(),
+            playlist_name=playlist_name,
             ordered=parsed_ordered,
         ),
         None,
