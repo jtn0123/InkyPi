@@ -31,6 +31,41 @@ def test_create_update_delete_playlist_flow(client):
     assert resp.status_code == 200
 
 
+def test_update_playlist_accepts_form_payload(client, device_config_dev):
+    pm = device_config_dev.get_playlist_manager()
+    pm.add_playlist("FormUpdate", "06:00", "09:00")
+    device_config_dev.write_config()
+
+    resp = client.put(
+        "/update_playlist/FormUpdate",
+        data={
+            "new_name": "FormUpdated",
+            "start_time": "07:00",
+            "end_time": "10:00",
+            "cycle_minutes": "12",
+        },
+    )
+
+    assert resp.status_code == 200
+    playlist = pm.get_playlist("FormUpdated")
+    assert playlist is not None
+    assert playlist.cycle_interval_seconds == 12 * 60
+
+
+def test_update_playlist_malformed_json_returns_fielded_error(client):
+    resp = client.put(
+        "/update_playlist/Default",
+        data=b"{{invalid",
+        content_type="application/json",
+    )
+
+    assert resp.status_code == 400
+    body = resp.get_json()
+    assert body["success"] is False
+    assert body["error"] == "Invalid JSON data"
+    assert body["code"] == "validation_error"
+
+
 def test_create_playlist_persists_cycle_override(
     client: Any, device_config_dev: Any
 ) -> None:
@@ -135,6 +170,34 @@ def test_reorder_plugins_endpoint(client, device_config_dev):
     assert len(pl2.plugins) == 2
     assert pl2.plugins[0].plugin_id == "clock"
     assert pl2.plugins[0].name == "B"
+
+
+def test_reorder_plugins_rejects_empty_plugin_id(client, device_config_dev):
+    pm = device_config_dev.get_playlist_manager()
+    pm.add_playlist("BadReorder", "00:00", "24:00")
+    pl = pm.get_playlist("BadReorder")
+    pl.add_plugin(
+        {
+            "plugin_id": "clock",
+            "name": "A",
+            "plugin_settings": {},
+            "refresh": {"interval": 60},
+        }
+    )
+    device_config_dev.write_config()
+
+    resp = client.post(
+        "/reorder_plugins",
+        json={
+            "playlist_name": "BadReorder",
+            "ordered": [{"plugin_id": "", "name": "A"}],
+        },
+    )
+
+    assert resp.status_code == 400
+    body = resp.get_json()
+    assert body["success"] is False
+    assert body["details"]["field"] == "ordered"
 
 
 def test_cycle_override_zero_rejected(client, device_config_dev):
