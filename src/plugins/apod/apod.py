@@ -145,17 +145,27 @@ class Apod(BasePlugin):
             raise RuntimeError("NASA API Key not configured.")
 
         params = {"api_key": api_key}
+        request_date = "today"
 
         if settings.get("randomizeApod") == "true":
             start = datetime(2015, 1, 1, tzinfo=UTC)
             end = datetime.now(tz=UTC)
             delta_days = (end - start).days
             random_date = start + timedelta(days=randint(0, delta_days))
-            params["date"] = random_date.strftime("%Y-%m-%d")
+            request_date = random_date.strftime("%Y-%m-%d")
+            params["date"] = request_date
         elif isinstance(settings.get("customDate"), str):
-            params["date"] = cast(str, settings["customDate"])
+            request_date = cast(str, settings["customDate"])
+            params["date"] = request_date
 
         apod_url = os.getenv("INKYPI_NASA_API_URL", "https://api.nasa.gov")
+        logger.info(
+            "APOD request: date=%s randomized=%s base_url=%s timeout_s=%.1f",
+            request_date,
+            settings.get("randomizeApod") == "true",
+            apod_url,
+            self._request_timeout(),
+        )
         response = get_http_session().get(
             f"{apod_url}/planetary/apod",
             params=params,
@@ -167,6 +177,12 @@ class Apod(BasePlugin):
             raise RuntimeError("Failed to retrieve NASA APOD.")
 
         data = cast(dict[str, object], response.json())
+        logger.info(
+            "APOD response: date=%s media_type=%s title=%s",
+            data.get("date"),
+            data.get("media_type"),
+            data.get("title"),
+        )
 
         if data.get("media_type") != "image":
             raise RuntimeError("APOD is not an image today.")
@@ -176,6 +192,13 @@ class Apod(BasePlugin):
         timeout_ms = int(self._request_timeout() * 1000)
         dimensions = self.get_oriented_dimensions(device_config)
         candidate_urls = self._candidate_image_urls(data)
+        logger.info(
+            "APOD image candidates: count=%d low_resource=%s target=%dx%d",
+            len(candidate_urls),
+            self.image_loader.is_low_resource,
+            dimensions[0],
+            dimensions[1],
+        )
         if not candidate_urls:
             raise RuntimeError("Failed to load APOD image.")
 
@@ -188,6 +211,13 @@ class Apod(BasePlugin):
             )
             if image is not None:
                 selected_image_url = image_url
+                logger.info(
+                    "APOD image loaded: attempt=%d/%d size=%dx%d",
+                    idx + 1,
+                    len(candidate_urls),
+                    image.size[0],
+                    image.size[1],
+                )
                 break
             logger.warning(
                 "APOD image load failed for %s (attempt %s/%s)",
