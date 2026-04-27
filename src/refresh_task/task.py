@@ -1077,9 +1077,12 @@ class RefreshTask:
                 break
             if getattr(plugin, "paused", False):
                 logger.info(
-                    "plugin circuit_breaker: skipping paused plugin | plugin_id=%s instance=%s",
+                    "plugin circuit_breaker: skipping paused plugin | "
+                    "plugin_id=%s instance=%s failures=%s reason=%s",
                     plugin.plugin_id,
                     plugin.name,
+                    getattr(plugin, "consecutive_failure_count", "?"),
+                    getattr(plugin, "disabled_reason", None) or "not recorded",
                 )
                 attempts_left -= 1
                 continue
