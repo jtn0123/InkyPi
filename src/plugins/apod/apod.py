@@ -145,20 +145,23 @@ class Apod(BasePlugin):
             raise RuntimeError("NASA API Key not configured.")
 
         params = {"api_key": api_key}
+        request_date = "today"
 
         if settings.get("randomizeApod") == "true":
             start = datetime(2015, 1, 1, tzinfo=UTC)
             end = datetime.now(tz=UTC)
             delta_days = (end - start).days
             random_date = start + timedelta(days=randint(0, delta_days))
-            params["date"] = random_date.strftime("%Y-%m-%d")
+            request_date = random_date.strftime("%Y-%m-%d")
+            params["date"] = request_date
         elif isinstance(settings.get("customDate"), str):
-            params["date"] = cast(str, settings["customDate"])
+            request_date = cast(str, settings["customDate"])
+            params["date"] = request_date
 
         apod_url = os.getenv("INKYPI_NASA_API_URL", "https://api.nasa.gov")
         logger.info(
             "APOD request: date=%s randomized=%s base_url=%s timeout_s=%.1f",
-            params.get("date", "today"),
+            request_date,
             settings.get("randomizeApod") == "true",
             apod_url,
             self._request_timeout(),
