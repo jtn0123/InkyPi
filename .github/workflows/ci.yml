@@ -63,21 +63,28 @@ jobs:
           PERF_COLD_START_SAMPLES: ${{ vars.PERF_COLD_START_SAMPLES || '3' }}
           PERF_COLD_START_TIMEOUT_S: ${{ vars.PERF_COLD_START_TIMEOUT_S || '90' }}
         run: |
+          set -o pipefail
           python -m pytest tests/benchmarks/ --benchmark-only \
             --benchmark-columns=min,mean,median,stddev,ops \
             --benchmark-json=/tmp/bench-current.json -q
           # Compare against CI-cached baseline if available, otherwise
-          # fall back to the repo-committed baseline.
+          # fall back to the repo-committed baseline. Both paths are blocking
+          # so cache misses cannot silently hide PR regressions.
           if [ -f /tmp/bench-baseline.json ]; then
+            echo "Using CI cached benchmark baseline." | tee /tmp/benchmark-compare.txt
+            cp /tmp/bench-baseline.json /tmp/bench-effective-baseline.json
             python scripts/benchmark_compare.py \
-              --baseline /tmp/bench-baseline.json \
-              --current /tmp/bench-current.json
+              --baseline /tmp/bench-effective-baseline.json \
+              --current /tmp/bench-current.json \
+              | tee -a /tmp/benchmark-compare.txt
           else
-            echo "No CI baseline cache found — recording initial baseline."
-            echo "Comparing against repo baseline (cross-platform, informational only):"
+            echo "No CI baseline cache found — using repo baseline as blocking fallback." \
+              | tee /tmp/benchmark-compare.txt
+            cp tests/benchmarks/baseline.json /tmp/bench-effective-baseline.json
             python scripts/benchmark_compare.py \
-              --baseline tests/benchmarks/baseline.json \
-              --current /tmp/bench-current.json || true
+              --baseline /tmp/bench-effective-baseline.json \
+              --current /tmp/bench-current.json \
+              | tee -a /tmp/benchmark-compare.txt
           fi
           # JTN-738: hard performance budgets on plugin render latency and
           # cold-start startup time.
@@ -86,6 +93,16 @@ jobs:
           if [ "${{ github.ref }}" = "refs/heads/main" ]; then
             cp /tmp/bench-current.json /tmp/bench-baseline.json
           fi
+      - name: Upload benchmark artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results
+          path: |
+            /tmp/bench-current.json
+            /tmp/benchmark-compare.txt
+            /tmp/bench-effective-baseline.json
+          if-no-files-found: ignore
 
   shellcheck:
     name: Shell script validation
