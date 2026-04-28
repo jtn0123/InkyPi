@@ -228,7 +228,7 @@ class DisplayPipeline:
         manual_request: ManualUpdateRequest | None,
         plugin_id: str,
         request_id: str | None,
-    ) -> Callable[[Mapping[str, Any]], None] | None:
+    ) -> Callable[[Mapping[str, Any]], None]:
         """Return a callback that reports disk-save progress and releases waiters."""
 
         def on_image_saved(save_metrics: Mapping[str, Any]) -> None:

@@ -298,11 +298,6 @@ class AIImage(BasePlugin):
         return msg
 
     @staticmethod
-    def _is_openai_moderation_block(exc: BaseException) -> bool:
-        payload = AIImage._openai_error_payload(exc)
-        return payload.get("code") == "moderation_blocked"
-
-    @staticmethod
     def _safe_rewrite_openai_prompt(
         ai_client: Any, prompt: str, reason: Mapping[str, str | None]
     ) -> str:
@@ -397,7 +392,8 @@ class AIImage(BasePlugin):
             if not any(payload.values()):
                 raise
             safe_message = self._openai_user_error_message(payload)
-            if safe_rewrite_blocked_prompt and self._is_openai_moderation_block(exc):
+            is_moderation_block = payload.get("code") == "moderation_blocked"
+            if safe_rewrite_blocked_prompt and is_moderation_block:
                 logger.warning(
                     "%s Retrying once with opt-in safe prompt rewrite.",
                     safe_message,

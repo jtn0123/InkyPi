@@ -61,17 +61,38 @@ _MANUAL_WAIT_DEFAULTS_S = {
     # plugin's real result instead of a queue wait timeout.
     "ai_image": 210.0,
 }
-_API_KEY_PLUGIN_IDS = frozenset(
-    {
-        "ai_image",
-        "ai_text",
-        "apod",
-        "github",
-        "image_album",
-        "unsplash",
-        "weather",
-    }
-)
+
+
+def _plugin_requires_api_key(plugin_config: Mapping[str, Any]) -> bool:
+    """Return whether plugin metadata declares API-key configuration."""
+    plugin_id = plugin_config.get("id")
+    if not isinstance(plugin_id, str):
+        return False
+
+    try:
+        plugin = get_plugin_instance(dict(plugin_config))
+    except Exception:
+        logger.debug(
+            "Could not inspect API-key metadata for plugin %s",
+            plugin_id,
+            exc_info=True,
+        )
+        return False
+
+    if getattr(plugin, "requires_api_key", False):
+        return True
+
+    try:
+        template = plugin.generate_settings_template()
+    except Exception:
+        logger.debug(
+            "Could not inspect settings template for plugin %s",
+            plugin_id,
+            exc_info=True,
+        )
+        return False
+
+    return isinstance(template, Mapping) and "api_key" in template
 
 
 class RefreshTask:
@@ -415,7 +436,7 @@ class RefreshTask:
                 request_id=request_id,
                 step=(
                     "Checking provider credentials"
-                    if plugin_id in _API_KEY_PLUGIN_IDS
+                    if _plugin_requires_api_key(plugin_config)
                     else "Checking plugin settings"
                 ),
             )

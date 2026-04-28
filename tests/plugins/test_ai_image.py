@@ -382,6 +382,51 @@ def test_ai_image_openai_safe_rewrite_retries_moderation_block(
     assert "generic icy retro science fiction cathedral" in second_prompt
 
 
+def test_ai_image_openai_safe_rewrite_reports_retry_rejection(
+    device_config_dev: Any, monkeypatch: Any
+) -> None:
+    from plugins.ai_image.ai_image import AIImage
+    from utils.plugin_errors import (
+        OPENAI_MODERATION_BLOCKED_MSG,
+        ProviderReportedPluginError,
+    )
+
+    p = AIImage({"id": "ai_image"})
+    monkeypatch.setattr(device_config_dev, "load_env_key", lambda key: "fake_key")
+
+    with patch("plugins.ai_image.ai_image.OpenAI") as mock_openai:
+        mock_client = MagicMock()
+        mock_openai.return_value = mock_client
+        mock_client.images.generate.side_effect = [
+            _FakeOpenAIImageError(),
+            _FakeOpenAIImageError(),
+        ]
+        rewrite_response = MagicMock()
+        rewrite_choice = MagicMock()
+        rewrite_choice.message.content = "generic icy retro science fiction cathedral"
+        rewrite_response.choices = [rewrite_choice]
+        mock_client.chat.completions.create.return_value = rewrite_response
+
+        with pytest.raises(ProviderReportedPluginError) as exc:
+            p.generate_image(
+                {
+                    "textPrompt": "icy sci-fi cathedral",
+                    "provider": "openai",
+                    "imageModel": "gpt-image-2",
+                    "quality": "medium",
+                    "safeRewriteBlockedPrompt": "true",
+                },
+                device_config_dev,
+            )
+
+    message = str(exc.value)
+    assert "moderation_blocked" in message
+    assert "req_testblocked123" in message
+    assert exc.value.safe_message() == OPENAI_MODERATION_BLOCKED_MSG
+    assert mock_client.images.generate.call_count == 2
+    assert mock_client.chat.completions.create.call_count == 1
+
+
 def test_ai_image_raises_when_provider_returns_no_image(device_config_dev, monkeypatch):
     """AI image generation should not return None on a falsy provider response."""
     from plugins.ai_image.ai_image import AIImage
