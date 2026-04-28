@@ -1,6 +1,34 @@
 # CHANGELOG
 
 
+## v1.1.1 (2026-04-28)
+
+### Bug Fixes
+
+- Align logs, theme bootstrap, and AI image validation
+  ([#605](https://github.com/jtn0123/InkyPi/pull/605),
+  [`81362c9`](https://github.com/jtn0123/InkyPi/commit/81362c9ed92b8975e571089cb412a1584f967e7a))
+
+* fix: align logs theme and AI image playlist validation
+
+* test: cover sidebar footer and progress timings
+
+* fix: make memory diff comment actionable
+
+* fix: use consistent memory diff helper for base
+
+* fix: hide memory diff harness allocator
+
+* test: raise Sonar new-code coverage
+
+* test: trim mypy ratchet noise
+
+### Continuous Integration
+
+- Harden benchmark and mutation gates ([#606](https://github.com/jtn0123/InkyPi/pull/606),
+  [`645218c`](https://github.com/jtn0123/InkyPi/commit/645218c21264bf06850bf21f528fbbaad26f94d4))
+
+
 ## v1.1.0 (2026-04-28)
 
 ### Documentation
