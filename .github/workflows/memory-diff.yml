@@ -77,17 +77,17 @@ jobs:
 
       - name: Checkout base branch into side worktree
         run: |
-          # Stash the memory_diff helpers so the worktree still has them if
-          # the base branch predates this commit. The helpers are standalone
-          # scripts so this is safe.
+          # Stash the memory_diff helpers from the PR and use the same helper
+          # version for both measurements. The helper is measurement tooling;
+          # using the base branch's older helper can make the diff compare two
+          # different sampling methods (for example base top-20 vs PR top-500).
           mkdir -p /tmp/memdiff-scripts
           cp scripts/memory_diff.py /tmp/memdiff-scripts/
           cp scripts/format_memory_diff.py /tmp/memdiff-scripts/
           git worktree add --detach /tmp/base-tree "origin/${{ github.base_ref }}"
-          if [ ! -f /tmp/base-tree/scripts/memory_diff.py ]; then
-            echo "Base branch does not have memory_diff.py yet — copying from PR"
-            cp /tmp/memdiff-scripts/memory_diff.py /tmp/base-tree/scripts/
-          fi
+          mkdir -p /tmp/base-tree/scripts
+          cp /tmp/memdiff-scripts/memory_diff.py /tmp/base-tree/scripts/
+          cp /tmp/memdiff-scripts/format_memory_diff.py /tmp/base-tree/scripts/
 
       - name: Measure base branch startup
         env:

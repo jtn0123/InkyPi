@@ -2746,6 +2746,15 @@ class TestMemoryDiffWorkflow:
     def test_workflow_checks_out_base_branch(self):
         assert "github.base_ref" in self.content
 
+    def test_workflow_uses_same_helper_for_base_and_pr_measurements(self):
+        assert "cp /tmp/memdiff-scripts/memory_diff.py /tmp/base-tree/scripts/" in (
+            self.content
+        )
+        assert (
+            "cp /tmp/memdiff-scripts/format_memory_diff.py /tmp/base-tree/scripts/"
+            in self.content
+        )
+
     def test_capture_helper_exists_and_is_valid_python(self):
         helper = self.SCRIPTS_DIR / "memory_diff.py"
         assert helper.exists(), f"Missing {helper}"
