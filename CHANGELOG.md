@@ -1,6 +1,79 @@
 # CHANGELOG
 
 
+## v1.1.0 (2026-04-28)
+
+### Documentation
+
+- Add dev dashboard screenshot ([#595](https://github.com/jtn0123/InkyPi/pull/595),
+  [`aebbad7`](https://github.com/jtn0123/InkyPi/commit/aebbad76cecd8256ab895cc42eb331987ec47bf1))
+
+Captures the InkyPi web UI dashboard rendered in --dev --web-only mode against the mock 800x480
+  display, for use in handoff/preview docs.
+
+Co-authored-by: Claude <noreply@anthropic.com>
+
+### Features
+
+- Add benchmark diagnostics dashboard ([#604](https://github.com/jtn0123/InkyPi/pull/604),
+  [`c18e2f0`](https://github.com/jtn0123/InkyPi/commit/c18e2f08d1a685b55046eb4dee1c9f67748db7bc))
+
+* feat: add benchmark diagnostics dashboard
+
+* fix: harden benchmark diagnostics refreshes
+
+### Refactoring
+
+- Add plugin request models
+  ([`6c3a318`](https://github.com/jtn0123/InkyPi/commit/6c3a318d2619a9b9e4e517cd98d6728582d11d4c))
+
+* refactor: add plugin request models
+
+* fix: prepare generated plugin images for display
+
+* fix: avoid logging APOD secret-bearing params
+
+* fix: address plugin request model review
+
+- Extract refresh display pipeline ([#598](https://github.com/jtn0123/InkyPi/pull/598),
+  [`918f770`](https://github.com/jtn0123/InkyPi/commit/918f7706421aa51b352b65c71d038a95b5696bab))
+
+- Extract refresh executor policy ([#599](https://github.com/jtn0123/InkyPi/pull/599),
+  [`4d5994b`](https://github.com/jtn0123/InkyPi/commit/4d5994bf6376067e07a1fc4efbc6a26a8ccfb5c9))
+
+* refactor: extract refresh executor policy
+
+* fix: address executor review feedback
+
+* fix: satisfy executor sonar architecture gate
+
+* fix: avoid test architecture imports
+
+* fix: clear sonar and security gates
+
+* fix: avoid in-process retry after timeout
+
+- Extract refresh recorder collaborator ([#597](https://github.com/jtn0123/InkyPi/pull/597),
+  [`5f2632c`](https://github.com/jtn0123/InkyPi/commit/5f2632cf7eef9d43337e046665935ad91b8766fb))
+
+* refactor: extract refresh recorder collaborator
+
+* fix: align refresh recorder typing with ci
+
+- Split plugin page helpers ([#601](https://github.com/jtn0123/InkyPi/pull/601),
+  [`cac83ee`](https://github.com/jtn0123/InkyPi/commit/cac83ee9b4b08846ffc7ef64aff5215d9430809d))
+
+* refactor: split plugin page helpers
+
+* fix: address plugin page review feedback
+
+- Split progressive disclosure script ([#600](https://github.com/jtn0123/InkyPi/pull/600),
+  [`7fa7aa1`](https://github.com/jtn0123/InkyPi/commit/7fa7aa1e766c830aa03f6530613afe238ef1597d))
+
+- Tighten playlist request models ([#602](https://github.com/jtn0123/InkyPi/pull/602),
+  [`e878945`](https://github.com/jtn0123/InkyPi/commit/e878945e142f1b77abe9cfc56458d12e2d8e51f2))
+
+
 ## v1.0.7 (2026-04-26)
 
 ### Bug Fixes
