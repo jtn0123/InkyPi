@@ -61,6 +61,17 @@ _MANUAL_WAIT_DEFAULTS_S = {
     # plugin's real result instead of a queue wait timeout.
     "ai_image": 210.0,
 }
+_API_KEY_PLUGIN_IDS = frozenset(
+    {
+        "ai_image",
+        "ai_text",
+        "apod",
+        "github",
+        "image_album",
+        "unsplash",
+        "weather",
+    }
+)
 
 
 class RefreshTask:
@@ -394,6 +405,25 @@ class RefreshTask:
                 refresh_id=benchmark_id,
                 request_id=request_id,
             )
+            self.recorder.publish_step(
+                plugin_id=plugin_id,
+                request_id=request_id,
+                step="Preparing plugin",
+            )
+            self.recorder.publish_step(
+                plugin_id=plugin_id,
+                request_id=request_id,
+                step=(
+                    "Checking provider credentials"
+                    if plugin_id in _API_KEY_PLUGIN_IDS
+                    else "Checking plugin settings"
+                ),
+            )
+            self.recorder.publish_step(
+                plugin_id=plugin_id,
+                request_id=request_id,
+                step="Generating image",
+            )
             try:
                 image, plugin_meta = self._execute_with_policy(
                     refresh_action,
@@ -456,10 +486,20 @@ class RefreshTask:
                 "request_id": request_id,
             },
         )
+        self.recorder.publish_step(
+            plugin_id=plugin_id,
+            request_id=request_id,
+            step="Image generated",
+        )
         if image is None:
             raise RuntimeError("Plugin returned None image; cannot refresh display.")
 
         # Validate dimensions before doing anything expensive (hash / display push).
+        self.recorder.publish_step(
+            plugin_id=plugin_id,
+            request_id=request_id,
+            step="Checking image",
+        )
         expected_w, expected_h = self.device_config.get_resolution()
         try:
             image = validate_image_dimensions(

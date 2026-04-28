@@ -63,6 +63,16 @@ class PermanentPluginError(RuntimeError):
     """
 
 
+class ProviderReportedPluginError(PermanentPluginError):
+    """A response-safe provider rejection that should be shown to the user.
+
+    Plugins raise this when an upstream API returns a specific, user-actionable
+    rejection such as an image-safety block. The message should already be
+    scrubbed down to provider, reason code, and request id before construction;
+    callers may return ``str(exc)`` to clients.
+    """
+
+
 class URLValidationError(PermanentPluginError):
     """Raised by plugins when a user-supplied URL fails SSRF/scheme validation.
 

@@ -85,6 +85,11 @@ class DisplayPipeline:
         # already wrote it. Unblock the manual-update waiter immediately.
         if manual_request is not None:
             manual_request.image_saved.set()
+        self.recorder.publish_step(
+            plugin_id=plugin_id,
+            request_id=request_id,
+            step="Image unchanged; display skipped",
+        )
         return None, None
 
     def push_to_display(
@@ -117,7 +122,17 @@ class DisplayPipeline:
         display_duration_ms = None
         preprocess_ms = None
         display_driver = None
-        on_image_saved = self._manual_image_saved_callback(manual_request)
+        display_ok = False
+        on_image_saved = self._image_saved_callback(
+            manual_request=manual_request,
+            plugin_id=plugin_id,
+            request_id=request_id,
+        )
+        self.recorder.publish_step(
+            plugin_id=plugin_id,
+            request_id=request_id,
+            step="Saving image",
+        )
 
         try:
             display_metrics = self.display_manager.display_image(
@@ -130,6 +145,7 @@ class DisplayPipeline:
                 preprocess_ms = display_metrics.get("preprocess_ms")
                 display_duration_ms = display_metrics.get("display_ms")
                 display_driver = display_metrics.get("display_driver")
+            display_ok = True
         except Exception as exc:
             logger.error(
                 "plugin_lifecycle: display_failure | plugin_id=%s instance=%s error=%s",
@@ -168,6 +184,12 @@ class DisplayPipeline:
                     "request_id": request_id,
                 },
             )
+            if display_ok:
+                self.recorder.publish_step(
+                    plugin_id=plugin_id,
+                    request_id=request_id,
+                    step="Display complete",
+                )
             self.recorder.save_stage(
                 benchmark_id or "",
                 "display_pipeline",
@@ -200,15 +222,23 @@ class DisplayPipeline:
             refresh_action=refresh_action,
         )
 
-    @staticmethod
-    def _manual_image_saved_callback(
+    def _image_saved_callback(
+        self,
+        *,
         manual_request: ManualUpdateRequest | None,
+        plugin_id: str,
+        request_id: str | None,
     ) -> Callable[[Mapping[str, Any]], None] | None:
-        """Return a callback that releases manual-update waiters after disk save."""
-        if manual_request is None:
-            return None
+        """Return a callback that reports disk-save progress and releases waiters."""
 
         def on_image_saved(save_metrics: Mapping[str, Any]) -> None:
+            self.recorder.publish_step(
+                plugin_id=plugin_id,
+                request_id=request_id,
+                step="Image saved; writing to display",
+            )
+            if manual_request is None:
+                return
             manual_request.image_saved_metrics = {
                 "generate_ms": None,
                 "preprocess_ms": save_metrics.get("preprocess_ms"),

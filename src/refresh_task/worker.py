@@ -17,6 +17,7 @@ from refresh_task.actions import PluginLike, RefreshAction
 from refresh_task.context import RefreshContext, SupportsRefreshConfig
 from utils.plugin_errors import (
     PermanentPluginError,
+    ProviderReportedPluginError,
     ScreenshotBackendError,
     URLValidationError,
 )
@@ -201,6 +202,7 @@ def _remote_exception(error_type: str, error_message: str) -> BaseException:
         # would reconstruct it as a plain RuntimeError and fall through to
         # the generic 500 ``internal_error`` handler.
         "ScreenshotBackendError": ScreenshotBackendError,
+        "ProviderReportedPluginError": ProviderReportedPluginError,
     }
     exc_cls = exc_types.get(error_type, RuntimeError)
     return exc_cls(error_message)
