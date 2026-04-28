@@ -76,3 +76,25 @@ def test_format_comment_does_not_invent_zero_for_sampled_shared_location():
     assert "| `werkzeug/http.py:1` | 0 B |" not in comment
     assert "| `werkzeug/http.py:1` | 512.0 KB | 0 B |" not in comment
 
+
+def test_format_comment_hides_memray_command_string_allocator():
+    base = {
+        "backend": "memray",
+        "total_rss_bytes": 0,
+        "module_count": 0,
+        "allocator_sample_limit": 500,
+        "allocators": [{"location": "<string>:1", "bytes": 2 * 1024 * 1024}],
+    }
+    pr = {
+        "backend": "memray",
+        "total_rss_bytes": 0,
+        "module_count": 0,
+        "allocator_sample_limit": 500,
+        "allocators": [],
+    }
+
+    comment = format_comment(base, pr)
+
+    assert "<string>:1" not in comment
+    assert "profile harness" not in comment
+    assert "no significant grouped allocator deltas" in comment

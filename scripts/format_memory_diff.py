@@ -80,6 +80,8 @@ def _location_group(loc: str) -> str:
     if not loc:
         return "<unknown>"
     normalized = loc.replace("\\", "/")
+    if normalized.startswith("<string>"):
+        return "profile harness"
     if normalized.startswith("<frozen importlib"):
         return "python import system"
     if normalized.startswith("<frozen"):
@@ -104,6 +106,12 @@ def _location_group(loc: str) -> str:
         if part.startswith("python") and idx + 1 < len(parts):
             return "python stdlib"
     return _short_location(loc, max_len=40)
+
+
+def _is_displayable_allocator(entry: dict) -> bool:
+    """Drop profiler-wrapper rows that are not actionable app attribution."""
+    loc = str(entry.get("location", ""))
+    return not loc.startswith("<string>")
 
 
 def _load(path: Path) -> dict:
@@ -214,8 +222,12 @@ def format_comment(base: dict, pr: dict, top: int = 20) -> str:
     pr_mods = int(pr.get("module_count", 0) or 0)
     mod_delta = pr_mods - base_mods
 
-    base_allocators = list(base.get("allocators", []))
-    pr_allocators = list(pr.get("allocators", []))
+    base_allocators = [
+        entry for entry in list(base.get("allocators", [])) if _is_displayable_allocator(entry)
+    ]
+    pr_allocators = [
+        entry for entry in list(pr.get("allocators", [])) if _is_displayable_allocator(entry)
+    ]
     rows = _significant_rows(_merge_allocators(base_allocators, pr_allocators), top)
     group_rows = _significant_rows(
         _merge_allocator_groups(base_allocators, pr_allocators),
