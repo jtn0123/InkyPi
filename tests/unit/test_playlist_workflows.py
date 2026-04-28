@@ -374,3 +374,19 @@ def test_prepare_add_plugin_workflow_rejects_ai_image_provider_without_key():
     assert result.error is not None
     assert result.error.field == "provider"
     assert result.error.message == "Google AI API Key not configured."
+
+
+def test_validate_ai_image_provider_key_lookup_failures_are_non_blocking() -> None:
+    playlist_workflows_mod = _playlist_workflows_mod()
+
+    class _ExplodingDeviceConfig(_DeviceConfig):
+        def load_env_key(self, key: str) -> str | None:
+            raise RuntimeError(f"cannot read {key}")
+
+    err = playlist_workflows_mod.validate_plugin_settings_security(
+        _ExplodingDeviceConfig(plugin_config=None),
+        "ai_image",
+        {"provider": "openai"},
+    )
+
+    assert err is None

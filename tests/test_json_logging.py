@@ -7,12 +7,24 @@ they are discoverable by a plain ``pytest tests/`` invocation.
 
 import json
 import logging
+import os
 import sys
+from typing import Any
 
-from utils.logging_utils import JsonFormatter, set_log_timezone
+from utils.logging_utils import (
+    JsonFormatter,
+    log_datetime_from_timestamp,
+    set_log_timezone,
+)
 
 
-def _record(msg="hello", level=logging.INFO, name="root", exc_info=None, **extras):
+def _record(
+    msg: object = "hello",
+    level: int = logging.INFO,
+    name: str = "root",
+    exc_info: Any = None,
+    **extras: object,
+) -> logging.LogRecord:
     r = logging.LogRecord(
         name=name,
         level=level,
@@ -75,7 +87,37 @@ def test_json_formatter_uses_configured_log_timezone():
         set_log_timezone("UTC")
 
 
-def test_env_var_detection(monkeypatch):
+def test_invalid_log_timezone_falls_back_to_utc(monkeypatch: Any) -> None:
+    calls: list[str] = []
+
+    monkeypatch.setattr(
+        "app_setup.logging_setup.time.tzset", lambda: calls.append("tzset")
+    )
+    from app_setup.logging_setup import configure_log_timezone
+
+    configure_log_timezone("Not/A_Zone")
+
+    try:
+        assert os.environ["TZ"] == "UTC"
+        assert calls == ["tzset"]
+        assert log_datetime_from_timestamp(0).isoformat().endswith("+00:00")
+    finally:
+        set_log_timezone("UTC")
+        os.environ["TZ"] = "UTC"
+
+
+def test_waitress_disconnect_filter_only_drops_expected_sse_disconnects() -> None:
+    from app_setup.logging_setup import ExpectedSSEDisconnectFilter
+
+    log_filter = ExpectedSSEDisconnectFilter()
+    ordinary = _record("Client disconnected while serving /api/health")
+    expected_sse = _record("Client disconnected while serving /api/events")
+
+    assert log_filter.filter(ordinary) is True
+    assert log_filter.filter(expected_sse) is False
+
+
+def test_env_var_detection(monkeypatch: Any) -> None:
     """Root logger must use JsonFormatter when INKYPI_LOG_FORMAT=json."""
     monkeypatch.setenv("INKYPI_LOG_FORMAT", "json")
 

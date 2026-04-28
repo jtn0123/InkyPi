@@ -223,10 +223,14 @@ def format_comment(base: dict, pr: dict, top: int = 20) -> str:
     mod_delta = pr_mods - base_mods
 
     base_allocators = [
-        entry for entry in list(base.get("allocators", [])) if _is_displayable_allocator(entry)
+        entry
+        for entry in list(base.get("allocators", []))
+        if _is_displayable_allocator(entry)
     ]
     pr_allocators = [
-        entry for entry in list(pr.get("allocators", [])) if _is_displayable_allocator(entry)
+        entry
+        for entry in list(pr.get("allocators", []))
+        if _is_displayable_allocator(entry)
     ]
     rows = _significant_rows(_merge_allocators(base_allocators, pr_allocators), top)
     group_rows = _significant_rows(
