@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 from utils.request_models import (
     parse_api_keys_save_request,
     parse_device_cycle_request,
@@ -9,8 +11,12 @@ from utils.request_models import (
     parse_playlist_update_request,
     parse_plugin_instance_action_request,
     parse_plugin_order_request,
+    parse_plugin_settings_form_request,
+    parse_plugin_update_instance_request,
+    parse_plugin_update_now_request,
     validate_cycle_minutes,
     validate_playlist_name,
+    validate_plugin_id,
 )
 
 
@@ -258,6 +264,148 @@ def test_parse_plugin_instance_action_request_returns_typed_payload() -> None:
     assert parsed.playlist_name == "Default"
     assert parsed.plugin_id == "clock"
     assert parsed.plugin_instance == "Clock A"
+
+
+def test_validate_plugin_id_strips_and_accepts_string() -> None:
+    plugin_id, error = validate_plugin_id("  weather  ")
+
+    assert error is None
+    assert plugin_id == "weather"
+
+
+def test_validate_plugin_id_rejects_missing_with_field() -> None:
+    plugin_id, error = validate_plugin_id(" ")
+
+    assert plugin_id is None
+    assert error is not None
+    assert error.status == 422
+    assert error.field == "plugin_id"
+    assert error.message == "plugin_id is required"
+
+
+def test_validate_plugin_id_rejects_non_string_with_field() -> None:
+    plugin_id, error = validate_plugin_id(123)
+
+    assert plugin_id is None
+    assert error is not None
+    assert error.status == 422
+    assert error.field == "plugin_id"
+    assert error.message == "plugin_id must be a string"
+
+
+def test_parse_plugin_settings_form_request_pops_plugin_id() -> None:
+    parsed, error = parse_plugin_settings_form_request(
+        {"plugin_id": "  clock  ", "timezone": "UTC"}
+    )
+
+    assert error is None
+    assert parsed is not None
+    assert parsed.plugin_id == "clock"
+    assert parsed.plugin_settings == {"timezone": "UTC"}
+
+
+def test_parse_plugin_settings_form_request_rejects_missing_plugin_id() -> None:
+    parsed, error = parse_plugin_settings_form_request({"timezone": "UTC"})
+
+    assert parsed is None
+    assert error is not None
+    assert error.status == 422
+    assert error.field == "plugin_id"
+
+
+def test_parse_plugin_update_instance_request_decodes_refresh_settings() -> None:
+    parsed, error = parse_plugin_update_instance_request(
+        {
+            "plugin_id": "clock",
+            "timezone": "UTC",
+            "refresh_settings": json.dumps({"refreshType": "interval"}),
+        }
+    )
+
+    assert error is None
+    assert parsed is not None
+    assert parsed.plugin_id == "clock"
+    assert parsed.plugin_settings == {"timezone": "UTC"}
+    assert parsed.refresh_settings == {"refreshType": "interval"}
+
+
+def test_parse_plugin_update_instance_request_rejects_bad_refresh_json() -> None:
+    parsed, error = parse_plugin_update_instance_request(
+        {"plugin_id": "clock", "refresh_settings": "not valid json"}
+    )
+
+    assert parsed is None
+    assert error is not None
+    assert error.message == "Refresh settings must be valid JSON"
+    assert error.field == "refresh_settings"
+
+
+def test_parse_plugin_update_instance_request_rejects_non_object_refresh() -> None:
+    parsed, error = parse_plugin_update_instance_request(
+        {"plugin_id": "clock", "refresh_settings": json.dumps(["bad"])}
+    )
+
+    assert parsed is None
+    assert error is not None
+    assert error.message == "Refresh settings must be an object"
+    assert error.field == "refresh_settings"
+
+
+def test_parse_plugin_update_instance_request_ignores_empty_refresh_settings() -> None:
+    parsed, error = parse_plugin_update_instance_request(
+        {"plugin_id": "clock", "refresh_settings": ""}
+    )
+
+    assert error is None
+    assert parsed is not None
+    assert parsed.refresh_settings is None
+    assert parsed.plugin_settings == {}
+
+
+def test_parse_plugin_update_now_request_extracts_async_flag() -> None:
+    parsed, error = parse_plugin_update_now_request(
+        {"plugin_id": "clock", "timezone": "UTC"},
+        async_query="1",
+    )
+
+    assert error is None
+    assert parsed is not None
+    assert parsed.plugin_id == "clock"
+    assert parsed.plugin_settings == {"timezone": "UTC"}
+    assert parsed.want_async is True
+
+
+def test_parse_plugin_update_now_request_extracts_header_async_flag() -> None:
+    parsed, error = parse_plugin_update_now_request(
+        {"plugin_id": "clock"},
+        async_header="true",
+    )
+
+    assert error is None
+    assert parsed is not None
+    assert parsed.want_async is True
+
+
+def test_parse_plugin_update_now_request_accepts_html_on_async_flag() -> None:
+    parsed, error = parse_plugin_update_now_request(
+        {"plugin_id": "clock"},
+        async_query="on",
+    )
+
+    assert error is None
+    assert parsed is not None
+    assert parsed.want_async is True
+
+
+def test_parse_plugin_update_now_request_treats_empty_async_as_false() -> None:
+    parsed, error = parse_plugin_update_now_request(
+        {"plugin_id": "clock"},
+        async_query="",
+    )
+
+    assert error is None
+    assert parsed is not None
+    assert parsed.want_async is False
 
 
 def test_parse_plugin_instance_action_request_requires_playlist_name() -> None:

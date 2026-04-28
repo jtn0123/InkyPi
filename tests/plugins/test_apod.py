@@ -1,4 +1,5 @@
 # pyright: reportMissingImports=false
+import logging
 from unittest.mock import MagicMock, patch
 from urllib.parse import urlparse
 
@@ -6,7 +7,11 @@ import pytest
 
 
 def test_apod_success(
-    monkeypatch, device_config_dev, realistic_nasa_apod_response, fake_image_response
+    monkeypatch,
+    caplog,
+    device_config_dev,
+    realistic_nasa_apod_response,
+    fake_image_response,
 ):
     from plugins.apod.apod import Apod
 
@@ -32,8 +37,12 @@ def test_apod_success(
         plugin.image_loader, "from_url", MagicMock(return_value=fake_image)
     )
 
+    caplog.set_level(logging.INFO, logger="plugins.apod.apod")
     img = plugin.generate_image({}, device_config_dev)
     assert img.size[0] > 0
+    assert "APOD request: date=today" in caplog.text
+    assert "APOD response:" in caplog.text
+    assert "APOD image candidates:" in caplog.text
 
 
 def test_apod_requires_key(monkeypatch, device_config_dev):

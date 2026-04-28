@@ -160,6 +160,27 @@ def test_ai_image_generate_image_success(client, monkeypatch, mock_openai):
         assert resp.status_code == 200
 
 
+def test_ai_image_openai_resizes_generated_image_to_display(
+    device_config_dev, monkeypatch, mock_openai
+):
+    from plugins.ai_image.ai_image import AIImage
+
+    monkeypatch.setenv("OPEN_AI_SECRET", "test")
+
+    plugin = AIImage({"id": "ai_image"})
+    result = plugin.generate_image(
+        {
+            "textPrompt": "a cat",
+            "provider": "openai",
+            "imageModel": "gpt-image-2",
+            "quality": "medium",
+        },
+        device_config_dev,
+    )
+
+    assert result.size == tuple(device_config_dev.get_resolution())
+
+
 def test_ai_image_google_generate_success(device_config_dev, monkeypatch):
     """Test ai_image plugin with Google Imagen provider."""
     import sys
@@ -205,6 +226,7 @@ def test_ai_image_google_generate_success(device_config_dev, monkeypatch):
     result = p.generate_image(settings, device_config_dev)
     assert result is not None
     assert isinstance(result, PILImage.Image)
+    assert result.size == tuple(device_config_dev.get_resolution())
 
 
 def test_ai_image_google_empty_results_raises(device_config_dev, monkeypatch):

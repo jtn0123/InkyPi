@@ -257,7 +257,12 @@ class AIImage(BasePlugin):
         )
         prompt = self._ensure_image_prompt(prompt)
         logger.info(f"Generating image with {image_model}...")
-        return self.fetch_image_google(google_client, prompt, image_model)
+        return self.fetch_image_google(
+            google_client,
+            prompt,
+            image_model,
+            dimensions=self.get_oriented_dimensions(device_config),
+        )
 
     def _generate_openai_image(
         self,
@@ -283,6 +288,7 @@ class AIImage(BasePlugin):
             model=image_model,
             quality=image_quality,
             orientation=orientation,
+            dimensions=self.get_oriented_dimensions(device_config),
         )
 
     def generate_image(
@@ -352,6 +358,7 @@ class AIImage(BasePlugin):
         model: str = DEFAULT_IMAGE_MODEL,
         quality: str = "medium",
         orientation: str = "horizontal",
+        dimensions: tuple[int, int] | None = None,
     ) -> ImageType:
         """Fetch image from OpenAI API."""
         logger.info(
@@ -385,14 +392,26 @@ class AIImage(BasePlugin):
         image_base64 = response.data[0].b64_json
         image_bytes = base64.b64decode(image_base64)
         image_loader = cast(Any, self.image_loader)
+        target_dimensions = dimensions or (1536, 1536)
         image = image_loader.from_bytesio(
-            BytesIO(image_bytes), (1536, 1536), resize=False
+            BytesIO(image_bytes), target_dimensions, resize=dimensions is not None
         )
         if image is None:
             raise RuntimeError("Failed to decode generated image")
+        logger.info(
+            "OpenAI generated image prepared for display: %dx%d",
+            image.size[0],
+            image.size[1],
+        )
         return image
 
-    def fetch_image_google(self, client: Any, prompt: str, model: str) -> ImageType:
+    def fetch_image_google(
+        self,
+        client: Any,
+        prompt: str,
+        model: str,
+        dimensions: tuple[int, int] | None = None,
+    ) -> ImageType:
         """Fetch image from Google Imagen API."""
         from google.genai import types
 
@@ -416,13 +435,19 @@ class AIImage(BasePlugin):
         if not response.generated_images:
             raise RuntimeError("Google Imagen returned no images")
         image_loader = cast(Any, self.image_loader)
+        target_dimensions = dimensions or (1536, 1536)
         image = image_loader.from_bytesio(
             BytesIO(response.generated_images[0].image.image_bytes),
-            (1536, 1536),
-            resize=False,
+            target_dimensions,
+            resize=dimensions is not None,
         )
         if image is None:
             raise RuntimeError("Failed to decode generated image")
+        logger.info(
+            "Google generated image prepared for display: %dx%d",
+            image.size[0],
+            image.size[1],
+        )
         return image
 
     @staticmethod

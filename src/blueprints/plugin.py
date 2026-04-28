@@ -3,7 +3,7 @@ import logging
 import os
 from collections.abc import Mapping
 from time import perf_counter
-from typing import Any, cast
+from typing import Any, NoReturn, cast
 
 from flask import (
     Blueprint,
@@ -41,7 +41,13 @@ from utils.plugin_errors import (
 )
 from utils.plugin_history import record_change as _record_plugin_change
 from utils.progress import track_progress
-from utils.request_models import parse_plugin_instance_action_request
+from utils.request_models import (
+    RequestModelError,
+    parse_plugin_instance_action_request,
+    parse_plugin_settings_form_request,
+    parse_plugin_update_instance_request,
+    parse_plugin_update_now_request,
+)
 from utils.security_utils import URLValidationError, validate_file_path
 
 logger = logging.getLogger(__name__)
@@ -58,6 +64,26 @@ _ERR_PLUGIN_INSTANCE_NOT_FOUND = "Plugin instance not found"
 _ERR_PLUGIN_NOT_FOUND = "Plugin not found"
 _ERR_PLAYLIST_NOT_FOUND = "Playlist not found"
 _MSG_CIRCUIT_BREAKER_RESET = "Circuit-breaker reset for plugin instance."
+
+
+def _raise_request_model_error(error: RequestModelError) -> NoReturn:
+    raise ClientInputError(
+        error.message,
+        status=error.status,
+        code=error.code,
+        field=error.field,
+    )
+
+
+def _plugin_form_data(*, include_form_for_files: bool = False) -> dict[str, Any]:
+    form_data = parse_form(request.form)
+    file_args: tuple[Any, ...]
+    if include_form_for_files:
+        file_args = (request.files, request.form)
+    else:
+        file_args = (request.files,)
+    form_data.update(handle_request_files(*file_args))
+    return form_data
 
 
 def _plugins_dir() -> str:
@@ -439,14 +465,11 @@ def delete_plugin_instance() -> Any:
         request.get_json(silent=True)
     )
     if parse_error is not None:
-        raise ClientInputError(
-            parse_error.message,
-            status=parse_error.status,
-            code=parse_error.code,
-            field=parse_error.field,
-        )
+        _raise_request_model_error(parse_error)
     if parsed is None:
-        raise ClientInputError("Invalid or missing JSON payload", status=400)
+        _raise_request_model_error(
+            RequestModelError(message="Invalid or missing JSON payload", status=400)
+        )
 
     with route_error_boundary(
         "delete plugin instance",
@@ -490,7 +513,6 @@ def update_plugin_instance(instance_name: str) -> Any:
         logger=logger,
         hint="Check submitted plugin settings and config persistence.",
     ):
-        form_data = cast(dict[str, Any], cast(Any, parse_form)(request.form))
         if not instance_name:
             raise ClientInputError(
                 "Instance name is required",
@@ -498,22 +520,15 @@ def update_plugin_instance(instance_name: str) -> Any:
                 code="validation_error",
                 field="instance_name",
             )
-        plugin_settings: dict[str, Any] = form_data
-        plugin_settings.update(
-            cast(
-                dict[str, Any],
-                cast(Any, handle_request_files)(request.files, request.form),
-            )
+        parsed, parse_error = parse_plugin_update_instance_request(
+            _plugin_form_data(include_form_for_files=True)
         )
-
-        plugin_id = plugin_settings.pop(_PLUGIN_ID, None)
-        if not plugin_id:
-            raise ClientInputError(
-                _ERR_PLUGIN_ID_REQUIRED,
-                status=422,
-                code="validation_error",
-                field=_PLUGIN_ID,
-            )
+        if parse_error is not None:
+            _raise_request_model_error(parse_error)
+        if parsed is None:
+            raise ClientInputError("Invalid form payload", status=400)
+        plugin_id = parsed.plugin_id
+        plugin_settings = parsed.plugin_settings
         plugin_instance = playlist_manager.find_plugin(plugin_id, instance_name)
         if not plugin_instance:
             logger.warning(
@@ -532,28 +547,11 @@ def update_plugin_instance(instance_name: str) -> Any:
         # and the new refresh config was never applied — reload silently
         # reverted the user's change while the toast said "success".
         new_refresh_config: dict[str, Any] | None = None
-        raw_refresh = plugin_settings.pop("refresh_settings", None)
-        if raw_refresh is not None:
-            try:
-                refresh_payload = json.loads(raw_refresh)
-            except (TypeError, ValueError) as exc:
-                raise ClientInputError(
-                    "Refresh settings must be valid JSON",
-                    status=400,
-                    code="validation_error",
-                    field="refresh_settings",
-                ) from exc
-            if not isinstance(refresh_payload, dict):
-                raise ClientInputError(
-                    "Refresh settings must be an object",
-                    status=400,
-                    code="validation_error",
-                    field="refresh_settings",
-                )
+        if parsed.refresh_settings is not None:
             from blueprints.playlist import validate_plugin_refresh_settings
 
             new_refresh_config, refresh_err = validate_plugin_refresh_settings(
-                refresh_payload
+                parsed.refresh_settings
             )
             if refresh_err:
                 return refresh_err
@@ -629,14 +627,11 @@ def display_plugin_instance() -> Any:
         request.get_json(silent=True)
     )
     if parse_error is not None:
-        raise ClientInputError(
-            parse_error.message,
-            status=parse_error.status,
-            code=parse_error.code,
-            field=parse_error.field,
-        )
+        _raise_request_model_error(parse_error)
     if parsed is None:
-        raise ClientInputError("Invalid or missing JSON payload", status=400)
+        _raise_request_model_error(
+            RequestModelError(message="Invalid or missing JSON payload", status=400)
+        )
 
     with route_error_boundary(
         "display plugin instance",
@@ -1059,24 +1054,21 @@ def update_now() -> Any:
 
     plugin_id: str | None = None
     try:
-        plugin_settings = cast(dict[str, Any], cast(Any, parse_form)(request.form))
-        plugin_settings.update(
-            cast(dict[str, Any], cast(Any, handle_request_files)(request.files))
+        parsed, parse_error = parse_plugin_update_now_request(
+            _plugin_form_data(),
+            async_header=request.headers.get("X-Async", ""),
+            async_query=request.args.get("async", ""),
         )
-        plugin_id = plugin_settings.pop(_PLUGIN_ID, None)
-        if not plugin_id:
-            return json_error(
-                _ERR_PLUGIN_ID_REQUIRED,
-                status=422,
-                code="validation_error",
-                details={"field": _PLUGIN_ID},
+        if parse_error is not None:
+            _raise_request_model_error(parse_error)
+        if parsed is None:
+            _raise_request_model_error(
+                RequestModelError(message="Invalid form payload", status=400)
             )
+        plugin_id = parsed.plugin_id
+        plugin_settings = parsed.plugin_settings
 
-        want_async = request.headers.get(
-            "X-Async", ""
-        ).lower() == "true" or request.args.get("async", "").lower() in ("1", "true")
-
-        if want_async:
+        if parsed.want_async:
             queue = get_job_queue()
             app = current_app._get_current_object()  # real app, not proxy
             job_id = queue.enqueue(_run_update_now, app, plugin_id, plugin_settings)
@@ -1146,6 +1138,13 @@ def update_now() -> Any:
             status=504,
             code="manual_update_timeout",
         )
+    except ClientInputError as e:
+        return json_error(
+            e.message,
+            status=e.status,
+            code=e.code,
+            details=e.details,
+        )
     except Exception as e:
         logger.exception("Error in update_now: %s", e)
         return json_error(_ERR_INTERNAL, status=500, code="internal_error")
@@ -1158,25 +1157,25 @@ def save_plugin_settings() -> Any:
     htmx = _is_htmx_request()
 
     try:
-        plugin_settings = cast(dict[str, Any], cast(Any, parse_form)(request.form))
-        plugin_settings.update(
-            cast(dict[str, Any], cast(Any, handle_request_files)(request.files))
-        )
-        plugin_id = plugin_settings.pop(_PLUGIN_ID, None)
-        if not plugin_id:
+        parsed, parse_error = parse_plugin_settings_form_request(_plugin_form_data())
+        if parse_error is not None:
             if htmx:
                 return _render_plugin_form_error(
-                    _ERR_PLUGIN_ID_REQUIRED, status=422, field=_PLUGIN_ID
+                    parse_error.message,
+                    status=parse_error.status,
+                    field=parse_error.field,
                 )
             return json_error(
-                _ERR_PLUGIN_ID_REQUIRED,
-                status=422,
-                code="validation_error",
-                details={"field": _PLUGIN_ID},
+                parse_error.message,
+                status=parse_error.status,
+                code=parse_error.code,
+                details=parse_error.details,
             )
+        if parsed is None:
+            raise ClientInputError("Invalid form payload", status=400)
         return _save_plugin_settings_common(
-            plugin_id=plugin_id,
-            plugin_settings=plugin_settings,
+            plugin_id=parsed.plugin_id,
+            plugin_settings=parsed.plugin_settings,
             device_config=device_config,
             playlist_manager=playlist_manager,
         )
@@ -1194,10 +1193,8 @@ def save_plugin_settings_alias(plugin_id: str) -> Any:
     playlist_manager = device_config.get_playlist_manager()
 
     try:
-        plugin_settings = cast(dict[str, Any], cast(Any, parse_form)(request.form))
-        plugin_settings.update(
-            cast(dict[str, Any], cast(Any, handle_request_files)(request.files))
-        )
+        plugin_settings = _plugin_form_data()
+        plugin_settings.pop(_PLUGIN_ID, None)
         return _save_plugin_settings_common(
             plugin_id=plugin_id,
             plugin_settings=plugin_settings,

@@ -10,6 +10,7 @@ Covers:
 - /plugin_instance/<plugin_id>/<instance_name>/force_retry endpoint
 """
 
+import logging
 import os
 from datetime import UTC, datetime
 from unittest.mock import MagicMock
@@ -321,15 +322,19 @@ class TestCircuitBreakerScheduler:
         pm.active_playlist = "CircuitTest"
         return pm
 
-    def test_paused_plugin_skipped_by_scheduler(self, device_config_dev, monkeypatch):
+    def test_paused_plugin_skipped_by_scheduler(
+        self, device_config_dev, monkeypatch, caplog
+    ):
         from model import RefreshInfo
 
         monkeypatch.setenv("PLUGIN_FAILURE_THRESHOLD", "5")
+        caplog.set_level(logging.INFO, logger="refresh_task.task")
         task = _make_task(device_config_dev)
 
         paused_pi = _make_plugin_instance("weather", "paused_weather")
         paused_pi.paused = True
         paused_pi.consecutive_failure_count = 5
+        paused_pi.disabled_reason = "last API error"
 
         good_pi = _make_plugin_instance("clock", "my_clock")
 
@@ -349,6 +354,7 @@ class TestCircuitBreakerScheduler:
         assert plugin is not None
         assert plugin.name == "my_clock"
         assert plugin.paused is False
+        assert "failures=5 reason=last API error" in caplog.text
 
     def test_all_paused_returns_none(self, device_config_dev, monkeypatch):
         from model import RefreshInfo
