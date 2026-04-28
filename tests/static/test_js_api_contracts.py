@@ -109,6 +109,24 @@ def test_enhanced_progress_script_exists(client):
     assert "enhanced-progress-log" in js
 
 
+def test_plugin_and_playlist_progress_keep_ms_metric_labels(client):
+    """Progress summaries keep millisecond timing labels visible in the UI."""
+    plugin_resp = client.get("/static/scripts/plugin_form.js")
+    playlist_resp = client.get("/static/scripts/playlist/progress.js")
+    assert plugin_resp.status_code == 200
+    assert playlist_resp.status_code == 200
+
+    plugin_js = plugin_resp.get_data(as_text=True)
+    playlist_js = playlist_resp.get_data(as_text=True)
+
+    assert "fmtElapsed(elapsedMs)" in plugin_js
+    assert "${step.elapsed_ms} ms" in plugin_js
+    assert "${label} ${val} ms" in plugin_js
+    assert "formatElapsed(Date.now() - startedAt)" in playlist_js
+    assert "${name} ${ms} ms" in playlist_js
+    assert "${label} ${value} ms" in playlist_js
+
+
 # --- Icons Loader ---
 
 

@@ -104,6 +104,42 @@ def test_all_pages_include_theme_toggle(client, path):
         "/api-keys",
     ],
 )
+def test_all_pages_include_sidebar_system_footer(client, monkeypatch, path):
+    """All main pages keep the bottom-left online/load footer visible."""
+    monkeypatch.setattr("os.getloadavg", lambda: (0.0, 0.0, 0.0), raising=False)
+
+    resp = client.get(path)
+    assert resp.status_code == 200
+    html = resp.get_data(as_text=True)
+
+    assert 'class="sys-row"' in html
+    assert 'class="sys-stats"' in html
+    assert 'id="sidebarOnlineLabel">online</span>' in html
+    assert 'class="sys-load" aria-label="Load average">0.00 avg</span>' in html
+
+
+def test_plugin_page_keeps_progress_timer_contract(client):
+    """Plugin pages keep the elapsed timer and progress log hooks present."""
+    resp = client.get("/plugin/clock")
+    assert resp.status_code == 200
+    html = resp.get_data(as_text=True)
+
+    assert 'id="requestProgress"' in html
+    assert 'id="requestProgressClock" class="value">—</span>' in html
+    assert 'id="requestProgressElapsed" class="value">0s</span>' in html
+    assert 'id="requestProgressList" class="progress-log" aria-live="polite"' in html
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/",
+        "/settings",
+        "/playlist",
+        "/plugin/clock",
+        "/api-keys",
+    ],
+)
 def test_all_pages_include_navigation(client, path):
     """All main pages include navigation elements."""
     resp = client.get(path)

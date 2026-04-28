@@ -17,9 +17,11 @@ import logging
 import logging.config
 import logging.handlers
 import os
+import time
 from typing import NamedTuple
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from utils.logging_utils import SecretRedactionFilter
+from utils.logging_utils import SecretRedactionFilter, set_log_timezone
 
 _LOGGING_CONF_PATH = os.path.join(
     os.path.dirname(os.path.dirname(__file__)), "config", "logging.conf"
@@ -35,10 +37,49 @@ class RotationConfig(NamedTuple):
     formatter: str
 
 
+class ExpectedSSEDisconnectFilter(logging.Filter):
+    """Drop normal browser disconnect chatter from Waitress SSE streams."""
+
+    _PATHS = ("/api/events", "/api/progress/stream")
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        message = record.getMessage()
+        if "Client disconnected while serving" not in message:
+            return True
+        return not any(path in message for path in self._PATHS)
+
+
 def use_json_logging() -> bool:
     """Return True when INKYPI_LOG_FORMAT=json is set."""
     fmt = (os.getenv("INKYPI_LOG_FORMAT") or "").strip().lower()
     return fmt == "json"
+
+
+def configure_log_timezone(tz_name: str | None) -> None:
+    """Align process and structured-log timestamps with the device timezone."""
+    try:
+        ZoneInfo(str(tz_name)) if tz_name else ZoneInfo("UTC")
+    except (ZoneInfoNotFoundError, ValueError):
+        set_log_timezone("UTC")
+        os.environ["TZ"] = "UTC"
+        if hasattr(time, "tzset"):
+            time.tzset()
+        return
+
+    selected = str(tz_name or "UTC")
+    set_log_timezone(selected)
+    os.environ["TZ"] = selected
+    if hasattr(time, "tzset"):
+        time.tzset()
+
+
+def install_waitress_disconnect_filter() -> None:
+    """Suppress expected SSE client-close lines from the Waitress logger."""
+    waitress_logger = logging.getLogger("waitress")
+    if not any(
+        isinstance(f, ExpectedSSEDisconnectFilter) for f in waitress_logger.filters
+    ):
+        waitress_logger.addFilter(ExpectedSSEDisconnectFilter())
 
 
 def read_rotation_config(conf_path: str = _LOGGING_CONF_PATH) -> RotationConfig:
@@ -154,6 +195,7 @@ def setup_logging() -> None:
     # Attach the secret-redaction filter to the root logger so it applies to
     # ALL handlers (console, file, dev-mode buffer) and both log formats.
     logging.getLogger().addFilter(SecretRedactionFilter())
+    install_waitress_disconnect_filter()
 
     # Optional rotating file output — only attached when an explicit path is
     # provided via env var, preserving the default console-only behavior.

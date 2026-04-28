@@ -175,3 +175,36 @@ def test_log_lines_exclude_internal_details(client, monkeypatch):
         assert not re.search(
             r"\w+\[\d+\]:", line
         ), f"Found identifier[pid] pattern in: {line}"
+
+
+def test_dev_mode_log_handler_uses_configured_timezone() -> None:
+    import logging
+
+    import blueprints.settings as mod
+    from utils.logging_utils import set_log_timezone
+
+    set_log_timezone("America/Los_Angeles")
+    mod._dev_log_buffer.clear()
+    record = logging.LogRecord(
+        name="test",
+        level=logging.INFO,
+        pathname=__file__,
+        lineno=1,
+        msg="hello",
+        args=(),
+        exc_info=None,
+    )
+    record.created = 1735693200.0  # 2025-01-01T01:00:00Z
+
+    try:
+        mod.DevModeLogHandler().emit(record)
+        assert mod._dev_log_buffer[-1][1].startswith("Dec 31 17:00:00")
+    finally:
+        mod._dev_log_buffer.clear()
+        set_log_timezone("UTC")
+
+
+def test_device_log_timezone_falls_back_without_app_context() -> None:
+    import blueprints.settings as mod
+
+    assert mod._device_log_timezone().key == "UTC"

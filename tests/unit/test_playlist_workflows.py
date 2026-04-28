@@ -92,13 +92,17 @@ class _PlaylistManager:
 
 
 class _DeviceConfig:
-    def __init__(self, plugin_config=None):
+    def __init__(self, plugin_config=None, env_keys: dict[str, str] | None = None):
         self.plugin_config = plugin_config
+        self.env_keys = env_keys or {}
         self.playlist_manager = _PlaylistManager()
         self.update_calls: list[dict[str, Any]] = []
 
     def get_plugin(self, plugin_id: str):
         return self.plugin_config
+
+    def load_env_key(self, key: str):
+        return self.env_keys.get(key)
 
     def update_atomic(self, update_fn):
         payload: dict[str, Any] = {}
@@ -306,3 +310,83 @@ def test_prepare_add_plugin_workflow_rejects_security_error(monkeypatch):
     assert result.ok is False
     assert result.error is not None
     assert result.error.message == "bad input"
+
+
+def test_prepare_add_plugin_workflow_allows_ai_image_provider_with_key():
+    playlist_workflows_mod = _playlist_workflows_mod()
+    device_config = _DeviceConfig(
+        plugin_config={"id": "ai_image"},
+        env_keys={"OPEN_AI_SECRET": "configured"},
+    )
+    manager = device_config.playlist_manager
+    manager.add_playlist("Rotation")
+
+    result = playlist_workflows_mod.prepare_add_plugin_workflow(
+        "ai_image",
+        {
+            "textPrompt": "a glass city",
+            "provider": "openai",
+            "imageModel": "gpt-image-2",
+            "quality": "medium",
+        },
+        {
+            "playlist": "Rotation",
+            "instance_name": "AI Surprise",
+            "refreshType": "interval",
+            "unit": "hour",
+            "interval": "1",
+        },
+        playlist_manager=manager,
+        device_config=device_config,
+    )
+
+    assert result.ok is True
+    instance = manager.find_plugin("ai_image", "AI Surprise")
+    assert instance is not None
+    assert instance.settings["textPrompt"] == "a glass city"
+
+
+def test_prepare_add_plugin_workflow_rejects_ai_image_provider_without_key():
+    playlist_workflows_mod = _playlist_workflows_mod()
+    device_config = _DeviceConfig(plugin_config={"id": "ai_image"})
+    manager = device_config.playlist_manager
+    manager.add_playlist("Rotation")
+
+    result = playlist_workflows_mod.prepare_add_plugin_workflow(
+        "ai_image",
+        {
+            "textPrompt": "a glass city",
+            "provider": "google",
+            "imageModel": "imagen-4.0-generate-001",
+        },
+        {
+            "playlist": "Rotation",
+            "instance_name": "AI Surprise",
+            "refreshType": "interval",
+            "unit": "hour",
+            "interval": "1",
+        },
+        playlist_manager=manager,
+        device_config=device_config,
+    )
+
+    assert result.ok is False
+    assert result.error is not None
+    assert result.error.field == "provider"
+    assert result.error.message == "Google AI API Key not configured."
+
+
+def test_validate_ai_image_provider_key_lookup_failures_are_non_blocking() -> None:
+    playlist_workflows_mod = _playlist_workflows_mod()
+
+    class _ExplodingDeviceConfig(_DeviceConfig):
+        def load_env_key(self, key: str) -> str | None:
+            raise RuntimeError(f"cannot read {key}")
+
+    err = playlist_workflows_mod.validate_plugin_settings_security(
+        _ExplodingDeviceConfig(plugin_config=None),
+        "ai_image",
+        {"provider": "openai"},
+    )
+
+    assert err is None

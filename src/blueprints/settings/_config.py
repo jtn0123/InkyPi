@@ -7,6 +7,7 @@ from zoneinfo import available_timezones
 from flask import current_app, redirect, render_template, request
 
 import blueprints.settings as _mod
+from app_setup.logging_setup import configure_log_timezone
 from utils.backend_errors import ClientInputError, route_error_boundary
 from utils.http_utils import json_error, json_success
 from utils.time_utils import calculate_seconds
@@ -617,6 +618,7 @@ def save_settings() -> Any:
             form_data, normalized_device_name
         )
         device_config.update_config(settings)
+        configure_log_timezone(settings.get("timezone"))
 
         if plugin_cycle_interval_seconds != previous_interval_seconds:
             # wake the background thread up to signal interval config change

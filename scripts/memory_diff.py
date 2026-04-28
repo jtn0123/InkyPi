@@ -49,9 +49,10 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SRC_DIR = REPO_ROOT / "src"
 
-# Cap on how many allocators we surface in the diff comment. Matches the
-# acceptance criteria in JTN-610 ("top 20 allocators").
-TOP_N = 20
+# Capture more than the comment displays. Comparing only each side's top 20
+# makes the diff lie with "0 B" whenever a location merely fell out of the
+# other side's top 20. The formatter still keeps the PR comment short.
+DEFAULT_ALLOCATOR_SAMPLE_LIMIT = 500
 
 
 def _startup_env() -> dict[str, str]:
@@ -62,25 +63,58 @@ def _startup_env() -> dict[str, str]:
     checks. ``INKYPI_NO_REFRESH=1`` keeps plugin side-effects quiet.
     """
     env = os.environ.copy()
-    env["PYTHONPATH"] = str(SRC_DIR)
+    existing_pythonpath = env.get("PYTHONPATH")
+    env["PYTHONPATH"] = (
+        str(SRC_DIR)
+        if not existing_pythonpath
+        else str(SRC_DIR) + os.pathsep + existing_pythonpath
+    )
     env["INKYPI_ENV"] = "dev"
     env["INKYPI_NO_REFRESH"] = "1"
     env["PYTHONWARNINGS"] = "ignore"
     return env
 
 
-def _read_rss_bytes() -> int:
-    """Best-effort RSS read — returns 0 when psutil/resource are unavailable."""
-    try:
-        import resource  # noqa: PLC0415 — stdlib, Linux/macOS only
+def _run_plain_import_stats() -> dict[str, int]:
+    """Measure RSS and module count in a plain child process.
+
+    Keep this separate from memray/tracemalloc. Profilers add their own import
+    and allocation overhead, which makes the summary row look precise while
+    measuring the tool rather than InkyPi startup.
+    """
+    code = textwrap.dedent("""
+        import json
+        import resource
+        import sys
+
+        import inkypi  # noqa: F401
 
         rusage = resource.getrusage(resource.RUSAGE_SELF)
-        # Linux reports ru_maxrss in kilobytes; macOS reports in bytes.
-        if sys.platform == "darwin":
-            return int(rusage.ru_maxrss)
-        return int(rusage.ru_maxrss) * 1024
-    except Exception:
-        return 0
+        rss = int(rusage.ru_maxrss)
+        if sys.platform != "darwin":
+            rss *= 1024
+
+        print(json.dumps({
+            "module_count": len(sys.modules),
+            "total_rss_bytes": rss,
+        }))
+        """)
+    proc = subprocess.run(  # noqa: S603 — fixed argv
+        [sys.executable, "-c", code],
+        env=_startup_env(),
+        capture_output=True,
+        text=True,
+        timeout=60,
+        check=False,
+    )
+    if proc.returncode != 0:
+        return {"module_count": 0, "total_rss_bytes": 0}
+    last = [line for line in proc.stdout.splitlines() if line.strip()][-1]
+    raw = json.loads(last)
+    return {
+        "module_count": int(raw.get("module_count", 0) or 0),
+        "total_rss_bytes": int(raw.get("total_rss_bytes", 0) or 0),
+    }
 
 
 def _run_tracemalloc() -> dict:
@@ -96,24 +130,16 @@ def _run_tracemalloc() -> dict:
         snapshot = tracemalloc.take_snapshot()
         stats = snapshot.statistics("filename")
         allocators = [
-            {"location": str(s.traceback[0]), "bytes": int(s.size)}
-            for s in stats[:100]
+            {{"location": str(s.traceback[0]), "bytes": int(s.size)}}
+            for s in stats[:{limit}]
         ]
-        # Best-effort RSS — tracemalloc size is the tracked Python heap, not RSS.
-        rss = 0
-        try:
-            import resource
-            r = resource.getrusage(resource.RUSAGE_SELF)
-            rss = r.ru_maxrss * (1 if sys.platform == "darwin" else 1024)
-        except Exception:
-            pass
-        print(json.dumps({
+        print(json.dumps({{
             "backend": "tracemalloc",
-            "total_rss_bytes": rss,
-            "module_count": len(sys.modules),
+            "total_rss_bytes": 0,
+            "module_count": 0,
             "allocators": allocators,
-        }))
-        """)
+        }}))
+        """).format(limit=DEFAULT_ALLOCATOR_SAMPLE_LIMIT)
     proc = subprocess.run(  # noqa: S603 — trusted stdlib-only snippet
         [sys.executable, "-c", code],
         env=_startup_env(),
@@ -130,7 +156,9 @@ def _run_tracemalloc() -> dict:
     # The subprocess may emit warnings / log lines before the JSON; take the
     # last non-empty line.
     last = [line for line in proc.stdout.splitlines() if line.strip()][-1]
-    return json.loads(last)
+    result = json.loads(last)
+    result.update(_run_plain_import_stats())
+    return result
 
 
 def _run_memray() -> dict:
@@ -210,32 +238,15 @@ def _run_memray() -> dict:
             {"location": loc, "bytes": total}
             for loc, total in sorted(
                 by_location.items(), key=lambda kv: kv[1], reverse=True
-            )[:100]
+            )
         ]
 
-    # Also count modules loaded after import to feed the summary row.
-    module_code = textwrap.dedent("""
-        import json, sys
-        import inkypi  # noqa: F401
-        print(json.dumps({"count": len(sys.modules)}))
-        """)
-    mod_proc = subprocess.run(  # noqa: S603 — fixed argv
-        [sys.executable, "-c", module_code],
-        env=_startup_env(),
-        capture_output=True,
-        text=True,
-        timeout=60,
-        check=False,
-    )
-    module_count = 0
-    if mod_proc.returncode == 0:
-        last = [line for line in mod_proc.stdout.splitlines() if line.strip()][-1]
-        module_count = int(json.loads(last)["count"])
+    plain_stats = _run_plain_import_stats()
 
     return {
         "backend": "memray",
-        "total_rss_bytes": _read_rss_bytes(),
-        "module_count": module_count,
+        "total_rss_bytes": plain_stats["total_rss_bytes"],
+        "module_count": plain_stats["module_count"],
         "allocators": allocators,
     }
 
@@ -284,8 +295,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--top",
         type=int,
-        default=TOP_N,
-        help="Number of top allocators to keep in the output JSON.",
+        default=DEFAULT_ALLOCATOR_SAMPLE_LIMIT,
+        help=(
+            "Number of top allocators to keep in the output JSON. Keep this "
+            "larger than the comment display limit so base/PR comparison is "
+            "not distorted by top-N truncation."
+        ),
     )
     args = parser.parse_args(argv)
 
@@ -309,13 +324,17 @@ def main(argv: list[str] | None = None) -> int:
     else:
         result = _run_tracemalloc()
 
-    # Trim to the top-N allocators by bytes before writing.
+    # Trim to the sampled allocator limit before writing. The formatter applies
+    # its own smaller display limit after merging base + PR locations.
+    sampled_allocator_count = len(result.get("allocators", []))
     allocators = sorted(
         result.get("allocators", []),
         key=lambda a: int(a.get("bytes", 0)),
         reverse=True,
     )[: args.top]
     result["allocators"] = allocators
+    result["sampled_allocator_count"] = sampled_allocator_count
+    result["allocator_sample_limit"] = args.top
 
     out_path = Path(args.output)
     out_path.parent.mkdir(parents=True, exist_ok=True)

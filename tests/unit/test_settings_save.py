@@ -228,6 +228,24 @@ class TestSaveSettings:
         assert data["success"] is True
         assert device_config_dev.get_config("name") == "TestDevice"
 
+    def test_save_settings_reconfigures_log_timezone(self, client, monkeypatch):
+        import blueprints.settings._config as settings_config
+
+        configured: list[str | None] = []
+        monkeypatch.setattr(
+            settings_config,
+            "configure_log_timezone",
+            lambda tz_name: configured.append(tz_name),
+        )
+
+        resp = client.post(
+            "/save_settings",
+            data={**self.VALID_FORM, "timezoneName": "America/Los_Angeles"},
+        )
+
+        assert resp.status_code == 200
+        assert configured == ["America/Los_Angeles"]
+
     def test_save_settings_missing_unit(self, client):
         form = {**self.VALID_FORM}
         del form["unit"]

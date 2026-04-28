@@ -506,6 +506,7 @@
             refreshInfoUrl: {{ url_for("main.refresh_info") | tojson }},
             resolution: {{ resolution | tojson }},
             styleSettings: {{ style_settings | default(false) | tojson }},
+            apiKeyServices: {{ (api_key.services if api_key is defined and api_key and api_key.services else []) | tojson }},
             urls: {
                 add_to_playlist: {{ url_for('playlist.add_plugin') | tojson }},
                 random_prompt: {{ url_for("plugin.ai_image_random_prompt") | tojson }},

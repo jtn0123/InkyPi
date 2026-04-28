@@ -130,3 +130,47 @@ def test_logs_api_uses_device_timezone_for_since(client, flask_app, monkeypatch)
         expected_usec = int(since_et * 1_000_000)
 
         assert captured["since_usec"] == expected_usec
+
+
+def test_logs_api_formats_journal_timestamps_in_device_timezone(
+    client, flask_app, monkeypatch
+):
+    dc = flask_app.config["DEVICE_CONFIG"]
+    dc.update_value("timezone", "America/Los_Angeles", write=True)
+
+    import blueprints.settings as settings_mod
+
+    class FakeRecord:
+        data = {"PRIORITY": "6", "MESSAGE": "hello from journal"}
+
+        def get_realtime_usec(self):
+            return 1735693200 * 1_000_000  # 2025-01-01T01:00:00Z
+
+    class FakeJR:
+        def open(self, mode):
+            return None
+
+        def add_filter(self, rule):
+            return None
+
+        def seek_realtime_usec(self, usec):
+            return None
+
+        def __iter__(self):
+            return iter([FakeRecord()])
+
+        def close(self):
+            return None
+
+    monkeypatch.setattr(settings_mod, "JOURNAL_AVAILABLE", True, raising=True)
+    monkeypatch.setattr(settings_mod, "JournalReader", FakeJR, raising=True)
+    monkeypatch.setattr(
+        settings_mod, "JournalOpenMode", type("M", (), {"SYSTEM": object()})
+    )
+    monkeypatch.setattr(settings_mod, "Rule", lambda *a, **k: (a, k))
+
+    resp = client.get("/api/logs?hours=2")
+
+    assert resp.status_code == 200
+    lines = resp.get_json()["lines"]
+    assert lines == ["Dec 31 17:00:00 [INFO] hello from journal"]

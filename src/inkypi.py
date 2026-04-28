@@ -29,7 +29,11 @@ from app_setup.health import (
     register_health_endpoints as _register_health_endpoints,
 )
 from app_setup.http_metrics import setup_http_metrics
-from app_setup.logging_setup import install_dev_log_handler, setup_logging
+from app_setup.logging_setup import (
+    configure_log_timezone,
+    install_dev_log_handler,
+    setup_logging,
+)
 from app_setup.schema_validator import register as register_schema_validator
 from app_setup.security_middleware import (
     _extract_csrf_token_from_request,
@@ -339,6 +343,7 @@ def _init_core_services(app: Flask) -> Config:
     except ConfigValidationError as exc:
         logger.error("Config invalid: %s", exc)
         raise SystemExit(1) from exc
+    configure_log_timezone(device_config.get_config("timezone", default="UTC"))
 
     display_manager = DisplayManager(device_config)
     refresh_task = RefreshTask(device_config, display_manager)
