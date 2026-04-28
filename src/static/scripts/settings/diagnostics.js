@@ -279,8 +279,22 @@
     console.warn(message, error);
     const panel = document.getElementById(panelId);
     if (panel) {
-      panel.textContent = message;
+      const detail = error?.message ? `: ${error.message}` : "";
+      panel.textContent = `${message}${detail}`;
     }
+  }
+
+  function getResponseError(data, fallback) {
+    if (typeof data?.error === "string" && data.error.trim()) {
+      return data.error;
+    }
+    if (data?.error != null) {
+      return String(data.error);
+    }
+    if (typeof data?.message === "string" && data.message.trim()) {
+      return data.message;
+    }
+    return fallback;
   }
 
   function getIsolationFailureMessage(data, verb, pluginId) {
@@ -299,6 +313,8 @@
 
   function createDiagnosticsModule({ ui }) {
     let progressES = null;
+    let benchmarkRequestSeq = 0;
+    let stageRequestSeq = 0;
 
     function getBenchmarkWindow() {
       return document.getElementById("benchmarkWindow")?.value || "24h";
@@ -318,9 +334,17 @@
       return panel;
     }
 
+    function resetStagesPanel(message = "Select a recent refresh to view recorded stages.") {
+      const panel = document.getElementById("benchStages");
+      if (!panel) return;
+      panel.textContent = message;
+      ui.setPanelLoading?.("benchStages", false);
+    }
+
     async function refreshStages(refreshItem) {
       const panel = document.getElementById("benchStages");
       if (!panel || !refreshItem?.refresh_id) return;
+      const requestSeq = ++stageRequestSeq;
       ui.setPanelLoading?.("benchStages", true);
       const refreshLabel =
         refreshItem.instance || refreshItem.plugin_id || "refresh";
@@ -331,6 +355,12 @@
           cache: "no-store",
         });
         const data = await resp.json();
+        if (requestSeq !== stageRequestSeq) return;
+        if (!resp.ok || data?.success === false) {
+          throw new Error(
+            getResponseError(data, resp.statusText || `HTTP ${resp.status}`)
+          );
+        }
         panel.textContent = "";
         const header = document.createElement("div");
         header.className = "benchmark-stage-heading";
@@ -340,16 +370,21 @@
           buildStagesTable(Array.isArray(data?.items) ? data.items : [])
         );
       } catch (e) {
+        if (requestSeq !== stageRequestSeq) return;
         setPanelFailure("benchStages", "Failed to load refresh stages", e);
       } finally {
-        ui.setPanelLoading?.("benchStages", false);
+        if (requestSeq === stageRequestSeq) {
+          ui.setPanelLoading?.("benchStages", false);
+        }
       }
     }
 
     async function refreshBenchmarks() {
+      const requestSeq = ++benchmarkRequestSeq;
+      const windowValue = getBenchmarkWindow();
       setBenchmarkPanelsLoading(true);
+      resetStagesPanel();
       try {
-        const windowValue = getBenchmarkWindow();
         const [summaryResp, pluginsResp, refreshesResp] = await Promise.all([
           fetch(
             `/api/benchmarks/summary?window=${encodeURIComponent(windowValue)}`,
@@ -367,6 +402,24 @@
         const summary = await summaryResp.json();
         const plugins = await pluginsResp.json();
         const refreshes = await refreshesResp.json();
+        if (requestSeq !== benchmarkRequestSeq || windowValue !== getBenchmarkWindow()) {
+          return;
+        }
+
+        const failures = [
+          [summaryResp, summary, "benchSummary", "benchmark summary"],
+          [pluginsResp, plugins, "benchPlugins", "plugin timing"],
+          [refreshesResp, refreshes, "benchRefreshes", "recent refreshes"],
+        ].filter(([resp, body]) => !resp.ok || body?.success === false);
+
+        if (failures.length > 0) {
+          for (const [, body, panelId, label] of failures) {
+            const message = getResponseError(body, `Failed to load ${label}`);
+            renderPanel(panelId, document.createTextNode(message));
+          }
+          resetStagesPanel("Refresh stages are unavailable until recent refreshes load.");
+          return;
+        }
 
         const summaryData = summary.summary || {};
         const hasData = Object.values(summaryData).some(
@@ -385,6 +438,7 @@
           renderPanel("benchSummary", emptyMsg);
           renderPanel("benchPlugins", null);
           renderPanel("benchRefreshes", null);
+          resetStagesPanel("No refreshes available for this window.");
           return;
         }
 
@@ -396,12 +450,17 @@
 
         renderPanel("benchPlugins", buildPluginsTable(pluginItems));
         renderPanel("benchRefreshes", buildRefreshesTable(refreshItems, refreshStages));
+        resetStagesPanel();
       } catch (e) {
+        if (requestSeq !== benchmarkRequestSeq) return;
         setPanelFailure("benchSummary", "Failed to load benchmark summary", e);
         setPanelFailure("benchPlugins", "Failed to load plugin timing", e);
         setPanelFailure("benchRefreshes", "Failed to load recent refreshes", e);
+        resetStagesPanel("Refresh stages are unavailable until recent refreshes load.");
       } finally {
-        setBenchmarkPanelsLoading(false);
+        if (requestSeq === benchmarkRequestSeq) {
+          setBenchmarkPanelsLoading(false);
+        }
       }
     }
 

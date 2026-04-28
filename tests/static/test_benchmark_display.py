@@ -48,6 +48,21 @@ class TestBenchmarkTableBuilder:
         js = _read_js()
         assert "function buildStagesTable" in js
 
+    def test_benchmark_refreshes_ignore_stale_responses(self):
+        js = _read_js()
+        assert "benchmarkRequestSeq" in js
+        assert "windowValue !== getBenchmarkWindow()" in js
+
+    def test_benchmark_errors_check_response_status(self):
+        js = _read_js()
+        assert "!resp.ok || body?.success === false" in js
+        assert "!resp.ok || data?.success === false" in js
+
+    def test_stage_panel_reset_helper_defined(self):
+        js = _read_js()
+        assert "function resetStagesPanel" in js
+        assert "No refreshes available for this window." in js
+
     def test_stage_labels_defined(self):
         """Human-readable labels must replace raw keys like 'generate_ms'."""
         js = _read_js()
