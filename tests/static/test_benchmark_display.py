@@ -40,6 +40,14 @@ class TestBenchmarkTableBuilder:
         js = _read_js()
         assert "function buildPluginsTable" in js
 
+    def test_build_refreshes_table_defined(self):
+        js = _read_js()
+        assert "function buildRefreshesTable" in js
+
+    def test_build_stages_table_defined(self):
+        js = _read_js()
+        assert "function buildStagesTable" in js
+
     def test_stage_labels_defined(self):
         """Human-readable labels must replace raw keys like 'generate_ms'."""
         js = _read_js()
@@ -63,3 +71,9 @@ class TestBenchmarkTableCSS:
     def test_bench_table_class_used_in_js(self):
         js = _read_js()
         assert '"bench-table"' in js
+
+    def test_benchmark_window_control_exists(self):
+        html = Path("src/templates/settings.html").read_text()
+        assert 'id="benchmarkWindow"' in html
+        assert 'id="benchRefreshes"' in html
+        assert 'id="benchStages"' in html

@@ -189,6 +189,18 @@
   flex-wrap: wrap;
 }
 
+.benchmark-control-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.benchmark-window-select {
+  min-width: 8rem;
+  width: auto;
+}
+
 .observability-section-title {
   display: grid;
   gap: 4px;
@@ -317,6 +329,37 @@
   font-size: var(--text-2xs);
   text-transform: uppercase;
   letter-spacing: 0.03em;
+}
+
+.bench-refresh-table {
+  min-width: 36rem;
+}
+
+.benchmark-stage-button {
+  border: 1px solid var(--border-color, var(--divider));
+  border-radius: 6px;
+  background: var(--panel-bg);
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--text-xs);
+  line-height: 1.2;
+  padding: 4px 8px;
+}
+
+.benchmark-stage-button:hover:not(:disabled),
+.benchmark-stage-button:focus-visible {
+  border-color: var(--accent);
+}
+
+.benchmark-stage-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.benchmark-stage-heading {
+  font-weight: 700;
+  margin-bottom: 6px;
 }
 
 /* Mobile settings nav toggle */
