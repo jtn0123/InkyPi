@@ -258,6 +258,21 @@ class TestSetupLoggingWiresFilter:
             root.filters = saved_filters
             root.level = saved_level
 
+    def test_expected_sse_disconnect_filter_drops_waitress_noise(self):
+        from app_setup.logging_setup import ExpectedSSEDisconnectFilter
+
+        flt = ExpectedSSEDisconnectFilter()
+
+        progress = _make_record(
+            "Client disconnected while serving /api/progress/stream"
+        )
+        events = _make_record("Client disconnected while serving /api/events")
+        other = _make_record("Client disconnected while serving /settings")
+
+        assert flt.filter(progress) is False
+        assert flt.filter(events) is False
+        assert flt.filter(other) is True
+
     def test_root_logger_has_redaction_filter_plain_text(self, monkeypatch, tmp_path):
         """Filter is wired for plain-text mode too."""
         monkeypatch.delenv("INKYPI_LOG_FORMAT", raising=False)

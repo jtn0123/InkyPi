@@ -9,7 +9,7 @@ import json
 import logging
 import sys
 
-from utils.logging_utils import JsonFormatter
+from utils.logging_utils import JsonFormatter, set_log_timezone
 
 
 def _record(msg="hello", level=logging.INFO, name="root", exc_info=None, **extras):
@@ -59,6 +59,20 @@ def test_non_serialisable_extra_does_not_crash():
 
     data = json.loads(JsonFormatter().format(_record(blob=_Blob())))
     assert "blob" in data["extra"]
+
+
+def test_json_formatter_uses_configured_log_timezone():
+    try:
+        set_log_timezone("America/Los_Angeles")
+        record = _record()
+        record.created = 1735693200.0  # 2025-01-01T01:00:00Z
+
+        data = json.loads(JsonFormatter().format(record))
+
+        assert data["ts"].endswith("-08:00")
+        assert data["ts"].startswith("2024-12-31T17:00:00")
+    finally:
+        set_log_timezone("UTC")
 
 
 def test_env_var_detection(monkeypatch):

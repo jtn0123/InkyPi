@@ -17,6 +17,7 @@ from flask import (
 )
 
 from utils.http_utils import http_get
+from utils.logging_utils import log_datetime_from_timestamp
 from utils.progress_events import get_progress_bus
 from utils.rate_limiter import CooldownLimiter, SlidingWindowLimiter
 from utils.time_utils import get_timezone, now_device_tz
@@ -180,7 +181,7 @@ class DevModeLogHandler(logging.Handler):
     def emit(self, record: logging.LogRecord) -> None:
         try:
             msg = self.format(record)
-            timestamp = datetime.fromtimestamp(record.created, tz=UTC).strftime(
+            timestamp = log_datetime_from_timestamp(record.created).strftime(
                 LOG_TIMESTAMP_FORMAT
             )
             log_line = f"{timestamp} [{record.levelname}] {record.name}: {msg}"
@@ -212,6 +213,14 @@ def _format_journal_line(formatted_ts: str, data: dict[str, Any]) -> str:
     level = _PRIORITY_TO_LEVEL.get(priority, "INFO")
     msg = (data.get("MESSAGE", "") or "").rstrip()
     return f"{formatted_ts} [{level}] {msg}"
+
+
+def _device_log_timezone() -> Any:
+    try:
+        device_config = current_app.config["DEVICE_CONFIG"]
+        return get_timezone(device_config.get_config("timezone", default="UTC"))
+    except Exception:
+        return get_timezone("UTC")
 
 
 def _read_log_lines(hours: int) -> list[str]:
@@ -247,6 +256,8 @@ def _read_log_lines(hours: int) -> list[str]:
             lines.append("(No logs captured in buffer yet)")
         return lines
 
+    log_tz = _device_log_timezone()
+
     # Journal available path
     reader = JournalReader()
     try:
@@ -259,7 +270,9 @@ def _read_log_lines(hours: int) -> list[str]:
                 timestamp = datetime.fromtimestamp(
                     record.get_realtime_usec() / 1_000_000, tz=UTC
                 )
-                formatted_ts = timestamp.strftime(LOG_TIMESTAMP_FORMAT)
+                formatted_ts = timestamp.astimezone(log_tz).strftime(
+                    LOG_TIMESTAMP_FORMAT
+                )
             except Exception:
                 formatted_ts = "??? ?? ??:??:??"
 
@@ -304,6 +317,7 @@ def _read_units_log_lines(hours: int, units: list[str]) -> list[str]:
             dev_lines.append("(No logs captured in buffer yet)")
         return dev_lines
 
+    log_tz = _device_log_timezone()
     merged: list[tuple[float, str]] = []
     reader = JournalReader()
     try:
@@ -317,7 +331,7 @@ def _read_units_log_lines(hours: int, units: list[str]) -> list[str]:
                     continue
                 ts_usec = record.get_realtime_usec()
                 log_ts = datetime.fromtimestamp(ts_usec / 1_000_000, tz=UTC)
-                formatted_ts = log_ts.strftime(LOG_TIMESTAMP_FORMAT)
+                formatted_ts = log_ts.astimezone(log_tz).strftime(LOG_TIMESTAMP_FORMAT)
                 line = _format_journal_line(formatted_ts, data)
                 merged.append((log_ts.timestamp(), line))
             except Exception:

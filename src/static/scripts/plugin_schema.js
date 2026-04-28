@@ -183,6 +183,23 @@
 
     button.addEventListener("click", async () => {
       const provider = document.querySelector("[name='provider']")?.value || "openai";
+      const services = window.__INKYPI_PLUGIN_BOOT__?.apiKeyServices || [];
+      if (Array.isArray(services) && services.length) {
+        const providerName = provider === "google" ? "Google" : "OpenAI";
+        const providerKeyLabel = provider === "google" ? "Google AI" : "OpenAI";
+        const service = services.find(
+          (item) => String(item?.name || "").toLowerCase() === providerName.toLowerCase()
+        );
+        if (service && !service.present) {
+          if (window.showResponseModal) {
+            window.showResponseModal(
+              "failure",
+              `${providerKeyLabel} API Key not configured.`
+            );
+          }
+          return;
+        }
+      }
       const originalText = button.textContent;
       button.disabled = true;
       button.textContent = "Thinking...";

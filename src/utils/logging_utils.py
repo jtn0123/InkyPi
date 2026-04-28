@@ -12,8 +12,9 @@ from __future__ import annotations
 import json
 import logging
 import re
-from datetime import UTC, datetime
+from datetime import UTC, datetime, tzinfo
 from typing import Any
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 # All keys that exist on a bare LogRecord.  Extras are anything in
 # record.__dict__ that is NOT in this set and does NOT start with "_".
@@ -46,6 +47,7 @@ _LOGRECORD_BUILTIN_KEYS: frozenset[str] = frozenset(
 
 
 _REDACTED = "***REDACTED***"
+_LOG_TIMEZONE: tzinfo = UTC
 
 # Sensitive key names used in pattern 0.
 _SECRET_KEY_NAMES = r"api[_-]?key|token|password|secret|pin"
@@ -89,6 +91,26 @@ def redact_secrets(value: object) -> str:
     ``str()`` before redaction.
     """
     return _redact(value if isinstance(value, str) else str(value))
+
+
+def set_log_timezone(tz_name: str | None) -> tzinfo:
+    """Set the timezone used by structured log timestamps.
+
+    Plain-text logging uses the process ``TZ`` setting configured in
+    ``app_setup.logging_setup``. JSON logs do their own timestamp formatting,
+    so they keep a small module-level timezone instead.
+    """
+    global _LOG_TIMEZONE
+    try:
+        _LOG_TIMEZONE = ZoneInfo(str(tz_name)) if tz_name else UTC
+    except (ZoneInfoNotFoundError, ValueError):
+        _LOG_TIMEZONE = UTC
+    return _LOG_TIMEZONE
+
+
+def log_datetime_from_timestamp(created: float) -> datetime:
+    """Return a log timestamp in the configured device timezone."""
+    return datetime.fromtimestamp(created, tz=_LOG_TIMEZONE)
 
 
 def _redact_value(value: object) -> object:
@@ -171,7 +193,7 @@ class JsonFormatter(logging.Formatter):
     # ------------------------------------------------------------------
 
     def _build_payload(self, record: logging.LogRecord) -> dict[str, Any]:
-        ts = datetime.fromtimestamp(record.created, tz=UTC).isoformat()
+        ts = log_datetime_from_timestamp(record.created).isoformat()
 
         payload: dict[str, Any] = {
             "ts": ts,

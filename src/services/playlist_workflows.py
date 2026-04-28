@@ -182,6 +182,28 @@ def validate_plugin_settings_security(
     device_config: Any, plugin_id: str, plugin_settings: dict[str, Any]
 ) -> WorkflowError | None:
     """Run plugin-specific validation for settings that are about to be added."""
+    if plugin_id == "ai_image":
+        provider = str(plugin_settings.get("provider") or "openai").strip().lower()
+        required_key = {
+            "openai": ("OpenAI", "OPEN_AI_SECRET"),
+            "google": ("Google", "GOOGLE_AI_SECRET"),
+        }.get(provider)
+        if required_key is not None:
+            service_name, env_key = required_key
+            try:
+                if device_config.load_env_key(env_key) is None:
+                    return WorkflowError(
+                        f"{service_name} AI API Key not configured.",
+                        status=400,
+                        field="provider",
+                    )
+            except Exception:
+                logger.debug(
+                    "Could not validate AI image provider key for %s",
+                    sanitize_log_field(provider),
+                    exc_info=True,
+                )
+
     if not plugin_settings:
         return None
     plugin_config = None
