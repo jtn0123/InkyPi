@@ -93,7 +93,16 @@ Add benchmarks only if they:
 
 After adding a new benchmark, regenerate the baseline as described above.
 
+### Dashboard
+
+The Settings → Updates → Diagnostics panel reads from the runtime benchmark
+database through `/api/benchmarks/*` endpoints. It shows:
+
+- p50/p95 timing by stage for the selected window
+- per-plugin timing averages
+- recent refresh rows
+- stage drill-down for a selected refresh
+
 ### Roadmap (next)
 
-- Add `/api/benchmarks/*` endpoints and simple dashboard.
 - SSE progress stream and lightweight UI indicator.

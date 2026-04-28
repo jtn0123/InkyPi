@@ -22,6 +22,22 @@
     return seconds < 10 ? `${seconds.toFixed(1)}s` : `${Math.round(seconds)}s`;
   }
 
+  function formatTimestamp(val) {
+    if (val === null || val === undefined || Number.isNaN(Number(val))) {
+      return "—";
+    }
+    try {
+      return new Date(Number(val) * 1000).toLocaleString([], {
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    } catch (_e) {
+      return "—";
+    }
+  }
+
   function formatPercent(val) {
     if (val === null || val === undefined || Number.isNaN(Number(val))) {
       return "—";
@@ -108,6 +124,68 @@
       for (const key of Object.keys(PLUGIN_AVG_LABELS)) {
         appendCell(row, formatMs(item[key]));
       }
+      tbody.appendChild(row);
+    }
+    table.appendChild(tbody);
+    return table;
+  }
+
+  function buildRefreshesTable(items, onSelectRefresh) {
+    if (!items.length) {
+      const msg = document.createElement("div");
+      msg.className = "bench-empty";
+      msg.textContent = "No recent refresh timings for this window.";
+      return msg;
+    }
+
+    const table = buildTable([
+      "Time",
+      "Plugin",
+      "Request",
+      "Generate",
+      "Display",
+      "Stages",
+    ]);
+    table.className = "bench-table bench-refresh-table";
+    const tbody = document.createElement("tbody");
+    for (const item of items.slice(0, 12)) {
+      const row = document.createElement("tr");
+      appendCell(row, formatTimestamp(item.ts));
+      appendCell(row, item.instance || item.plugin_id || "—");
+      appendCell(row, formatMs(item.request_ms));
+      appendCell(row, formatMs(item.generate_ms));
+      appendCell(row, formatMs(item.display_ms));
+
+      const actionCell = document.createElement("td");
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "benchmark-stage-button";
+      button.textContent = "View";
+      button.disabled = !item.refresh_id;
+      button.addEventListener("click", () => onSelectRefresh(item));
+      actionCell.appendChild(button);
+      row.appendChild(actionCell);
+      tbody.appendChild(row);
+    }
+    table.appendChild(tbody);
+    return table;
+  }
+
+  function buildStagesTable(items) {
+    if (!items.length) {
+      const msg = document.createElement("div");
+      msg.className = "bench-empty";
+      msg.textContent = "No stage events were recorded for this refresh.";
+      return msg;
+    }
+    const table = buildTable(["Stage", "Duration", "Recorded"]);
+    table.className = "bench-table";
+    const tbody = document.createElement("tbody");
+    for (const item of items) {
+      const row = document.createElement("tr");
+      appendCell(row, item.stage || "—");
+      appendCell(row, formatMs(item.duration_ms));
+      appendCell(row, formatTimestamp(item.ts));
       tbody.appendChild(row);
     }
     table.appendChild(tbody);
@@ -201,8 +279,22 @@
     console.warn(message, error);
     const panel = document.getElementById(panelId);
     if (panel) {
-      panel.textContent = message;
+      const detail = error?.message ? `: ${error.message}` : "";
+      panel.textContent = `${message}${detail}`;
     }
+  }
+
+  function getResponseError(data, fallback) {
+    if (typeof data?.error === "string" && data.error.trim()) {
+      return data.error;
+    }
+    if (data?.error != null) {
+      return String(data.error);
+    }
+    if (typeof data?.message === "string" && data.message.trim()) {
+      return data.message;
+    }
+    return fallback;
   }
 
   function getIsolationFailureMessage(data, verb, pluginId) {
@@ -221,51 +313,154 @@
 
   function createDiagnosticsModule({ ui }) {
     let progressES = null;
+    let benchmarkRequestSeq = 0;
+    let stageRequestSeq = 0;
+
+    function getBenchmarkWindow() {
+      return document.getElementById("benchmarkWindow")?.value || "24h";
+    }
+
+    function setBenchmarkPanelsLoading(isLoading) {
+      for (const panelId of ["benchSummary", "benchPlugins", "benchRefreshes"]) {
+        ui.setPanelLoading?.(panelId, isLoading);
+      }
+    }
+
+    function renderPanel(panelId, child) {
+      const panel = document.getElementById(panelId);
+      if (!panel) return null;
+      panel.textContent = "";
+      if (child) panel.appendChild(child);
+      return panel;
+    }
+
+    function resetStagesPanel(message = "Select a recent refresh to view recorded stages.") {
+      const panel = document.getElementById("benchStages");
+      if (!panel) return;
+      panel.textContent = message;
+      ui.setPanelLoading?.("benchStages", false);
+    }
+
+    async function refreshStages(refreshItem) {
+      const panel = document.getElementById("benchStages");
+      if (!panel || !refreshItem?.refresh_id) return;
+      const requestSeq = ++stageRequestSeq;
+      ui.setPanelLoading?.("benchStages", true);
+      const refreshLabel =
+        refreshItem.instance || refreshItem.plugin_id || "refresh";
+      panel.textContent = `Loading stages for ${refreshLabel}...`;
+      try {
+        const params = new URLSearchParams({ refresh_id: refreshItem.refresh_id });
+        const resp = await fetch(`/api/benchmarks/stages?${params.toString()}`, {
+          cache: "no-store",
+        });
+        const data = await resp.json();
+        if (requestSeq !== stageRequestSeq) return;
+        if (!resp.ok || data?.success === false) {
+          throw new Error(
+            getResponseError(data, resp.statusText || `HTTP ${resp.status}`)
+          );
+        }
+        panel.textContent = "";
+        const header = document.createElement("div");
+        header.className = "benchmark-stage-heading";
+        header.textContent = `${refreshLabel} stages`;
+        panel.appendChild(header);
+        panel.appendChild(
+          buildStagesTable(Array.isArray(data?.items) ? data.items : [])
+        );
+      } catch (e) {
+        if (requestSeq !== stageRequestSeq) return;
+        setPanelFailure("benchStages", "Failed to load refresh stages", e);
+      } finally {
+        if (requestSeq === stageRequestSeq) {
+          ui.setPanelLoading?.("benchStages", false);
+        }
+      }
+    }
 
     async function refreshBenchmarks() {
-      ui.setPanelLoading?.("benchSummary", true);
+      const requestSeq = ++benchmarkRequestSeq;
+      const windowValue = getBenchmarkWindow();
+      setBenchmarkPanelsLoading(true);
+      resetStagesPanel();
       try {
-        const [summaryResp, pluginsResp] = await Promise.all([
-          fetch("/api/benchmarks/summary?window=24h", { cache: "no-store" }),
-          fetch("/api/benchmarks/plugins?window=24h", { cache: "no-store" }),
+        const [summaryResp, pluginsResp, refreshesResp] = await Promise.all([
+          fetch(
+            `/api/benchmarks/summary?window=${encodeURIComponent(windowValue)}`,
+            { cache: "no-store" }
+          ),
+          fetch(
+            `/api/benchmarks/plugins?window=${encodeURIComponent(windowValue)}`,
+            { cache: "no-store" }
+          ),
+          fetch(
+            `/api/benchmarks/refreshes?window=${encodeURIComponent(windowValue)}&limit=12`,
+            { cache: "no-store" }
+          ),
         ]);
         const summary = await summaryResp.json();
         const plugins = await pluginsResp.json();
+        const refreshes = await refreshesResp.json();
+        if (requestSeq !== benchmarkRequestSeq || windowValue !== getBenchmarkWindow()) {
+          return;
+        }
 
-        const panel = document.getElementById("benchSummary");
-        if (!panel) return;
-        panel.textContent = "";
+        const failures = [
+          [summaryResp, summary, "benchSummary", "benchmark summary"],
+          [pluginsResp, plugins, "benchPlugins", "plugin timing"],
+          [refreshesResp, refreshes, "benchRefreshes", "recent refreshes"],
+        ].filter(([resp, body]) => !resp.ok || body?.success === false);
+
+        if (failures.length > 0) {
+          for (const [, body, panelId, label] of failures) {
+            const message = getResponseError(body, `Failed to load ${label}`);
+            renderPanel(panelId, document.createTextNode(message));
+          }
+          resetStagesPanel("Refresh stages are unavailable until recent refreshes load.");
+          return;
+        }
 
         const summaryData = summary.summary || {};
         const hasData = Object.values(summaryData).some(
           (stage) => stage?.p50 !== null && stage?.p50 !== undefined
         );
         const pluginItems = Array.isArray(plugins?.items) ? plugins.items : [];
+        const refreshItems = Array.isArray(refreshes?.items)
+          ? refreshes.items
+          : [];
 
-        if (!hasData && pluginItems.length === 0) {
+        if (!hasData && pluginItems.length === 0 && refreshItems.length === 0) {
           const emptyMsg = document.createElement("div");
           emptyMsg.className = "bench-empty";
           emptyMsg.textContent =
-            "No benchmark data recorded in the last 24 hours. Benchmarks are collected automatically on each display refresh.";
-          panel.appendChild(emptyMsg);
+            "No benchmark data recorded in this window. Benchmarks are collected automatically on each display refresh.";
+          renderPanel("benchSummary", emptyMsg);
+          renderPanel("benchPlugins", null);
+          renderPanel("benchRefreshes", null);
+          resetStagesPanel("No refreshes available for this window.");
           return;
         }
 
+        const summaryPanel = renderPanel("benchSummary", null);
         const heading1 = document.createElement("strong");
-        heading1.textContent = "Benchmark Summary (24h)";
-        panel.appendChild(heading1);
-        panel.appendChild(buildSummaryTable(summaryData));
+        heading1.textContent = `Timing Summary (${windowValue})`;
+        summaryPanel?.appendChild(heading1);
+        summaryPanel?.appendChild(buildSummaryTable(summaryData));
 
-        if (pluginItems.length > 0) {
-          const heading2 = document.createElement("strong");
-          heading2.textContent = "Per-plugin Averages";
-          panel.appendChild(heading2);
-          panel.appendChild(buildPluginsTable(pluginItems));
-        }
+        renderPanel("benchPlugins", buildPluginsTable(pluginItems));
+        renderPanel("benchRefreshes", buildRefreshesTable(refreshItems, refreshStages));
+        resetStagesPanel();
       } catch (e) {
+        if (requestSeq !== benchmarkRequestSeq) return;
         setPanelFailure("benchSummary", "Failed to load benchmark summary", e);
+        setPanelFailure("benchPlugins", "Failed to load plugin timing", e);
+        setPanelFailure("benchRefreshes", "Failed to load recent refreshes", e);
+        resetStagesPanel("Refresh stages are unavailable until recent refreshes load.");
       } finally {
-        ui.setPanelLoading?.("benchSummary", false);
+        if (requestSeq === benchmarkRequestSeq) {
+          setBenchmarkPanelsLoading(false);
+        }
       }
     }
 
@@ -406,6 +601,9 @@
       document
         .getElementById("refreshBenchmarksBtn")
         ?.addEventListener("click", refreshBenchmarks);
+      document
+        .getElementById("benchmarkWindow")
+        ?.addEventListener("change", refreshBenchmarks);
       document.getElementById("safeResetBtn")?.addEventListener("click", safeReset);
       document
         .getElementById("isolatePluginBtn")

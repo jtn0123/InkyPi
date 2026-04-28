@@ -310,6 +310,49 @@ class BenchmarksPluginsResponse(TypedDict, total=False):
     items: list[BenchmarksPluginEntry]
 
 
+class BenchmarksRefreshEntry(TypedDict):
+    """One recent refresh row from ``GET /api/benchmarks/refreshes``."""
+
+    id: int
+    ts: float
+    refresh_id: str
+    plugin_id: str | None
+    instance: str | None
+    playlist: str | None
+    used_cached: int | None
+    request_ms: int | None
+    generate_ms: int | None
+    preprocess_ms: int | None
+    display_ms: int | None
+
+
+class BenchmarksRefreshesResponse(TypedDict, total=False):
+    """Response body for ``GET /api/benchmarks/refreshes``."""
+
+    success: bool
+    request_id: str
+    items: list[BenchmarksRefreshEntry]
+    next_cursor: str | None
+
+
+class BenchmarksStageEntry(TypedDict):
+    """One stage event from ``GET /api/benchmarks/stages``."""
+
+    id: int
+    ts: float
+    stage: str
+    duration_ms: int | None
+    extra_json: str | None
+
+
+class BenchmarksStagesResponse(TypedDict, total=False):
+    """Response body for ``GET /api/benchmarks/stages``."""
+
+    success: bool
+    request_id: str
+    items: list[BenchmarksStageEntry]
+
+
 class JobStatusResult(TypedDict, total=False):
     """Async ``/update_now`` job result payload returned by ``/api/job/<job_id>``."""
 

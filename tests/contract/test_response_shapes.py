@@ -18,6 +18,8 @@ test suite lightweight. It walks a TypedDict's ``__annotations__`` and checks:
 
 from __future__ import annotations
 
+import sqlite3
+import time
 from typing import Any
 
 import pytest
@@ -25,8 +27,11 @@ import pytest
 # Import schemas via the ``src.*`` path which ``tests/conftest.py`` puts on
 # sys.path via SRC_ABS. TypedDict subclasses from ``typing`` expose their
 # total-ness on the class itself.
+from benchmarks.benchmark_storage import _ensure_schema
 from schemas.responses import (  # noqa: E402  (sys.path set up by conftest)
     BenchmarksPluginsResponse,
+    BenchmarksRefreshesResponse,
+    BenchmarksStagesResponse,
     BenchmarksSummaryResponse,
     DiagnosticsResponse,
     HealthPluginsResponse,
@@ -228,6 +233,55 @@ def test_benchmarks_plugins_shape(client, device_config_dev, tmp_path):
 
     body = _get_json(client, "/api/benchmarks/plugins?window=24h")
     assert_shape(body, BenchmarksPluginsResponse)
+    assert body.get("success") is True
+    assert isinstance(body.get("items"), list)
+
+
+def test_benchmarks_refreshes_shape(client, device_config_dev, tmp_path):
+    db_path = tmp_path / "contract_benchmarks_refreshes.db"
+    device_config_dev.update_value("enable_benchmarks", True, write=False)
+    device_config_dev.update_value("benchmarks_db_path", str(db_path), write=True)
+
+    conn = sqlite3.connect(db_path)
+    _ensure_schema(conn)
+    conn.execute(
+        """
+        INSERT INTO refresh_events (
+            refresh_id, ts, plugin_id, instance, playlist, used_cached,
+            request_ms, generate_ms, preprocess_ms, display_ms
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        ("shape-refresh-1", time.time(), "clock", "Clock", "Default", 0, 10, 20, 3, 4),
+    )
+    conn.commit()
+    conn.close()
+
+    body = _get_json(client, "/api/benchmarks/refreshes?window=24h&limit=5")
+    assert_shape(body, BenchmarksRefreshesResponse)
+    assert body.get("success") is True
+    assert isinstance(body.get("items"), list)
+
+
+def test_benchmarks_stages_shape(client, device_config_dev, tmp_path):
+    db_path = tmp_path / "contract_benchmarks_stages.db"
+    device_config_dev.update_value("enable_benchmarks", True, write=False)
+    device_config_dev.update_value("benchmarks_db_path", str(db_path), write=True)
+
+    refresh_id = "shape-refresh-2"
+    conn = sqlite3.connect(db_path)
+    _ensure_schema(conn)
+    conn.execute(
+        """
+        INSERT INTO stage_events (refresh_id, ts, stage, duration_ms, extra_json)
+        VALUES (?, ?, ?, ?, ?)
+        """,
+        (refresh_id, time.time(), "generate_image", 123, "{}"),
+    )
+    conn.commit()
+    conn.close()
+
+    body = _get_json(client, f"/api/benchmarks/stages?refresh_id={refresh_id}")
+    assert_shape(body, BenchmarksStagesResponse)
     assert body.get("success") is True
     assert isinstance(body.get("items"), list)
 

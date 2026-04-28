@@ -15,6 +15,8 @@ from __future__ import annotations
 
 from schemas.responses import (
     BenchmarksPluginsResponse,
+    BenchmarksRefreshesResponse,
+    BenchmarksStagesResponse,
     BenchmarksSummaryResponse,
     DiagnosticsResponse,
     HealthPluginsResponse,
@@ -54,6 +56,8 @@ ENDPOINT_SCHEMAS: dict[str, type] = {
     "settings.start_rollback": RollbackControlResponse,
     "settings.benchmarks_summary": BenchmarksSummaryResponse,
     "settings.benchmarks_plugins": BenchmarksPluginsResponse,
+    "settings.benchmarks_refreshes": BenchmarksRefreshesResponse,
+    "settings.benchmarks_stages": BenchmarksStagesResponse,
     "settings.safe_reset": SuccessMessageResponse,
     "settings.save_api_keys": SaveApiKeysResponse,
     "settings.delete_api_key": SuccessMessageResponse,

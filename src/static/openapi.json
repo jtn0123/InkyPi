@@ -650,6 +650,103 @@
         }
       }
     },
+    "/api/benchmarks/refreshes": {
+      "get": {
+        "tags": [
+          "Health"
+        ],
+        "summary": "Recent benchmark refreshes",
+        "description": "Returns recent refresh timing rows for the diagnostics dashboard.",
+        "operationId": "benchmarksRefreshes",
+        "parameters": [
+          {
+            "name": "window",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "24h"
+            },
+            "description": "Look-back window (for example 1h, 24h, 7d)."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            },
+            "description": "Maximum rows to return."
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Previous refresh_events id for pagination."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Recent benchmark refresh rows",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BenchmarksRefreshesResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/benchmarks/stages": {
+      "get": {
+        "tags": [
+          "Health"
+        ],
+        "summary": "Benchmark stage events",
+        "description": "Returns stage timing rows for a single refresh_id.",
+        "operationId": "benchmarksStages",
+        "parameters": [
+          {
+            "name": "refresh_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Refresh id from /api/benchmarks/refreshes."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Benchmark stage rows",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BenchmarksStagesResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/BadRequest"
+          }
+        }
+      }
+    },
     "/api/diagnostics": {
       "get": {
         "tags": [
@@ -2092,6 +2189,141 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/BenchmarksPluginEntry"
+            }
+          }
+        }
+      },
+      "BenchmarksRefreshEntry": {
+        "type": "object",
+        "required": [
+          "id",
+          "ts",
+          "refresh_id",
+          "plugin_id",
+          "instance",
+          "playlist",
+          "used_cached",
+          "request_ms",
+          "generate_ms",
+          "preprocess_ms",
+          "display_ms"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "ts": {
+            "type": "number"
+          },
+          "refresh_id": {
+            "type": "string"
+          },
+          "plugin_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "instance": {
+            "type": "string",
+            "nullable": true
+          },
+          "playlist": {
+            "type": "string",
+            "nullable": true
+          },
+          "used_cached": {
+            "type": "integer",
+            "nullable": true
+          },
+          "request_ms": {
+            "type": "integer",
+            "nullable": true
+          },
+          "generate_ms": {
+            "type": "integer",
+            "nullable": true
+          },
+          "preprocess_ms": {
+            "type": "integer",
+            "nullable": true
+          },
+          "display_ms": {
+            "type": "integer",
+            "nullable": true
+          }
+        }
+      },
+      "BenchmarksRefreshesResponse": {
+        "type": "object",
+        "required": [
+          "success",
+          "items",
+          "next_cursor"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BenchmarksRefreshEntry"
+            }
+          },
+          "next_cursor": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "BenchmarksStageEntry": {
+        "type": "object",
+        "required": [
+          "id",
+          "ts",
+          "stage",
+          "duration_ms",
+          "extra_json"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "ts": {
+            "type": "number"
+          },
+          "stage": {
+            "type": "string"
+          },
+          "duration_ms": {
+            "type": "integer",
+            "nullable": true
+          },
+          "extra_json": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "BenchmarksStagesResponse": {
+        "type": "object",
+        "required": [
+          "success",
+          "items"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BenchmarksStageEntry"
             }
           }
         }

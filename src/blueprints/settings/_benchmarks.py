@@ -9,6 +9,23 @@ from utils.http_utils import json_error, json_internal_error, json_success
 from utils.messages import BENCHMARKS_API_DISABLED_ERROR
 
 
+def _clamp_benchmark_limit(raw_limit: str | None) -> int:
+    try:
+        return max(1, min(200, int(raw_limit or "50")))
+    except (TypeError, ValueError):
+        return 50
+
+
+def _parse_benchmark_cursor(raw_cursor: str | None) -> int | None:
+    if not raw_cursor:
+        return None
+    try:
+        cursor = int(raw_cursor)
+    except (TypeError, ValueError):
+        return None
+    return cursor if cursor > 0 else None
+
+
 @_mod.settings_bp.route("/api/benchmarks/summary", methods=["GET"])  # type: ignore
 def benchmarks_summary() -> tuple[object, int] | Response:
     if not _mod._benchmarks_enabled():
@@ -66,8 +83,8 @@ def benchmarks_refreshes() -> tuple[object, int] | Response:
         return json_error(BENCHMARKS_API_DISABLED_ERROR, status=404)
     conn = None
     try:
-        limit = max(1, min(200, int(request.args.get("limit", "50"))))
-        cursor = request.args.get("cursor")
+        limit = _clamp_benchmark_limit(request.args.get("limit"))
+        cursor = _parse_benchmark_cursor(request.args.get("cursor"))
         since = _mod._window_since_seconds(request.args.get("window", "24h"))
         conn = sqlite3.connect(_mod._get_bench_db_path())
         conn.row_factory = sqlite3.Row
@@ -82,7 +99,7 @@ def benchmarks_refreshes() -> tuple[object, int] | Response:
                 ORDER BY id DESC
                 LIMIT ?
                 """,
-                (since, int(cursor), limit),
+                (since, cursor, limit),
             ).fetchall()
         else:
             rows = conn.execute(

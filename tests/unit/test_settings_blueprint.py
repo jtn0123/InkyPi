@@ -360,6 +360,20 @@ class TestBenchmarkAPIs:
         resp = client.get("/api/benchmarks/refreshes?cursor=999")
         assert resp.status_code == 200
 
+    def test_benchmarks_refreshes_invalid_cursor_is_ignored(
+        self, client, monkeypatch, tmp_path
+    ):
+        import blueprints.settings as mod
+
+        monkeypatch.setattr(mod, "_benchmarks_enabled", lambda: True)
+        db_path = str(tmp_path / "bench.db")
+        monkeypatch.setattr(mod, "_get_bench_db_path", lambda: db_path)
+        resp = client.get("/api/benchmarks/refreshes?cursor=not-an-int&limit=nope")
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["success"] is True
+        assert isinstance(data["items"], list)
+
 
 # ---------------------------------------------------------------------------
 # Health API endpoints
