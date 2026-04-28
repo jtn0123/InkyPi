@@ -36,8 +36,8 @@ from utils.form_utils import (
 from utils.http_utils import json_error, json_success
 from utils.plugin_errors import (
     MANUAL_UPDATE_TIMEOUT_MSG,
-    ProviderReportedPluginError,
     SCREENSHOT_BACKEND_UNAVAILABLE_MSG,
+    ProviderReportedPluginError,
     ScreenshotBackendError,
 )
 from utils.plugin_history import record_change as _record_plugin_change
@@ -827,6 +827,7 @@ def _update_now_direct(
                 code="manual_update_timeout",
             )
         except ProviderReportedPluginError as e:
+            safe_msg = e.safe_message()
             logger.info(
                 "Plugin %s provider rejected request: %s",
                 sanitize_log_field(plugin_id),
@@ -836,7 +837,7 @@ def _update_now_direct(
                 plugin_id, plugin_config, device_config, display_manager, e
             )
             return json_error(
-                str(e),
+                safe_msg,
                 status=400,
                 code="provider_rejected",
             )
@@ -1154,13 +1155,14 @@ def update_now() -> Any:
             code="manual_update_timeout",
         )
     except ProviderReportedPluginError as e:
+        safe_msg = e.safe_message()
         logger.info(
             "update_now: provider rejected plugin %s: %s",
             sanitize_log_field(plugin_id or "?"),
             sanitize_log_field(str(e)),
         )
         return json_error(
-            str(e),
+            safe_msg,
             status=400,
             code="provider_rejected",
         )

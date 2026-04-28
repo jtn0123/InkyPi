@@ -422,10 +422,17 @@ class AIImage(BasePlugin):
                             "Safe prompt rewrite retry failed: %s",
                             retry_message,
                         )
-                        raise ProviderReportedPluginError(retry_message) from retry_exc
+                        raise ProviderReportedPluginError(
+                            retry_message,
+                            reason_code=retry_payload.get("code")
+                            or retry_payload.get("type"),
+                        ) from retry_exc
                 logger.warning("Safe rewrite was empty; reporting original rejection.")
             logger.error("%s", safe_message)
-            raise ProviderReportedPluginError(safe_message) from exc
+            raise ProviderReportedPluginError(
+                safe_message,
+                reason_code=payload.get("code") or payload.get("type"),
+            ) from exc
 
     def generate_image(
         self, settings: Mapping[str, object], device_config: Any

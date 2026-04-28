@@ -64,13 +64,34 @@ class PermanentPluginError(RuntimeError):
 
 
 class ProviderReportedPluginError(PermanentPluginError):
-    """A response-safe provider rejection that should be shown to the user.
+    """A provider rejection with a response-safe summary.
 
     Plugins raise this when an upstream API returns a specific, user-actionable
-    rejection such as an image-safety block. The message should already be
-    scrubbed down to provider, reason code, and request id before construction;
-    callers may return ``str(exc)`` to clients.
+    rejection such as an image-safety block. The exception text is for logs; API
+    handlers must use :meth:`safe_message` so provider or SDK exception details
+    cannot leak into HTTP responses.
     """
+
+    def __init__(self, message: str, *, reason_code: str | None = None) -> None:
+        super().__init__(message)
+        self.reason_code = reason_code or _extract_provider_reason_code(message)
+
+    def safe_message(self) -> str:
+        """Return a response-safe provider rejection reason.
+
+        The returned value is selected from hardcoded module constants, matching
+        the CodeQL-safe pattern used by :class:`URLValidationError`.
+        """
+        if self.reason_code == PROVIDER_REASON_OPENAI_MODERATION_BLOCKED:
+            return OPENAI_MODERATION_BLOCKED_MSG
+        return PROVIDER_REJECTED_MSG
+
+
+PROVIDER_REASON_OPENAI_MODERATION_BLOCKED = "moderation_blocked"
+OPENAI_MODERATION_BLOCKED_MSG = (
+    "OpenAI rejected the image prompt (moderation_blocked). See logs for request id."
+)
+PROVIDER_REJECTED_MSG = "Provider rejected the request. See logs for details."
 
 
 class URLValidationError(PermanentPluginError):
@@ -170,3 +191,10 @@ def _extract_reason(message: str) -> str:
     if message.startswith(prefix):
         return message[len(prefix) :]
     return message
+
+
+def _extract_provider_reason_code(message: str) -> str | None:
+    """Extract a known provider reason code from a log-oriented message."""
+    if PROVIDER_REASON_OPENAI_MODERATION_BLOCKED in message:
+        return PROVIDER_REASON_OPENAI_MODERATION_BLOCKED
+    return None

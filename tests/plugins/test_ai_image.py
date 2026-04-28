@@ -303,7 +303,10 @@ def test_ai_image_openai_moderation_block_reports_provider_reason(
     device_config_dev: Any, monkeypatch: Any
 ) -> None:
     from plugins.ai_image.ai_image import AIImage
-    from utils.plugin_errors import ProviderReportedPluginError
+    from utils.plugin_errors import (
+        OPENAI_MODERATION_BLOCKED_MSG,
+        ProviderReportedPluginError,
+    )
 
     p = AIImage({"id": "ai_image"})
     monkeypatch.setattr(device_config_dev, "load_env_key", lambda key: "fake_key")
@@ -328,6 +331,7 @@ def test_ai_image_openai_moderation_block_reports_provider_reason(
     message = str(exc.value)
     assert "moderation_blocked" in message
     assert "req_testblocked123" in message
+    assert exc.value.safe_message() == OPENAI_MODERATION_BLOCKED_MSG
     assert mock_client.chat.completions.create.call_count == 0
 
 
