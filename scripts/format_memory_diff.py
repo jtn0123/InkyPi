@@ -27,10 +27,11 @@ from pathlib import Path
 # workflow that looks for it.
 STICKY_MARKER = "<!-- memory-diff:jtn-610 -->"
 
-# Delta (in bytes) above which we flag a row with a warning emoji. 1 MiB is a
-# reasonable "noticeable but not alarming" threshold on the Pi Zero 2 W
-# envelope (total budget is 200 MB idle).
-WARN_DELTA_BYTES = 1 * 1024 * 1024
+# Delta (in bytes) above which we flag a row with a warning emoji. Keep this
+# high enough that allocator arena churn does not turn the whole table yellow.
+WARN_DELTA_BYTES = 5 * 1024 * 1024
+DETAIL_DELTA_FLOOR_BYTES = 256 * 1024
+GROUP_TOP_N = 10
 
 
 def _fmt_bytes(n: int) -> str:
@@ -72,6 +73,37 @@ def _short_location(loc: str, max_len: int = 60) -> str:
     # Escape markdown pipe characters inside the location string so a
     # filename containing a pipe cannot break the table rendering.
     return tail.replace("|", "\\|")
+
+
+def _location_group(loc: str) -> str:
+    """Return a reviewer-friendly bucket for a source allocator location."""
+    if not loc:
+        return "<unknown>"
+    normalized = loc.replace("\\", "/")
+    if normalized.startswith("<frozen importlib"):
+        return "python import system"
+    if normalized.startswith("<frozen"):
+        return "python runtime"
+
+    parts = [part for part in normalized.split("/") if part]
+    if "site-packages" in parts:
+        idx = parts.index("site-packages")
+        if idx + 1 < len(parts):
+            package = parts[idx + 1]
+            if package.endswith(".py"):
+                package = package[:-3]
+            return package.replace("|", "\\|")
+    if "src" in parts:
+        idx = parts.index("src")
+        if idx + 1 < len(parts):
+            package = parts[idx + 1]
+            if package.endswith(".py"):
+                package = package[:-3]
+            return f"inkypi:{package}".replace("|", "\\|")
+    for idx, part in enumerate(parts):
+        if part.startswith("python") and idx + 1 < len(parts):
+            return "python stdlib"
+    return _short_location(loc, max_len=40)
 
 
 def _load(path: Path) -> dict:
@@ -135,6 +167,31 @@ def _merge_allocators(base: list[dict], pr: list[dict]) -> list[dict]:
     return rows
 
 
+def _merge_allocator_groups(base: list[dict], pr: list[dict]) -> list[dict]:
+    """Aggregate allocator rows into package/module buckets before diffing."""
+    index: dict[str, dict] = {}
+    for side, entries in (("base_bytes", base), ("pr_bytes", pr)):
+        for entry in entries:
+            group = _location_group(str(entry.get("location", "<unknown>")))
+            bucket = index.setdefault(
+                group,
+                {"location": group, "base_bytes": 0, "pr_bytes": 0},
+            )
+            bucket[side] += int(entry.get("bytes", 0))
+    rows = list(index.values())
+    for row in rows:
+        row["delta"] = row["pr_bytes"] - row["base_bytes"]
+    rows.sort(key=lambda r: abs(r["delta"]), reverse=True)
+    return rows
+
+
+def _significant_rows(rows: list[dict], top: int) -> list[dict]:
+    """Return rows worth showing, suppressing zero-delta allocator noise."""
+    return [
+        row for row in rows if abs(int(row.get("delta", 0))) >= DETAIL_DELTA_FLOOR_BYTES
+    ][:top]
+
+
 def format_comment(base: dict, pr: dict, top: int = 20) -> str:
     """Build the full Markdown comment body.
 
@@ -157,10 +214,23 @@ def format_comment(base: dict, pr: dict, top: int = 20) -> str:
     pr_mods = int(pr.get("module_count", 0) or 0)
     mod_delta = pr_mods - base_mods
 
-    rows = _merge_allocators(
-        list(base.get("allocators", [])),
-        list(pr.get("allocators", [])),
-    )[:top]
+    base_allocators = list(base.get("allocators", []))
+    pr_allocators = list(pr.get("allocators", []))
+    rows = _significant_rows(_merge_allocators(base_allocators, pr_allocators), top)
+    group_rows = _significant_rows(
+        _merge_allocator_groups(base_allocators, pr_allocators),
+        GROUP_TOP_N,
+    )
+    base_sample_count = int(
+        base.get("allocator_sample_limit")
+        or base.get("sampled_allocator_count")
+        or len(base_allocators)
+    )
+    pr_sample_count = int(
+        pr.get("allocator_sample_limit")
+        or pr.get("sampled_allocator_count")
+        or len(pr_allocators)
+    )
 
     lines: list[str] = []
     lines.append(STICKY_MARKER)
@@ -190,15 +260,41 @@ def format_comment(base: dict, pr: dict, top: int = 20) -> str:
     )
     lines.append("")
 
+    lines.append("### Largest grouped allocator deltas")
+    lines.append("")
+    lines.append("| Group | Base | PR | Delta |")
+    lines.append("|---|---|---|---|")
+    if not group_rows:
+        lines.append("| _(no significant grouped allocator deltas)_ | — | — | — |")
+    else:
+        lines.extend(
+            (
+                f"| `{row['location']}` "
+                f"| {_fmt_bytes(row['base_bytes'])} "
+                f"| {_fmt_bytes(row['pr_bytes'])} "
+                f"| {_fmt_delta(row['delta'])} |"
+            )
+            for row in group_rows
+        )
+    lines.append("")
+
     # Collapse the long allocator table by default so the PR conversation
     # stays skimmable. GitHub renders <details> nicely in comments.
     lines.append("<details>")
-    lines.append(f"<summary>Top {len(rows)} startup allocators</summary>")
+    detail_summary = (
+        f"Source-location detail: top {len(rows)} deltas"
+        if rows
+        else "Source-location detail: no significant deltas"
+    )
+    lines.append(
+        f"<summary>{detail_summary} "
+        f"(sampled base={base_sample_count}, PR={pr_sample_count})</summary>"
+    )
     lines.append("")
     lines.append("| # | Location | Base | PR | Delta |")
     lines.append("|---|---|---|---|---|")
     if not rows:
-        lines.append("| — | _(no allocators sampled)_ | — | — | — |")
+        lines.append("| — | _(no significant source-location deltas)_ | — | — | — |")
     else:
         for i, row in enumerate(rows, 1):
             lines.append(
@@ -213,7 +309,8 @@ def format_comment(base: dict, pr: dict, top: int = 20) -> str:
     lines.append(
         f"<sub>JTN-610 · backend=base:{base_backend}, pr:{pr_backend} · "
         "informational only, does not block merge. Hard RSS budgets are enforced "
-        "separately by JTN-608.</sub>"
+        "separately by JTN-608. Source-location rows are sampled allocator "
+        "attribution, not exact module ownership.</sub>"
     )
     return "\n".join(lines) + "\n"
 
