@@ -106,6 +106,20 @@ The job is sharded by package so each package has its own runtime budget:
 Results are uploaded as `mutmut-cache-<shard>` artifacts and can be downloaded
 from the GitHub Actions run summary.
 
+## Narrow PR Mutation Gate
+
+The full `mutmut` pass is intentionally advisory because it is slow. For PR and
+pre-flash confidence, the repo also has a narrow deterministic harness:
+
+```bash
+INKYPI_ENV=dev INKYPI_NO_REFRESH=1 PYTHONPATH=src python scripts/mutation_check.py
+```
+
+This harness applies a small set of known high-value mutants to a temporary copy
+of the repo, runs targeted tests for each mutant, and fails if any mutant
+survives. It is the fast signal for source-path drift and regression-sensitive
+logic while the full nightly `mutmut` job remains the broad advisory signal.
+
 ## Interpreting results
 
 | Status | Meaning |

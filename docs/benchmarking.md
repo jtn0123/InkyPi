@@ -61,13 +61,14 @@ benchmark's median time exceeds the baseline by more than the configured
 threshold, CI fails.
 
 - **CI baseline**: cached per-OS via GitHub Actions cache. On pushes to `main`,
-  the current run becomes the new baseline for future PRs. On the very first
-  run (no cache), the comparison is informational only (non-blocking).
+  the current run becomes the new baseline for future PRs.
 - **Repo baseline** (`tests/benchmarks/baseline.json`): committed for local
-  development use and as a fallback when no CI cache exists.
+  development use and as a blocking fallback when no CI cache exists.
 - **Threshold**: defaults to +15%. Override via the `BENCHMARK_THRESHOLD_PCT`
   GitHub Actions variable or environment variable.
 - **Comparison script**: `scripts/benchmark_compare.py`
+- **Artifacts**: every PR uploads `benchmark-results` with the current
+  pytest-benchmark JSON and comparison log for audit/debugging.
 
 The gate runs as part of the `lint` job in `.github/workflows/ci.yml`.
 
