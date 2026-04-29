@@ -1,6 +1,21 @@
 # CHANGELOG
 
 
+## v1.2.0 (2026-04-29)
+
+### Features
+
+- Improve AI image failures and refresh progress
+  ([#607](https://github.com/jtn0123/InkyPi/pull/607),
+  [`3ca7668`](https://github.com/jtn0123/InkyPi/commit/3ca76680b4559dc5801e6cd1dad184f40ad61522))
+
+* feat: improve AI image failures and refresh progress
+
+* fix: sanitize provider rejection responses
+
+* fix: address pr review feedback
+
+
 ## v1.1.1 (2026-04-28)
 
 ### Bug Fixes
