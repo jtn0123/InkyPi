@@ -336,12 +336,12 @@
             // Silent refresh — the user was just watching the update log
             // stream, they don't need another toast announcing the state.
             checkForUpdates({ silent: true });
-          }
-        } catch (e) {
-          console.warn(`${logLabel} status poll failed:`, e);
-          clearInterval(state.updateTimer);
-          state.updateTimer = null;
         }
+      } catch (e) {
+        console.warn("Settings update status poll failed:", logLabel, e);
+        clearInterval(state.updateTimer);
+        state.updateTimer = null;
+      }
       }, 2000);
     }
 
@@ -366,7 +366,7 @@
         showResponseModal("success", data.message || startingLabel);
         pollUpdateStatusUntilDone(kind);
       } catch (e) {
-        console.warn(`Failed to start ${kind.toLowerCase()}:`, e);
+        console.warn("Failed to start settings action:", kind, e);
         showResponseModal("failure", failureMessage);
       } finally {
         setHeaderButtonsDisabled(false);

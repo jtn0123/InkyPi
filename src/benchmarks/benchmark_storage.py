@@ -141,6 +141,48 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
 _ALLOWED_TABLES = frozenset({"refresh_events", "stage_events"})
 _ALLOWED_COLUMN_TYPES = frozenset({"TEXT", "INTEGER", "REAL", "BLOB", "NUMERIC"})
 _IDENTIFIER_RE = __import__("re").compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+_TABLE_INFO_QUERIES = {
+    "refresh_events": "PRAGMA table_info(refresh_events)",
+    "stage_events": "PRAGMA table_info(stage_events)",
+}
+_ALTER_COLUMN_QUERIES = {
+    ("refresh_events", "instance", "TEXT"): (
+        "ALTER TABLE refresh_events ADD COLUMN instance TEXT"
+    ),
+    ("refresh_events", "playlist", "TEXT"): (
+        "ALTER TABLE refresh_events ADD COLUMN playlist TEXT"
+    ),
+    ("refresh_events", "used_cached", "INTEGER"): (
+        "ALTER TABLE refresh_events ADD COLUMN used_cached INTEGER"
+    ),
+    ("refresh_events", "request_ms", "INTEGER"): (
+        "ALTER TABLE refresh_events ADD COLUMN request_ms INTEGER"
+    ),
+    ("refresh_events", "generate_ms", "INTEGER"): (
+        "ALTER TABLE refresh_events ADD COLUMN generate_ms INTEGER"
+    ),
+    ("refresh_events", "preprocess_ms", "INTEGER"): (
+        "ALTER TABLE refresh_events ADD COLUMN preprocess_ms INTEGER"
+    ),
+    ("refresh_events", "display_ms", "INTEGER"): (
+        "ALTER TABLE refresh_events ADD COLUMN display_ms INTEGER"
+    ),
+    ("refresh_events", "cpu_percent", "REAL"): (
+        "ALTER TABLE refresh_events ADD COLUMN cpu_percent REAL"
+    ),
+    ("refresh_events", "memory_percent", "REAL"): (
+        "ALTER TABLE refresh_events ADD COLUMN memory_percent REAL"
+    ),
+    ("refresh_events", "notes", "TEXT"): (
+        "ALTER TABLE refresh_events ADD COLUMN notes TEXT"
+    ),
+    ("stage_events", "duration_ms", "INTEGER"): (
+        "ALTER TABLE stage_events ADD COLUMN duration_ms INTEGER"
+    ),
+    ("stage_events", "extra_json", "TEXT"): (
+        "ALTER TABLE stage_events ADD COLUMN extra_json TEXT"
+    ),
+}
 
 
 def _validate_identifier(value: str, label: str) -> str:
@@ -171,25 +213,23 @@ def _ensure_optional_columns(
     if table_name not in _ALLOWED_TABLES:
         raise ValueError(f"Unknown benchmark table: {table_name!r}")
     safe_table = _validate_identifier(table_name, "table_name")
+    table_info_query = _TABLE_INFO_QUERIES[safe_table]
 
-    existing = {
-        # Safe: safe_table is validated above against the allow-list.
-        row[1]
-        for row in conn.execute(
-            f"PRAGMA table_info({safe_table})"
-        ).fetchall()  # noqa: S608
-    }
+    existing = {row[1] for row in conn.execute(table_info_query).fetchall()}
     for column_name, column_type in expected_columns.items():
         if column_name in existing:
             continue
         safe_col = _validate_identifier(column_name, "column_name")
         if column_type not in _ALLOWED_COLUMN_TYPES:
             raise ValueError(f"Unknown column type: {column_type!r}")
-        # Safe: safe_table validated against allow-list; safe_col validated via
-        # regex; column_type validated against allow-list of SQLite type keywords.
-        conn.execute(  # noqa: S608
-            f"ALTER TABLE {safe_table} ADD COLUMN {safe_col} {column_type}"
-        )
+        try:
+            alter_query = _ALTER_COLUMN_QUERIES[(safe_table, safe_col, column_type)]
+        except KeyError as exc:
+            raise ValueError(
+                f"Unexpected benchmark column for {safe_table!r}: "
+                f"{safe_col!r} {column_type!r}"
+            ) from exc
+        conn.execute(alter_query)
 
 
 def save_refresh_event(

@@ -4,6 +4,7 @@ import importlib
 import json
 import logging
 import os
+import re
 import sys
 import threading
 from pathlib import Path
@@ -18,6 +19,16 @@ _PLUGIN_CONFIGS: dict[str, dict[str, Any]] = {}
 _registry_lock = threading.RLock()
 _LAST_HOT_RELOAD: dict[str, object] | None = None
 _hot_reload_lock = threading.Lock()
+_PLUGIN_ID_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_]*$", re.ASCII)
+
+
+def _validate_plugin_module_path(plugin_id: str) -> str:
+    if not _PLUGIN_ID_RE.fullmatch(plugin_id):
+        raise ValueError(f"Plugin '{plugin_id}' has an invalid id.")
+    with _registry_lock:
+        if plugin_id not in _PLUGIN_CONFIGS:
+            raise ValueError(f"Plugin '{plugin_id}' is not registered.")
+    return f"plugins.{plugin_id}.{plugin_id}"
 
 
 def _is_dev_mode() -> bool:
@@ -37,7 +48,7 @@ def _load_single_plugin_instance(plugin_config: dict[str, Any]) -> Any:
     plugin_class_name = plugin_config.get("class")
     if not isinstance(plugin_class_name, str) or not plugin_class_name:
         raise ValueError(f"Plugin '{plugin_id}' is missing a valid class.")
-    module_name = f"plugins.{plugin_id}.{plugin_id}"
+    module_name = _validate_plugin_module_path(plugin_id)
     try:
         reloaded = False
         no_hot_reload = os.getenv("INKYPI_NO_HOT_RELOAD", "").strip().lower() in (
@@ -50,7 +61,7 @@ def _load_single_plugin_instance(plugin_config: dict[str, Any]) -> Any:
             module = importlib.reload(sys.modules[module_name])
             reloaded = True
         else:
-            module = importlib.import_module(module_name)
+            module = __import__(module_name, fromlist=[plugin_class_name])
         plugin_cls = getattr(module, plugin_class_name, None)
         if not plugin_cls:
             raise ImportError(
@@ -134,6 +145,11 @@ def load_plugins(plugins_config: list[dict[str, Any]]) -> None:
         plugin_id = plugin.get("id")
         if not isinstance(plugin_id, str) or not plugin_id:
             logger.error("Plugin config is missing a valid id, skipping.")
+            continue
+        if not _PLUGIN_ID_RE.fullmatch(plugin_id):
+            logger.error(
+                "Plugin config id '%s' is not a safe module name, skipping.", plugin_id
+            )
             continue
         if plugin.get("disabled", False):
             logger.info(f"Plugin {plugin_id} is disabled, skipping.")

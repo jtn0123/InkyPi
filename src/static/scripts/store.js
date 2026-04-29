@@ -72,7 +72,7 @@
           try {
             fn(next[k], prev[k]);
           } catch (e) {
-            console.warn('InkyPiStore subscriber error for key "' + k + '":', e);
+            console.warn("InkyPiStore subscriber error for key:", k, e);
           }
         });
       });

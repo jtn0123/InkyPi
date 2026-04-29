@@ -126,22 +126,22 @@ RUN mkdir -p /boot/firmware \
         'dtparam=i2c_arm=off' \
     > /boot/firmware/config.txt
 
+RUN useradd --create-home --shell /bin/bash inkypi-ci \
+    && printf 'inkypi-ci ALL=(ALL) NOPASSWD:ALL\n' > /etc/sudoers.d/inkypi-ci \
+    && chmod 0440 /etc/sudoers.d/inkypi-ci
+
 # Copy the local checkout into the image so we exercise the branch under test,
 # not whatever is on GitHub. The entrypoint script (passed in via docker run)
 # will cd to /InkyPi/install and invoke install.sh.
-COPY . /InkyPi
+COPY --chown=inkypi-ci:inkypi-ci . /InkyPi
 
 WORKDIR /InkyPi/install
 
-# install.sh requires root to run apt-get, write to /boot/firmware, manage
-# services, and create the inkypi system user. A non-root USER would break the
-# installer. We declare USER root explicitly to satisfy the DS-0002 linter
-# requirement for an explicit USER directive before CMD.
-USER root
+USER inkypi-ci
 
 # This image is a CI install-verification container, not a long-running service.
 # HEALTHCHECK NONE suppresses the DS-0026 "missing healthcheck" alert.
 HEALTHCHECK NONE
 
 # Default command runs install.sh; CI overrides this to add verification steps.
-CMD ["bash", "./install.sh"]
+CMD ["sudo", "bash", "./install.sh"]

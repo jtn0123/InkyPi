@@ -179,6 +179,21 @@ def test_load_plugins_logs_error_for_missing_dir(monkeypatch, tmp_path, caplog):
     )
 
 
+def test_load_plugins_rejects_unsafe_plugin_id(monkeypatch, tmp_path, caplog):
+    monkeypatch.setenv("SRC_DIR", str(tmp_path))
+    (tmp_path / "plugins").mkdir(parents=True, exist_ok=True)
+
+    PLUGIN_CLASSES.clear()
+    _PLUGIN_CONFIGS.clear()
+    with caplog.at_level(logging.ERROR, logger="plugins.plugin_registry"):
+        load_plugins([{"id": "../evil", "class": "X"}])
+
+    assert "../evil" not in get_registered_plugin_ids()
+    assert any(
+        "not a safe module name" in record.getMessage() for record in caplog.records
+    )
+
+
 def test_get_plugin_instance_returns_cached_instance():
     """Second call should return the same cached instance."""
     PLUGIN_CLASSES.clear()
@@ -252,6 +267,7 @@ def test_plugin_registry_hot_reload_flag(monkeypatch, tmp_path):
     mod = type(sys)(module_name)
     mod.Sample = DummyPlugin
     sys.modules[module_name] = mod
+    pr._PLUGIN_CONFIGS[plugin_id] = {"id": plugin_id, "class": "Sample"}
 
     # First load should import (not reload) → reloaded=False
     inst1 = pr._load_single_plugin_instance({"id": plugin_id, "class": "Sample"})

@@ -34,18 +34,18 @@ RUN printf '#!/bin/sh\n# sim-only no-op raspi-config shim\nexit 0\n' \
     > /usr/sbin/raspi-config \
     && chmod +x /usr/sbin/raspi-config
 
+RUN useradd --create-home --shell /bin/bash inkypi-ci \
+    && printf 'inkypi-ci ALL=(ALL) NOPASSWD:ALL\n' > /etc/sudoers.d/inkypi-ci \
+    && chmod 0440 /etc/sudoers.d/inkypi-ci
+
 # Copy the local checkout into the image so we exercise the branch under test,
 # not whatever is on GitHub.
-COPY . /InkyPi
+COPY --chown=inkypi-ci:inkypi-ci . /InkyPi
 
-# install.sh requires root to run apt-get, write to /boot/firmware, manage
-# services, and create the inkypi system user. A non-root USER would break the
-# installer. We declare USER root explicitly to satisfy the DS-0002 linter
-# requirement for an explicit USER directive before CMD.
-USER root
+USER inkypi-ci
 
 # This image is a local sim-install container, not a long-running service.
 # HEALTHCHECK NONE suppresses the DS-0026 "missing healthcheck" alert.
 HEALTHCHECK NONE
 
-CMD ["bash", "-c", "cd /InkyPi/install && ./install.sh"]
+CMD ["sudo", "bash", "-c", "cd /InkyPi/install && ./install.sh"]
