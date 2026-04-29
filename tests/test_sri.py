@@ -391,6 +391,15 @@ class TestUpdateCdnSriScript:
         still = json.loads(manifest_path.read_text(encoding="utf-8"))
         assert still["test-lib"]["integrity"] == original_integrity
 
+    def test_rejects_non_https_cdn_urls(self) -> None:
+        import update_cdn_sri as ucs
+
+        with patch("urllib.request.urlopen") as urlopen:
+            with pytest.raises(ValueError, match="absolute HTTPS"):
+                ucs.compute_sri_from_url("file:///etc/passwd")
+
+        urlopen.assert_not_called()
+
     def test_missing_manifest_returns_error(self, tmp_path: Path) -> None:
         import update_cdn_sri as ucs
 

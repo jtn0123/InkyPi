@@ -1,6 +1,6 @@
-import importlib
 import inspect
 import logging
+import re
 import sys
 from collections.abc import Callable
 from pathlib import Path
@@ -11,6 +11,34 @@ from PIL import Image
 from display.abstract_display import AbstractDisplay
 
 logger = logging.getLogger(__name__)
+_WAVESHARE_DISPLAY_RE = re.compile(r"^epd[A-Za-z0-9_]+$", re.ASCII)
+_WAVESHARE_MANIFEST = (
+    Path(__file__).resolve().parents[2] / "install" / "waveshare-manifest.txt"
+)
+
+
+def _allowed_waveshare_display_types() -> set[str]:
+    try:
+        names: set[str] = set()
+        for line in _WAVESHARE_MANIFEST.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            driver_name = line.split(maxsplit=1)[0]
+            if driver_name.endswith(".py") and driver_name != "epdconfig.py":
+                names.add(driver_name[:-3])
+        return names
+    except OSError:
+        return set()
+
+
+def _validate_waveshare_display_type(display_type: str) -> str:
+    if not _WAVESHARE_DISPLAY_RE.fullmatch(display_type):
+        raise ValueError(f"Unsupported Waveshare display type: {display_type}")
+    allowed = _allowed_waveshare_display_types()
+    if allowed and display_type not in allowed:
+        raise ValueError(f"Unsupported Waveshare display type: {display_type}")
+    return display_type
 
 
 def split_image_for_bi_color_epd(image: Image.Image) -> tuple[Image.Image, Image.Image]:
@@ -72,8 +100,8 @@ class WaveshareDisplay(AbstractDisplay):
                 "Waveshare driver but 'display_type' not specified in configuration."
             )
 
-        # Construct module path dynamically - e.g. "display.waveshare_epd.epd7in3e"
-        module_name = f"display.waveshare_epd.{display_type}"
+        safe_display_type = _validate_waveshare_display_type(display_type)
+        module_name = f"display.waveshare_epd.{safe_display_type}"
 
         # Workaround for some Waveshare drivers using 'import epdconfig' causing import errors
         epd_dir = Path(__file__).parent / "waveshare_epd"
@@ -81,8 +109,7 @@ class WaveshareDisplay(AbstractDisplay):
             sys.path.insert(0, str(epd_dir))
 
         try:
-            # Dynamically load module
-            epd_module = importlib.import_module(module_name)
+            epd_module = __import__(module_name, fromlist=["EPD"])
             self.epd_display: Any = epd_module.EPD()
             # Workaround for init functions with inconsistent casing
             init_method = getattr(self.epd_display, "Init", None)

@@ -18,7 +18,7 @@ from time import perf_counter
 from typing import Any, cast
 from urllib.parse import quote, urlencode, urlunsplit
 
-from flask import Flask, Response, abort, g, make_response, redirect, request, session
+from flask import Flask, Response, abort, g, redirect, request, session
 
 from app_setup.smoke import SMOKE_RENDER_PATH, smoke_render_enabled
 from config import Config
@@ -100,7 +100,7 @@ def setup_secret_key(app: Flask, device_config: Config) -> None:
         except Exception as e:
             secret = generated
             logger.warning(
-                "SECRET_KEY could not persist: %s — sessions won't survive restarts", e
+                "Generated session signing key could not be persisted: %s", e
             )
     app.secret_key = secret
     app.config["SESSION_COOKIE_HTTPONLY"] = True
@@ -270,6 +270,14 @@ def _is_mutating_path(path: str) -> bool:
     return path in _MUTATING_RATE_PATHS or path.startswith(_MUTATING_RATE_PREFIX)
 
 
+def _rate_limited_json_response(message: str, *, retry_after: str) -> Response:
+    body, status = json_error(message, status=429)
+    resp = cast(Response, body)
+    resp.status_code = status
+    resp.headers["Retry-After"] = retry_after
+    return resp
+
+
 def _apply_token_bucket_limits(path: str, addr: str) -> Response | None:
     """Check per-endpoint token-bucket limits; return a 429 response or None.
 
@@ -280,22 +288,17 @@ def _apply_token_bucket_limits(path: str, addr: str) -> Response | None:
         return None
 
     if path in _AUTH_RATE_PATHS and not _auth_bucket.try_acquire(addr):
-        body, code = json_error("Too many login attempts — try again later", status=429)
-        resp = make_response(body, code)
-        resp.headers["Retry-After"] = "30"
-        return resp
-    if path in _REFRESH_RATE_PATHS and not _refresh_bucket.try_acquire(addr):
-        body, code = json_error(
-            "Refresh rate limit exceeded — try again later", status=429
+        return _rate_limited_json_response(
+            "Too many login attempts — try again later", retry_after="30"
         )
-        resp = make_response(body, code)
-        resp.headers["Retry-After"] = "6"
-        return resp
+    if path in _REFRESH_RATE_PATHS and not _refresh_bucket.try_acquire(addr):
+        return _rate_limited_json_response(
+            "Refresh rate limit exceeded — try again later", retry_after="6"
+        )
     if _is_mutating_path(path) and not _mutating_bucket.try_acquire(addr):
-        body, code = json_error("Too many requests — try again later", status=429)
-        resp = make_response(body, code)
-        resp.headers["Retry-After"] = "6"
-        return resp
+        return _rate_limited_json_response(
+            "Too many requests — try again later", retry_after="6"
+        )
     return None
 
 

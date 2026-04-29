@@ -61,7 +61,7 @@ fi
 # wheelhouse would mask a broken requirements.txt.
 export INKYPI_SKIP_WHEELHOUSE=1
 
-if bash ./install.sh; then
+if sudo bash ./install.sh; then
     pass "install.sh exited 0"
 else
     rc=$?

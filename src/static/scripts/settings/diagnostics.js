@@ -537,7 +537,7 @@
         await refreshIsolation();
         await refreshHealth();
       } catch (e) {
-        console.warn(`Failed to ${verb} plugin:`, e);
+        console.warn("Failed to toggle plugin isolation:", verb, e);
         showResponseModal(
           "failure",
           `Failed to ${verb} plugin. Check your connection and try again.`

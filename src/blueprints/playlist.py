@@ -572,13 +572,13 @@ def _parse_playlist_request_data(
 
 def _parse_playlist_update_payload(
     data: Any,
-) -> tuple[PlaylistUpdateRequest | None, Any]:
+) -> tuple[PlaylistUpdateRequest | None, RequestModelError | None]:
     """Validate an /update_playlist request payload."""
     parsed, error = parse_playlist_update_request(data)
     if error is not None:
-        return None, _request_model_error_response(error)
+        return None, error
     if parsed is None:
-        return None, json_error("Invalid playlist payload", status=400)
+        return None, RequestModelError("Invalid playlist payload")
     return parsed, None
 
 
@@ -684,7 +684,7 @@ def update_playlist(playlist_name: str) -> Any:
 
     parsed, err = _parse_playlist_update_payload(data)
     if err:
-        return err
+        return _request_model_error_response(err)
     if parsed is None:
         return json_error("Invalid playlist payload", status=400)
 
@@ -1002,7 +1002,9 @@ def playlist_eta(playlist_name: str) -> Any:
         except Exception:
             num = 0
 
-        is_active = bool(last_dt and getattr(ri_obj, "playlist", None) == playlist_name)
+        is_active = (
+            last_dt is not None and getattr(ri_obj, "playlist", None) == playlist_name
+        )
         next_index = _safe_next_index(pl, num)
         until_next_min = _safe_until_next_min(
             is_active, cast(datetime | None, last_dt), cycle_min, now

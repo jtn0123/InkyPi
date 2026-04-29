@@ -6,7 +6,7 @@
     try {
       return JSON.parse(rawValue);
     } catch (error) {
-      console.debug(`Failed parsing ${label}:`, error);
+      console.debug("Failed parsing playlist progress payload:", label, error);
       return null;
     }
   }
@@ -15,7 +15,7 @@
     try {
       return await response.json();
     } catch (error) {
-      console.debug(`Failed parsing ${label}:`, error);
+      console.debug("Failed parsing playlist progress response:", label, error);
       return null;
     }
   }

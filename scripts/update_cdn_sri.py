@@ -24,14 +24,23 @@ import json
 import sys
 import urllib.request
 from pathlib import Path
+from urllib.parse import urlparse
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 MANIFEST_PATH = REPO_ROOT / "src" / "static" / "cdn_manifest.json"
 
 
+def _validate_cdn_url(url: str) -> str:
+    parsed = urlparse(url)
+    if parsed.scheme != "https" or not parsed.netloc:
+        raise ValueError("CDN asset URLs must be absolute HTTPS URLs")
+    return url
+
+
 def compute_sri_from_url(url: str) -> str:
     """Download *url* and return its ``sha384-<base64>`` SRI hash."""
-    with urllib.request.urlopen(url, timeout=30) as resp:  # noqa: S310
+    safe_url = _validate_cdn_url(url)
+    with urllib.request.urlopen(safe_url, timeout=30) as resp:  # noqa: S310
         data = resp.read()
     digest = hashlib.sha384(data).digest()
     return "sha384-" + base64.b64encode(digest).decode("ascii")

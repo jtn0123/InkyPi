@@ -93,6 +93,21 @@ def test_fallback_without_title():
     assert "title=" not in result
 
 
+def test_invalid_icon_name_and_class_are_sanitized():
+    result = str(
+        icon_utils.render_icon(
+            '../bad" onmouseover="alert(1)',
+            class_name='ok bad" onclick="alert(1)',
+        )
+    )
+
+    assert "../bad" not in result
+    assert "onmouseover" not in result
+    assert "onclick" not in result
+    assert "ph ph-question" in result
+    assert " ok" in result
+
+
 def test_title_injected_with_doctype(monkeypatch):
     svg_content = (
         "<!DOCTYPE svg PUBLIC '-//W3C//DTD SVG 1.1//EN' "

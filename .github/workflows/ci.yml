@@ -62,6 +62,7 @@ jobs:
           PERF_COLD_START_BUDGET_S: ${{ vars.PERF_COLD_START_BUDGET_S || '3' }}
           PERF_COLD_START_SAMPLES: ${{ vars.PERF_COLD_START_SAMPLES || '3' }}
           PERF_COLD_START_TIMEOUT_S: ${{ vars.PERF_COLD_START_TIMEOUT_S || '90' }}
+          GITHUB_REF_VALUE: ${{ github.ref }}
         run: |
           set -o pipefail
           python -m pytest tests/benchmarks/ --benchmark-only \
@@ -90,7 +91,7 @@ jobs:
           # cold-start startup time.
           python scripts/perf_budget_gate.py --bench-json /tmp/bench-current.json
           # On main branch pushes, update the cached baseline for future PRs
-          if [ "${{ github.ref }}" = "refs/heads/main" ]; then
+          if [ "$GITHUB_REF_VALUE" = "refs/heads/main" ]; then
             cp /tmp/bench-current.json /tmp/bench-baseline.json
           fi
       - name: Upload benchmark artifacts

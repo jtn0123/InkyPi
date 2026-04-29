@@ -76,6 +76,8 @@ jobs:
           python -c "import json; d=json.load(open('pr.json')); print('backend:', d['backend'], 'modules:', d['module_count'], 'rss:', d['total_rss_bytes'])"
 
       - name: Checkout base branch into side worktree
+        env:
+          GITHUB_BASE_REF_VALUE: ${{ github.base_ref }}
         run: |
           # Stash the memory_diff helpers from the PR and use the same helper
           # version for both measurements. The helper is measurement tooling;
@@ -84,7 +86,7 @@ jobs:
           mkdir -p /tmp/memdiff-scripts
           cp scripts/memory_diff.py /tmp/memdiff-scripts/
           cp scripts/format_memory_diff.py /tmp/memdiff-scripts/
-          git worktree add --detach /tmp/base-tree "origin/${{ github.base_ref }}"
+          git worktree add --detach /tmp/base-tree "origin/$GITHUB_BASE_REF_VALUE"
           mkdir -p /tmp/base-tree/scripts
           cp /tmp/memdiff-scripts/memory_diff.py /tmp/base-tree/scripts/
           cp /tmp/memdiff-scripts/format_memory_diff.py /tmp/base-tree/scripts/
