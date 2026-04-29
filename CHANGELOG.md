@@ -1,6 +1,18 @@
 # CHANGELOG
 
 
+## v1.2.1 (2026-04-29)
+
+### Bug Fixes
+
+- Clean up code scanning security alerts ([#608](https://github.com/jtn0123/InkyPi/pull/608),
+  [`3a269ee`](https://github.com/jtn0123/InkyPi/commit/3a269ee1816b47bfdd3d8176f6bda9c30d983214))
+
+* fix code scanning security alerts
+
+* fix preflash plugin loading
+
+
 ## v1.2.0 (2026-04-29)
 
 ### Features
