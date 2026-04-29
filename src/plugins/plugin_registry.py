@@ -22,11 +22,20 @@ _hot_reload_lock = threading.Lock()
 _PLUGIN_ID_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_]*$", re.ASCII)
 
 
-def _validate_plugin_module_path(plugin_id: str) -> str:
+def _validate_plugin_module_path(
+    plugin_id: str, *, allow_unregistered: bool = False
+) -> str:
     if not _PLUGIN_ID_RE.fullmatch(plugin_id):
         raise ValueError(f"Plugin '{plugin_id}' has an invalid id.")
     with _registry_lock:
-        if plugin_id not in _PLUGIN_CONFIGS:
+        is_registered = plugin_id in _PLUGIN_CONFIGS
+    if not is_registered:
+        plugin_module_path = (
+            Path(cast(str, cast(Any, resolve_path)(PLUGINS_DIR)))
+            / plugin_id
+            / f"{plugin_id}.py"
+        )
+        if not allow_unregistered or not plugin_module_path.is_file():
             raise ValueError(f"Plugin '{plugin_id}' is not registered.")
     return f"plugins.{plugin_id}.{plugin_id}"
 
@@ -48,7 +57,9 @@ def _load_single_plugin_instance(plugin_config: dict[str, Any]) -> Any:
     plugin_class_name = plugin_config.get("class")
     if not isinstance(plugin_class_name, str) or not plugin_class_name:
         raise ValueError(f"Plugin '{plugin_id}' is missing a valid class.")
-    module_name = _validate_plugin_module_path(plugin_id)
+    module_name = _validate_plugin_module_path(
+        plugin_id, allow_unregistered=_is_dev_mode()
+    )
     try:
         reloaded = False
         no_hot_reload = os.getenv("INKYPI_NO_HOT_RELOAD", "").strip().lower() in (
