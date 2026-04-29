@@ -49,6 +49,7 @@ def _make_pipeline(device_config_dev: Any, display_manager: _DisplayManager) -> 
     list[tuple[str, str | None, bool, Mapping[str, Any] | None, str | None]],
     list[tuple[str, str, int | None, Mapping[str, Any] | None]],
     list[dict[str, Any]],
+    list[dict[str, Any]],
 ]:
     housekeeper = RefreshHousekeeper(device_config_dev, display_manager)
     recorder = RefreshRecorder(device_config_dev)
@@ -57,6 +58,7 @@ def _make_pipeline(device_config_dev: Any, display_manager: _DisplayManager) -> 
     ] = []
     stages: list[tuple[str, str, int | None, Mapping[str, Any] | None]] = []
     errors: list[dict[str, Any]] = []
+    steps: list[dict[str, Any]] = []
 
     def update_health(
         plugin_id: str,
@@ -79,22 +81,26 @@ def _make_pipeline(device_config_dev: Any, display_manager: _DisplayManager) -> 
     def publish_error(**kwargs: Any) -> None:
         errors.append(kwargs)
 
+    def publish_step(**kwargs: Any) -> None:
+        steps.append(kwargs)
+
     recorder.save_stage = save_stage
     recorder.publish_error = publish_error
+    recorder.publish_step = publish_step
     pipeline = DisplayPipeline(
         display_manager=display_manager,
         housekeeper=housekeeper,
         recorder=recorder,
         update_plugin_health=update_health,
     )
-    return pipeline, health_updates, stages, errors
+    return pipeline, health_updates, stages, errors, steps
 
 
 def test_display_pipeline_success_records_metrics_and_stage(
     device_config_dev: Any,
 ) -> None:
     display_manager = _DisplayManager()
-    pipeline, health_updates, stages, errors = _make_pipeline(
+    pipeline, health_updates, stages, errors, steps = _make_pipeline(
         device_config_dev, display_manager
     )
     action = ManualRefresh("clock", {})
@@ -119,13 +125,18 @@ def test_display_pipeline_success_records_metrics_and_stage(
     ]
     assert health_updates == []
     assert errors == []
+    assert [item["step"] for item in steps] == [
+        "Saving image",
+        "Image saved; writing to display",
+        "Display complete",
+    ]
 
 
 def test_display_pipeline_cached_path_releases_manual_waiter(
     device_config_dev: Any,
 ) -> None:
     display_manager = _DisplayManager()
-    pipeline, _health_updates, stages, _errors = _make_pipeline(
+    pipeline, _health_updates, stages, _errors, steps = _make_pipeline(
         device_config_dev, display_manager
     )
     action = ManualRefresh("clock", {})
@@ -149,13 +160,14 @@ def test_display_pipeline_cached_path_releases_manual_waiter(
     assert request.image_saved.is_set()
     assert display_manager.calls == []
     assert stages == []
+    assert steps[-1]["step"] == "Image unchanged; display skipped"
 
 
 def test_display_pipeline_manual_callback_sets_image_saved_metrics(
     device_config_dev: Any,
 ) -> None:
     display_manager = _DisplayManager()
-    pipeline, _health_updates, _stages, _errors = _make_pipeline(
+    pipeline, _health_updates, _stages, _errors, _steps = _make_pipeline(
         device_config_dev, display_manager
     )
     action = ManualRefresh("clock", {})
@@ -188,7 +200,7 @@ def test_display_pipeline_failure_records_health_and_progress_error(
 ) -> None:
     display_manager = _DisplayManager()
     display_manager.exception = RuntimeError("display offline")
-    pipeline, health_updates, _stages, errors = _make_pipeline(
+    pipeline, health_updates, _stages, errors, steps = _make_pipeline(
         device_config_dev, display_manager
     )
     action = ManualRefresh("clock", {})
@@ -227,4 +239,8 @@ def test_display_pipeline_failure_records_health_and_progress_error(
             "error": "display offline",
             "retained_display": True,
         }
+    ]
+    assert [item["step"] for item in steps] == [
+        "Saving image",
+        "Image saved; writing to display",
     ]

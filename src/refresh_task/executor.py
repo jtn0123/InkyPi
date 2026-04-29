@@ -225,6 +225,11 @@ class RefreshExecutor:
                 attempts,
                 timeout_s,
             )
+            self.recorder.publish_step(
+                plugin_id=plugin_id,
+                request_id=request_id,
+                step=f"Starting render attempt {attempt}/{attempts}",
+            )
             image, exc_or_meta = self.run_subprocess_attempt(
                 refresh_action, plugin_config, current_dt, plugin_id, timeout_s, attempt
             )
@@ -356,6 +361,11 @@ class RefreshExecutor:
 
         last_exc: BaseException | None = None
         for attempt in range(1, attempts + 1):
+            self.recorder.publish_step(
+                plugin_id=plugin_id,
+                request_id=request_id,
+                step=f"Starting render attempt {attempt}/{attempts}",
+            )
             _worker, result_holder, cancel_event = self.make_inprocess_worker(
                 refresh_action,
                 plugin_config,

@@ -8,6 +8,19 @@ import pytest
 from PIL import Image as PILImage
 
 
+class _FakeOpenAIImageError(Exception):
+    def __init__(self) -> None:
+        super().__init__("provider rejected request req_testblocked123")
+        self.body = {
+            "error": {
+                "message": "Your request was rejected by the safety system.",
+                "type": "image_generation_user_error",
+                "code": "moderation_blocked",
+            }
+        }
+        self.request_id = "req_testblocked123"
+
+
 @pytest.fixture(autouse=True)
 def mock_openai():
     """Mock OpenAI for all ai_image tests."""
@@ -284,6 +297,134 @@ def test_ai_image_openai_api_failure(device_config_dev, monkeypatch):
 
         with pytest.raises(RuntimeError, match="API request failure"):
             p.generate_image(settings, device_config_dev)
+
+
+def test_ai_image_openai_moderation_block_reports_provider_reason(
+    device_config_dev: Any, monkeypatch: Any
+) -> None:
+    from plugins.ai_image.ai_image import AIImage
+    from utils.plugin_errors import (
+        OPENAI_MODERATION_BLOCKED_MSG,
+        ProviderReportedPluginError,
+    )
+
+    p = AIImage({"id": "ai_image"})
+    monkeypatch.setattr(device_config_dev, "load_env_key", lambda key: "fake_key")
+
+    with patch("plugins.ai_image.ai_image.OpenAI") as mock_openai:
+        mock_client = MagicMock()
+        mock_openai.return_value = mock_client
+        mock_client.images.generate.side_effect = _FakeOpenAIImageError()
+
+        with pytest.raises(ProviderReportedPluginError) as exc:
+            p.generate_image(
+                {
+                    "textPrompt": "icy sci-fi cathedral",
+                    "provider": "openai",
+                    "imageModel": "gpt-image-2",
+                    "quality": "medium",
+                    "safeRewriteBlockedPrompt": "false",
+                },
+                device_config_dev,
+            )
+
+    message = str(exc.value)
+    assert "moderation_blocked" in message
+    assert "req_testblocked123" in message
+    assert exc.value.safe_message() == OPENAI_MODERATION_BLOCKED_MSG
+    assert mock_client.chat.completions.create.call_count == 0
+
+
+def test_ai_image_openai_safe_rewrite_retries_moderation_block(
+    device_config_dev: Any, monkeypatch: Any
+) -> None:
+    from plugins.ai_image.ai_image import AIImage
+
+    p = AIImage({"id": "ai_image"})
+    monkeypatch.setattr(device_config_dev, "load_env_key", lambda key: "fake_key")
+
+    with patch("plugins.ai_image.ai_image.OpenAI") as mock_openai:
+        mock_client = MagicMock()
+        mock_openai.return_value = mock_client
+
+        img = PILImage.new("RGB", (64, 64), "black")
+        buf = BytesIO()
+        img.save(buf, format="PNG")
+        img_b64 = base64.b64encode(buf.getvalue()).decode()
+        success = MagicMock()
+        success.data = [MagicMock()]
+        success.data[0].b64_json = img_b64
+
+        mock_client.images.generate.side_effect = [
+            _FakeOpenAIImageError(),
+            success,
+        ]
+        rewrite_response = MagicMock()
+        rewrite_choice = MagicMock()
+        rewrite_choice.message.content = "generic icy retro science fiction cathedral"
+        rewrite_response.choices = [rewrite_choice]
+        mock_client.chat.completions.create.return_value = rewrite_response
+
+        result = p.generate_image(
+            {
+                "textPrompt": "icy sci-fi cathedral",
+                "provider": "openai",
+                "imageModel": "gpt-image-2",
+                "quality": "medium",
+                "safeRewriteBlockedPrompt": "true",
+            },
+            device_config_dev,
+        )
+
+    assert result.size == tuple(device_config_dev.get_resolution())
+    assert mock_client.images.generate.call_count == 2
+    second_prompt = mock_client.images.generate.call_args_list[1].kwargs["prompt"]
+    assert "generic icy retro science fiction cathedral" in second_prompt
+
+
+def test_ai_image_openai_safe_rewrite_reports_retry_rejection(
+    device_config_dev: Any, monkeypatch: Any
+) -> None:
+    from plugins.ai_image.ai_image import AIImage
+    from utils.plugin_errors import (
+        OPENAI_MODERATION_BLOCKED_MSG,
+        ProviderReportedPluginError,
+    )
+
+    p = AIImage({"id": "ai_image"})
+    monkeypatch.setattr(device_config_dev, "load_env_key", lambda key: "fake_key")
+
+    with patch("plugins.ai_image.ai_image.OpenAI") as mock_openai:
+        mock_client = MagicMock()
+        mock_openai.return_value = mock_client
+        mock_client.images.generate.side_effect = [
+            _FakeOpenAIImageError(),
+            _FakeOpenAIImageError(),
+        ]
+        rewrite_response = MagicMock()
+        rewrite_choice = MagicMock()
+        rewrite_choice.message.content = "generic icy retro science fiction cathedral"
+        rewrite_response.choices = [rewrite_choice]
+        mock_client.chat.completions.create.return_value = rewrite_response
+
+        with pytest.raises(ProviderReportedPluginError) as exc:
+            p.generate_image(
+                {
+                    "textPrompt": "icy sci-fi cathedral",
+                    "provider": "openai",
+                    "imageModel": "gpt-image-2",
+                    "quality": "medium",
+                    "safeRewriteBlockedPrompt": "true",
+                },
+                device_config_dev,
+            )
+
+    message = str(exc.value)
+    assert "moderation_blocked" in message
+    assert "req_testblocked123" in message
+    assert exc.value.safe_message() == OPENAI_MODERATION_BLOCKED_MSG
+    assert mock_client.images.generate.call_count == 2
+    assert mock_client.chat.completions.create.call_count == 1
 
 
 def test_ai_image_raises_when_provider_returns_no_image(device_config_dev, monkeypatch):
@@ -617,6 +758,22 @@ def test_ai_image_schema_includes_random_prompt_widget() -> None:
     ]
 
     assert any(item.get("widget_type") == "ai-image-prompt-tools" for item in widgets)
+
+
+def test_ai_image_schema_includes_safe_rewrite_opt_in() -> None:
+    from plugins.ai_image.ai_image import SAFE_REWRITE_SETTING, AIImage
+
+    p = AIImage({"id": "ai_image"})
+    schema = p.build_settings_schema()
+
+    fields = [
+        item
+        for section in schema["sections"]
+        for item in section["items"]
+        if item.get("kind") == "field"
+    ]
+
+    assert any(item.get("name") == SAFE_REWRITE_SETTING for item in fields)
 
 
 def test_ai_image_prompt_renders_as_textarea(client: Any) -> None:

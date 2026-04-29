@@ -37,6 +37,7 @@ from utils.http_utils import json_error, json_success
 from utils.plugin_errors import (
     MANUAL_UPDATE_TIMEOUT_MSG,
     SCREENSHOT_BACKEND_UNAVAILABLE_MSG,
+    ProviderReportedPluginError,
     ScreenshotBackendError,
 )
 from utils.plugin_history import record_change as _record_plugin_change
@@ -825,6 +826,21 @@ def _update_now_direct(
                 status=504,
                 code="manual_update_timeout",
             )
+        except ProviderReportedPluginError as e:
+            safe_msg = e.safe_message()
+            logger.info(
+                "Plugin %s provider rejected request: %s",
+                sanitize_log_field(plugin_id),
+                sanitize_log_field(str(e)),
+            )
+            _push_update_now_fallback(
+                plugin_id, plugin_config, device_config, display_manager, e
+            )
+            return json_error(
+                safe_msg,
+                status=400,
+                code="provider_rejected",
+            )
         except RuntimeError as e:
             # RuntimeError is raised by plugins to signal a user-actionable
             # failure (bad config, upstream API returned empty, etc.).  Do not
@@ -1137,6 +1153,18 @@ def update_now() -> Any:
             MANUAL_UPDATE_TIMEOUT_MSG,
             status=504,
             code="manual_update_timeout",
+        )
+    except ProviderReportedPluginError as e:
+        safe_msg = e.safe_message()
+        logger.info(
+            "update_now: provider rejected plugin %s: %s",
+            sanitize_log_field(plugin_id or "?"),
+            sanitize_log_field(str(e)),
+        )
+        return json_error(
+            safe_msg,
+            status=400,
+            code="provider_rejected",
         )
     except ClientInputError as e:
         return json_error(

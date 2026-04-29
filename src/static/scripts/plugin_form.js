@@ -42,6 +42,50 @@
     return { setStep, start, stop };
   }
 
+  function attachLiveProgress(progress, pluginId){
+    if (!pluginId || typeof EventSource === 'undefined') {
+      return { close(){}, hasRecent(){ return false; } };
+    }
+    let source = null;
+    let lastLiveAt = 0;
+    const startedAt = Date.now() / 1000 - 5;
+    const labels = {
+      queued: 'Queued on device',
+      running: 'Preparing plugin',
+      done: 'Done',
+      error: 'Failed — see error above'
+    };
+    function applyEvent(payload){
+      if (!payload || payload.plugin_id !== pluginId) return;
+      if (typeof payload.ts === 'number' && payload.ts < startedAt) return;
+      let text = payload.step || labels[payload.state] || null;
+      if (payload.state === 'error' && payload.error) {
+        text = `Failed — ${payload.error}`;
+      }
+      if (!text) return;
+      lastLiveAt = Date.now();
+      const pctByState = { queued: 15, running: 25, step: 50, done: 100, error: 100 };
+      progress.setStep(text, pctByState[payload.state] || 55);
+      if (payload.state === 'done' || payload.state === 'error') {
+        try { source?.close(); } catch(e){}
+      }
+    }
+    try {
+      source = new EventSource('/api/progress/stream');
+      ['queued', 'running', 'step', 'done', 'error'].forEach((eventName) => {
+        source.addEventListener(eventName, (event) => {
+          try { applyEvent(JSON.parse(event.data || '{}')); } catch(e){}
+        });
+      });
+    } catch (e) {
+      console.warn('Live progress stream unavailable:', e);
+    }
+    return {
+      close(){ try { source?.close(); } catch(e){} },
+      hasRecent(){ return lastLiveAt > 0 && Date.now() - lastLiveAt < 3000; }
+    };
+  }
+
   function surfaceFieldError(result) {
     const message = result?.error || result?.message || "";
     const field = String(result?.field || "").toLowerCase();
@@ -98,6 +142,7 @@
     const formData = new FormData(form);
     let success = false;
     let result = null;
+    let liveProgress = null;
 
     // append uploaded files
     try { Object.keys(uploadedFiles || {}).forEach(key => { (uploadedFiles[key] || []).forEach(f => formData.append(key, f)); }); } catch(e){ console.warn('Failed to append uploaded files:', e); if (window.showResponseModal) window.showResponseModal('failure', 'Failed to attach uploaded files: ' + (e.message || e)); return { success: false, result: null }; }
@@ -128,6 +173,7 @@
       if (response.status === 202) {
         const accepted = await response.json();
         const jobId = accepted.job_id;
+        liveProgress = attachLiveProgress(progress, String(formData.get('plugin_id') || ''));
         progress.setStep('Rendering (background)…', 40);
 
         // Poll /api/job/<id> until done or error
@@ -143,7 +189,9 @@
             const pollResp = await fetch('/api/job/' + jobId, { signal: controller.signal });
             const jobInfo = await pollResp.json();
             if (jobInfo.status === 'running') {
-              progress.setStep('Rendering (background)…', 40 + Math.min(polls, 50));
+              if (!liveProgress?.hasRecent()) {
+                progress.setStep('Rendering (background)…', 40 + Math.min(polls, 50));
+              }
             } else if (jobInfo.status === 'done') {
               result = jobInfo.result || { success: true, message: 'Display updated' };
               // metrics display
@@ -210,6 +258,7 @@
       }
     } finally {
       clearTimeout(timeoutId);
+      try { liveProgress?.close(); } catch(e){}
       if (loadingIndicator) loadingIndicator.style.display = 'none';
       progress.setStep(success ? 'Done' : 'Failed \u2014 see error above', 100);
       progress.stop();

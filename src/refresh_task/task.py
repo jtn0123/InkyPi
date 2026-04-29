@@ -63,6 +63,38 @@ _MANUAL_WAIT_DEFAULTS_S = {
 }
 
 
+def _plugin_requires_api_key(plugin_config: Mapping[str, Any]) -> bool:
+    """Return whether plugin metadata declares API-key configuration."""
+    plugin_id = plugin_config.get("id")
+    if not isinstance(plugin_id, str):
+        return False
+
+    try:
+        plugin = get_plugin_instance(dict(plugin_config))
+    except Exception:
+        logger.debug(
+            "Could not inspect API-key metadata for plugin %s",
+            plugin_id,
+            exc_info=True,
+        )
+        return False
+
+    if getattr(plugin, "requires_api_key", False):
+        return True
+
+    try:
+        template = plugin.generate_settings_template()
+    except Exception:
+        logger.debug(
+            "Could not inspect settings template for plugin %s",
+            plugin_id,
+            exc_info=True,
+        )
+        return False
+
+    return isinstance(template, Mapping) and "api_key" in template
+
+
 class RefreshTask:
     """Handles the logic for refreshing the display using a background thread."""
 
@@ -394,6 +426,25 @@ class RefreshTask:
                 refresh_id=benchmark_id,
                 request_id=request_id,
             )
+            self.recorder.publish_step(
+                plugin_id=plugin_id,
+                request_id=request_id,
+                step="Preparing plugin",
+            )
+            self.recorder.publish_step(
+                plugin_id=plugin_id,
+                request_id=request_id,
+                step=(
+                    "Checking provider credentials"
+                    if _plugin_requires_api_key(plugin_config)
+                    else "Checking plugin settings"
+                ),
+            )
+            self.recorder.publish_step(
+                plugin_id=plugin_id,
+                request_id=request_id,
+                step="Generating image",
+            )
             try:
                 image, plugin_meta = self._execute_with_policy(
                     refresh_action,
@@ -456,10 +507,20 @@ class RefreshTask:
                 "request_id": request_id,
             },
         )
+        self.recorder.publish_step(
+            plugin_id=plugin_id,
+            request_id=request_id,
+            step="Image generated",
+        )
         if image is None:
             raise RuntimeError("Plugin returned None image; cannot refresh display.")
 
         # Validate dimensions before doing anything expensive (hash / display push).
+        self.recorder.publish_step(
+            plugin_id=plugin_id,
+            request_id=request_id,
+            step="Checking image",
+        )
         expected_w, expected_h = self.device_config.get_resolution()
         try:
             image = validate_image_dimensions(

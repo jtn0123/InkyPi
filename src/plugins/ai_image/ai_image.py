@@ -1,5 +1,6 @@
 import base64
 import logging
+import re
 from collections.abc import Mapping
 from io import BytesIO
 from typing import Any, cast
@@ -21,6 +22,7 @@ from plugins.base_plugin.settings_schema import (
     section,
     widget,
 )
+from utils.plugin_errors import ProviderReportedPluginError
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +42,8 @@ IMAGE_MODELS = [
 DEFAULT_IMAGE_MODEL = OPENAI_IMAGE_MODEL_2
 DEFAULT_IMAGE_QUALITY = "medium"
 FALLBACK_IMAGE_PROMPT = "A vivid imaginative scene, high detail."
+SAFE_REWRITE_SETTING = "safeRewriteBlockedPrompt"
+_OPENAI_REQUEST_ID_RE = re.compile(r"\b(req_[A-Za-z0-9]+)\b")
 
 
 class AIImage(BasePlugin):
@@ -89,6 +93,20 @@ class AIImage(BasePlugin):
                     submit_unchecked=True,
                     checked_value="true",
                     unchecked_value="false",
+                ),
+                field(
+                    SAFE_REWRITE_SETTING,
+                    "checkbox",
+                    label="Retry blocked prompts with safe rewrite",
+                    hint="If OpenAI rejects a generated image prompt, rewrite it once with generic visual language and retry. This is off by default so failures stay visible.",
+                    submit_unchecked=True,
+                    checked_value="true",
+                    unchecked_value="false",
+                    visible_if={
+                        "field": "provider",
+                        "operator": "equals",
+                        "equals": "openai",
+                    },
                 ),
             ),
             section(
@@ -241,6 +259,83 @@ class AIImage(BasePlugin):
         logger.warning("Prompt remix returned no usable prompt; using fallback prompt.")
         return FALLBACK_IMAGE_PROMPT
 
+    @staticmethod
+    def _openai_error_payload(exc: BaseException) -> dict[str, str | None]:
+        """Extract response-safe OpenAI error fields from SDK exceptions."""
+        body = getattr(exc, "body", None)
+        error_obj: object = None
+        if isinstance(body, Mapping):
+            error_obj = body.get("error")
+        code = error_type = message = request_id = None
+        if isinstance(error_obj, Mapping):
+            code = str(error_obj.get("code") or "") or None
+            error_type = str(error_obj.get("type") or "") or None
+            message = str(error_obj.get("message") or "") or None
+        request_id_attr = getattr(exc, "request_id", None)
+        if isinstance(request_id_attr, str) and request_id_attr:
+            request_id = request_id_attr
+        if request_id is None:
+            match = _OPENAI_REQUEST_ID_RE.search(str(exc))
+            if match:
+                request_id = match.group(1)
+        return {
+            "code": code,
+            "type": error_type,
+            "message": message,
+            "request_id": request_id,
+        }
+
+    @staticmethod
+    def _openai_user_error_message(payload: Mapping[str, str | None]) -> str:
+        code = payload.get("code") or payload.get("type") or "provider_error"
+        request_id = payload.get("request_id")
+        if code == "moderation_blocked":
+            msg = "OpenAI rejected the image prompt (moderation_blocked)."
+        else:
+            msg = f"OpenAI image generation failed ({code})."
+        if request_id:
+            msg = f"{msg} Request id: {request_id}."
+        return msg
+
+    @staticmethod
+    def _safe_rewrite_openai_prompt(
+        ai_client: Any, prompt: str, reason: Mapping[str, str | None]
+    ) -> str:
+        logger.info(
+            "Rewriting OpenAI image prompt after provider rejection: code=%s type=%s request_id=%s",
+            reason.get("code"),
+            reason.get("type"),
+            reason.get("request_id"),
+        )
+        response = ai_client.chat.completions.create(
+            model="gpt-5-nano",
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "Rewrite image-generation prompts into safe, generic visual "
+                        "language. Remove named artists, living people, franchises, "
+                        "copyrighted style labels, and provocative references. Keep the "
+                        "core subject and mood. Return only one prompt under 30 words."
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": f'Rewrite this prompt safely: "{prompt}"',
+                },
+            ],
+            temperature=0.4,
+        )
+        choices = getattr(response, "choices", None) or []
+        message = getattr(choices[0], "message", None) if choices else None
+        content = getattr(message, "content", None) if message else None
+        rewritten = (content or "").strip()
+        if rewritten:
+            logger.info("Safe prompt rewrite produced: %s", rewritten)
+        else:
+            logger.warning("Safe prompt rewrite returned an empty result.")
+        return rewritten
+
     def _generate_google_image(
         self, device_config: Any, text_prompt: str, image_model: str, randomize: bool
     ) -> ImageType:
@@ -272,6 +367,7 @@ class AIImage(BasePlugin):
         image_quality: str,
         orientation: str,
         randomize: bool,
+        safe_rewrite_blocked_prompt: bool,
     ) -> ImageType:
         api_key = device_config.load_env_key("OPEN_AI_SECRET")
         if not api_key:
@@ -282,14 +378,57 @@ class AIImage(BasePlugin):
         prompt = self._maybe_randomize_openai_prompt(ai_client, text_prompt, randomize)
         prompt = self._ensure_image_prompt(prompt)
         logger.info(f"Generating image with {image_model}...")
-        return self.fetch_image(
-            ai_client,
-            prompt,
-            model=image_model,
-            quality=image_quality,
-            orientation=orientation,
-            dimensions=self.get_oriented_dimensions(device_config),
-        )
+        try:
+            return self.fetch_image(
+                ai_client,
+                prompt,
+                model=image_model,
+                quality=image_quality,
+                orientation=orientation,
+                dimensions=self.get_oriented_dimensions(device_config),
+            )
+        except Exception as exc:
+            payload = self._openai_error_payload(exc)
+            if not any(payload.values()):
+                raise
+            safe_message = self._openai_user_error_message(payload)
+            is_moderation_block = payload.get("code") == "moderation_blocked"
+            if safe_rewrite_blocked_prompt and is_moderation_block:
+                logger.warning(
+                    "%s Retrying once with opt-in safe prompt rewrite.",
+                    safe_message,
+                )
+                rewritten = self._safe_rewrite_openai_prompt(ai_client, prompt, payload)
+                if rewritten:
+                    try:
+                        return self.fetch_image(
+                            ai_client,
+                            rewritten,
+                            model=image_model,
+                            quality=image_quality,
+                            orientation=orientation,
+                            dimensions=self.get_oriented_dimensions(device_config),
+                        )
+                    except Exception as retry_exc:
+                        retry_payload = self._openai_error_payload(retry_exc)
+                        if not any(retry_payload.values()):
+                            raise
+                        retry_message = self._openai_user_error_message(retry_payload)
+                        logger.error(
+                            "Safe prompt rewrite retry failed: %s",
+                            retry_message,
+                        )
+                        raise ProviderReportedPluginError(
+                            retry_message,
+                            reason_code=retry_payload.get("code")
+                            or retry_payload.get("type"),
+                        ) from retry_exc
+                logger.warning("Safe rewrite was empty; reporting original rejection.")
+            logger.error("%s", safe_message)
+            raise ProviderReportedPluginError(
+                safe_message,
+                reason_code=payload.get("code") or payload.get("type"),
+            ) from exc
 
     def generate_image(
         self, settings: Mapping[str, object], device_config: Any
@@ -305,6 +444,7 @@ class AIImage(BasePlugin):
             text_prompt = ""
         image_model, image_quality = self._validate_generate_inputs(settings, provider)
         randomize_prompt = settings.get("randomizePrompt") == "true"
+        safe_rewrite_blocked_prompt = settings.get(SAFE_REWRITE_SETTING) == "true"
         if not text_prompt.strip() and not randomize_prompt:
             raise RuntimeError("Prompt is required unless Vivid remix is enabled.")
         orientation = device_config.get_config("orientation")
@@ -332,6 +472,7 @@ class AIImage(BasePlugin):
                     image_quality,
                     orientation,
                     randomize_prompt,
+                    safe_rewrite_blocked_prompt,
                 )
 
             if image:
@@ -457,10 +598,9 @@ class AIImage(BasePlugin):
         system_content = (
             "You are a creative assistant generating extremely random and unique image prompts. "
             "Avoid common themes. Focus on unexpected, unconventional, and bizarre combinations "
-            "of art style, medium, subjects, time periods, and moods. No repetition. Prompts "
-            "should be 20 words or less and specify random artist, movie, tv show or time period "
-            "for the theme. Do not provide any headers or repeat the request, just provide the "
-            "updated prompt in your response."
+            "of visual genre, medium, subjects, time periods, and moods. No repetition. Prompts "
+            "should be 20 words or less and avoid named artists, people, franchises, movies, or TV shows. "
+            "Do not provide any headers or repeat the request, just provide the updated prompt."
         )
         user_content = (
             "Give me a completely random image prompt, something unexpected and creative! "
@@ -474,11 +614,10 @@ class AIImage(BasePlugin):
                 "and descriptive version that captures the essence of the original while "
                 "making it unique and vivid. Avoid adding irrelevant details but feel free "
                 "to include creative and visual enhancements. Avoid common themes. Focus on "
-                "unexpected, unconventional, and bizarre combinations of art style, medium, "
+                "unexpected, unconventional, and bizarre combinations of visual genre, medium, "
                 "subjects, time periods, and moods. Do not provide any headers or repeat the "
                 "request, just provide your updated prompt in the response. Prompts "
-                "should be 20 words or less and specify random artist, movie, tv show or time "
-                "period for the theme."
+                "should be 20 words or less and avoid named artists, people, franchises, movies, or TV shows. "
             )
             user_content = (
                 f'Original prompt: "{from_prompt}"\n'
@@ -516,10 +655,9 @@ class AIImage(BasePlugin):
         system_content = (
             "You are a creative assistant generating extremely random and unique image prompts. "
             "Avoid common themes. Focus on unexpected, unconventional, and bizarre combinations "
-            "of art style, medium, subjects, time periods, and moods. No repetition. Prompts "
-            "should be 20 words or less and specify random artist, movie, tv show or time period "
-            "for the theme. Do not provide any headers or repeat the request, just provide the "
-            "updated prompt in your response."
+            "of visual genre, medium, subjects, time periods, and moods. No repetition. Prompts "
+            "should be 20 words or less and avoid named artists, people, franchises, movies, or TV shows. "
+            "Do not provide any headers or repeat the request, just provide the updated prompt."
         )
         user_content = (
             "Give me a completely random image prompt, something unexpected and creative! "
@@ -533,11 +671,10 @@ class AIImage(BasePlugin):
                 "and descriptive version that captures the essence of the original while "
                 "making it unique and vivid. Avoid adding irrelevant details but feel free "
                 "to include creative and visual enhancements. Avoid common themes. Focus on "
-                "unexpected, unconventional, and bizarre combinations of art style, medium, "
+                "unexpected, unconventional, and bizarre combinations of visual genre, medium, "
                 "subjects, time periods, and moods. Do not provide any headers or repeat the "
                 "request, just provide your updated prompt in the response. Prompts "
-                "should be 20 words or less and specify random artist, movie, tv show or time "
-                "period for the theme."
+                "should be 20 words or less and avoid named artists, people, franchises, movies, or TV shows. "
             )
             user_content = (
                 f'Original prompt: "{from_prompt}"\n'

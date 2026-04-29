@@ -84,8 +84,18 @@ def test_executor_policy_retries_transient_subprocess_error(monkeypatch: Any) ->
         {
             "plugin_id": "clock",
             "request_id": "req-1",
+            "step": "Starting render attempt 1/2",
+        },
+        {
+            "plugin_id": "clock",
+            "request_id": "req-1",
             "step": "retry 1/1",
-        }
+        },
+        {
+            "plugin_id": "clock",
+            "request_id": "req-1",
+            "step": "Starting render attempt 2/2",
+        },
     ]
 
 
@@ -164,8 +174,18 @@ def test_executor_inprocess_retry_publishes_request_step(monkeypatch: Any) -> No
         {
             "plugin_id": "clock",
             "request_id": "req-2",
+            "step": "Starting render attempt 1/2",
+        },
+        {
+            "plugin_id": "clock",
+            "request_id": "req-2",
             "step": "retry 1/1",
-        }
+        },
+        {
+            "plugin_id": "clock",
+            "request_id": "req-2",
+            "step": "Starting render attempt 2/2",
+        },
     ]
 
 
@@ -213,7 +233,13 @@ def test_executor_inprocess_timeout_does_not_retry(monkeypatch: Any) -> None:
         )
 
     assert calls["count"] == 1
-    assert recorder.steps == []
+    assert recorder.steps == [
+        {
+            "plugin_id": "slow",
+            "request_id": "req-timeout",
+            "step": "Starting render attempt 1/2",
+        }
+    ]
     assert _ZombieOwner._zombie_thread_count == 1
     release.set()
     deadline = time.monotonic() + 5
