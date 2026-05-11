@@ -44,7 +44,7 @@ playwright>=1.55,<2
 flask>=3.1,<4
 python-dotenv>=1.0,<2
 requests>=2.32,<3
-urllib3>=2.0,<3
+urllib3>=2.7.0,<3
 werkzeug>=3.1,<4
 pillow>=11.0,<13
 # pi-heif has wheels for all major platforms — no platform guard needed.
