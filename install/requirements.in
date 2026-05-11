@@ -9,7 +9,7 @@ python-dotenv>=1.0,<2
 # inky display driver — only needed on Pi hardware
 inky>=2.3,<3; sys_platform == "linux"
 requests>=2.32,<3
-urllib3>=2.0,<3
+urllib3>=2.7.0,<3
 werkzeug>=3.1,<4
 pillow>=11.0,<13
 # pi-heif has wheels for all major platforms (Linux, macOS, Windows) — no platform guard.
