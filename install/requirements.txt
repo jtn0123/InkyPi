@@ -14,7 +14,7 @@ anyio==4.13.0 \
 astral==3.2 \
     --hash=sha256:9b7c3b412e9e69d172cfb24be0e6addcc9f1bd01a28db8bebe66d75ccc533d88 \
     --hash=sha256:cb7b49a3f0d4c64ae666be131276d2a3226134c598db10e672028cf8ff855f83
-    # via inkypi
+    # via -r install/requirements.in
 attrs==26.1.0 \
     --hash=sha256:c647aa4a12dfbad9333ca4e71fe62ddc36f4e63b2d260a37a8b83d2f043ac309 \
     --hash=sha256:d03ceb89cb322a8fd706d4fb91940737b6642aa36998fe130a9bc96c985eff32
@@ -32,7 +32,7 @@ certifi==2026.2.25 \
     #   httpcore
     #   httpx
     #   requests
-cffi==2.0.0 ; platform_python_implementation != 'PyPy' \
+cffi==2.0.0 \
     --hash=sha256:00bdf7acc5f795150faa6957054fbbca2439db2f775ce831222b66f192f03beb \
     --hash=sha256:07b271772c100085dd28b74fa0cd81c8fb1a3ba18b21e03d7c27f3436a10606b \
     --hash=sha256:19f705ada2530c1167abacb171925dd886168931e0a7b78f5bffcae5c6b5be75 \
@@ -130,48 +130,55 @@ click==8.3.2 \
     # via
     #   flask
     #   x-wr-timezone
-colorama==0.4.6 ; sys_platform == 'win32' \
-    --hash=sha256:08695f5cb7ed6e0531a20572697297273c47b8cae5a63ffc6d6ed5c201be6e44 \
-    --hash=sha256:4f1d9991f5acc0ca119f9d443620b77f9d6b33703e51011c16baf57afb285fc6
-    # via
-    #   click
-    #   tqdm
-cryptography==49.0.0 \
-    --hash=sha256:026ac7423e6fa66872d3bf889be5974507da3944f866f704fa200eadacd00001 \
-    --hash=sha256:084ef1af862eb07ec46d25f68689f2102a9fc0e05ce7b80f14f5fe51e4eef0f6 \
-    --hash=sha256:0b82e28ee398a386f0807bba7884d30f25218855690f45115831bcce5d90822c \
-    --hash=sha256:0e959b578856a3924bc0cbb710fc12c387b9412a951389f3ca61704a9e25f325 \
-    --hash=sha256:0f21641cf4b30fca7aee061ced0ec7ad7b073518088b7c9969a297c0ae796c69 \
-    --hash=sha256:2400ef9c9e2299a25614eb1dea3db54a69b1349efd043bfac9c67630d136df36 \
-    --hash=sha256:28d8b15e6275f12c8a207dc309dfa957903c927d08d0cc937ee3f63f200693cc \
-    --hash=sha256:2afe9051da7ae7bd5905da5a949280c7d2bb75682e188f650a9d0f2756b834c6 \
-    --hash=sha256:2eda353d8a27bcbcaa4cbed18994a74ab4d19a2ca897db188ea269ab9b71419b \
-    --hash=sha256:35b151772baff2c74cba7fa290ceaff4c3b11c0c881eb93eb5dbc05a7cfbba18 \
-    --hash=sha256:36d1709f992593689b45bda411498d62c6e365f2ca00b84657d4dadd24de16db \
-    --hash=sha256:42b0684e0e40cf26122427802486f6d93aea593612603a94fbf260c7eb1e9c1b \
-    --hash=sha256:53ecee2e23f7169b6117e99fc8a944e5e50f79e69758a83b52a00cb98ab2b2d2 \
-    --hash=sha256:66ec79c3904820572d7e987abdf304281f141d37ad9a489b8e97066e7b9b6459 \
-    --hash=sha256:67e1d20ad9ef3a563c59ef22e7a8a0b8210bd26604369ea4a30a7c66aefe504e \
-    --hash=sha256:6f2debedf9ca60cf1d5bd466475638af5130f89965605cd818484d19987d3a21 \
-    --hash=sha256:6fc361c34fb6aac015ce19435876635e5c6d21db31998b0920f675f131e043b8 \
-    --hash=sha256:8c25ceb16df5b9435f3f6a9829204985b0e0cbee3b48aacd432c7d2c850b44d9 \
-    --hash=sha256:966fe0e9c67490071f14c0d2b1cb2dfb3023c5ce39457343931415f08382f2db \
-    --hash=sha256:9e82dcc8e56052715fb18b2429e3bca4823b1629136a2084fc45a9a5cecb9b64 \
-    --hash=sha256:b39efa323140595abd3ecca8529d321ae50f55f3aa3ba9cc81ea56a6011953d5 \
-    --hash=sha256:b47db11c2c3525083296069b98ac5221907455e989ae0c2e3008bde851921615 \
-    --hash=sha256:b87e65d263b3e5d3bb92a57e2a6638e2f31110fa7aa890c7b2dbba42248d0a3f \
-    --hash=sha256:be9fcb48a55f023493482827d4f459bd263cc20efde64f204b97c123201850c6 \
-    --hash=sha256:c83782480a4a9da4d0feb51950131ba32e12e70813848b3343f6e18c28a66838 \
-    --hash=sha256:cbc77da8c523d5abd028635ba850a6966fcee2c82e2bf65a41d1d8afe0f98be9 \
-    --hash=sha256:ccac2bfebc306b862133e3bb71f3f6ee8bb525240089b2d952e4144b3a6d5da7 \
-    --hash=sha256:d0527ce944105f257f605a827d6ebead966c752038b6e8656abb9c5edee6fc68 \
-    --hash=sha256:e5dfc1e64de5677cec922ffa8da89c546d0415bf6efdf081842e5d44c84e1f0e \
-    --hash=sha256:ec5e529fb80935c94fe7b729f9972b50e351a0e6b50aa294fd5cabb109fcc29a \
-    --hash=sha256:f78ff2c9ed8dc2d036b0f4d640e22522213d047c1b14e61205a7e55c80a494d4 \
-    --hash=sha256:f89660a348f4f78a92366240a61404e337586ef7f5909a2fef59ca88ef505493 \
-    --hash=sha256:fc1e275c2f1d97b1a6450b8b0ea3ebfa6e087a611c2b26cb2404d48588abab7b
+cryptography==50.0.0 \
+    --hash=sha256:031e2d5dd4bb9caa3ca9c82e5a197fd8ae680232cee62603d1a813f3f07e3d03 \
+    --hash=sha256:06a32a980526a6ab9a4b9bf8f7385800791e2bb960903cb6b530e4817509a3b7 \
+    --hash=sha256:07479a1cb08219ab719147e742e76090c9c773321959bb94946fffdd397a6437 \
+    --hash=sha256:07949c449a1abcf60d1ee6e88956d89404c7df3c8258f46589e912988e551987 \
+    --hash=sha256:105110f43a471dbd0060b9c9516cb8a6a79233631a04cc2ba16f28323ac6e025 \
+    --hash=sha256:11b74db56cdbe3cdee6e3f6982ecb70334fa10dce99ed58bf7894aaaa3b2a037 \
+    --hash=sha256:12b9c6996425c76ea6c457ace4f3073e715b8c545add07cd1a8f3a4f90691269 \
+    --hash=sha256:1489e263a8048bb8b6a8bac662eb2d402ea5d2b7b4699b72f385f1e2772db105 \
+    --hash=sha256:19736989797678c6af1e55cd49055cdbcb55d8f6b5583ac5335f933aba9101dc \
+    --hash=sha256:1b4a266766514614f8aa60416e71f2fc6e575d36e7bdc90f644fadb2f4b75b95 \
+    --hash=sha256:2a8183b489dc1f7f80f135780fadc1108f14b31b8a40411c7a5b17425f65f28b \
+    --hash=sha256:37fdb0d0111f1e2ff07139dfb79f1b49531f8e213c46f1163dd7642979b58c47 \
+    --hash=sha256:3f5735ffe4996d28b809371756219f5354864902a3b9e7c0b9ee87041209fc9c \
+    --hash=sha256:49e7d93abdbd2990caced757e5fade25302f719c3c8fb6e6fff2dde98999fc41 \
+    --hash=sha256:5e34edd123674534acd70147f0ca331eaa2c74e6325fb2028c886aa26ba0b68c \
+    --hash=sha256:62598a8a57f815db4c6259a4e97d857dab56697e7de8e8ab02352ab74da1995d \
+    --hash=sha256:65c2c3add92b45fd0709db8594536aea39c2a67af0e27ffcf049c498501140b7 \
+    --hash=sha256:6ba6a53445bd3cfa809ef3ef5f1589aa6ba08784a1d962bf47d0940e871dab1c \
+    --hash=sha256:6e7d61120573a7f2cd94cc095f9e81f6967c61ccdf194285aa143ecec8e0b708 \
+    --hash=sha256:7cec5b856506da6defb290f30c9ee687d5f5e8cb0bd3f6459dde43b0b4fa40ef \
+    --hash=sha256:80b63928fa35083b33966ce1efb70e5b9607181e49dcd1c22c8c005e319f667f \
+    --hash=sha256:82148ec5bddac30b51a5b3c1945075f896fa022cb93f8e4a01e9f6ee95292c5f \
+    --hash=sha256:828743d939e9629bc267b8e2d08d8bb67cd4319c771a33d4b18b22dd8fb7440a \
+    --hash=sha256:8d89f3976b10b4ce31118de72329025f70d2c6ead14a8217c5514dd2c6d5a78f \
+    --hash=sha256:8eb5e1172eb569ea8a872796576e6a67c276351728b6455d5beb01242b027c6a \
+    --hash=sha256:900131fafd8aead39ac7dd3a7e833be754c17a95cfd91221636949fe4eb0aa8a \
+    --hash=sha256:910d11e1a385c654bf738bf3e6b8e6ed5de0f5610fcae2be9e5b398d8081d20e \
+    --hash=sha256:910e1d2668e7de9648f2bcee30e180db2a6b15c30f887d7c4c93ddf96e3992e3 \
+    --hash=sha256:9aa87839c383bdbab6ef865787a1fb877af8dd03464c4400322726feaaadfc6d \
+    --hash=sha256:a1b30560f2acc95aa8b2e06e716a13dbfc97314747b80d9707e307f77b40d6b3 \
+    --hash=sha256:a91296cb61e8df6f86d0c19cc4068228da256bf59bf86049fbd821084565327f \
+    --hash=sha256:b42a28c1844fd9de8f3f7d540e36b66f3a9c83fceac7170ebc7a6a19edd9dcae \
+    --hash=sha256:bd1c592e4d5974f0d08d4888e432157adba757c66da0246918e43677fafa2d30 \
+    --hash=sha256:c87f62a3d3b9888ed0fdde100ec06aa61ca9cd44bad9057d1dff9a516b5f5bb9 \
+    --hash=sha256:c99c003e088647b8a5b7c145d6f78c335f6348332b62e142d411c4b63d1460b9 \
+    --hash=sha256:ccdc4a71a4dabae05de219404f9f4abc38e3b58422177ff93d0da05967dafa07 \
+    --hash=sha256:d24fead1d4d076e1bfb006dcec392074a3cd8d7b4fc8a595aa64073b2b7a96ba \
+    --hash=sha256:d58c3db7cd6eed54e6c06744db55456b65ebd7492ddeae9c1e93cfca7aa857d3 \
+    --hash=sha256:d764dcf130c428ef66786f866dd750f53182bc608813489915e9fc106bb0c82f \
+    --hash=sha256:df2a58a472f332225671c35b0a830208b86d004f82baa8530fa3782c85646533 \
+    --hash=sha256:e722f16708d854fe924790e051061f6704a472c3bac347b6fd88033ea8dd0dc5 \
+    --hash=sha256:ecfed7367f965a0328cfbdd70da860f15441f002f613185668c6e6ebf5a0ac11 \
+    --hash=sha256:eeac2acb5a20ed25e0ad6d1df9891a520b78b404266b6d11778f25d5d691a6c9 \
+    --hash=sha256:f59e38625469987d7ef6d495323c55e7db6c212eaf6112267e0d3b565a2e9c9f \
+    --hash=sha256:f89831ef99dd7dd169ab06d63a831adb9e20a87aac6d380266bbda5823349169 \
+    --hash=sha256:fd9192b7b70c573d7f214eb1ae35e00d359f6f5e4b27c7e21e30de1fc6204645
     # via google-auth
-cysystemd==2.0.5 ; sys_platform == 'linux' \
+cysystemd==2.0.5 \
     --hash=sha256:693426351795a82d0ce6b3c6667434c25eb671bc1652dd374bbf1144d4af7aa9 \
     --hash=sha256:764568f622392a8cbc6c692ec83ce63baca559434f850ff3e90712d9275a3a8b \
     --hash=sha256:95f692ebdeb219ab770c7f638434acd76504e97beef6054c7ee37ad8847cb656 \
@@ -179,7 +186,7 @@ cysystemd==2.0.5 ; sys_platform == 'linux' \
     --hash=sha256:a8c573e6ec970b3643dfae675a904ef81aa59d78e8e9ff331896c293a4057279 \
     --hash=sha256:f2e9479bd471a38ab8dfc6c52c9ba33462e7c37b64e50975ef0eaaf242d684c0 \
     --hash=sha256:faac7506b6a709e96c0b0028bc5b3b62c3f5457b31e13e7d82b7a5f1c1889d96
-    # via inkypi
+    # via -r install/requirements.in
 distro==1.9.0 \
     --hash=sha256:2fa77c6fd8940f116ee1d6b94a2f90b13b5ea8d019b98bc8bafdcabcdd9bdbed \
     --hash=sha256:7bffd925d65168f85027d8da9af6bddab658135b840670a223589bc0c8ef02b2
@@ -189,11 +196,11 @@ distro==1.9.0 \
 feedparser==6.0.12 \
     --hash=sha256:64f76ce90ae3e8ef5d1ede0f8d3b50ce26bcce71dd8ae5e82b1cd2d4a5f94228 \
     --hash=sha256:6bbff10f5a52662c00a2e3f86a38928c37c48f77b3c511aedcd51de933549324
-    # via inkypi
+    # via -r install/requirements.in
 flask==3.1.3 \
     --hash=sha256:0ef0e52b8a9cd932855379197dd8f94047b359ca0a78695144304cb45f87c9eb \
     --hash=sha256:f4bcbefc124291925f1a26446da31a5178f9483862233b23c0c96a20701f670c
-    # via inkypi
+    # via -r install/requirements.in
 google-auth==2.49.2 \
     --hash=sha256:c1ae38500e73065dcae57355adb6278cf8b5c8e391994ae9cbadbcb9631ab409 \
     --hash=sha256:c2720924dfc82dedb962c9f52cabb2ab16714fd0a6a707e40561d217574ed6d5
@@ -201,8 +208,8 @@ google-auth==2.49.2 \
 google-genai==1.72.0 \
     --hash=sha256:abe7d3aecfafb464b904e3a09c81b626fb425e160e123e71a5125a7021cea7b2 \
     --hash=sha256:ea861e4c6946e3185c24b40d95503e088fc230a73a71fec0ef78164b369a8489
-    # via inkypi
-gpiod==2.4.2 ; sys_platform == 'linux' \
+    # via -r install/requirements.in
+gpiod==2.4.2 \
     --hash=sha256:1ba4d8e2ebc83ac50d4546134f2222cf67d50534eda7433f03f496950991611f \
     --hash=sha256:452defdf75edf175a5f85d42a4186e3ad16b8d99aeac1843d1da939ec4643d0f \
     --hash=sha256:515c60a56be2eb74f4c277a1b4d5560aab9d1148d4815a7585e63269bd2fcbd0 \
@@ -217,7 +224,7 @@ gpiod==2.4.2 ; sys_platform == 'linux' \
     --hash=sha256:ec1526a258d251c93f0ad4589f47ff98b512f95f87ba283e33a107026c26ddcf \
     --hash=sha256:f37be705406efa4d2170c03be2191f2be81bb5463c981d53e505084bc135132f
     # via gpiodevice
-gpiodevice==0.0.5 ; sys_platform == 'linux' \
+gpiodevice==0.0.5 \
     --hash=sha256:b808250cd1d89379b69f98cc6442b6b098aa32604c3ed7fb194a39607ee35253 \
     --hash=sha256:cca01ff4319e0ba906ff46dcb8113d8d532b3f5ee03d683d8a11037c8e89140c
     # via inky
@@ -239,7 +246,7 @@ icalendar==6.3.2 \
     --hash=sha256:d400e9c9bb8c025e5a3c77c236941bb690494be52528a0b43cc7e8b7c9505064 \
     --hash=sha256:e0c10ecbfcebe958d33af7d491f6e6b7580d11d475f2eeb29532d0424f9110a1
     # via
-    #   inkypi
+    #   -r install/requirements.in
     #   recurring-ical-events
     #   x-wr-timezone
 idna==3.18 \
@@ -249,10 +256,10 @@ idna==3.18 \
     #   anyio
     #   httpx
     #   requests
-inky==2.3.0 ; sys_platform == 'linux' \
+inky==2.3.0 \
     --hash=sha256:08dfae735a3329889472ce0b18e17359f1f050a64566fa8c62974ce025c13173 \
     --hash=sha256:fe417eab9d9147dd5c9ec0f7e75358b3ce096ea0349a3de81562aafc0d8f2b0c
-    # via inkypi
+    # via -r install/requirements.in
 itsdangerous==2.2.0 \
     --hash=sha256:c6242fc49e35958c8b15141343aa660db5fc54d4f13a1db01a3f5891b98700ef \
     --hash=sha256:e0050c0b7da1eea53ffaf149c0cfbb5c6e2e2b69c4bef22c81fa6eb73e5f6173
@@ -322,7 +329,7 @@ jiter==0.14.0 \
 jsonschema==4.26.0 \
     --hash=sha256:0c26707e2efad8aa1bfc5b7ce170f3fccc2e4918ff85989ba9ffa9facb2be326 \
     --hash=sha256:d489f15263b8d200f8387e64b4c3a75f06629559fb73deb8fdfb525f2dab50ce
-    # via inkypi
+    # via -r install/requirements.in
 jsonschema-specifications==2025.9.1 \
     --hash=sha256:98802fee3a11ee76ecaca44429fda8a41bff98b00a0f2838151b113f210cc6fe \
     --hash=sha256:b540987f239e745613c7a9176f3edb72b832a4ac465cf02712288397832b5e8d
@@ -430,12 +437,12 @@ numpy==2.4.4 \
     --hash=sha256:fbc356aae7adf9e6336d336b9c8111d390a05df88f1805573ebb0807bd06fd1d \
     --hash=sha256:fcfe2045fd2e8f3cb0ce9d4ba6dba6333b8fa05bb8a4939c908cd43322d14c7e
     # via
+    #   -r install/requirements.in
     #   inky
-    #   inkypi
 openai==2.31.0 \
     --hash=sha256:43ca59a88fc973ad1848d86b98d7fac207e265ebbd1828b5e4bdfc85f79427a5 \
     --hash=sha256:44e1344d87e56a493d649b17e2fac519d1368cbb0745f59f1957c4c26de50a0a
-    # via inkypi
+    # via -r install/requirements.in
 pi-heif==1.2.0 \
     --hash=sha256:0495913cfd4ddf726fd3dc12cc0af065218f682bfb091feb1641223e7563065b \
     --hash=sha256:06947b98598026cf71df9ab841a17bd2cf0da704789e4fff73311d79539d6cc5 \
@@ -464,7 +471,7 @@ pi-heif==1.2.0 \
     --hash=sha256:e26fd46cc0c75c0e44a923c7e7d1407b2a1576f94c8bbf61b9e00516b6d1b1be \
     --hash=sha256:eb7f0fcdbc80ae75b0881ee1e63d1e8b873df72ff2bdd154d500d6d0644d22e2 \
     --hash=sha256:fd886282231d630af17f0371aeaaec3ec8351c35b5e32fe9ef01b2c60bc176ef
-    # via inkypi
+    # via -r install/requirements.in
 pillow==12.2.0 \
     --hash=sha256:00a2865911330191c0b818c59103b58a5e697cae67042366970a6b6f1b20b7f9 \
     --hash=sha256:01afa7cf67f74f09523699b4e88c73fb55c13346d212a59a2db1f86b0a63e8c5 \
@@ -522,13 +529,13 @@ pillow==12.2.0 \
     --hash=sha256:f490f9368b6fc026f021db16d7ec2fbf7d89e2edb42e8ec09d2c60505f5729c7 \
     --hash=sha256:fc3d34d4a8fbec3e88a79b92e5465e0f9b842b628675850d860b8bd300b159f5
     # via
+    #   -r install/requirements.in
     #   inky
-    #   inkypi
     #   pi-heif
 prometheus-client==0.25.0 \
     --hash=sha256:5e373b75c31afb3c86f1a52fa1ad470c9aace18082d39ec0d2f918d11cc9ba28 \
     --hash=sha256:d5aec89e349a6ec230805d0df882f3807f74fd6c1a2fa86864e3c2279059fed1
-    # via inkypi
+    # via -r install/requirements.in
 psutil==7.2.2 \
     --hash=sha256:0746f5f8d406af344fd547f1c8daa5f5c33dbc293bb8d6a16d80b4bb88f59372 \
     --hash=sha256:076a2d2f923fd4821644f5ba89f059523da90dc9014e85f8e45a5774ca5bc6f9 \
@@ -545,7 +552,7 @@ psutil==7.2.2 \
     --hash=sha256:eb7e81434c8d223ec4a219b5fc1c47d0417b12be7ea866e24fb5ad6e84b3d988 \
     --hash=sha256:ed0cace939114f62738d808fdcecd4c869222507e266e574799e9c0faa17d486 \
     --hash=sha256:fd04ef36b4a6d599bbdb225dd1d3f51e00105f6d48a28f006da7f9822f2606d8
-    # via inkypi
+    # via -r install/requirements.in
 pyasn1==0.6.3 \
     --hash=sha256:697a8ecd6d98891189184ca1fa05d1bb00e2f84b5977c481452050549c8a72cf \
     --hash=sha256:a80184d120f0864a52a073acc6fc642847d0be408e7c7252f31390c0f4eadcde
@@ -554,7 +561,7 @@ pyasn1-modules==0.4.2 \
     --hash=sha256:29253a9207ce32b64c3ac6600edc75368f98473906e8fd1043bd6b5b1de2c14a \
     --hash=sha256:677091de870a80aae844b1ca6134f54652fa2c8c5a52aa396440ac3106e941e6
     # via google-auth
-pycparser==3.0 ; implementation_name != 'PyPy' and platform_python_implementation != 'PyPy' \
+pycparser==3.0 \
     --hash=sha256:600f49d217304a5902ac3c37e1281c9fe94e4d0489de643a9504c5cdfdfc6b29 \
     --hash=sha256:b727414169a36b7d524c1c3e31839a521725078d7b2ff038656844266160a992
     # via cffi
@@ -634,11 +641,11 @@ python-dateutil==2.9.0.post0 \
 python-dotenv==1.2.2 \
     --hash=sha256:1d8214789a24de455a8b8bd8ae6fe3c6b69a5e3d64aa8a8e5d68e694bbcb285a \
     --hash=sha256:2c371a91fbd7ba082c2c1dc1f8bf89ca22564a087c2c287cd9b662adde799cf3
-    # via inkypi
+    # via -r install/requirements.in
 recurring-ical-events==3.8.1 \
     --hash=sha256:3bb3aaa0c87a4d3ab5951360480686bd69f1512945f478be6a2c0f141da0bf78 \
     --hash=sha256:c3eb2490a00559fb963d2bdee39acf2f287c91c07dcea4ce80ade1c60a8c3acf
-    # via inkypi
+    # via -r install/requirements.in
 referencing==0.37.0 \
     --hash=sha256:381329a9f99628c9069361716891d34ad94af76e461dcb0335825aecc7692231 \
     --hash=sha256:44aefc3142c5b842538163acb373e24cce6632bd54bdb01b21ad5863489f50d8
@@ -649,9 +656,9 @@ requests==2.33.1 \
     --hash=sha256:18817f8c57c6263968bc123d237e3b8b08ac046f5456bd1e307ee8f4250d3517 \
     --hash=sha256:4e6d1ef462f3626a1f0a0a9c42dd93c63bad33f9f1c1937509b8c5c8718ab56a
     # via
+    #   -r install/requirements.in
     #   google-auth
     #   google-genai
-    #   inkypi
 rpds-py==0.30.0 \
     --hash=sha256:07ae8a593e1c3c6b82ca3292efbe73c30b61332fd612e05abee07c79359f292f \
     --hash=sha256:0a59119fc6e3f460315fe9d08149f8102aa322299deaa5cab5b40092345c2136 \
@@ -735,7 +742,7 @@ six==1.17.0 \
     --hash=sha256:4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274 \
     --hash=sha256:ff70335d468e7eb6ec65b95b99d3a2836546063f63acc5171de367e834932a81
     # via python-dateutil
-smbus2==0.6.1 ; sys_platform == 'linux' \
+smbus2==0.6.1 \
     --hash=sha256:2b043372abf8f6029a632c3aab36b641c5d5872b1cbad599fc68e17ac4fd90a5 \
     --hash=sha256:650feeb27ca0ed58b07db4c10201c2a662c41305b7bf6e5fab9d888056f48180
     # via inky
@@ -745,7 +752,7 @@ sniffio==1.3.1 \
     # via
     #   google-genai
     #   openai
-spidev==3.8 ; sys_platform == 'linux' \
+spidev==3.8 \
     --hash=sha256:2bc02fb8c6312d519ebf1f4331067427c0921d3f77b8bcaf05189a2e8b8382c0
     # via inky
 tenacity==9.1.4 \
@@ -775,21 +782,20 @@ tzdata==2026.1 \
     --hash=sha256:4b1d2be7ac37ceafd7327b961aa3a54e467efbdb563a23655fbfe0d39cfc42a9 \
     --hash=sha256:67658a1903c75917309e753fdc349ac0efd8c27db7a0cb406a25be4840f87f98
     # via
-    #   astral
+    #   -r install/requirements.in
     #   icalendar
-    #   inkypi
     #   recurring-ical-events
     #   x-wr-timezone
 urllib3==2.7.0 \
     --hash=sha256:231e0ec3b63ceb14667c67be60f2f2c40a518cb38b03af60abc813da26505f4c \
     --hash=sha256:9fb4c81ebbb1ce9531cce37674bbc6f1360472bc18ca9a553ede278ef7276897
     # via
-    #   inkypi
+    #   -r install/requirements.in
     #   requests
 waitress==3.0.2 \
     --hash=sha256:682aaaf2af0c44ada4abfb70ded36393f0e307f4ab9456a215ce0020baefc31f \
     --hash=sha256:c56d67fd6e87c2ee598b76abdd4e96cfad1f24cacdea5078d382b1f9d7b5ed2e
-    # via inkypi
+    # via -r install/requirements.in
 websockets==16.0 \
     --hash=sha256:0298d07ee155e2e9fda5be8a9042200dd2e3bb0b8a38482156576f863a9d457c \
     --hash=sha256:08d7af67b64d29823fed316505a89b86705f2b7981c07848fb5e3ea3020c1abe \
@@ -830,8 +836,8 @@ werkzeug==3.1.8 \
     --hash=sha256:63a77fb8892bf28ebc3178683445222aa500e48ebad5ec77b0ad80f8726b1f50 \
     --hash=sha256:9bad61a4268dac112f1c5cd4630a56ede601b6ed420300677a869083d70a4c44
     # via
+    #   -r install/requirements.in
     #   flask
-    #   inkypi
 x-wr-timezone==2.0.1 \
     --hash=sha256:9166c40e6ffd4c0edebabc354e1a1e2cffc1bb473f88007694793757685cc8c3 \
     --hash=sha256:e74a53b9f4f7def8138455c240e65e47c224778bce3c024fcd6da2cbe91ca038
