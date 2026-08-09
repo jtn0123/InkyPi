@@ -46,9 +46,9 @@ python-dotenv>=1.0,<2
 requests>=2.32,<3
 urllib3>=2.0,<3
 werkzeug>=3.1,<4
-pillow>=11.0,<13
+pillow>=12.3.0,<13
 # pi-heif has wheels for all major platforms — no platform guard needed.
-pi-heif==1.2.0
+pi-heif==1.3.0
 tzdata>=2024.1
 openai>=2.0,<3
 google-genai>=1.14,<2
@@ -70,7 +70,7 @@ cyclonedx-bom>=6.0,<7
 pre-commit>=4.0,<5
 python-semantic-release>=9.0,<10
 # Patched floor for transitive python-semantic-release dependency.
-GitPython>=3.1.47,<4
+GitPython>=3.1.58,<4
 pip-licenses>=5.0,<6
 
 # Mutation testing (optional — slow; run with: mutmut run)
