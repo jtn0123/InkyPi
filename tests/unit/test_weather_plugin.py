@@ -550,3 +550,53 @@ class TestWeatherIconPaths:
         )
         assert os.path.exists(rows[0]["icon"]), rows[0]["icon"]
         assert os.path.exists(rows[0]["moon_phase_icon"]), rows[0]["moon_phase_icon"]
+
+
+class TestOpenMeteoDataPointsUseTheNormalisedCurrentBlock:
+    """Wind read 0 after the request moved to the modern `current=` block.
+
+    `parse_open_meteo_data_points` still read `current_weather` directly, which
+    no longer exists in responses, so the dashboard's Wind data point silently
+    reported zero. Caught by CodeRabbit on PR #632.
+    """
+
+    def _wind(self, payload: dict[str, Any]) -> dict[str, Any]:
+        from plugins.weather.weather_data import parse_open_meteo_data_points
+
+        points = parse_open_meteo_data_points(
+            payload, {}, UTC, "metric", "24h", "/plugins/weather"
+        )
+        return next(p for p in points if p["label"] == "Wind")
+
+    def test_modern_current_block_supplies_wind(self) -> None:
+        wind = self._wind(
+            {
+                "current": {
+                    "temperature_2m": 20,
+                    "wind_speed_10m": 5.4,
+                    "wind_direction_10m": 180,
+                },
+                "daily": {},
+                "hourly": {},
+            }
+        )
+        assert wind["measurement"] == 5.4
+        assert wind["arrow"], "a direction should resolve to an arrow glyph"
+
+    def test_legacy_current_weather_block_still_works(self) -> None:
+        """Cached responses predating the request change must not regress."""
+        wind = self._wind(
+            {
+                "current_weather": {
+                    "temperature": 20,
+                    "windspeed": 5.4,
+                    "winddirection": 180,
+                },
+                "daily": {},
+                "hourly": {},
+            }
+        )
+        assert wind["measurement"] == 5.4
+
+    def test_absent_current_data_degrades_to_zero_rather_than_raising(self) -> None:
+        assert self._wind({"daily": {}, "hourly": {}})["measurement"] == 0

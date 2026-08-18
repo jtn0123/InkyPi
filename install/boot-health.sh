@@ -12,7 +12,9 @@
 # (firmware/arduino/src/system/boot_health.h), which solved the same problem for
 # an OTA image that boots but never reaches the network:
 #
-#   * a counter tracks consecutive failed starts;
+#   * a counter tracks consecutive start-limit events (see
+#     BOOT_HEALTH_MAX_UNHEALTHY — systemd reports these, not individual
+#     failed starts);
 #   * a separate record remembers the last version that was ever CONFIRMED
 #     healthy (serving, and reporting the version we installed);
 #   * at decision time we roll back only when the running version has never
@@ -43,9 +45,21 @@ CONFIRMED_VERSION_FILE="$STATE_DIR/confirmed_version"
 PREV_VERSION_FILE="$STATE_DIR/prev_version"
 ROLLBACK_MARKER="$STATE_DIR/.auto-rollback-attempted"
 
-# Consecutive failed starts of a never-confirmed version before we roll back.
-# Matches BOOT_HEALTH_MAX_UNHEALTHY in the firmware.
-BOOT_HEALTH_MAX_UNHEALTHY="${INKYPI_BOOT_HEALTH_MAX_UNHEALTHY:-3}"
+# Consecutive START-LIMIT EVENTS of a never-confirmed version before we roll
+# back.
+#
+# The unit counts differently from the firmware this scheme came from. systemd
+# calls OnFailure= once, when inkypi.service exhausts StartLimitBurst (5) and
+# enters the failed state — not once per failed start. So one increment here
+# already represents five failed attempts, and systemd then stops retrying
+# until the unit is reset or the device reboots. A threshold of 3 would have
+# required three separate start-limit episodes (≈15 failed starts across
+# multiple boots) before rolling back, which is far later than "three unhealthy
+# boots" implies.
+#
+# 2 keeps one episode's worth of benefit-of-the-doubt for a transient (a bad SD
+# read, a slow mount) while still recovering on the next boot.
+BOOT_HEALTH_MAX_UNHEALTHY="${INKYPI_BOOT_HEALTH_MAX_UNHEALTHY:-2}"
 if ! [[ "$BOOT_HEALTH_MAX_UNHEALTHY" =~ ^[1-9][0-9]*$ ]]; then
   BOOT_HEALTH_MAX_UNHEALTHY=3
 fi
@@ -57,7 +71,7 @@ fi
 # boot_health.h free of Arduino headers, so the rule can be tested directly
 # instead of through a simulated failing install.
 #
-#   $1 — consecutive failed starts, INCLUDING the failure being decided
+#   $1 — consecutive start-limit events, INCLUDING the one being decided
 #   $2 — "yes" when the running version has previously been confirmed healthy
 #
 # Returns 0 (true) when the caller should roll back.
@@ -119,7 +133,7 @@ boot_health_record_failure() {
     running_confirmed="yes"
   fi
 
-  echo "boot-health: failed start #$failed_starts of version '${current:-unknown}'" \
+  echo "boot-health: start-limit event #$failed_starts for version '${current:-unknown}'" \
     "(last confirmed healthy: '${confirmed:-none}')"
 
   if ! boot_health_should_rollback "$failed_starts" "$running_confirmed"; then
@@ -151,7 +165,7 @@ boot_health_record_failure() {
 
   touch "$ROLLBACK_MARKER" 2>/dev/null || true
   echo "boot-health: rolling back to $(_read_file "$PREV_VERSION_FILE")" \
-    "after $failed_starts failed starts of an unconfirmed version."
+    "after $failed_starts start-limit events of an unconfirmed version."
   bash "$rollback_script"
 }
 

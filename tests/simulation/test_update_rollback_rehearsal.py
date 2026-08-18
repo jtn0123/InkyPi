@@ -139,7 +139,7 @@ def _verify(rehearsal: Any) -> Any:
     )
 
 
-def _record_failure(rehearsal: Any, threshold: Any = 3) -> Any:
+def _record_failure(rehearsal: Any, threshold: Any = 2) -> Any:
     return run_bash(
         f"INKYPI_BOOT_HEALTH_MAX_UNHEALTHY={threshold} "
         f'bash {rehearsal["install"] / "boot-health.sh"}',
@@ -211,16 +211,15 @@ class TestDarkUpdateRollsBack:
         assert _outcome(rehearsal)["verdict"] == "dark"
         assert not (rehearsal["state"] / "confirmed_version").exists()
 
-        # systemd now retries and gives up; OnFailure fires boot-health each time.
+        # systemd retries, exhausts StartLimitBurst, and calls OnFailure once
+        # per start-limit episode — not once per failed start.
         _record_failure(rehearsal)
-        assert not log.exists(), "must not roll back on the first failure"
-        _record_failure(rehearsal)
-        assert not log.exists(), "must not roll back on the second failure"
+        assert not log.exists(), "must not roll back on the first start-limit event"
         _record_failure(rehearsal)
 
         assert (
             log.exists()
-        ), "third failed start of an unconfirmed version must roll back"
+        ), "a second start-limit event on an unconfirmed version must roll back"
         assert "ROLLBACK_TO=1.0.0" in log.read_text()
 
     def test_rollback_happens_once_even_if_failures_continue(

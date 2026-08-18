@@ -265,8 +265,8 @@ class TestSystemdActuallyDrivesTheChain:
         """The end-to-end outcome: an unconfirmed version rolls itself back."""
         _install_inkypi(container, version="2.0.0", confirmed="1.0.0")
 
-        # Threshold is 3; each start-limit cycle fires the failure unit once.
-        for _ in range(3):
+        # Threshold is 2 start-limit events; each cycle fires the unit once.
+        for _ in range(2):
             container.exec("systemctl reset-failed inkypi.service || true")
             _drive_to_start_limit(container)
 

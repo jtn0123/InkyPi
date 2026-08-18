@@ -23,7 +23,7 @@ FAILURE_UNIT = REPO_ROOT / "install" / "inkypi-failure.service"
 pytestmark = pytest.mark.skipif(shutil.which("bash") is None, reason="requires bash")
 
 
-def _decide(failed_starts: Any, running_confirmed: Any, threshold: Any = 3) -> Any:
+def _decide(failed_starts: Any, running_confirmed: Any, threshold: Any = 2) -> Any:
     """Invoke the pure decision function; returns True when it says roll back."""
     script = f"""
     set -uo pipefail
@@ -45,11 +45,31 @@ def _decide(failed_starts: Any, running_confirmed: Any, threshold: Any = 3) -> A
 class TestDecisionRule:
     def test_holds_below_the_threshold(self) -> None:
         assert _decide(1, "no") is False
-        assert _decide(2, "no") is False
 
     def test_rolls_back_at_the_threshold(self) -> None:
-        assert _decide(3, "no") is True
+        assert _decide(2, "no") is True
         assert _decide(9, "no") is True
+
+    def test_default_threshold_is_two_start_limit_events(self) -> None:
+        """Each event is already StartLimitBurst failed starts, not one.
+
+        systemd calls OnFailure= once when the unit exhausts its start limit,
+        so a threshold of 3 would have needed three separate episodes across
+        multiple boots before recovering.
+        """
+        import subprocess
+
+        out = subprocess.run(
+            [
+                "bash",
+                "-c",
+                f"source {BOOT_HEALTH_SH!s}; " "echo $BOOT_HEALTH_MAX_UNHEALTHY",
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        ).stdout.strip()
+        assert out == "2"
 
     def test_a_confirmed_version_never_rolls_back(self) -> None:
         """If a version worked before, the environment is the suspect.
@@ -57,7 +77,7 @@ class TestDecisionRule:
         Swapping versions would regress the install without fixing the actual
         cause — a full disk, a yanked SD card, a broken OS dependency.
         """
-        assert _decide(3, "yes") is False
+        assert _decide(2, "yes") is False
         assert _decide(99, "yes") is False
 
     def test_threshold_is_configurable(self) -> None:

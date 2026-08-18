@@ -710,7 +710,10 @@ def parse_open_meteo_data_points(
     """Parses current data points from Open-Meteo API response."""
     data_points = []
     daily_data = weather_data.get("daily", {})
-    current_data = weather_data.get("current_weather", {})
+    # Go through the normaliser: the request now asks for the modern `current=`
+    # block, so reading `current_weather` directly returned an empty dict and
+    # silently reported wind speed and direction as 0.
+    current_data = _open_meteo_current(weather_data)
     hourly_data = weather_data.get("hourly", {})
 
     current_time = datetime.now(tz)
