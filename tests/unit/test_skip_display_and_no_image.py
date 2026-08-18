@@ -14,6 +14,7 @@ working plugin.
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from typing import Any
 
 import pytest
 
@@ -22,11 +23,11 @@ from refresh_task.actions import ManualRefresh, PlaylistRefresh
 
 
 class TestBasePluginDefaults:
-    def test_default_never_skips(self):
+    def test_default_never_skips(self) -> None:
         plugin = BasePlugin({"id": "demo"})
         assert plugin.skip_display_condition({}, object(), datetime.now(UTC)) is None
 
-    def test_existing_plugins_inherit_the_default_unchanged(self):
+    def test_existing_plugins_inherit_the_default_unchanged(self) -> None:
         """Shipping plugins must be unaffected by the new hook."""
         from plugins.clock.clock import Clock
         from plugins.weather.weather import Weather
@@ -39,15 +40,15 @@ class TestBasePluginDefaults:
 
 
 class _FakeInstance:
-    def __init__(self, settings=None):
+    def __init__(self, settings: Any = None) -> None:
         self.plugin_id = "demo"
         self.name = "demo-instance"
         self.settings = settings if settings is not None else {}
         self.paused = False
         self.consecutive_failure_count = 0
-        self.disabled_reason = None
+        self.disabled_reason: str | None = None
 
-    def get_image_path(self):
+    def get_image_path(self) -> Any:
         return "demo.png"
 
 
@@ -56,7 +57,7 @@ class _FakePlaylist:
 
 
 @pytest.fixture
-def task(monkeypatch):
+def task(monkeypatch: pytest.MonkeyPatch) -> Any:
     """A RefreshTask with just enough wiring to exercise the skip decision."""
     from unittest.mock import MagicMock
 
@@ -68,11 +69,20 @@ def task(monkeypatch):
     return RefreshTask(device_config, MagicMock())
 
 
-def _skip_reason(task, monkeypatch, *, reason, action=None, settings=None):
+def _skip_reason(
+    task: Any,
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    reason: Any,
+    action: Any = None,
+    settings: Any = None,
+) -> Any:
     """Drive _skip_display_reason with a plugin whose hook returns *reason*."""
 
     class FakePlugin:
-        def skip_display_condition(self, _settings, _device_config, _now):
+        def skip_display_condition(
+            self, _settings: Any, _device_config: Any, _now: Any
+        ) -> Any:
             if isinstance(reason, Exception):
                 raise reason
             return reason
@@ -86,46 +96,64 @@ def _skip_reason(task, monkeypatch, *, reason, action=None, settings=None):
 
 
 class TestSkipDecision:
-    def test_none_renders_normally(self, task, monkeypatch):
+    def test_none_renders_normally(
+        self, task: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         assert _skip_reason(task, monkeypatch, reason=None) is None
 
-    def test_reason_string_skips(self, task, monkeypatch):
+    def test_reason_string_skips(
+        self, task: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         assert (
             _skip_reason(task, monkeypatch, reason="No games to display")
             == "No games to display"
         )
 
-    def test_reason_is_stripped(self, task, monkeypatch):
+    def test_reason_is_stripped(
+        self, task: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         assert _skip_reason(task, monkeypatch, reason="  offseason  ") == "offseason"
 
-    def test_blank_reason_is_treated_as_no_skip(self, task, monkeypatch):
+    def test_blank_reason_is_treated_as_no_skip(
+        self, task: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """An empty string is almost certainly a bug, not a deliberate skip."""
         assert _skip_reason(task, monkeypatch, reason="   ") is None
         assert _skip_reason(task, monkeypatch, reason="") is None
 
-    def test_non_string_reason_is_ignored(self, task, monkeypatch):
+    def test_non_string_reason_is_ignored(
+        self, task: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         assert _skip_reason(task, monkeypatch, reason=True) is None
         assert _skip_reason(task, monkeypatch, reason=42) is None
 
-    def test_raising_hook_renders_normally(self, task, monkeypatch):
+    def test_raising_hook_renders_normally(
+        self, task: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """A broken optional hook must not stop a plugin from ever displaying."""
         assert (
             _skip_reason(task, monkeypatch, reason=RuntimeError("hook exploded"))
             is None
         )
 
-    def test_manual_refresh_is_never_skipped(self, task, monkeypatch):
+    def test_manual_refresh_is_never_skipped(
+        self, task: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """'Update Now' is an explicit user request; declining looks broken."""
         action = ManualRefresh({"id": "demo"}, {})
         assert (
             _skip_reason(task, monkeypatch, reason="offseason", action=action) is None
         )
 
-    def test_hook_receives_the_instance_settings(self, task, monkeypatch):
+    def test_hook_receives_the_instance_settings(
+        self, task: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         seen = {}
 
         class FakePlugin:
-            def skip_display_condition(self, settings, _device_config, _now):
+            def skip_display_condition(
+                self, settings: Any, _device_config: Any, _now: Any
+            ) -> None:
                 seen.update(settings)
 
         monkeypatch.setattr(
@@ -137,14 +165,14 @@ class TestSkipDecision:
 
 
 class TestGenerateImageReturningNone:
-    def test_base_plugin_signature_allows_none(self):
+    def test_base_plugin_signature_allows_none(self) -> None:
         """The declared return type is what tells plugin authors this is legal."""
         import inspect
 
         annotation = inspect.signature(BasePlugin.generate_image).return_annotation
         assert "None" in str(annotation)
 
-    def test_none_is_documented_as_a_side_effect_plugin(self):
+    def test_none_is_documented_as_a_side_effect_plugin(self) -> None:
         doc = BasePlugin.generate_image.__doc__ or ""
         assert "None" in doc
 
@@ -156,7 +184,9 @@ class TestSkipAndNoImageAreDistinct:
     because there is nothing to say. Collapsing them would lose the reason.
     """
 
-    def test_skip_reports_a_reason_and_no_image_does_not(self, task, monkeypatch):
+    def test_skip_reports_a_reason_and_no_image_does_not(
+        self, task: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         reason = _skip_reason(task, monkeypatch, reason="No games to display")
         assert reason == "No games to display"
 

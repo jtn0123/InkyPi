@@ -11,6 +11,8 @@ an old setting.
 
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 from PIL import Image
 
@@ -28,53 +30,53 @@ SQUARE = (500, 500)
 
 
 class TestLegacyMigration:
-    def test_pad_image_true_becomes_contain(self):
+    def test_pad_image_true_becomes_contain(self) -> None:
         assert resolve_fit_mode({"padImage": "true"}) == FIT_CONTAIN
 
-    def test_pad_image_false_becomes_cover(self):
+    def test_pad_image_false_becomes_cover(self) -> None:
         assert resolve_fit_mode({"padImage": "false"}) == FIT_COVER
 
-    def test_neither_setting_defaults_to_cover(self):
+    def test_neither_setting_defaults_to_cover(self) -> None:
         """What an instance with no fit setting has always done."""
         assert resolve_fit_mode({}) == FIT_COVER
 
-    def test_explicit_fit_mode_wins_over_the_legacy_flag(self):
+    def test_explicit_fit_mode_wins_over_the_legacy_flag(self) -> None:
         settings = {"fitMode": "contain", "padImage": "false"}
         assert resolve_fit_mode(settings) == FIT_CONTAIN
 
-    def test_migration_never_produces_auto(self):
+    def test_migration_never_produces_auto(self) -> None:
         """Auto changes what users see, so it must be an explicit choice."""
         for legacy in ("true", "false", True, False, "TRUE", "garbage"):
             assert resolve_fit_mode({"padImage": legacy}) != FIT_AUTO
 
     @pytest.mark.parametrize("raw", ["cover", "contain", "auto", "  COVER  "])
-    def test_valid_fit_modes_are_accepted_case_insensitively(self, raw):
+    def test_valid_fit_modes_are_accepted_case_insensitively(self, raw: Any) -> None:
         assert resolve_fit_mode({"fitMode": raw}) in {FIT_COVER, FIT_CONTAIN, FIT_AUTO}
 
-    def test_unknown_fit_mode_falls_back_to_cover(self):
+    def test_unknown_fit_mode_falls_back_to_cover(self) -> None:
         """The value comes from stored JSON an older version may have written."""
         assert resolve_fit_mode({"fitMode": "stretch"}) == FIT_COVER
         assert resolve_fit_mode({"fitMode": 42}) == FIT_COVER
 
-    def test_empty_fit_mode_falls_through_to_the_legacy_flag(self):
+    def test_empty_fit_mode_falls_through_to_the_legacy_flag(self) -> None:
         assert resolve_fit_mode({"fitMode": "", "padImage": "true"}) == FIT_CONTAIN
 
 
 class TestAutoResolution:
-    def test_landscape_image_on_landscape_display_covers(self):
+    def test_landscape_image_on_landscape_display_covers(self) -> None:
         assert effective_fit_mode(FIT_AUTO, (1600, 900), LANDSCAPE) == FIT_COVER
 
-    def test_portrait_image_on_landscape_display_contains(self):
+    def test_portrait_image_on_landscape_display_contains(self) -> None:
         """A portrait photo keeps its head and feet instead of a letterbox crop."""
         assert effective_fit_mode(FIT_AUTO, (900, 1600), LANDSCAPE) == FIT_CONTAIN
 
-    def test_portrait_image_on_portrait_display_covers(self):
+    def test_portrait_image_on_portrait_display_covers(self) -> None:
         assert effective_fit_mode(FIT_AUTO, (900, 1600), PORTRAIT) == FIT_COVER
 
-    def test_landscape_image_on_portrait_display_contains(self):
+    def test_landscape_image_on_portrait_display_contains(self) -> None:
         assert effective_fit_mode(FIT_AUTO, (1600, 900), PORTRAIT) == FIT_CONTAIN
 
-    def test_square_image_counts_as_landscape(self):
+    def test_square_image_counts_as_landscape(self) -> None:
         """A square is treated as landscape, so it fills a landscape panel.
 
         Cropping a square to a landscape panel loses only top and bottom, which
@@ -84,7 +86,7 @@ class TestAutoResolution:
         assert effective_fit_mode(FIT_AUTO, SQUARE, PORTRAIT) == FIT_CONTAIN
 
     @pytest.mark.parametrize("mode", [FIT_COVER, FIT_CONTAIN])
-    def test_explicit_modes_pass_through_untouched(self, mode):
+    def test_explicit_modes_pass_through_untouched(self, mode: Any) -> None:
         assert effective_fit_mode(mode, (900, 1600), LANDSCAPE) == mode
         assert effective_fit_mode(mode, (1600, 900), PORTRAIT) == mode
 
@@ -98,7 +100,7 @@ class TestPluginsShareTheResolver:
             "plugins.image_upload.image_upload",
         ],
     )
-    def test_plugin_uses_the_central_resolver(self, module_path):
+    def test_plugin_uses_the_central_resolver(self, module_path: Any) -> None:
         import importlib
 
         module = importlib.import_module(module_path)
@@ -113,7 +115,7 @@ class TestPluginsShareTheResolver:
             "plugins.image_upload.image_upload",
         ],
     )
-    def test_plugin_offers_the_fit_mode_setting(self, module_path):
+    def test_plugin_offers_the_fit_mode_setting(self, module_path: Any) -> None:
         import importlib
         import json
 
@@ -135,16 +137,16 @@ class TestPluginsShareTheResolver:
 class TestUploadRenderRespectsFitMode:
     """End-to-end on the one plugin that pads without a loader round-trip."""
 
-    def _render(self, settings, image_size):
+    def _render(self, settings: Any, image_size: Any) -> Any:
         from plugins.image_upload.image_upload import ImageUpload
 
         source = Image.new("RGB", image_size, "red")
 
         class FakeDeviceConfig:
-            def get_resolution(self):
+            def get_resolution(self) -> Any:
                 return LANDSCAPE
 
-            def get_config(self, key, default=None):
+            def get_config(self, key: Any, default: Any = None) -> Any:
                 return default
 
         plugin = ImageUpload({"id": "image_upload"})
@@ -153,19 +155,19 @@ class TestUploadRenderRespectsFitMode:
             {"imageFiles[]": ["a.png"], **settings}, FakeDeviceConfig()
         )
 
-    def test_legacy_pad_true_still_pads(self):
+    def test_legacy_pad_true_still_pads(self) -> None:
         result = self._render({"padImage": "true"}, (400, 400))
         assert result.size == LANDSCAPE
 
-    def test_legacy_pad_false_still_returns_the_source(self):
+    def test_legacy_pad_false_still_returns_the_source(self) -> None:
         """Cover previously left the loader to resize; behaviour is unchanged."""
         result = self._render({"padImage": "false"}, (400, 400))
         assert result.size == (400, 400)
 
-    def test_auto_pads_a_portrait_image_on_a_landscape_display(self):
+    def test_auto_pads_a_portrait_image_on_a_landscape_display(self) -> None:
         result = self._render({"fitMode": "auto"}, (300, 900))
         assert result.size == LANDSCAPE
 
-    def test_auto_leaves_a_landscape_image_to_the_cover_path(self):
+    def test_auto_leaves_a_landscape_image_to_the_cover_path(self) -> None:
         result = self._render({"fitMode": "auto"}, (1600, 900))
         assert result.size == (1600, 900)

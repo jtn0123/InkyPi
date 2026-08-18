@@ -1,4 +1,5 @@
 from datetime import UTC, datetime
+from typing import Any
 from zoneinfo import ZoneInfoNotFoundError
 
 import pytest
@@ -353,21 +354,21 @@ class TestOpenMeteoUnitsAndIcons:
     and "feels like" silently mirrored the plain temperature.
     """
 
-    def test_standard_units_request_celsius_not_kelvin(self):
+    def test_standard_units_request_celsius_not_kelvin(self) -> None:
         from plugins.weather.weather_api import OPEN_METEO_UNIT_PARAMS
 
         # Open-Meteo rejects temperature_unit=kelvin; we convert at parse time.
         assert "temperature_unit=celsius" in OPEN_METEO_UNIT_PARAMS["standard"]
         assert "kelvin" not in OPEN_METEO_UNIT_PARAMS["standard"]
 
-    def test_forecast_url_requests_apparent_temperature_and_hourly_codes(self):
+    def test_forecast_url_requests_apparent_temperature_and_hourly_codes(self) -> None:
         from plugins.weather.weather_api import OPEN_METEO_FORECAST_URL
 
         assert "apparent_temperature" in OPEN_METEO_FORECAST_URL
         assert "hourly=weather_code" in OPEN_METEO_FORECAST_URL
         assert "current_weather=true" not in OPEN_METEO_FORECAST_URL
 
-    def test_to_display_temperature_shifts_only_standard(self):
+    def test_to_display_temperature_shifts_only_standard(self) -> None:
         from plugins.weather.weather_data import to_display_temperature
 
         assert to_display_temperature(0, "standard") == pytest.approx(273.15)
@@ -376,7 +377,7 @@ class TestOpenMeteoUnitsAndIcons:
         # A malformed reading degrades to zero rather than raising mid-render.
         assert to_display_temperature("n/a", "metric") == 0.0
 
-    def test_current_block_normalises_modern_and_legacy_shapes(self):
+    def test_current_block_normalises_modern_and_legacy_shapes(self) -> None:
         from plugins.weather.weather_data import _open_meteo_current
 
         modern = _open_meteo_current(
@@ -401,7 +402,9 @@ class TestOpenMeteoUnitsAndIcons:
         assert legacy["temperature"] == 7
         assert _open_meteo_current({}) == {}
 
-    def test_feels_like_uses_apparent_temperature_when_present(self, weather_plugin):
+    def test_feels_like_uses_apparent_temperature_when_present(
+        self, weather_plugin: Any
+    ) -> None:
         w = weather_plugin
         data = w.parse_open_meteo_data(
             {
@@ -425,7 +428,7 @@ class TestOpenMeteoUnitsAndIcons:
 
     def test_standard_units_convert_current_and_forecast_to_kelvin(
         self, weather_plugin
-    ):
+    ) -> None:
         w = weather_plugin
         data = w.parse_open_meteo_data(
             {
@@ -456,7 +459,7 @@ class TestOpenMeteoUnitsAndIcons:
 
     def test_moon_phase_uses_the_rendered_day_not_tomorrow(
         self, monkeypatch, weather_plugin
-    ):
+    ) -> None:
         from astral import moon
 
         seen = []
@@ -474,7 +477,9 @@ class TestOpenMeteoUnitsAndIcons:
         )
         assert [d.isoformat() for d in seen] == ["2026-08-15"]
 
-    def test_hourly_rows_carry_icons_derived_from_weather_codes(self, weather_plugin):
+    def test_hourly_rows_carry_icons_derived_from_weather_codes(
+        self, weather_plugin: Any
+    ) -> None:
         # A future date keeps every row past the parser's "start at the current
         # hour" filter, so the assertion does not depend on the wall clock.
         # Open-Meteo returns naive local timestamps (timezone=auto); rows and
@@ -498,7 +503,7 @@ class TestOpenMeteoUnitsAndIcons:
         assert rows[0]["icon"].endswith("01d.png")
         assert rows[1]["icon"].endswith("01n.png")
 
-    def test_hourly_rows_omit_icon_when_codes_absent(self, weather_plugin):
+    def test_hourly_rows_omit_icon_when_codes_absent(self, weather_plugin: Any) -> None:
         rows = weather_plugin.parse_open_meteo_hourly(
             {
                 "time": [f"{FUTURE_DAY}T12:00"],
@@ -516,12 +521,12 @@ class TestOpenMeteoUnitsAndIcons:
 class TestWeatherIconPaths:
     """Every icon the plugin renders lives in <plugin_dir>/icons/."""
 
-    def test_icon_path_points_into_the_icons_directory(self):
+    def test_icon_path_points_into_the_icons_directory(self) -> None:
         from plugins.weather.weather_data import icon_path
 
         assert icon_path("/plugins/weather", "01d") == "/plugins/weather/icons/01d.png"
 
-    def test_forecast_and_moon_icons_resolve_on_disk(self):
+    def test_forecast_and_moon_icons_resolve_on_disk(self) -> None:
         import json
         import os
 

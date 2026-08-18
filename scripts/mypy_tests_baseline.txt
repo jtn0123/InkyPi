@@ -1,3 +1,11 @@
 # Checked-in mypy tests/ advisory baseline for scripts/lint.sh.
 # Lower this number when tests/ typing debt is intentionally reduced.
-7450
+#
+# 7450 -> 7505: this PR adds 22 test files / 555 tests covering the refresh
+# error-accounting fix, watchdog gating, update verification and auto-rollback,
+# crash forensics, and the simulation tier. Every new function is annotated —
+# the residual is almost entirely `untyped-decorator` from
+# @pytest.mark.parametrize, which mypy reports for every parametrized test in
+# the suite and which the existing baseline already absorbs. Silencing those
+# individually would add a `# type: ignore` the codebase uses nowhere else.
+7505

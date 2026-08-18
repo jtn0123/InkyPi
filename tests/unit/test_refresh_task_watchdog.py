@@ -16,6 +16,8 @@ import types
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SRC_DIR = REPO_ROOT / "src"
 
@@ -307,29 +309,33 @@ class TestWatchdogGatedOnRefreshProgress:
     watchdog could never fire for the one failure it exists to catch.
     """
 
-    def setup_method(self):
+    def setup_method(self) -> None:
         self.module, _ = _load_task_module(
             with_sd_notify=True, module_alias="task_stall_gate_test"
         )
 
-    def test_idle_loop_always_pings(self):
+    def test_idle_loop_always_pings(self) -> None:
         """Waiting between cycles is healthy, however long the interval is."""
         task = _make_refresh_task(self.module, with_sd_notify=True)
         task._work_started_at = None
         assert task._watchdog_should_notify() is True
 
-    def test_refresh_within_budget_still_pings(self):
+    def test_refresh_within_budget_still_pings(self) -> None:
         task = _make_refresh_task(self.module, with_sd_notify=True)
         task._work_started_at = time.monotonic() - 5
         assert task._watchdog_should_notify() is True
 
-    def test_refresh_over_budget_withholds_ping(self, monkeypatch):
+    def test_refresh_over_budget_withholds_ping(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         task = _make_refresh_task(self.module, with_sd_notify=True)
         monkeypatch.setenv("INKYPI_REFRESH_STALL_TIMEOUT_SECONDS", "10")
         task._work_started_at = time.monotonic() - 11
         assert task._watchdog_should_notify() is False
 
-    def test_stall_is_logged_once_not_every_tick(self, monkeypatch, caplog):
+    def test_stall_is_logged_once_not_every_tick(
+        self, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+    ) -> None:
         task = _make_refresh_task(self.module, with_sd_notify=True)
         monkeypatch.setenv("INKYPI_REFRESH_STALL_TIMEOUT_SECONDS", "1")
         task._work_started_at = time.monotonic() - 60
@@ -339,7 +345,9 @@ class TestWatchdogGatedOnRefreshProgress:
         stall_lines = [r for r in caplog.records if "withholding" in r.getMessage()]
         assert len(stall_lines) == 1
 
-    def test_heartbeat_loop_stops_pinging_while_wedged(self, monkeypatch):
+    def test_heartbeat_loop_stops_pinging_while_wedged(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """End-to-end: the loop keeps running but withholds the keepalive."""
         task = _make_refresh_task(self.module, with_sd_notify=True)
         monkeypatch.setenv("INKYPI_REFRESH_STALL_TIMEOUT_SECONDS", "0.05")
@@ -351,7 +359,7 @@ class TestWatchdogGatedOnRefreshProgress:
 
         pings = 0
 
-        def fake_notify_watchdog():
+        def fake_notify_watchdog() -> None:
             nonlocal pings
             pings += 1
 
@@ -376,7 +384,9 @@ class TestWatchdogGatedOnRefreshProgress:
 
         assert pings == wedged_pings, "watchdog kept being fed while refresh was wedged"
 
-    def test_stall_timeout_rejects_junk_and_non_positive_values(self, monkeypatch):
+    def test_stall_timeout_rejects_junk_and_non_positive_values(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """A bad override must not silently disable the guard."""
         default = self.module._DEFAULT_REFRESH_STALL_TIMEOUT
         for raw in ("", "abc", "0", "-5"):

@@ -16,8 +16,10 @@ from __future__ import annotations
 import json
 import shutil
 import threading
+from collections.abc import Iterator
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -49,7 +51,7 @@ class FakeDevice:
         outer = self
 
         class Handler(BaseHTTPRequestHandler):
-            def do_GET(self):  # noqa: N802 — BaseHTTPRequestHandler API
+            def do_GET(self) -> None:  # noqa: N802 — BaseHTTPRequestHandler API
                 if self.path == "/readyz":
                     self.send_response(200 if outer.ready else 503)
                     self.end_headers()
@@ -63,7 +65,7 @@ class FakeDevice:
                     self.send_response(404)
                     self.end_headers()
 
-            def log_message(self, *_args):
+            def log_message(self, *_args) -> None:
                 return
 
         self._server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
@@ -85,7 +87,7 @@ class FakeDevice:
 
 
 @pytest.fixture
-def rehearsal(tmp_path):
+def rehearsal(tmp_path: Path) -> Iterator[Any]:
     """A throwaway install tree: real scripts, real git repo, fake systemctl."""
     project = tmp_path / "inkypi"
     install = project / "install"
@@ -123,7 +125,7 @@ def rehearsal(tmp_path):
     device.close()
 
 
-def _verify(rehearsal):
+def _verify(rehearsal: Any) -> Any:
     """Run the real ``verify_app_serving`` from the real update.sh."""
     return run_bash(
         f"""
@@ -137,7 +139,7 @@ def _verify(rehearsal):
     )
 
 
-def _record_failure(rehearsal, threshold=3):
+def _record_failure(rehearsal: Any, threshold: Any = 3) -> Any:
     return run_bash(
         f"INKYPI_BOOT_HEALTH_MAX_UNHEALTHY={threshold} "
         f'bash {rehearsal["install"] / "boot-health.sh"}',
@@ -145,13 +147,15 @@ def _record_failure(rehearsal, threshold=3):
     )
 
 
-def _outcome(rehearsal):
+def _outcome(rehearsal: Any) -> Any:
     path = rehearsal["state"] / ".last-update-outcome"
     return json.loads(path.read_text()) if path.exists() else None
 
 
 class TestHealthyUpdate:
-    def test_confirmed_update_records_health_and_disarms_rollback(self, rehearsal):
+    def test_confirmed_update_records_health_and_disarms_rollback(
+        self, rehearsal: Any
+    ) -> None:
         """The happy path: serving the expected version marks it healthy."""
         rehearsal["device"].version = "2.0.0"
 
@@ -171,7 +175,9 @@ class TestHealthyUpdate:
 
 
 class TestUpdateThatComesBackWrong:
-    def test_stale_version_is_unconfirmed_and_leaves_rollback_armed(self, rehearsal):
+    def test_stale_version_is_unconfirmed_and_leaves_rollback_armed(
+        self, rehearsal: Any
+    ) -> None:
         """The unit is up but running yesterday's code — the checkout did not take."""
         rehearsal["device"].version = "1.0.0"  # expected 2.0.0
 
@@ -186,7 +192,9 @@ class TestUpdateThatComesBackWrong:
 
 
 class TestDarkUpdateRollsBack:
-    def test_dark_service_eventually_rolls_back_to_the_previous_tag(self, rehearsal):
+    def test_dark_service_eventually_rolls_back_to_the_previous_tag(
+        self, rehearsal: Any
+    ) -> None:
         """The scenario that used to need physical access to recover from."""
         # Stage a previous version to fall back to, and a rollback stand-in so
         # the rehearsal does not need a full git checkout to observe the intent.
@@ -215,7 +223,9 @@ class TestDarkUpdateRollsBack:
         ), "third failed start of an unconfirmed version must roll back"
         assert "ROLLBACK_TO=1.0.0" in log.read_text()
 
-    def test_rollback_happens_once_even_if_failures_continue(self, rehearsal):
+    def test_rollback_happens_once_even_if_failures_continue(
+        self, rehearsal: Any
+    ) -> None:
         """Flipping between two broken versions forever would never converge."""
         (rehearsal["state"] / "prev_version").write_text("1.0.0\n")
         log = rehearsal["state"] / "rollback.log"
@@ -232,7 +242,9 @@ class TestDarkUpdateRollsBack:
 
 
 class TestRecoveryAfterRollback:
-    def test_a_confirmed_run_after_rollback_clears_the_failure_streak(self, rehearsal):
+    def test_a_confirmed_run_after_rollback_clears_the_failure_streak(
+        self, rehearsal: Any
+    ) -> None:
         """Once the device is serving again the slate must be wiped clean.
 
         Otherwise a later unrelated failure would inherit an old streak and
@@ -254,7 +266,7 @@ class TestScriptsAgreeOnState:
 
     def test_confirmed_version_written_by_update_is_read_by_boot_health(
         self, rehearsal
-    ):
+    ) -> None:
         rehearsal["device"].version = "2.0.0"
         _verify(rehearsal)
 
@@ -270,7 +282,9 @@ class TestScriptsAgreeOnState:
         assert "CONFIRMED=2.0.0" in probe.stdout, probe.stdout + probe.stderr
         assert "CURRENT=2.0.0" in probe.stdout
 
-    def test_update_and_boot_health_use_the_same_state_directory(self, rehearsal):
+    def test_update_and_boot_health_use_the_same_state_directory(
+        self, rehearsal: Any
+    ) -> None:
         """Both must honour INKYPI_LOCKFILE_DIR or the device writes to /var."""
         rehearsal["device"].version = "2.0.0"
         _verify(rehearsal)
@@ -284,7 +298,7 @@ class TestScriptsAgreeOnState:
 class TestVerifyIsResilient:
     def test_missing_curl_skips_rather_than_failing_the_update(
         self, rehearsal, tmp_path
-    ):
+    ) -> None:
         """A stripped image without curl must not fail an otherwise-good update."""
         minimal_bin = tmp_path / "nocurl"
         minimal_bin.mkdir()
@@ -313,7 +327,9 @@ class TestVerifyIsResilient:
 
 
 class TestBrokenVersionFile:
-    def test_unreadable_version_still_confirms_on_readiness(self, rehearsal):
+    def test_unreadable_version_still_confirms_on_readiness(
+        self, rehearsal: Any
+    ) -> None:
         """With nothing to compare, answering /readyz is the strongest claim."""
         (rehearsal["project"] / "VERSION").write_text("\n")
         rehearsal["device"].version = "whatever"

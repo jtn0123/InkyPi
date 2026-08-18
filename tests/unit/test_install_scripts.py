@@ -2158,7 +2158,7 @@ class TestUpdateScript:
             "to start (JTN-684)"
         )
 
-    def test_journal_tail_helper_cannot_block_on_a_sudo_prompt(self):
+    def test_journal_tail_helper_cannot_block_on_a_sudo_prompt(self) -> None:
         """A diagnostic must never be able to wedge an update.
 
         `sudo journalctl` waits forever for a password when there is no cached

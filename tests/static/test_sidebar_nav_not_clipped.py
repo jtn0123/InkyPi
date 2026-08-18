@@ -36,7 +36,7 @@ def _block_for_selector(css: str, selector: str) -> str:
 
 
 class TestNavDoesNotShrinkBelowItsContent:
-    def test_sidebar_nav_does_not_shrink(self):
+    def test_sidebar_nav_does_not_shrink(self) -> None:
         body = _block_for_selector(SIDEBAR_CSS.read_text(), ".sidebar-nav")
         flex = re.search(r"flex:\s*([^;]+);", body)
         assert flex, ".sidebar-nav must declare a flex shorthand"
@@ -49,21 +49,21 @@ class TestNavDoesNotShrinkBelowItsContent:
             shorthand.split()[1] == "0"
         ), f"flex-shrink must be 0 so nav items are never clipped, got {shorthand!r}"
 
-    def test_sidebar_nav_no_longer_hides_overflow_from_the_user(self):
+    def test_sidebar_nav_no_longer_hides_overflow_from_the_user(self) -> None:
         """A scroll container with no scrollbar is indistinguishable from a bug."""
         body = _block_for_selector(SIDEBAR_CSS.read_text(), ".sidebar-nav")
         assert (
             "overflow-y: auto" not in body
         ), "the nav should not be its own scroll container; the sidebar scrolls"
 
-    def test_footer_yields_before_the_nav(self):
+    def test_footer_yields_before_the_nav(self) -> None:
         body = _block_for_selector(SIDEBAR_CSS.read_text(), ".sidebar-foot")
         assert "margin-top: auto" in body, (
             "the footer should be pushed to the bottom rather than competing "
             "with the nav for space"
         )
 
-    def test_sidebar_scrolls_rather_than_clipping(self):
+    def test_sidebar_scrolls_rather_than_clipping(self) -> None:
         body = _block_for_selector(SIDEBAR_CSS.read_text(), ".shell-sidebar")
         assert (
             "overflow: hidden" not in body
@@ -74,7 +74,7 @@ class TestNavDoesNotShrinkBelowItsContent:
 class TestBundleIsInSync:
     """main.css is generated; a partial-only fix would not reach the browser."""
 
-    def test_fix_is_present_in_the_built_bundle(self):
+    def test_fix_is_present_in_the_built_bundle(self) -> None:
         body = _block_for_selector(MAIN_CSS.read_text(), ".sidebar-nav")
         flex = re.search(r"flex:\s*([^;]+);", body)
         assert (
@@ -83,7 +83,7 @@ class TestBundleIsInSync:
 
 
 class TestEveryNavDestinationIsPresent:
-    def test_sidebar_lists_all_primary_destinations(self):
+    def test_sidebar_lists_all_primary_destinations(self) -> None:
         markup = SIDEBAR_TEMPLATE.read_text()
         sidebar = markup[markup.index('class="sidebar-nav"') :]
         for label in (

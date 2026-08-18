@@ -12,6 +12,7 @@ import subprocess
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -24,11 +25,11 @@ pytestmark = pytest.mark.skipif(
 )
 
 
-def _make_server(*, ready: bool, version: str | None):
+def _make_server(*, ready: bool, version: str | None) -> Any:
     """Serve just the two endpoints the verifier polls."""
 
     class Handler(BaseHTTPRequestHandler):
-        def do_GET(self):  # noqa: N802 — BaseHTTPRequestHandler API
+        def do_GET(self) -> None:  # noqa: N802 — BaseHTTPRequestHandler API
             if self.path == "/readyz":
                 if ready:
                     self.send_response(200)
@@ -48,7 +49,7 @@ def _make_server(*, ready: bool, version: str | None):
             self.send_response(404)
             self.end_headers()
 
-        def log_message(self, *_args):  # silence per-request stderr noise
+        def log_message(self, *_args) -> None:  # silence per-request stderr noise
             return
 
     server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
@@ -59,7 +60,7 @@ def _make_server(*, ready: bool, version: str | None):
 
 def _run_verify(
     tmp_path: Path, *, port: int, expected_version: str, timeout: str = "6"
-):
+) -> Any:
     """Source update.sh for its helpers, then call verify_app_serving."""
     state_dir = tmp_path / "state"
     state_dir.mkdir(exist_ok=True)
@@ -89,7 +90,7 @@ def _run_verify(
     return proc, outcome
 
 
-def test_confirmed_when_serving_the_expected_version(tmp_path):
+def test_confirmed_when_serving_the_expected_version(tmp_path: Path) -> None:
     server = _make_server(ready=True, version="9.9.9")
     try:
         proc, outcome = _run_verify(
@@ -105,7 +106,7 @@ def test_confirmed_when_serving_the_expected_version(tmp_path):
     assert outcome["expected_version"] == "9.9.9"
 
 
-def test_unconfirmed_when_a_stale_version_answers(tmp_path):
+def test_unconfirmed_when_a_stale_version_answers(tmp_path: Path) -> None:
     """The exact gap: the unit is up, but it is not the build we installed."""
     server = _make_server(ready=True, version="1.0.0")
     try:
@@ -122,7 +123,7 @@ def test_unconfirmed_when_a_stale_version_answers(tmp_path):
     assert outcome["expected_version"] == "9.9.9"
 
 
-def test_unconfirmed_when_never_becomes_ready(tmp_path):
+def test_unconfirmed_when_never_becomes_ready(tmp_path: Path) -> None:
     server = _make_server(ready=False, version="9.9.9")
     try:
         proc, outcome = _run_verify(
@@ -137,7 +138,7 @@ def test_unconfirmed_when_never_becomes_ready(tmp_path):
     assert outcome["verdict"] == "dark"
 
 
-def test_dark_when_nothing_is_listening(tmp_path):
+def test_dark_when_nothing_is_listening(tmp_path: Path) -> None:
     # Bind and immediately release a port so we know nothing is on it.
     server = _make_server(ready=True, version="9.9.9")
     port = server.server_address[1]
@@ -152,7 +153,7 @@ def test_dark_when_nothing_is_listening(tmp_path):
     assert outcome["observed_version"] == ""
 
 
-def test_ready_is_enough_when_no_version_is_available(tmp_path):
+def test_ready_is_enough_when_no_version_is_available(tmp_path: Path) -> None:
     """An empty VERSION leaves nothing to compare; readiness is the best claim."""
     server = _make_server(ready=True, version="")
     try:
@@ -167,7 +168,9 @@ def test_ready_is_enough_when_no_version_is_available(tmp_path):
     assert outcome["verdict"] == "confirmed"
 
 
-def test_update_script_runs_verification_after_starting_the_service(tmp_path):
+def test_update_script_runs_verification_after_starting_the_service(
+    tmp_path: Path,
+) -> None:
     """Ordering matters: verification is meaningless before the unit is active."""
     content = UPDATE_SH.read_text()
     assert content.index("update_app_service\n") < content.index("verify_app_serving\n")

@@ -9,6 +9,9 @@ breadcrumb records what was in flight, and the quarantine acts on it.
 
 from __future__ import annotations
 
+from pathlib import Path
+from typing import Any
+
 import pytest
 
 from refresh_task.health import PluginHealthTracker
@@ -16,7 +19,7 @@ from utils import crash_breadcrumb
 
 
 @pytest.fixture(autouse=True)
-def isolated_dirs(tmp_path, monkeypatch):
+def isolated_dirs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Any:
     """Point both the tmpfs-backed and persistent paths at a tmpdir."""
     runtime = tmp_path / "run"
     state = tmp_path / "state"
@@ -28,19 +31,19 @@ def isolated_dirs(tmp_path, monkeypatch):
 
 
 class TestBreadcrumbLifecycle:
-    def test_clean_run_leaves_nothing_behind(self):
+    def test_clean_run_leaves_nothing_behind(self) -> None:
         with crash_breadcrumb.trail("refresh", plugin_id="clock", instance="a"):
             pass
         assert crash_breadcrumb.examine_boot() is None
 
-    def test_handled_exception_still_clears_the_breadcrumb(self):
+    def test_handled_exception_still_clears_the_breadcrumb(self) -> None:
         """A raised exception was handled — that is the breaker's job, not ours."""
         with pytest.raises(RuntimeError):
             with crash_breadcrumb.trail("refresh", plugin_id="clock", instance="a"):
                 raise RuntimeError("plugin blew up but we caught it")
         assert crash_breadcrumb.examine_boot() is None
 
-    def test_hard_kill_leaves_the_breadcrumb_for_the_next_start(self):
+    def test_hard_kill_leaves_the_breadcrumb_for_the_next_start(self) -> None:
         # A hard kill runs no finally block, so simulate by dropping only.
         crash_breadcrumb.drop("refresh", plugin_id="ai_image", instance="daily")
 
@@ -52,13 +55,13 @@ class TestBreadcrumbLifecycle:
         assert found["instance"] == "daily"
         assert "started_at" in found
 
-    def test_examine_boot_is_idempotent(self):
+    def test_examine_boot_is_idempotent(self) -> None:
         """A second start must not re-attribute a death it already consumed."""
         crash_breadcrumb.drop("refresh", plugin_id="ai_image", instance="daily")
         assert crash_breadcrumb.examine_boot() is not None
         assert crash_breadcrumb.examine_boot() is None
 
-    def test_death_is_persisted_and_counted(self):
+    def test_death_is_persisted_and_counted(self) -> None:
         crash_breadcrumb.drop("refresh", plugin_id="ai_image", instance="daily")
         crash_breadcrumb.examine_boot()
 
@@ -72,21 +75,23 @@ class TestBreadcrumbLifecycle:
         assert crash_breadcrumb.death_count() == 2
         assert crash_breadcrumb.last_death()["plugin_id"] == "weather"
 
-    def test_clear_last_death_forgets_the_record(self):
+    def test_clear_last_death_forgets_the_record(self) -> None:
         crash_breadcrumb.drop("refresh", plugin_id="ai_image", instance="daily")
         crash_breadcrumb.examine_boot()
         crash_breadcrumb.clear_last_death()
         assert crash_breadcrumb.last_death() is None
         assert crash_breadcrumb.death_count() == 0
 
-    def test_corrupt_breadcrumb_is_survivable(self, isolated_dirs):
+    def test_corrupt_breadcrumb_is_survivable(self, isolated_dirs: Any) -> None:
         runtime, _ = isolated_dirs
         (runtime / "breadcrumb.json").write_text("{not json")
         # Must not raise, and must clear the bad file so it cannot loop.
         assert crash_breadcrumb.examine_boot() is None
         assert not (runtime / "breadcrumb.json").exists()
 
-    def test_unwritable_paths_never_raise(self, monkeypatch):
+    def test_unwritable_paths_never_raise(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Forensics must never be why a refresh fails."""
         monkeypatch.setenv("INKYPI_RUNTIME_DIR", "/proc/definitely/not/writable")
         crash_breadcrumb.drop("refresh", plugin_id="clock")
@@ -95,41 +100,41 @@ class TestBreadcrumbLifecycle:
 
 
 class _FakeInstance:
-    def __init__(self):
+    def __init__(self) -> None:
         self.paused = False
         self.consecutive_failure_count = 0
-        self.disabled_reason = None
+        self.disabled_reason: str | None = None
 
 
 class _FakePlaylistManager:
-    def __init__(self, instances):
+    def __init__(self, instances: Any) -> None:
         self._instances = instances
 
-    def find_plugin(self, plugin_id, instance_name):
+    def find_plugin(self, plugin_id: Any, instance_name: Any) -> Any:
         return self._instances.get((plugin_id, instance_name))
 
 
 class _FakeConfig:
-    def __init__(self, instances):
+    def __init__(self, instances: Any) -> None:
         self.playlist_manager = _FakePlaylistManager(instances)
         self.writes = 0
 
-    def get_playlist_manager(self):
+    def get_playlist_manager(self) -> Any:
         return self.playlist_manager
 
-    def get_config(self, key, default=None):
+    def get_config(self, key: Any, default: Any = None) -> Any:
         return default
 
-    def write_config(self):
+    def write_config(self) -> None:
         self.writes += 1
 
 
 class TestCrashQuarantine:
-    def _tracker(self, instances):
+    def _tracker(self, instances: Any) -> Any:
         config = _FakeConfig(instances)
         return PluginHealthTracker(device_config=config), config
 
-    def test_pauses_the_plugin_that_was_in_flight(self):
+    def test_pauses_the_plugin_that_was_in_flight(self) -> None:
         instance = _FakeInstance()
         tracker, config = self._tracker({("ai_image", "daily"): instance})
 
@@ -147,7 +152,7 @@ class TestCrashQuarantine:
         assert "died while this plugin was rendering" in instance.disabled_reason
         assert config.writes == 1, "the pause must be persisted"
 
-    def test_is_a_noop_without_an_instance_name(self):
+    def test_is_a_noop_without_an_instance_name(self) -> None:
         """Pausing every instance of a plugin would be too blunt a response."""
         instance = _FakeInstance()
         tracker, _ = self._tracker({("ai_image", "daily"): instance})
@@ -155,7 +160,7 @@ class TestCrashQuarantine:
         assert tracker.quarantine_after_crash({"plugin_id": "ai_image"}) is False
         assert instance.paused is False
 
-    def test_is_a_noop_for_an_unknown_instance(self):
+    def test_is_a_noop_for_an_unknown_instance(self) -> None:
         tracker, config = self._tracker({})
         assert (
             tracker.quarantine_after_crash(
@@ -165,7 +170,7 @@ class TestCrashQuarantine:
         )
         assert config.writes == 0
 
-    def test_does_not_re_pause_an_already_paused_instance(self):
+    def test_does_not_re_pause_an_already_paused_instance(self) -> None:
         instance = _FakeInstance()
         instance.paused = True
         instance.disabled_reason = "Paused by the user"
@@ -181,7 +186,7 @@ class TestCrashQuarantine:
         assert instance.disabled_reason == "Paused by the user"
         assert config.writes == 0
 
-    def test_quarantine_can_be_lifted_by_the_normal_reset_path(self):
+    def test_quarantine_can_be_lifted_by_the_normal_reset_path(self) -> None:
         """Re-enabling must work through the existing UI/API plumbing."""
         instance = _FakeInstance()
         tracker, _ = self._tracker({("ai_image", "daily"): instance})

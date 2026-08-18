@@ -34,6 +34,7 @@ import time
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
+from typing import Any
 
 
 class NotifySocket:
@@ -181,7 +182,7 @@ def install_fake_systemctl(
     }
 
 
-def wait_until(predicate, timeout: float = 2.0, interval: float = 0.02) -> bool:
+def wait_until(predicate: Any, timeout: float = 2.0, interval: float = 0.02) -> bool:
     """Poll *predicate* until it is true or *timeout* elapses.
 
     Returns whether it became true. Polling rather than sleeping a fixed span
@@ -192,10 +193,10 @@ def wait_until(predicate, timeout: float = 2.0, interval: float = 0.02) -> bool:
         if predicate():
             return True
         time.sleep(interval)
-    return predicate()
+    return bool(predicate())
 
 
-def run_bash(script: str, env: dict[str, str], timeout: int = 120):
+def run_bash(script: str, env: dict[str, str], timeout: int = 120) -> Any:
     """Run *script* under bash with *env* overlaid on the current environment."""
     merged = {**os.environ, **env}
     return subprocess.run(

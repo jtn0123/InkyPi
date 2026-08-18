@@ -12,6 +12,7 @@ rather than through a simulated failing install.
 import shutil
 import subprocess
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -22,7 +23,7 @@ FAILURE_UNIT = REPO_ROOT / "install" / "inkypi-failure.service"
 pytestmark = pytest.mark.skipif(shutil.which("bash") is None, reason="requires bash")
 
 
-def _decide(failed_starts, running_confirmed, threshold=3):
+def _decide(failed_starts: Any, running_confirmed: Any, threshold: Any = 3) -> Any:
     """Invoke the pure decision function; returns True when it says roll back."""
     script = f"""
     set -uo pipefail
@@ -42,15 +43,15 @@ def _decide(failed_starts, running_confirmed, threshold=3):
 
 
 class TestDecisionRule:
-    def test_holds_below_the_threshold(self):
+    def test_holds_below_the_threshold(self) -> None:
         assert _decide(1, "no") is False
         assert _decide(2, "no") is False
 
-    def test_rolls_back_at_the_threshold(self):
+    def test_rolls_back_at_the_threshold(self) -> None:
         assert _decide(3, "no") is True
         assert _decide(9, "no") is True
 
-    def test_a_confirmed_version_never_rolls_back(self):
+    def test_a_confirmed_version_never_rolls_back(self) -> None:
         """If a version worked before, the environment is the suspect.
 
         Swapping versions would regress the install without fixing the actual
@@ -59,11 +60,11 @@ class TestDecisionRule:
         assert _decide(3, "yes") is False
         assert _decide(99, "yes") is False
 
-    def test_threshold_is_configurable(self):
+    def test_threshold_is_configurable(self) -> None:
         assert _decide(2, "no", threshold=2) is True
         assert _decide(2, "no", threshold=5) is False
 
-    def test_garbage_counter_does_not_trigger_a_rollback(self):
+    def test_garbage_counter_does_not_trigger_a_rollback(self) -> None:
         assert _decide("", "no") is False
         assert _decide("abc", "no") is False
 
@@ -71,7 +72,14 @@ class TestDecisionRule:
 class TestFailureAccounting:
     """The stateful half: counting failures and firing rollback exactly once."""
 
-    def _stage(self, tmp_path, *, version, confirmed=None, prev_version="1.0.0"):
+    def _stage(
+        self,
+        tmp_path: Path,
+        *,
+        version: Any,
+        confirmed: Any = None,
+        prev_version: Any = "1.0.0",
+    ) -> Any:
         install_dir = tmp_path / "install"
         install_dir.mkdir(parents=True, exist_ok=True)
         shutil.copy(BOOT_HEALTH_SH, install_dir / "boot-health.sh")
@@ -90,7 +98,7 @@ class TestFailureAccounting:
         )
         return install_dir, state
 
-    def _record_failure(self, install_dir, state, threshold=3):
+    def _record_failure(self, install_dir: Any, state: Any, threshold: Any = 3) -> Any:
         script = f"""
         set -uo pipefail
         export INKYPI_LOCKFILE_DIR={state!s}
@@ -101,7 +109,9 @@ class TestFailureAccounting:
             ["bash", "-c", script], capture_output=True, text=True, timeout=60
         )
 
-    def test_counter_increments_and_rollback_fires_at_the_threshold(self, tmp_path):
+    def test_counter_increments_and_rollback_fires_at_the_threshold(
+        self, tmp_path: Path
+    ) -> None:
         install_dir, state = self._stage(tmp_path, version="2.0.0", confirmed="1.0.0")
 
         self._record_failure(install_dir, state)
@@ -116,14 +126,14 @@ class TestFailureAccounting:
         assert (state / "failed_starts").read_text().strip() == "3"
         assert "ROLLBACK_RAN" in (state / "rollback.log").read_text()
 
-    def test_confirmed_version_is_never_rolled_back(self, tmp_path):
+    def test_confirmed_version_is_never_rolled_back(self, tmp_path: Path) -> None:
         # Running version equals the last confirmed-healthy one.
         install_dir, state = self._stage(tmp_path, version="2.0.0", confirmed="2.0.0")
         for _ in range(5):
             self._record_failure(install_dir, state)
         assert not (state / "rollback.log").exists()
 
-    def test_rollback_is_attempted_only_once(self, tmp_path):
+    def test_rollback_is_attempted_only_once(self, tmp_path: Path) -> None:
         """Flipping between two broken versions forever would never converge."""
         install_dir, state = self._stage(tmp_path, version="2.0.0", confirmed="1.0.0")
         for _ in range(6):
@@ -131,7 +141,7 @@ class TestFailureAccounting:
         log = (state / "rollback.log").read_text()
         assert log.count("ROLLBACK_RAN") == 1, log
 
-    def test_no_previous_version_means_no_rollback(self, tmp_path):
+    def test_no_previous_version_means_no_rollback(self, tmp_path: Path) -> None:
         install_dir, state = self._stage(
             tmp_path, version="2.0.0", confirmed="1.0.0", prev_version=None
         )
@@ -139,7 +149,7 @@ class TestFailureAccounting:
             self._record_failure(install_dir, state)
         assert not (state / "rollback.log").exists()
 
-    def test_marking_confirmed_clears_the_streak(self, tmp_path):
+    def test_marking_confirmed_clears_the_streak(self, tmp_path: Path) -> None:
         install_dir, state = self._stage(tmp_path, version="2.0.0", confirmed="1.0.0")
         self._record_failure(install_dir, state)
         self._record_failure(install_dir, state)
@@ -164,7 +174,7 @@ class TestFailureAccounting:
         assert not (state / "rollback.log").exists()
 
 
-def test_failure_unit_invokes_boot_health_without_masking_the_sentinel():
+def test_failure_unit_invokes_boot_health_without_masking_the_sentinel() -> None:
     unit = FAILURE_UNIT.read_text()
     assert "boot-health.sh" in unit, "failure unit should invoke boot-health.sh"
     assert ".start-limit-hit" in unit, "the sentinel write must remain"
@@ -173,7 +183,7 @@ def test_failure_unit_invokes_boot_health_without_masking_the_sentinel():
     assert "ExecStart=-" in unit, "boot-health invocation must be failure-tolerant"
 
 
-def test_update_script_records_confirmation_for_boot_health():
+def test_update_script_records_confirmation_for_boot_health() -> None:
     update_sh = (REPO_ROOT / "install" / "update.sh").read_text()
     assert "_inkypi_mark_boot_health_confirmed" in update_sh
     # Only the confirmed branches may mark health; a dark or stale-version

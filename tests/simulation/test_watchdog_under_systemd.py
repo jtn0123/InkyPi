@@ -15,7 +15,9 @@ what lets ``WatchdogSec`` expire and restart the unit.
 from __future__ import annotations
 
 import threading
+from pathlib import Path
 from time import monotonic
+from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
@@ -42,7 +44,7 @@ PING = "WATCHDOG=1"
 
 
 @pytest.fixture
-def task(monkeypatch):
+def task(monkeypatch: pytest.MonkeyPatch) -> Any:
     device_config = MagicMock()
     device_config.get_config.return_value = 3600  # a long, healthy cycle
     device_config.history_image_dir = "/tmp/history"
@@ -52,7 +54,9 @@ def task(monkeypatch):
     return instance
 
 
-def _run_heartbeat(task: RefreshTask, monkeypatch=None) -> threading.Thread:
+def _run_heartbeat(
+    task: RefreshTask, monkeypatch: pytest.MonkeyPatch = None
+) -> threading.Thread:
     if monkeypatch is not None:
         # Keep the socket and the gating real; only the cadence is accelerated,
         # because the derived interval floors at 1 s (see the interval tests).
@@ -75,12 +79,12 @@ def _stop_heartbeat(task: RefreshTask, thread: threading.Thread) -> None:
 
 
 class TestIntervalComesFromTheEnvironment:
-    def test_device_watchdog_sec_yields_half_interval(self, tmp_path):
+    def test_device_watchdog_sec_yields_half_interval(self, tmp_path: Path) -> None:
         """WatchdogSec=120 on the device means a ping every 60 s."""
         with systemd_notify_environment(tmp_path, DEVICE_WATCHDOG_USEC):
             assert RefreshTask._watchdog_interval_seconds() == pytest.approx(60.0)
 
-    def test_interval_never_drops_below_one_second(self, tmp_path):
+    def test_interval_never_drops_below_one_second(self, tmp_path: Path) -> None:
         """A floor keeps a misconfigured tiny WatchdogSec from spinning the CPU.
 
         Worth pinning: it also means the cadence tests below cannot use the
@@ -89,13 +93,17 @@ class TestIntervalComesFromTheEnvironment:
         with systemd_notify_environment(tmp_path, 200_000):  # 0.2 s
             assert RefreshTask._watchdog_interval_seconds() == 1.0
 
-    def test_absent_watchdog_usec_falls_back(self, monkeypatch):
+    def test_absent_watchdog_usec_falls_back(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         monkeypatch.delenv("WATCHDOG_USEC", raising=False)
         assert RefreshTask._watchdog_interval_seconds() == 30.0
 
 
 class TestPingsReachTheSocket:
-    def test_idle_loop_pings_repeatedly(self, tmp_path, task, monkeypatch):
+    def test_idle_loop_pings_repeatedly(
+        self, tmp_path: Path, task: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """An idle loop is healthy, however long the configured cycle is.
 
         The device's default cycle is an hour; the heartbeat must not be
@@ -110,7 +118,9 @@ class TestPingsReachTheSocket:
             finally:
                 _stop_heartbeat(task, thread)
 
-    def test_pings_stop_once_a_refresh_wedges(self, tmp_path, task, monkeypatch):
+    def test_pings_stop_once_a_refresh_wedges(
+        self, tmp_path: Path, task: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """The whole point: a stuck refresh must let WatchdogSec expire.
 
         Before the gating change the heartbeat was a bare timer keyed on a
@@ -138,7 +148,9 @@ class TestPingsReachTheSocket:
             finally:
                 _stop_heartbeat(task, thread)
 
-    def test_pings_resume_once_the_refresh_completes(self, tmp_path, task, monkeypatch):
+    def test_pings_resume_once_the_refresh_completes(
+        self, tmp_path: Path, task: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """A slow-but-recovering cycle must not leave the service dead."""
         monkeypatch.setenv("INKYPI_REFRESH_STALL_TIMEOUT_SECONDS", "0.15")
 
@@ -159,7 +171,7 @@ class TestPingsReachTheSocket:
 
     def test_a_long_but_healthy_refresh_keeps_pinging(
         self, tmp_path, task, monkeypatch
-    ):
+    ) -> None:
         """AI image generation legitimately takes minutes; that is not a hang."""
         monkeypatch.setenv("INKYPI_REFRESH_STALL_TIMEOUT_SECONDS", "600")
 
@@ -178,7 +190,7 @@ class TestPingsReachTheSocket:
 class TestThreadWiring:
     def test_start_launches_the_heartbeat_when_systemd_is_present(
         self, tmp_path, task, monkeypatch
-    ):
+    ) -> None:
         """Under Type=notify the thread must actually be created."""
         monkeypatch.setattr(task, "_run", lambda: None)
         with systemd_notify_environment(tmp_path, WATCHDOG_USEC):
@@ -189,7 +201,9 @@ class TestThreadWiring:
             finally:
                 task.stop()
 
-    def test_no_heartbeat_thread_without_systemd(self, monkeypatch):
+    def test_no_heartbeat_thread_without_systemd(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Off-device there is no socket to feed, so no thread should spawn."""
         monkeypatch.setattr(task_module, "_sd_notify", None)
         device_config = MagicMock()

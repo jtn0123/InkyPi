@@ -10,6 +10,7 @@ return non-zero rather than logging and exiting successfully.
 
 from __future__ import annotations
 
+from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
@@ -18,11 +19,11 @@ import inkypi
 
 
 class _FakePlaylist:
-    def __init__(self, plugin_instance):
+    def __init__(self, plugin_instance: Any) -> None:
         self.name = "default"
         self._plugin_instance = plugin_instance
 
-    def get_next_eligible_plugin(self, _current_dt):
+    def get_next_eligible_plugin(self, _current_dt: Any) -> Any:
         return self._plugin_instance
 
 
@@ -31,7 +32,7 @@ class _FakePluginInstance:
     name = "clock-a"
 
 
-def _app(*, playlist, refresh_task):
+def _app(*, playlist: Any, refresh_task: Any) -> Any:
     app = MagicMock()
     device_config = MagicMock()
     playlist_manager = MagicMock()
@@ -43,7 +44,7 @@ def _app(*, playlist, refresh_task):
 
 
 class TestRunOnce:
-    def test_refreshes_the_next_plugin_and_succeeds(self):
+    def test_refreshes_the_next_plugin_and_succeeds(self) -> None:
         refresh_task = MagicMock()
         playlist = _FakePlaylist(_FakePluginInstance())
 
@@ -55,7 +56,7 @@ class TestRunOnce:
         assert action.plugin_instance.plugin_id == "clock"
         assert action.force is True
 
-    def test_stops_the_refresh_task_before_returning(self):
+    def test_stops_the_refresh_task_before_returning(self) -> None:
         """Nothing should be left running — the process is about to exit."""
         refresh_task = MagicMock()
         playlist = _FakePlaylist(_FakePluginInstance())
@@ -64,7 +65,7 @@ class TestRunOnce:
 
         assert refresh_task.stop.called
 
-    def test_stops_the_refresh_task_even_when_the_refresh_raises(self):
+    def test_stops_the_refresh_task_even_when_the_refresh_raises(self) -> None:
         refresh_task = MagicMock()
         refresh_task.manual_update.side_effect = RuntimeError("plugin exploded")
         playlist = _FakePlaylist(_FakePluginInstance())
@@ -72,25 +73,27 @@ class TestRunOnce:
         assert inkypi.run_once(_app(playlist=playlist, refresh_task=refresh_task)) == 1
         assert refresh_task.stop.called
 
-    def test_no_active_playlist_is_a_failure(self):
+    def test_no_active_playlist_is_a_failure(self) -> None:
         refresh_task = MagicMock()
         assert inkypi.run_once(_app(playlist=None, refresh_task=refresh_task)) == 1
         assert not refresh_task.manual_update.called
 
-    def test_no_eligible_plugin_is_a_failure(self):
+    def test_no_eligible_plugin_is_a_failure(self) -> None:
         refresh_task = MagicMock()
         playlist = _FakePlaylist(None)
         assert inkypi.run_once(_app(playlist=playlist, refresh_task=refresh_task)) == 1
         assert not refresh_task.manual_update.called
 
-    def test_missing_core_services_is_a_failure(self):
+    def test_missing_core_services_is_a_failure(self) -> None:
         app = MagicMock()
         app.config = {"DEVICE_CONFIG": None, "REFRESH_TASK": None}
         assert inkypi.run_once(app) == 1
 
 
 class TestRunOnceFlag:
-    def test_flag_is_accepted_and_defaults_off(self, monkeypatch):
+    def test_flag_is_accepted_and_defaults_off(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         monkeypatch.setattr(inkypi, "create_app", lambda: MagicMock())
         inkypi.main(["--web-only"])
         assert inkypi.args.run_once is False
@@ -98,7 +101,7 @@ class TestRunOnceFlag:
         inkypi.main(["--web-only", "--run-once"])
         assert inkypi.args.run_once is True
 
-    def test_help_documents_the_exit_status_contract(self):
+    def test_help_documents_the_exit_status_contract(self) -> None:
         """The exit status is the whole point for a cron caller."""
         import contextlib
         import io

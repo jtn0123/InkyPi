@@ -1,5 +1,6 @@
 import sys
 import types
+from typing import Any
 
 import pytest
 from PIL import Image
@@ -221,7 +222,7 @@ class FakeGrayscaleModeEPD:
     — only ``display_1Gray`` / ``display_4Gray``.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.width = 280
         self.height = 480
         self.init_modes = []
@@ -230,43 +231,43 @@ class FakeGrayscaleModeEPD:
         self.gray4 = []
         self.slept = False
 
-    def init(self, mode):
+    def init(self, mode: Any) -> None:
         self.init_modes.append(mode)
 
-    def getbuffer(self, img):
+    def getbuffer(self, img: Any):
         return ("buf", img.size)
 
-    def getbuffer_4Gray(self, img):  # noqa: N802 — mirrors the vendor driver
+    def getbuffer_4Gray(self, img: Any):  # noqa: N802 — mirrors the vendor driver
         return ("buf4", img.size)
 
-    def display_1Gray(self, buf):  # noqa: N802 — mirrors the vendor driver
+    def display_1Gray(self, buf: Any) -> None:  # noqa: N802 — mirrors the vendor driver
         self.gray1.append(buf)
 
-    def display_4Gray(self, buf):  # noqa: N802 — mirrors the vendor driver
+    def display_4Gray(self, buf: Any) -> None:  # noqa: N802 — mirrors the vendor driver
         self.gray4.append(buf)
 
-    def Clear(self, color, mode):
+    def Clear(self, color: Any, mode: Any) -> None:
         self.clear_calls.append((color, mode))
 
-    def sleep(self):
+    def sleep(self) -> None:
         self.slept = True
 
 
 class FakeClearWithColorEPD(FakeMonoEPD):
     """A driver whose Clear takes a colour byte but no mode."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
         self.clear_colors = []
 
-    def Clear(self, color):
+    def Clear(self, color: Any) -> None:
         self.clear_colors.append(color)
         self.cleared = True
 
 
 def test_grayscale_mode_driver_initializes_without_typeerror(
     monkeypatch, device_config_dev
-):
+) -> None:
     """epd3in7 is in the driver manifest, so it must actually load."""
     device_config_dev.update_value("display_type", "epd3in7")
     device_config_dev.update_value("resolution", None)
@@ -285,7 +286,7 @@ def test_grayscale_mode_driver_initializes_without_typeerror(
 
 def test_grayscale_mode_driver_renders_via_display_1gray(
     monkeypatch, device_config_dev
-):
+) -> None:
     device_config_dev.update_value("display_type", "epd3in7")
     install_fake_epd_module(monkeypatch, "epd3in7", FakeGrayscaleModeEPD)
 
@@ -303,17 +304,19 @@ def test_grayscale_mode_driver_renders_via_display_1gray(
     assert epd.slept is True
 
 
-def test_mode_argument_with_a_default_is_not_treated_as_mode_driven(monkeypatch):
+def test_mode_argument_with_a_default_is_not_treated_as_mode_driven(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Only a *required* mode parameter changes how we drive the panel."""
     from display.waveshare_display import _requires_mode_argument
 
-    def init_required(mode):
+    def init_required(mode: Any) -> None:
         pass
 
-    def init_defaulted(mode=0):
+    def init_defaulted(mode: Any = 0) -> None:
         pass
 
-    def init_plain():
+    def init_plain() -> None:
         pass
 
     assert _requires_mode_argument(init_required) is True
@@ -323,7 +326,7 @@ def test_mode_argument_with_a_default_is_not_treated_as_mode_driven(monkeypatch)
 
 def test_clear_receives_a_color_when_the_driver_requires_one(
     monkeypatch, device_config_dev
-):
+) -> None:
     device_config_dev.update_value("display_type", "epd7in3e")
     install_fake_epd_module(monkeypatch, "epd7in3e", FakeClearWithColorEPD)
 

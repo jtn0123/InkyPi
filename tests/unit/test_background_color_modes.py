@@ -6,6 +6,8 @@ than anywhere that mentions colour.  Grayscale and bi-colour Waveshare panels
 are exactly the configurations our fork supports, so these paths need cover.
 """
 
+from typing import Any
+
 import pytest
 from PIL import Image, ImageOps
 
@@ -17,15 +19,15 @@ PAD_MODES = ["RGB", "RGBA", "L", "1"]
 
 class TestResolveBackgroundColor:
     @pytest.mark.parametrize("mode", PAD_MODES)
-    def test_named_color_resolves_for_every_mode(self, mode):
+    def test_named_color_resolves_for_every_mode(self, mode: Any) -> None:
         assert resolve_background_color("white", mode) is not None
 
     @pytest.mark.parametrize("mode", PAD_MODES)
-    def test_hex_color_resolves_for_every_mode(self, mode):
+    def test_hex_color_resolves_for_every_mode(self, mode: Any) -> None:
         assert resolve_background_color("#336699", mode) is not None
 
     @pytest.mark.parametrize("mode", PAD_MODES)
-    def test_unset_falls_back_to_white(self, mode):
+    def test_unset_falls_back_to_white(self, mode: Any) -> None:
         assert resolve_background_color(None, mode) == resolve_background_color(
             "#ffffff", mode
         )
@@ -34,7 +36,7 @@ class TestResolveBackgroundColor:
         )
 
     @pytest.mark.parametrize("mode", PAD_MODES)
-    def test_malformed_color_falls_back_instead_of_raising(self, mode):
+    def test_malformed_color_falls_back_instead_of_raising(self, mode: Any) -> None:
         # The value comes from a free-text settings field, so garbage is a
         # normal input, not an exceptional one.
         assert resolve_background_color("not-a-color", mode) == (
@@ -42,20 +44,20 @@ class TestResolveBackgroundColor:
         )
 
     @pytest.mark.parametrize("mode", PAD_MODES)
-    def test_non_string_setting_is_treated_as_unset(self, mode):
+    def test_non_string_setting_is_treated_as_unset(self, mode: Any) -> None:
         # Older settings shapes stored tuples; upstream #568 crashed on these.
         assert resolve_background_color((255, 255, 255), mode) == (
             resolve_background_color("#ffffff", mode)
         )
 
-    def test_grayscale_returns_an_int_not_a_tuple(self):
+    def test_grayscale_returns_an_int_not_a_tuple(self) -> None:
         # An RGB tuple here is precisely what breaks ImageOps.pad on L images.
         assert isinstance(resolve_background_color("white", "L"), int)
         assert isinstance(resolve_background_color("white", "RGB"), tuple)
 
     @pytest.mark.parametrize("mode", PAD_MODES)
     @pytest.mark.parametrize("color", ["white", "#336699", None, "not-a-color"])
-    def test_result_is_actually_paddable(self, mode, color):
+    def test_result_is_actually_paddable(self, mode: Any, color: Any) -> None:
         """The real contract: ImageOps.pad must accept what we return."""
         img = Image.new(mode, (4, 3))
         padded = ImageOps.pad(
@@ -81,7 +83,7 @@ class TestPluginsUseModeAwareBackgrounds:
             "plugins.image_upload.image_upload",
         ],
     )
-    def test_plugin_imports_the_shared_helper(self, module_path):
+    def test_plugin_imports_the_shared_helper(self, module_path: Any) -> None:
         import importlib
 
         module = importlib.import_module(module_path)
@@ -97,7 +99,7 @@ class TestPluginsUseModeAwareBackgrounds:
             "plugins.image_upload.image_upload",
         ],
     )
-    def test_plugin_no_longer_defines_a_private_copy(self, module_path):
+    def test_plugin_no_longer_defines_a_private_copy(self, module_path: Any) -> None:
         import importlib
 
         module = importlib.import_module(module_path)

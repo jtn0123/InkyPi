@@ -12,6 +12,8 @@ from __future__ import annotations
 
 import json
 import time
+from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -321,12 +323,12 @@ class TestSidecarsWithoutAStatusField:
     covered the shape the app was really producing.
     """
 
-    def setup_method(self):
+    def setup_method(self) -> None:
         from utils.refresh_stats import _clear_cache
 
         _clear_cache()
 
-    def _real_world_record(self, ts, **extra):
+    def _real_world_record(self, ts: Any, **extra):
         """The exact shape display_manager writes for a successful display."""
         return {
             "refresh_type": "Manual Update",
@@ -338,7 +340,7 @@ class TestSidecarsWithoutAStatusField:
             **extra,
         }
 
-    def test_statusless_records_count_as_successes(self, tmp_path):
+    def test_statusless_records_count_as_successes(self, tmp_path: Path) -> None:
         from utils.refresh_stats import compute_stats
 
         now = time.time()
@@ -350,7 +352,7 @@ class TestSidecarsWithoutAStatusField:
         assert result["success"] == 3
         assert result["success_rate"] == 1.0
 
-    def test_explicit_failures_are_still_counted(self, tmp_path):
+    def test_explicit_failures_are_still_counted(self, tmp_path: Path) -> None:
         from utils.refresh_stats import compute_stats
 
         now = time.time()
@@ -365,7 +367,7 @@ class TestSidecarsWithoutAStatusField:
         assert result["failure"] == 1
         assert result["success"] == 2
 
-    def test_failure_count_agrees_with_top_failing(self, tmp_path):
+    def test_failure_count_agrees_with_top_failing(self, tmp_path: Path) -> None:
         """These two disagreed: many errors reported, no failing plugins listed.
 
         Both now key on the same explicit status, so the numbers cannot drift
@@ -383,7 +385,7 @@ class TestSidecarsWithoutAStatusField:
 
         assert result["failure"] == sum(f["count"] for f in result["top_failing"])
 
-    def test_an_unrecognised_status_is_not_an_error(self, tmp_path):
+    def test_an_unrecognised_status_is_not_an_error(self, tmp_path: Path) -> None:
         """Only an explicit "failure" counts; unknown values are not errors."""
         from utils.refresh_stats import compute_stats
 
@@ -407,19 +409,19 @@ class TestHistoryMetaCarriesStatus:
                 "plugin_instance": "clock-a",
             }
 
-    def test_default_is_success(self):
+    def test_default_is_success(self) -> None:
         from refresh_task.housekeeping import RefreshHousekeeper
 
         meta = RefreshHousekeeper.build_history_meta(self._Action())
         assert meta["status"] == "success"
 
-    def test_failure_status_can_be_recorded(self):
+    def test_failure_status_can_be_recorded(self) -> None:
         from refresh_task.housekeeping import RefreshHousekeeper
 
         meta = RefreshHousekeeper.build_history_meta(self._Action(), status="failure")
         assert meta["status"] == "failure"
 
-    def test_fallback_error_render_is_recorded_as_a_failure(self):
+    def test_fallback_error_render_is_recorded_as_a_failure(self) -> None:
         """The error-card path pushes an image, so it writes a sidecar too.
 
         Without a status it was indistinguishable on disk from a real render.

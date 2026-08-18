@@ -15,6 +15,8 @@ bare ``None`` return would bubble up as.
 
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 from PIL import Image
 
@@ -51,7 +53,14 @@ class _AttemptRecorder:
         self._outcomes = list(outcomes)
         self.calls: list[tuple] = []
 
-    def __call__(self, target, dimensions, timeout_ms, attempt, render_wait_ms=None):
+    def __call__(
+        self,
+        target: Any,
+        dimensions: Any,
+        timeout_ms: Any,
+        attempt: Any,
+        render_wait_ms: Any = None,
+    ):
         self.calls.append((target, dimensions, timeout_ms, attempt))
         try:
             return self._outcomes.pop(0)

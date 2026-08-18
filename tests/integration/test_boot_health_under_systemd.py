@@ -23,6 +23,7 @@ import textwrap
 import uuid
 from collections.abc import Iterator
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -94,7 +95,7 @@ class Container:
     def __init__(self, name: str) -> None:
         self.name = name
 
-    def exec(self, script: str, timeout: int = 60):
+    def exec(self, script: str, timeout: int = 60) -> Any:
         return subprocess.run(
             ["docker", "exec", self.name, "bash", "-lc", script],
             capture_output=True,
@@ -233,7 +234,7 @@ def _drive_to_start_limit(ctr: Container) -> None:
 
 
 class TestSystemdActuallyDrivesTheChain:
-    def test_onfailure_fires_the_failure_unit(self, container):
+    def test_onfailure_fires_the_failure_unit(self, container: Any) -> None:
         """The sentinel proves OnFailure= reached inkypi-failure.service."""
         _install_inkypi(container, version="2.0.0", confirmed="1.0.0")
         _drive_to_start_limit(container)
@@ -246,7 +247,7 @@ class TestSystemdActuallyDrivesTheChain:
             f"journal: {container.exec('journalctl -u inkypi.service -n 20 --no-pager').stdout[-600:]}"
         )
 
-    def test_boot_health_runs_and_counts_the_failure(self, container):
+    def test_boot_health_runs_and_counts_the_failure(self, container: Any) -> None:
         """The second ExecStart in the failure unit must actually execute."""
         _install_inkypi(container, version="2.0.0", confirmed="1.0.0")
         _drive_to_start_limit(container)
@@ -257,7 +258,7 @@ class TestSystemdActuallyDrivesTheChain:
             f"failure unit journal: {container.exec('journalctl -u inkypi-failure.service -n 30 --no-pager').stdout[-800:]}"
         )
 
-    def test_repeated_failures_reach_rollback(self, container):
+    def test_repeated_failures_reach_rollback(self, container: Any) -> None:
         """The end-to-end outcome: an unconfirmed version rolls itself back."""
         _install_inkypi(container, version="2.0.0", confirmed="1.0.0")
 
@@ -272,7 +273,7 @@ class TestSystemdActuallyDrivesTheChain:
             f"state: {container.exec('ls -la /var/lib/inkypi').stdout}"
         )
 
-    def test_a_confirmed_version_is_not_rolled_back(self, container):
+    def test_a_confirmed_version_is_not_rolled_back(self, container: Any) -> None:
         """A version that worked before points at the environment, not the build."""
         _install_inkypi(container, version="2.0.0", confirmed="2.0.0")
 
@@ -287,7 +288,9 @@ class TestSystemdActuallyDrivesTheChain:
 
 
 class TestFailureUnitDoesNotMaskTheSentinel:
-    def test_a_broken_boot_health_still_leaves_the_sentinel(self, container):
+    def test_a_broken_boot_health_still_leaves_the_sentinel(
+        self, container: Any
+    ) -> None:
         """The '-' prefix on the ExecStart must keep the sentinel load-bearing."""
         _install_inkypi(container, version="2.0.0", confirmed="1.0.0")
         # Replace boot-health with something that fails outright.
