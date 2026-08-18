@@ -81,13 +81,16 @@ REQUIRE_CRASH_LOOP_TEST = os.getenv("REQUIRE_INSTALL_CRASH_LOOP_TEST", "").lower
     "true",
 )
 
-pytestmark = pytest.mark.skipif(
-    not REQUIRE_CRASH_LOOP_TEST and not _docker_available(),
-    reason=(
-        "Install crash-loop regression test requires Docker. "
-        "Set REQUIRE_INSTALL_CRASH_LOOP_TEST=1 to force-run (and fail if Docker is missing)."
+pytestmark = [
+    pytest.mark.container,
+    pytest.mark.skipif(
+        not REQUIRE_CRASH_LOOP_TEST and not _docker_available(),
+        reason=(
+            "Install crash-loop regression test requires Docker. "
+            "Set REQUIRE_INSTALL_CRASH_LOOP_TEST=1 to force-run (and fail if Docker is missing)."
+        ),
     ),
-)
+]
 
 
 # ── container payload ─────────────────────────────────────────────────────────

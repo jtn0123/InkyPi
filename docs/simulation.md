@@ -99,6 +99,12 @@ crash-loop gate went unnoticed-but-not-running on every modern host.
   mount on top actively breaks it.
 
 Both gates now detect the version via `docker info` and pick the right flags.
+
+They carry the `container` marker and are excluded from the pytest matrix —
+systemd behaviour does not vary by Python version, so running them across three
+interpreters only triples the cost (it pushed 3.13 past its 20-minute cap). CI
+runs them once in the `Systemd container gates` job; locally, use
+`pytest -m container`.
 If you add another systemd container test, reuse `_cgroup_run_args()` rather
 than hardcoding either recipe.
 

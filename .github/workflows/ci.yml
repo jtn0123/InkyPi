@@ -205,7 +205,11 @@ jobs:
           # because REQUIRE_BROWSER_SMOKE is not set (they need Playwright
           # Chromium which isn't installed in this job). The browser-smoke
           # job runs them with a real browser.
-          pytest --cov --cov-report=xml -q
+          # Container tests are excluded here and run once in the dedicated
+          # `Container tests` job below: they boot systemd as PID 1, which does
+          # not vary by Python version, so running them across the matrix only
+          # triples the cost. Including them pushed 3.13 past the 20-minute cap.
+          pytest --cov --cov-report=xml -q -m "not container"
       - name: Upload coverage
         if: always()
         uses: actions/upload-artifact@v4
@@ -745,15 +749,21 @@ jobs:
           if-no-files-found: ignore
 
   install-crash-loop-gate:
-    name: Install crash-loop regression gate
+    name: Systemd container gates
     # JTN-614: runs the JTN-609 Docker-based regression gate that verifies
     # JTN-600 (systemctl disable during install) and JTN-607 (install-in-progress
     # lockfile) both prevent a mid-install crash from spawning a restart loop
     # that would OOM a Pi Zero 2 W. The test auto-skips without Docker, so we
     # set REQUIRE_INSTALL_CRASH_LOOP_TEST=1 to force it on CI.
+    #
+    # Now runs every `container`-marked test, which also covers
+    # test_boot_health_under_systemd.py (OnFailure= -> boot-health.sh ->
+    # rollback). Those are excluded from the pytest matrix: systemd behaviour
+    # does not vary by Python version, so running them three times only
+    # triples the cost — it pushed 3.13 past its 20-minute cap.
     needs: tests
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -768,12 +778,12 @@ jobs:
         run: |
           python -m pip install --upgrade pip wheel
           pip install -r install/requirements.txt -r install/requirements-dev.txt
-      - name: Run install crash-loop regression gate
+      - name: Run systemd container gates
         env:
           REQUIRE_INSTALL_CRASH_LOOP_TEST: '1'
           PYTHONPATH: src
         run: |
-          pytest tests/integration/test_install_crash_loop.py -v
+          pytest -m container -v
 
   ci-gate:
     name: CI gate (all checks pass)

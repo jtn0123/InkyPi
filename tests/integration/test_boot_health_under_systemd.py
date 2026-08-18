@@ -30,14 +30,17 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[2]
 INSTALL_DIR = REPO_ROOT / "install"
 
-pytestmark = pytest.mark.skipif(
-    shutil.which("docker") is None
-    or subprocess.run(
-        ["docker", "info"], capture_output=True, timeout=30, check=False
-    ).returncode
-    != 0,
-    reason="requires a running Docker daemon",
-)
+pytestmark = [
+    pytest.mark.container,
+    pytest.mark.skipif(
+        shutil.which("docker") is None
+        or subprocess.run(
+            ["docker", "info"], capture_output=True, timeout=30, check=False
+        ).returncode
+        != 0,
+        reason="requires a running Docker daemon",
+    ),
+]
 
 
 def _cgroup_run_args() -> list[str]:
