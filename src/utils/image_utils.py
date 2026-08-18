@@ -7,7 +7,7 @@ import tempfile
 import time
 from collections.abc import Callable
 from io import BytesIO
-from typing import Any
+from typing import Any, cast
 
 from PIL import Image
 from PIL.Image import Resampling
@@ -339,6 +339,47 @@ def apply_image_enhancement(
     return ImageEnhance.Sharpness(img).enhance(image_settings.get("sharpness", 1.0))
 
 
+def resolve_background_color(
+    color_value: object, mode: str
+) -> tuple[int, ...] | int | str:
+    """Resolve a user-supplied background colour for an image of *mode*.
+
+    Two failure modes this guards against, both of which raise inside
+    ``ImageOps.pad`` rather than anywhere obviously colour-related:
+
+    * a colour resolved in ``RGB`` cannot be pasted into an ``L`` (grayscale)
+      or ``1`` (bi-level) image — the exact crash upstream fixed in #568, and
+      one our bi-colour and grayscale panel users are the most likely to hit;
+    * ``ImageColor.getcolor`` raises ``ValueError`` on a malformed value, and
+      the colour arrives from a free-text settings field.
+
+    Resolving against the target image's own mode fixes the first; falling back
+    to white fixes the second.  Non-string input (a stored tuple from an older
+    settings shape) is treated as unset.
+
+    Args:
+        color_value: Whatever the plugin settings hold for the colour.
+        mode: The PIL mode of the image the colour will be composited into.
+
+    Returns:
+        A colour in the representation ``mode`` expects — an int for ``L``,
+        a tuple for ``RGB``/``RGBA``.
+    """
+    from PIL import ImageColor
+
+    resolved = tuple[int, ...] | int | str
+    requested = color_value if isinstance(color_value, str) and color_value else None
+    try:
+        return cast(resolved, ImageColor.getcolor(requested or "#ffffff", mode))
+    except ValueError:
+        logger.warning(
+            "Invalid background color %r for mode %s, defaulting to white",
+            color_value,
+            mode,
+        )
+        return cast(resolved, ImageColor.getcolor("#ffffff", mode))
+
+
 def pad_image_blur(img: Image, dimensions: tuple[int, int]) -> Image:
     """Fit an image into *dimensions* with a blurred letterbox background.
 
@@ -497,6 +538,7 @@ def _find_browser_command(
     img_file_path: str,
     dimensions: tuple[int, int],
     timeout_ms: int | None,
+    render_wait_ms: int | None = None,
 ) -> list[str] | None:
     """Return the browser subprocess command for a headless screenshot, or None.
 
@@ -540,6 +582,13 @@ def _find_browser_command(
             ]
             if timeout_ms:
                 command.append(f"--timeout={timeout_ms}")
+            if render_wait_ms:
+                # Headless Chrome captures as soon as load fires, which is too
+                # early for pages that paint from JavaScript — those screenshot
+                # as a blank or half-built frame. A virtual time budget lets the
+                # page's timers run to completion first; it is virtual time, so
+                # it costs far less wall clock than the number suggests.
+                command.append(f"--virtual-time-budget={render_wait_ms}")
             return command
 
     return None
@@ -602,6 +651,7 @@ def _take_screenshot_once(
     dimensions: tuple[int, int],
     timeout_ms: int | None,
     attempt: int,
+    render_wait_ms: int | None = None,
 ) -> tuple[Image.Image | None, bool]:
     """Single-attempt chromium screenshot.
 
@@ -618,7 +668,9 @@ def _take_screenshot_once(
         with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as img_file:
             img_file_path = img_file.name
 
-        command = _find_browser_command(target, img_file_path, dimensions, timeout_ms)
+        command = _find_browser_command(
+            target, img_file_path, dimensions, timeout_ms, render_wait_ms
+        )
         if command is None:
             logger.error(
                 "%s No supported browser found. Install Chromium or Google Chrome.",
@@ -686,6 +738,7 @@ def take_screenshot(
     target: str,
     dimensions: tuple[int, int],
     timeout_ms: int | None = None,
+    render_wait_ms: int | None = None,
 ) -> Image.Image | None:
     """Capture a screenshot of *target* using a headless browser subprocess.
 
@@ -708,6 +761,8 @@ def take_screenshot(
             in pixels.
         timeout_ms: Optional screenshot timeout in milliseconds passed to the
             browser via ``--timeout``.
+        render_wait_ms: Optional virtual-time budget, letting a page that
+            paints from JavaScript finish before capture.
 
     Returns:
         A ``PIL.Image.Image`` of the captured page, or ``None`` when the
@@ -720,7 +775,7 @@ def take_screenshot(
     last_transient = False
     for attempt in range(1, _SCREENSHOT_MAX_ATTEMPTS + 1):
         image, transient = _take_screenshot_once(
-            target, dimensions, timeout_ms, attempt
+            target, dimensions, timeout_ms, attempt, render_wait_ms=render_wait_ms
         )
         if image is not None:
             if attempt > 1:

@@ -4,7 +4,7 @@ import random
 from collections.abc import Mapping
 from typing import Any, cast
 
-from PIL import Image, ImageColor, ImageOps
+from PIL import Image, ImageOps
 
 from plugins.base_plugin.base_plugin import BasePlugin, DeviceConfigLike
 from plugins.base_plugin.settings_schema import (
@@ -16,7 +16,12 @@ from plugins.base_plugin.settings_schema import (
     widget,
 )
 from utils.app_utils import resolve_path
-from utils.image_utils import pad_image_blur
+from utils.image_loader import (
+    FIT_CONTAIN,
+    effective_fit_mode,
+    resolve_fit_mode,
+)
+from utils.image_utils import pad_image_blur, resolve_background_color
 from utils.security_utils import validate_file_path
 
 logger = logging.getLogger(__name__)
@@ -24,19 +29,6 @@ logger = logging.getLogger(__name__)
 
 def _get_upload_dir() -> str:
     return cast(str, cast(Any, resolve_path)(os.path.join("static", "images", "saved")))
-
-
-def _resolve_background_color(
-    color_value: str | None, mode: str
-) -> tuple[int, ...] | int:
-    """Return a safe background color, falling back to white on invalid input."""
-    try:
-        return cast(
-            tuple[int, ...] | int, ImageColor.getcolor(color_value or "#ffffff", mode)
-        )
-    except ValueError:
-        logger.warning("Invalid background color %r, defaulting to white", color_value)
-        return cast(tuple[int, ...] | int, ImageColor.getcolor("#ffffff", mode))
 
 
 class ImageUpload(BasePlugin):
@@ -55,13 +47,21 @@ class ImageUpload(BasePlugin):
                 "Display Options",
                 row(
                     field(
-                        "padImage",
-                        "checkbox",
-                        label="Scale to Fit",
-                        hint="Pad smaller images to match the display aspect ratio.",
-                        checked_value="false",
-                        unchecked_value="true",
-                        submit_unchecked=True,
+                        "fitMode",
+                        "select",
+                        label="Fit",
+                        hint=(
+                            "Fill crops to fill the screen. Whole image pads the "
+                            "leftover space. Auto picks per image: fill when the "
+                            "photo and screen share an orientation, whole image "
+                            "when they differ."
+                        ),
+                        default="cover",
+                        options=[
+                            option("cover", "Fill display"),
+                            option("contain", "Whole image"),
+                            option("auto", "Auto"),
+                        ],
                     ),
                     field(
                         "randomize",
@@ -149,16 +149,18 @@ class ImageUpload(BasePlugin):
         # Write the new index back to the device json
         if isinstance(settings, dict):
             settings["image_index"] = img_index
-        if settings.get("padImage") == "true":
-            dimensions = self.get_oriented_dimensions(device_config)
-
+        dimensions = self.get_oriented_dimensions(device_config)
+        fit_mode = effective_fit_mode(
+            resolve_fit_mode(settings), image.size, dimensions
+        )
+        if fit_mode == FIT_CONTAIN:
             if settings.get("backgroundOption") == "blur":
                 return pad_image_blur(image, dimensions)
             raw_background_color = settings.get("backgroundColor")
             background_color_value = (
                 raw_background_color if isinstance(raw_background_color, str) else None
             )
-            background_color = _resolve_background_color(
+            background_color = resolve_background_color(
                 background_color_value,
                 "RGB",
             )

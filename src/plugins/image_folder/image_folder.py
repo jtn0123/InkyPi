@@ -4,26 +4,18 @@ import random
 from collections.abc import Mapping
 from typing import Any, cast
 
-from PIL import Image, ImageColor, ImageOps
+from PIL import Image, ImageOps
 
 from plugins.base_plugin.base_plugin import BasePlugin, DeviceConfigLike
 from plugins.base_plugin.settings_schema import field, option, row, schema, section
-from utils.image_utils import pad_image_blur
+from utils.image_loader import (
+    FIT_CONTAIN,
+    effective_fit_mode,
+    resolve_fit_mode,
+)
+from utils.image_utils import pad_image_blur, resolve_background_color
 
 logger = logging.getLogger(__name__)
-
-
-def _resolve_background_color(
-    color_value: str | None, mode: str
-) -> tuple[int, ...] | int:
-    """Return a safe background color, falling back to white on invalid input."""
-    try:
-        return cast(
-            tuple[int, ...] | int, ImageColor.getcolor(color_value or "#ffffff", mode)
-        )
-    except ValueError:
-        logger.warning("Invalid background color %r, defaulting to white", color_value)
-        return cast(tuple[int, ...] | int, ImageColor.getcolor("#ffffff", mode))
 
 
 def list_files_in_folder(folder_path: str) -> list[str]:
@@ -95,13 +87,21 @@ class ImageFolder(BasePlugin):
                 "Display",
                 row(
                     field(
-                        "padImage",
-                        "checkbox",
-                        label="Scale to Fit",
-                        hint="Keep the full image visible and pad the background instead of cropping to fill the screen.",
-                        checked_value="false",
-                        unchecked_value="true",
-                        submit_unchecked=True,
+                        "fitMode",
+                        "select",
+                        label="Fit",
+                        hint=(
+                            "Fill crops to fill the screen. Whole image pads the "
+                            "leftover space. Auto picks per image: fill when the "
+                            "photo and screen share an orientation, whole image "
+                            "when they differ."
+                        ),
+                        default="cover",
+                        options=[
+                            option("cover", "Fill display"),
+                            option("contain", "Whole image"),
+                            option("auto", "Auto"),
+                        ],
                     ),
                     field(
                         "backgroundOption",
@@ -157,12 +157,12 @@ class ImageFolder(BasePlugin):
         logger.debug(f"Full path: {image_url}")
 
         # Check padding options
-        use_padding = settings.get("padImage") == "true"
+        requested_fit = resolve_fit_mode(settings)
         background_option = settings.get("backgroundOption")
         if not isinstance(background_option, str):
             background_option = "blur"
         logger.debug(
-            f"Settings: pad_image={use_padding}, background_option={background_option}"
+            f"Settings: fit_mode={requested_fit}, background_option={background_option}"
         )
 
         try:
@@ -176,7 +176,10 @@ class ImageFolder(BasePlugin):
             if not img:
                 raise RuntimeError("Failed to load image from file")
 
-            if use_padding:
+            # `auto` needs the image's own orientation, so it can only be
+            # settled now that the file is open.
+            fit_mode = effective_fit_mode(requested_fit, img.size, dimensions)
+            if fit_mode == FIT_CONTAIN:
                 logger.debug(f"Applying padding with {background_option} background")
                 if background_option == "blur":
                     img = pad_image_blur(img, dimensions)
@@ -187,7 +190,7 @@ class ImageFolder(BasePlugin):
                         if isinstance(raw_background_color, str)
                         else None
                     )
-                    background_color = _resolve_background_color(
+                    background_color = resolve_background_color(
                         background_color_value,
                         img.mode,
                     )
