@@ -19,7 +19,7 @@ from typing import Any
 import pytest
 
 from plugins.base_plugin.base_plugin import BasePlugin
-from refresh_task.actions import ManualRefresh, PlaylistRefresh
+from refresh_task.actions import ManualRefresh, ManualUpdateRequest, PlaylistRefresh
 
 
 class TestBasePluginDefaults:
@@ -76,6 +76,7 @@ def _skip_reason(
     reason: Any,
     action: Any = None,
     settings: Any = None,
+    manual_request: Any = None,
 ) -> Any:
     """Drive _skip_display_reason with a plugin whose hook returns *reason*."""
 
@@ -92,7 +93,9 @@ def _skip_reason(
     )
     if action is None:
         action = PlaylistRefresh(_FakePlaylist(), _FakeInstance(settings))
-    return task._skip_display_reason(action, {"id": "demo"}, datetime.now(UTC))
+    return task._skip_display_reason(
+        action, {"id": "demo"}, datetime.now(UTC), manual_request
+    )
 
 
 class TestSkipDecision:
@@ -144,6 +147,35 @@ class TestSkipDecision:
         assert (
             _skip_reason(task, monkeypatch, reason="offseason", action=action) is None
         )
+
+    def test_display_now_is_never_skipped(
+        self, task: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A manual request carrying a PlaylistRefresh is still manual.
+
+        "Display Now" in the UI and ``--run-once`` on the CLI both build a
+        ``PlaylistRefresh(..., force=True)`` and hand it to ``manual_update``,
+        so gating on the action type alone let a plugin veto a button press.
+        What makes a refresh manual is the request, not the action class.
+        """
+        action = PlaylistRefresh(_FakePlaylist(), _FakeInstance({}), force=True)
+        request = ManualUpdateRequest(request_id="req-1", refresh_action=action)
+        assert (
+            _skip_reason(
+                task,
+                monkeypatch,
+                reason="offseason",
+                action=action,
+                manual_request=request,
+            )
+            is None
+        )
+
+    def test_the_scheduler_s_own_turn_is_still_skippable(
+        self, task: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The guard above must not disable the hook for playlist refreshes."""
+        assert _skip_reason(task, monkeypatch, reason="offseason") == "offseason"
 
     def test_hook_receives_the_instance_settings(
         self, task: Any, monkeypatch: pytest.MonkeyPatch

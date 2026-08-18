@@ -125,9 +125,14 @@ class TestFailureAccounting:
         export INKYPI_BOOT_HEALTH_MAX_UNHEALTHY={threshold}
         bash {install_dir / "boot-health.sh"!s}
         """
-        return subprocess.run(
+        proc = subprocess.run(
             ["bash", "-c", script], capture_output=True, text=True, timeout=60
         )
+        # Every path through boot-health.sh — hold and rollback alike — exits 0.
+        # Without this, a script that died early would still satisfy the
+        # "rollback.log is absent" assertions and look like a passing hold.
+        assert proc.returncode == 0, proc.stderr
+        return proc
 
     def test_counter_increments_and_rollback_fires_at_the_threshold(
         self, tmp_path: Path

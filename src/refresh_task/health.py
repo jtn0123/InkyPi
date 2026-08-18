@@ -17,6 +17,18 @@ from utils.time_utils import now_device_tz
 
 logger = logging.getLogger(__name__)
 
+# Control characters that would let a crafted value forge extra log lines, or
+# break out of the single-line reason the UI renders.
+_CONTROL_CHARS = str.maketrans("", "", "\r\n\t\x00")
+
+
+def _clean(value: object) -> str:
+    """Return *value* as a single-line string, or "" if it is not usable."""
+    if not isinstance(value, str):
+        return ""
+    return value.translate(_CONTROL_CHARS).strip()
+
+
 if TYPE_CHECKING:
     from config import Config
 
@@ -242,11 +254,15 @@ class PluginHealthTracker:
         Returns:
             Whether a plugin instance was newly quarantined.
         """
-        plugin_id = breadcrumb.get("plugin_id")
-        instance = breadcrumb.get("instance")
-        if not isinstance(plugin_id, str) or not plugin_id:
+        # The breadcrumb is read back from disk after a crash, so it is
+        # untrusted input: it may be truncated mid-write or hand-edited. Strip
+        # control characters at this boundary rather than at each use — these
+        # values reach the log *and* `disabled_reason`, which the web UI shows.
+        plugin_id = _clean(breadcrumb.get("plugin_id"))
+        instance = _clean(breadcrumb.get("instance"))
+        if not plugin_id:
             return False
-        if not isinstance(instance, str) or not instance:
+        if not instance:
             # Without an instance we cannot name a single playlist entry, and
             # pausing every instance of the plugin would be too blunt.
             logger.warning(

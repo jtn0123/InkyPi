@@ -470,16 +470,24 @@ class RefreshTask:
         refresh_action: RefreshAction,
         plugin_config: Mapping[str, Any],
         current_dt: datetime,
+        manual_request: ManualUpdateRequest | None = None,
     ) -> str | None:
         """Ask the plugin whether it wants to yield this playlist turn.
 
-        Only playlist refreshes may be skipped: a manual "Update Now" is an
-        explicit request from the user, and silently declining it would look
-        like the button is broken.
+        Only the scheduler's own turn may be skipped: anything the user asked
+        for is an explicit request, and silently declining it would look like
+        the button is broken.
+
+        What makes a refresh manual is *how it arrived* — via ``manual_update``
+        — not the action class. "Display Now" and ``--run-once`` both hand us a
+        ``PlaylistRefresh``, so keying off the type alone would let a plugin
+        veto a button press.
 
         A hook that raises is treated as "do not skip" — a broken optional hook
         must not be able to stop a plugin from ever displaying.
         """
+        if manual_request is not None:
+            return None
         if not isinstance(refresh_action, PlaylistRefresh):
             return None
 
@@ -555,7 +563,7 @@ class RefreshTask:
         # a render. The playlist index has already advanced, so a skip yields
         # the turn to the next plugin rather than sticking.
         skip_reason = self._skip_display_reason(
-            refresh_action, plugin_config, current_dt
+            refresh_action, plugin_config, current_dt, manual_request
         )
         if skip_reason is not None:
             logger.info(

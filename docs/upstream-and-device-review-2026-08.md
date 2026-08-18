@@ -7,8 +7,11 @@ Two investigations in one doc:
 - **Part B** — operational patterns from the ESP projects
   (`jtn0123/ESP32-Garage-Fan`, `jtn0123/halloween_esp`) worth having on the Pi.
 
-Nothing here is implemented yet. Tick boxes as items land; strike through
-anything we decide against, with the reason.
+The review turned up both work that has since been done and work that has not.
+Items implemented in PR #632 are ticked below and listed in that PR's
+description; everything still unticked — B8–B15 and the Part A watch list — is
+live follow-up work. Tick boxes as further items land; strike through anything
+we decide against, with the reason.
 
 ## Scope and method
 
@@ -59,15 +62,15 @@ Where I could not confirm something without hardware, it says so.
 No code written on any of these. Listed newest-verdict-first, not re-triaged —
 the April write-ups still stand.
 
-- [ ] **JTN-768** — grayscale (`L`-mode) background-color crash · [#568](https://github.com/fatihak/InkyPi/pull/568) · *High*
+- [x] **JTN-768** — grayscale (`L`-mode) background-color crash · [#568](https://github.com/fatihak/InkyPi/pull/568) · *High*
       — partially mitigated: `image_album.py:314` already coerces to `str` and
       uses `img.mode`. Re-check `clock.py:87`, `image_folder`, `image_upload`.
-- [ ] **JTN-769** — Open-Meteo day-label / moon-phase off-by-one · [#613](https://github.com/fatihak/InkyPi/pull/613) · *High*
+- [x] **JTN-769** — Open-Meteo day-label / moon-phase off-by-one · [#613](https://github.com/fatihak/InkyPi/pull/613) · *High*
       — **confirmed present**: `weather_data.py` computes
       `target_date = dt.date() + timedelta(days=1)`, so every row's moon phase
       is tomorrow's.
 - [ ] **JTN-767** — plugin fallback logic & deprecation cleanup · [#561](https://github.com/fatihak/InkyPi/pull/561) · *Medium*
-- [ ] **JTN-772** — run-once mode + on-frame error rendering · [#451](https://github.com/fatihak/InkyPi/pull/451) · *Medium*
+- [x] **JTN-772** — run-once mode + on-frame error rendering · [#451](https://github.com/fatihak/InkyPi/pull/451) · *Medium*
       — on-frame errors we now have (`utils/fallback_image.render_error_image`);
       run-once mode we don't. Scope the issue down to run-once.
 - [ ] **JTN-773** — mutable-default + security hardening batch · [#623](https://github.com/fatihak/InkyPi/pull/623) · *Medium*
@@ -82,14 +85,14 @@ The April review closed [#487](https://github.com/fatihak/InkyPi/pull/487) as
 "already in our `weather_api.py`". Re-checking the file, we still carry the
 original bug plus two more that upstream fixed in the same neighbourhood.
 
-- [ ] **A1a — `temperature_unit=kelvin` is not a valid Open-Meteo parameter.**
+- [x] **A1a — `temperature_unit=kelvin` is not a valid Open-Meteo parameter.**
       [`weather_api.py:26`](../src/plugins/weather/weather_api.py) sends
       `temperature_unit=kelvin`; Open-Meteo accepts only `celsius` and
       `fahrenheit`. Upstream's fix requests `celsius` and adds `+273.15` at
       parse time. **Effect: choosing "Standard (K)" with the Open-Meteo
       provider does not work.** *High — small fix.*
 
-- [ ] **A1b — "Feels like" silently equals the plain temperature.**
+- [x] **A1b — "Feels like" silently equals the plain temperature.**
       [`weather_data.py:770`](../src/plugins/weather/weather_data.py) reads the
       legacy `current_weather` block, then line 784 asks it for
       `apparent_temperature` — a key that block never contains, so the
@@ -98,7 +101,7 @@ original bug plus two more that upstream fixed in the same neighbourhood.
       `precipitation,weather_code,apparent_temperature`; ours still uses
       `current_weather=true`. *Medium — no error, just quietly wrong.*
 
-- [ ] **A1c — hourly forecast has no weather codes, so no per-hour icons.**
+- [x] **A1c — hourly forecast has no weather codes, so no per-hour icons.**
       Our `hourly=` list omits `weather_code`, and `parse_open_meteo_hourly`
       reads only time/temp/precip. Upstream [#471](https://github.com/fatihak/InkyPi/pull/471)
       requests hourly `weather_code` and passes sunrise/sunset for day-vs-night
@@ -115,7 +118,7 @@ Seventeen PRs opened after 2026-04-19. Triaged against our tree.
 
 ### Worth acting on
 
-- [ ] **[#724](https://github.com/fatihak/InkyPi/pull/724) — `epd3in7`-class panels cannot work in our driver.**
+- [x] **[#724](https://github.com/fatihak/InkyPi/pull/724) — `epd3in7`-class panels cannot work in our driver.**
       Those drivers take a required `mode` argument on `init()` and expose
       `display_1Gray`/`display_4Gray` instead of a generic `display()`. Our
       [`waveshare_display.py`](../src/display/waveshare_display.py)
@@ -215,7 +218,7 @@ so it "never blocks more than 50 ms at a time, feeds the watchdog between
 slices" (`net/http_tx.h`) — liveness is proven *by the work loop*, not by a
 timer that runs beside it.
 
-- [ ] **B1 — Gate the heartbeat on refresh-loop progress.** Have the refresh
+- [x] **B1 — Gate the heartbeat on refresh-loop progress.** Have the refresh
       loop stamp a monotonic `last_progress_at` at each phase boundary; the
       heartbeat pings only while `now - last_progress_at < grace`, where grace
       generously exceeds the slowest legitimate refresh (AI image generation,
@@ -227,7 +230,7 @@ timer that runs beside it.
 `garage_fan/scripts/deploy.sh` is the reference. Its comments are worth reading
 in full — every guard in it exists because of a specific incident.
 
-- [ ] **B2 — Verify the new version is actually serving, not just "active".**
+- [x] **B2 — Verify the new version is actually serving, not just "active".**
       `update.sh:100` waits for `systemctl is-active`. That proves the unit
       started, not that the new code works. `deploy.sh` polls
       `/api/state` until `fw == EXPECTED_FW` **and** `confirmed == true`, and
@@ -235,7 +238,7 @@ in full — every guard in it exists because of a specific incident.
       Ours should poll `/readyz` plus the version from `/api/diagnostics` until
       it matches the target tag, with the same three-way reporting. *High.*
 
-- [ ] **B3 — Automatic rollback after N failed starts.** `rollback.sh` exists
+- [x] **B3 — Automatic rollback after N failed starts.** `rollback.sh` exists
       but is manual (`sudo bash rollback.sh`) or UI-triggered. `boot_health.h`
       auto-reverts unattended in ~10–15 min: an RTC counter tracks consecutive
       boots that never reached the broker, NVS records the last image that ever
@@ -254,13 +257,13 @@ in full — every guard in it exists because of a specific incident.
       driver for the configured panel is present, `VERSION` is readable.
       *Medium.*
 
-- [ ] **B5 — Report unconfirmed vs rolled-back vs dark.** Follows from B2/B3;
+- [x] **B5 — Report unconfirmed vs rolled-back vs dark.** Follows from B2/B3;
       surface the three-way outcome in the settings UI and in
       `.last-update-failure` so the UI can say which happened. *Medium.*
 
 ## B6–B7. Crash forensics
 
-- [ ] **B6 — Breadcrumb the operation in flight.** `system/crashlog.h` keeps a
+- [x] **B6 — Breadcrumb the operation in flight.** `system/crashlog.h` keeps a
       16-byte RTC breadcrumb naming the op in flight plus the reset reason, so
       a boot that dies mid-operation can name it on the next boot: *"panic
       during sd_mount"* rather than *"panic"*. The header notes it was "the
@@ -271,7 +274,7 @@ in full — every guard in it exists because of a specific incident.
       the diagnostics payload at startup. *Medium-High — cheap, and it pays for
       itself the first time.*
 
-- [ ] **B7 — Quarantine whatever killed the last boot.** Our circuit breaker
+- [x] **B7 — Quarantine whatever killed the last boot.** Our circuit breaker
       counts *handled* exceptions; a plugin that gets the process OOM-killed
       never trips it and just crash-loops. `crashlog`'s SD sentinel is the
       pattern: a sentinel is held only while the risky operation is in flight,

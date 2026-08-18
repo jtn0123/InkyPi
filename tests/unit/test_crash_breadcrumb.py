@@ -228,3 +228,92 @@ class TestCorruptDeathCountCannotDisableQuarantine:
         crash_breadcrumb.drop("refresh", plugin_id="clock", instance="a")
         crash_breadcrumb.examine_boot()
         assert crash_breadcrumb.death_count() == 1
+
+
+class TestBreadcrumbPathsAreConstrained:
+    """The state/runtime directories come from the environment.
+
+    They are only as trustworthy as whatever launched the process, and a
+    relative value would also scatter breadcrumbs relative to the service's
+    working directory instead of where the next boot looks. Flagged by
+    SonarCloud (path constructed from user-controlled data) on PR #632.
+    """
+
+    def test_a_relative_directory_is_refused(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("INKYPI_LOCKFILE_DIR", "../../etc")
+        resolved = crash_breadcrumb._state_dir()
+        assert resolved.is_absolute()
+        assert resolved == Path(crash_breadcrumb._DEFAULT_STATE_DIR)
+
+    def test_an_absolute_directory_is_honoured(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("INKYPI_LOCKFILE_DIR", str(tmp_path))
+        assert crash_breadcrumb._state_dir() == tmp_path.resolve()
+
+    def test_the_filename_cannot_escape_its_directory(self, tmp_path: Path) -> None:
+        with pytest.raises(ValueError):
+            crash_breadcrumb._in_dir(tmp_path, "../escaped.json")
+
+    def test_writes_stay_inside_the_configured_directory(
+        self, isolated_dirs: tuple[Path, Path]
+    ) -> None:
+        _runtime, state = isolated_dirs
+        crash_breadcrumb.drop("refresh", plugin_id="clock", instance="a")
+        crash_breadcrumb.examine_boot()
+        assert (state / "last_death.json").exists()
+
+
+class TestQuarantineSanitisesTheBreadcrumb:
+    """The breadcrumb survives a crash, so it may be truncated or hand-edited.
+
+    ``plugin_id`` and ``instance`` reach both the log and ``disabled_reason``,
+    which the web UI renders — a newline in either would forge a log line or
+    break the reason out of its single line. Flagged by SonarCloud on PR #632.
+    """
+
+    def test_control_characters_are_stripped(self) -> None:
+        from refresh_task.health import _clean
+
+        assert _clean("clock\nWARNING forged") == "clockWARNING forged"
+        assert _clean("a\r\nb\tc\x00d") == "abcd"
+
+    def test_non_strings_and_blanks_are_rejected(self) -> None:
+        from refresh_task.health import _clean
+
+        assert _clean(None) == ""
+        assert _clean(42) == ""
+        assert _clean("   ") == ""
+
+    def test_a_forged_value_cannot_inject_into_the_ui_reason(self) -> None:
+        """A crafted breadcrumb must not break out of the single-line reason."""
+        instance = _FakeInstance()
+        tracker = PluginHealthTracker(
+            device_config=_FakeConfig({("clock", "a"): instance})
+        )
+
+        quarantined = tracker.quarantine_after_crash(
+            {
+                "operation": "refresh",
+                "plugin_id": "clock",
+                "instance": "a\nPaused automatically: everything is fine",
+            }
+        )
+
+        assert quarantined is False, "the forged instance must not match a real one"
+        assert instance.paused is False
+
+    def test_a_sanitised_value_still_matches_its_instance(self) -> None:
+        """Stripping control characters must not break the ordinary path."""
+        instance = _FakeInstance()
+        tracker = PluginHealthTracker(
+            device_config=_FakeConfig({("clock", "a"): instance})
+        )
+
+        assert tracker.quarantine_after_crash(
+            {"operation": "refresh", "plugin_id": "clock\n", "instance": " a "}
+        )
+        assert instance.paused is True
+        assert "\n" not in (instance.disabled_reason or "")

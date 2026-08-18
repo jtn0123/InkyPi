@@ -51,24 +51,68 @@ _LAST_DEATH_NAME = "last_death.json"
 _DEATH_HISTORY = 2
 
 
+def _resolved_dir(candidate: str, fallback: str) -> Path:
+    """Resolve an environment-supplied directory, falling back if unusable.
+
+    These directories come from the environment, so they are only as trustworthy
+    as whatever launched the process. A relative value would also scatter
+    breadcrumbs relative to the service's working directory rather than putting
+    them where the next boot looks, so requiring an absolute path is both the
+    safer and the more correct reading.
+    """
+    try:
+        path = Path(candidate).expanduser()
+        if path.is_absolute():
+            return path.resolve()
+        logger.warning(
+            "crash breadcrumb: ignoring relative directory %r; using %s",
+            candidate,
+            fallback,
+        )
+    except (OSError, ValueError):
+        logger.warning(
+            "crash breadcrumb: unusable directory %r; using %s",
+            candidate,
+            fallback,
+            exc_info=True,
+        )
+    return Path(fallback)
+
+
 def _runtime_dir() -> Path:
-    return Path(os.getenv("INKYPI_RUNTIME_DIR", _DEFAULT_RUNTIME_DIR))
-
-
-def _state_dir() -> Path:
-    return Path(
-        os.getenv("INKYPI_LOCKFILE_DIR")
-        or os.getenv("INKYPI_STATE_DIR")
-        or _DEFAULT_STATE_DIR
+    return _resolved_dir(
+        os.getenv("INKYPI_RUNTIME_DIR") or _DEFAULT_RUNTIME_DIR, _DEFAULT_RUNTIME_DIR
     )
 
 
+def _state_dir() -> Path:
+    return _resolved_dir(
+        os.getenv("INKYPI_LOCKFILE_DIR")
+        or os.getenv("INKYPI_STATE_DIR")
+        or _DEFAULT_STATE_DIR,
+        _DEFAULT_STATE_DIR,
+    )
+
+
+def _in_dir(directory: Path, name: str) -> Path:
+    """Join a *constant* filename to *directory*, refusing to escape it.
+
+    ``name`` is a module constant today; the check keeps that a property of the
+    code rather than an assumption, so a future caller cannot turn these
+    helpers into an arbitrary-write primitive.
+    """
+    candidate = (directory / name).resolve()
+    if candidate.parent != directory:
+        raise ValueError(f"{name!r} does not resolve inside {directory}")
+    return candidate
+
+
 def _breadcrumb_path() -> Path:
-    return _runtime_dir() / _BREADCRUMB_NAME
+    return _in_dir(_runtime_dir(), _BREADCRUMB_NAME)
 
 
 def _last_death_path() -> Path:
-    return _state_dir() / _LAST_DEATH_NAME
+    return _in_dir(_state_dir(), _LAST_DEATH_NAME)
 
 
 def _now_iso() -> str:
