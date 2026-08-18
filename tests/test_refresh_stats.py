@@ -303,3 +303,130 @@ class TestApiStatsEndpoint:
         assert resp.status_code == 200
         data = resp.get_json()
         assert data["last_1h"]["total"] == 0
+
+
+# ---------------------------------------------------------------------------
+# Records written before the `status` field existed
+# ---------------------------------------------------------------------------
+
+
+class TestSidecarsWithoutAStatusField:
+    """A sidecar with no `status` is a successful display, not a failure.
+
+    Every sidecar the app had actually written on disk looked like this —
+    `refresh_type`, `plugin_id`, `playlist`, `plugin_instance`, `refresh_time`
+    and nothing else. `failure` used to be derived as `total - success`, so all
+    of them counted as errors and the dashboard reported a 100% error rate on a
+    healthy device. Every existing test supplied an explicit status, so nothing
+    covered the shape the app was really producing.
+    """
+
+    def setup_method(self):
+        from utils.refresh_stats import _clear_cache
+
+        _clear_cache()
+
+    def _real_world_record(self, ts, **extra):
+        """The exact shape display_manager writes for a successful display."""
+        return {
+            "refresh_type": "Manual Update",
+            "plugin_id": "clock",
+            "playlist": None,
+            "plugin_instance": None,
+            "refresh_time": "2026-08-15T15:40:35.447671-07:00",
+            "timestamp": ts,
+            **extra,
+        }
+
+    def test_statusless_records_count_as_successes(self, tmp_path):
+        from utils.refresh_stats import compute_stats
+
+        now = time.time()
+        records = [self._real_world_record(now - i) for i in range(1, 4)]
+        result = compute_stats(_make_sidecars(tmp_path, records), 3600)
+
+        assert result["total"] == 3
+        assert result["failure"] == 0, "a displayed render is not an error"
+        assert result["success"] == 3
+        assert result["success_rate"] == 1.0
+
+    def test_explicit_failures_are_still_counted(self, tmp_path):
+        from utils.refresh_stats import compute_stats
+
+        now = time.time()
+        records = [
+            self._real_world_record(now - 1),
+            self._real_world_record(now - 2, status="failure", plugin_id="weather"),
+            self._real_world_record(now - 3, status="success"),
+        ]
+        result = compute_stats(_make_sidecars(tmp_path, records), 3600)
+
+        assert result["total"] == 3
+        assert result["failure"] == 1
+        assert result["success"] == 2
+
+    def test_failure_count_agrees_with_top_failing(self, tmp_path):
+        """These two disagreed: many errors reported, no failing plugins listed.
+
+        Both now key on the same explicit status, so the numbers cannot drift
+        apart again.
+        """
+        from utils.refresh_stats import compute_stats
+
+        now = time.time()
+        records = [
+            self._real_world_record(now - 1),
+            self._real_world_record(now - 2),
+            self._real_world_record(now - 3, status="failure", plugin_id="weather"),
+        ]
+        result = compute_stats(_make_sidecars(tmp_path, records), 3600)
+
+        assert result["failure"] == sum(f["count"] for f in result["top_failing"])
+
+    def test_an_unrecognised_status_is_not_an_error(self, tmp_path):
+        """Only an explicit "failure" counts; unknown values are not errors."""
+        from utils.refresh_stats import compute_stats
+
+        now = time.time()
+        records = [self._real_world_record(now - 1, status="displayed")]
+        result = compute_stats(_make_sidecars(tmp_path, records), 3600)
+
+        assert result["failure"] == 0
+        assert result["success"] == 1
+
+
+class TestHistoryMetaCarriesStatus:
+    """The writer half — success and error renders must be distinguishable."""
+
+    class _Action:
+        def get_refresh_info(self):
+            return {
+                "refresh_type": "Playlist",
+                "plugin_id": "clock",
+                "playlist": "Default",
+                "plugin_instance": "clock-a",
+            }
+
+    def test_default_is_success(self):
+        from refresh_task.housekeeping import RefreshHousekeeper
+
+        meta = RefreshHousekeeper.build_history_meta(self._Action())
+        assert meta["status"] == "success"
+
+    def test_failure_status_can_be_recorded(self):
+        from refresh_task.housekeeping import RefreshHousekeeper
+
+        meta = RefreshHousekeeper.build_history_meta(self._Action(), status="failure")
+        assert meta["status"] == "failure"
+
+    def test_fallback_error_render_is_recorded_as_a_failure(self):
+        """The error-card path pushes an image, so it writes a sidecar too.
+
+        Without a status it was indistinguishable on disk from a real render.
+        """
+        import inspect
+
+        from refresh_task import housekeeping
+
+        source = inspect.getsource(housekeeping.RefreshHousekeeper.push_fallback_image)
+        assert 'status="failure"' in source

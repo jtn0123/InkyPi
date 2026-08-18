@@ -28,6 +28,12 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
+#: Sidecar ``status`` marking a refresh that displayed an error card rather than
+#: plugin output. Anything else — including records written before the field
+#: existed — is a successful display, because a sidecar is only written once an
+#: image has actually been shown.
+_STATUS_FAILURE = "failure"
+
 # ---------------------------------------------------------------------------
 # Cache — one entry per (history_dir, window_seconds) pair
 # ---------------------------------------------------------------------------
@@ -100,8 +106,17 @@ def _load_sidecars(history_dir: str, since: float) -> list[RefreshStatsRecord]:
 def _compute_window(records: list[RefreshStatsRecord]) -> RefreshStatsResult:
     """Build the stats dict for a pre-filtered list of sidecar records."""
     total = len(records)
-    success = sum(1 for r in records if r.get("status") == "success")
-    failure = total - success
+    # Count failures explicitly rather than deriving them from "not success".
+    #
+    # A sidecar is only written when an image actually reached the display, so
+    # its existence already means a refresh happened. Deriving failures as
+    # `total - success` therefore misclassified every record that predates the
+    # `status` field — which was all of them — and the dashboard reported a 100%
+    # error rate on a perfectly healthy device. It also disagreed with
+    # `top_failing` below, which has always keyed on an explicit "failure",
+    # leaving the UI showing many errors and no failing plugins.
+    failure = sum(1 for r in records if r.get("status") == _STATUS_FAILURE)
+    success = total - failure
     success_rate = (success / total) if total else 0.0
 
     durations = sorted(
@@ -116,7 +131,7 @@ def _compute_window(records: list[RefreshStatsRecord]) -> RefreshStatsResult:
     # Top failing plugins — plugins that appear in failure records
     fail_counter: Counter[str] = Counter()
     for r in records:
-        if r.get("status") == "failure":
+        if r.get("status") == _STATUS_FAILURE:
             plugin = r.get("plugin_id") or r.get("plugin") or "unknown"
             fail_counter[plugin] += 1
 

@@ -79,6 +79,9 @@ def test_refresh_housekeeper_build_history_meta_prefers_explicit_instance() -> N
         "plugin_id": "weather",
         "playlist": "Default",
         "plugin_instance": "override",
+        # Sidecars now record success/failure so the dashboard can tell a
+        # rendered plugin from a rendered error card.
+        "status": "success",
     }
 
 

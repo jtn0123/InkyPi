@@ -79,8 +79,15 @@ class RefreshHousekeeper:
         refresh_action: RefreshActionLike,
         *,
         instance_name: str | None = None,
+        status: str = "success",
     ) -> dict[str, str | None]:
-        """Build a consistent history metadata payload from a refresh action."""
+        """Build a consistent history metadata payload from a refresh action.
+
+        ``status`` is what lets the dashboard tell a rendered plugin apart from a
+        rendered *error card*. Both push an image and therefore both write a
+        sidecar, so without it the two are indistinguishable on disk — which is
+        exactly how every successful refresh came to be counted as an error.
+        """
         refresh_info = refresh_action.get_refresh_info()
         return {
             "refresh_type": refresh_info.get("refresh_type"),
@@ -91,6 +98,7 @@ class RefreshHousekeeper:
                 if instance_name is not None
                 else refresh_info.get("plugin_instance")
             ),
+            "status": status,
         }
 
     def stale_display_path(self) -> str | None:
@@ -127,7 +135,7 @@ class RefreshHousekeeper:
                 fallback,
                 image_settings=plugin_config.get("image_settings", []),
                 history_meta=self.build_history_meta(
-                    refresh_action, instance_name=instance_name
+                    refresh_action, instance_name=instance_name, status="failure"
                 ),
             )
             logger.info(
