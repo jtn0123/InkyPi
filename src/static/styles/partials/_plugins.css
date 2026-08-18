@@ -316,13 +316,18 @@
     width: auto;
     padding: 0;
     min-height: 0;
-    /* Wrap to a second line rather than truncating.
+    /* Wrap to a second line rather than truncating on the first.
      *
      * `white-space: nowrap` clipped the plugin's *name* — "NASA Astronom…",
      * "Wikipedia:Pictur…", "Today's Newspa…" — and the name is the only thing
      * distinguishing one tile from another in a 20-item grid. The description
-     * below may still truncate; that is what descriptions are for. Two lines is
-     * enough for every shipped plugin name and keeps the tiles even. */
+     * below may still truncate; that is what descriptions are for.
+     *
+     * Two lines resolves every shipped name except the two longest
+     * ("Wikipedia:Picture of the day", "NASA Astronomy Picture of the Day"),
+     * which still end in an ellipsis but now show enough to tell them apart.
+     * A third line would fix those too at the cost of taller tiles across the
+     * whole grid; the trade is not worth it for two plugins. */
     display: -webkit-box;
     -webkit-line-clamp: 2;
     line-clamp: 2;
