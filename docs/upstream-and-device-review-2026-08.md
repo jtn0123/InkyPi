@@ -112,6 +112,17 @@ original bug plus two more that upstream fixed in the same neighbourhood.
 > separately means touching the same function three times. **Fold JTN-769 (A0)
 > into the same change** — it's the same file and the same parse loop.
 
+- [ ] **A1d — Open-Meteo timestamps are parsed in the wrong timezone.**
+      With `timezone=auto` the API returns offset-free *local* timestamps for
+      the forecast location, but `weather_data.py` attaches the device timezone
+      before converting. Anywhere the device and the forecast location differ,
+      current/hourly/sunrise/sunset/humidity/pressure all shift. Predates this
+      review — raised by CodeRabbit on
+      [#632](https://github.com/jtn0123/InkyPi/pull/632) and deliberately left
+      out of it: the fix spans the API and data-point helpers, and it changes
+      behaviour for everyone whose device timezone already matches their
+      location, so it wants its own change and its own testing. *Medium.*
+
 ## A2. New upstream PRs since the April review
 
 Seventeen PRs opened after 2026-04-19. Triaged against our tree.
