@@ -2,7 +2,7 @@ import logging
 import math
 import os
 from collections.abc import Mapping, Sequence
-from datetime import UTC, date, datetime, timedelta, tzinfo
+from datetime import UTC, date, datetime, tzinfo
 from typing import Any
 from zoneinfo import ZoneInfo
 
@@ -44,6 +44,70 @@ UNITS = {
     "metric": {"temperature": "\u00b0C", "speed": "m/s"},
     "imperial": {"temperature": "\u00b0F", "speed": "mph"},
 }
+
+#: Offset from Celsius to Kelvin.  Open-Meteo has no Kelvin output mode, so
+#: "standard" units are fetched in Celsius and shifted here at parse time.
+_KELVIN_OFFSET = 273.15
+
+
+def icon_path(plugin_dir: str, icon_name: str) -> str:
+    """Absolute path to one of the plugin's PNG icons.
+
+    Every icon this plugin renders — weather conditions, moon phases and the
+    data-point glyphs — lives in ``<plugin_dir>/icons/``.  Several call sites
+    previously joined against ``plugin_dir`` directly, producing paths like
+    ``.../weather/01d.png`` that do not exist, so the forecast row, moon phase
+    and current-conditions images rendered broken for both providers.  Routing
+    every join through one helper keeps that from drifting apart again.
+    """
+    return os.path.join(plugin_dir, "icons", f"{icon_name}.png")
+
+
+#: Maps the modern Open-Meteo ``current=`` response keys onto the legacy
+#: ``current_weather=true`` names the parsers were written against.
+_OPEN_METEO_CURRENT_ALIASES = {
+    "temperature_2m": "temperature",
+    "wind_speed_10m": "windspeed",
+    "wind_direction_10m": "winddirection",
+    "weather_code": "weathercode",
+}
+
+
+def to_display_temperature(value: Any, units: str) -> float:
+    """Convert an Open-Meteo temperature into the unit the user asked for.
+
+    Open-Meteo returns Celsius for both ``metric`` and ``standard`` (it has no
+    Kelvin mode), and Fahrenheit for ``imperial``.  Only ``standard`` needs
+    shifting.  Non-numeric values fall back to ``0.0`` so a malformed response
+    degrades to a visible zero rather than raising mid-render.
+    """
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError):
+        return 0.0
+    return numeric + _KELVIN_OFFSET if units == "standard" else numeric
+
+
+def _open_meteo_current(weather_data: Mapping[str, Any]) -> dict[str, Any]:
+    """Return the current-conditions block in the legacy key spelling.
+
+    Accepts either the modern ``current`` block (what we now request, and the
+    only one carrying ``apparent_temperature``) or the legacy
+    ``current_weather`` block, so cached responses and existing fixtures keep
+    working.  Modern keys are translated to the legacy names the parsers use;
+    keys with no legacy equivalent (``apparent_temperature``, ``precipitation``)
+    pass through unchanged.
+    """
+    current = weather_data.get("current")
+    if not isinstance(current, Mapping):
+        legacy = weather_data.get("current_weather")
+        return dict(legacy) if isinstance(legacy, Mapping) else {}
+
+    normalised: dict[str, Any] = {}
+    for key, value in current.items():
+        name = str(key)
+        normalised[_OPEN_METEO_CURRENT_ALIASES.get(name, name)] = value
+    return normalised
 
 
 def get_moon_phase_name(phase_age: float) -> str:
@@ -180,7 +244,7 @@ def get_moon_phase_icon_path(phase_name: str, lat: float, plugin_dir: str) -> st
         elif phase_name == "lastquarter":
             phase_name = "firstquarter"
 
-    return os.path.join(plugin_dir, f"{phase_name}.png")
+    return icon_path(plugin_dir, phase_name)
 
 
 _MOON_PHASES = [
@@ -228,7 +292,7 @@ def parse_forecast(
         else:
             if weather_icon.endswith("n"):
                 weather_icon = weather_icon.replace("n", "d")
-        weather_icon_path = os.path.join(plugin_dir, f"{weather_icon}.png")
+        weather_icon_path = icon_path(plugin_dir, weather_icon)
 
         # --- moon phase & icon ---
         moon_phase = float(day["moon_phase"])  # [0.0-1.0]
@@ -264,6 +328,7 @@ def parse_open_meteo_forecast(
     is_day: int,
     lat: float,
     plugin_dir: str,
+    units: str = "metric",
 ) -> list[dict[str, Any]]:
     """
     Parse the daily forecast from Open-Meteo API and calculate moon phase and illumination using the local 'astral' library.
@@ -283,9 +348,12 @@ def parse_open_meteo_forecast(
 
         code = weather_codes[i] if i < len(weather_codes) else 0
         weather_icon = map_weather_code_to_icon(code, is_day)
-        weather_icon_path = os.path.join(plugin_dir, f"{weather_icon}.png")
+        weather_icon_path = icon_path(plugin_dir, weather_icon)
 
-        target_date: date = dt.date() + timedelta(days=1)
+        # The moon phase belongs to the day being rendered.  This previously
+        # added a day, so every row showed tomorrow's phase against today's
+        # label (upstream fatihak#613).
+        target_date: date = dt.date()
 
         try:
             phase_age = moon.phase(target_date)
@@ -304,8 +372,16 @@ def parse_open_meteo_forecast(
         forecast.append(
             {
                 "day": day_label,
-                "high": int(temp_max[i]) if i < len(temp_max) else 0,
-                "low": int(temp_min[i]) if i < len(temp_min) else 0,
+                "high": (
+                    int(to_display_temperature(temp_max[i], units))
+                    if i < len(temp_max)
+                    else 0
+                ),
+                "low": (
+                    int(to_display_temperature(temp_min[i], units))
+                    if i < len(temp_min)
+                    else 0
+                ),
                 "icon": weather_icon_path,
                 "moon_phase_pct": f"{illum_pct:.0f}",
                 "moon_phase_icon": moon_icon_path,
@@ -336,16 +412,58 @@ def parse_hourly(
     return hourly
 
 
+def _is_daytime(
+    moment: datetime,
+    sunrises: Sequence[str],
+    sunsets: Sequence[str],
+    tz: tzinfo,
+) -> int:
+    """Return 1 when *moment* falls inside any sunrise→sunset interval.
+
+    Open-Meteo returns one sunrise and one sunset per forecast day, aligned by
+    index.  Testing interval containment rather than matching on calendar date
+    keeps this correct across the day boundary and needs no assumption about
+    which day an hour belongs to.
+
+    Timestamps are parsed exactly the way the hourly rows are (see the caller),
+    so both sides of the comparison land in the same frame of reference even
+    though ``timezone=auto`` responses are naive.  With no usable sunrise data —
+    polar summer/winter, or a malformed entry — this reports daytime, matching
+    the plugin's existing ``is_day`` fallback.
+    """
+    covered = False
+    for index, sunrise_str in enumerate(sunrises):
+        if index >= len(sunsets):
+            break
+        try:
+            sunrise = datetime.fromisoformat(sunrise_str).astimezone(tz)
+            sunset = datetime.fromisoformat(sunsets[index]).astimezone(tz)
+        except (TypeError, ValueError):
+            continue
+        covered = True
+        if sunrise <= moment < sunset:
+            return 1
+    # Parsed at least one interval and the moment sat outside all of them.
+    return 0 if covered else 1
+
+
 def parse_open_meteo_hourly(
     hourly_data: Mapping[str, Any],
     tz: tzinfo,
     time_format: str,
+    units: str = "metric",
+    plugin_dir: str = "",
+    sunrises: Sequence[str] | None = None,
+    sunsets: Sequence[str] | None = None,
 ) -> list[dict[str, Any]]:
     hourly = []
     times = hourly_data.get("time", [])
     temperatures = hourly_data.get("temperature_2m", [])
     precipitation_probabilities = hourly_data.get("precipitation_probability", [])
     rain = hourly_data.get("precipitation", [])
+    weather_codes = hourly_data.get("weather_code", [])
+    sunrises = sunrises or []
+    sunsets = sunsets or []
     current_time_in_tz = datetime.now(tz)
     start_index = 0
     for i, time_str in enumerate(times):
@@ -367,13 +485,16 @@ def parse_open_meteo_hourly(
     sliced_temperatures = temperatures[start_index:]
     sliced_precipitation_probabilities = precipitation_probabilities[start_index:]
     sliced_rain = rain[start_index:]
+    sliced_weather_codes = weather_codes[start_index:]
 
     for i in range(min(24, len(sliced_times))):
         dt = datetime.fromisoformat(sliced_times[i]).astimezone(tz)
         hour_forecast = {
             "time": format_time(dt, time_format, True),
             "temperature": (
-                int(sliced_temperatures[i]) if i < len(sliced_temperatures) else 0
+                int(to_display_temperature(sliced_temperatures[i], units))
+                if i < len(sliced_temperatures)
+                else 0
             ),
             "precipitation": (
                 (sliced_precipitation_probabilities[i] / 100)
@@ -382,6 +503,15 @@ def parse_open_meteo_hourly(
             ),
             "rain": (sliced_rain[i]) if i < len(sliced_rain) else 0,
         }
+        # Per-hour icon for the forecast graph's `displayGraphIcons` option.
+        # Omitted entirely when the response carries no hourly weather codes,
+        # so the template's `hour.icon` stays falsy rather than pointing at a
+        # file that does not exist.
+        if i < len(sliced_weather_codes):
+            icon_name = map_weather_code_to_icon(
+                sliced_weather_codes[i], _is_daytime(dt, sunrises, sunsets, tz)
+            )
+            hour_forecast["icon"] = icon_path(plugin_dir, icon_name)
         hourly.append(hour_forecast)
     return hourly
 
@@ -423,7 +553,7 @@ def _build_sun_data_point(
         "label": label,
         "measurement": format_time(dt, time_format, include_am_pm=False),
         "unit": "" if time_format == "24h" else dt.strftime("%p"),
-        "icon": os.path.join(plugin_dir, f"icons/{icon_name}.png"),
+        "icon": icon_path(plugin_dir, icon_name),
     }
 
 
@@ -565,7 +695,7 @@ def _build_open_meteo_sun_point(
         "label": label,
         "measurement": format_time(dt, time_format, include_am_pm=False),
         "unit": "" if time_format == "24h" else dt.strftime("%p"),
-        "icon": os.path.join(plugin_dir, f"icons/{icon_name}.png"),
+        "icon": icon_path(plugin_dir, icon_name),
     }
 
 
@@ -740,7 +870,7 @@ def parse_weather_data(
         current_icon = current_icon.replace("n", "d")
     data: dict[str, Any] = {
         "current_date": dt.strftime("%A, %B %d"),
-        "current_day_icon": os.path.join(plugin_dir, f"{current_icon}.png"),
+        "current_day_icon": icon_path(plugin_dir, current_icon),
         "current_temperature": str(round(current.get("temp"))),
         "feels_like": str(round(current.get("feels_like"))),
         "temperature_unit": UNITS[units]["temperature"],
@@ -767,36 +897,50 @@ def parse_open_meteo_data(
     lat: float,
     plugin_dir: str,
 ) -> dict[str, Any]:
-    current = weather_data.get("current_weather", {})
+    current = _open_meteo_current(weather_data)
+    current_time = current.get("time")
     dt = (
-        datetime.fromisoformat(current.get("time")).astimezone(tz)
-        if current.get("time")
+        datetime.fromisoformat(str(current_time)).astimezone(tz)
+        if current_time
         else datetime.now(tz)
     )
     weather_code = current.get("weathercode", 0)
     is_day = current.get("is_day", 1)
     current_icon = map_weather_code_to_icon(weather_code, is_day)
 
+    temperature = current.get("temperature", 0)
+    # apparent_temperature is only present on the modern `current` block; fall
+    # back to the plain temperature for legacy/cached responses.
+    apparent = current.get("apparent_temperature")
+    if apparent is None:
+        apparent = temperature
+
+    daily_data = weather_data.get("daily", {})
+
     data: dict[str, Any] = {
         "current_date": dt.strftime("%A, %B %d"),
-        "current_day_icon": os.path.join(plugin_dir, f"{current_icon}.png"),
-        "current_temperature": str(round(current.get("temperature", 0))),
-        "feels_like": str(
-            round(current.get("apparent_temperature", current.get("temperature", 0)))
-        ),
+        "current_day_icon": icon_path(plugin_dir, current_icon),
+        "current_temperature": str(round(to_display_temperature(temperature, units))),
+        "feels_like": str(round(to_display_temperature(apparent, units))),
         "temperature_unit": UNITS[units]["temperature"],
         "units": units,
         "time_format": time_format,
     }
 
     data["forecast"] = parse_open_meteo_forecast(
-        weather_data.get("daily", {}), tz, is_day, lat, plugin_dir
+        daily_data, tz, is_day, lat, plugin_dir, units=units
     )
     data["data_points"] = parse_open_meteo_data_points(
         weather_data, aqi_data, tz, units, time_format, plugin_dir
     )
 
     data["hourly_forecast"] = parse_open_meteo_hourly(
-        weather_data.get("hourly", {}), tz, time_format
+        weather_data.get("hourly", {}),
+        tz,
+        time_format,
+        units=units,
+        plugin_dir=plugin_dir,
+        sunrises=daily_data.get("sunrise", []),
+        sunsets=daily_data.get("sunset", []),
     )
     return data

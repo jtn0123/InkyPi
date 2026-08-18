@@ -381,10 +381,15 @@ class Weather(BasePlugin):
         )
 
     def parse_open_meteo_forecast(
-        self, daily_data: Mapping[str, Any], tz: tzinfo, is_day: int, lat: float
+        self,
+        daily_data: Mapping[str, Any],
+        tz: tzinfo,
+        is_day: int,
+        lat: float,
+        units: str = "metric",
     ) -> list[dict[str, Any]]:
         return _wd.parse_open_meteo_forecast(
-            daily_data, tz, is_day, lat, self.get_plugin_dir()
+            daily_data, tz, is_day, lat, self.get_plugin_dir(), units=units
         )
 
     def parse_hourly(
@@ -397,9 +402,23 @@ class Weather(BasePlugin):
         return _wd.parse_hourly(hourly_forecast, tz, time_format, units)
 
     def parse_open_meteo_hourly(
-        self, hourly_data: Mapping[str, Any], tz: tzinfo, time_format: str
+        self,
+        hourly_data: Mapping[str, Any],
+        tz: tzinfo,
+        time_format: str,
+        units: str = "metric",
+        sunrises: Sequence[str] | None = None,
+        sunsets: Sequence[str] | None = None,
     ) -> list[dict[str, Any]]:
-        return _wd.parse_open_meteo_hourly(hourly_data, tz, time_format)
+        return _wd.parse_open_meteo_hourly(
+            hourly_data,
+            tz,
+            time_format,
+            units=units,
+            plugin_dir=self.get_plugin_dir(),
+            sunrises=sunrises,
+            sunsets=sunsets,
+        )
 
     def parse_data_points(
         self,

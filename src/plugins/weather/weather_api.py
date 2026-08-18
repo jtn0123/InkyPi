@@ -20,10 +20,36 @@ _OPEN_METEO_BASE = os.getenv("INKYPI_OPEN_METEO_API_URL", "https://api.open-mete
 _OPEN_METEO_AQI_BASE = os.getenv(
     "INKYPI_OPEN_METEO_AQI_API_URL", "https://air-quality-api.open-meteo.com"
 )
-OPEN_METEO_FORECAST_URL = f"{_OPEN_METEO_BASE}/v1/forecast?latitude={{lat}}&longitude={{long}}&hourly=temperature_2m,precipitation,precipitation_probability,relative_humidity_2m,surface_pressure,visibility&daily=weathercode,temperature_2m_max,temperature_2m_min,sunrise,sunset&current_weather=true&timezone=auto&models=best_match&forecast_days={{forecast_days}}"
+#: Current-conditions variables requested from Open-Meteo.
+#
+# Replaces the legacy ``current_weather=true`` block, which carries only
+# temperature/windspeed/winddirection/weathercode/is_day.  In particular it has
+# no ``apparent_temperature``, so the "feels like" reading silently fell back to
+# the plain temperature for every Open-Meteo user.  The modern ``current=``
+# parameter lets us ask for it explicitly.  Response keys match these names
+# (``temperature_2m`` etc.), which is why ``_open_meteo_current()`` in
+# weather_data.py normalises both spellings.
+OPEN_METEO_CURRENT_FIELDS = (
+    "temperature_2m,apparent_temperature,wind_speed_10m,wind_direction_10m,"
+    "is_day,precipitation,weather_code"
+)
+
+#: Hourly variables. ``weather_code`` drives the per-hour icons on the forecast
+#: graph (``displayGraphIcons``); without it ``hour.icon`` renders empty.
+OPEN_METEO_HOURLY_FIELDS = (
+    "weather_code,temperature_2m,precipitation,precipitation_probability,"
+    "relative_humidity_2m,surface_pressure,visibility"
+)
+
+OPEN_METEO_FORECAST_URL = f"{_OPEN_METEO_BASE}/v1/forecast?latitude={{lat}}&longitude={{long}}&hourly={OPEN_METEO_HOURLY_FIELDS}&daily=weathercode,temperature_2m_max,temperature_2m_min,sunrise,sunset&current={OPEN_METEO_CURRENT_FIELDS}&timezone=auto&models=best_match&forecast_days={{forecast_days}}"
 OPEN_METEO_AIR_QUALITY_URL = f"{_OPEN_METEO_AQI_BASE}/v1/air-quality?latitude={{lat}}&longitude={{long}}&hourly=european_aqi,uv_index,uv_index_clear_sky&timezone=auto"
+
+# Open-Meteo accepts only ``celsius`` and ``fahrenheit`` for temperature_unit.
+# "Standard" (Kelvin) is therefore requested in Celsius and converted at parse
+# time by ``weather_data.to_display_temperature`` — sending
+# ``temperature_unit=kelvin`` made the API reject the request outright.
 OPEN_METEO_UNIT_PARAMS = {
-    "standard": "temperature_unit=kelvin&wind_speed_unit=ms&precipitation_unit=mm",
+    "standard": "temperature_unit=celsius&wind_speed_unit=ms&precipitation_unit=mm",
     "metric": "temperature_unit=celsius&wind_speed_unit=ms&precipitation_unit=mm",
     "imperial": "temperature_unit=fahrenheit&wind_speed_unit=mph&precipitation_unit=inch",
 }

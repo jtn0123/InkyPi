@@ -338,3 +338,210 @@ class TestFormatOwmVisibility:
 
         assert _format_owm_visibility(None, "imperial") == "N/A"
         assert _format_owm_visibility(None, "metric") == "N/A"
+
+
+#: Far enough ahead that the hourly parser's "skip past hours already gone
+#: today" filter never trims a fixture row, whatever day the suite runs on.
+FUTURE_DAY = "2099-06-15"
+
+
+class TestOpenMeteoUnitsAndIcons:
+    """Regression cover for the Open-Meteo request/parse fixes.
+
+    Open-Meteo has no Kelvin output mode and its legacy ``current_weather``
+    block carries no apparent temperature, so "Standard" units failed outright
+    and "feels like" silently mirrored the plain temperature.
+    """
+
+    def test_standard_units_request_celsius_not_kelvin(self):
+        from plugins.weather.weather_api import OPEN_METEO_UNIT_PARAMS
+
+        # Open-Meteo rejects temperature_unit=kelvin; we convert at parse time.
+        assert "temperature_unit=celsius" in OPEN_METEO_UNIT_PARAMS["standard"]
+        assert "kelvin" not in OPEN_METEO_UNIT_PARAMS["standard"]
+
+    def test_forecast_url_requests_apparent_temperature_and_hourly_codes(self):
+        from plugins.weather.weather_api import OPEN_METEO_FORECAST_URL
+
+        assert "apparent_temperature" in OPEN_METEO_FORECAST_URL
+        assert "hourly=weather_code" in OPEN_METEO_FORECAST_URL
+        assert "current_weather=true" not in OPEN_METEO_FORECAST_URL
+
+    def test_to_display_temperature_shifts_only_standard(self):
+        from plugins.weather.weather_data import to_display_temperature
+
+        assert to_display_temperature(0, "standard") == pytest.approx(273.15)
+        assert to_display_temperature(0, "metric") == 0
+        assert to_display_temperature(50, "imperial") == 50
+        # A malformed reading degrades to zero rather than raising mid-render.
+        assert to_display_temperature("n/a", "metric") == 0.0
+
+    def test_current_block_normalises_modern_and_legacy_shapes(self):
+        from plugins.weather.weather_data import _open_meteo_current
+
+        modern = _open_meteo_current(
+            {
+                "current": {
+                    "temperature_2m": 12,
+                    "wind_speed_10m": 3,
+                    "wind_direction_10m": 180,
+                    "weather_code": 2,
+                    "apparent_temperature": 10,
+                }
+            }
+        )
+        assert modern["temperature"] == 12
+        assert modern["windspeed"] == 3
+        assert modern["winddirection"] == 180
+        assert modern["weathercode"] == 2
+        # No legacy equivalent, so it passes through untouched.
+        assert modern["apparent_temperature"] == 10
+
+        legacy = _open_meteo_current({"current_weather": {"temperature": 7}})
+        assert legacy["temperature"] == 7
+        assert _open_meteo_current({}) == {}
+
+    def test_feels_like_uses_apparent_temperature_when_present(self, weather_plugin):
+        w = weather_plugin
+        data = w.parse_open_meteo_data(
+            {
+                "current": {
+                    "temperature_2m": 20,
+                    "apparent_temperature": 26,
+                    "weather_code": 0,
+                    "is_day": 1,
+                },
+                "daily": {},
+                "hourly": {},
+            },
+            {},
+            UTC,
+            "metric",
+            "24h",
+            40.7,
+        )
+        assert data["current_temperature"] == "20"
+        assert data["feels_like"] == "26"
+
+    def test_standard_units_convert_current_and_forecast_to_kelvin(
+        self, weather_plugin
+    ):
+        w = weather_plugin
+        data = w.parse_open_meteo_data(
+            {
+                "current": {
+                    "temperature_2m": 0,
+                    "apparent_temperature": 0,
+                    "weather_code": 0,
+                    "is_day": 1,
+                },
+                "daily": {
+                    "time": ["2026-08-15"],
+                    "weathercode": [0],
+                    "temperature_2m_max": [10],
+                    "temperature_2m_min": [0],
+                },
+                "hourly": {},
+            },
+            {},
+            UTC,
+            "standard",
+            "24h",
+            40.7,
+        )
+        assert data["current_temperature"] == "273"
+        assert data["feels_like"] == "273"
+        assert data["forecast"][0]["high"] == 283
+        assert data["forecast"][0]["low"] == 273
+
+    def test_moon_phase_uses_the_rendered_day_not_tomorrow(
+        self, monkeypatch, weather_plugin
+    ):
+        from astral import moon
+
+        seen = []
+        monkeypatch.setattr(moon, "phase", lambda d: seen.append(d) or 14.75)
+        weather_plugin.parse_open_meteo_forecast(
+            {
+                "time": ["2026-08-15"],
+                "weathercode": [0],
+                "temperature_2m_max": [15],
+                "temperature_2m_min": [5],
+            },
+            UTC,
+            1,
+            40.7,
+        )
+        assert [d.isoformat() for d in seen] == ["2026-08-15"]
+
+    def test_hourly_rows_carry_icons_derived_from_weather_codes(self, weather_plugin):
+        # A future date keeps every row past the parser's "start at the current
+        # hour" filter, so the assertion does not depend on the wall clock.
+        # Open-Meteo returns naive local timestamps (timezone=auto); rows and
+        # sunrise/sunset are parsed identically, so the day/night verdict holds
+        # whatever the host timezone is.
+        rows = weather_plugin.parse_open_meteo_hourly(
+            {
+                "time": [f"{FUTURE_DAY}T12:00", f"{FUTURE_DAY}T22:00"],
+                "temperature_2m": [20, 15],
+                "precipitation_probability": [0, 0],
+                "precipitation": [0, 0],
+                "weather_code": [0, 0],
+            },
+            UTC,
+            "24h",
+            sunrises=[f"{FUTURE_DAY}T06:00"],
+            sunsets=[f"{FUTURE_DAY}T20:00"],
+        )
+        assert len(rows) == 2
+        # Clear sky by day vs night resolves to the day/night icon pair.
+        assert rows[0]["icon"].endswith("01d.png")
+        assert rows[1]["icon"].endswith("01n.png")
+
+    def test_hourly_rows_omit_icon_when_codes_absent(self, weather_plugin):
+        rows = weather_plugin.parse_open_meteo_hourly(
+            {
+                "time": [f"{FUTURE_DAY}T12:00"],
+                "temperature_2m": [20],
+                "precipitation_probability": [0],
+                "precipitation": [0],
+            },
+            UTC,
+            "24h",
+        )
+        # Falsy in the template rather than a path that does not exist.
+        assert "icon" not in rows[0]
+
+
+class TestWeatherIconPaths:
+    """Every icon the plugin renders lives in <plugin_dir>/icons/."""
+
+    def test_icon_path_points_into_the_icons_directory(self):
+        from plugins.weather.weather_data import icon_path
+
+        assert icon_path("/plugins/weather", "01d") == "/plugins/weather/icons/01d.png"
+
+    def test_forecast_and_moon_icons_resolve_on_disk(self):
+        import json
+        import os
+
+        from plugins.weather.weather import Weather
+        from plugins.weather.weather_data import parse_open_meteo_forecast
+
+        with open("src/plugins/weather/plugin-info.json") as handle:
+            cfg = json.load(handle)
+        plugin_dir = Weather(cfg).get_plugin_dir()
+        rows = parse_open_meteo_forecast(
+            {
+                "time": ["2026-08-15"],
+                "weathercode": [0],
+                "temperature_2m_max": [20],
+                "temperature_2m_min": [10],
+            },
+            UTC,
+            1,
+            40.7,
+            plugin_dir,
+        )
+        assert os.path.exists(rows[0]["icon"]), rows[0]["icon"]
+        assert os.path.exists(rows[0]["moon_phase_icon"]), rows[0]["moon_phase_icon"]
