@@ -50,6 +50,23 @@ This guide walks you through the process of creating a new plugin for InkyPi.
             # update value for next refresh
             settings["index"] = settings["index"] + 1
         ```
+- (Optional) If your plugin sometimes has nothing worth showing, implement `skip_display_condition` to yield its playlist turn instead of rendering an empty frame. On an e-ink panel the cheapest refresh is the one that never happens.
+    - Return `None` to render normally, or a short reason string to skip this cycle. The reason is recorded against the plugin, so a skip reads as deliberate rather than as a silent failure.
+    - Intended for plugins with legitimate quiet periods — a scoreboard out of season, a calendar with no events today, a feed with nothing new.
+    - Only playlist refreshes are skipped. A manual **Update Now** always renders, because declining an explicit request looks like a broken button.
+    - If the hook fetches data to decide and then returns `None`, cache what it fetched in a plugin-private `settings` key so `generate_image` does not immediately repeat the request.
+        ```python
+        def skip_display_condition(self, settings, device_config, current_dt):
+            games = fetch_games(settings, current_dt)
+            if not games:
+                return "No games to display"
+
+            # Reuse this in generate_image instead of fetching twice.
+            settings["_scoreboard_games_cache"] = games
+            return None
+        ```
+- (Optional) `generate_image` may return `None` when your plugin has no image to show at all — it exists for its side effect, such as driving a servo or calling a webhook. The refresh completes and the display is left untouched.
+    - This is different from `skip_display_condition`: returning `None` means *"I was never about showing anything"*, while a skip means *"I normally show something, just not this cycle"*.
 
 ### 3. Create a Settings Template (Optional)
 

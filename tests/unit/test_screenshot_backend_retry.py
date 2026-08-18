@@ -38,14 +38,20 @@ def _make_img() -> Image.Image:
 
 
 class _AttemptRecorder:
-    """Records (target, dimensions, timeout_ms, attempt) for each invocation."""
+    """Records (target, dimensions, timeout_ms, attempt) for each invocation.
+
+    ``render_wait_ms`` is accepted and deliberately not recorded: these tests
+    are about the retry/transient-detection contract, and folding it into
+    ``calls`` would churn every existing assertion for a parameter none of them
+    exercise. It is covered directly in the screenshot render-wait tests.
+    """
 
     def __init__(self, outcomes):
         # outcomes is a list of (image, transient) tuples returned in order.
         self._outcomes = list(outcomes)
         self.calls: list[tuple] = []
 
-    def __call__(self, target, dimensions, timeout_ms, attempt):
+    def __call__(self, target, dimensions, timeout_ms, attempt, render_wait_ms=None):
         self.calls.append((target, dimensions, timeout_ms, attempt))
         try:
             return self._outcomes.pop(0)
@@ -221,7 +227,12 @@ class TestRunSingleAttemptTransientDetection:
         monkeypatch.setattr(
             iu,
             "_find_browser_command",
-            lambda target, out, dims, timeout_ms: [sys.executable, "-c", "pass", out],
+            lambda target, out, dims, timeout_ms, render_wait_ms=None: [
+                sys.executable,
+                "-c",
+                "pass",
+                out,
+            ],
         )
 
         def fake_run(command, **kwargs):
@@ -272,7 +283,12 @@ class TestTakeScreenshotOnceBranchCoverage:
         monkeypatch.setattr(
             iu,
             "_find_browser_command",
-            lambda target, out, dims, timeout_ms: [sys.executable, "-c", "pass", out],
+            lambda target, out, dims, timeout_ms, render_wait_ms=None: [
+                sys.executable,
+                "-c",
+                "pass",
+                out,
+            ],
         )
         return iu
 
