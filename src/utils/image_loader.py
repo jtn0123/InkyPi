@@ -13,6 +13,7 @@ import tempfile
 import threading
 from collections.abc import Mapping
 from io import BytesIO
+from typing import Any
 
 import psutil
 import requests
@@ -73,6 +74,74 @@ def _is_low_resource_device() -> bool:
             f"Could not detect device memory: {e}. Defaulting to low-resource mode."
         )
         return True
+
+
+# ---------------------------------------------------------------------------
+# Fit modes
+#
+# How a source image is mapped onto the panel. Centralised here rather than
+# repeated in each image plugin so the three of them cannot drift, and so the
+# legacy-settings migration happens in exactly one place.
+# ---------------------------------------------------------------------------
+
+#: Fill the panel, cropping whatever overflows. The historical `padImage=false`.
+FIT_COVER = "cover"
+#: Show the whole image, padding the leftover space. The historical
+#: `padImage=true`.
+FIT_CONTAIN = "contain"
+#: Decide per image: cover when the image and panel share an orientation,
+#: contain when they do not. A portrait photo on a landscape panel keeps its
+#: head and feet instead of being cropped to a letterbox.
+FIT_AUTO = "auto"
+
+_VALID_FIT_MODES = frozenset({FIT_COVER, FIT_CONTAIN, FIT_AUTO})
+
+#: Old boolean setting mapped onto the new vocabulary. Existing instances keep
+#: behaving exactly as before; `auto` is opt-in and never arrived at by
+#: migration.
+_LEGACY_PAD_IMAGE_MAP = {"true": FIT_CONTAIN, "false": FIT_COVER}
+
+
+def resolve_fit_mode(settings: Mapping[str, Any]) -> str:
+    """Return the fit mode for *settings*, migrating the legacy flag.
+
+    Precedence: an explicit ``fitMode`` wins; otherwise the legacy
+    ``padImage`` boolean is translated; otherwise cover, which is what an
+    instance with neither setting has always done.
+
+    Unrecognised values fall back rather than raising — the value reaches us
+    from stored JSON that a much older version may have written.
+    """
+    raw_mode = settings.get("fitMode")
+    if isinstance(raw_mode, str):
+        mode = raw_mode.strip().lower()
+        if mode in _VALID_FIT_MODES:
+            return mode
+        if mode:
+            logger.warning("Unknown fitMode %r; falling back to cover", raw_mode)
+            return FIT_COVER
+
+    legacy = settings.get("padImage")
+    if legacy is not None:
+        return _LEGACY_PAD_IMAGE_MAP.get(str(legacy).strip().lower(), FIT_COVER)
+
+    return FIT_COVER
+
+
+def effective_fit_mode(
+    fit_mode: str, image_size: tuple[int, int], dimensions: tuple[int, int]
+) -> str:
+    """Resolve ``auto`` against a concrete image; other modes pass through.
+
+    "Same orientation" includes squares on either side: a square image has no
+    orientation to disagree with, so cropping it to fill is the better default.
+    """
+    if fit_mode != FIT_AUTO:
+        return fit_mode
+
+    image_is_landscape = image_size[0] >= image_size[1]
+    display_is_landscape = dimensions[0] >= dimensions[1]
+    return FIT_COVER if image_is_landscape == display_is_landscape else FIT_CONTAIN
 
 
 class AdaptiveImageLoader:
