@@ -43,6 +43,10 @@ FAILURE_FILE="$LOCKFILE_DIR/.last-update-failure"
 # Production callers never set INKYPI_UPDATE_TEST_SUCCESS_FAST, so this file
 # is not written outside of tests.
 SUCCESS_SENTINEL_FILE="$LOCKFILE_DIR/.last-update-success"
+# Records the post-update verification verdict (confirmed / unconfirmed / dark)
+# so the settings UI and rollback can tell "the new build is genuinely serving"
+# from "the unit started and then did nothing useful".
+OUTCOME_FILE="$LOCKFILE_DIR/.last-update-outcome"
 
 SERVICE_FILE="$APPNAME.service"
 SERVICE_FILE_SOURCE="$SCRIPT_DIR/$SERVICE_FILE"
@@ -107,7 +111,9 @@ update_app_service() {
       sudo systemctl status --no-pager "$SERVICE_FILE" >&2 || true
       sudo systemctl show -p ActiveState,SubState,Result "$SERVICE_FILE" >&2 || true
       echo "Last 20 journal lines:" >&2
-      sudo journalctl -u "$APPNAME" -n 20 --no-pager >&2 || true
+      # Same non-blocking helper as the verify path — a diagnostic must never
+      # be able to wedge an update waiting on a sudo password prompt.
+      _inkypi_journal_tail 20
       exit 1
     fi
   else
@@ -122,6 +128,167 @@ update_cli() {
   cp -a "$SCRIPT_DIR/cli/." "$INSTALL_PATH/cli/"
   sudo chmod +x "$INSTALL_PATH/cli/"*
 }
+
+# ---------------------------------------------------------------------------
+# Post-update verification
+#
+# `systemctl is-active` proves the unit started; it does not prove the new code
+# is serving. An update that starts and then fails to answer — a bad migration,
+# a broken template, a missing dependency that only bites at request time —
+# reported success. So after the unit is active we ask the app itself, and
+# distinguish three outcomes rather than two:
+#
+#   confirmed   — answering /readyz AND reporting the version we just installed
+#   unconfirmed — answering, but not with the expected version (or never ready)
+#   dark        — not answering at all within the timeout
+#
+# Only "confirmed" is a successful update. The verdict is written to
+# .last-update-outcome so the settings UI can say which happened, and so
+# rollback has a signal to act on instead of guessing.
+# ---------------------------------------------------------------------------
+
+# Port the service listens on. Mirrors src/inkypi.py: INKYPI_PORT, then PORT,
+# then 80 in production. Non-numeric values fall back rather than producing an
+# unparseable URL.
+_inkypi_app_port() {
+  local port="${INKYPI_PORT:-${PORT:-80}}"
+  if ! [[ "$port" =~ ^[1-9][0-9]*$ ]]; then
+    port=80
+  fi
+  printf '%s' "$port"
+}
+
+_inkypi_expected_version() {
+  local version_file="$SCRIPT_DIR/../VERSION"
+  local version=""
+  if [ -r "$version_file" ]; then
+    version=$(tr -d '[:space:]' < "$version_file" 2>/dev/null || true)
+  fi
+  printf '%s' "$version"
+}
+
+# Write the verdict atomically, mirroring the failure-record convention above.
+_inkypi_write_outcome() {
+  local verdict="$1" expected="$2" observed="$3"
+  local ts tmp
+  ts=$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || echo "unknown")
+  mkdir -p "$LOCKFILE_DIR" 2>/dev/null || true
+  tmp="${OUTCOME_FILE}.tmp"
+  {
+    printf '{'
+    printf '"timestamp":"%s",' "$ts"
+    printf '"verdict":"%s",' "$verdict"
+    printf '"expected_version":"%s",' "$expected"
+    printf '"observed_version":"%s"' "$observed"
+    printf '}\n'
+  } > "$tmp" 2>/dev/null || true
+  if [ -s "$tmp" ]; then
+    mv -f "$tmp" "$OUTCOME_FILE" 2>/dev/null || rm -f "$tmp" 2>/dev/null || true
+  else
+    rm -f "$tmp" 2>/dev/null || true
+  fi
+}
+
+# Print recent journal lines for the service, without ever blocking.
+#
+# The obvious `sudo journalctl ...` hangs forever when sudo has no cached
+# credential and no tty to prompt on — which is every non-interactive caller.
+# Diagnostics must never be the reason an update stalls, so this skips when
+# journalctl is absent and uses sudo's non-interactive mode when elevation is
+# actually needed.
+_inkypi_journal_tail() {
+  local lines="${1:-20}"
+  if ! command -v journalctl >/dev/null 2>&1; then
+    return 0
+  fi
+  if [ "${EUID:-$(id -u)}" -eq 0 ]; then
+    journalctl -u "$APPNAME" -n "$lines" --no-pager >&2 2>/dev/null || true
+  else
+    sudo -n journalctl -u "$APPNAME" -n "$lines" --no-pager >&2 2>/dev/null || true
+  fi
+}
+
+# Record this version as healthy so boot-health.sh knows it has worked before.
+# A confirmed version is never auto-rolled-back — if it starts failing later the
+# environment is at fault, not the build.
+_inkypi_mark_boot_health_confirmed() {
+  local version="$1"
+  local helper="$SCRIPT_DIR/boot-health.sh"
+  if [ ! -f "$helper" ]; then
+    return 0
+  fi
+  # shellcheck source=install/boot-health.sh
+  if source "$helper" 2>/dev/null; then
+    boot_health_mark_confirmed "$version" || true
+  fi
+}
+
+verify_app_serving() {
+  # curl is in debian-requirements, but a stripped image could lack it. Skipping
+  # is strictly better than failing an otherwise-good update on a missing tool.
+  if ! command -v curl >/dev/null 2>&1; then
+    echo "curl not available; skipping post-update serving verification."
+    _inkypi_write_outcome "skipped" "$(_inkypi_expected_version)" ""
+    return 0
+  fi
+
+  local expected base wait_seconds deadline observed ready
+  expected=$(_inkypi_expected_version)
+  base="http://127.0.0.1:$(_inkypi_app_port)"
+  # Shares the service-start override so one env var tunes slow boards.
+  wait_seconds="${INKYPI_SERVICE_START_TIMEOUT:-45}"
+  if ! [[ "$wait_seconds" =~ ^[1-9][0-9]*$ ]]; then
+    wait_seconds=45
+  fi
+
+  echo "Verifying $APPNAME is serving version '${expected:-unknown}' on $base ..."
+  deadline=$(( SECONDS + wait_seconds ))
+  observed=""
+  ready="no"
+  while [ "$SECONDS" -lt "$deadline" ]; do
+    if curl -fsS -m 5 "$base/readyz" >/dev/null 2>&1; then
+      ready="yes"
+      observed=$(curl -fsS -m 5 "$base/api/version/info" 2>/dev/null \
+        | sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)
+      if [ -n "$expected" ] && [ "$observed" = "$expected" ]; then
+        _inkypi_write_outcome "confirmed" "$expected" "$observed"
+        _inkypi_mark_boot_health_confirmed "$expected"
+        echo_success "Verified: serving $observed."
+        return 0
+      fi
+      # An empty VERSION file means we have nothing to compare against;
+      # answering /readyz is the strongest claim available.
+      if [ -z "$expected" ]; then
+        _inkypi_write_outcome "confirmed" "" "$observed"
+        _inkypi_mark_boot_health_confirmed ""
+        echo_success "Verified: service is ready (no VERSION to compare)."
+        return 0
+      fi
+    fi
+    sleep 3
+  done
+
+  if [ "$ready" = "yes" ]; then
+    _inkypi_write_outcome "unconfirmed" "$expected" "$observed"
+    echo_error "UPDATE UNCONFIRMED: $APPNAME is serving '${observed:-unknown}', expected '$expected'."
+    echo "The service answers but is not running the version just installed." >&2
+    echo "A stale process may still be alive, or the checkout did not take." >&2
+  else
+    _inkypi_write_outcome "dark" "$expected" ""
+    echo_error "UPDATE UNVERIFIED: $APPNAME did not answer $base/readyz within ${wait_seconds}s."
+    echo "Last 20 journal lines:" >&2
+    _inkypi_journal_tail 20
+  fi
+  return 1
+}
+
+# Test-only hook: stop here when sourced, so the verification helpers above can
+# be exercised against a real HTTP server without running an actual update.
+# Production callers execute this script rather than sourcing it and never set
+# the variable, so this is inert outside tests.
+if [ -n "${INKYPI_UPDATE_SOURCE_ONLY:-}" ] && (return 0 2>/dev/null); then
+  return 0
+fi
 
 # Ensure script is run with sudo. JTN-704: when the test-only env hook is
 # set we skip the root check so the trap can be exercised from pytest without
@@ -498,6 +665,13 @@ rm -f "$LOCKFILE"
 _current_step="update_app_service"
 _inkypi_maybe_inject_failure "update_app_service"
 update_app_service
+
+# The unit is active; now confirm the new build actually serves. A non-zero
+# return here fails the update, which is what gives rollback something to act
+# on — previously a service that started and then went dark reported success.
+_current_step="verify_app_serving"
+_inkypi_maybe_inject_failure "verify_app_serving"
+verify_app_serving
 
 echo "Version: $(cat "$SCRIPT_DIR/../VERSION" 2>/dev/null || echo 'unknown')"
 echo_success "Update completed."

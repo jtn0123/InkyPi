@@ -2153,12 +2153,44 @@ class TestUpdateScript:
         fn_start = self.content.index("update_app_service() {")
         fn_end = self.content.index("\n}", fn_start) + 2
         fn_body = self.content[fn_start:fn_end]
+        assert "_inkypi_journal_tail" in fn_body, (
+            "update_app_service must dump journal output when the service fails "
+            "to start (JTN-684)"
+        )
+
+    def test_journal_tail_helper_cannot_block_on_a_sudo_prompt(self):
+        """A diagnostic must never be able to wedge an update.
+
+        `sudo journalctl` waits forever for a password when there is no cached
+        credential and no tty — every non-interactive caller. The helper must
+        use sudo's non-interactive mode and skip entirely when journalctl is
+        absent.
+        """
+        fn_start = self.content.index("_inkypi_journal_tail() {")
+        fn_end = self.content.index("\n}", fn_start) + 2
+        fn_body = self.content[fn_start:fn_end]
+
+        assert "journalctl" in fn_body and "--no-pager" in fn_body, (
+            "the helper must still produce non-interactive journal output " "(JTN-684)"
+        )
         assert (
-            "journalctl" in fn_body
-        ), "update_app_service must dump journalctl output when service fails to start (JTN-684)"
+            "command -v journalctl" in fn_body
+        ), "the helper must skip when journalctl is unavailable"
+        assert "sudo -n" in fn_body, (
+            "elevation must be non-interactive; a bare `sudo` blocks forever "
+            "without a tty"
+        )
+        # Scan code lines only — the helper's own comment names the hazard it
+        # exists to avoid, and matching that would be a false positive.
+        code_lines = [
+            line
+            for line in self.content.splitlines()
+            if not line.lstrip().startswith("#")
+        ]
+        offenders = [line for line in code_lines if "sudo journalctl" in line]
         assert (
-            "--no-pager" in fn_body
-        ), "journalctl in update_app_service must use --no-pager for non-interactive output (JTN-684)"
+            not offenders
+        ), f"no call site may use a blocking `sudo journalctl`: {offenders}"
 
     def test_update_service_wait_uses_timeout_bound(self):
         # JTN-706: the 3-attempt sleep 1 loop (total cap 3s) was replaced with

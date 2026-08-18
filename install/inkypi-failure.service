@@ -8,3 +8,15 @@ Description=InkyPi failure sentinel writer
 Type=oneshot
 User=root
 ExecStart=/bin/bash -c 'mkdir -p /var/lib/inkypi && touch /var/lib/inkypi/.start-limit-hit && echo "InkyPi hit systemd start-limit — manual intervention required" | systemd-cat -t inkypi-failure -p err'
+# Count the failure and, when the rule in boot-health.sh is met, roll back to
+# the previous version without waiting for a human. A device that updated
+# itself into a non-starting state cannot serve the UI that offers the rollback
+# button, so "manual intervention required" meant physical access.
+#
+# /usr/local/inkypi/src is a symlink into the real repo checkout, so resolve
+# through it first and fall back to a direct install/ copy — the same cascade
+# the settings blueprint uses to locate update.sh and rollback.sh.
+#
+# Prefixed with '-' so a failure here never fails the unit: the sentinel file
+# written above is the load-bearing signal and must not be masked.
+ExecStart=-/bin/bash -c 'repo=$(dirname "$(readlink -f /usr/local/inkypi/src)"); for c in "$repo/install/boot-health.sh" /usr/local/inkypi/install/boot-health.sh; do [ -f "$c" ] && exec /bin/bash "$c"; done; echo "boot-health.sh not found" | systemd-cat -t inkypi-failure -p warning'
