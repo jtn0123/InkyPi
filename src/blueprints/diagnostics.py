@@ -29,6 +29,7 @@ from typing import Any
 
 from flask import Blueprint, current_app, jsonify, request
 
+from utils import crash_breadcrumb
 from utils.http_utils import json_error
 
 logger = logging.getLogger(__name__)
@@ -384,6 +385,8 @@ def api_diagnostics() -> Any:
         "plugin_health": {"clock": "ok", "weather": "fail"},
         "log_tail_100": ["..."],
         "last_update_failure": null,
+        "last_death": {"operation": "refresh", "plugin_id": "ai_image", "...": "..."},
+        "death_count": 0,
         "recent_client_log_errors": {
           "count_5m": 0,
           "warn_count_5m": 0,
@@ -407,6 +410,12 @@ def api_diagnostics() -> Any:
         "plugin_health": _plugin_health_summary(),
         "log_tail_100": _log_tail(_LOG_TAIL_LINES),
         "last_update_failure": _read_last_update_failure(),
+        # What the service was doing when it last died mid-operation, and how
+        # often that has happened. A hard kill (OOM, segfault) leaves no
+        # traceback in the journal, so without this there is nothing to
+        # attribute it to.
+        "last_death": crash_breadcrumb.last_death(),
+        "death_count": crash_breadcrumb.death_count(),
         "recent_client_log_errors": _recent_client_log_summary(),
     }
     return jsonify(payload), 200

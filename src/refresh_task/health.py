@@ -219,6 +219,72 @@ class PluginHealthTracker:
             webhook_sender=webhook_sender,
         )
 
+    def quarantine_after_crash(self, breadcrumb: Mapping[str, object]) -> bool:
+        """Pause the plugin that was in flight when the previous run died.
+
+        The circuit breaker only sees *handled* failures. A plugin that gets the
+        process OOM-killed or segfaults raises nothing catchable, so it never
+        trips the breaker — it simply crash-loops, and each loop is another SD
+        write. Once the process is gone the in-memory failure count is gone too,
+        so the streak never accumulates either.
+
+        This is the same move ``crashlog``'s SD sentinel makes in the
+        ESP32-Garage-Fan firmware: a resource that killed the last boot is
+        disabled on this one so it "can never boot-loop the controller".
+
+        Reuses the existing paused / ``disabled_reason`` plumbing so the UI,
+        the API and the manual re-enable path all work unchanged.
+
+        Args:
+            breadcrumb: The record left by the run that died — see
+                :func:`utils.crash_breadcrumb.examine_boot`.
+
+        Returns:
+            Whether a plugin instance was newly quarantined.
+        """
+        plugin_id = breadcrumb.get("plugin_id")
+        instance = breadcrumb.get("instance")
+        if not isinstance(plugin_id, str) or not plugin_id:
+            return False
+        if not isinstance(instance, str) or not instance:
+            # Without an instance we cannot name a single playlist entry, and
+            # pausing every instance of the plugin would be too blunt.
+            logger.warning(
+                "crash quarantine: previous run died in plugin %s but named no "
+                "instance; not quarantining",
+                plugin_id,
+            )
+            return False
+
+        plugin_instance = self._find_plugin_instance(plugin_id, instance)
+        if plugin_instance is None or plugin_instance.paused:
+            return False
+
+        started = breadcrumb.get("started_at") or "an earlier run"
+        plugin_instance.paused = True
+        plugin_instance.disabled_reason = (
+            f"Paused automatically: the service died while this plugin was "
+            f"rendering (started {started}). Re-enable it once the cause is "
+            f"understood."
+        )
+        set_circuit_breaker_open(plugin_id, True)
+        logger.error(
+            "crash quarantine: paused | plugin_id=%s instance=%s — it was in "
+            "flight when the previous run died",
+            plugin_id,
+            instance,
+        )
+        try:
+            self.device_config.write_config()
+        except Exception:
+            logger.warning(
+                "crash quarantine: failed to persist paused state for %s/%s",
+                plugin_id,
+                instance,
+                exc_info=True,
+            )
+        return True
+
     def reset_circuit_breaker(self, plugin_id: str, instance: str) -> bool:
         """Clear the paused state and failure counter for a plugin instance."""
         plugin_instance = self._find_plugin_instance(plugin_id, instance)
