@@ -1,0 +1,89 @@
+name: Refresh visual baselines
+
+# Regenerate layout/plugin snapshot baselines in the *same* environment the
+# `Browser smoke` job renders them in, and upload the PNGs as an artifact to
+# download and commit.
+#
+# Why this exists: the baselines are pixel comparisons and are documented as
+# reproducible only on Linux x86_64 with ubuntu-24.04's font set
+# (tests/snapshots/README.md). That leaves a contributor on Apple Silicon with
+# no way to refresh them after an intentional CSS change — the documented
+# `--platform linux/amd64` docker one-liner installs fine but Chromium SIGABRTs
+# under emulation. Rather than commit baselines that cannot be verified, render
+# them on the same runner CI compares against.
+#
+# Usage:
+#   gh workflow run refresh-visual-baselines.yml --ref <branch>
+#   gh run download <run-id> -n refreshed-visual-baselines
+#   # copy over tests/snapshots/, inspect the diff, commit
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'Which baselines to regenerate'
+        required: true
+        default: 'layout'
+        type: choice
+        options:
+          - layout
+          - plugins
+          - both
+
+jobs:
+  refresh:
+    name: Refresh baselines
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: 'pip'
+          cache-dependency-path: |
+            install/requirements.txt
+            install/requirements-dev.txt
+      - name: Install OS dependencies
+        # Matches the browser-smoke job — the font set is what makes these
+        # baselines reproducible.
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libopenjp2-7 \
+            libopenblas-dev \
+            libfreetype6-dev \
+            fonts-noto-color-emoji
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip wheel
+          pip install -r install/requirements.txt -r install/requirements-dev.txt
+      - name: Install Playwright Chromium
+        run: python -m playwright install --with-deps chromium
+      - name: Build CSS
+        run: python scripts/build_css.py
+      - name: Regenerate baselines
+        env:
+          REQUIRE_BROWSER_SMOKE: '1'
+          INKYPI_ENV: dev
+          INKYPI_NO_REFRESH: '1'
+          PYTHONPATH: src
+        run: |
+          case "${{ inputs.target }}" in
+            layout)  targets="tests/integration/test_visual_regression.py" ;;
+            plugins) targets="tests/snapshots/" ;;
+            both)    targets="tests/integration/test_visual_regression.py tests/snapshots/" ;;
+          esac
+          # --update-snapshots makes every assert_image_snapshot() write instead
+          # of compare, so the run is expected to pass trivially; the artifact is
+          # the point.
+          pytest $targets -q --update-snapshots
+      - name: Show what changed
+        run: git --no-pager diff --stat -- tests/snapshots/ || true
+      - name: Upload refreshed baselines
+        uses: actions/upload-artifact@v4
+        with:
+          name: refreshed-visual-baselines
+          path: tests/snapshots/**/*.png
+          if-no-files-found: error
