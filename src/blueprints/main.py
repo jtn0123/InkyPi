@@ -530,6 +530,13 @@ def _display_next_direct(
     except RuntimeError:
         logger.exception("generate_image failed in display_next")
         return None, json_error("Plugin image generation failed", status=400)
+    if image is None:
+        # A control-only plugin legitimately produces no image (see BasePlugin.generate_image). That is a completed refresh with nothing to show, not a failure — leave the panel alone.
+        logger.info(
+            "display_next: %s produced no image; leaving the display unchanged",
+            plugin_instance.plugin_id,
+        )
+        return None, json_error("Plugin produced no image to display", status=409)
     generate_ms = int((perf_counter() - _t_gen_start) * 1000)
 
     try:

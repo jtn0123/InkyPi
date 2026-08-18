@@ -78,8 +78,14 @@ _read_file() {
   [ -r "$path" ] && tr -d '[:space:]' < "$path" 2>/dev/null || printf ''
 }
 
+#: Stand-in used when VERSION cannot be read, so "confirmed" and "running"
+#: still compare equal instead of both being empty and never matching.
+UNKNOWN_VERSION="unknown"
+
 _current_version() {
-  _read_file "$SCRIPT_DIR/../VERSION"
+  local version
+  version=$(_read_file "$SCRIPT_DIR/../VERSION")
+  printf '%s' "${version:-$UNKNOWN_VERSION}"
 }
 
 # Record the running version as healthy and clear the failure streak. Called by
@@ -87,9 +93,12 @@ _current_version() {
 boot_health_mark_confirmed() {
   local version="${1:-$(_current_version)}"
   mkdir -p "$STATE_DIR" 2>/dev/null || true
-  if [ -n "$version" ]; then
-    printf '%s\n' "$version" > "$CONFIRMED_VERSION_FILE" 2>/dev/null || true
-  fi
+  # Record something even when VERSION is unreadable. Skipping the write left
+  # the install permanently unconfirmed, so a build that had been verified
+  # healthy stayed eligible for rollback for the rest of its life. The sentinel
+  # matches what _current_version reports in the same situation, so the
+  # "has this version ever worked?" comparison still lines up.
+  printf '%s\n' "${version:-$UNKNOWN_VERSION}" > "$CONFIRMED_VERSION_FILE" 2>/dev/null || true
   rm -f "$FAILED_STARTS_FILE" "$ROLLBACK_MARKER" 2>/dev/null || true
 }
 

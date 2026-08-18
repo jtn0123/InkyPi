@@ -870,6 +870,15 @@ def _update_now_direct(
                 plugin_id, plugin_config, device_config, display_manager
             )
             return json_error(_ERR_INTERNAL, status=500, code="internal_error")
+        if image is None:
+            # A control-only plugin legitimately produces no image (see
+            # BasePlugin.generate_image). That is a completed refresh with
+            # nothing to show, not a failure — leave the panel alone.
+            logger.info(
+                "update_now: %s produced no image; display unchanged",
+                sanitize_log_field(plugin_id),
+            )
+            return json_error("Plugin produced no image to display", status=409)
         generate_ms = int((perf_counter() - _t_gen_start) * 1000)
         history_meta = {
             "refresh_type": "Manual Update",
@@ -1019,6 +1028,21 @@ def _run_update_now(
             _t_req_start = perf_counter()
             _t_gen_start = perf_counter()
             image = plugin.generate_image(plugin_settings, device_config)
+            if image is None:
+                # A control-only plugin legitimately produces no image (see
+                # BasePlugin.generate_image). Nothing to push, but the refresh
+                # itself succeeded. This worker reports outcomes by return
+                # value, so return a success dict rather than falling through
+                # and handing None to the display manager.
+                logger.info(
+                    "update_now: %s produced no image; display unchanged",
+                    plugin_id,
+                )
+                return {
+                    "success": True,
+                    "message": "Plugin produced no image; display unchanged",
+                    "metrics": {"no_image": True},
+                }
             generate_ms = int((perf_counter() - _t_gen_start) * 1000)
             history_meta = {
                 "refresh_type": "Manual Update",

@@ -157,7 +157,7 @@ class TestSkipIfBlankBehaviour:
     ) -> Any:
         seen = {}
 
-        def fake_take_screenshot(*_args, **kwargs) -> Any:
+        def fake_take_screenshot(*_args: Any, **kwargs: Any) -> Any:
             seen.update(kwargs)
             return Image.new("RGB", (40, 30), "white")
 
@@ -176,3 +176,16 @@ class TestSkipIfBlankBehaviour:
             {"url": "http://example.com", "renderWaitMs": "3000"}, FakeDeviceConfig()
         )
         assert seen.get("render_wait_ms") == 3000
+
+
+class TestRenderWaitRejectsOverflow:
+    """`int(float("1e999"))` raises OverflowError, not ValueError.
+
+    The original guard caught only (TypeError, ValueError), so a junk setting
+    escaped as an unhandled exception and failed the whole render instead of
+    being ignored. Reported by CodeRabbit on PR #632.
+    """
+
+    @pytest.mark.parametrize("raw", ["1e999", "inf", "-inf", "Infinity"])
+    def test_overflow_values_are_ignored_not_raised(self, raw: str) -> None:
+        assert Screenshot._render_wait_ms({"renderWaitMs": raw}) is None

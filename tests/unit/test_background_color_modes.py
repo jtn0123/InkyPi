@@ -106,3 +106,39 @@ class TestPluginsUseModeAwareBackgrounds:
         assert not hasattr(
             module, "_resolve_background_color"
         ), f"{module_path} still defines a private background-color helper"
+
+
+class TestUploadPadsInTheImageMode:
+    """image_upload resolved its background in RGB regardless of image mode.
+
+    The other two padding plugins already resolved against `img.mode`; this one
+    was missed, which is the exact crash the shared helper exists to prevent.
+    Reported by CodeRabbit on PR #632.
+    """
+
+    @pytest.mark.parametrize("mode", ["L", "1", "RGB"])
+    def test_padding_a_non_rgb_upload_does_not_raise(self, mode: str) -> None:
+        from plugins.image_upload.image_upload import ImageUpload
+
+        source = Image.new(mode, (40, 40))
+
+        class FakeDeviceConfig:
+            def get_resolution(self) -> tuple[int, int]:
+                return (80, 60)
+
+            def get_config(self, _key: str, default: Any = None) -> Any:
+                return default
+
+        plugin = ImageUpload({"id": "image_upload"})
+        plugin.open_image = lambda _i, _locs: source
+        result = plugin.generate_image(
+            {
+                "imageFiles[]": ["a.png"],
+                "padImage": "true",
+                "backgroundColor": "#336699",
+            },
+            FakeDeviceConfig(),
+        )
+        assert result is not None
+        assert result.size == (80, 60)
+        assert result.mode == mode

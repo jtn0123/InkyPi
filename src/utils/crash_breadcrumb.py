@@ -162,10 +162,23 @@ def examine_boot() -> dict[str, Any] | None:
         {
             "last_death": verdict,
             "history": history[:_DEATH_HISTORY],
-            "deaths": int(record.get("deaths", 0)) + 1,
+            "deaths": _coerce_death_count(record.get("deaths")) + 1,
         },
     )
     return breadcrumb
+
+
+def _coerce_death_count(value: Any) -> int:
+    """Read a persisted death count, tolerating a corrupt state file.
+
+    The count is only ever advisory. Letting a bad value raise here would abort
+    ``examine_boot`` and with it the quarantine step — the one thing that must
+    still happen after a crash.
+    """
+    try:
+        return max(0, int(value))
+    except (TypeError, ValueError):
+        return 0
 
 
 def last_death() -> dict[str, Any] | None:
@@ -180,10 +193,7 @@ def last_death() -> dict[str, Any] | None:
 def death_count() -> int:
     """How many times a run has died mid-operation on this device."""
     record = _read_json(_last_death_path()) or {}
-    try:
-        return int(record.get("deaths", 0))
-    except (TypeError, ValueError):
-        return 0
+    return _coerce_death_count(record.get("deaths"))
 
 
 def clear_last_death() -> None:

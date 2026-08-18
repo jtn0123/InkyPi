@@ -9,6 +9,7 @@ breadcrumb records what was in flight, and the quarantine acts on it.
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any
 
@@ -149,6 +150,7 @@ class TestCrashQuarantine:
 
         assert quarantined is True
         assert instance.paused is True
+        assert instance.disabled_reason is not None
         assert "died while this plugin was rendering" in instance.disabled_reason
         assert config.writes == 1, "the pause must be persisted"
 
@@ -196,3 +198,33 @@ class TestCrashQuarantine:
         assert tracker.reset_circuit_breaker("ai_image", "daily") is True
         assert instance.paused is False
         assert instance.disabled_reason is None
+
+
+class TestCorruptDeathCountCannotDisableQuarantine:
+    """The death counter is advisory; a bad value must not abort examine_boot.
+
+    Raising there would take the quarantine step down with it — the one thing
+    that still has to happen after a crash. Reported by CodeRabbit on PR #632.
+    """
+
+    @pytest.mark.parametrize("bad", ["not-a-number", None, {}, [], "12x"])
+    def test_examine_boot_survives_a_corrupt_count(
+        self, isolated_dirs: tuple[Path, Path], bad: object
+    ) -> None:
+        _runtime, state = isolated_dirs
+        (state / "last_death.json").write_text(json.dumps({"deaths": bad}))
+        crash_breadcrumb.drop("refresh", plugin_id="ai_image", instance="daily")
+
+        found = crash_breadcrumb.examine_boot()
+
+        assert found is not None, "the breadcrumb must still be reported"
+        assert crash_breadcrumb.death_count() == 1, "count restarts from a clean base"
+
+    def test_negative_counts_are_clamped(
+        self, isolated_dirs: tuple[Path, Path]
+    ) -> None:
+        _runtime, state = isolated_dirs
+        (state / "last_death.json").write_text(json.dumps({"deaths": -5}))
+        crash_breadcrumb.drop("refresh", plugin_id="clock", instance="a")
+        crash_breadcrumb.examine_boot()
+        assert crash_breadcrumb.death_count() == 1

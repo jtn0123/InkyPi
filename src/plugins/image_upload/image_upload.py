@@ -162,7 +162,7 @@ class ImageUpload(BasePlugin):
             )
             background_color = resolve_background_color(
                 background_color_value,
-                "RGB",
+                image.mode,
             )
             return ImageOps.pad(
                 image,

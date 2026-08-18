@@ -168,7 +168,18 @@ def install_fake_systemctl(
     # update.sh calls `sudo systemctl ...`; a passthrough sudo keeps the real
     # scripts unmodified while running unprivileged.
     sudo = bin_dir / "sudo"
-    sudo.write_text('#!/bin/bash\nexec "$@"\n')
+    # Skip sudo's own flags (-n, -E, ...) before exec'ing the command, so a
+    # caller using `sudo -n journalctl` does not try to run `-n` as a program.
+    sudo.write_text(
+        "#!/bin/bash\n"
+        "while [ $# -gt 0 ]; do\n"
+        '  case "$1" in\n'
+        "    -*) shift ;;\n"
+        "    *) break ;;\n"
+        "  esac\n"
+        "done\n"
+        'exec "$@"\n'
+    )
     sudo.chmod(sudo.stat().st_mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH)
 
     log.touch()

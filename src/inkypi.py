@@ -659,17 +659,44 @@ def run_once(created_app: Flask) -> int:
             plugin_instance.name,
             playlist.name,
         )
-        refresh_task_obj.manual_update(
+        result = refresh_task_obj.manual_update(
             PlaylistRefresh(playlist, plugin_instance, force=True)
         )
+        if result is None:
+            # manual_update returns None when the refresh task is not running,
+            # so nothing was rendered. Reporting success here would tell cron
+            # the frame updated when it did not.
+            logger.error("run-once: refresh did not run (task not running)")
+            return 1
     except Exception:
         logger.exception("run-once: refresh failed")
         return 1
     finally:
+        # manual_update returns as soon as the image is on disk (JTN-786),
+        # leaving the slow e-paper write in flight. That is right for an API
+        # caller, but this process is about to exit — wait for the write to
+        # finish so the panel actually shows the render.
+        _await_display_write(refresh_task_obj)
         refresh_task_obj.stop()
 
     logger.info("run-once: complete")
     return 0
+
+
+def _await_display_write(refresh_task_obj: object, timeout: float = 120.0) -> None:
+    """Block until the refresh loop is idle again, or *timeout* elapses.
+
+    Best-effort: a device whose panel write hangs should still exit rather than
+    wedge a cron job forever.
+    """
+    from time import monotonic, sleep
+
+    deadline = monotonic() + timeout
+    while monotonic() < deadline:
+        if getattr(refresh_task_obj, "_work_started_at", None) is None:
+            return
+        sleep(0.2)
+    logger.warning("run-once: display write still in flight after %.0fs", timeout)
 
 
 if __name__ == "__main__":

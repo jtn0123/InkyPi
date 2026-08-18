@@ -83,8 +83,10 @@ class Screenshot(BasePlugin):  # type: ignore[misc, unused-ignore]
         if raw is None or raw == "":
             return None
         try:
+            # OverflowError covers "1e999"/"inf", which int(float(...)) raises
+            # rather than rejecting — a junk setting must not fail the render.
             value = int(float(str(raw)))
-        except (TypeError, ValueError):
+        except (TypeError, ValueError, OverflowError):
             logger.warning("Ignoring invalid renderWaitMs value %r", raw)
             return None
         if value <= 0:
