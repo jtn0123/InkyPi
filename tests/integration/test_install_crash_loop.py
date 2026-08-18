@@ -355,6 +355,41 @@ def _ensure_repo_artifacts_present() -> None:
     )
 
 
+def _cgroup_run_args() -> list[str]:
+    """Docker flags that let systemd boot as PID 1, per cgroup version.
+
+    The two hierarchies need opposite things, and getting it wrong does not
+    produce a useful error — systemd exits 255 with no logs at all:
+
+    * **cgroup v1** wants the host hierarchy bind-mounted in at
+      ``/sys/fs/cgroup`` so systemd can create its own subtree.
+    * **cgroup v2** has a single unified hierarchy that a container cannot be
+      handed a writable copy of. systemd needs its *own namespaced* view, which
+      is what ``--cgroupns=host`` grants; adding the v1 bind-mount on top
+      actively breaks it.
+
+    This mattered in practice: the v1 recipe was hardcoded, so on any cgroup v2
+    host — which is every current Docker Desktop, colima and modern Linux
+    distribution — the container died instantly and the test skipped with
+    "systemd did not reach a running state". A skipped regression gate looks
+    exactly like a passing one in CI output.
+
+    Falls back to the v2 arrangement when the version cannot be determined,
+    since v2 is the default everywhere current.
+    """
+    probe = subprocess.run(
+        ["docker", "info", "--format", "{{.CgroupVersion}}"],
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=False,
+    )
+    version = (probe.stdout or "").strip()
+    if version == "1":
+        return ["-v", "/sys/fs/cgroup:/sys/fs/cgroup:rw"]
+    return ["--cgroupns=host"]
+
+
 def test_install_crash_mid_pip_does_not_restart_loop(systemd_image: str) -> None:
     """Install crash mid-pip must NOT drive the service into a restart loop.
 
@@ -380,8 +415,7 @@ def test_install_crash_mid_pip_does_not_restart_loop(systemd_image: str) -> None
         "/run",
         "--tmpfs",
         "/run/lock",
-        "-v",
-        "/sys/fs/cgroup:/sys/fs/cgroup:rw",
+        *_cgroup_run_args(),
         "-v",
         f"{REPO_ROOT}:/opt/inkypi-src:ro",
         systemd_image,

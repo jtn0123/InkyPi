@@ -116,6 +116,25 @@ Server-side normalization:
 
 ---
 
+### Simulating the device off-device
+
+`tests/simulation/` runs device-shaped code paths on any machine with bash — no
+Pi, no systemd, no container. The systemd notification socket is reproduced
+rather than mocked (`sd_notify` is just a unix datagram), `systemctl` is a
+recording shim on `PATH`, and the real `update.sh` / `boot-health.sh` /
+`rollback.sh` run unmodified against a throwaway install tree.
+
+```bash
+SKIP_BROWSER=1 PYTHONPATH=src:. pytest -m simulation
+```
+
+This tier proves *our* logic against real protocols; it deliberately does not
+simulate systemd's own behaviour (`Restart=`, `OnFailure=`, cgroups), which is
+what the container gate below is for. **See [simulation.md](./simulation.md) for
+the full boundary** — what is covered, what is not, and why.
+
+---
+
 ### Pi thrash protection regression gate
 
 `tests/integration/test_install_crash_loop.py` is the canonical regression gate for the "install crash mid-pip → restart loop" failure mode (JTN-609) that caused a real Pi Zero 2 W to require a hard power cycle on 2026-04-10.
