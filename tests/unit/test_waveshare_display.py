@@ -211,3 +211,125 @@ def test_waveshare_display_image_valid_pil_image_not_rejected(
     img = Image.new("RGB", (1, 1), (0, 0, 0))
     # Should not raise
     driver.display_image(img)
+
+
+class FakeGrayscaleModeEPD:
+    """Mirrors the epd3in7 driver shape (upstream fatihak#724).
+
+    Signatures copied from the manifest-pinned epd3in7.py: ``init`` and
+    ``Clear`` take required mode arguments and there is no generic ``display``
+    — only ``display_1Gray`` / ``display_4Gray``.
+    """
+
+    def __init__(self):
+        self.width = 280
+        self.height = 480
+        self.init_modes = []
+        self.clear_calls = []
+        self.gray1 = []
+        self.gray4 = []
+        self.slept = False
+
+    def init(self, mode):
+        self.init_modes.append(mode)
+
+    def getbuffer(self, img):
+        return ("buf", img.size)
+
+    def getbuffer_4Gray(self, img):  # noqa: N802 — mirrors the vendor driver
+        return ("buf4", img.size)
+
+    def display_1Gray(self, buf):  # noqa: N802 — mirrors the vendor driver
+        self.gray1.append(buf)
+
+    def display_4Gray(self, buf):  # noqa: N802 — mirrors the vendor driver
+        self.gray4.append(buf)
+
+    def Clear(self, color, mode):
+        self.clear_calls.append((color, mode))
+
+    def sleep(self):
+        self.slept = True
+
+
+class FakeClearWithColorEPD(FakeMonoEPD):
+    """A driver whose Clear takes a colour byte but no mode."""
+
+    def __init__(self):
+        super().__init__()
+        self.clear_colors = []
+
+    def Clear(self, color):
+        self.clear_colors.append(color)
+        self.cleared = True
+
+
+def test_grayscale_mode_driver_initializes_without_typeerror(
+    monkeypatch, device_config_dev
+):
+    """epd3in7 is in the driver manifest, so it must actually load."""
+    device_config_dev.update_value("display_type", "epd3in7")
+    device_config_dev.update_value("resolution", None)
+    install_fake_epd_module(monkeypatch, "epd3in7", FakeGrayscaleModeEPD)
+
+    from display.waveshare_display import WaveshareDisplay
+
+    driver = WaveshareDisplay(device_config_dev)
+
+    assert driver.grayscale_mode_display is True
+    assert driver.bi_color_display is False
+    # 1-bit grayscale mirrors the standard single-colour path.
+    assert driver.epd_display.init_modes == [1]
+    assert device_config_dev.get_config("resolution") == [480, 280]
+
+
+def test_grayscale_mode_driver_renders_via_display_1gray(
+    monkeypatch, device_config_dev
+):
+    device_config_dev.update_value("display_type", "epd3in7")
+    install_fake_epd_module(monkeypatch, "epd3in7", FakeGrayscaleModeEPD)
+
+    from display.waveshare_display import WaveshareDisplay
+
+    driver = WaveshareDisplay(device_config_dev)
+    img = Image.new("1", (200, 100), 255)
+    driver.display_image(img)
+
+    epd = driver.epd_display
+    assert len(epd.gray1) == 1, "should render through display_1Gray"
+    assert epd.gray4 == [], "4-grayscale needs a different buffer; not our path"
+    # Clear takes (color, mode) on these drivers.
+    assert epd.clear_calls == [(0xFF, 1)]
+    assert epd.slept is True
+
+
+def test_mode_argument_with_a_default_is_not_treated_as_mode_driven(monkeypatch):
+    """Only a *required* mode parameter changes how we drive the panel."""
+    from display.waveshare_display import _requires_mode_argument
+
+    def init_required(mode):
+        pass
+
+    def init_defaulted(mode=0):
+        pass
+
+    def init_plain():
+        pass
+
+    assert _requires_mode_argument(init_required) is True
+    assert _requires_mode_argument(init_defaulted) is False
+    assert _requires_mode_argument(init_plain) is False
+
+
+def test_clear_receives_a_color_when_the_driver_requires_one(
+    monkeypatch, device_config_dev
+):
+    device_config_dev.update_value("display_type", "epd7in3e")
+    install_fake_epd_module(monkeypatch, "epd7in3e", FakeClearWithColorEPD)
+
+    from display.waveshare_display import WaveshareDisplay
+
+    driver = WaveshareDisplay(device_config_dev)
+    driver.display_image(Image.new("1", (200, 100), 255))
+
+    assert driver.epd_display.clear_colors == [0xFF]
