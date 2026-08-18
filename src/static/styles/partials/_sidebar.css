@@ -20,7 +20,11 @@
   position: sticky;
   top: 0;
   height: 100vh;
-  overflow: hidden;
+  /* Scroll rather than clip: with the nav no longer shrinking (see
+   * .sidebar-nav), a short viewport pushes the footer past the bottom edge.
+   * `hidden` would silently amputate it the same way the nav used to lose its
+   * last item. */
+  overflow-y: auto;
 }
 
 /* Row that holds the brand link plus the update-available affordance.
@@ -145,12 +149,24 @@
   text-overflow: ellipsis;
 }
 
+/* The nav must never be the thing that gets clipped.
+ *
+ * It used to be `flex: 1` + `overflow-y: auto` while `.sidebar-foot` could not
+ * shrink, so on a short viewport the footer took its full height and the nav
+ * box ended up smaller than its own content — 258px tall holding 300px of
+ * items. The last entry ("API Keys") was scrolled out of a container with no
+ * visible scrollbar, so it looked like the link simply did not exist. It came
+ * and went depending on how tall the NOW PLAYING card happened to be, which is
+ * what made it look intermittent.
+ *
+ * `flex-shrink: 0` keeps every nav item laid out at full height; the footer
+ * below yields instead, and the sidebar itself scrolls when even that is not
+ * enough. Navigation stays reachable at any viewport height. */
 .sidebar-nav {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  flex: 1;
-  overflow-y: auto;
+  flex: 1 0 auto;
   min-height: 0;
 }
 
@@ -215,6 +231,11 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
+  /* Yields before the nav does — NOW PLAYING is informational, navigation is
+   * not. Its height varies with the current plugin's name and status text,
+   * which is what used to change how much of the nav survived. */
+  flex-shrink: 0;
+  margin-top: auto;
 }
 
 .now-card {

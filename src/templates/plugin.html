@@ -100,7 +100,7 @@
                    with an empty/default form triggers validation 400s that the click-sweep
                    (JTN-698) would report as console errors. Dedicated plugin-submission
                    tests cover the real submit path. #}
-                <button type="button" data-plugin-action="update_now" data-test-skip-click="true" class="header-button primary" aria-describedby="update-now-help" {% if api_key_missing %}disabled title="Configure {{ api_key.service }} API key first"{% endif %}>Update preview</button>
+                <button type="button" data-plugin-action="update_now" data-test-skip-click="true" class="header-button primary" aria-describedby="update-now-help" {% if api_key_missing %}disabled title="Configure {{ api_key.service }} API key first"{% endif %}>Update display</button>
                 <div id="loadingIndicator" class="loading-indicator"></div>
             </div>
         </header>
@@ -368,7 +368,7 @@
         <div class="workflow-preview-card-head">
             <div>
                 <h2 id="pluginPreviewHeading">Preview</h2>
-                <p>Rendered for {{ resolution[0] }}&times;{{ resolution[1] }}. Compare the live display against this plugin output before applying or scheduling it.</p>
+                <p>Rendered for {{ resolution[0] }}&times;{{ resolution[1] }}. Shows what is on the panel now next to this plugin's most recent render. Note that &ldquo;Update display&rdquo; writes straight to the panel.</p>
             </div>
         </div>
         <div class="status-bar">
@@ -400,7 +400,7 @@
                         <div class="status-placeholder-actions"><button type="button" id="displayInstanceBtn" class="action-button compact">Display Instance</button></div>
                         {% endif %}
                         {% else %}
-                        No images generated yet. Use "Update preview" to create one.
+                        No images generated yet. Use "Update display" to render this plugin.
                         {% endif %}
                     </div>
                 </div>

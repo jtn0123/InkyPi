@@ -29,7 +29,11 @@
             {% endif %}
             </span>
             <span class="plugin-tile-body">
-                <span class="plugin-name plugin-tile-name">{{ plugin.display_name }}</span>
+                {#- title= is the fallback for the rare name still long enough to
+                    clamp at two lines; without it a truncated name was
+                    unreadable to sighted users even though the accessibility
+                    tree carried it in full. -#}
+                <span class="plugin-name plugin-tile-name" title="{{ plugin.display_name }}">{{ plugin.display_name }}</span>
                 {% set plugin_desc = PLUGIN_DESC_MAP.get(plugin.id) %}
                 {% if plugin_desc %}
                 <span class="plugin-tile-desc">{{ plugin_desc }}</span>

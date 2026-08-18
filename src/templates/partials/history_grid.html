@@ -9,7 +9,11 @@
         <button type="button" class="seg-btn" data-history-filter="playlist" aria-pressed="false">Playlist</button>
         <button type="button" class="seg-btn" data-history-filter="manual" aria-pressed="false">Manual</button>
     </div>
-    <span id="historyShownCount" class="section-count" aria-live="polite">{{ images | length }} of {{ images | length }}</span>
+    {#- `total` is every render on disk; `images` is only this page's slice.
+        Expose both so the filter counter can say "on this page" instead of
+        contradicting the "N items" badge in the header (see history_page.js). -#}
+    <span id="historyShownCount" class="section-count" aria-live="polite"
+          data-total-items="{{ total }}">{{ images | length }} of {{ images | length }}{% if total > images | length %} on this page · {{ total }} total{% endif %}</span>
 </div>
 {% for group in groups %}
 <section class="history-group" aria-label="{{ group.label }}" data-history-group>

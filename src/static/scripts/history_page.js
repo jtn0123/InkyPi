@@ -108,8 +108,20 @@
           count.textContent = `${visible} ${visible === 1 ? "render" : "renders"}`;
         }
       });
+      // Say "on this page" whenever the header badge disagrees with our
+      // denominator. The filter only ever sees the current page's cards, so
+      // with 27 items across two pages this read "24 of 24" directly beneath a
+      // "27 items" badge — three numbers, two meanings, and no way to tell
+      // whether three renders had gone missing.
       const countEl = document.getElementById("historyShownCount");
-      if (countEl) countEl.textContent = `${shown} of ${totalCards}`;
+      if (countEl) {
+        const grandTotal = Number(countEl.dataset.totalItems || totalCards);
+        const paginated =
+          Number.isFinite(grandTotal) && grandTotal > totalCards;
+        countEl.textContent = paginated
+          ? `${shown} of ${totalCards} on this page · ${grandTotal} total`
+          : `${shown} of ${totalCards}`;
+      }
       const emptyEl = document.getElementById("historyFilterEmpty");
       if (emptyEl) emptyEl.hidden = totalCards === 0 || shown > 0;
     }

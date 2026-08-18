@@ -316,12 +316,19 @@
     width: auto;
     padding: 0;
     min-height: 0;
-    display: block;
+    /* Wrap to a second line rather than truncating.
+     *
+     * `white-space: nowrap` clipped the plugin's *name* — "NASA Astronom…",
+     * "Wikipedia:Pictur…", "Today's Newspa…" — and the name is the only thing
+     * distinguishing one tile from another in a 20-item grid. The description
+     * below may still truncate; that is what descriptions are for. Two lines is
+     * enough for every shipped plugin name and keeps the tiles even. */
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
     overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    -webkit-line-clamp: unset;
-    -webkit-box-orient: unset;
+    overflow-wrap: anywhere;
 }
 
 .plugin-tile-desc {
