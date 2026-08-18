@@ -69,10 +69,20 @@ class RefreshScheduler:
         is_running: Callable[[], bool],
         notify_watchdog: Callable[[], None],
         interval_seconds: float,
+        should_notify: Callable[[], bool] | None = None,
     ) -> None:
-        """Feed the watchdog on a fixed cadence until the task stops."""
+        """Feed the watchdog on a fixed cadence until the task stops.
+
+        ``should_notify`` gates each ping on evidence that the refresh loop is
+        still making progress.  Without it the heartbeat is a bare timer, and a
+        refresh wedged in a blocking call (SPI write, chromium subprocess,
+        plugin socket) would keep systemd satisfied forever — the watchdog
+        could never fire for the failure it exists to catch.  Skipping the ping
+        lets ``WatchdogSec`` expire and systemd restart the unit.
+        """
         while is_running():
-            notify_watchdog()
+            if should_notify is None or should_notify():
+                notify_watchdog()
             with self.condition:
                 self.condition.wait(timeout=interval_seconds)
 

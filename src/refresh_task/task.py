@@ -6,7 +6,7 @@ import threading
 from collections import deque
 from collections.abc import Callable, Mapping
 from datetime import datetime
-from time import perf_counter
+from time import monotonic, perf_counter
 from typing import Any, ClassVar, NoReturn, cast
 from uuid import uuid4
 
@@ -24,6 +24,7 @@ from refresh_task.worker import (
     _get_mp_context,
     sweep_orphan_render_tempfiles,
 )
+from utils import crash_breadcrumb
 from utils.image_utils import compute_image_hash
 from utils.output_validator import OutputDimensionMismatch, validate_image_dimensions
 from utils.progress import ProgressTracker, track_progress
@@ -61,6 +62,13 @@ _MANUAL_WAIT_DEFAULTS_S = {
     # plugin's real result instead of a queue wait timeout.
     "ai_image": 210.0,
 }
+
+#: A single refresh may occupy the loop this long before the watchdog heartbeat
+#: treats it as wedged.  Deliberately well clear of the slowest sanctioned
+#: refresh (ai_image allows 180s of plugin time, plus render and the e-paper
+#: write) so an ordinary slow cycle is never mistaken for a hang; systemd then
+#: takes a further WatchdogSec to act.
+_DEFAULT_REFRESH_STALL_TIMEOUT = 600.0
 
 
 def _plugin_requires_api_key(plugin_config: Mapping[str, Any]) -> bool:
@@ -144,6 +152,32 @@ class RefreshTask:
         self._executor_run_subprocess_attempt = self.executor.run_subprocess_attempt
         self._tick_count: int = 0
         self.watchdog_thread: threading.Thread | None = None
+        # Monotonic timestamp of the moment the current refresh started, or
+        # None while the loop is idle waiting for its next trigger.  Read by
+        # the watchdog heartbeat to tell "working" from "wedged"; see
+        # _watchdog_should_notify.  Plain attribute assignment is sufficient
+        # synchronisation here — single writer, single reader, no read-modify.
+        self._work_started_at: float | None = None
+        self._watchdog_stall_logged: bool = False
+
+    def _examine_previous_boot(self) -> None:
+        """Attribute an unclean shutdown and quarantine whatever caused it.
+
+        A breadcrumb still on disk means the previous run was killed mid-refresh
+        rather than shutting down cleanly. Errors are swallowed: forensics must
+        never be the reason the service fails to start.
+        """
+        try:
+            breadcrumb = crash_breadcrumb.examine_boot()
+        except Exception:  # noqa: BLE001  defensive — startup must not fail
+            logger.warning("Could not examine previous boot", exc_info=True)
+            return
+        if breadcrumb is None:
+            return
+        try:
+            self.health_tracker.quarantine_after_crash(breadcrumb)
+        except Exception:  # noqa: BLE001  defensive — startup must not fail
+            logger.warning("Could not quarantine after crash", exc_info=True)
 
     @staticmethod
     def _get_circuit_breaker_threshold() -> int:
@@ -172,6 +206,7 @@ class RefreshTask:
                     )
             except Exception as exc:  # noqa: BLE001  defensive — startup must not fail
                 logger.warning("Orphan render tempfile sweep failed: %s", exc)
+            self._examine_previous_boot()
             self.thread = threading.Thread(
                 target=self._run, daemon=True, name="RefreshTask"
             )
@@ -211,16 +246,60 @@ class RefreshTask:
         """
         return float(RefreshScheduler.watchdog_interval_seconds())
 
+    @staticmethod
+    def _refresh_stall_timeout_seconds() -> float:
+        """How long a single refresh may run before the loop is judged wedged.
+
+        Must comfortably exceed the slowest legitimate refresh — AI image
+        generation and chromium screenshots are the long poles — because
+        exceeding it stops the watchdog pings and systemd restarts the service
+        ``WatchdogSec`` later.  Override with
+        ``INKYPI_REFRESH_STALL_TIMEOUT_SECONDS``; non-numeric or non-positive
+        values fall back to the default rather than disabling the guard.
+        """
+        raw = os.environ.get("INKYPI_REFRESH_STALL_TIMEOUT_SECONDS", "")
+        try:
+            value = float(raw)
+        except (TypeError, ValueError):
+            return _DEFAULT_REFRESH_STALL_TIMEOUT
+        return value if value > 0 else _DEFAULT_REFRESH_STALL_TIMEOUT
+
+    def _watchdog_should_notify(self) -> bool:
+        """True while the refresh loop is idle or working within its budget.
+
+        Returning False stops the heartbeat, which is the whole point: a
+        refresh stuck in a blocking call holds no lock, so nothing else would
+        ever notice it. Idle waiting between cycles is healthy and always
+        pings, no matter how long ``plugin_cycle_interval_seconds`` is — that
+        is the JTN-596 property this must not regress.
+        """
+        started = self._work_started_at
+        if started is None:
+            return True
+        elapsed = monotonic() - started
+        if elapsed <= self._refresh_stall_timeout_seconds():
+            return True
+        if not self._watchdog_stall_logged:
+            self._watchdog_stall_logged = True
+            logger.error(
+                "Refresh has been running for %.0fs with no progress; withholding "
+                "systemd watchdog keepalive so the service is restarted.",
+                elapsed,
+            )
+        return False
+
     def _watchdog_heartbeat_loop(self) -> None:
         """Background loop that feeds the systemd watchdog at WatchdogSec/2 cadence.
 
         Decoupled from the refresh cycle so a long plugin_cycle_interval_seconds
-        cannot stall the heartbeat (JTN-596).
+        cannot stall the heartbeat (JTN-596), but gated on refresh progress so a
+        wedged cycle still trips the watchdog.
         """
         self.scheduler.watchdog_heartbeat_loop(
             is_running=lambda: self.running,
             notify_watchdog=self._notify_watchdog,
             interval_seconds=self._watchdog_interval_seconds(),
+            should_notify=self._watchdog_should_notify,
         )
 
     @staticmethod
@@ -283,13 +362,33 @@ class RefreshTask:
                 )
 
                 if refresh_action:
-                    refresh_info, used_cached, metrics = self._perform_refresh(
-                        refresh_action,
-                        latest_refresh,
-                        current_dt,
-                        request_id=request_id,
-                        manual_request=manual_request,
-                    )
+                    # Mark work in flight so the watchdog heartbeat can tell a
+                    # long-but-healthy refresh from a wedged one.  Cleared in
+                    # `finally` so an exception mid-refresh returns the loop to
+                    # the idle state rather than looking permanently stalled.
+                    self._work_started_at = monotonic()
+                    # Name the plugin in flight so a hard kill — OOM, segfault —
+                    # can be attributed on the next start. Handled exceptions
+                    # clear the breadcrumb on the way out; only an unhandled
+                    # death leaves it behind, which is the signal we want.
+                    try:
+                        with crash_breadcrumb.trail(
+                            "refresh",
+                            plugin_id=refresh_action.get_plugin_id(),
+                            instance=refresh_action.get_refresh_info().get(
+                                "plugin_instance"
+                            ),
+                        ):
+                            refresh_info, used_cached, metrics = self._perform_refresh(
+                                refresh_action,
+                                latest_refresh,
+                                current_dt,
+                                request_id=request_id,
+                                manual_request=manual_request,
+                            )
+                    finally:
+                        self._work_started_at = None
+                        self._watchdog_stall_logged = False
                     if refresh_info is not None:
                         self._update_refresh_info(refresh_info, metrics, used_cached)
                     self._complete_manual_request(manual_request, metrics=metrics)
@@ -366,6 +465,53 @@ class RefreshTask:
                 refresh_action = PlaylistRefresh(playlist, plugin_instance)
         return refresh_action, request_id
 
+    def _skip_display_reason(
+        self,
+        refresh_action: RefreshAction,
+        plugin_config: Mapping[str, Any],
+        current_dt: datetime,
+    ) -> str | None:
+        """Ask the plugin whether it wants to yield this playlist turn.
+
+        Only playlist refreshes may be skipped: a manual "Update Now" is an
+        explicit request from the user, and silently declining it would look
+        like the button is broken.
+
+        A hook that raises is treated as "do not skip" — a broken optional hook
+        must not be able to stop a plugin from ever displaying.
+        """
+        if not isinstance(refresh_action, PlaylistRefresh):
+            return None
+
+        settings = getattr(refresh_action.plugin_instance, "settings", None)
+        if not isinstance(settings, Mapping):
+            return None
+
+        try:
+            plugin = get_plugin_instance(dict(plugin_config))
+            reason = plugin.skip_display_condition(
+                settings, self.device_config, current_dt
+            )
+        except Exception:
+            logger.warning(
+                "skip_display_condition raised for plugin %s; rendering normally",
+                refresh_action.get_plugin_id(),
+                exc_info=True,
+            )
+            return None
+
+        if reason is None:
+            return None
+        if not isinstance(reason, str) or not reason.strip():
+            logger.warning(
+                "skip_display_condition for plugin %s returned %r; expected None "
+                "or a non-empty reason string — rendering normally",
+                refresh_action.get_plugin_id(),
+                reason,
+            )
+            return None
+        return reason.strip()
+
     def _perform_refresh(
         self,
         refresh_action: RefreshAction,
@@ -404,6 +550,35 @@ class RefreshTask:
         benchmark_id = self.recorder.refresh_id(request_id)
         plugin_id = refresh_action.get_plugin_id()
         instance_name = refresh_action.get_refresh_info().get("plugin_instance")
+
+        # Ask the plugin whether it has anything worth showing before paying for
+        # a render. The playlist index has already advanced, so a skip yields
+        # the turn to the next plugin rather than sticking.
+        skip_reason = self._skip_display_reason(
+            refresh_action, plugin_config, current_dt
+        )
+        if skip_reason is not None:
+            logger.info(
+                "plugin_lifecycle: skipped | plugin_id=%s instance=%s reason=%s",
+                plugin_id,
+                instance_name,
+                skip_reason,
+            )
+            self.recorder.publish_step(
+                plugin_id=plugin_id,
+                request_id=request_id,
+                step=f"Skipped: {skip_reason}",
+            )
+            # A skip is a healthy outcome, not a failure — recording it as one
+            # would march the circuit breaker toward pausing a working plugin.
+            self._update_plugin_health(
+                plugin_id=plugin_id,
+                instance=instance_name,
+                ok=True,
+                metrics={"skipped": True, "skip_reason": skip_reason},
+                error=None,
+            )
+            return None, False, {"skipped": True, "skip_reason": skip_reason}
 
         # Plugin lifecycle: generate_start
         logger.info(
@@ -513,7 +688,30 @@ class RefreshTask:
             step="Image generated",
         )
         if image is None:
-            raise RuntimeError("Plugin returned None image; cannot refresh display.")
+            # A control-only plugin (servo, webhook poke, anything whose point
+            # is the side effect) legitimately produces no image. That is a
+            # completed refresh with nothing to display — not a failure — so
+            # the display, the history record and plugin health are all left
+            # alone rather than being handed a fallback error frame.
+            logger.info(
+                "plugin_lifecycle: no_image | plugin_id=%s instance=%s — plugin "
+                "produced no image; leaving the display unchanged",
+                plugin_id,
+                instance_name,
+            )
+            self.recorder.publish_step(
+                plugin_id=plugin_id,
+                request_id=request_id,
+                step="Plugin produced no image",
+            )
+            self._update_plugin_health(
+                plugin_id=plugin_id,
+                instance=instance_name,
+                ok=True,
+                metrics={"no_image": True},
+                error=None,
+            )
+            return None, False, {"generate_ms": generate_ms, "no_image": True}
 
         # Validate dimensions before doing anything expensive (hash / display push).
         self.recorder.publish_step(
