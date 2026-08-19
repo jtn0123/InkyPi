@@ -160,6 +160,10 @@
         item.setAttribute("aria-pressed", selected ? "true" : "false");
       });
       hidden.value = option.dataset.faceName || "";
+      // Match setColor's pattern: dispatch so anything listening for
+      // input/change on this field (e.g. a settings-save handler) observes
+      // the new selection, not just the two color fields it also updates.
+      hidden.dispatchEvent(new Event("change", { bubbles: true }));
       setColor(primary, option.dataset.primaryColor);
       setColor(secondary, option.dataset.secondaryColor);
     };
@@ -574,10 +578,21 @@
     latInput.value = config.latitude || latInput.value || "40.7128";
     lonInput.value = config.longitude || lonInput.value || "-74.0060";
 
-    const mapState = { map: null, marker: null };
+    const mapState = { map: null, marker: null, leafletWaitAttempts: 0 };
 
     const initLeafletMap = () => {
-      if (!globalThis.L || mapState.map) return;
+      if (mapState.map) return;
+      if (!globalThis.L) {
+        // Leaflet is normally already loaded by the time this page's own
+        // script tag has parsed, but a consumer that loads/embeds this
+        // widget's markup dynamically (fetching it separately from a
+        // freshly created <script>, since a cloned/parsed <script> tag
+        // never executes on its own) may still have it in flight when the
+        // modal opens. Retry briefly rather than silently no-op — bounded
+        // so a genuine load failure doesn't poll forever.
+        if (mapState.leafletWaitAttempts++ < 20) setTimeout(initLeafletMap, 150);
+        return;
+      }
       const lat = Number.parseFloat(latInput.value) || 40.7128;
       const lon = Number.parseFloat(lonInput.value) || -74.006;
       mapState.map = globalThis.L.map(mapRoot).setView([lat, lon], 4.5);
@@ -602,6 +617,12 @@
         const position = mapState.marker.getLatLng().wrap();
         latInput.value = position.lat;
         lonInput.value = position.lng;
+        // These are the two fields this whole widget exists to set — dispatch
+        // so anything listening for input/change (e.g. a settings-save
+        // handler) actually observes the picked location, matching the
+        // pattern the color-picker widget already uses for its own fields.
+        latInput.dispatchEvent(new Event("change", { bubbles: true }));
+        lonInput.dispatchEvent(new Event("change", { bubbles: true }));
       }
       modal.hidden = true;
       modal.style.display = "none";
