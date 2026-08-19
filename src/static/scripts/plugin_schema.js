@@ -624,9 +624,16 @@
     "weather-map": initWeatherMap,
   };
 
-  function initializeWidgets(root, config) {
+  // `allowedTypes`, when given, restricts initialization to just those
+  // widget types (e.g. a caller embedding a schema fragment scoped to a
+  // single root element, where only some widget types are known-safe to
+  // re-invoke outside the one-copy-per-page assumption most of these were
+  // written under). Omitted (undefined) means "all" — the normal page-load
+  // path below always passes undefined, so its behavior is unchanged.
+  function initializeWidgets(root, config, allowedTypes) {
     root.querySelectorAll("[data-hybrid-widget]").forEach((widget) => {
       const widgetType = widget.dataset.hybridWidget;
+      if (allowedTypes && !allowedTypes.includes(widgetType)) return;
       const widgetConfig = parseJson(widget.dataset.widgetConfig || "{}", {});
       const initializer = widgetInitializers[widgetType];
       if (initializer) initializer(widget, { ...config, ...widgetConfig });
@@ -644,6 +651,16 @@
     bindStandardEvents(root);
   }
 
-  globalThis.InkyPiPluginSchema = { init };
+  // Public, externally-callable entry point for initializing widgets inside
+  // an arbitrary root/config/allowlist — e.g. a fragment scraped and cloned
+  // by another page embedding one plugin's schema inside another's, where
+  // `init()`'s own hardcoded document-wide `[data-settings-schema]` lookup
+  // isn't usable. Thin wrapper so the internal `initializeWidgets` signature
+  // stays free to evolve without also being a public API surface.
+  function initWidgetsIn(root, config, allowedTypes) {
+    initializeWidgets(root, config || {}, allowedTypes);
+  }
+
+  globalThis.InkyPiPluginSchema = { init, initWidgetsIn };
   document.addEventListener("DOMContentLoaded", init);
 })();
