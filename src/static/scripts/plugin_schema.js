@@ -403,11 +403,18 @@
     const addButton = widget.querySelector("[data-repeater-add]");
     if (!list || !addButton) return;
     bindRemoveButtons(list);
-    if (!list.children.length) {
-      const urls = config["calendarURLs[]"] || [""];
+    const configUrls = config["calendarURLs[]"];
+    // The template always server-renders at least one (possibly blank) row,
+    // so `!list.children.length` never fires for a caller (e.g. Layout)
+    // re-invoking this on a fragment seeded from a saved instance's config.
+    // `list.children.length <= 1` also covers that single-default-row case;
+    // when the page's own server-rendered rows already match config (the
+    // normal, non-Layout path), reseeding here is a no-op in effect.
+    if (Array.isArray(configUrls) && configUrls.length && list.children.length <= 1) {
       const colors = config["calendarColors[]"] || ["#007BFF"];
-      urls.forEach((url, index) => list.appendChild(createCalendarEntry(url, colors[index] || "#007BFF")));
-      if (!urls.length) list.appendChild(createCalendarEntry("", "#007BFF"));
+      list.innerHTML = "";
+      configUrls.forEach((url, index) => list.appendChild(createCalendarEntry(url, colors[index] || "#007BFF")));
+      bindRemoveButtons(list);
     }
     updateRepeaterEmptyState(list);
     syncRemoveButtonStates(list);
@@ -487,12 +494,19 @@
     const maxItems = Number(list?.dataset.maxItems || widget.dataset.maxItems || "3");
     if (!list || !addButton) return;
     bindRemoveButtons(list);
-    if (!list.children.length) {
-      const titles = config["list-title[]"] || [];
-      const items = config["list[]"] || [];
-      const seedCount = Math.min(Math.max(titles.length, items.length, 1), maxItems);
-      for (let index = 0; index < seedCount; index += 1) {
-        list.appendChild(createTodoEntry(titles[index] || "", items[index] || ""));
+    const configTitles = config["list-title[]"];
+    const configItems = config["list[]"];
+    // Same server-always-renders-one-row situation as initCalendarRepeater.
+    if ((Array.isArray(configTitles) && configTitles.length) || (Array.isArray(configItems) && configItems.length)) {
+      if (list.children.length <= 1) {
+        const titles = configTitles || [];
+        const items = configItems || [];
+        const seedCount = Math.min(Math.max(titles.length, items.length, 1), maxItems);
+        list.innerHTML = "";
+        for (let index = 0; index < seedCount; index += 1) {
+          list.appendChild(createTodoEntry(titles[index] || "", items[index] || ""));
+        }
+        bindRemoveButtons(list);
       }
     }
     syncRemoveButtonStates(list);
