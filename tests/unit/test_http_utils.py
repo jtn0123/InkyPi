@@ -611,3 +611,12 @@ class TestRequestIdIsNotReflectedUnvalidated:
 
     def test_absent_header_still_yields_an_id(self, flask_app: Any) -> None:
         assert self._request_id(flask_app, None)
+
+    def test_a_valid_id_is_unchanged_by_the_escape(self, flask_app: Any) -> None:
+        """The charset check runs first, so escaping must be a no-op here.
+
+        If this ever fails, the accepted charset and the escape disagree and one
+        of them is wrong.
+        """
+        for rid in ("abc-123_XY.z:9", "3f2504e0-4f89-11d3-9a0c-0305e82c3301"):
+            assert self._request_id(flask_app, rid) == rid

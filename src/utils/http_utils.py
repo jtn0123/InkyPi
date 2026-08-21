@@ -149,8 +149,14 @@ def _get_or_set_request_id() -> str | None:
         # bounded, so a multi-megabyte header cannot ride along on every reply.
         rid_hdr: str | None = request.headers.get("X-Request-Id")
         if rid_hdr and _REQUEST_ID_RE.fullmatch(rid_hdr):
-            g.request_id = rid_hdr
-            return rid_hdr
+            # Escaped on the way out for the same reason `_sanitize_details`
+            # escapes the details dict: it is a user-derived string reaching the
+            # JSON envelope, and that policy applied to every such value except
+            # this one. After the charset check above the escape is a no-op, so
+            # this is consistency and defence in depth rather than the guard.
+            rid_safe = sanitize_response_value(rid_hdr)
+            g.request_id = rid_safe
+            return rid_safe
         # Generate
         import uuid
 
