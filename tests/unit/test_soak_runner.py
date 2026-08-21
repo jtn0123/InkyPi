@@ -12,6 +12,7 @@ from __future__ import annotations
 import importlib.util
 import sys
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -19,7 +20,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT_PATH = REPO_ROOT / "scripts" / "soak_runner.py"
 
 
-def _load_module():
+def _load_module() -> Any:
     """Load ``scripts/soak_runner.py`` as a module regardless of sys.path."""
     spec = importlib.util.spec_from_file_location("soak_runner_under_test", SCRIPT_PATH)
     assert spec is not None and spec.loader is not None
@@ -51,11 +52,11 @@ class TestParseDuration:
             ("1.5m", 90),
         ],
     )
-    def test_valid(self, text, expected):
+    def test_valid(self, text: Any, expected: Any) -> None:
         assert soak.parse_duration(text) == expected
 
     @pytest.mark.parametrize("bad", ["", "abc", "5x", "-1m", "0s", None])
-    def test_invalid(self, bad):
+    def test_invalid(self, bad: Any) -> None:
         with pytest.raises(ValueError):
             soak.parse_duration(bad)
 
@@ -65,7 +66,7 @@ class TestParseDuration:
 # ---------------------------------------------------------------------------
 
 
-def _payload(**overrides):
+def _payload(**overrides: Any) -> Any:
     """Canonical /api/diagnostics response, with overrides applied."""
     base = {
         "ts": "2026-04-19T00:00:00+00:00",
@@ -100,7 +101,7 @@ def _payload(**overrides):
 
 
 class TestParsePayload:
-    def test_happy_path(self):
+    def test_happy_path(self) -> None:
         s = soak.parse_diagnostics_payload(_payload(), elapsed_s=1.0, http_status=200)
         assert s.fetch_ok is True
         assert s.fetch_error is None
@@ -120,7 +121,7 @@ class TestParsePayload:
             "wpotd": "ok",
         }
 
-    def test_tolerates_missing_blocks(self):
+    def test_tolerates_missing_blocks(self) -> None:
         s = soak.parse_diagnostics_payload({}, elapsed_s=0.5, http_status=200)
         assert s.fetch_ok is True
         assert s.memory_pct is None
@@ -129,12 +130,12 @@ class TestParsePayload:
         assert s.refresh_running is None
         assert s.plugin_health == {}
 
-    def test_non_dict_is_failure(self):
+    def test_non_dict_is_failure(self) -> None:
         s = soak.parse_diagnostics_payload("not-a-dict", elapsed_s=0.1, http_status=200)
         assert s.fetch_ok is False
         assert s.fetch_error == "non-dict payload"
 
-    def test_plugin_health_filters_non_strings(self):
+    def test_plugin_health_filters_non_strings(self) -> None:
         # A forward-compat diagnostics build might return richer shapes per
         # plugin. The runner should drop those rather than crash.
         payload = _payload(plugin_health={"clock": "ok", "weather": {"status": "fail"}})
@@ -179,7 +180,7 @@ def _mk_sample(
 
 class TestTrendSummary:
     def test_monotonic_leak_shows_positive_slope(self):
-        # Simulate a slow leak: 50% -> 62% over 1 hour (3600s). Slope per
+        # Simulate a slow leak: 50% -> 62% over 1 hour (3600s) -> None -> None. Slope per
         # hour must be very close to +12.
         samples = [
             _mk_sample(t=i * 300.0, memory_pct=50.0 + (12.0 * i / 12.0))
@@ -193,18 +194,18 @@ class TestTrendSummary:
         assert trend["slope_per_hour"] == pytest.approx(12.0, rel=1e-6)
         assert trend["slope_per_second"] == pytest.approx(12.0 / 3600.0, rel=1e-6)
 
-    def test_flat_shows_zero_slope(self):
+    def test_flat_shows_zero_slope(self) -> None:
         samples = [_mk_sample(t=i * 60.0, memory_pct=42.0) for i in range(10)]
         trend = soak.summarize_samples(samples)["memory_pct_trend"]
         assert trend["slope_per_hour"] == pytest.approx(0.0, abs=1e-9)
 
-    def test_single_sample_has_no_slope(self):
+    def test_single_sample_has_no_slope(self) -> None:
         trend = soak.summarize_samples([_mk_sample(t=0.0)])["memory_pct_trend"]
         assert trend["n"] == 1
         assert trend["slope_per_hour"] is None
         assert trend["slope_per_second"] is None
 
-    def test_no_samples_safe(self):
+    def test_no_samples_safe(self) -> None:
         summary = soak.summarize_samples([])
         assert summary["total_samples"] == 0
         assert summary["successful_samples"] == 0
@@ -216,7 +217,7 @@ class TestTrendSummary:
 
 
 class TestSummaryAggregates:
-    def test_unreachable_counted_but_excluded_from_trend(self):
+    def test_unreachable_counted_but_excluded_from_trend(self) -> None:
         # Two good samples, one unreachable between them. The unreachable
         # must not corrupt the memory trend computation.
         samples = [
@@ -233,7 +234,7 @@ class TestSummaryAggregates:
         assert summary["memory_pct_trend"]["first"] == pytest.approx(50.0)
         assert summary["memory_pct_trend"]["last"] == pytest.approx(52.0)
 
-    def test_refresh_failure_rate(self):
+    def test_refresh_failure_rate(self) -> None:
         samples = [
             _mk_sample(t=0.0, refresh_last_error=None),
             _mk_sample(t=300.0, refresh_last_error="boom"),
@@ -244,7 +245,7 @@ class TestSummaryAggregates:
         assert summary["refresh_failure_count"] == 2
         assert summary["refresh_failure_rate"] == pytest.approx(0.5)
 
-    def test_client_log_totals_sum(self):
+    def test_client_log_totals_sum(self) -> None:
         samples = [
             _mk_sample(t=0.0, client_log_count_5m=0, client_log_warn_count_5m=1),
             _mk_sample(t=300.0, client_log_count_5m=3, client_log_warn_count_5m=2),
@@ -254,7 +255,7 @@ class TestSummaryAggregates:
         assert summary["client_log_error_total"] == 8
         assert summary["client_log_warn_total"] == 3
 
-    def test_service_restart_detected_on_uptime_regression(self):
+    def test_service_restart_detected_on_uptime_regression(self) -> None:
         samples = [
             _mk_sample(t=0.0, uptime_s=1000),
             _mk_sample(t=300.0, uptime_s=1300),
@@ -265,7 +266,7 @@ class TestSummaryAggregates:
         summary = soak.summarize_samples(samples)
         assert summary["service_restarts"] == 1
 
-    def test_unreachable_samples_dont_trigger_restarts(self):
+    def test_unreachable_samples_dont_trigger_restarts(self) -> None:
         # An unreachable window should not be counted as a restart on its
         # own — only a subsequent uptime regression should.
         samples = [
@@ -284,7 +285,7 @@ class TestSummaryAggregates:
 
 
 class TestBuildReport:
-    def test_report_shape(self):
+    def test_report_shape(self) -> None:
         samples = [
             _mk_sample(t=0.0, memory_pct=50.0, disk_pct=30.0),
             _mk_sample(t=300.0, memory_pct=51.0, disk_pct=30.0),
@@ -337,22 +338,24 @@ class TestBuildReport:
 
 
 class _FakeResponse:
-    def __init__(self, status_code, payload):
+    def __init__(self, status_code: Any, payload: Any) -> None:
         self.status_code = status_code
         self._payload = payload
 
-    def json(self):
+    def json(self) -> Any:
         return self._payload
 
 
 class _FakeSession:
     """Session stub that serves canned payloads in order."""
 
-    def __init__(self, responses):
+    def __init__(self, responses: Any) -> None:
         self._responses = list(responses)
         self.calls: list[tuple[str, dict]] = []
 
-    def get(self, url, headers=None, timeout=None):  # noqa: D401 - stub
+    def get(
+        self, url: Any, headers: Any = None, timeout: Any = None
+    ) -> Any:  # noqa: D401 - stub
         self.calls.append((url, dict(headers or {})))
         if not self._responses:
             raise RuntimeError("no more canned responses")
@@ -363,7 +366,7 @@ class _FakeSession:
 
 
 class TestRunSoakLoop:
-    def test_collects_samples_and_handles_transient_failure(self):
+    def test_collects_samples_and_handles_transient_failure(self) -> Any:
         # Three sample windows: success, network error, success.
         responses = [
             _FakeResponse(
@@ -391,10 +394,10 @@ class TestRunSoakLoop:
         # 0, 1, 2, ... and cap duration at 3s for three iterations.
         clock = {"t": 0.0}
 
-        def fake_now():
+        def fake_now() -> Any:
             return clock["t"]
 
-        def fake_sleep(seconds):
+        def fake_sleep(seconds: Any) -> None:
             # Advance the virtual clock by whatever was requested.
             clock["t"] += max(float(seconds), 0.0)
 
@@ -421,14 +424,14 @@ class TestRunSoakLoop:
         # All calls hit the diagnostics endpoint.
         assert all(url.endswith("/api/diagnostics") for url, _ in session.calls)
 
-    def test_token_is_forwarded_in_headers(self):
+    def test_token_is_forwarded_in_headers(self) -> Any:
         session = _FakeSession([_FakeResponse(200, _payload())])
         clock = {"t": 0.0}
 
-        def fake_now():
+        def fake_now() -> Any:
             return clock["t"]
 
-        def fake_sleep(seconds):
+        def fake_sleep(seconds: Any) -> None:
             clock["t"] += max(float(seconds), 0.0)
 
         soak.run_soak(
@@ -453,12 +456,16 @@ class TestRunSoakLoop:
 
 
 class TestCLI:
-    def test_invalid_duration_returns_2(self, capsys):
+    def test_invalid_duration_returns_2(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         rc = soak.main(["--duration", "nope"])
         assert rc == 2
         assert "invalid duration" in capsys.readouterr().err
 
-    def test_interval_larger_than_duration_rejected(self, capsys):
+    def test_interval_larger_than_duration_rejected(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         rc = soak.main(["--duration", "10s", "--interval", "1m"])
         assert rc == 2
         assert "interval" in capsys.readouterr().err

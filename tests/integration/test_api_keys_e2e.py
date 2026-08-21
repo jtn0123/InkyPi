@@ -4,6 +4,7 @@ from __future__ import annotations
 import os
 
 import pytest
+from playwright.sync_api import Page
 
 pytestmark = pytest.mark.skipif(
     os.getenv("SKIP_UI", "").lower() in ("1", "true"),
@@ -13,7 +14,7 @@ pytestmark = pytest.mark.skipif(
 from tests.integration.browser_helpers import navigate_and_wait  # noqa: E402
 
 
-def test_api_keys_page_loads(live_server, browser_page):
+def test_api_keys_page_loads(live_server: str, browser_page: Page) -> None:
     page = browser_page
     rc = navigate_and_wait(page, live_server, "/api-keys")
 
@@ -24,7 +25,7 @@ def test_api_keys_page_loads(live_server, browser_page):
     rc.assert_no_errors(name="api_keys_loads")
 
 
-def test_api_key_input_and_save(live_server, browser_page):
+def test_api_key_input_and_save(live_server: str, browser_page: Page) -> None:
     page = browser_page
     navigate_and_wait(page, live_server, "/api-keys")
 
@@ -52,7 +53,9 @@ def test_api_key_input_and_save(live_server, browser_page):
     assert len(save_responses) > 0, "Save should fire a request"
 
 
-def test_api_key_close_buttons_are_buttons(live_server, browser_page):
+def test_api_key_close_buttons_are_buttons(
+    live_server: str, browser_page: Page
+) -> None:
     page = browser_page
     rc = navigate_and_wait(page, live_server, "/api-keys")
 
@@ -67,7 +70,7 @@ def test_api_key_close_buttons_are_buttons(live_server, browser_page):
     rc.assert_no_errors(name="api_key_close_buttons")
 
 
-def test_api_key_managed_fields_exist(live_server, browser_page):
+def test_api_key_managed_fields_exist(live_server: str, browser_page: Page) -> None:
     """The managed API keys page at /settings/api-keys has provider input fields."""
     page = browser_page
     rc = navigate_and_wait(page, live_server, "/settings/api-keys")

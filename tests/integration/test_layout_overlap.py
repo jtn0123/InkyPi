@@ -221,7 +221,9 @@ def _format_collision(a: dict, b: dict, frac: float) -> str:
 
 @pytest.mark.parametrize("viewport", VIEWPORTS, ids=lambda v: v.label)
 @pytest.mark.parametrize("page_spec", PAGES_TO_CHECK, ids=lambda p: p.label)
-def test_interactive_overlap(live_server, page_spec: OverlapPage, viewport: Viewport):
+def test_interactive_overlap(
+    live_server: str, page_spec: OverlapPage, viewport: Viewport
+) -> None:
     """Flag pairs of clickables whose bounding boxes visually collide."""
     from playwright.sync_api import sync_playwright
     from tests.integration.browser_helpers import stub_leaflet

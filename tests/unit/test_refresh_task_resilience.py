@@ -1,7 +1,12 @@
 import time
+from typing import Any
+
+import pytest
 
 
-def test_refresh_task_signal_and_stop(monkeypatch, device_config_dev):
+def test_refresh_task_signal_and_stop(
+    monkeypatch: pytest.MonkeyPatch, device_config_dev: Any
+) -> None:
     from display.display_manager import DisplayManager
     from refresh_task import RefreshTask
 
@@ -20,7 +25,9 @@ def test_refresh_task_signal_and_stop(monkeypatch, device_config_dev):
     assert rt.running is False
 
 
-def test_refresh_task_plugin_exception_isolated(monkeypatch, device_config_dev):
+def test_refresh_task_plugin_exception_isolated(
+    monkeypatch: pytest.MonkeyPatch, device_config_dev: Any
+) -> None:
     import plugins.ai_text.ai_text as ai_text_mod
     from display.display_manager import DisplayManager
     from refresh_task import RefreshTask
@@ -29,7 +36,7 @@ def test_refresh_task_plugin_exception_isolated(monkeypatch, device_config_dev):
     rt = RefreshTask(device_config_dev, dm)
 
     # Make AIText raise to simulate plugin failure during cycle
-    def boom(settings, cfg):
+    def boom(settings: Any, cfg: Any) -> None:
         raise RuntimeError("cycle failure")
 
     monkeypatch.setattr(

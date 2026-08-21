@@ -170,7 +170,7 @@ class TestPingsReachTheSocket:
                 _stop_heartbeat(task, thread)
 
     def test_a_long_but_healthy_refresh_keeps_pinging(
-        self, tmp_path, task, monkeypatch
+        self, tmp_path: Path, task: Any, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """AI image generation legitimately takes minutes; that is not a hang."""
         monkeypatch.setenv("INKYPI_REFRESH_STALL_TIMEOUT_SECONDS", "600")
@@ -189,7 +189,7 @@ class TestPingsReachTheSocket:
 
 class TestThreadWiring:
     def test_start_launches_the_heartbeat_when_systemd_is_present(
-        self, tmp_path, task, monkeypatch
+        self, tmp_path: Path, task: Any, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """Under Type=notify the thread must actually be created."""
         monkeypatch.setattr(task, "_run", lambda: None)

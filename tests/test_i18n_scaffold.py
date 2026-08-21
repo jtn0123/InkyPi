@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 import sys
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -29,7 +30,7 @@ SCRIPTS_DIR = REPO_ROOT / "scripts"
 # ---------------------------------------------------------------------------
 
 
-def test_underscore_returns_msg_unchanged():
+def test_underscore_returns_msg_unchanged() -> None:
     from utils.i18n import _
 
     assert _("Settings") == "Settings"
@@ -38,7 +39,7 @@ def test_underscore_returns_msg_unchanged():
     assert _("untranslated key xyz") == "untranslated key xyz"
 
 
-def test_underscore_returns_string_type():
+def test_underscore_returns_string_type() -> None:
     from utils.i18n import _
 
     result = _("any key")
@@ -95,7 +96,7 @@ def _run_extractor(argv: list[str]) -> int:
 
 def test_extract_strings_finds_strings_in_fixtures(
     fixture_template_dir: Path, tmp_path: Path
-):
+) -> None:
     output_path = tmp_path / "out.json"
     # Point --src at the fixture tree (both templates/ and src/ are inside it)
     rc = _run_extractor(
@@ -113,7 +114,9 @@ def test_extract_strings_finds_strings_in_fixtures(
     assert "Download" in strings
 
 
-def test_extract_strings_output_is_sorted(fixture_template_dir: Path, tmp_path: Path):
+def test_extract_strings_output_is_sorted(
+    fixture_template_dir: Path, tmp_path: Path
+) -> None:
     output_path = tmp_path / "out.json"
     _run_extractor(["--src", str(fixture_template_dir), "--output", str(output_path)])
     data = json.loads(output_path.read_text(encoding="utf-8"))
@@ -128,7 +131,7 @@ def test_extract_strings_output_is_sorted(fixture_template_dir: Path, tmp_path: 
 
 def test_extract_strings_check_passes_when_up_to_date(
     fixture_template_dir: Path, tmp_path: Path
-):
+) -> None:
     output_path = tmp_path / "out.json"
     # First run: write the catalogue.
     rc = _run_extractor(
@@ -150,7 +153,7 @@ def test_extract_strings_check_passes_when_up_to_date(
 
 def test_extract_strings_check_fails_when_stale(
     fixture_template_dir: Path, tmp_path: Path
-):
+) -> None:
     output_path = tmp_path / "out.json"
     # Write a stale catalogue (missing strings present in the fixture).
     stale = {"_meta": {"description": "stale"}, "strings": ["OldString"]}
@@ -164,7 +167,7 @@ def test_extract_strings_check_fails_when_stale(
 
 def test_extract_strings_check_fails_when_file_missing(
     fixture_template_dir: Path, tmp_path: Path
-):
+) -> None:
     output_path = tmp_path / "nonexistent.json"
     rc = _run_extractor(
         ["--src", str(fixture_template_dir), "--output", str(output_path), "--check"]
@@ -177,7 +180,7 @@ def test_extract_strings_check_fails_when_file_missing(
 # ---------------------------------------------------------------------------
 
 
-def test_jinja_template_renders_with_underscore():
+def test_jinja_template_renders_with_underscore() -> None:
     from flask import Flask
 
     from utils.i18n import init_i18n
@@ -194,7 +197,7 @@ def test_jinja_template_renders_with_underscore():
         assert rendered == "Settings"
 
 
-def test_jinja_template_renders_unknown_key_as_key():
+def test_jinja_template_renders_unknown_key_as_key() -> None:
     from flask import Flask
 
     from utils.i18n import init_i18n
@@ -214,7 +217,9 @@ def test_jinja_template_renders_unknown_key_as_key():
 # ---------------------------------------------------------------------------
 
 
-def test_init_i18n_unsupported_locale_falls_back(monkeypatch):
+def test_init_i18n_unsupported_locale_falls_back(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setenv("INKYPI_LOCALE", "zz")
 
     from flask import Flask
@@ -233,7 +238,7 @@ def test_init_i18n_unsupported_locale_falls_back(monkeypatch):
 # ---------------------------------------------------------------------------
 
 
-def test_baseline_messages_json_is_valid():
+def test_baseline_messages_json_is_valid() -> None:
     path = REPO_ROOT / "translations" / "en" / "messages.json"
     assert path.exists(), "translations/en/messages.json is missing"
     data = json.loads(path.read_text(encoding="utf-8"))
@@ -250,7 +255,7 @@ def test_baseline_messages_json_is_valid():
         assert isinstance(value, str), f"Non-string value for {key!r}: {value!r}"
 
 
-def test_baseline_messages_json_has_minimum_strings():
+def test_baseline_messages_json_has_minimum_strings() -> None:
     path = REPO_ROOT / "translations" / "en" / "messages.json"
     data = json.loads(path.read_text(encoding="utf-8"))
     strings = {k: v for k, v in data.items() if not k.startswith("_")}
@@ -264,7 +269,7 @@ def test_baseline_messages_json_has_minimum_strings():
 # ---------------------------------------------------------------------------
 
 
-def test_load_locale_returns_dict_when_file_exists():
+def test_load_locale_returns_dict_when_file_exists() -> None:
     """Loads the real en messages.json and strips _meta."""
     import utils.i18n as i18n_mod
 
@@ -275,7 +280,9 @@ def test_load_locale_returns_dict_when_file_exists():
     assert len(result) >= 1
 
 
-def test_load_locale_missing_file_returns_empty(tmp_path, monkeypatch):
+def test_load_locale_missing_file_returns_empty(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Locale that has no messages.json returns empty dict and logs debug."""
     import utils.i18n as i18n_mod
 
@@ -285,7 +292,9 @@ def test_load_locale_missing_file_returns_empty(tmp_path, monkeypatch):
     assert result == {}
 
 
-def test_load_locale_handles_non_dict_json(tmp_path, monkeypatch):
+def test_load_locale_handles_non_dict_json(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> Any:
     """A messages.json that contains a non-dict (e.g., list) is ignored."""
     import utils.i18n as i18n_mod
 
@@ -295,7 +304,7 @@ def test_load_locale_handles_non_dict_json(tmp_path, monkeypatch):
     fake_locale_dir.write_text("[1, 2, 3]", encoding="utf-8")
 
     # Monkeypatch __file__ so the relative path computation lands in tmp_path
-    def patched_load(locale):
+    def patched_load(locale: Any) -> Any:
         path = tmp_path / "translations" / locale / "messages.json"
         if not path.exists():
             return {}
@@ -312,7 +321,7 @@ def test_load_locale_handles_non_dict_json(tmp_path, monkeypatch):
     assert i18n_mod._load_locale("fake") == {}
 
 
-def test_load_locale_handles_invalid_json(tmp_path):
+def test_load_locale_handles_invalid_json(tmp_path: Path) -> None:
     """A messages.json with broken JSON triggers the generic Exception branch."""
     import utils.i18n as i18n_mod
 
@@ -331,7 +340,7 @@ def test_load_locale_handles_invalid_json(tmp_path):
 # ---------------------------------------------------------------------------
 
 
-def test_init_i18n_loads_translations_count(monkeypatch):
+def test_init_i18n_loads_translations_count(monkeypatch: pytest.MonkeyPatch) -> None:
     """init_i18n should populate _TRANSLATIONS from the real en messages.json."""
     monkeypatch.setenv("INKYPI_LOCALE", "en")
 
@@ -355,8 +364,8 @@ def test_init_i18n_loads_translations_count(monkeypatch):
 
 
 def test_extract_strings_main_writes_output_with_count(
-    fixture_template_dir: Path, tmp_path: Path, capsys
-):
+    fixture_template_dir: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     output_path = tmp_path / "out.json"
     rc = _run_extractor(
         ["--src", str(fixture_template_dir), "--output", str(output_path)]
@@ -368,8 +377,8 @@ def test_extract_strings_main_writes_output_with_count(
 
 
 def test_extract_strings_main_check_ok_path(
-    fixture_template_dir: Path, tmp_path: Path, capsys
-):
+    fixture_template_dir: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     """--check on an up-to-date file prints 'OK' and exits 0."""
     output_path = tmp_path / "out.json"
     _run_extractor(["--src", str(fixture_template_dir), "--output", str(output_path)])
@@ -385,7 +394,7 @@ def test_extract_strings_main_check_ok_path(
 
 def test_extract_strings_check_handles_corrupt_json(
     fixture_template_dir: Path, tmp_path: Path
-):
+) -> None:
     """--check returns 1 (stale) when the existing file is unparseable JSON."""
     output_path = tmp_path / "out.json"
     output_path.write_text("not { valid json", encoding="utf-8")
@@ -396,7 +405,9 @@ def test_extract_strings_check_handles_corrupt_json(
     assert rc == 1
 
 
-def test_extract_strings_scan_unreadable_file(tmp_path, monkeypatch):
+def test_extract_strings_scan_unreadable_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """_scan_file returns [] on OSError without raising."""
     if str(SCRIPTS_DIR) not in sys.path:
         sys.path.insert(0, str(SCRIPTS_DIR))

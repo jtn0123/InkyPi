@@ -1,6 +1,8 @@
 import os
+from typing import Any
 
 import pytest
+from flask.testing import FlaskClient
 
 pytestmark = pytest.mark.skipif(
     os.getenv("SKIP_UI", "").lower() in ("1", "true"),
@@ -11,7 +13,9 @@ pytestmark = pytest.mark.skipif(
 @pytest.mark.skip(
     reason="Weather template image loading broken by upstream merge - needs investigation"
 )
-def test_weather_template_loads_images(client, device_config_dev, monkeypatch):
+def test_weather_template_loads_images(
+    client: FlaskClient, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> Any:
     __import__("pytest").importorskip(
         "playwright.sync_api", reason="playwright not available"
     )
@@ -22,7 +26,7 @@ def test_weather_template_loads_images(client, device_config_dev, monkeypatch):
     w = Weather({"id": "weather"})
 
     # Fake data to skip network
-    def fake_get_weather_data(api_key, units, lat, lon):
+    def fake_get_weather_data(api_key: Any, units: Any, lat: Any, lon: Any) -> Any:
         return {
             "timezone": "America/Los_Angeles",
             "current": {
@@ -53,7 +57,7 @@ def test_weather_template_loads_images(client, device_config_dev, monkeypatch):
             ],
         }
 
-    def fake_get_air_quality(api_key, lat, lon):
+    def fake_get_air_quality(api_key: Any, lat: Any, lon: Any) -> Any:
         return {"list": [{"main": {"aqi": 1}}]}
 
     monkeypatch.setattr(w, "get_weather_data", fake_get_weather_data, raising=True)

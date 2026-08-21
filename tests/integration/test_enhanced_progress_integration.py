@@ -1,5 +1,6 @@
 """Integration tests for enhanced progress tracking in plugin operations."""
 
+from typing import Any
 from unittest.mock import Mock, patch
 
 import pytest
@@ -11,7 +12,7 @@ from utils.progress import get_current_tracker, track_progress
 class TestProgressTrackingIntegration:
     """Test integration of progress tracking with plugin operations."""
 
-    def test_base_plugin_uses_progress_tracking(self):
+    def test_base_plugin_uses_progress_tracking(self) -> None:
         """Test that BasePlugin uses enhanced progress tracking."""
         # Create a mock plugin config
         mock_config = {"id": "test_plugin", "display_name": "Test Plugin"}
@@ -64,7 +65,7 @@ class TestProgressTrackingIntegration:
                 screenshot_steps = [s for s in steps if s.name == "screenshot"]
                 assert len(screenshot_steps) >= 1
 
-    def test_progress_tracking_with_template_error(self):
+    def test_progress_tracking_with_template_error(self) -> None:
         """Test progress tracking when template rendering fails."""
         mock_config = {"id": "test_plugin"}
         plugin = BasePlugin(mock_config)
@@ -94,7 +95,7 @@ class TestProgressTrackingIntegration:
                     if s.error_message
                 )
 
-    def test_progress_tracking_with_screenshot_error(self):
+    def test_progress_tracking_with_screenshot_error(self) -> None:
         """Test progress tracking when screenshot capture fails."""
         mock_config = {"id": "test_plugin"}
         plugin = BasePlugin(mock_config)
@@ -135,7 +136,7 @@ class TestProgressTrackingIntegration:
                 assert any(s.status == "completed" for s in template_steps)
                 assert any(s.status == "failed" for s in screenshot_steps)
 
-    def test_progress_tracking_step_timing(self):
+    def test_progress_tracking_step_timing(self) -> Any:
         """Test that progress tracking records proper timing information."""
         mock_config = {"id": "test_plugin"}
         plugin = BasePlugin(mock_config)
@@ -153,7 +154,7 @@ class TestProgressTrackingIntegration:
             mock_template.render.return_value = "<html>test</html>"
             mock_get_template.return_value = mock_template
 
-            def delayed_screenshot(*args, **kwargs):
+            def delayed_screenshot(*args: Any, **kwargs: Any) -> Any:
                 import time
 
                 time.sleep(0.01)  # Small delay to ensure measurable time
@@ -183,7 +184,7 @@ class TestProgressTrackingIntegration:
                 # Total tracker time should be at least as much as step times
                 assert total_tracker_time >= total_step_time
 
-    def test_progress_tracking_step_descriptions(self):
+    def test_progress_tracking_step_descriptions(self) -> None:
         """Test that progress steps have meaningful descriptions."""
         mock_config = {"id": "test_plugin"}
         plugin = BasePlugin(mock_config)
@@ -227,7 +228,7 @@ class TestProgressTrackingIntegration:
                         for word in ["screenshot", "capture", "html"]
                     )
 
-    def test_nested_progress_tracking(self):
+    def test_nested_progress_tracking(self) -> None:
         """Test that progress tracking works with nested operations."""
         mock_config = {"id": "test_plugin"}
         plugin = BasePlugin(mock_config)
@@ -277,7 +278,7 @@ class TestProgressTrackingIntegration:
 class TestProgressTrackingHelpers:
     """Test the global progress tracking helper functions."""
 
-    def test_progress_helpers_in_context(self):
+    def test_progress_helpers_in_context(self) -> None:
         """Test that global helper functions work within tracking context."""
         from utils.progress import complete_step, record_step, start_step
 
@@ -297,7 +298,7 @@ class TestProgressTrackingHelpers:
             assert steps[1].status == "completed"
             assert steps[1].description == "Second step completed"
 
-    def test_progress_helpers_without_context(self):
+    def test_progress_helpers_without_context(self) -> None:
         """Test that global helpers don't break without tracking context."""
         from utils.progress import complete_step, fail_step, record_step, start_step
 
@@ -314,7 +315,7 @@ class TestProgressTrackingHelpers:
 class TestProgressTrackingErrorHandling:
     """Test error handling in progress tracking."""
 
-    def test_progress_tracking_survives_plugin_errors(self):
+    def test_progress_tracking_survives_plugin_errors(self) -> None:
         """Test that progress tracking continues to work even if plugin operations fail."""
         mock_config = {"id": "failing_plugin"}
         plugin = BasePlugin(mock_config)
@@ -338,14 +339,14 @@ class TestProgressTrackingErrorHandling:
                 post_failure_steps = [s for s in steps if s.name == "post_failure"]
                 assert len(post_failure_steps) == 1
 
-    def test_progress_tracking_concurrent_access(self):
+    def test_progress_tracking_concurrent_access(self) -> None:
         """Test that progress tracking handles concurrent access gracefully."""
         import threading
         import time
 
         results = []
 
-        def worker(worker_id):
+        def worker(worker_id: Any) -> None:
             with track_progress() as tracker:
                 tracker.step(
                     f"worker_{worker_id}_start", f"Worker {worker_id} starting"

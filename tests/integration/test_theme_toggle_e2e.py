@@ -4,6 +4,7 @@ from __future__ import annotations
 import os
 
 import pytest
+from playwright.sync_api import Page
 from tests.integration.browser_helpers import navigate_and_wait
 
 pytestmark = pytest.mark.skipif(
@@ -12,7 +13,7 @@ pytestmark = pytest.mark.skipif(
 )
 
 
-def test_theme_toggle_changes_attribute(live_server, browser_page):
+def test_theme_toggle_changes_attribute(live_server: str, browser_page: Page) -> None:
     page = browser_page
     rc = navigate_and_wait(page, live_server, "/")
 
@@ -27,7 +28,7 @@ def test_theme_toggle_changes_attribute(live_server, browser_page):
     rc.assert_no_errors("screenshots", "theme_toggle_changes_attribute")
 
 
-def test_theme_persists_in_localstorage(live_server, browser_page):
+def test_theme_persists_in_localstorage(live_server: str, browser_page: Page) -> None:
     page = browser_page
     navigate_and_wait(page, live_server, "/")
 
@@ -48,7 +49,7 @@ def test_theme_persists_in_localstorage(live_server, browser_page):
     ), f"localStorage 'inkypi-theme' expected {expected}, got {stored_inkypi}"
 
 
-def test_theme_persists_across_navigation(live_server, browser_page):
+def test_theme_persists_across_navigation(live_server: str, browser_page: Page) -> None:
     page = browser_page
     navigate_and_wait(page, live_server, "/")
 
@@ -69,7 +70,7 @@ def test_theme_persists_across_navigation(live_server, browser_page):
     ), f"Expected 'dark' after navigation, got '{theme_after}'"
 
 
-def test_theme_persists_after_reload(live_server, browser_page):
+def test_theme_persists_after_reload(live_server: str, browser_page: Page) -> None:
     page = browser_page
     navigate_and_wait(page, live_server, "/")
 

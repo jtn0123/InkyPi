@@ -4,13 +4,14 @@ Each test renders a macro and asserts required a11y attributes are present.
 """
 
 import os
+from typing import Any
 
 import pytest
 from jinja2 import Environment, FileSystemLoader
 
 
 @pytest.fixture()
-def jinja_env():
+def jinja_env() -> Any:
     """Create a Jinja2 environment pointing at the templates directory."""
     templates_dir = os.path.join(
         os.path.dirname(__file__), "..", "..", "src", "templates"
@@ -23,10 +24,10 @@ def jinja_env():
 
 
 @pytest.fixture()
-def render(jinja_env):
+def render(jinja_env: Any) -> Any:
     """Helper that renders a template string with components imported."""
 
-    def _render(source, **ctx):
+    def _render(source: Any, **ctx: Any) -> Any:
         tpl = jinja_env.from_string(
             "{% from 'macros/components.html' import button, form_field, "
             "modal, status_chip, card %}\n" + source
@@ -40,32 +41,32 @@ def render(jinja_env):
 
 
 class TestButton:
-    def test_default_type_attribute(self, render):
+    def test_default_type_attribute(self, render: Any) -> None:
         html = render("{{ button('Click me') }}")
         assert 'type="button"' in html
         assert "Click me" in html
 
-    def test_submit_type(self, render):
+    def test_submit_type(self, render: Any) -> None:
         html = render("{{ button('Send', type='submit') }}")
         assert 'type="submit"' in html
 
-    def test_variant_class(self, render):
+    def test_variant_class(self, render: Any) -> None:
         html = render("{{ button('Go', variant='is-secondary') }}")
         assert "is-secondary" in html
 
-    def test_primary_variant_no_extra_class(self, render):
+    def test_primary_variant_no_extra_class(self, render: Any) -> None:
         html = render("{{ button('Go') }}")
         assert 'class="action-button"' in html
 
-    def test_disabled(self, render):
+    def test_disabled(self, render: Any) -> None:
         html = render("{{ button('Nope', disabled=True) }}")
         assert "disabled" in html
 
-    def test_extra_attrs(self, render):
+    def test_extra_attrs(self, render: Any) -> None:
         html = render("""{{ button('Act', attrs={'aria-describedby': 'help1'}) }}""")
         assert 'aria-describedby="help1"' in html
 
-    def test_attrs_none_and_false_skipped(self, render):
+    def test_attrs_none_and_false_skipped(self, render: Any) -> None:
         html = render(
             """{{ button('Act', attrs={'data-x': None, 'data-y': false}) }}"""
         )
@@ -77,18 +78,18 @@ class TestButton:
 
 
 class TestFormField:
-    def test_label_present(self, render):
+    def test_label_present(self, render: Any) -> None:
         html = render("{{ form_field('email', 'Email address') }}")
         assert "<label" in html
         assert 'for="email"' in html
         assert "Email address" in html
 
-    def test_required_aria(self, render):
+    def test_required_aria(self, render: Any) -> None:
         html = render("{{ form_field('name', 'Name', required=True) }}")
         assert "required" in html
         assert 'aria-required="true"' in html
 
-    def test_help_text_describedby(self, render):
+    def test_help_text_describedby(self, render: Any) -> None:
         html = render(
             "{{ form_field('pw', 'Password', type='password', help_text='Min 8 chars') }}"
         )
@@ -96,22 +97,22 @@ class TestFormField:
         assert 'id="pw-help"' in html
         assert "Min 8 chars" in html
 
-    def test_error_aria_invalid(self, render):
+    def test_error_aria_invalid(self, render: Any) -> None:
         html = render("{{ form_field('age', 'Age', error='Too young') }}")
         assert 'aria-invalid="true"' in html
         assert 'role="alert"' in html
         assert "Too young" in html
 
-    def test_value_set(self, render):
+    def test_value_set(self, render: Any) -> None:
         html = render("{{ form_field('city', 'City', value='Paris') }}")
         assert 'value="Paris"' in html
 
-    def test_custom_id(self, render):
+    def test_custom_id(self, render: Any) -> None:
         html = render("{{ form_field('x', 'X', id='custom_id') }}")
         assert 'id="custom_id"' in html
         assert 'for="custom_id"' in html
 
-    def test_help_and_error_both_describedby(self, render):
+    def test_help_and_error_both_describedby(self, render: Any) -> None:
         html = render("{{ form_field('f', 'F', help_text='Hint', error='Bad') }}")
         assert "f-help" in html
         assert "f-error" in html
@@ -122,25 +123,25 @@ class TestFormField:
 
 
 class TestModal:
-    def test_role_dialog(self, render):
+    def test_role_dialog(self, render: Any) -> None:
         html = render("{% call modal('testModal', 'Test Title') %}body{% endcall %}")
         assert 'role="dialog"' in html
 
-    def test_aria_modal(self, render):
+    def test_aria_modal(self, render: Any) -> None:
         html = render("{% call modal('testModal', 'Test Title') %}body{% endcall %}")
         assert 'aria-modal="true"' in html
 
-    def test_aria_labelledby(self, render):
+    def test_aria_labelledby(self, render: Any) -> None:
         html = render("{% call modal('myModal', 'My Title') %}content{% endcall %}")
         assert 'aria-labelledby="myModalTitle"' in html
         assert 'id="myModalTitle"' in html
         assert "My Title" in html
 
-    def test_close_button(self, render):
+    def test_close_button(self, render: Any) -> None:
         html = render("{% call modal('m1', 'T') %}b{% endcall %}")
         assert 'aria-label="Close"' in html
 
-    def test_body_rendered(self, render):
+    def test_body_rendered(self, render: Any) -> None:
         html = render("{% call modal('m2', 'T') %}<p>Hello</p>{% endcall %}")
         assert "<p>Hello</p>" in html
 
@@ -149,17 +150,17 @@ class TestModal:
 
 
 class TestStatusChip:
-    def test_default_variant(self, render):
+    def test_default_variant(self, render: Any) -> None:
         html = render("{{ status_chip('Online') }}")
         assert "status-chip" in html
         assert "info" in html
         assert "Online" in html
 
-    def test_custom_variant(self, render):
+    def test_custom_variant(self, render: Any) -> None:
         html = render("{{ status_chip('Error', 'danger') }}")
         assert "danger" in html
 
-    def test_success_variant(self, render):
+    def test_success_variant(self, render: Any) -> None:
         html = render("{{ status_chip('Active', 'success') }}")
         assert "success" in html
 
@@ -168,15 +169,15 @@ class TestStatusChip:
 
 
 class TestCard:
-    def test_title_rendered(self, render):
+    def test_title_rendered(self, render: Any) -> None:
         html = render("{% call card('My Card') %}content{% endcall %}")
         assert "My Card" in html
         assert "status-card" in html
 
-    def test_body_rendered(self, render):
+    def test_body_rendered(self, render: Any) -> None:
         html = render("{% call card('C') %}<span>inner</span>{% endcall %}")
         assert "<span>inner</span>" in html
 
-    def test_no_title(self, render):
+    def test_no_title(self, render: Any) -> None:
         html = render("{% call card('') %}body{% endcall %}")
         assert "status-title" not in html

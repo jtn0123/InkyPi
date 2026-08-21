@@ -4,7 +4,7 @@ import re
 from pathlib import Path
 
 
-def test_playlist_modal_defaults_to_non_overlapping_range():
+def test_playlist_modal_defaults_to_non_overlapping_range() -> None:
     """openCreateModal should default to 09:00-17:00, not 00:00-24:00."""
     js = Path("src/static/scripts/playlist/modals.js").read_text()
     # Find openCreateModal function body
@@ -19,7 +19,7 @@ def test_playlist_modal_defaults_to_non_overlapping_range():
     assert '"24:00"' not in body, "end_time should not default to 24:00"
 
 
-def test_preview_helper_text_is_conditional():
+def test_preview_helper_text_is_conditional() -> None:
     """The workflow-help region must be context-aware (draft vs instance)."""
     html = Path("src/templates/plugin.html").read_text()
     # Find the workflow-help section specifically

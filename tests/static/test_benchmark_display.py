@@ -5,24 +5,25 @@ Null values should display as an em-dash, not the literal string 'null'.
 """
 
 from pathlib import Path
+from typing import Any
 
 JS_PATH = Path("src/static/scripts/settings/diagnostics.js")
 
 
-def _read_js():
+def _read_js() -> Any:
     return JS_PATH.read_text()
 
 
 class TestBenchmarkNoRawJSON:
     """Ensure refreshBenchmarks no longer dumps raw JSON to the UI."""
 
-    def test_no_json_stringify_for_summary(self):
+    def test_no_json_stringify_for_summary(self) -> None:
         """Summary data must not be rendered via JSON.stringify."""
         js = _read_js()
         # The old code did: JSON.stringify(summary.summary || {}, null, 2)
         assert "JSON.stringify(summary.summary" not in js
 
-    def test_no_json_stringify_for_plugins(self):
+    def test_no_json_stringify_for_plugins(self) -> None:
         """Plugin data must not be rendered via JSON.stringify."""
         js = _read_js()
         # The old code did: JSON.stringify((plugins.items || []).slice(0, 10), null, 2)
@@ -32,44 +33,44 @@ class TestBenchmarkNoRawJSON:
 class TestBenchmarkTableBuilder:
     """Ensure the JS defines proper table-building helpers."""
 
-    def test_build_summary_table_defined(self):
+    def test_build_summary_table_defined(self) -> None:
         js = _read_js()
         assert "function buildSummaryTable" in js
 
-    def test_build_plugins_table_defined(self):
+    def test_build_plugins_table_defined(self) -> None:
         js = _read_js()
         assert "function buildPluginsTable" in js
 
-    def test_build_refreshes_table_defined(self):
+    def test_build_refreshes_table_defined(self) -> None:
         js = _read_js()
         assert "function buildRefreshesTable" in js
 
-    def test_build_stages_table_defined(self):
+    def test_build_stages_table_defined(self) -> None:
         js = _read_js()
         assert "function buildStagesTable" in js
 
-    def test_benchmark_refreshes_ignore_stale_responses(self):
+    def test_benchmark_refreshes_ignore_stale_responses(self) -> None:
         js = _read_js()
         assert "benchmarkRequestSeq" in js
         assert "windowValue !== getBenchmarkWindow()" in js
 
-    def test_benchmark_errors_check_response_status(self):
+    def test_benchmark_errors_check_response_status(self) -> None:
         js = _read_js()
         assert "!resp.ok || body?.success === false" in js
         assert "!resp.ok || data?.success === false" in js
 
-    def test_stage_panel_reset_helper_defined(self):
+    def test_stage_panel_reset_helper_defined(self) -> None:
         js = _read_js()
         assert "function resetStagesPanel" in js
         assert "No refreshes available for this window." in js
 
-    def test_stage_labels_defined(self):
+    def test_stage_labels_defined(self) -> None:
         """Human-readable labels must replace raw keys like 'generate_ms'."""
         js = _read_js()
         for label in ("Request", "Generate", "Preprocess", "Display"):
             assert label in js
 
-    def test_null_rendered_as_em_dash(self):
+    def test_null_rendered_as_em_dash(self) -> None:
         """formatMs must return an em-dash for null/undefined values."""
         js = _read_js()
         # U+2014 em-dash or its JS unicode escape
@@ -79,15 +80,15 @@ class TestBenchmarkTableBuilder:
 class TestBenchmarkTableCSS:
     """Ensure the bench-table CSS class exists."""
 
-    def test_bench_table_class_in_css(self):
+    def test_bench_table_class_in_css(self) -> None:
         css = Path("src/static/styles/partials/_settings-console.css").read_text()
         assert ".bench-table" in css
 
-    def test_bench_table_class_used_in_js(self):
+    def test_bench_table_class_used_in_js(self) -> None:
         js = _read_js()
         assert '"bench-table"' in js
 
-    def test_benchmark_window_control_exists(self):
+    def test_benchmark_window_control_exists(self) -> None:
         html = Path("src/templates/settings.html").read_text()
         assert 'id="benchmarkWindow"' in html
         assert 'id="benchRefreshes"' in html

@@ -8,6 +8,9 @@ correctly into the middleware chain.
 
 from __future__ import annotations
 
+from collections.abc import Iterator
+from typing import Any
+
 import pytest
 from flask import Flask
 
@@ -17,45 +20,45 @@ from flask import Flask
 
 
 class TestIsMutatingPath:
-    def test_save_plugin_settings_is_mutating(self):
+    def test_save_plugin_settings_is_mutating(self) -> None:
         from app_setup.security_middleware import _is_mutating_path
 
         assert _is_mutating_path("/save_plugin_settings") is True
 
-    def test_update_now_is_mutating(self):
+    def test_update_now_is_mutating(self) -> None:
         from app_setup.security_middleware import _is_mutating_path
 
         assert _is_mutating_path("/update_now") is True
 
-    def test_api_refresh_subpath_is_mutating(self):
+    def test_api_refresh_subpath_is_mutating(self) -> None:
         from app_setup.security_middleware import _is_mutating_path
 
         assert _is_mutating_path("/api/refresh/all") is True
         assert _is_mutating_path("/api/refresh/plugin/42") is True
 
-    def test_api_refresh_exact_prefix_not_mutating(self):
+    def test_api_refresh_exact_prefix_not_mutating(self) -> None:
         """Only paths starting with /api/refresh/ (with trailing slash) match."""
         from app_setup.security_middleware import _is_mutating_path
 
         # This deliberately does NOT start with "/api/refresh/" (note trailing slash)
         assert _is_mutating_path("/api/refreshment") is False
 
-    def test_login_not_mutating(self):
+    def test_login_not_mutating(self) -> None:
         from app_setup.security_middleware import _is_mutating_path
 
         assert _is_mutating_path("/login") is False
 
-    def test_display_next_not_mutating(self):
+    def test_display_next_not_mutating(self) -> None:
         from app_setup.security_middleware import _is_mutating_path
 
         assert _is_mutating_path("/display-next") is False
 
-    def test_healthz_not_mutating(self):
+    def test_healthz_not_mutating(self) -> None:
         from app_setup.security_middleware import _is_mutating_path
 
         assert _is_mutating_path("/healthz") is False
 
-    def test_other_path_not_mutating(self):
+    def test_other_path_not_mutating(self) -> None:
         from app_setup.security_middleware import _is_mutating_path
 
         assert _is_mutating_path("/api/logs") is False
@@ -67,7 +70,7 @@ class TestIsMutatingPath:
 
 
 @pytest.fixture()
-def ctx_app():
+def ctx_app() -> Any:
     """Minimal Flask app used to provide an application context for direct helper tests."""
     app = Flask(__name__)
     app.secret_key = "test-secret"
@@ -76,7 +79,7 @@ def ctx_app():
 
 
 @pytest.fixture(autouse=True)
-def _reset_module_buckets():
+def _reset_module_buckets() -> Iterator[Any]:
     """Reset module-level bucket references before/after each test."""
     import app_setup.security_middleware as mw
     from utils.rate_limit import TokenBucket
@@ -99,7 +102,7 @@ class TestApplyTokenBucketLimits:
 
     _TEST_ADDR = "127.0.0.1"
 
-    def _call(self, ctx_app, path: str, addr: str | None = None):
+    def _call(self, ctx_app: Any, path: str, addr: str | None = None) -> Any:
         from app_setup.security_middleware import _apply_token_bucket_limits
 
         if addr is None:
@@ -107,7 +110,7 @@ class TestApplyTokenBucketLimits:
         with ctx_app.app_context():
             return _apply_token_bucket_limits(path, addr)
 
-    def _drained_bucket(self, addr: str | None = None):
+    def _drained_bucket(self, addr: str | None = None) -> Any:
         """Return a TokenBucket(capacity=1) already drained for *addr*."""
         from utils.rate_limit import TokenBucket
 
@@ -117,10 +120,10 @@ class TestApplyTokenBucketLimits:
         b.try_acquire(addr)  # consume the single token for the target key
         return b
 
-    def test_auth_path_allowed_returns_none(self, ctx_app):
+    def test_auth_path_allowed_returns_none(self, ctx_app: Any) -> None:
         assert self._call(ctx_app, "/login") is None
 
-    def test_auth_path_exhausted_returns_429(self, ctx_app):
+    def test_auth_path_exhausted_returns_429(self, ctx_app: Any) -> None:
         import app_setup.security_middleware as mw
 
         mw._auth_bucket = self._drained_bucket()
@@ -128,18 +131,18 @@ class TestApplyTokenBucketLimits:
         assert resp is not None
         assert resp.status_code == 429
 
-    def test_auth_path_exhausted_has_retry_after_30(self, ctx_app):
+    def test_auth_path_exhausted_has_retry_after_30(self, ctx_app: Any) -> None:
         import app_setup.security_middleware as mw
 
         mw._auth_bucket = self._drained_bucket()
         resp = self._call(ctx_app, "/login")
         assert resp.headers.get("Retry-After") == "30"
 
-    def test_refresh_path_allowed_returns_none(self, ctx_app):
+    def test_refresh_path_allowed_returns_none(self, ctx_app: Any) -> None:
         assert self._call(ctx_app, "/display-next") is None
         assert self._call(ctx_app, "/refresh") is None
 
-    def test_refresh_path_exhausted_returns_429(self, ctx_app):
+    def test_refresh_path_exhausted_returns_429(self, ctx_app: Any) -> None:
         import app_setup.security_middleware as mw
 
         mw._refresh_bucket = self._drained_bucket()
@@ -147,19 +150,19 @@ class TestApplyTokenBucketLimits:
         assert resp is not None
         assert resp.status_code == 429
 
-    def test_refresh_path_exhausted_has_retry_after_6(self, ctx_app):
+    def test_refresh_path_exhausted_has_retry_after_6(self, ctx_app: Any) -> None:
         import app_setup.security_middleware as mw
 
         mw._refresh_bucket = self._drained_bucket()
         resp = self._call(ctx_app, "/display-next")
         assert resp.headers.get("Retry-After") == "6"
 
-    def test_mutating_path_allowed_returns_none(self, ctx_app):
+    def test_mutating_path_allowed_returns_none(self, ctx_app: Any) -> None:
         assert self._call(ctx_app, "/update_now") is None
         assert self._call(ctx_app, "/save_plugin_settings") is None
         assert self._call(ctx_app, "/api/refresh/all") is None
 
-    def test_mutating_path_exhausted_returns_429(self, ctx_app):
+    def test_mutating_path_exhausted_returns_429(self, ctx_app: Any) -> None:
         import app_setup.security_middleware as mw
 
         mw._mutating_bucket = self._drained_bucket()
@@ -167,14 +170,14 @@ class TestApplyTokenBucketLimits:
         assert resp is not None
         assert resp.status_code == 429
 
-    def test_mutating_path_exhausted_has_retry_after_6(self, ctx_app):
+    def test_mutating_path_exhausted_has_retry_after_6(self, ctx_app: Any) -> None:
         import app_setup.security_middleware as mw
 
         mw._mutating_bucket = self._drained_bucket()
         resp = self._call(ctx_app, "/update_now")
         assert resp.headers.get("Retry-After") == "6"
 
-    def test_mutating_path_exhausted_has_json_error_body(self, ctx_app):
+    def test_mutating_path_exhausted_has_json_error_body(self, ctx_app: Any) -> None:
         import app_setup.security_middleware as mw
 
         mw._mutating_bucket = self._drained_bucket()
@@ -183,10 +186,10 @@ class TestApplyTokenBucketLimits:
         assert data is not None
         assert "error" in data
 
-    def test_unknown_path_returns_none(self, ctx_app):
+    def test_unknown_path_returns_none(self, ctx_app: Any) -> None:
         assert self._call(ctx_app, "/api/logs") is None
 
-    def test_different_ips_tracked_independently(self, ctx_app):
+    def test_different_ips_tracked_independently(self, ctx_app: Any) -> None:
         import app_setup.security_middleware as mw
         from utils.rate_limit import TokenBucket
 
@@ -207,7 +210,7 @@ class TestApplyTokenBucketLimits:
 
 
 @pytest.fixture()
-def middleware_app():
+def middleware_app() -> Any:
     """Flask app with the real setup_rate_limiting wired up (JTN-513)."""
     from app_setup.security_middleware import setup_rate_limiting
 
@@ -218,19 +221,19 @@ def middleware_app():
     setup_rate_limiting(app)
 
     @app.route("/update_now", methods=["POST"])
-    def update_now():
+    def update_now() -> Any:
         return {"ok": True}
 
     @app.route("/save_plugin_settings", methods=["POST"])
-    def save_plugin_settings():
+    def save_plugin_settings() -> Any:
         return {"ok": True}
 
     @app.route("/login", methods=["POST"])
-    def login():
+    def login() -> Any:
         return {"ok": True}
 
     @app.route("/healthz", methods=["GET", "POST"])
-    def healthz():
+    def healthz() -> Any:
         return {"ok": True}
 
     return app
@@ -239,7 +242,9 @@ def middleware_app():
 class TestSetupRateLimitingIntegration:
     """Integration tests verifying setup_rate_limiting applies the mutating bucket."""
 
-    def test_update_now_burst_then_429(self, middleware_app, monkeypatch):
+    def test_update_now_burst_then_429(
+        self, middleware_app: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """POST /update_now → first 10 succeed, 11th returns 429."""
         import app_setup.security_middleware as mw
         from utils.rate_limit import TokenBucket
@@ -253,7 +258,9 @@ class TestSetupRateLimitingIntegration:
         resp = client.post("/update_now")
         assert resp.status_code == 429
 
-    def test_save_plugin_settings_burst_then_429(self, middleware_app, monkeypatch):
+    def test_save_plugin_settings_burst_then_429(
+        self, middleware_app: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         import app_setup.security_middleware as mw
         from utils.rate_limit import TokenBucket
 
@@ -264,13 +271,13 @@ class TestSetupRateLimitingIntegration:
         resp = client.post("/save_plugin_settings")
         assert resp.status_code == 429
 
-    def test_healthz_get_not_rate_limited(self, middleware_app):
+    def test_healthz_get_not_rate_limited(self, middleware_app: Any) -> None:
         client = middleware_app.test_client()
         for _ in range(20):
             resp = client.get("/healthz")
             assert resp.status_code == 200
 
-    def test_429_response_has_retry_after_header(self, middleware_app):
+    def test_429_response_has_retry_after_header(self, middleware_app: Any) -> None:
         import app_setup.security_middleware as mw
         from utils.rate_limit import TokenBucket
 

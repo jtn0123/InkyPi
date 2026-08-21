@@ -18,7 +18,7 @@ def _html() -> str:
 class TestDeletePlaylistModalLabelledBy:
     """deletePlaylistModal must have aria-labelledby pointing to an existing id."""
 
-    def test_delete_playlist_modal_has_aria_labelledby(self):
+    def test_delete_playlist_modal_has_aria_labelledby(self) -> None:
         html = _html()
         match = re.search(
             r'id="deletePlaylistModal"[^>]*aria-labelledby="([^"]+)"'
@@ -27,7 +27,7 @@ class TestDeletePlaylistModalLabelledBy:
         )
         assert match, "#deletePlaylistModal must have aria-labelledby attribute"
 
-    def test_delete_playlist_modal_labelledby_id_exists(self):
+    def test_delete_playlist_modal_labelledby_id_exists(self) -> None:
         html = _html()
         # Extract the aria-labelledby value from deletePlaylistModal
         match = re.search(
@@ -42,7 +42,7 @@ class TestDeletePlaylistModalLabelledBy:
             f"must exist in playlist.html"
         )
 
-    def test_delete_playlist_modal_no_aria_label_fallback(self):
+    def test_delete_playlist_modal_no_aria_label_fallback(self) -> None:
         """The modal should use aria-labelledby (not aria-label) for consistency."""
         html = _html()
         # Find the deletePlaylistModal element and verify it doesn't rely on aria-label
@@ -63,7 +63,7 @@ class TestDeletePlaylistModalLabelledBy:
 class TestDeleteInstanceModalLabelledBy:
     """deleteInstanceModal must have aria-labelledby pointing to an existing id."""
 
-    def test_delete_instance_modal_has_aria_labelledby(self):
+    def test_delete_instance_modal_has_aria_labelledby(self) -> None:
         html = _html()
         match = re.search(
             r'id="deleteInstanceModal"[^>]*aria-labelledby="([^"]+)"'
@@ -72,7 +72,7 @@ class TestDeleteInstanceModalLabelledBy:
         )
         assert match, "#deleteInstanceModal must have aria-labelledby attribute"
 
-    def test_delete_instance_modal_labelledby_id_exists(self):
+    def test_delete_instance_modal_labelledby_id_exists(self) -> None:
         html = _html()
         match = re.search(
             r'id="deleteInstanceModal"[^>]*aria-labelledby="([^"]+)"'
@@ -86,7 +86,7 @@ class TestDeleteInstanceModalLabelledBy:
             f"must exist in playlist.html"
         )
 
-    def test_delete_instance_modal_no_aria_label_fallback(self):
+    def test_delete_instance_modal_no_aria_label_fallback(self) -> None:
         """The modal should use aria-labelledby (not aria-label) for consistency."""
         html = _html()
         assert (
@@ -105,19 +105,19 @@ class TestDeleteInstanceModalLabelledBy:
 class TestDeleteModalHeadingElements:
     """Both delete modals must have visible-or-sr-only heading elements."""
 
-    def test_delete_playlist_title_heading_exists(self):
+    def test_delete_playlist_title_heading_exists(self) -> None:
         html = _html()
         assert (
             'id="deletePlaylistTitle"' in html
         ), "An element with id='deletePlaylistTitle' must exist in playlist.html"
 
-    def test_delete_instance_title_heading_exists(self):
+    def test_delete_instance_title_heading_exists(self) -> None:
         html = _html()
         assert (
             'id="deleteInstanceTitle"' in html
         ), "An element with id='deleteInstanceTitle' must exist in playlist.html"
 
-    def test_all_role_dialog_modals_have_accessible_name(self):
+    def test_all_role_dialog_modals_have_accessible_name(self) -> None:
         """Every role=dialog element on playlist page must have an accessible name."""
         html = _html()
         # Find all modal divs with role="dialog"

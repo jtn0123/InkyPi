@@ -4,19 +4,22 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 from unittest.mock import patch
 
 import pytest
+from flask import Flask
+from flask.testing import FlaskClient
 
 
 @pytest.fixture()
-def client(flask_app):
+def client(flask_app: Flask) -> Any:
     """Flask test client with the diagnostics blueprint registered."""
     return flask_app.test_client()
 
 
 @pytest.fixture(autouse=True)
-def _patch_diagnostics_paths(tmp_path, monkeypatch):
+def _patch_diagnostics_paths(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Any:
     """Redirect /var/lib/inkypi paths so tests never touch the real fs.
 
     The endpoint reads ``/var/lib/inkypi/prev_version`` and
@@ -39,7 +42,7 @@ def _patch_diagnostics_paths(tmp_path, monkeypatch):
 # ---------------------------------------------------------------------------
 
 
-def test_returns_200_with_required_keys(client):
+def test_returns_200_with_required_keys(client: FlaskClient) -> None:
     """GET /api/diagnostics returns 200 with the documented top-level shape."""
     resp = client.get("/api/diagnostics")
     assert resp.status_code == 200
@@ -90,7 +93,7 @@ def test_returns_200_with_required_keys(client):
         assert v in {"ok", "fail", "unknown"}
 
 
-def test_version_matches_version_file(client):
+def test_version_matches_version_file(client: FlaskClient) -> None:
     """The `version` field reflects the repo's VERSION file."""
     repo_root = Path(__file__).resolve().parents[2]
     expected = (repo_root / "VERSION").read_text().strip()
@@ -104,7 +107,9 @@ def test_version_matches_version_file(client):
 # ---------------------------------------------------------------------------
 
 
-def test_handles_missing_prev_version(client, _patch_diagnostics_paths):
+def test_handles_missing_prev_version(
+    client: FlaskClient, _patch_diagnostics_paths: Any
+) -> None:
     """prev_version is null when /var/lib/inkypi/prev_version is absent."""
     assert not _patch_diagnostics_paths["prev"].exists()
     resp = client.get("/api/diagnostics")
@@ -112,7 +117,9 @@ def test_handles_missing_prev_version(client, _patch_diagnostics_paths):
     assert data["prev_version"] is None
 
 
-def test_reads_prev_version_when_present(client, _patch_diagnostics_paths):
+def test_reads_prev_version_when_present(
+    client: FlaskClient, _patch_diagnostics_paths: Any
+) -> None:
     """prev_version is returned verbatim (stripped) when the file exists."""
     _patch_diagnostics_paths["prev"].write_text("0.51.7\n")
     resp = client.get("/api/diagnostics")
@@ -120,7 +127,9 @@ def test_reads_prev_version_when_present(client, _patch_diagnostics_paths):
     assert data["prev_version"] == "0.51.7"
 
 
-def test_handles_missing_last_update_failure(client, _patch_diagnostics_paths):
+def test_handles_missing_last_update_failure(
+    client: FlaskClient, _patch_diagnostics_paths: Any
+) -> None:
     """last_update_failure is null when the sentinel file does not exist."""
     assert not _patch_diagnostics_paths["fail"].exists()
     resp = client.get("/api/diagnostics")
@@ -128,7 +137,9 @@ def test_handles_missing_last_update_failure(client, _patch_diagnostics_paths):
     assert data["last_update_failure"] is None
 
 
-def test_last_update_failure_parses_json_payload(client, _patch_diagnostics_paths):
+def test_last_update_failure_parses_json_payload(
+    client: FlaskClient, _patch_diagnostics_paths: Any
+) -> None:
     """A JSON payload in .last-update-failure is parsed and returned as-is."""
     _patch_diagnostics_paths["fail"].write_text(
         '{"ts": "2026-04-14T00:00:00Z", "reason": "apt update failed"}'
@@ -139,7 +150,9 @@ def test_last_update_failure_parses_json_payload(client, _patch_diagnostics_path
     assert data["last_update_failure"]["reason"] == "apt update failed"
 
 
-def test_last_update_failure_raw_text_fallback(client, _patch_diagnostics_paths):
+def test_last_update_failure_raw_text_fallback(
+    client: FlaskClient, _patch_diagnostics_paths: Any
+) -> None:
     """Non-JSON contents are returned as a plain string so info is never lost."""
     _patch_diagnostics_paths["fail"].write_text("plain text failure note")
     resp = client.get("/api/diagnostics")
@@ -152,7 +165,7 @@ def test_last_update_failure_raw_text_fallback(client, _patch_diagnostics_paths)
 # ---------------------------------------------------------------------------
 
 
-def test_plugin_health_includes_all_registered_plugins(client):
+def test_plugin_health_includes_all_registered_plugins(client: FlaskClient) -> None:
     """Every registered plugin appears in plugin_health, even if never run."""
     from plugins.plugin_registry import get_registered_plugin_ids
 
@@ -174,7 +187,9 @@ def test_plugin_health_includes_all_registered_plugins(client):
         assert status in {"ok", "fail", "unknown"}, (pid, status)
 
 
-def test_plugin_health_reflects_snapshot_status(client, flask_app):
+def test_plugin_health_reflects_snapshot_status(
+    client: FlaskClient, flask_app: Flask
+) -> None:
     """A green/red entry in the refresh-task snapshot maps to ok/fail."""
     rt = flask_app.config["REFRESH_TASK"]
     with patch.object(
@@ -199,7 +214,9 @@ def test_plugin_health_reflects_snapshot_status(client, flask_app):
 # ---------------------------------------------------------------------------
 
 
-def test_log_tail_respects_100_line_cap(client, monkeypatch):
+def test_log_tail_respects_100_line_cap(
+    client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """log_tail_100 is capped to the most recent 100 entries, even if more exist."""
     import blueprints.settings as settings_mod
 
@@ -216,11 +233,13 @@ def test_log_tail_respects_100_line_cap(client, monkeypatch):
     assert tail[-1] == "line-499"
 
 
-def test_log_tail_handles_reader_error(client, monkeypatch):
+def test_log_tail_handles_reader_error(
+    client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """A failing log reader degrades to an empty list, not a 500."""
     import blueprints.settings as settings_mod
 
-    def boom(hours):  # noqa: ARG001 — signature match
+    def boom(hours: Any) -> None:  # noqa: ARG001 — signature match
         raise RuntimeError("journalctl unavailable")
 
     monkeypatch.setattr(settings_mod, "_read_log_lines", boom)
@@ -235,7 +254,9 @@ def test_log_tail_handles_reader_error(client, monkeypatch):
 # ---------------------------------------------------------------------------
 
 
-def test_access_denied_for_remote_ip_without_auth(flask_app, monkeypatch):
+def test_access_denied_for_remote_ip_without_auth(
+    flask_app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Without PIN auth and outside INKYPI_ENV=dev, non-private IPs get 403."""
     monkeypatch.delenv("INKYPI_ENV", raising=False)
     flask_app.config["AUTH_ENABLED"] = False
@@ -244,7 +265,9 @@ def test_access_denied_for_remote_ip_without_auth(flask_app, monkeypatch):
     assert resp.status_code == 403
 
 
-def test_access_allowed_for_private_ip_without_auth(flask_app, monkeypatch):
+def test_access_allowed_for_private_ip_without_auth(
+    flask_app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """RFC1918 / loopback callers are allowed even without auth."""
     monkeypatch.delenv("INKYPI_ENV", raising=False)
     flask_app.config["AUTH_ENABLED"] = False
@@ -255,7 +278,9 @@ def test_access_allowed_for_private_ip_without_auth(flask_app, monkeypatch):
     assert resp.status_code == 200
 
 
-def test_access_allowed_when_auth_enabled(flask_app, monkeypatch):
+def test_access_allowed_when_auth_enabled(
+    flask_app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """If app-level PIN auth is enabled, the endpoint trusts the gate."""
     monkeypatch.delenv("INKYPI_ENV", raising=False)
     flask_app.config["AUTH_ENABLED"] = True
@@ -264,7 +289,9 @@ def test_access_allowed_when_auth_enabled(flask_app, monkeypatch):
     assert resp.status_code == 200
 
 
-def test_access_denied_for_unparseable_remote_addr(flask_app, monkeypatch):
+def test_access_denied_for_unparseable_remote_addr(
+    flask_app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """An unparseable REMOTE_ADDR fails closed (403), not open."""
     monkeypatch.delenv("INKYPI_ENV", raising=False)
     flask_app.config["AUTH_ENABLED"] = False
@@ -280,7 +307,9 @@ def test_access_denied_for_unparseable_remote_addr(flask_app, monkeypatch):
 # ---------------------------------------------------------------------------
 
 
-def test_uptime_seconds_falls_back_to_proc_uptime(monkeypatch, tmp_path):
+def test_uptime_seconds_falls_back_to_proc_uptime(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     """When psutil.boot_time raises, _uptime_seconds reads /proc/uptime."""
     import blueprints.diagnostics as diag
 
@@ -289,7 +318,7 @@ def test_uptime_seconds_falls_back_to_proc_uptime(monkeypatch, tmp_path):
 
     class _BoomPsutil:
         @staticmethod
-        def boot_time():
+        def boot_time() -> None:
             raise RuntimeError("no psutil on this host")
 
     monkeypatch.setitem(__import__("sys").modules, "psutil", _BoomPsutil)
@@ -299,29 +328,33 @@ def test_uptime_seconds_falls_back_to_proc_uptime(monkeypatch, tmp_path):
     assert diag._uptime_seconds() == 54321
 
 
-def test_uptime_seconds_returns_none_on_total_failure(monkeypatch):
+def test_uptime_seconds_returns_none_on_total_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Both psutil and /proc/uptime failing yields None instead of raising."""
     import blueprints.diagnostics as diag
 
     class _BoomPsutil:
         @staticmethod
-        def boot_time():
+        def boot_time() -> None:
             raise RuntimeError("x")
 
     monkeypatch.setitem(__import__("sys").modules, "psutil", _BoomPsutil)
 
     class _NoFile:
-        def __init__(self, *_args, **_kw):
+        def __init__(self, *_args: Any, **_kw: Any) -> None:
             pass
 
-        def read_text(self):
+        def read_text(self) -> None:
             raise FileNotFoundError
 
     monkeypatch.setattr(diag, "Path", _NoFile)
     assert diag._uptime_seconds() is None
 
 
-def test_memory_info_falls_back_to_proc_meminfo(monkeypatch, tmp_path):
+def test_memory_info_falls_back_to_proc_meminfo(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> Any:
     """When psutil raises, _memory_info parses /proc/meminfo in kB."""
     import blueprints.diagnostics as diag
 
@@ -334,7 +367,7 @@ def test_memory_info_falls_back_to_proc_meminfo(monkeypatch, tmp_path):
 
     class _BoomPsutil:
         @staticmethod
-        def virtual_memory():
+        def virtual_memory() -> None:
             raise RuntimeError("no psutil")
 
     monkeypatch.setitem(__import__("sys").modules, "psutil", _BoomPsutil)
@@ -342,7 +375,7 @@ def test_memory_info_falls_back_to_proc_meminfo(monkeypatch, tmp_path):
     # Patch Path("/proc/meminfo") to our temp file while leaving others alone.
     real_path = diag.Path
 
-    def _path(p=""):
+    def _path(p: Any = "") -> Any:
         if p == "/proc/meminfo":
             return fake
         return real_path(p)
@@ -356,22 +389,24 @@ def test_memory_info_falls_back_to_proc_meminfo(monkeypatch, tmp_path):
     assert info["pct"] == pytest.approx(60.9, abs=0.2)
 
 
-def test_memory_info_returns_nulls_on_total_failure(monkeypatch):
+def test_memory_info_returns_nulls_on_total_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """When every source raises, _memory_info returns a null-shaped dict."""
     import blueprints.diagnostics as diag
 
     class _BoomPsutil:
         @staticmethod
-        def virtual_memory():
+        def virtual_memory() -> None:
             raise RuntimeError("x")
 
     monkeypatch.setitem(__import__("sys").modules, "psutil", _BoomPsutil)
 
     class _NoFile:
-        def __init__(self, *_args, **_kw):
+        def __init__(self, *_args: Any, **_kw: Any) -> None:
             pass
 
-        def open(self, *_a, **_kw):
+        def open(self, *_a: Any, **_kw: Any) -> None:
             raise FileNotFoundError
 
     monkeypatch.setattr(diag, "Path", _NoFile)
@@ -379,11 +414,11 @@ def test_memory_info_returns_nulls_on_total_failure(monkeypatch):
     assert info == {"total_mb": None, "used_mb": None, "pct": None}
 
 
-def test_disk_info_returns_nulls_on_oserror(monkeypatch):
+def test_disk_info_returns_nulls_on_oserror(monkeypatch: pytest.MonkeyPatch) -> None:
     """shutil.disk_usage raising gives a null-shaped disk entry (no 500)."""
     import blueprints.diagnostics as diag
 
-    def _boom(_path):
+    def _boom(_path: Any) -> None:
         raise OSError("read-only")
 
     monkeypatch.setattr(diag.shutil, "disk_usage", _boom)
@@ -399,27 +434,29 @@ def test_disk_info_returns_nulls_on_oserror(monkeypatch):
 # ---------------------------------------------------------------------------
 
 
-def test_read_version_falls_back_to_app_config(flask_app, monkeypatch):
+def test_read_version_falls_back_to_app_config(
+    flask_app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> Any:
     """When the VERSION file is unreadable, APP_VERSION from flask config is used."""
     import blueprints.diagnostics as diag
 
     flask_app.config["APP_VERSION"] = "9.9.9-test"
 
     class _NoFile:
-        def __init__(self, *_args, **_kw):
+        def __init__(self, *_args: Any, **_kw: Any) -> None:
             pass
 
-        def resolve(self):
+        def resolve(self) -> Any:
             return self
 
         @property
-        def parent(self):
+        def parent(self) -> Any:
             return self
 
-        def __truediv__(self, _other):
+        def __truediv__(self, _other: Any) -> Any:
             return self
 
-        def read_text(self, *_a, **_kw):
+        def read_text(self, *_a: Any, **_kw: Any) -> None:
             raise FileNotFoundError
 
     monkeypatch.setattr(diag, "Path", _NoFile)
@@ -427,27 +464,29 @@ def test_read_version_falls_back_to_app_config(flask_app, monkeypatch):
         assert diag._read_version() == "9.9.9-test"
 
 
-def test_read_version_unknown_when_no_source(flask_app, monkeypatch):
+def test_read_version_unknown_when_no_source(
+    flask_app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> Any:
     """Returns the literal 'unknown' when VERSION and APP_VERSION are both missing."""
     import blueprints.diagnostics as diag
 
     flask_app.config.pop("APP_VERSION", None)
 
     class _NoFile:
-        def __init__(self, *_args, **_kw):
+        def __init__(self, *_args: Any, **_kw: Any) -> None:
             pass
 
-        def resolve(self):
+        def resolve(self) -> Any:
             return self
 
         @property
-        def parent(self):
+        def parent(self) -> Any:
             return self
 
-        def __truediv__(self, _other):
+        def __truediv__(self, _other: Any) -> Any:
             return self
 
-        def read_text(self, *_a, **_kw):
+        def read_text(self, *_a: Any, **_kw: Any) -> None:
             raise FileNotFoundError
 
     monkeypatch.setattr(diag, "Path", _NoFile)
@@ -460,7 +499,7 @@ def test_read_version_unknown_when_no_source(flask_app, monkeypatch):
 # ---------------------------------------------------------------------------
 
 
-def test_refresh_task_snapshot_no_refresh_task(flask_app):
+def test_refresh_task_snapshot_no_refresh_task(flask_app: Flask) -> None:
     """Missing REFRESH_TASK yields a benign null-shaped snapshot."""
     import blueprints.diagnostics as diag
 
@@ -470,7 +509,9 @@ def test_refresh_task_snapshot_no_refresh_task(flask_app):
     assert snap == {"running": False, "last_run_ts": None, "last_error": None}
 
 
-def test_refresh_task_snapshot_picks_most_recent_failure(client, flask_app):
+def test_refresh_task_snapshot_picks_most_recent_failure(
+    client: FlaskClient, flask_app: Flask
+) -> None:
     """When multiple plugins have errors, the most recent failure wins."""
     import blueprints.diagnostics as diag
 
@@ -494,7 +535,9 @@ def test_refresh_task_snapshot_picks_most_recent_failure(client, flask_app):
     assert snap["last_error"] == "newer"
 
 
-def test_refresh_task_snapshot_handles_health_method_raising(client, flask_app):
+def test_refresh_task_snapshot_handles_health_method_raising(
+    client: FlaskClient, flask_app: Flask
+) -> None:
     """A health-snapshot method that raises doesn't leak past the endpoint."""
     import blueprints.diagnostics as diag
 
@@ -505,10 +548,12 @@ def test_refresh_task_snapshot_handles_health_method_raising(client, flask_app):
     assert snap["last_error"] is None
 
 
-def test_plugin_health_registry_failure_still_returns_dict(client, monkeypatch):
+def test_plugin_health_registry_failure_still_returns_dict(
+    client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """A broken plugin registry still yields a dict (possibly empty)."""
 
-    def _boom():
+    def _boom() -> None:
         raise RuntimeError("registry broken")
 
     monkeypatch.setattr("plugins.plugin_registry.get_registered_plugin_ids", _boom)
@@ -523,7 +568,7 @@ def test_plugin_health_registry_failure_still_returns_dict(client, monkeypatch):
 # ---------------------------------------------------------------------------
 
 
-def test_is_private_address_classifier():
+def test_is_private_address_classifier() -> None:
     """_is_private_address covers loopback, RFC1918, link-local, and public IPs."""
     import blueprints.diagnostics as diag
 

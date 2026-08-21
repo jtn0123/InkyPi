@@ -2,6 +2,7 @@
 """Shared fixtures with realistic API response shapes for plugin tests."""
 
 from io import BytesIO
+from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
@@ -9,7 +10,7 @@ from PIL import Image
 
 
 @pytest.fixture()
-def realistic_weather_response():
+def realistic_weather_response() -> Any:
     """Return a dict matching the actual OpenWeatherMap One Call API shape."""
     return {
         "lat": 40.7128,
@@ -93,7 +94,7 @@ def realistic_weather_response():
 
 
 @pytest.fixture()
-def realistic_rss_feed():
+def realistic_rss_feed() -> Any:
     """Return a feedparser-compatible feed object matching a real RSS feed shape."""
     feed = MagicMock()
     feed.bozo = False
@@ -120,7 +121,7 @@ def realistic_rss_feed():
 
 
 @pytest.fixture()
-def realistic_nasa_apod_response():
+def realistic_nasa_apod_response() -> Any:
     """Return a dict matching the actual NASA APOD API response shape."""
     return {
         "date": "2026-03-18",
@@ -138,7 +139,7 @@ def realistic_nasa_apod_response():
 
 
 @pytest.fixture()
-def fake_image_response():
+def fake_image_response() -> Any:
     """Return a mock HTTP response containing a small valid PNG image."""
     buf = BytesIO()
     Image.new("RGB", (100, 100), "white").save(buf, format="PNG")

@@ -8,6 +8,7 @@ import json
 import os
 import tarfile
 from pathlib import Path
+from typing import Any
 from unittest.mock import patch
 
 import pytest
@@ -17,7 +18,7 @@ import pytest
 # ---------------------------------------------------------------------------
 
 
-def _load_script(script_name: str):
+def _load_script(script_name: str) -> Any:
     """Load a scripts/ module by file path, avoiding sys.path pollution."""
     scripts_dir = Path(__file__).parent.parent / "scripts"
     spec = importlib.util.spec_from_file_location(
@@ -29,12 +30,12 @@ def _load_script(script_name: str):
 
 
 @pytest.fixture(scope="module")
-def backup_mod():
+def backup_mod() -> Any:
     return _load_script("backup_config")
 
 
 @pytest.fixture(scope="module")
-def restore_mod():
+def restore_mod() -> Any:
     return _load_script("restore_config")
 
 
@@ -80,7 +81,7 @@ def _make_instances_dir(base: Path) -> Path:
 
 
 class TestBackupConfig:
-    def test_backup_creates_valid_tar_gz(self, backup_mod, tmp_path):
+    def test_backup_creates_valid_tar_gz(self, backup_mod: Any, tmp_path: Path) -> None:
         config_dir = _make_config_dir(tmp_path / "src")
         instances_dir = _make_instances_dir(tmp_path / "src")
         output = str(tmp_path / "backup.tar.gz")
@@ -96,7 +97,9 @@ class TestBackupConfig:
         assert os.path.isfile(output)
         assert tarfile.is_tarfile(output)
 
-    def test_manifest_contains_expected_fields(self, backup_mod, tmp_path):
+    def test_manifest_contains_expected_fields(
+        self, backup_mod: Any, tmp_path: Path
+    ) -> None:
         config_dir = _make_config_dir(tmp_path / "src")
         instances_dir = _make_instances_dir(tmp_path / "src")
         output = str(tmp_path / "backup.tar.gz")
@@ -121,7 +124,9 @@ class TestBackupConfig:
         # All included paths should be strings
         assert all(isinstance(p, str) for p in manifest["included_paths"])
 
-    def test_backup_includes_config_and_instance_files(self, backup_mod, tmp_path):
+    def test_backup_includes_config_and_instance_files(
+        self, backup_mod: Any, tmp_path: Path
+    ) -> None:
         config_dir = _make_config_dir(tmp_path / "src")
         instances_dir = _make_instances_dir(tmp_path / "src")
         output = str(tmp_path / "backup.tar.gz")
@@ -139,7 +144,9 @@ class TestBackupConfig:
         assert "manifest.json" in names
         assert any(n.startswith("config/") and n.endswith(".json") for n in names)
 
-    def test_backup_excludes_history_by_default(self, backup_mod, tmp_path):
+    def test_backup_excludes_history_by_default(
+        self, backup_mod: Any, tmp_path: Path
+    ) -> None:
         config_dir = _make_config_dir(tmp_path / "src")
         instances_dir = _make_instances_dir(tmp_path / "src")
         history_dir = tmp_path / "src" / "history"
@@ -160,7 +167,9 @@ class TestBackupConfig:
 
         assert not any(n.startswith("history/") for n in names)
 
-    def test_backup_includes_history_when_flag_set(self, backup_mod, tmp_path):
+    def test_backup_includes_history_when_flag_set(
+        self, backup_mod: Any, tmp_path: Path
+    ) -> None:
         config_dir = _make_config_dir(tmp_path / "src")
         instances_dir = _make_instances_dir(tmp_path / "src")
         history_dir = tmp_path / "src" / "history"
@@ -181,7 +190,9 @@ class TestBackupConfig:
 
         assert any(n.startswith("history/") for n in names)
 
-    def test_manifest_checksum_matches_device_json(self, backup_mod, tmp_path):
+    def test_manifest_checksum_matches_device_json(
+        self, backup_mod: Any, tmp_path: Path
+    ) -> None:
         config_dir = _make_config_dir(tmp_path / "src")
         instances_dir = _make_instances_dir(tmp_path / "src")
         output = str(tmp_path / "backup.tar.gz")
@@ -209,7 +220,7 @@ class TestBackupConfig:
 
 
 class TestRestoreConfig:
-    def _make_backup(self, backup_mod, src_base: Path, output: str) -> str:
+    def _make_backup(self, backup_mod: Any, src_base: Path, output: str) -> str:
         config_dir = _make_config_dir(src_base)
         instances_dir = _make_instances_dir(src_base)
         backup_mod.run_backup(
@@ -220,7 +231,9 @@ class TestRestoreConfig:
         )
         return output
 
-    def test_restore_round_trip(self, backup_mod, restore_mod, tmp_path):
+    def test_restore_round_trip(
+        self, backup_mod: Any, restore_mod: Any, tmp_path: Path
+    ) -> None:
         """backup → wipe → restore → contents match original."""
         src = tmp_path / "original"
         src.mkdir()
@@ -251,7 +264,9 @@ class TestRestoreConfig:
         restored = (config_dir / "device.json").read_text()
         assert json.loads(restored) == json.loads(original_device)
 
-    def test_restore_without_yes_shows_prompt(self, backup_mod, restore_mod, tmp_path):
+    def test_restore_without_yes_shows_prompt(
+        self, backup_mod: Any, restore_mod: Any, tmp_path: Path
+    ) -> Any:
         """restore without --yes should call the input function for confirmation."""
         src = tmp_path / "src"
         src.mkdir()
@@ -284,8 +299,12 @@ class TestRestoreConfig:
         assert rc == 1  # user declined
 
     def test_restore_creates_pre_restore_safety_backup(
-        self, backup_mod, restore_mod, tmp_path, monkeypatch
-    ):
+        self,
+        backup_mod: Any,
+        restore_mod: Any,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> Any:
         """restore --yes should create a .pre-restore-*.tar.gz next to the config."""
         src = tmp_path / "src"
         src.mkdir()
@@ -305,7 +324,9 @@ class TestRestoreConfig:
 
         # JTN-538: pin the safety backup output dir to tmp_path so the
         # .pre-restore-*.tar.gz never leaks into the repo working tree.
-        def capture_pre_restore(config_dir, instances_dir, output_dir=None):
+        def capture_pre_restore(
+            config_dir: Any, instances_dir: Any, output_dir: Any = None
+        ) -> Any:
             result = original_pre_restore(
                 config_dir, instances_dir, output_dir=str(tmp_path)
             )
@@ -325,7 +346,9 @@ class TestRestoreConfig:
         assert ".pre-restore-" in safety_outputs[0]
         assert os.path.isfile(safety_outputs[0])
 
-    def test_restore_fails_on_missing_backup(self, restore_mod, tmp_path):
+    def test_restore_fails_on_missing_backup(
+        self, restore_mod: Any, tmp_path: Path
+    ) -> None:
         """restore should return non-zero when backup file doesn't exist."""
         rc = restore_mod.run_restore(
             backup_path=str(tmp_path / "nonexistent.tar.gz"),
@@ -335,7 +358,9 @@ class TestRestoreConfig:
         )
         assert rc != 0
 
-    def test_restore_verifies_checksum(self, backup_mod, restore_mod, tmp_path):
+    def test_restore_verifies_checksum(
+        self, backup_mod: Any, restore_mod: Any, tmp_path: Path
+    ) -> None:
         """After restore, device.json checksum should match the manifest."""
         src = tmp_path / "src"
         src.mkdir()
@@ -360,8 +385,8 @@ class TestRestoreConfig:
         assert rc == 0
 
     def test_restore_detects_tampered_device_json(
-        self, backup_mod, restore_mod, tmp_path
-    ):
+        self, backup_mod: Any, restore_mod: Any, tmp_path: Path
+    ) -> None:
         """If device.json is tampered after extraction, checksum mismatch should fail."""
         src = tmp_path / "src"
         src.mkdir()

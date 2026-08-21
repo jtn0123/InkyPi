@@ -1,10 +1,16 @@
 import os
 import shutil
+from pathlib import Path
+from typing import Any
 
+import pytest
+from flask.testing import FlaskClient
 from PIL import Image
 
 
-def test_config_init_tolerates_preview_copy_permission_error(monkeypatch, tmp_path):
+def test_config_init_tolerates_preview_copy_permission_error(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     import config as config_mod
 
     config_path = tmp_path / "device.json"
@@ -39,19 +45,19 @@ def test_config_init_tolerates_preview_copy_permission_error(monkeypatch, tmp_pa
 
 
 def test_display_manager_tolerates_readonly_preview_paths(
-    device_config_dev, monkeypatch
-):
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> Any:
     from display.display_manager import DisplayManager
 
     manager = DisplayManager(device_config_dev)
     render_calls = {"count": 0}
 
-    def fake_render(img, image_settings=None):
+    def fake_render(img: Any, image_settings: Any = None) -> None:
         render_calls["count"] += 1
 
     original_save = Image.Image.save
 
-    def conditional_save(self, fp, *args, **kwargs):
+    def conditional_save(self, fp: Any, *args: Any, **kwargs: Any) -> Any:
         if str(fp) == device_config_dev.current_image_file:
             return original_save(self, fp, *args, **kwargs)
         raise PermissionError("readonly")
@@ -65,8 +71,11 @@ def test_display_manager_tolerates_readonly_preview_paths(
 
 
 def test_history_clear_returns_500_on_permission_error(
-    client, device_config_dev, tmp_path, monkeypatch
-):
+    client: FlaskClient,
+    device_config_dev: Any,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     history_dir = device_config_dev.history_image_dir
     image_path = os.path.join(history_dir, "display_20250101_000000.png")
     Image.new("RGB", (10, 10), "white").save(image_path)
@@ -82,7 +91,9 @@ def test_history_clear_returns_500_on_permission_error(
     assert response.get_json()["success"] is False
 
 
-def test_preview_returns_404_when_preview_files_missing(client, device_config_dev):
+def test_preview_returns_404_when_preview_files_missing(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     for path in (
         device_config_dev.processed_image_file,
         device_config_dev.current_image_file,

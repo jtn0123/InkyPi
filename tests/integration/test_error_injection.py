@@ -1,20 +1,22 @@
 # pyright: reportMissingImports=false
 import json
 import os
+from typing import Any
 from unittest.mock import patch
 
 import pytest
+from flask.testing import FlaskClient
 from PIL import Image
 
 
-def _valid_ai_text_settings():
+def _valid_ai_text_settings() -> Any:
     return {"title": "T", "textModel": "gpt-4o", "textPrompt": "Hi"}
 
 
 @patch("plugins.ai_text.ai_text.OpenAI")
 def test_manual_update_propagates_plugin_exception(
-    mock_openai, device_config_dev, monkeypatch
-):
+    mock_openai: Any, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> Any:
     # Ensure plugin registry is loaded
     from plugins.plugin_registry import load_plugins
 
@@ -22,25 +24,25 @@ def test_manual_update_propagates_plugin_exception(
 
     # Mock OpenAI to avoid API calls
     class FakeMsg:
-        def __init__(self, content):
+        def __init__(self, content: Any) -> None:
             self.content = content
 
     class Choice:
-        def __init__(self, content):
+        def __init__(self, content: Any) -> None:
             self.message = FakeMsg(content)
 
     class FakeChat:
-        def __init__(self):
+        def __init__(self) -> None:
             self.completions = self
 
-        def create(self, *args, **kwargs):
+        def create(self, *args: Any, **kwargs: Any) -> Any:
             class Resp:
                 choices = [Choice("Hello World")]
 
             return Resp()
 
     class FakeOpenAI:
-        def __init__(self, api_key=None):
+        def __init__(self, api_key: Any = None) -> None:
             self.chat = FakeChat()
 
     mock_openai.return_value = FakeOpenAI()
@@ -48,7 +50,7 @@ def test_manual_update_propagates_plugin_exception(
     # Force AI Text plugin to raise on generate_image
     import plugins.ai_text.ai_text as ai_text_mod
 
-    def boom(self, settings, device_config):
+    def boom(self, settings: Any, device_config: Any) -> None:
         raise RuntimeError("boom")
 
     monkeypatch.setattr(ai_text_mod.AIText, "generate_image", boom, raising=True)
@@ -70,28 +72,30 @@ def test_manual_update_propagates_plugin_exception(
 
 
 @patch("plugins.ai_text.ai_text.OpenAI")
-def test_update_now_returns_500_when_display_raises(mock_openai, client, monkeypatch):
+def test_update_now_returns_500_when_display_raises(
+    mock_openai: Any, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> Any:
     # Mock OpenAI to avoid API calls
     class FakeMsg:
-        def __init__(self, content):
+        def __init__(self, content: Any) -> None:
             self.content = content
 
     class Choice:
-        def __init__(self, content):
+        def __init__(self, content: Any) -> None:
             self.message = FakeMsg(content)
 
     class FakeChat:
-        def __init__(self):
+        def __init__(self) -> None:
             self.completions = self
 
-        def create(self, *args, **kwargs):
+        def create(self, *args: Any, **kwargs: Any) -> Any:
             class Resp:
                 choices = [Choice("Hello World")]
 
             return Resp()
 
     class FakeOpenAI:
-        def __init__(self, api_key=None):
+        def __init__(self, api_key: Any = None) -> None:
             self.chat = FakeChat()
 
     mock_openai.return_value = FakeOpenAI()
@@ -99,7 +103,7 @@ def test_update_now_returns_500_when_display_raises(mock_openai, client, monkeyp
     # Return a simple image from plugin
     import plugins.ai_text.ai_text as ai_text_mod
 
-    def ok_img(self, settings, device_config):
+    def ok_img(self, settings: Any, device_config: Any) -> Any:
         return Image.new("RGB", device_config.get_resolution(), "white")
 
     monkeypatch.setattr(ai_text_mod.AIText, "generate_image", ok_img, raising=True)
@@ -108,7 +112,7 @@ def test_update_now_returns_500_when_display_raises(mock_openai, client, monkeyp
     app = client.application
     display_manager = app.config["DISPLAY_MANAGER"]
 
-    def raise_display(img, image_settings=None):
+    def raise_display(img: Any, image_settings: Any = None) -> None:
         raise RuntimeError("display failure")
 
     monkeypatch.setattr(display_manager, "display_image", raise_display, raising=True)
@@ -126,29 +130,32 @@ def test_update_now_returns_500_when_display_raises(mock_openai, client, monkeyp
 
 @patch("plugins.ai_text.ai_text.OpenAI")
 def test_display_plugin_instance_returns_500_on_plugin_error(
-    mock_openai, client, device_config_dev, monkeypatch
-):
+    mock_openai: Any,
+    client: FlaskClient,
+    device_config_dev: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> Any:
     # Mock OpenAI to avoid API calls
     class FakeMsg:
-        def __init__(self, content):
+        def __init__(self, content: Any) -> None:
             self.content = content
 
     class Choice:
-        def __init__(self, content):
+        def __init__(self, content: Any) -> None:
             self.message = FakeMsg(content)
 
     class FakeChat:
-        def __init__(self):
+        def __init__(self) -> None:
             self.completions = self
 
-        def create(self, *args, **kwargs):
+        def create(self, *args: Any, **kwargs: Any) -> Any:
             class Resp:
                 choices = [Choice("Hello World")]
 
             return Resp()
 
     class FakeOpenAI:
-        def __init__(self, api_key=None):
+        def __init__(self, api_key: Any = None) -> None:
             self.chat = FakeChat()
 
     mock_openai.return_value = FakeOpenAI()
@@ -174,7 +181,7 @@ def test_display_plugin_instance_returns_500_on_plugin_error(
     # Force plugin to raise during image generation
     import plugins.ai_text.ai_text as ai_text_mod
 
-    def boom(self, settings, device_config):
+    def boom(self, settings: Any, device_config: Any) -> None:
         raise RuntimeError("boom")
 
     monkeypatch.setattr(ai_text_mod.AIText, "generate_image", boom, raising=True)
@@ -198,11 +205,13 @@ def test_display_plugin_instance_returns_500_on_plugin_error(
         task.stop()
 
 
-def test_plugin_settings_page_returns_500_on_template_error(client, monkeypatch):
+def test_plugin_settings_page_returns_500_on_template_error(
+    client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
     # Mock the plugin's generate_settings_template method
     import plugins.ai_text.ai_text as ai_text_mod
 
-    def raise_settings(self):
+    def raise_settings(self) -> None:
         raise RuntimeError("template error")
 
     monkeypatch.setattr(
@@ -215,29 +224,32 @@ def test_plugin_settings_page_returns_500_on_template_error(client, monkeypatch)
 
 @patch("plugins.ai_text.ai_text.OpenAI")
 def test_add_plugin_returns_500_when_write_config_fails(
-    mock_openai, client, device_config_dev, monkeypatch
-):
+    mock_openai: Any,
+    client: FlaskClient,
+    device_config_dev: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> Any:
     # Mock OpenAI to avoid API calls
     class FakeMsg:
-        def __init__(self, content):
+        def __init__(self, content: Any) -> None:
             self.content = content
 
     class Choice:
-        def __init__(self, content):
+        def __init__(self, content: Any) -> None:
             self.message = FakeMsg(content)
 
     class FakeChat:
-        def __init__(self):
+        def __init__(self) -> None:
             self.completions = self
 
-        def create(self, *args, **kwargs):
+        def create(self, *args: Any, **kwargs: Any) -> Any:
             class Resp:
                 choices = [Choice("Hello World")]
 
             return Resp()
 
     class FakeOpenAI:
-        def __init__(self, api_key=None):
+        def __init__(self, api_key: Any = None) -> None:
             self.chat = FakeChat()
 
     mock_openai.return_value = FakeOpenAI()
@@ -247,7 +259,7 @@ def test_add_plugin_returns_500_when_write_config_fails(
     pm.add_playlist("P1", "00:00", "24:00")
 
     # Make write_config raise
-    def raise_write():
+    def raise_write() -> None:
         raise RuntimeError("write failed")
 
     monkeypatch.setattr(device_config_dev, "write_config", raise_write, raising=True)

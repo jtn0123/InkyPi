@@ -20,9 +20,11 @@ from __future__ import annotations
 
 import sqlite3
 import time
+from pathlib import Path
 from typing import Any
 
 import pytest
+from flask.testing import FlaskClient
 
 # Import schemas via the ``src.*`` path which ``tests/conftest.py`` puts on
 # sys.path via SRC_ABS. TypedDict subclasses from ``typing`` expose their
@@ -69,7 +71,7 @@ def assert_shape(payload: Any, schema: Any) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_validator_accepts_matching_payload():
+def test_validator_accepts_matching_payload() -> None:
     good: VersionInfoResponse = {
         "version": "1.0",
         "git_sha": "abc",
@@ -80,13 +82,13 @@ def test_validator_accepts_matching_payload():
     assert validate_typeddict(good, VersionInfoResponse) == []
 
 
-def test_validator_detects_missing_key():
+def test_validator_detects_missing_key() -> None:
     bad = {"version": "1.0"}
     errs = validate_typeddict(bad, VersionInfoResponse)
     assert any("missing required key" in e for e in errs)
 
 
-def test_validator_detects_wrong_type():
+def test_validator_detects_wrong_type() -> None:
     bad = {
         "version": 1,  # should be str
         "git_sha": "abc",
@@ -98,7 +100,7 @@ def test_validator_detects_wrong_type():
     assert any("expected str" in e for e in errs)
 
 
-def test_validator_handles_nested_typeddict():
+def test_validator_handles_nested_typeddict() -> None:
     good = {
         "last_1h": {
             "total": 0,
@@ -139,14 +141,20 @@ def test_validator_handles_nested_typeddict():
 # ---------------------------------------------------------------------------
 
 
-def _get_json(client, path, **kwargs):
+def _get_json(client: FlaskClient, path: Any, **kwargs: Any) -> Any:
     resp = client.get(path, **kwargs)
     assert resp.status_code == 200, f"{path} returned {resp.status_code}: {resp.data!r}"
     assert resp.is_json, f"{path} did not return JSON: {resp.content_type!r}"
     return resp.get_json()
 
 
-def _request_json(client, method: str, path: str, expected_status: int = 200, **kwargs):
+def _request_json(
+    client: FlaskClient,
+    method: str,
+    path: str,
+    expected_status: int = 200,
+    **kwargs: Any,
+) -> Any:
     resp = getattr(client, method)(path, **kwargs)
     assert (
         resp.status_code == expected_status
@@ -157,17 +165,17 @@ def _request_json(client, method: str, path: str, expected_status: int = 200, **
     return resp.get_json()
 
 
-def test_version_info_shape(client):
+def test_version_info_shape(client: FlaskClient) -> None:
     body = _get_json(client, "/api/version/info")
     assert_shape(body, VersionInfoResponse)
 
 
-def test_uptime_shape(client):
+def test_uptime_shape(client: FlaskClient) -> None:
     body = _get_json(client, "/api/uptime")
     assert_shape(body, UptimeResponse)
 
 
-def test_refresh_info_shape(client):
+def test_refresh_info_shape(client: FlaskClient) -> None:
     body = _get_json(client, "/refresh-info")
     # refresh_info may be empty ({}) on a pristine config; total=False schema
     # still validates that any keys present are correctly typed.
@@ -175,7 +183,7 @@ def test_refresh_info_shape(client):
     assert_shape(body, RefreshInfoResponse)
 
 
-def test_next_up_shape(client):
+def test_next_up_shape(client: FlaskClient) -> None:
     body = _get_json(client, "/next-up")
     # next-up returns {} when nothing is scheduled; total=False schema allows
     # that while still locking in the shape of populated responses.
@@ -190,7 +198,7 @@ def test_next_up_shape(client):
         assert "plugin_instance" in body
 
 
-def test_refresh_stats_shape(client):
+def test_refresh_stats_shape(client: FlaskClient) -> None:
     body = _get_json(client, "/api/stats")
     assert_shape(body, RefreshStatsResponse)
     # Also validate the sub-window schema explicitly so regressions at that
@@ -198,20 +206,22 @@ def test_refresh_stats_shape(client):
     assert_shape(body["last_1h"], RefreshStatsWindow)
 
 
-def test_health_system_shape(client):
+def test_health_system_shape(client: FlaskClient) -> None:
     body = _get_json(client, "/api/health/system")
     assert_shape(body, HealthSystemResponse)
     assert body.get("success") is True
 
 
-def test_health_plugins_shape(client):
+def test_health_plugins_shape(client: FlaskClient) -> None:
     body = _get_json(client, "/api/health/plugins")
     assert_shape(body, HealthPluginsResponse)
     assert body.get("success") is True
     assert "items" in body
 
 
-def test_benchmarks_summary_shape(client, device_config_dev, tmp_path):
+def test_benchmarks_summary_shape(
+    client: FlaskClient, device_config_dev: Any, tmp_path: Path
+) -> None:
     db_path = tmp_path / "contract_benchmarks_shape.db"
     device_config_dev.update_value("enable_benchmarks", True, write=False)
     device_config_dev.update_value("benchmarks_db_path", str(db_path), write=True)
@@ -224,7 +234,9 @@ def test_benchmarks_summary_shape(client, device_config_dev, tmp_path):
     assert body.get("success") is True
 
 
-def test_benchmarks_plugins_shape(client, device_config_dev, tmp_path):
+def test_benchmarks_plugins_shape(
+    client: FlaskClient, device_config_dev: Any, tmp_path: Path
+) -> None:
     db_path = tmp_path / "contract_benchmarks_plugins.db"
     device_config_dev.update_value("enable_benchmarks", True, write=False)
     device_config_dev.update_value("benchmarks_db_path", str(db_path), write=True)
@@ -237,7 +249,9 @@ def test_benchmarks_plugins_shape(client, device_config_dev, tmp_path):
     assert isinstance(body.get("items"), list)
 
 
-def test_benchmarks_refreshes_shape(client, device_config_dev, tmp_path):
+def test_benchmarks_refreshes_shape(
+    client: FlaskClient, device_config_dev: Any, tmp_path: Path
+) -> None:
     db_path = tmp_path / "contract_benchmarks_refreshes.db"
     device_config_dev.update_value("enable_benchmarks", True, write=False)
     device_config_dev.update_value("benchmarks_db_path", str(db_path), write=True)
@@ -262,7 +276,9 @@ def test_benchmarks_refreshes_shape(client, device_config_dev, tmp_path):
     assert isinstance(body.get("items"), list)
 
 
-def test_benchmarks_stages_shape(client, device_config_dev, tmp_path):
+def test_benchmarks_stages_shape(
+    client: FlaskClient, device_config_dev: Any, tmp_path: Path
+) -> None:
     db_path = tmp_path / "contract_benchmarks_stages.db"
     device_config_dev.update_value("enable_benchmarks", True, write=False)
     device_config_dev.update_value("benchmarks_db_path", str(db_path), write=True)
@@ -286,13 +302,13 @@ def test_benchmarks_stages_shape(client, device_config_dev, tmp_path):
     assert isinstance(body.get("items"), list)
 
 
-def test_diagnostics_shape(client):
+def test_diagnostics_shape(client: FlaskClient) -> None:
     body = _get_json(client, "/api/diagnostics")
     assert_shape(body, DiagnosticsResponse)
     assert "plugin_health" in body
 
 
-def test_job_status_shape(client):
+def test_job_status_shape(client: FlaskClient) -> None:
     start = client.post("/update_now?async=1", data={"plugin_id": "clock"})
     assert start.status_code == 202
     start_body = start.get_json()
@@ -322,14 +338,14 @@ def test_job_status_shape(client):
     assert final.get("status") == "done", f"async update job failed: {final!r}"
 
 
-def test_isolation_shape(client):
+def test_isolation_shape(client: FlaskClient) -> None:
     body = _get_json(client, "/settings/isolation")
     assert_shape(body, IsolationResponse)
     assert body.get("success") is True
     assert isinstance(body.get("isolated_plugins"), list)
 
 
-def test_isolation_mutation_shapes(client):
+def test_isolation_mutation_shapes(client: FlaskClient) -> None:
     body = _request_json(
         client,
         "post",
@@ -351,7 +367,7 @@ def test_isolation_mutation_shapes(client):
     assert "clock" not in body.get("isolated_plugins", [])
 
 
-def test_playlist_crud_shapes(client):
+def test_playlist_crud_shapes(client: FlaskClient) -> None:
     body = _request_json(
         client,
         "post",
@@ -387,7 +403,7 @@ def test_playlist_crud_shapes(client):
     assert body.get("success") is True
 
 
-def test_update_device_cycle_shape(client):
+def test_update_device_cycle_shape(client: FlaskClient) -> None:
     body = _request_json(
         client,
         "put",
@@ -398,7 +414,9 @@ def test_update_device_cycle_shape(client):
     assert body.get("success") is True
 
 
-def test_update_control_shapes(client, monkeypatch, tmp_path):
+def test_update_control_shapes(
+    client: FlaskClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     import blueprints.settings as mod
     from blueprints.settings import _updates as updates_mod
 
@@ -438,7 +456,7 @@ def test_update_control_shapes(client, monkeypatch, tmp_path):
         mod._set_update_state(False, None)
 
 
-def test_delete_api_key_shape(client):
+def test_delete_api_key_shape(client: FlaskClient) -> None:
     body = _request_json(
         client,
         "post",
@@ -449,7 +467,7 @@ def test_delete_api_key_shape(client):
     assert body.get("success") is True
 
 
-def test_history_storage_shape(client):
+def test_history_storage_shape(client: FlaskClient) -> None:
     resp = client.get("/history/storage")
     # The history dir is a tmp_path created by device_config_dev; shutil
     # should succeed and return 200. If it fails (e.g. read-only CI FS), we

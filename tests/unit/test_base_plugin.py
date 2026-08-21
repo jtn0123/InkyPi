@@ -1,7 +1,11 @@
 import os
+from pathlib import Path
+from typing import Any
+
+import pytest
 
 
-def test_generate_settings_template_defaults(monkeypatch):
+def test_generate_settings_template_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
     # Import within test to pick up runtime code changes
     from plugins.base_plugin.base_plugin import BasePlugin
 
@@ -18,11 +22,11 @@ def test_generate_settings_template_defaults(monkeypatch):
     assert isinstance(template["frame_styles"], list)
 
 
-def test_generate_settings_template_uses_schema_when_available():
+def test_generate_settings_template_uses_schema_when_available() -> Any:
     from plugins.base_plugin.base_plugin import BasePlugin
 
     class SchemaPlugin(BasePlugin):
-        def build_settings_schema(self):
+        def build_settings_schema(self) -> Any:
             return {"version": 1, "sections": [{"title": "Demo", "items": []}]}
 
     p = SchemaPlugin({"id": "ai_text"})
@@ -32,7 +36,9 @@ def test_generate_settings_template_uses_schema_when_available():
     assert "settings_template" not in template
 
 
-def test_render_image_with_base_template(monkeypatch, tmp_path):
+def test_render_image_with_base_template(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     # This test verifies that render_image works even if the plugin has no custom render dir
     # by relying on the autouse fixture that patches take_screenshot_html to a fake image.
     from plugins.base_plugin.base_plugin import BasePlugin
@@ -56,7 +62,7 @@ def test_render_image_with_base_template(monkeypatch, tmp_path):
 
 
 # ---- Metadata hooks tests ----
-def test_set_and_get_latest_metadata():
+def test_set_and_get_latest_metadata() -> None:
     from plugins.base_plugin.base_plugin import BasePlugin
 
     p = BasePlugin({"id": "test_plugin"})
@@ -74,7 +80,7 @@ def test_set_and_get_latest_metadata():
     assert p.get_latest_metadata() is None
 
 
-def test_set_latest_metadata_empty_dict():
+def test_set_latest_metadata_empty_dict() -> None:
     from plugins.base_plugin.base_plugin import BasePlugin
 
     p = BasePlugin({"id": "test_plugin"})
@@ -83,7 +89,7 @@ def test_set_latest_metadata_empty_dict():
     assert p.get_latest_metadata() is None
 
 
-def test_get_latest_metadata_never_crashes():
+def test_get_latest_metadata_never_crashes() -> None:
     """Ensure get_latest_metadata never raises even if attribute is corrupted."""
     from plugins.base_plugin.base_plugin import BasePlugin
 
@@ -94,7 +100,7 @@ def test_get_latest_metadata_never_crashes():
 
 
 # ---- URL/path conversion tests ----
-def test_to_file_url_with_local_path():
+def test_to_file_url_with_local_path() -> None:
     from plugins.base_plugin.base_plugin import BasePlugin
 
     p = BasePlugin({"id": "test_plugin"})
@@ -102,7 +108,7 @@ def test_to_file_url_with_local_path():
     assert result == "file:///path/to/file.png"
 
 
-def test_to_file_url_with_http_url():
+def test_to_file_url_with_http_url() -> None:
     from plugins.base_plugin.base_plugin import BasePlugin
 
     p = BasePlugin({"id": "test_plugin"})
@@ -110,7 +116,7 @@ def test_to_file_url_with_http_url():
     assert p.to_file_url(url) == url
 
 
-def test_to_file_url_with_https_url():
+def test_to_file_url_with_https_url() -> None:
     from plugins.base_plugin.base_plugin import BasePlugin
 
     p = BasePlugin({"id": "test_plugin"})
@@ -118,7 +124,7 @@ def test_to_file_url_with_https_url():
     assert p.to_file_url(url) == url
 
 
-def test_to_file_url_with_data_uri():
+def test_to_file_url_with_data_uri() -> None:
     from plugins.base_plugin.base_plugin import BasePlugin
 
     p = BasePlugin({"id": "test_plugin"})
@@ -126,7 +132,7 @@ def test_to_file_url_with_data_uri():
     assert p.to_file_url(data_uri) == data_uri
 
 
-def test_to_file_url_with_file_url():
+def test_to_file_url_with_file_url() -> None:
     from plugins.base_plugin.base_plugin import BasePlugin
 
     p = BasePlugin({"id": "test_plugin"})
@@ -134,7 +140,7 @@ def test_to_file_url_with_file_url():
     assert p.to_file_url(file_url) == file_url
 
 
-def test_path_to_data_uri_png(tmp_path):
+def test_path_to_data_uri_png(tmp_path: Path) -> None:
     from plugins.base_plugin.base_plugin import BasePlugin
 
     p = BasePlugin({"id": "test_plugin"})
@@ -147,7 +153,7 @@ def test_path_to_data_uri_png(tmp_path):
     assert result.startswith("data:image/png;base64,")
 
 
-def test_path_to_data_uri_jpeg(tmp_path):
+def test_path_to_data_uri_jpeg(tmp_path: Path) -> None:
     from plugins.base_plugin.base_plugin import BasePlugin
 
     p = BasePlugin({"id": "test_plugin"})
@@ -160,7 +166,7 @@ def test_path_to_data_uri_jpeg(tmp_path):
     assert result.startswith("data:image/jpeg;base64,")
 
 
-def test_path_to_data_uri_gif(tmp_path):
+def test_path_to_data_uri_gif(tmp_path: Path) -> None:
     from plugins.base_plugin.base_plugin import BasePlugin
 
     p = BasePlugin({"id": "test_plugin"})
@@ -173,7 +179,7 @@ def test_path_to_data_uri_gif(tmp_path):
     assert result.startswith("data:image/gif;base64,")
 
 
-def test_path_to_data_uri_fallback_on_error():
+def test_path_to_data_uri_fallback_on_error() -> None:
     from plugins.base_plugin.base_plugin import BasePlugin
 
     p = BasePlugin({"id": "test_plugin"})
@@ -184,14 +190,14 @@ def test_path_to_data_uri_fallback_on_error():
 
 
 # ---- Plugin ID and directory tests ----
-def test_get_plugin_id():
+def test_get_plugin_id() -> None:
     from plugins.base_plugin.base_plugin import BasePlugin
 
     p = BasePlugin({"id": "weather"})
     assert p.get_plugin_id() == "weather"
 
 
-def test_get_plugin_dir_no_path():
+def test_get_plugin_dir_no_path() -> None:
     from plugins.base_plugin.base_plugin import BasePlugin
 
     p = BasePlugin({"id": "weather"})
@@ -199,7 +205,7 @@ def test_get_plugin_dir_no_path():
     assert result.endswith("plugins/weather")
 
 
-def test_get_plugin_dir_with_path():
+def test_get_plugin_dir_with_path() -> None:
     from plugins.base_plugin.base_plugin import BasePlugin
 
     p = BasePlugin({"id": "weather"})
@@ -208,7 +214,7 @@ def test_get_plugin_dir_with_path():
 
 
 # ---- render_image edge cases ----
-def test_render_image_with_extra_css_files():
+def test_render_image_with_extra_css_files() -> None:
     from plugins.base_plugin.base_plugin import BasePlugin
 
     p = BasePlugin({"id": "clock"})
@@ -235,7 +241,7 @@ def test_render_image_with_extra_css_files():
             os.remove(extra_css_path)
 
 
-def test_render_image_with_extra_css_string(tmp_path):
+def test_render_image_with_extra_css_string(tmp_path: Path) -> None:
     from plugins.base_plugin.base_plugin import BasePlugin
 
     p = BasePlugin({"id": "clock"})
@@ -250,11 +256,11 @@ def test_render_image_with_extra_css_string(tmp_path):
     assert out.size == (100, 50)
 
 
-def test_render_image_screenshot_returns_none(monkeypatch):
+def test_render_image_screenshot_returns_none(monkeypatch: pytest.MonkeyPatch) -> Any:
     from plugins.base_plugin.base_plugin import BasePlugin
 
     # Mock screenshot to return None to test fallback
-    def mock_screenshot_none(html, dimensions, timeout_ms=None):
+    def mock_screenshot_none(html: Any, dimensions: Any, timeout_ms: Any = None) -> Any:
         return None
 
     monkeypatch.setattr(
@@ -271,7 +277,7 @@ def test_render_image_screenshot_returns_none(monkeypatch):
     assert out.size == (100, 50)
 
 
-def test_render_image_with_screenshot_timeout(monkeypatch):
+def test_render_image_with_screenshot_timeout(monkeypatch: pytest.MonkeyPatch) -> Any:
     from PIL import Image
 
     from plugins.base_plugin.base_plugin import BasePlugin
@@ -281,7 +287,9 @@ def test_render_image_with_screenshot_timeout(monkeypatch):
 
     captured_timeout = []
 
-    def mock_screenshot_with_timeout(html, dimensions, timeout_ms=None):
+    def mock_screenshot_with_timeout(
+        html: Any, dimensions: Any, timeout_ms: Any = None
+    ) -> Any:
         captured_timeout.append(timeout_ms)
         return Image.new("RGB", dimensions, "white")
 
@@ -300,7 +308,9 @@ def test_render_image_with_screenshot_timeout(monkeypatch):
 
 
 # ---- CSS helper exception-path tests (JTN-326) ----
-def test_build_inline_css_missing_file_raises_and_logs_redacted(caplog):
+def test_build_inline_css_missing_file_raises_and_logs_redacted(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
     """_build_inline_css wraps missing CSS path in RuntimeError and logs a redacted message."""
     import logging
 
@@ -320,7 +330,7 @@ def test_build_inline_css_missing_file_raises_and_logs_redacted(caplog):
     assert any("Failed to read CSS file" in r.getMessage() for r in caplog.records)
 
 
-def test_build_inline_css_extra_css_non_string_is_tolerated():
+def test_build_inline_css_extra_css_non_string_is_tolerated() -> None:
     """extra_css that is not a string is ignored (no exception, no log)."""
     from plugins.base_plugin.base_plugin import BasePlugin
 
@@ -331,7 +341,7 @@ def test_build_inline_css_extra_css_non_string_is_tolerated():
     assert out == []
 
 
-def test_build_css_files_accepts_extra_css_files_list():
+def test_build_css_files_accepts_extra_css_files_list() -> None:
     """_build_css_files happily appends valid filenames from the extra list."""
     from plugins.base_plugin.base_plugin import BasePlugin
 
@@ -342,7 +352,9 @@ def test_build_css_files_accepts_extra_css_files_list():
     assert any(f.endswith("extra2.css") for f in files)
 
 
-def test_build_css_files_bad_fname_is_logged_and_skipped(caplog):
+def test_build_css_files_bad_fname_is_logged_and_skipped(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
     """Non-string fname causes os.path.join to raise; warning is logged with redaction."""
     import logging
 
@@ -359,7 +371,9 @@ def test_build_css_files_bad_fname_is_logged_and_skipped(caplog):
     assert any("Failed to add extra CSS file" in r.getMessage() for r in caplog.records)
 
 
-def test_build_inline_css_extra_css_lookup_failure_raises_and_logs(caplog):
+def test_build_inline_css_extra_css_lookup_failure_raises_and_logs(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
     """A plugin_settings value that is truthy but not a Mapping raises AttributeError."""
     import logging
 

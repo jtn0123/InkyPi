@@ -22,9 +22,11 @@ from __future__ import annotations
 import json
 import logging
 import os
+from pathlib import Path
 from typing import Any
 
 import pytest
+from flask.testing import FlaskClient
 
 _BASE_CFG: dict[str, Any] = {
     "name": "OK",
@@ -61,7 +63,7 @@ def _write_cfg(path: str, name: str) -> None:
         json.dump(data, fh)
 
 
-def _make_config(tmp_path, monkeypatch, name: str):
+def _make_config(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, name: str) -> Any:
     """Build a Config instance pointed at a fresh tmp_path device.json.
 
     The ``config`` module is imported lazily inside the helper so the
@@ -98,7 +100,9 @@ def _make_config(tmp_path, monkeypatch, name: str):
 # ---------------------------------------------------------------------------
 
 
-def test_oversize_name_truncated_on_load(tmp_path, monkeypatch, caplog):
+def test_oversize_name_truncated_on_load(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
     """A 500-char stored name is exposed as <=64 chars after load."""
     long_name = "A" * 500
     # Capture at the root logger so the assertion does not depend on whether
@@ -118,7 +122,9 @@ def test_oversize_name_truncated_on_load(tmp_path, monkeypatch, caplog):
     ), "expected a 'device_name_truncated' warning in logs"
 
 
-def test_oversize_name_persists_coerced_on_write(tmp_path, monkeypatch):
+def test_oversize_name_persists_coerced_on_write(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """After write_config(), on-disk name is the coerced 64-char value.
 
     The in-memory config is already coerced, so the next natural flush of
@@ -152,7 +158,9 @@ def test_oversize_name_persists_coerced_on_write(tmp_path, monkeypatch):
         "Kitchen Display ☕",  # unicode; <64 chars
     ],
 )
-def test_name_at_or_under_cap_untouched(tmp_path, monkeypatch, name):
+def test_name_at_or_under_cap_untouched(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, name: Any
+) -> None:
     """Names with <=64 characters round-trip unchanged through read_config.
 
     The empty-string case is deliberately excluded: whether "" is legal is a
@@ -164,7 +172,9 @@ def test_name_at_or_under_cap_untouched(tmp_path, monkeypatch, name):
     assert cfg.get_config("name") == name
 
 
-def test_exactly_at_cap_does_not_log_warning(tmp_path, monkeypatch, caplog):
+def test_exactly_at_cap_does_not_log_warning(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
     """64-char names must not trigger the truncation warning (no false positives)."""
     name = "c" * _CAP
     with caplog.at_level(logging.WARNING):
@@ -188,7 +198,7 @@ def test_exactly_at_cap_does_not_log_warning(tmp_path, monkeypatch, caplog):
 # the next load.
 
 
-def _rewrite_device_config_name(device_config, new_name: str) -> None:
+def _rewrite_device_config_name(device_config: Any, new_name: str) -> None:
     """Replace the on-disk device.json name and invalidate the mtime cache."""
     with open(device_config.config_file) as fh:
         data = json.load(fh)
@@ -202,7 +212,9 @@ def _rewrite_device_config_name(device_config, new_name: str) -> None:
     device_config.config = device_config.read_config()
 
 
-def test_rendered_main_page_does_not_leak_oversize_name(client, device_config_dev):
+def test_rendered_main_page_does_not_leak_oversize_name(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     """<title> and alt= must contain only the coerced 64-char name."""
     long_name = "Z" * 500
     _rewrite_device_config_name(device_config_dev, long_name)
@@ -236,7 +248,9 @@ def test_rendered_main_page_does_not_leak_oversize_name(client, device_config_de
 # ---------------------------------------------------------------------------
 
 
-def test_valid_name_round_trips_through_save_settings(client, device_config_dev):
+def test_valid_name_round_trips_through_save_settings(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     """A 64-char name saved via /save_settings is stored and read back intact."""
     # Prime a CSRF token by hitting the main page.
     client.get("/")

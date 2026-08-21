@@ -15,6 +15,8 @@ an empty wizard container.
 import re
 from pathlib import Path
 
+from flask.testing import FlaskClient
+
 # Plugin ids that can be rendered without external API credentials
 _RENDERABLE_PLUGINS = [
     "clock",
@@ -40,7 +42,7 @@ _JS_PATH = (
 # ---------------------------------------------------------------------------
 
 
-def test_wizard_buttons_use_data_attributes_not_ids():
+def test_wizard_buttons_use_data_attributes_not_ids() -> None:
     """progressive_disclosure.js must not emit id="wizardPrev" or id="wizardNext"."""
     source = _JS_PATH.read_text(encoding="utf-8")
     assert 'id="wizardPrev"' not in source, (
@@ -53,7 +55,7 @@ def test_wizard_buttons_use_data_attributes_not_ids():
     )
 
 
-def test_wizard_js_queries_data_attributes():
+def test_wizard_js_queries_data_attributes() -> None:
     """JS must query wizard buttons via [data-wizard-prev]/[data-wizard-next]."""
     source = _JS_PATH.read_text(encoding="utf-8")
     assert (
@@ -64,7 +66,7 @@ def test_wizard_js_queries_data_attributes():
     ), "progressive_disclosure.js must use querySelector('[data-wizard-next]')"
 
 
-def test_wizard_empty_container_guard_present():
+def test_wizard_empty_container_guard_present() -> None:
     """initializeWizard must return early when there are no wizard steps."""
     source = _JS_PATH.read_text(encoding="utf-8")
     # Expect a guard like: if (steps.length === 0) return;
@@ -87,7 +89,7 @@ def _find_duplicate_ids(html: str) -> list[str]:
     return [id_val for id_val, count in seen.items() if count > 1]
 
 
-def test_plugin_pages_have_no_wizard_id_attributes(client):
+def test_plugin_pages_have_no_wizard_id_attributes(client: FlaskClient) -> None:
     """Rendered plugin pages must not contain id='wizardPrev' or id='wizardNext'."""
     for plugin_id in _RENDERABLE_PLUGINS:
         resp = client.get(f"/plugin/{plugin_id}")
@@ -102,7 +104,7 @@ def test_plugin_pages_have_no_wizard_id_attributes(client):
         ), f'/plugin/{plugin_id} HTML contains id="wizardNext" (JTN-314)'
 
 
-def test_plugin_pages_have_no_duplicate_ids(client):
+def test_plugin_pages_have_no_duplicate_ids(client: FlaskClient) -> None:
     """Rendered plugin pages must not contain any duplicate id attributes."""
     for plugin_id in _RENDERABLE_PLUGINS:
         resp = client.get(f"/plugin/{plugin_id}")

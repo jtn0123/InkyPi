@@ -4,7 +4,7 @@ from model import Playlist, PlaylistManager
 
 
 def test_determine_active_playlist_midnight_wrap():
-    # Playlist A active 23:00-01:00 (wraps), B active 01:00-23:00
+    # Playlist A active 23:00-01:00 (wraps) -> None -> None, B active 01:00-23:00
     a = Playlist("A", "23:00", "01:00", plugins=[])
     b = Playlist("B", "01:00", "23:00", plugins=[])
     pm = PlaylistManager([a, b])
@@ -15,7 +15,7 @@ def test_determine_active_playlist_midnight_wrap():
     assert active is not None and active.name == "A"
 
 
-def test_priority_prefers_shorter_range():
+def test_priority_prefers_shorter_range() -> None:
     # Priority uses time range minutes; smaller range = higher priority
     a = Playlist(
         "Short",

@@ -1,8 +1,10 @@
 # pyright: reportMissingImports=false
 """Tests for Weather plugin UI enhancements including progressive disclosure, validation, and wizard."""
 
+from flask.testing import FlaskClient
 
-def test_weather_plugin_settings_organization(client):
+
+def test_weather_plugin_settings_organization(client: FlaskClient) -> None:
     """Test that weather settings use the shared section/card organization."""
     resp = client.get("/plugin/weather")
     assert resp.status_code == 200
@@ -18,7 +20,7 @@ def test_weather_plugin_settings_organization(client):
     assert "displayMetrics" in response_text
 
 
-def test_weather_plugin_smart_defaults(client):
+def test_weather_plugin_smart_defaults(client: FlaskClient) -> None:
     """Test that weather plugin has proper smart defaults."""
     resp = client.get("/plugin/weather")
     assert resp.status_code == 200
@@ -35,7 +37,7 @@ def test_weather_plugin_smart_defaults(client):
     assert "displayRefreshTime" in response_text
 
 
-def test_weather_plugin_settings_persistence(client):
+def test_weather_plugin_settings_persistence(client: FlaskClient) -> None:
     """Test that weather plugin uses the shared boot payload and schema runtime."""
     resp = client.get("/plugin/weather")
     assert resp.status_code == 200
@@ -47,7 +49,7 @@ def test_weather_plugin_settings_persistence(client):
     assert "plugin_schema.js" in response_text
 
 
-def test_weather_plugin_wizard_step_navigation(client):
+def test_weather_plugin_wizard_step_navigation(client: FlaskClient) -> None:
     """Test that weather plugin retains the setup-wizard container and loads the JS that creates nav.
 
     The wizard navigation buttons (wizardPrev/wizardNext) are injected at runtime by

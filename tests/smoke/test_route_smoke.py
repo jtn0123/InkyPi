@@ -32,6 +32,8 @@ from typing import Any
 
 import pytest
 import yaml
+from flask import Flask
+from flask.testing import FlaskClient
 
 _ALLOWLIST_PATH = Path(__file__).with_name("route_allowlist.yml")
 _OK_STATUSES = {200, 302, 400, 401, 403, 404, 405, 422}
@@ -55,7 +57,7 @@ def _load_allowlist() -> dict[str, str]:
     return out
 
 
-def _iter_smoke_targets(flask_app) -> list[tuple[str, str]]:
+def _iter_smoke_targets(flask_app: Flask) -> list[tuple[str, str]]:
     """Yield (path, endpoint) pairs for unparameterized GET routes."""
     allow = _load_allowlist()
     targets: list[tuple[str, str]] = []
@@ -78,7 +80,7 @@ def _iter_smoke_targets(flask_app) -> list[tuple[str, str]]:
     return targets
 
 
-def _check_one(client, path: str, endpoint: str) -> list[str]:
+def _check_one(client: FlaskClient, path: str, endpoint: str) -> list[str]:
     """Return a list of human-readable failure strings for a single route."""
     failures: list[str] = []
     resp = client.get(path)
@@ -115,7 +117,7 @@ def _check_one(client, path: str, endpoint: str) -> list[str]:
     return failures
 
 
-def test_smoke_targets_are_discovered(flask_app):
+def test_smoke_targets_are_discovered(flask_app: Flask) -> None:
     """Sanity: we must find a non-trivial number of smoke-able routes."""
     targets = _iter_smoke_targets(flask_app)
     assert (
@@ -123,7 +125,7 @@ def test_smoke_targets_are_discovered(flask_app):
     ), f"expected >=10 unparameterized GET routes, got {len(targets)}: {targets}"
 
 
-def test_all_get_routes_do_not_500(client, flask_app):
+def test_all_get_routes_do_not_500(client: FlaskClient, flask_app: Flask) -> None:
     """Every unparameterized GET route must return a controlled status.
 
     We iterate rather than parametrise to avoid rebuilding the Flask app at

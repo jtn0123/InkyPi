@@ -14,6 +14,7 @@ The plugin error fallback card must not leak Python implementation details
 from __future__ import annotations
 
 import logging
+from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
@@ -204,7 +205,9 @@ class TestRenderErrorImageSanitised:
         assert "URL scheme" not in friendly
         del captured, original_draw_cls_attr
 
-    def test_render_uses_sanitized_message_via_draw_text(self, monkeypatch) -> None:
+    def test_render_uses_sanitized_message_via_draw_text(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Capture draw.text calls to verify the rendered lines.
 
         This confirms the image renderer uses ``sanitize_error_message``'s
@@ -215,7 +218,9 @@ class TestRenderErrorImageSanitised:
         captured: list[str] = []
         original_text = ImageDraw.ImageDraw.text
 
-        def _capture(self, xy, text, *args, **kwargs):  # noqa: ANN001
+        def _capture(
+            self, xy: Any, text: Any, *args: Any, **kwargs: Any
+        ) -> Any:  # noqa: ANN001
             captured.append(text)
             return original_text(self, xy, text, *args, **kwargs)
 
@@ -238,13 +243,17 @@ class TestRenderErrorImageSanitised:
         # And the raw validator string is not echoed verbatim either.
         assert "URL scheme must be http or https" not in joined
 
-    def test_unknown_error_renders_generic_message(self, monkeypatch) -> None:
+    def test_unknown_error_renders_generic_message(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         from PIL import ImageDraw
 
         captured: list[str] = []
         original_text = ImageDraw.ImageDraw.text
 
-        def _capture(self, xy, text, *args, **kwargs):  # noqa: ANN001
+        def _capture(
+            self, xy: Any, text: Any, *args: Any, **kwargs: Any
+        ) -> Any:  # noqa: ANN001
             captured.append(text)
             return original_text(self, xy, text, *args, **kwargs)
 
@@ -274,7 +283,10 @@ class TestRenderErrorImageSanitised:
 
 class TestLoggingKeepsRawDetail:
     def test_logger_receives_class_and_raw_message(
-        self, device_config_dev, monkeypatch, caplog
+        self,
+        device_config_dev: Any,
+        monkeypatch: pytest.MonkeyPatch,
+        caplog: pytest.LogCaptureFixture,
     ) -> None:
         """The operator log line must contain the raw exception class + message,
         even though the user-visible card hides them."""
@@ -309,10 +321,10 @@ class TestLoggingKeepsRawDetail:
         monkeypatch.setattr(device_config_dev, "get_plugin", lambda pid: dummy_cfg)
 
         class AlwaysRaisesPlugin:
-            def generate_image(self, settings, cfg):
+            def generate_image(self, settings: Any, cfg: Any) -> None:
                 raise RuntimeError("Invalid URL: URL scheme must be http or https")
 
-            def get_latest_metadata(self):
+            def get_latest_metadata(self) -> Any:
                 return None
 
         monkeypatch.setattr(

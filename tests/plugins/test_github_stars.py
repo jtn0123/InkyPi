@@ -1,6 +1,7 @@
 # pyright: reportMissingImports=false
 """Tests for the GitHub stars plugin repository path resolution (JTN-264)."""
 
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -8,7 +9,7 @@ import pytest
 from plugins.github.github_stars import fetch_stars, stars_generate_image
 
 
-def _make_plugin_instance(width=800, height=480):
+def _make_plugin_instance(width: Any = 800, height: Any = 480) -> Any:
     """Return a minimal plugin instance mock."""
     instance = MagicMock()
     instance.get_oriented_dimensions.return_value = (width, height)
@@ -16,11 +17,11 @@ def _make_plugin_instance(width=800, height=480):
     return instance
 
 
-def _make_settings(username, repository):
+def _make_settings(username: Any, repository: Any) -> Any:
     return {"githubUsername": username, "githubRepository": repository}
 
 
-def _make_api_response(stars=42):
+def _make_api_response(stars: Any = 42) -> Any:
     resp = MagicMock()
     resp.status_code = 200
     resp.json.return_value = {"stargazers_count": stars}
@@ -33,7 +34,7 @@ def _make_api_response(stars=42):
 
 
 @patch("plugins.github.github_stars.get_http_session")
-def test_fetch_stars_plain_repo(mock_session):
+def test_fetch_stars_plain_repo(mock_session: Any) -> None:
     """fetch_stars passes the repository path straight to the API."""
     mock_get = MagicMock(return_value=_make_api_response(100))
     mock_session.return_value.get = mock_get
@@ -51,7 +52,7 @@ def test_fetch_stars_plain_repo(mock_session):
 
 
 @patch("plugins.github.github_stars.get_http_session")
-def test_plain_repo_name_prepends_username(mock_session):
+def test_plain_repo_name_prepends_username(mock_session: Any) -> None:
     """When repository has no '/', username is prepended as expected."""
     mock_get = MagicMock(return_value=_make_api_response(7))
     mock_session.return_value.get = mock_get
@@ -66,7 +67,7 @@ def test_plain_repo_name_prepends_username(mock_session):
 
 
 @patch("plugins.github.github_stars.get_http_session")
-def test_owner_slash_repo_used_directly(mock_session):
+def test_owner_slash_repo_used_directly(mock_session: Any) -> None:
     """When repository contains '/', it is used directly without doubling username."""
     mock_get = MagicMock(return_value=_make_api_response(99))
     mock_session.return_value.get = mock_get
@@ -86,7 +87,7 @@ def test_owner_slash_repo_used_directly(mock_session):
 
 
 @patch("plugins.github.github_stars.get_http_session")
-def test_owner_slash_repo_star_count_returned(mock_session):
+def test_owner_slash_repo_star_count_returned(mock_session: Any) -> None:
     """Star count is correctly read when owner/repo format is used."""
     mock_get = MagicMock(return_value=_make_api_response(512))
     mock_session.return_value.get = mock_get
@@ -105,7 +106,7 @@ def test_owner_slash_repo_star_count_returned(mock_session):
 
 
 @patch("plugins.github.github_stars.get_http_session")
-def test_missing_username_raises(mock_session):
+def test_missing_username_raises(mock_session: Any) -> None:
     """RuntimeError is raised when username is missing."""
     with pytest.raises(RuntimeError, match="required"):
         stars_generate_image(
@@ -116,7 +117,7 @@ def test_missing_username_raises(mock_session):
 
 
 @patch("plugins.github.github_stars.get_http_session")
-def test_missing_repository_raises(mock_session):
+def test_missing_repository_raises(mock_session: Any) -> None:
     """RuntimeError is raised when repository is missing."""
     with pytest.raises(RuntimeError, match="required"):
         stars_generate_image(

@@ -7,9 +7,12 @@ the user's new interval while the modal showed a green success toast.
 """
 
 import json
+from typing import Any
+
+from flask.testing import FlaskClient
 
 
-def _setup_playlist_for_instance(device_config_dev):
+def _setup_playlist_for_instance(device_config_dev: Any) -> None:
     pm = device_config_dev.get_playlist_manager()
     if not pm.get_playlist("Default"):
         pm.add_playlist("Default", "00:00", "24:00")
@@ -26,7 +29,9 @@ def _setup_playlist_for_instance(device_config_dev):
     device_config_dev.write_config()
 
 
-def _put(client, instance_name, refresh_settings, extra=None):
+def _put(
+    client: FlaskClient, instance_name: Any, refresh_settings: Any, extra: Any = None
+) -> Any:
     # ai_text requires textPrompt + textModel — supply sensible defaults so the
     # existing required-field validator doesn't mask what we're testing here.
     data = {
@@ -40,7 +45,9 @@ def _put(client, instance_name, refresh_settings, extra=None):
     return client.put(f"/update_plugin_instance/{instance_name}", data=data)
 
 
-def test_update_plugin_instance_rejects_interval_above_max(client, device_config_dev):
+def test_update_plugin_instance_rejects_interval_above_max(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     _setup_playlist_for_instance(device_config_dev)
     resp = _put(
         client,
@@ -59,7 +66,9 @@ def test_update_plugin_instance_rejects_interval_above_max(client, device_config
     assert inst.refresh == {"interval": 300}
 
 
-def test_update_plugin_instance_rejects_interval_below_min(client, device_config_dev):
+def test_update_plugin_instance_rejects_interval_below_min(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     _setup_playlist_for_instance(device_config_dev)
     resp = _put(
         client,
@@ -71,7 +80,9 @@ def test_update_plugin_instance_rejects_interval_below_min(client, device_config
     assert pm.find_plugin("ai_text", "Inst One").refresh == {"interval": 300}
 
 
-def test_update_plugin_instance_rejects_non_numeric_interval(client, device_config_dev):
+def test_update_plugin_instance_rejects_non_numeric_interval(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     _setup_playlist_for_instance(device_config_dev)
     resp = _put(
         client,
@@ -83,7 +94,9 @@ def test_update_plugin_instance_rejects_non_numeric_interval(client, device_conf
     assert pm.find_plugin("ai_text", "Inst One").refresh == {"interval": 300}
 
 
-def test_update_plugin_instance_rejects_invalid_unit(client, device_config_dev):
+def test_update_plugin_instance_rejects_invalid_unit(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     _setup_playlist_for_instance(device_config_dev)
     resp = _put(
         client,
@@ -95,7 +108,9 @@ def test_update_plugin_instance_rejects_invalid_unit(client, device_config_dev):
     assert pm.find_plugin("ai_text", "Inst One").refresh == {"interval": 300}
 
 
-def test_update_plugin_instance_accepts_valid_interval(client, device_config_dev):
+def test_update_plugin_instance_accepts_valid_interval(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     _setup_playlist_for_instance(device_config_dev)
     resp = _put(
         client,
@@ -107,7 +122,9 @@ def test_update_plugin_instance_accepts_valid_interval(client, device_config_dev
     assert pm.find_plugin("ai_text", "Inst One").refresh == {"interval": 15 * 60}
 
 
-def test_update_plugin_instance_accepts_valid_scheduled(client, device_config_dev):
+def test_update_plugin_instance_accepts_valid_scheduled(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     _setup_playlist_for_instance(device_config_dev)
     resp = _put(
         client,
@@ -120,8 +137,8 @@ def test_update_plugin_instance_accepts_valid_scheduled(client, device_config_de
 
 
 def test_update_plugin_instance_rejects_malformed_json_refresh_settings(
-    client, device_config_dev
-):
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     _setup_playlist_for_instance(device_config_dev)
     resp = client.put(
         "/update_plugin_instance/Inst One",
@@ -141,8 +158,8 @@ def test_update_plugin_instance_rejects_malformed_json_refresh_settings(
 
 
 def test_update_plugin_instance_without_refresh_settings_still_works(
-    client, device_config_dev
-):
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     """Callers that don't send refresh_settings (e.g. older flows) must not
     hit the new validator. The refresh config stays unchanged."""
     _setup_playlist_for_instance(device_config_dev)

@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
+from flask.testing import FlaskClient
 from prometheus_client import CollectorRegistry, Counter, Gauge  # noqa: F401
 
 # ---------------------------------------------------------------------------
@@ -10,7 +13,7 @@ from prometheus_client import CollectorRegistry, Counter, Gauge  # noqa: F401
 # ---------------------------------------------------------------------------
 
 
-def _fresh_registry():
+def _fresh_registry() -> Any:
     """Return a brand-new CollectorRegistry with the five InkyPi metrics."""
     reg = CollectorRegistry(auto_describe=True)
     Counter(
@@ -49,19 +52,19 @@ def _fresh_registry():
 # ---------------------------------------------------------------------------
 
 
-def test_metrics_endpoint_returns_200(client):
+def test_metrics_endpoint_returns_200(client: FlaskClient) -> None:
     resp = client.get("/metrics")
     assert resp.status_code == 200
 
 
-def test_metrics_endpoint_content_type(client):
+def test_metrics_endpoint_content_type(client: FlaskClient) -> None:
     resp = client.get("/metrics")
     ct = resp.content_type
     assert ct.startswith("text/plain")
     assert "version=0.0.4" in ct
 
 
-def test_metrics_endpoint_no_auth_required(client):
+def test_metrics_endpoint_no_auth_required(client: FlaskClient) -> None:
     """Scraping /metrics must succeed without any session or API key."""
     resp = client.get("/metrics")
     # Must NOT redirect to a login page
@@ -84,7 +87,9 @@ _EXPECTED_METRIC_NAMES = [
 
 
 @pytest.mark.parametrize("metric_name", _EXPECTED_METRIC_NAMES)
-def test_metrics_body_contains_metric_name(client, metric_name):
+def test_metrics_body_contains_metric_name(
+    client: FlaskClient, metric_name: Any
+) -> None:
     resp = client.get("/metrics")
     assert metric_name in resp.data, f"{metric_name!r} not found in /metrics output"
 
@@ -94,7 +99,9 @@ def test_metrics_body_contains_metric_name(client, metric_name):
 # ---------------------------------------------------------------------------
 
 
-def test_refresh_success_counter_increments(client, monkeypatch):
+def test_refresh_success_counter_increments(
+    client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """record_refresh_success() must bump inkypi_refreshes_total{status='success'}."""
     import utils.metrics as m
 
@@ -108,7 +115,7 @@ def test_refresh_success_counter_increments(client, monkeypatch):
     assert b'inkypi_refreshes_total{status="success"}' in resp.data
 
 
-def test_refresh_failure_counter_increments(client):
+def test_refresh_failure_counter_increments(client: FlaskClient) -> None:
     """record_refresh_failure() must bump both the total and plugin counters."""
     import utils.metrics as m
 
@@ -124,7 +131,7 @@ def test_refresh_failure_counter_increments(client):
     )
 
 
-def test_plugin_failure_reflected_in_endpoint(client):
+def test_plugin_failure_reflected_in_endpoint(client: FlaskClient) -> None:
     """After a simulated plugin failure the body must contain the plugin label."""
     import utils.metrics as m
 
@@ -138,7 +145,7 @@ def test_plugin_failure_reflected_in_endpoint(client):
 # ---------------------------------------------------------------------------
 
 
-def test_circuit_breaker_open_sets_gauge_to_1(client):
+def test_circuit_breaker_open_sets_gauge_to_1(client: FlaskClient) -> None:
     import utils.metrics as m
 
     m.set_circuit_breaker_open("demo_plugin", True)
@@ -146,7 +153,7 @@ def test_circuit_breaker_open_sets_gauge_to_1(client):
     assert val == 1.0
 
 
-def test_circuit_breaker_close_sets_gauge_to_0(client):
+def test_circuit_breaker_close_sets_gauge_to_0(client: FlaskClient) -> None:
     import utils.metrics as m
 
     m.set_circuit_breaker_open("demo_plugin", True)
@@ -160,7 +167,7 @@ def test_circuit_breaker_close_sets_gauge_to_0(client):
 # ---------------------------------------------------------------------------
 
 
-def test_uptime_gauge_is_positive(client):
+def test_uptime_gauge_is_positive(client: FlaskClient) -> None:
     import utils.metrics as m
 
     m.update_uptime()
@@ -173,7 +180,7 @@ def test_uptime_gauge_is_positive(client):
 # ---------------------------------------------------------------------------
 
 
-def test_fresh_registry_has_all_five_metrics():
+def test_fresh_registry_has_all_five_metrics() -> None:
     """Sanity-check the helper used in isolation tests."""
     from prometheus_client.exposition import generate_latest
 

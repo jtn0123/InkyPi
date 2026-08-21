@@ -10,6 +10,8 @@ JTN-152: API status chips removed from status row (header indicator is sole
 
 from pathlib import Path
 
+from flask.testing import FlaskClient
+
 _STYLES_DIR = Path(__file__).resolve().parents[2] / "src" / "static" / "styles"
 _TEMPLATES_DIR = Path(__file__).resolve().parents[2] / "src" / "templates"
 
@@ -21,7 +23,7 @@ def _read_partial(name: str) -> str:
 # --- JTN-89: mode bar removed; both panels always render ---------------------
 
 
-def test_workflow_mode_bar_removed_from_plugin_css():
+def test_workflow_mode_bar_removed_from_plugin_css() -> None:
     """The Configure/Preview mode bar was retired — no selectors should remain."""
     css = _read_partial("_plugins.css")
     assert ".workflow-mode-bar" not in css, (
@@ -33,7 +35,7 @@ def test_workflow_mode_bar_removed_from_plugin_css():
     ), ".workflow-mode-tab rule should no longer exist in _plugins.css"
 
 
-def test_plugin_template_has_no_workflow_mode_bar():
+def test_plugin_template_has_no_workflow_mode_bar() -> None:
     """plugin.html must not render the workflow-mode-bar tablist."""
     template = (_TEMPLATES_DIR / "plugin.html").read_text(encoding="utf-8")
     assert "workflow-mode-bar" not in template
@@ -44,7 +46,7 @@ def test_plugin_template_has_no_workflow_mode_bar():
 # --- JTN-152: duplicate API status chips removed -----------------------------
 
 
-def test_status_row_has_no_api_chips(client):
+def test_status_row_has_no_api_chips(client: FlaskClient) -> None:
     """The .status-row in plugin.html must not contain API ready / API key missing chips."""
     resp = client.get("/plugin/clock")
     assert resp.status_code == 200
@@ -61,7 +63,7 @@ def test_status_row_has_no_api_chips(client):
     ), "status-row should not contain 'API key missing' chip"
 
 
-def test_header_api_indicator_still_present():
+def test_header_api_indicator_still_present() -> None:
     """plugin.html must still contain the header .api-key-indicator."""
     template = (_TEMPLATES_DIR / "plugin.html").read_text(encoding="utf-8")
     assert (
@@ -69,7 +71,7 @@ def test_header_api_indicator_still_present():
     ), "Header API key indicator must remain in plugin.html"
 
 
-def test_plugin_template_uses_overview_and_preview_cards():
+def test_plugin_template_uses_overview_and_preview_cards() -> None:
     """The plugin page should keep the handoff-style overview + preview framing."""
     template = (_TEMPLATES_DIR / "plugin.html").read_text(encoding="utf-8")
     assert "plugin-editor-overview" in template

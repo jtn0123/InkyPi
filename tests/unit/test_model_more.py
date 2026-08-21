@@ -1,10 +1,11 @@
 # pyright: reportMissingImports=false
 from datetime import UTC, datetime
+from typing import Any
 
 from model import Playlist, PlaylistManager, PluginInstance, RefreshInfo
 
 
-def test_playlist_manager_serialization_roundtrip():
+def test_playlist_manager_serialization_roundtrip() -> None:
     p1 = Playlist(
         "Morning",
         "06:00",
@@ -26,7 +27,7 @@ def test_playlist_manager_serialization_roundtrip():
     assert pm2.get_playlist("Morning") is not None
 
 
-def test_playlist_update_and_delete():
+def test_playlist_update_and_delete() -> None:
     pm = PlaylistManager([])
     pm.add_playlist("P1", "01:00", "02:00")
     assert pm.get_playlist("P1") is not None
@@ -37,14 +38,14 @@ def test_playlist_update_and_delete():
     assert pm.get_playlist("P2") is None
 
 
-def test_plugin_instance_update_and_image_path():
+def test_plugin_instance_update_and_image_path() -> None:
     pi = PluginInstance("x", "My Inst", {}, {"interval": 300}, latest_refresh_time=None)
     assert pi.get_image_path() == "x_My_Inst.png"
     pi.update({"name": "New Name"})
     assert pi.name == "New Name"
 
 
-def test_refresh_info_helpers():
+def test_refresh_info_helpers() -> None:
     now = datetime.now(tz=UTC)
     ri = RefreshInfo("Manual Update", "ai_text", now.isoformat(), 123)
     assert ri.get_refresh_datetime().date() == now.date()
@@ -53,7 +54,7 @@ def test_refresh_info_helpers():
     assert ri2.plugin_id == "ai_text"
 
 
-def test_add_default_playlist_returns_true_and_grows_list():
+def test_add_default_playlist_returns_true_and_grows_list() -> None:
     pm = PlaylistManager([])
     before = len(pm.playlists)
     result = pm.add_default_playlist()
@@ -69,7 +70,7 @@ def test_add_default_playlist_returns_true_and_grows_list():
 class TestPluginInstanceUpdateAllowlist:
     """PluginInstance.update() should only apply fields in _UPDATABLE."""
 
-    def _make_pi(self):
+    def _make_pi(self) -> Any:
         return PluginInstance(
             plugin_id="weather",
             name="main",
@@ -80,51 +81,51 @@ class TestPluginInstanceUpdateAllowlist:
             snooze_until=None,
         )
 
-    def test_update_settings_allowed(self):
+    def test_update_settings_allowed(self) -> None:
         pi = self._make_pi()
         pi.update({"settings": {"city": "Paris"}})
         assert pi.settings == {"city": "Paris"}
 
-    def test_update_refresh_allowed(self):
+    def test_update_refresh_allowed(self) -> None:
         pi = self._make_pi()
         pi.update({"refresh": {"interval": 600}})
         assert pi.refresh == {"interval": 600}
 
-    def test_update_latest_refresh_time_allowed(self):
+    def test_update_latest_refresh_time_allowed(self) -> None:
         pi = self._make_pi()
         ts = "2024-01-01T12:00:00"
         pi.update({"latest_refresh_time": ts})
         assert pi.latest_refresh_time == ts
 
-    def test_update_only_show_when_fresh_allowed(self):
+    def test_update_only_show_when_fresh_allowed(self) -> None:
         pi = self._make_pi()
         pi.update({"only_show_when_fresh": True})
         assert pi.only_show_when_fresh is True
 
-    def test_update_snooze_until_allowed(self):
+    def test_update_snooze_until_allowed(self) -> None:
         pi = self._make_pi()
         ts = "2024-06-01T08:00:00"
         pi.update({"snooze_until": ts})
         assert pi.snooze_until == ts
 
-    def test_update_name_allowed(self):
+    def test_update_name_allowed(self) -> None:
         pi = self._make_pi()
         pi.update({"name": "Renamed"})
         assert pi.name == "Renamed"
 
-    def test_update_unknown_key_silently_ignored(self):
+    def test_update_unknown_key_silently_ignored(self) -> None:
         """Unknown keys must not raise and must not be applied."""
         pi = self._make_pi()
         pi.update({"evil_key": "evil_value"})
         assert not hasattr(pi, "evil_key")
 
-    def test_update_plugin_id_injection_blocked(self):
+    def test_update_plugin_id_injection_blocked(self) -> None:
         """plugin_id is not in _UPDATABLE and must not be overwritten."""
         pi = self._make_pi()
         pi.update({"plugin_id": "injected"})
         assert pi.plugin_id == "weather"
 
-    def test_update_mixed_allowed_and_unknown(self):
+    def test_update_mixed_allowed_and_unknown(self) -> None:
         """Allowed fields are applied; unknown fields are ignored."""
         pi = self._make_pi()
         pi.update(
@@ -138,7 +139,7 @@ class TestPluginInstanceUpdateAllowlist:
         assert pi.plugin_id == "weather"
         assert not hasattr(pi, "__class__") or pi.__class__ is PluginInstance
 
-    def test_playlist_update_plugin_end_to_end(self):
+    def test_playlist_update_plugin_end_to_end(self) -> None:
         """Playlist.update_plugin() still applies legitimate settings correctly."""
         pl = Playlist(
             "Default",
@@ -164,7 +165,7 @@ class TestPluginInstanceUpdateAllowlist:
         assert plugin.settings == {"format": "24h"}
         assert plugin.refresh == {"interval": 120}
 
-    def test_playlist_update_plugin_blocks_id_injection(self):
+    def test_playlist_update_plugin_blocks_id_injection(self) -> None:
         """Passing plugin_id in updated_data must not overwrite the stored id."""
         pl = Playlist(
             "Default",

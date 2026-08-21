@@ -6,7 +6,7 @@ from pathlib import Path
 _TEMPLATE = Path(__file__).resolve().parents[2] / "src" / "templates" / "plugin.html"
 
 
-def test_frame_option_is_button_not_div():
+def test_frame_option_is_button_not_div() -> None:
     """data-frame-option element must be <button>, not <div>.
 
     A native <button> provides keyboard activation (Enter/Space) for free and
@@ -21,7 +21,7 @@ def test_frame_option_is_button_not_div():
     )
 
 
-def test_frame_option_button_has_type_button():
+def test_frame_option_button_has_type_button() -> None:
     """The frame-option button must have type='button' to prevent form submission."""
     content = _TEMPLATE.read_text(encoding="utf-8")
     button_match = re.search(r"<button[^>]*data-frame-option[^>]*>", content)
@@ -31,7 +31,7 @@ def test_frame_option_button_has_type_button():
     ), "Frame option button must have type='button' to avoid accidental form submission."
 
 
-def test_frame_option_button_has_aria_label():
+def test_frame_option_button_has_aria_label() -> None:
     """The frame-option button must have an aria-label for screen readers."""
     content = _TEMPLATE.read_text(encoding="utf-8")
     button_match = re.search(r"<button[^>]*data-frame-option[^>]*>", content)
@@ -41,7 +41,7 @@ def test_frame_option_button_has_aria_label():
     ), "Frame option button must have aria-label for screen reader users."
 
 
-def test_image_option_css_has_transparent_background():
+def test_image_option_css_has_transparent_background() -> None:
     """The .image-option CSS must set background: transparent so button elements render correctly."""
     # JTN-504: .image-option moved from _components.css to _form.css during
     # the per-component CSS reshape. Read the built main.css so this test is

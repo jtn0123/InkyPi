@@ -17,6 +17,7 @@ Add a new benchmark only if it:
 from __future__ import annotations
 
 import io
+from typing import Any
 
 import pytest
 from PIL import Image
@@ -27,7 +28,7 @@ from PIL import Image
 
 
 @pytest.fixture()
-def warm_http_cache():
+def warm_http_cache() -> Any:
     """A pre-warmed HTTPCache containing one entry the benchmark can hit."""
     from utils.http_cache import HTTPCache
 
@@ -45,7 +46,7 @@ def warm_http_cache():
     return cache
 
 
-def test_http_cache_hit_lookup(benchmark, warm_http_cache):
+def test_http_cache_hit_lookup(benchmark: Any, warm_http_cache: Any) -> None:
     """Measure the cost of a single cache hit (the hot path for cached plugins)."""
     result = benchmark(warm_http_cache.get, "https://example.com/api")
     assert result is not None
@@ -68,11 +69,11 @@ def _make_test_image() -> Image.Image:
     return img
 
 
-def test_image_resize_and_convert(benchmark):
+def test_image_resize_and_convert(benchmark: Any) -> Any:
     """Resize a small image and convert to 1-bit — typical e-ink prep step."""
     src = _make_test_image()
 
-    def resize_convert():
+    def resize_convert() -> Any:
         return src.resize((200, 120), Image.LANCZOS).convert("1")
 
     result = benchmark(resize_convert)
@@ -85,11 +86,11 @@ def test_image_resize_and_convert(benchmark):
 # ---------------------------------------------------------------------------
 
 
-def test_image_png_encode(benchmark):
+def test_image_png_encode(benchmark: Any) -> Any:
     """Encode a small image to PNG bytes — what /preview returns on every load."""
     src = _make_test_image()
 
-    def encode():
+    def encode() -> Any:
         buf = io.BytesIO()
         src.save(buf, format="PNG", optimize=False)
         return buf.getvalue()
@@ -104,7 +105,7 @@ def test_image_png_encode(benchmark):
 # ---------------------------------------------------------------------------
 
 
-def test_config_read(benchmark, device_config_dev):
+def test_config_read(benchmark: Any, device_config_dev: Any) -> None:
     """Re-read the device config file from disk.
 
     The fixture builds a fresh on-disk device.json in tmp_path; we measure the
@@ -120,7 +121,7 @@ def test_config_read(benchmark, device_config_dev):
 # ---------------------------------------------------------------------------
 
 
-def test_plugin_registry_list_scan(benchmark, device_config_dev):
+def test_plugin_registry_list_scan(benchmark: Any, device_config_dev: Any) -> None:
     """Walk src/plugins/ to read each plugin-info.json (startup hot path)."""
     result = benchmark(device_config_dev.read_plugins_list)
     assert isinstance(result, list)
@@ -133,7 +134,7 @@ def test_plugin_registry_list_scan(benchmark, device_config_dev):
 # ---------------------------------------------------------------------------
 
 
-def test_config_read_cached(benchmark, device_config_dev):
+def test_config_read_cached(benchmark: Any, device_config_dev: Any) -> None:
     """Measure read_config() when the file is unchanged (cache hit path).
 
     After the first read (which populates the mtime cache), subsequent calls

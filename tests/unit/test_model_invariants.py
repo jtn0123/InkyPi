@@ -1,7 +1,7 @@
 from model import Playlist, PluginInstance
 
 
-def test_reorder_plugins_rejects_mismatch_and_invalid():
+def test_reorder_plugins_rejects_mismatch_and_invalid() -> None:
     p = Playlist(
         "P",
         "00:00",
@@ -27,7 +27,7 @@ def test_reorder_plugins_rejects_mismatch_and_invalid():
     )
 
 
-def test_get_next_plugin_resets_out_of_bounds():
+def test_get_next_plugin_resets_out_of_bounds() -> None:
     p = Playlist(
         "P",
         "00:00",

@@ -1,6 +1,9 @@
 # pyright: reportMissingImports=false
 """Property-based API tests using Hypothesis."""
 
+from typing import Any
+
+from flask.testing import FlaskClient
 from hypothesis import HealthCheck, given, settings, strategies as st
 
 
@@ -10,7 +13,9 @@ from hypothesis import HealthCheck, given, settings, strategies as st
     deadline=5000,
     suppress_health_check=[HealthCheck.function_scoped_fixture],
 )
-def test_settings_save_rejects_invalid_intervals(client, interval):
+def test_settings_save_rejects_invalid_intervals(
+    client: FlaskClient, interval: Any
+) -> None:
     """Settings save should handle any integer interval value without crashing."""
     data = {
         "unit": "minute",
@@ -29,7 +34,9 @@ def test_settings_save_rejects_invalid_intervals(client, interval):
     deadline=5000,
     suppress_health_check=[HealthCheck.function_scoped_fixture],
 )
-def test_settings_save_rejects_invalid_timezone(client, tz_value):
+def test_settings_save_rejects_invalid_timezone(
+    client: FlaskClient, tz_value: Any
+) -> None:
     """Settings save should handle arbitrary timezone strings."""
     data = {
         "unit": "minute",
@@ -47,7 +54,7 @@ def test_settings_save_rejects_invalid_timezone(client, tz_value):
     deadline=5000,
     suppress_health_check=[HealthCheck.function_scoped_fixture],
 )
-def test_playlist_create_name_validation(client, name):
+def test_playlist_create_name_validation(client: FlaskClient, name: Any) -> None:
     """Playlist creation should handle arbitrary name strings."""
     import json
 
@@ -71,7 +78,7 @@ def test_playlist_create_name_validation(client, name):
     deadline=5000,
     suppress_health_check=[HealthCheck.function_scoped_fixture],
 )
-def test_playlist_time_validation(client, time_str):
+def test_playlist_time_validation(client: FlaskClient, time_str: Any) -> None:
     """Playlist time fields should handle arbitrary time format strings."""
     import json
 
@@ -106,7 +113,7 @@ def test_playlist_time_validation(client, time_str):
     deadline=5000,
     suppress_health_check=[HealthCheck.function_scoped_fixture],
 )
-def test_plugin_form_rejects_xss_payloads(client, xss_input):
+def test_plugin_form_rejects_xss_payloads(client: FlaskClient, xss_input: Any) -> None:
     """Plugin save should not crash on XSS-like input strings."""
     import json
 
@@ -130,7 +137,7 @@ def test_plugin_form_rejects_xss_payloads(client, xss_input):
     deadline=5000,
     suppress_health_check=[HealthCheck.function_scoped_fixture],
 )
-def test_rss_feed_url_validation(client, url):
+def test_rss_feed_url_validation(client: FlaskClient, url: Any) -> None:
     """RSS plugin should handle arbitrary feed URL strings."""
     import json
 
@@ -155,7 +162,7 @@ def test_rss_feed_url_validation(client, url):
     deadline=5000,
     suppress_health_check=[HealthCheck.function_scoped_fixture],
 )
-def test_settings_name_unicode(client, name):
+def test_settings_name_unicode(client: FlaskClient, name: Any) -> None:
     """Device name with unicode/emoji should be accepted or rejected cleanly."""
     data = {
         "unit": "minute",
@@ -174,7 +181,7 @@ def test_settings_name_unicode(client, name):
     deadline=5000,
     suppress_health_check=[HealthCheck.function_scoped_fixture],
 )
-def test_interval_boundary_values(client, interval):
+def test_interval_boundary_values(client: FlaskClient, interval: Any) -> None:
     """Boundary interval values (0, negative, huge) should get error responses, not crashes."""
     data = {
         "unit": "minute",

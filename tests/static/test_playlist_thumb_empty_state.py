@@ -20,7 +20,7 @@ ROOT = Path(__file__).resolve().parents[2]
 PLAYLIST_HTML = ROOT / "src" / "templates" / "playlist.html"
 
 
-def test_thumb_wrapper_only_emitted_when_there_is_a_refresh_image():
+def test_thumb_wrapper_only_emitted_when_there_is_a_refresh_image() -> None:
     """The `pl-item-thumb` div must be inside the latest_refresh_time guard,
     not the other way around. Otherwise the wrapper renders empty-but-non-empty
     and shows a hardcoded-black box in the light theme."""
@@ -40,7 +40,7 @@ def test_thumb_wrapper_only_emitted_when_there_is_a_refresh_image():
     )
 
 
-def test_thumb_wrapper_does_not_appear_with_unconditional_whitespace_content():
+def test_thumb_wrapper_does_not_appear_with_unconditional_whitespace_content() -> None:
     """Defensive: the template must NOT have a `<div class="pl-item-thumb">`
     immediately followed (after only whitespace + comments) by the
     `{% if plugin_instance.latest_refresh_time %}` opener. That's the

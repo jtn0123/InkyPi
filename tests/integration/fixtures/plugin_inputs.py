@@ -15,6 +15,8 @@ until their fixtures can be stubbed in a follow-up.
 
 from __future__ import annotations
 
+from playwright.sync_api import Page
+
 # plugin_id -> { form_field_name: value }
 #
 # Scope is deliberately narrow: three plugins that render offline with no
@@ -47,7 +49,7 @@ PLUGIN_FORM_INPUTS: dict[str, dict[str, str]] = {
 }
 
 
-def fill_form_inputs(page, inputs: dict[str, str]) -> None:
+def fill_form_inputs(page: Page, inputs: dict[str, str]) -> None:
     """Fill ``#settingsForm`` fields from an inputs dict.
 
     Uses ``page.evaluate`` so the call site stays synchronous with Playwright

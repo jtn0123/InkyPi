@@ -9,6 +9,9 @@ save time and constrain the date input client-side via ``min``/``max``.
 """
 
 from datetime import UTC, date, datetime, timedelta
+from typing import Any
+
+from flask.testing import FlaskClient
 
 
 def _today_utc() -> date:
@@ -22,20 +25,20 @@ def _today_utc() -> date:
     return datetime.now(tz=UTC).date()
 
 
-def _make_plugin():
+def _make_plugin() -> Any:
     from plugins.wpotd.wpotd import Wpotd
 
     return Wpotd({"id": "wpotd"})
 
 
-def test_validate_settings_empty_custom_date_returns_none():
+def test_validate_settings_empty_custom_date_returns_none() -> None:
     plugin = _make_plugin()
     assert plugin.validate_settings({}) is None
     assert plugin.validate_settings({"customDate": ""}) is None
     assert plugin.validate_settings({"customDate": "   "}) is None
 
 
-def test_validate_settings_randomize_ignores_custom_date():
+def test_validate_settings_randomize_ignores_custom_date() -> None:
     plugin = _make_plugin()
     # Random mode supplies its own date — bad customDate must not block save.
     assert (
@@ -44,14 +47,14 @@ def test_validate_settings_randomize_ignores_custom_date():
     )
 
 
-def test_validate_settings_pre_archive_returns_error():
+def test_validate_settings_pre_archive_returns_error() -> None:
     plugin = _make_plugin()
     err = plugin.validate_settings({"customDate": "2006-12-31"})
     assert err is not None
     assert "2007-01-01" in err
 
 
-def test_validate_settings_far_future_returns_error():
+def test_validate_settings_far_future_returns_error() -> None:
     plugin = _make_plugin()
     err = plugin.validate_settings({"customDate": "2099-12-31"})
     assert err is not None
@@ -59,7 +62,7 @@ def test_validate_settings_far_future_returns_error():
     assert today in err
 
 
-def test_validate_settings_tomorrow_returns_error():
+def test_validate_settings_tomorrow_returns_error() -> None:
     plugin = _make_plugin()
     tomorrow = (_today_utc() + timedelta(days=1)).isoformat()
     err = plugin.validate_settings({"customDate": tomorrow})
@@ -67,31 +70,31 @@ def test_validate_settings_tomorrow_returns_error():
     assert _today_utc().isoformat() in err
 
 
-def test_validate_settings_archive_start_boundary_returns_none():
+def test_validate_settings_archive_start_boundary_returns_none() -> None:
     plugin = _make_plugin()
     assert plugin.validate_settings({"customDate": "2007-01-01"}) is None
 
 
-def test_validate_settings_today_boundary_returns_none():
+def test_validate_settings_today_boundary_returns_none() -> None:
     plugin = _make_plugin()
     today = _today_utc().isoformat()
     assert plugin.validate_settings({"customDate": today}) is None
 
 
-def test_validate_settings_invalid_format_returns_error():
+def test_validate_settings_invalid_format_returns_error() -> None:
     plugin = _make_plugin()
     err = plugin.validate_settings({"customDate": "not-a-date"})
     assert err is not None
     assert "format" in err.lower() or "invalid" in err.lower()
 
 
-def test_validate_settings_partial_date_returns_error():
+def test_validate_settings_partial_date_returns_error() -> None:
     plugin = _make_plugin()
     err = plugin.validate_settings({"customDate": "2024-13-40"})
     assert err is not None
 
 
-def test_settings_schema_advertises_min_and_max():
+def test_settings_schema_advertises_min_and_max() -> None:
     """Ensure the schema sets min=2007-01-01 and max=today on the date field."""
     plugin = _make_plugin()
     s = plugin.build_settings_schema()
@@ -107,7 +110,7 @@ def test_settings_schema_advertises_min_and_max():
     assert custom_date_field.get("max") == _today_utc().isoformat()
 
 
-def test_settings_template_renders_min_and_max(client):
+def test_settings_template_renders_min_and_max(client: FlaskClient) -> None:
     """The rendered settings page must include min/max attributes (JTN-651)."""
     resp = client.get("/plugin/wpotd")
     assert resp.status_code == 200
@@ -116,7 +119,7 @@ def test_settings_template_renders_min_and_max(client):
     assert f'max="{_today_utc().isoformat()}"' in body
 
 
-def test_save_plugin_settings_rejects_pre_archive_date(client):
+def test_save_plugin_settings_rejects_pre_archive_date(client: FlaskClient) -> None:
     """JTN-651: POST /save_plugin_settings with pre-2007 date returns 400."""
     data = {
         "plugin_id": "wpotd",
@@ -131,7 +134,7 @@ def test_save_plugin_settings_rejects_pre_archive_date(client):
     assert "2007-01-01" in msg
 
 
-def test_save_plugin_settings_rejects_future_date(client):
+def test_save_plugin_settings_rejects_future_date(client: FlaskClient) -> None:
     """JTN-651: POST /save_plugin_settings with a far-future date returns 400."""
     data = {
         "plugin_id": "wpotd",
@@ -146,7 +149,7 @@ def test_save_plugin_settings_rejects_future_date(client):
     assert _today_utc().isoformat() in msg
 
 
-def test_save_plugin_settings_accepts_valid_date(client):
+def test_save_plugin_settings_accepts_valid_date(client: FlaskClient) -> None:
     """JTN-651: a date inside the [2007-01-01, today] window saves successfully."""
     data = {
         "plugin_id": "wpotd",

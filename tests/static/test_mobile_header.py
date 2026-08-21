@@ -77,7 +77,7 @@ def _extract_rule(css: str, selector: str) -> str:
     return ""
 
 
-def test_app_title_truncates_with_ellipsis():
+def test_app_title_truncates_with_ellipsis() -> None:
     """`.app-title` must not allow long names to clip the header (JTN-340)."""
     css = _read_all_css()
     body = _extract_rule(css, ".app-title")
@@ -100,7 +100,7 @@ def test_app_title_truncates_with_ellipsis():
     )
 
 
-def test_title_container_allows_shrink():
+def test_title_container_allows_shrink() -> None:
     """`.title-container` must allow the title to shrink inside flex (JTN-340)."""
     css = _read_all_css()
     body = _extract_rule(css, ".title-container")
@@ -112,7 +112,7 @@ def test_title_container_allows_shrink():
     )
 
 
-def test_dashboard_header_exposes_full_name_via_title_attr():
+def test_dashboard_header_exposes_full_name_via_title_attr() -> None:
     """Full device name must remain accessible when truncated (JTN-340)."""
     html = _INKY_TEMPLATE.read_text(encoding="utf-8")
     assert 'class="app-title"' in html, "app-title element missing from inky.html"

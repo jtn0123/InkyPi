@@ -36,7 +36,7 @@ def _block_for_selector(css: str, selector: str) -> str:
     raise AssertionError(f"selector {selector!r} not found in CSS")
 
 
-def test_playlist_title_truncates_with_ellipsis_in_partial():
+def test_playlist_title_truncates_with_ellipsis_in_partial() -> None:
     """Source-of-truth: the partial that the build pulls in must declare
     truncation on `.playlist-title`."""
     block = _block_for_selector(
@@ -51,7 +51,7 @@ def test_playlist_title_truncates_with_ellipsis_in_partial():
     )
 
 
-def test_playlist_title_truncation_made_it_into_main_css_bundle():
+def test_playlist_title_truncation_made_it_into_main_css_bundle() -> None:
     """Build sanity: scripts/build_css.py must have inlined the truncation
     rule into the bundled main.css. Catches a forgotten rebuild."""
     block = _block_for_selector(MAIN_CSS.read_text(encoding="utf-8"), ".playlist-title")

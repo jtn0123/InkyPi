@@ -1,4 +1,6 @@
 import random
+from pathlib import Path
+from typing import Any
 
 import pytest
 from PIL import Image
@@ -7,31 +9,33 @@ import plugins.image_upload.image_upload as image_upload_mod
 
 
 class DummyDeviceConfig:
-    def __init__(self, resolution=(100, 200), orientation="horizontal"):
+    def __init__(
+        self, resolution: Any = (100, 200), orientation: Any = "horizontal"
+    ) -> None:
         self._resolution = resolution
         self._orientation = orientation
 
-    def get_resolution(self):
+    def get_resolution(self) -> Any:
         return self._resolution
 
-    def get_config(self, key):
+    def get_config(self, key: Any) -> Any:
         if key == "orientation":
             return self._orientation
         return None
 
 
-def make_png_file(path, size=(10, 10), color=(255, 0, 0)):
+def make_png_file(path: Any, size: Any = (10, 10), color: Any = (255, 0, 0)) -> None:
     img = Image.new("RGB", size, color=color)
     img.save(path, format="PNG")
 
 
 @pytest.fixture(autouse=True)
-def _patch_upload_dir(tmp_path, monkeypatch):
+def _patch_upload_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Point _get_upload_dir to tmp_path so path validation accepts test images."""
     monkeypatch.setattr(image_upload_mod, "_get_upload_dir", lambda: str(tmp_path))
 
 
-def test_open_image_success(tmp_path):
+def test_open_image_success(tmp_path: Path) -> None:
     p = tmp_path / "img.png"
     make_png_file(p)
     u = image_upload_mod.ImageUpload({"id": "image_upload"})
@@ -39,13 +43,13 @@ def test_open_image_success(tmp_path):
     assert isinstance(img, Image.Image)
 
 
-def test_open_image_no_images():
+def test_open_image_no_images() -> None:
     u = image_upload_mod.ImageUpload({"id": "image_upload"})
     with pytest.raises(RuntimeError):
         u.open_image(0, [])
 
 
-def test_open_image_bad_path(tmp_path):
+def test_open_image_bad_path(tmp_path: Path) -> None:
     u = image_upload_mod.ImageUpload({"id": "image_upload"})
     # Path inside tmp_path (allowed dir) but does not exist — triggers OSError in Image.open
     bad = str(tmp_path / "nonexistent.png")
@@ -53,14 +57,14 @@ def test_open_image_bad_path(tmp_path):
         u.open_image(0, [bad])
 
 
-def test_generate_image_no_images():
+def test_generate_image_no_images() -> None:
     u = image_upload_mod.ImageUpload({"id": "image_upload"})
     settings: dict = {}
     with pytest.raises(RuntimeError):
         u.generate_image(settings, DummyDeviceConfig())
 
 
-def test_generate_image_index_wrap_and_increment(tmp_path):
+def test_generate_image_index_wrap_and_increment(tmp_path: Path) -> None:
     # create two images
     p1 = tmp_path / "a.png"
     p2 = tmp_path / "b.png"
@@ -75,7 +79,9 @@ def test_generate_image_index_wrap_and_increment(tmp_path):
     assert isinstance(out, Image.Image)
 
 
-def test_generate_image_randomize(monkeypatch, tmp_path):
+def test_generate_image_randomize(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     p1 = tmp_path / "a.png"
     p2 = tmp_path / "b.png"
     make_png_file(p1, size=(10, 10))
@@ -93,7 +99,7 @@ def test_generate_image_randomize(monkeypatch, tmp_path):
     assert isinstance(out, Image.Image)
 
 
-def test_generate_image_padImage_true(tmp_path):
+def test_generate_image_padImage_true(tmp_path: Path) -> None:
     p = tmp_path / "wide.png"
     # wide image
     make_png_file(p, size=(200, 50))
@@ -116,7 +122,9 @@ def test_generate_image_padImage_true(tmp_path):
 # ---------------------------------------------------------------------------
 
 
-def test_open_image_rejects_path_traversal(tmp_path, monkeypatch):
+def test_open_image_rejects_path_traversal(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """open_image must reject paths that escape the upload directory."""
     # _get_upload_dir is already patched to tmp_path by autouse fixture
     u = image_upload_mod.ImageUpload({"id": "image_upload"})
@@ -125,14 +133,18 @@ def test_open_image_rejects_path_traversal(tmp_path, monkeypatch):
         u.open_image(0, [malicious])
 
 
-def test_open_image_rejects_absolute_outside(tmp_path, monkeypatch):
+def test_open_image_rejects_absolute_outside(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """open_image must reject absolute paths outside the upload directory."""
     u = image_upload_mod.ImageUpload({"id": "image_upload"})
     with pytest.raises(RuntimeError, match="Invalid image file path"):
         u.open_image(0, ["/etc/passwd"])
 
 
-def test_cleanup_skips_invalid_paths(tmp_path, monkeypatch):
+def test_cleanup_skips_invalid_paths(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """cleanup must silently skip paths outside the upload directory."""
     # Create a file inside the allowed dir to verify it gets cleaned up
     safe_file = tmp_path / "safe.png"
@@ -147,7 +159,9 @@ def test_cleanup_skips_invalid_paths(tmp_path, monkeypatch):
     assert not safe_file.exists(), "Safe file should have been deleted"
 
 
-def test_cleanup_skips_traversal_paths(tmp_path, monkeypatch):
+def test_cleanup_skips_traversal_paths(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """cleanup must skip traversal paths without raising."""
     settings = {
         "imageFiles[]": [str(tmp_path / ".." / ".." / "etc" / "passwd")],

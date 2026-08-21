@@ -14,12 +14,15 @@ Covers:
 from __future__ import annotations
 
 import json
+from pathlib import Path
+from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
+from flask.testing import FlaskClient
 
 
-def _write_failure(tmp_path, payload: dict | None = None) -> None:
+def _write_failure(tmp_path: Path, payload: dict | None = None) -> None:
     """Place a .last-update-failure record so the route gate opens."""
     record = payload or {
         "timestamp": "2026-04-14T23:00:00Z",
@@ -30,7 +33,7 @@ def _write_failure(tmp_path, payload: dict | None = None) -> None:
     (tmp_path / ".last-update-failure").write_text(json.dumps(record), encoding="utf-8")
 
 
-def _write_prev_version(tmp_path, value: str) -> None:
+def _write_prev_version(tmp_path: Path, value: str) -> None:
     (tmp_path / "prev_version").write_text(value, encoding="utf-8")
 
 
@@ -38,8 +41,8 @@ class TestRollbackGates:
     """The /settings/update/rollback endpoint is gated on two breadcrumbs."""
 
     def test_rollback_requires_last_failure_present(
-        self, client, monkeypatch, tmp_path
-    ):
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
         """Without .last-update-failure, rollback is refused with 409."""
         import blueprints.settings as mod
 
@@ -58,8 +61,8 @@ class TestRollbackGates:
             mod._set_update_state(False, None)
 
     def test_rollback_requires_prev_version_present(
-        self, client, monkeypatch, tmp_path
-    ):
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
         """With a failure recorded but no prev_version, rollback is refused."""
         import blueprints.settings as mod
 
@@ -78,8 +81,8 @@ class TestRollbackGates:
             mod._set_update_state(False, None)
 
     def test_rollback_refuses_malformed_prev_version(
-        self, client, monkeypatch, tmp_path
-    ):
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
         """A corrupt prev_version (non-semver) must not trigger a rollback."""
         import blueprints.settings as mod
 
@@ -102,8 +105,8 @@ class TestRollbackHappyPath:
     """Happy-path rollback returns 202 Accepted and schedules the script."""
 
     def test_rollback_endpoint_returns_202_on_success(
-        self, client, monkeypatch, tmp_path
-    ):
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
         import blueprints.settings as mod
 
         monkeypatch.setenv("INKYPI_LOCKFILE_DIR", str(tmp_path))
@@ -129,8 +132,8 @@ class TestRollbackHappyPath:
             mod._set_update_state(False, None)
 
     def test_rollback_endpoint_falls_back_without_systemd(
-        self, client, monkeypatch, tmp_path
-    ):
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
         """On dev/macOS without systemd-run, the fallback thread runner runs."""
         import blueprints.settings as mod
 
@@ -151,8 +154,8 @@ class TestRollbackHappyPath:
             mod._set_update_state(False, None)
 
     def test_rollback_refuses_when_update_already_running(
-        self, client, monkeypatch, tmp_path
-    ):
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
         """TOCTOU: rollback and a concurrent update cannot both pass."""
         import blueprints.settings as mod
 
@@ -174,8 +177,8 @@ class TestRollbackSanitization:
     """JTN-708 / JTN-319 parity: argv built from hardcoded constants only."""
 
     def test_rollback_route_sanitizes_version_before_systemd_run(
-        self, client, monkeypatch, tmp_path
-    ):
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
         """systemd-run argv contains only validated / literal values.
 
         Even though the route derives the target version from the
@@ -209,13 +212,15 @@ class TestRollbackSanitization:
         finally:
             mod._set_update_state(False, None)
 
-    def test_start_rollback_via_systemd_argv_is_hardcoded(self, monkeypatch, tmp_path):
+    def test_start_rollback_via_systemd_argv_is_hardcoded(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> Any:
         """argv has the expected shape: literal prefix + canonical script path."""
         import blueprints.settings as mod
 
         calls: list[list[str]] = []
 
-        def _fake_popen(cmd, *args, **kwargs):
+        def _fake_popen(cmd: Any, *args: Any, **kwargs: Any) -> Any:
             calls.append(list(cmd))
 
             class _FakeProc:
@@ -256,13 +261,17 @@ class TestRollbackSanitization:
 class TestValidateRollbackScriptPath:
     """Trusted-root enforcement — parity with _validate_update_script_path."""
 
-    def test_rejects_path_outside_trusted_root(self, monkeypatch, tmp_path):
+    def test_rejects_path_outside_trusted_root(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
         import blueprints.settings as mod
 
         with pytest.raises(ValueError, match="not under trusted root"):
             mod._validate_rollback_script_path("/opt/attacker/rollback.sh")
 
-    def test_rejects_wrong_basename_under_trusted_root(self, monkeypatch, tmp_path):
+    def test_rejects_wrong_basename_under_trusted_root(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
         """do_update.sh under a trusted root must NOT be execable as rollback."""
         import blueprints.settings as mod
 
@@ -278,7 +287,7 @@ class TestValidateRollbackScriptPath:
         with pytest.raises(ValueError, match="Invalid rollback script basename"):
             mod._validate_rollback_script_path(legitimate)
 
-    def test_accepts_repo_relative_rollback_script(self):
+    def test_accepts_repo_relative_rollback_script(self) -> None:
         import blueprints.settings as mod
 
         # mod.__file__ is src/blueprints/settings/__init__.py → repo root is parents[3].
@@ -300,7 +309,7 @@ class TestValidateRollbackScriptPath:
 class TestGetRollbackScriptPath:
     """Cover the candidate-cascade helper that resolves rollback.sh."""
 
-    def test_finds_repo_relative_script(self, monkeypatch):
+    def test_finds_repo_relative_script(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Developer environment: picks up install/rollback.sh via parents[3]."""
         import blueprints.settings as mod
 
@@ -313,7 +322,9 @@ class TestGetRollbackScriptPath:
         assert path is not None
         assert path.endswith("install/rollback.sh")
 
-    def test_returns_none_when_no_candidate_exists(self, monkeypatch, tmp_path):
+    def test_returns_none_when_no_candidate_exists(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
         """No PROJECT_DIR + no script on disk → None (caller decides)."""
         import blueprints.settings as mod
 
@@ -327,7 +338,9 @@ class TestGetRollbackScriptPath:
         monkeypatch.setattr(mod.os.path, "isfile", lambda _p: False)
         assert mod._get_rollback_script_path() is None
 
-    def test_honors_project_dir_with_symlinked_src(self, monkeypatch, tmp_path):
+    def test_honors_project_dir_with_symlinked_src(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
         """Production layout: PROJECT_DIR/src → repo/src (symlink) resolves."""
         import blueprints.settings as mod
 
@@ -350,7 +363,9 @@ class TestGetRollbackScriptPath:
 class TestStartRollbackViaSystemdFullPath:
     """End-to-end coverage of _start_rollback_via_systemd with Popen mocked."""
 
-    def test_popen_invoked_with_project_dir_override(self, monkeypatch, tmp_path):
+    def test_popen_invoked_with_project_dir_override(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> Any:
         """PROJECT_DIR env override flows into --setenv argv element."""
         import blueprints.settings as mod
 
@@ -366,7 +381,7 @@ class TestStartRollbackViaSystemdFullPath:
 
         calls: list[list[str]] = []
 
-        def _fake_popen(cmd, *args, **kwargs):
+        def _fake_popen(cmd: Any, *args: Any, **kwargs: Any) -> Any:
             calls.append(list(cmd))
 
             class _FakeProc:
@@ -386,8 +401,8 @@ class TestStartRollbackViaSystemdFullPath:
         assert str(script) in argv
 
     def test_popen_invoked_with_malformed_project_dir_falls_back(
-        self, monkeypatch, tmp_path
-    ):
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> Any:
         """A PROJECT_DIR with ``..`` traversal falls back to the default."""
         import blueprints.settings as mod
 
@@ -401,7 +416,7 @@ class TestStartRollbackViaSystemdFullPath:
 
         calls: list[list[str]] = []
 
-        def _fake_popen(cmd, *args, **kwargs):
+        def _fake_popen(cmd: Any, *args: Any, **kwargs: Any) -> Any:
             calls.append(list(cmd))
             return type("P", (), {})()
 
@@ -419,8 +434,8 @@ class TestRollbackRouteErrorPaths:
     """Outer-except branches that don't fire in the happy path."""
 
     def test_rollback_route_handles_systemd_run_exception(
-        self, client, monkeypatch, tmp_path
-    ):
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
         """If _start_rollback_via_systemd throws, state is cleared + 500 returned."""
         import blueprints.settings as mod
 
@@ -431,7 +446,7 @@ class TestRollbackRouteErrorPaths:
 
         monkeypatch.setattr(mod, "_systemd_available", lambda: True)
 
-        def _boom():
+        def _boom() -> None:
             raise OSError("systemd-run missing")
 
         monkeypatch.setattr(mod, "_start_rollback_via_systemd", _boom)
@@ -453,8 +468,8 @@ class TestUpdateStatusIncludesPrevVersion:
     """/settings/update_status surfaces prev_version for UI button gating."""
 
     def test_update_status_includes_prev_version_when_present(
-        self, client, monkeypatch, tmp_path
-    ):
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
         import blueprints.settings as mod
 
         monkeypatch.setenv("INKYPI_LOCKFILE_DIR", str(tmp_path))
@@ -467,8 +482,8 @@ class TestUpdateStatusIncludesPrevVersion:
         assert data["prev_version"] == "v0.52.0"
 
     def test_update_status_prev_version_null_when_missing(
-        self, client, monkeypatch, tmp_path
-    ):
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
         import blueprints.settings as mod
 
         monkeypatch.setenv("INKYPI_LOCKFILE_DIR", str(tmp_path))
@@ -481,8 +496,8 @@ class TestUpdateStatusIncludesPrevVersion:
         assert data["prev_version"] is None
 
     def test_update_status_prev_version_null_when_malformed(
-        self, client, monkeypatch, tmp_path
-    ):
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
         """Corrupt prev_version (fails semver) is surfaced as null."""
         import blueprints.settings as mod
 

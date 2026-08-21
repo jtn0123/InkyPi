@@ -6,6 +6,7 @@ This test patches get_http_session and confirms the wpotd plugin calls it, which
 exercises the adoption pattern required by docs/http_performance.md.
 """
 
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 
@@ -13,7 +14,13 @@ def _make_fake_session(image_bytes: bytes) -> MagicMock:
     """Build a MagicMock session whose .get() returns plausible Wikimedia responses."""
     session = MagicMock()
 
-    def _get(url, params=None, headers=None, timeout=None, **_kwargs):
+    def _get(
+        url: Any,
+        params: Any = None,
+        headers: Any = None,
+        timeout: Any = None,
+        **_kwargs: Any,
+    ) -> Any:
         resp = MagicMock()
         resp.status_code = 200
         resp.raise_for_status = MagicMock()
@@ -39,7 +46,7 @@ def _make_fake_session(image_bytes: bytes) -> MagicMock:
     return session
 
 
-def test_wpotd_calls_get_http_session(device_config_dev):
+def test_wpotd_calls_get_http_session(device_config_dev: Any) -> None:
     """wpotd.generate_image() must go through get_http_session(), not bare requests."""
     from io import BytesIO
 
@@ -67,7 +74,7 @@ def test_wpotd_calls_get_http_session(device_config_dev):
         mock_get_session.assert_called()
 
 
-def test_weather_api_calls_get_http_session():
+def test_weather_api_calls_get_http_session() -> None:
     """weather_api fetch functions must go through get_http_session()."""
     fake_session = MagicMock()
     fake_resp = MagicMock()

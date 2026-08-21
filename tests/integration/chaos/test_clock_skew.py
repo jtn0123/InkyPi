@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+from flask import Flask
+from flask.testing import FlaskClient
 from tests.helpers.refresh_info_helpers import seed_future_refresh_info
 
 
-def test_clock_skew_backwards_still_allows_manual_refresh(client, flask_app):
+def test_clock_skew_backwards_still_allows_manual_refresh(
+    client: FlaskClient, flask_app: Flask
+) -> None:
     refresh_task = flask_app.config["REFRESH_TASK"]
     device_config = flask_app.config["DEVICE_CONFIG"]
 

@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 import os
 import sys
+from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -23,7 +25,7 @@ import validate_api_keys as vak  # noqa: E402  (import after path manipulation)
 
 
 @pytest.fixture()
-def device_json(tmp_path):
+def device_json(tmp_path: Path) -> Any:
     """Create a minimal device.json with weather + ai_image plugins configured."""
     config = {
         "name": "Test Device",
@@ -51,7 +53,7 @@ def device_json(tmp_path):
 
 
 @pytest.fixture()
-def empty_device_json(tmp_path):
+def empty_device_json(tmp_path: Path) -> Any:
     """A device.json with no plugins configured."""
     config = {
         "name": "Empty",
@@ -66,7 +68,7 @@ def empty_device_json(tmp_path):
 
 
 @pytest.fixture()
-def env_file(tmp_path):
+def env_file(tmp_path: Path) -> Any:
     """Create a .env file with keys for all supported plugins."""
     content = (
         "OPENWEATHER_API_KEY=owm_test_key\n"
@@ -82,7 +84,7 @@ def env_file(tmp_path):
 
 
 @pytest.fixture()
-def empty_env_file(tmp_path):
+def empty_env_file(tmp_path: Path) -> Any:
     """Empty .env — no keys at all."""
     p = tmp_path / ".env"
     p.write_text("")
@@ -94,7 +96,7 @@ def empty_env_file(tmp_path):
 # ---------------------------------------------------------------------------
 
 
-def test_load_env_file_parses_entries(tmp_path):
+def test_load_env_file_parses_entries(tmp_path: Path) -> None:
     f = tmp_path / ".env"
     f.write_text("KEY1=val1\nKEY2=val2\n")
     result = vak._load_env_file(str(f))
@@ -102,14 +104,14 @@ def test_load_env_file_parses_entries(tmp_path):
     assert result["KEY2"] == "val2"
 
 
-def test_load_env_file_strips_quotes(tmp_path):
+def test_load_env_file_strips_quotes(tmp_path: Path) -> None:
     f = tmp_path / ".env"
     f.write_text('KEY="quoted_value"\n')
     result = vak._load_env_file(str(f))
     assert result["KEY"] == "quoted_value"
 
 
-def test_load_env_file_ignores_comments(tmp_path):
+def test_load_env_file_ignores_comments(tmp_path: Path) -> None:
     f = tmp_path / ".env"
     f.write_text("# comment\nKEY=value\n")
     result = vak._load_env_file(str(f))
@@ -117,7 +119,7 @@ def test_load_env_file_ignores_comments(tmp_path):
     assert result["KEY"] == "value"
 
 
-def test_load_env_file_missing_returns_empty(tmp_path):
+def test_load_env_file_missing_returns_empty(tmp_path: Path) -> None:
     result = vak._load_env_file(str(tmp_path / "nonexistent.env"))
     assert result == {}
 
@@ -127,7 +129,7 @@ def test_load_env_file_missing_returns_empty(tmp_path):
 # ---------------------------------------------------------------------------
 
 
-def test_extract_configured_plugin_ids():
+def test_extract_configured_plugin_ids() -> None:
     config = {
         "playlist_config": {
             "playlists": [
@@ -145,7 +147,7 @@ def test_extract_configured_plugin_ids():
     assert "clock" in ids
 
 
-def test_extract_configured_plugin_ids_empty():
+def test_extract_configured_plugin_ids_empty() -> None:
     config = {"playlist_config": {"playlists": []}}
     assert vak._extract_configured_plugin_ids(config) == set()
 
@@ -155,7 +157,7 @@ def test_extract_configured_plugin_ids_empty():
 # ---------------------------------------------------------------------------
 
 
-def test_probe_openweathermap_ok(requests_mock):
+def test_probe_openweathermap_ok(requests_mock: Any) -> None:
     requests_mock.get(
         "https://api.openweathermap.org/geo/1.0/reverse",
         json=[{"name": "London"}],
@@ -165,7 +167,7 @@ def test_probe_openweathermap_ok(requests_mock):
     assert status == vak.STATUS_OK
 
 
-def test_probe_openweathermap_invalid(requests_mock):
+def test_probe_openweathermap_invalid(requests_mock: Any) -> None:
     requests_mock.get(
         "https://api.openweathermap.org/geo/1.0/reverse",
         json={"message": "Invalid API key"},
@@ -175,7 +177,7 @@ def test_probe_openweathermap_invalid(requests_mock):
     assert status == vak.STATUS_INVALID
 
 
-def test_probe_openweathermap_quota(requests_mock):
+def test_probe_openweathermap_quota(requests_mock: Any) -> None:
     requests_mock.get(
         "https://api.openweathermap.org/geo/1.0/reverse",
         status_code=429,
@@ -184,7 +186,7 @@ def test_probe_openweathermap_quota(requests_mock):
     assert status == vak.STATUS_QUOTA
 
 
-def test_probe_openweathermap_network_error(requests_mock):
+def test_probe_openweathermap_network_error(requests_mock: Any) -> None:
     import requests
 
     requests_mock.get(
@@ -195,7 +197,7 @@ def test_probe_openweathermap_network_error(requests_mock):
     assert status == vak.STATUS_NETWORK_ERROR
 
 
-def test_probe_openai_ok(requests_mock):
+def test_probe_openai_ok(requests_mock: Any) -> None:
     requests_mock.get(
         "https://api.openai.com/v1/models",
         json={"data": []},
@@ -205,7 +207,7 @@ def test_probe_openai_ok(requests_mock):
     assert status == vak.STATUS_OK
 
 
-def test_probe_openai_invalid(requests_mock):
+def test_probe_openai_invalid(requests_mock: Any) -> None:
     requests_mock.get(
         "https://api.openai.com/v1/models",
         json={"error": {"message": "Incorrect API key"}},
@@ -215,7 +217,7 @@ def test_probe_openai_invalid(requests_mock):
     assert status == vak.STATUS_INVALID
 
 
-def test_probe_openai_quota(requests_mock):
+def test_probe_openai_quota(requests_mock: Any) -> None:
     requests_mock.get(
         "https://api.openai.com/v1/models",
         status_code=429,
@@ -224,7 +226,7 @@ def test_probe_openai_quota(requests_mock):
     assert status == vak.STATUS_QUOTA
 
 
-def test_probe_openai_network_error(requests_mock):
+def test_probe_openai_network_error(requests_mock: Any) -> None:
     import requests
 
     requests_mock.get(
@@ -235,7 +237,7 @@ def test_probe_openai_network_error(requests_mock):
     assert status == vak.STATUS_NETWORK_ERROR
 
 
-def test_probe_google_ai_ok(requests_mock):
+def test_probe_google_ai_ok(requests_mock: Any) -> None:
     requests_mock.get(
         "https://generativelanguage.googleapis.com/v1beta/models",
         json={"models": []},
@@ -245,7 +247,7 @@ def test_probe_google_ai_ok(requests_mock):
     assert status == vak.STATUS_OK
 
 
-def test_probe_google_ai_invalid(requests_mock):
+def test_probe_google_ai_invalid(requests_mock: Any) -> None:
     requests_mock.get(
         "https://generativelanguage.googleapis.com/v1beta/models",
         json={"error": {"status": "PERMISSION_DENIED"}},
@@ -255,7 +257,7 @@ def test_probe_google_ai_invalid(requests_mock):
     assert status == vak.STATUS_INVALID
 
 
-def test_probe_unsplash_ok(requests_mock):
+def test_probe_unsplash_ok(requests_mock: Any) -> None:
     requests_mock.get(
         "https://api.unsplash.com/photos/random",
         json=[{"id": "abc"}],
@@ -265,7 +267,7 @@ def test_probe_unsplash_ok(requests_mock):
     assert status == vak.STATUS_OK
 
 
-def test_probe_unsplash_invalid(requests_mock):
+def test_probe_unsplash_invalid(requests_mock: Any) -> None:
     requests_mock.get(
         "https://api.unsplash.com/photos/random",
         json={"errors": ["OAuth error: The access token is invalid."]},
@@ -275,7 +277,7 @@ def test_probe_unsplash_invalid(requests_mock):
     assert status == vak.STATUS_INVALID
 
 
-def test_probe_unsplash_network_error(requests_mock):
+def test_probe_unsplash_network_error(requests_mock: Any) -> None:
     import requests
 
     requests_mock.get(
@@ -286,7 +288,7 @@ def test_probe_unsplash_network_error(requests_mock):
     assert status == vak.STATUS_NETWORK_ERROR
 
 
-def test_probe_nasa_ok(requests_mock):
+def test_probe_nasa_ok(requests_mock: Any) -> None:
     requests_mock.get(
         "https://api.nasa.gov/planetary/apod",
         json={"media_type": "image", "url": "https://example.com/img.jpg"},
@@ -296,7 +298,7 @@ def test_probe_nasa_ok(requests_mock):
     assert status == vak.STATUS_OK
 
 
-def test_probe_nasa_invalid(requests_mock):
+def test_probe_nasa_invalid(requests_mock: Any) -> None:
     requests_mock.get(
         "https://api.nasa.gov/planetary/apod",
         json={"error": {"code": "API_KEY_INVALID"}},
@@ -306,7 +308,7 @@ def test_probe_nasa_invalid(requests_mock):
     assert status == vak.STATUS_INVALID
 
 
-def test_probe_github_ok(requests_mock):
+def test_probe_github_ok(requests_mock: Any) -> None:
     requests_mock.get(
         "https://api.github.com/user",
         json={"login": "testuser"},
@@ -316,7 +318,7 @@ def test_probe_github_ok(requests_mock):
     assert status == vak.STATUS_OK
 
 
-def test_probe_github_invalid(requests_mock):
+def test_probe_github_invalid(requests_mock: Any) -> None:
     requests_mock.get(
         "https://api.github.com/user",
         json={"message": "Bad credentials"},
@@ -326,7 +328,7 @@ def test_probe_github_invalid(requests_mock):
     assert status == vak.STATUS_INVALID
 
 
-def test_probe_github_network_error(requests_mock):
+def test_probe_github_network_error(requests_mock: Any) -> None:
     import requests
 
     requests_mock.get(
@@ -342,7 +344,7 @@ def test_probe_github_network_error(requests_mock):
 # ---------------------------------------------------------------------------
 
 
-def test_run_probes_all_ok(requests_mock):
+def test_run_probes_all_ok(requests_mock: Any) -> None:
     """All probes return 200 → all results OK."""
     requests_mock.get(
         "https://api.openweathermap.org/geo/1.0/reverse", json=[], status_code=200
@@ -382,7 +384,7 @@ def test_run_probes_all_ok(requests_mock):
     assert vak.STATUS_INVALID not in statuses
 
 
-def test_run_probes_skips_unconfigured_missing_key():
+def test_run_probes_skips_unconfigured_missing_key() -> None:
     """Plugin configured but key absent → Skipped."""
     env_keys: dict[str, str] = {}  # no keys
     configured = {"weather"}
@@ -392,7 +394,7 @@ def test_run_probes_skips_unconfigured_missing_key():
     assert all(r["status"] == vak.STATUS_SKIPPED for r in weather_results)
 
 
-def test_run_probes_empty_config_empty_env():
+def test_run_probes_empty_config_empty_env() -> None:
     """No configured plugins, no keys → no results."""
     env_keys: dict[str, str] = {}
     configured: set[str] = set()
@@ -400,7 +402,7 @@ def test_run_probes_empty_config_empty_env():
     assert results == []
 
 
-def test_run_probes_plugin_filter(requests_mock):
+def test_run_probes_plugin_filter(requests_mock: Any) -> None:
     """--plugin filter limits output to that plugin only."""
     requests_mock.get(
         "https://api.nasa.gov/planetary/apod",
@@ -419,7 +421,7 @@ def test_run_probes_plugin_filter(requests_mock):
 # ---------------------------------------------------------------------------
 
 
-def test_exit_code_all_ok():
+def test_exit_code_all_ok() -> None:
     results = [
         {"status": vak.STATUS_OK, "plugin": "x", "service": "S", "message": ""},
         {"status": vak.STATUS_SKIPPED, "plugin": "y", "service": "T", "message": ""},
@@ -427,14 +429,14 @@ def test_exit_code_all_ok():
     assert vak._exit_code(results) == 0
 
 
-def test_exit_code_invalid():
+def test_exit_code_invalid() -> None:
     results = [
         {"status": vak.STATUS_INVALID, "plugin": "x", "service": "S", "message": ""},
     ]
     assert vak._exit_code(results) == 1
 
 
-def test_exit_code_network_error():
+def test_exit_code_network_error() -> None:
     results = [
         {
             "status": vak.STATUS_NETWORK_ERROR,
@@ -446,7 +448,7 @@ def test_exit_code_network_error():
     assert vak._exit_code(results) == 2
 
 
-def test_exit_code_empty():
+def test_exit_code_empty() -> None:
     assert vak._exit_code([]) == 0
 
 
@@ -455,12 +457,14 @@ def test_exit_code_empty():
 # ---------------------------------------------------------------------------
 
 
-def test_main_missing_config_returns_2(tmp_path):
+def test_main_missing_config_returns_2(tmp_path: Path) -> None:
     code = vak.main(["--config", str(tmp_path / "nonexistent.json")])
     assert code == 2
 
 
-def test_main_json_output(tmp_path, requests_mock, device_json, env_file):
+def test_main_json_output(
+    tmp_path: Path, requests_mock: Any, device_json: Any, env_file: Any
+) -> None:
     """--json flag produces valid JSON list."""
     # Mock all external endpoints as OK
     requests_mock.get(
@@ -504,7 +508,9 @@ def test_main_json_output(tmp_path, requests_mock, device_json, env_file):
     assert len(parsed) > 0
 
 
-def test_main_all_invalid_exits_1(tmp_path, requests_mock, device_json, env_file):
+def test_main_all_invalid_exits_1(
+    tmp_path: Path, requests_mock: Any, device_json: Any, env_file: Any
+) -> None:
     """If all probes return 401, main exits with code 1."""
     requests_mock.get("https://api.openweathermap.org/geo/1.0/reverse", status_code=401)
     requests_mock.get("https://api.openai.com/v1/models", status_code=401)
@@ -522,7 +528,9 @@ def test_main_all_invalid_exits_1(tmp_path, requests_mock, device_json, env_file
     assert code == 1
 
 
-def test_main_empty_config_exits_0(tmp_path, empty_device_json, empty_env_file):
+def test_main_empty_config_exits_0(
+    tmp_path: Path, empty_device_json: Any, empty_env_file: Any
+) -> None:
     """Empty config + empty .env → exit 0, no probes run."""
     from unittest.mock import patch
 
@@ -533,7 +541,7 @@ def test_main_empty_config_exits_0(tmp_path, empty_device_json, empty_env_file):
     assert code == 0
 
 
-def test_main_unknown_plugin_skipped(tmp_path, requests_mock):
+def test_main_unknown_plugin_skipped(tmp_path: Path, requests_mock: Any) -> None:
     """Plugin IDs with no probe definition produce no output (skipped silently)."""
     config = {
         "name": "T",

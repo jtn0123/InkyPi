@@ -3,23 +3,27 @@
 import os
 import sqlite3
 import time
+from pathlib import Path
+from typing import Any
+
+import pytest
 
 
 class MockDeviceConfig:
     """Mock device config for testing benchmark storage."""
 
-    def __init__(self, config=None, base_dir=None):
+    def __init__(self, config: Any = None, base_dir: Any = None) -> None:
         self._config = config or {}
         self.BASE_DIR = base_dir or os.path.dirname(__file__)
 
-    def get_config(self, key, default=None):
+    def get_config(self, key: Any, default: Any = None) -> Any:
         return self._config.get(key, default)
 
 
 # --- _get_db_path tests ---
 
 
-def test_get_db_path_defaults(tmp_path, monkeypatch):
+def test_get_db_path_defaults(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Verify default path uses BASE_DIR when no config specified."""
     from benchmarks.benchmark_storage import _get_db_path
 
@@ -28,7 +32,7 @@ def test_get_db_path_defaults(tmp_path, monkeypatch):
     assert result == os.path.join(str(tmp_path.parent), "runtime", "benchmarks.db")
 
 
-def test_get_db_path_from_config(tmp_path):
+def test_get_db_path_from_config(tmp_path: Path) -> None:
     """Custom path from config is used when specified."""
     from benchmarks.benchmark_storage import _get_db_path
 
@@ -38,7 +42,7 @@ def test_get_db_path_from_config(tmp_path):
     assert result == custom_path
 
 
-def test_get_db_path_handles_empty_config_value(tmp_path):
+def test_get_db_path_handles_empty_config_value(tmp_path: Path) -> None:
     """Empty config value falls back to default path."""
     from benchmarks.benchmark_storage import _get_db_path
 
@@ -47,7 +51,7 @@ def test_get_db_path_handles_empty_config_value(tmp_path):
     assert result == os.path.join(str(tmp_path.parent), "runtime", "benchmarks.db")
 
 
-def test_get_db_path_falsy_base_dir_uses_fallback():
+def test_get_db_path_falsy_base_dir_uses_fallback() -> None:
     """Falsy BASE_DIR falls back to __file__-relative path."""
     from benchmarks.benchmark_storage import _get_db_path
 
@@ -57,14 +61,14 @@ def test_get_db_path_falsy_base_dir_uses_fallback():
     assert result.endswith(os.path.join("runtime", "benchmarks.db"))
 
 
-def test_get_db_path_handles_exception():
+def test_get_db_path_handles_exception() -> None:
     """Handles exception when get_config fails."""
     from benchmarks.benchmark_storage import _get_db_path
 
     class BrokenConfig:
         BASE_DIR = "/tmp"
 
-        def get_config(self, key, default=None):
+        def get_config(self, key: Any, default: Any = None) -> None:
             raise RuntimeError("Config error")
 
     result = _get_db_path(BrokenConfig())
@@ -74,7 +78,7 @@ def test_get_db_path_handles_exception():
 # --- _is_enabled tests ---
 
 
-def test_is_enabled_respects_config_false(monkeypatch):
+def test_is_enabled_respects_config_false(monkeypatch: pytest.MonkeyPatch) -> None:
     """Benchmarks disabled when enable_benchmarks is False."""
     from benchmarks.benchmark_storage import _is_enabled
 
@@ -83,7 +87,7 @@ def test_is_enabled_respects_config_false(monkeypatch):
     assert _is_enabled(config) is False
 
 
-def test_is_enabled_respects_config_true(monkeypatch):
+def test_is_enabled_respects_config_true(monkeypatch: pytest.MonkeyPatch) -> None:
     """Benchmarks enabled when enable_benchmarks is True."""
     from benchmarks.benchmark_storage import _is_enabled
 
@@ -93,7 +97,7 @@ def test_is_enabled_respects_config_true(monkeypatch):
     assert _is_enabled(config) is True
 
 
-def test_is_enabled_skips_pytest(monkeypatch):
+def test_is_enabled_skips_pytest(monkeypatch: pytest.MonkeyPatch) -> None:
     """Benchmarks disabled when PYTEST_CURRENT_TEST is set."""
     from benchmarks.benchmark_storage import _is_enabled
 
@@ -102,7 +106,7 @@ def test_is_enabled_skips_pytest(monkeypatch):
     assert _is_enabled(config) is False
 
 
-def test_sample_rate_filtering_zero(monkeypatch):
+def test_sample_rate_filtering_zero(monkeypatch: pytest.MonkeyPatch) -> None:
     """Sample rate of 0 always returns False."""
     from benchmarks.benchmark_storage import _is_enabled
 
@@ -115,7 +119,7 @@ def test_sample_rate_filtering_zero(monkeypatch):
         assert _is_enabled(config) is False
 
 
-def test_sample_rate_filtering_one(monkeypatch):
+def test_sample_rate_filtering_one(monkeypatch: pytest.MonkeyPatch) -> None:
     """Sample rate of 1.0 always returns True."""
     from benchmarks.benchmark_storage import _is_enabled
 
@@ -128,7 +132,7 @@ def test_sample_rate_filtering_one(monkeypatch):
         assert _is_enabled(config) is True
 
 
-def test_sample_rate_clamped_to_valid_range(monkeypatch):
+def test_sample_rate_clamped_to_valid_range(monkeypatch: pytest.MonkeyPatch) -> None:
     """Sample rate values outside 0-1 are clamped."""
     from benchmarks.benchmark_storage import _is_enabled
 
@@ -150,7 +154,7 @@ def test_sample_rate_clamped_to_valid_range(monkeypatch):
 # --- _should_record_event tests ---
 
 
-def test_should_record_event_include_filter(monkeypatch):
+def test_should_record_event_include_filter(monkeypatch: pytest.MonkeyPatch) -> None:
     """Include filter only allows specified plugins."""
     from benchmarks.benchmark_storage import _should_record_event
 
@@ -167,7 +171,7 @@ def test_should_record_event_include_filter(monkeypatch):
     assert _should_record_event(config, {"plugin_id": "calendar"}) is False
 
 
-def test_should_record_event_exclude_filter(monkeypatch):
+def test_should_record_event_exclude_filter(monkeypatch: pytest.MonkeyPatch) -> None:
     """Exclude filter blocks specified plugins."""
     from benchmarks.benchmark_storage import _should_record_event
 
@@ -183,7 +187,7 @@ def test_should_record_event_exclude_filter(monkeypatch):
     assert _should_record_event(config, {"plugin_id": "slow_plugin"}) is False
 
 
-def test_should_record_event_disabled(monkeypatch):
+def test_should_record_event_disabled(monkeypatch: pytest.MonkeyPatch) -> None:
     """Returns False when benchmarks disabled."""
     from benchmarks.benchmark_storage import _should_record_event
 
@@ -195,7 +199,9 @@ def test_should_record_event_disabled(monkeypatch):
 # --- save_refresh_event tests ---
 
 
-def test_save_refresh_event_creates_db(tmp_path, monkeypatch):
+def test_save_refresh_event_creates_db(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Database file is created on first write."""
     from benchmarks.benchmark_storage import save_refresh_event
 
@@ -222,7 +228,9 @@ def test_save_refresh_event_creates_db(tmp_path, monkeypatch):
     assert os.path.exists(db_path)
 
 
-def test_save_refresh_event_schema(tmp_path, monkeypatch):
+def test_save_refresh_event_schema(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Verify table structure is correct."""
     from benchmarks.benchmark_storage import save_refresh_event
 
@@ -258,7 +266,9 @@ def test_save_refresh_event_schema(tmp_path, monkeypatch):
     assert columns == expected_columns
 
 
-def test_save_refresh_event_data_integrity(tmp_path, monkeypatch):
+def test_save_refresh_event_data_integrity(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Round-trip data verification."""
     from benchmarks.benchmark_storage import save_refresh_event
 
@@ -310,7 +320,9 @@ def test_save_refresh_event_data_integrity(tmp_path, monkeypatch):
     assert row[13] == "test note"
 
 
-def test_save_refresh_event_uses_current_time_if_no_ts(tmp_path, monkeypatch):
+def test_save_refresh_event_uses_current_time_if_no_ts(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Uses current time when ts not provided."""
     from benchmarks.benchmark_storage import save_refresh_event
 
@@ -338,7 +350,7 @@ def test_save_refresh_event_uses_current_time_if_no_ts(tmp_path, monkeypatch):
 # --- save_stage_event tests ---
 
 
-def test_save_stage_event(tmp_path, monkeypatch):
+def test_save_stage_event(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Stage events are persisted correctly."""
     from benchmarks.benchmark_storage import save_stage_event
 
@@ -371,7 +383,9 @@ def test_save_stage_event(tmp_path, monkeypatch):
     assert '"key": "value"' in row[5]
 
 
-def test_save_stage_event_without_optional_fields(tmp_path, monkeypatch):
+def test_save_stage_event_without_optional_fields(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Stage events work without duration_ms and extra."""
     from benchmarks.benchmark_storage import save_stage_event
 
@@ -400,7 +414,7 @@ def test_save_stage_event_without_optional_fields(tmp_path, monkeypatch):
 # --- Exception handling tests ---
 
 
-def test_save_silently_fails_on_error(monkeypatch):
+def test_save_silently_fails_on_error(monkeypatch: pytest.MonkeyPatch) -> Any:
     """save_refresh_event swallows exceptions."""
     from benchmarks.benchmark_storage import save_refresh_event
 
@@ -409,7 +423,7 @@ def test_save_silently_fails_on_error(monkeypatch):
     class BadConfig:
         BASE_DIR = "/nonexistent"
 
-        def get_config(self, key, default=None):
+        def get_config(self, key: Any, default: Any = None) -> Any:
             if key == "enable_benchmarks":
                 return True
             if key == "benchmarks_db_path":
@@ -420,7 +434,9 @@ def test_save_silently_fails_on_error(monkeypatch):
     save_refresh_event(BadConfig(), {"refresh_id": "fail-test", "plugin_id": "test"})
 
 
-def test_save_stage_event_silently_fails_on_error(monkeypatch):
+def test_save_stage_event_silently_fails_on_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> Any:
     """save_stage_event swallows exceptions."""
     from benchmarks.benchmark_storage import save_stage_event
 
@@ -429,7 +445,7 @@ def test_save_stage_event_silently_fails_on_error(monkeypatch):
     class BadConfig:
         BASE_DIR = "/nonexistent"
 
-        def get_config(self, key, default=None):
+        def get_config(self, key: Any, default: Any = None) -> Any:
             if key == "enable_benchmarks":
                 return True
             if key == "benchmarks_db_path":
@@ -443,7 +459,7 @@ def test_save_stage_event_silently_fails_on_error(monkeypatch):
 # --- _validate_identifier tests ---
 
 
-def test_validate_identifier_accepts_valid_names():
+def test_validate_identifier_accepts_valid_names() -> None:
     """Valid SQL identifiers are returned unchanged."""
     from benchmarks.benchmark_storage import _validate_identifier
 
@@ -453,7 +469,7 @@ def test_validate_identifier_accepts_valid_names():
     assert _validate_identifier("CamelCase123", "col") == "CamelCase123"
 
 
-def test_validate_identifier_rejects_bad_input():
+def test_validate_identifier_rejects_bad_input() -> None:
     """Invalid SQL identifiers raise ValueError."""
     import pytest
 
@@ -476,7 +492,7 @@ def test_validate_identifier_rejects_bad_input():
 # --- _ensure_optional_columns tests ---
 
 
-def test_ensure_optional_columns_rejects_unknown_table(tmp_path):
+def test_ensure_optional_columns_rejects_unknown_table(tmp_path: Path) -> None:
     """_ensure_optional_columns raises ValueError for unknown table names."""
     import pytest
 
@@ -488,7 +504,7 @@ def test_ensure_optional_columns_rejects_unknown_table(tmp_path):
     conn.close()
 
 
-def test_ensure_optional_columns_adds_missing_columns(tmp_path):
+def test_ensure_optional_columns_adds_missing_columns(tmp_path: Path) -> None:
     """Adds columns that don't yet exist in the table."""
     from benchmarks.benchmark_storage import _ensure_optional_columns
 
@@ -507,7 +523,7 @@ def test_ensure_optional_columns_adds_missing_columns(tmp_path):
     assert "instance" in columns
 
 
-def test_ensure_optional_columns_skips_existing_columns(tmp_path):
+def test_ensure_optional_columns_skips_existing_columns(tmp_path: Path) -> None:
     """Does not fail when column already exists."""
     from benchmarks.benchmark_storage import _ensure_optional_columns
 
@@ -522,7 +538,7 @@ def test_ensure_optional_columns_skips_existing_columns(tmp_path):
     conn.close()
 
 
-def test_ensure_optional_columns_rejects_unexpected_column(tmp_path):
+def test_ensure_optional_columns_rejects_unexpected_column(tmp_path: Path) -> None:
     """Only known benchmark migration columns can be added."""
     import pytest
 

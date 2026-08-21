@@ -1,12 +1,20 @@
+from typing import Any
+
+import pytest
+from flask import Flask
+from flask.testing import FlaskClient
+
 # pyright: reportMissingImports=false
 from PIL import Image
 
 
-def test_update_now_happy_path(client, monkeypatch, flask_app):
+def test_update_now_happy_path(
+    client: FlaskClient, monkeypatch: pytest.MonkeyPatch, flask_app: Flask
+) -> Any:
     # Mock plugin image generation
     import plugins.ai_text.ai_text as ai_text_mod
 
-    def fake_generate_image(self, settings, device_config):
+    def fake_generate_image(self, settings: Any, device_config: Any) -> Any:
         return Image.new("RGB", device_config.get_resolution(), "white")
 
     monkeypatch.setattr(
@@ -16,7 +24,9 @@ def test_update_now_happy_path(client, monkeypatch, flask_app):
     # Mock display
     called = {"displayed": False}
 
-    def fake_display_image(image, image_settings=None, history_meta=None):
+    def fake_display_image(
+        image: Any, image_settings: Any = None, history_meta: Any = None
+    ) -> None:
         called["displayed"] = True
         called["history_meta"] = history_meta
 

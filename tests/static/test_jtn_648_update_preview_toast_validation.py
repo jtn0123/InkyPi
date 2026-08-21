@@ -17,14 +17,18 @@ The fix has two pieces:
    Save Settings / Add to Playlist.
 """
 
+from typing import Any
 
-def _get_plugin_page_js(client):
+from flask.testing import FlaskClient
+
+
+def _get_plugin_page_js(client: FlaskClient) -> Any:
     resp = client.get("/static/scripts/plugin_page.js")
     assert resp.status_code == 200
     return resp.get_data(as_text=True)
 
 
-def test_settings_form_has_novalidate(client):
+def test_settings_form_has_novalidate(client: FlaskClient) -> None:
     """The settings form must opt out of native HTML5 validation so no browser
     bubble can ever appear — all validation flows through the app-level
     helpers."""
@@ -46,7 +50,7 @@ def test_settings_form_has_novalidate(client):
     )
 
 
-def test_settings_form_has_novalidate_on_rss(client):
+def test_settings_form_has_novalidate_on_rss(client: FlaskClient) -> None:
     """Same guarantee on the RSS Feed plugin — this is the other plugin cited
     in the JTN-648 dogfood report."""
     resp = client.get("/plugin/rss")
@@ -63,7 +67,9 @@ def test_settings_form_has_novalidate_on_rss(client):
     )
 
 
-def test_plugin_page_submit_handler_uses_detailed_validator(client):
+def test_plugin_page_submit_handler_uses_detailed_validator(
+    client: FlaskClient,
+) -> None:
     """Pressing Enter inside the settings form implicitly submits it. The
     submit handler must route the validation through the labelled helpers and
     surface a response modal, not rely on the browser's native bubble."""
@@ -80,7 +86,9 @@ def test_plugin_page_submit_handler_uses_detailed_validator(client):
     assert "JTN-648" in js
 
 
-def test_plugin_page_update_preview_handler_still_uses_detailed_validator(client):
+def test_plugin_page_update_preview_handler_still_uses_detailed_validator(
+    client: FlaskClient,
+) -> None:
     """Regression guard for JTN-378: the click-driven Update Preview path must
     keep using the same helpers. This confirms JTN-648 did not regress the
     existing behaviour."""

@@ -13,7 +13,7 @@ from pathlib import Path
 JS_PATH = Path("src/static/scripts/settings/shared.js")
 
 
-def test_copy_text_uses_clipboard_when_secure_context():
+def test_copy_text_uses_clipboard_when_secure_context() -> None:
     js = JS_PATH.read_text()
     assert "navigator.clipboard && globalThis.isSecureContext" in js, (
         "copyText should still prefer the async Clipboard API when the page "
@@ -21,7 +21,7 @@ def test_copy_text_uses_clipboard_when_secure_context():
     )
 
 
-def test_copy_text_falls_back_to_exec_command_for_http_lan():
+def test_copy_text_falls_back_to_exec_command_for_http_lan() -> None:
     js = JS_PATH.read_text()
     assert "copyTextViaExecCommand" in js, (
         "copyText must fall back to a legacy execCommand path so HTTP-on-LAN "
@@ -32,7 +32,7 @@ def test_copy_text_falls_back_to_exec_command_for_http_lan():
     ), "Fallback path should call document.execCommand('copy')."
 
 
-def test_copy_text_does_not_short_circuit_on_insecure_context():
+def test_copy_text_does_not_short_circuit_on_insecure_context() -> None:
     js = JS_PATH.read_text()
     # The pre-fix code unconditionally returned false when the context was
     # insecure. Make sure that early return is gone.

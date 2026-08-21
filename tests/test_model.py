@@ -1,3 +1,5 @@
+from typing import Any
+
 import pytest
 
 from src.model import Playlist
@@ -41,7 +43,9 @@ class TestPlaylist:
             ("00:00", "24:00", "24:00", False, 1440),  # exactly at end
         ],
     )
-    def test_is_active_and_priority(self, start, end, current, expected, priority):
+    def test_is_active_and_priority(
+        self, start: Any, end: Any, current: Any, expected: Any, priority: Any
+    ) -> None:
         playlist = Playlist("Test Playlist", start, end)
         assert playlist.is_active(current) == expected
         assert playlist.get_priority() == priority

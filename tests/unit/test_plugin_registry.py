@@ -6,6 +6,9 @@ import shlex
 import subprocess
 import sys
 from pathlib import Path
+from typing import Any
+
+import pytest
 
 from plugins.plugin_registry import (
     _PLUGIN_CONFIGS,
@@ -20,7 +23,7 @@ from plugins.plugin_registry import (
 # ---------------------------------------------------------------------------
 
 
-def test_load_and_get_plugin_instance():
+def test_load_and_get_plugin_instance() -> None:
     PLUGIN_CLASSES.clear()
     _PLUGIN_CONFIGS.clear()
     plugins = [
@@ -78,7 +81,7 @@ def _read_pythonpath_from_shell(
     )
 
 
-def test_venv_shell_sets_pythonpath():
+def test_venv_shell_sets_pythonpath() -> None:
     """Ensure scripts/venv.sh can be sourced to set PYTHONPATH without side effects."""
 
     env = _base_env()
@@ -98,7 +101,7 @@ def test_venv_shell_sets_pythonpath():
     assert actual_entries == expected_entries
 
 
-def test_plugin_import_with_pythonpath():
+def test_plugin_import_with_pythonpath() -> None:
     """Simulate a fresh process using scripts/venv.sh output and ensure ai_image imports."""
 
     env = _base_env()
@@ -125,7 +128,9 @@ def test_plugin_import_with_pythonpath():
 # ---------------------------------------------------------------------------
 
 
-def test_load_plugins_skips_disabled_and_missing_paths(monkeypatch, tmp_path):
+def test_load_plugins_skips_disabled_and_missing_paths(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     # Force resolve_path to use tmp dir with no plugin subdirs
     monkeypatch.setenv("SRC_DIR", str(tmp_path))
     (tmp_path / "plugins").mkdir(parents=True, exist_ok=True)
@@ -143,7 +148,9 @@ def test_load_plugins_skips_disabled_and_missing_paths(monkeypatch, tmp_path):
     assert "skipme" not in registered
 
 
-def test_load_plugins_logs_error_for_missing_module_file(monkeypatch, tmp_path, caplog):
+def test_load_plugins_logs_error_for_missing_module_file(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
     """Plugin directory exists but module .py file is missing."""
     monkeypatch.setenv("SRC_DIR", str(tmp_path))
     plugins_dir = tmp_path / "plugins" / "myplugin"
@@ -162,7 +169,9 @@ def test_load_plugins_logs_error_for_missing_module_file(monkeypatch, tmp_path, 
     )
 
 
-def test_load_plugins_logs_error_for_missing_dir(monkeypatch, tmp_path, caplog):
+def test_load_plugins_logs_error_for_missing_dir(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
     monkeypatch.setenv("SRC_DIR", str(tmp_path))
     (tmp_path / "plugins").mkdir(parents=True, exist_ok=True)
 
@@ -179,7 +188,9 @@ def test_load_plugins_logs_error_for_missing_dir(monkeypatch, tmp_path, caplog):
     )
 
 
-def test_load_plugins_rejects_unsafe_plugin_id(monkeypatch, tmp_path, caplog):
+def test_load_plugins_rejects_unsafe_plugin_id(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
     monkeypatch.setenv("SRC_DIR", str(tmp_path))
     (tmp_path / "plugins").mkdir(parents=True, exist_ok=True)
 
@@ -194,7 +205,7 @@ def test_load_plugins_rejects_unsafe_plugin_id(monkeypatch, tmp_path, caplog):
     )
 
 
-def test_get_plugin_instance_returns_cached_instance():
+def test_get_plugin_instance_returns_cached_instance() -> None:
     """Second call should return the same cached instance."""
     PLUGIN_CLASSES.clear()
     _PLUGIN_CONFIGS.clear()
@@ -206,7 +217,7 @@ def test_get_plugin_instance_returns_cached_instance():
     assert inst1 is inst2
 
 
-def test_get_plugin_instance_raises_for_unregistered():
+def test_get_plugin_instance_raises_for_unregistered() -> None:
     PLUGIN_CLASSES.clear()
     _PLUGIN_CONFIGS.clear()
     try:
@@ -221,7 +232,9 @@ def test_get_plugin_instance_raises_for_unregistered():
 # ---------------------------------------------------------------------------
 
 
-def test_plugin_registry_reports_missing_dir_and_module(monkeypatch, tmp_path):
+def test_plugin_registry_reports_missing_dir_and_module(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     # Point PLUGINS_DIR to temp to force missing dirs
     import src.plugins.plugin_registry as pr
 
@@ -246,7 +259,9 @@ def test_plugin_registry_reports_missing_dir_and_module(monkeypatch, tmp_path):
     assert not pr.get_registered_plugin_ids()
 
 
-def test_plugin_registry_hot_reload_flag(monkeypatch, tmp_path):
+def test_plugin_registry_hot_reload_flag(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> Any:
     import src.plugins.plugin_registry as pr
 
     # Simulate dev mode for hot reload path
@@ -257,10 +272,10 @@ def test_plugin_registry_hot_reload_flag(monkeypatch, tmp_path):
 
     # Create a dummy module with a plugin class
     class DummyPlugin:
-        def __init__(self, cfg):
+        def __init__(self, cfg: Any) -> None:
             self.cfg = cfg
 
-        def get_plugin_id(self):
+        def get_plugin_id(self) -> Any:
             return plugin_id
 
     # Create a minimal module-like object
@@ -281,7 +296,7 @@ def test_plugin_registry_hot_reload_flag(monkeypatch, tmp_path):
     # Also, make sure _is_dev_mode() returns True by clearing PYTEST_CURRENT_TEST guard
     monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
 
-    def fake_reload(m):
+    def fake_reload(m: Any) -> Any:
         # Return the same module instance; mark that reload occurred by toggling attr
         m._reloaded = True
         return m

@@ -65,7 +65,7 @@ class FakeDevice:
                     self.send_response(404)
                     self.end_headers()
 
-            def log_message(self, *_args) -> None:
+            def log_message(self, *_args: Any) -> None:
                 return
 
         self._server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
@@ -264,7 +264,7 @@ class TestScriptsAgreeOnState:
     """The scripts share files by path; a rename in one breaks the chain."""
 
     def test_confirmed_version_written_by_update_is_read_by_boot_health(
-        self, rehearsal
+        self, rehearsal: Any
     ) -> None:
         rehearsal["device"].version = "2.0.0"
         _verify(rehearsal)
@@ -296,7 +296,7 @@ class TestScriptsAgreeOnState:
 
 class TestVerifyIsResilient:
     def test_missing_curl_skips_rather_than_failing_the_update(
-        self, rehearsal, tmp_path
+        self, rehearsal: Any, tmp_path: Path
     ) -> None:
         """A stripped image without curl must not fail an otherwise-good update."""
         minimal_bin = tmp_path / "nocurl"

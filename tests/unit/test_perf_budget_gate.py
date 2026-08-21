@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import json
 import subprocess
+from pathlib import Path
 
 import pytest
 from scripts import perf_budget_gate as gate
 
 
-def test_plugin_render_budget_passes_under_threshold():
+def test_plugin_render_budget_passes_under_threshold() -> None:
     benches = [
         {
             "name": "test_bench_clock_render",
@@ -19,7 +20,7 @@ def test_plugin_render_budget_passes_under_threshold():
     assert failures == []
 
 
-def test_plugin_render_budget_fails_over_threshold():
+def test_plugin_render_budget_fails_over_threshold() -> None:
     benches = [
         {
             "name": "test_bench_clock_render",
@@ -32,7 +33,7 @@ def test_plugin_render_budget_fails_over_threshold():
     assert "exceeds plugin-render budget" in failures[0]
 
 
-def test_plugin_render_budget_ignores_non_plugin_render_group():
+def test_plugin_render_budget_ignores_non_plugin_render_group() -> None:
     benches = [
         {
             "name": "test_bench_non_plugin_row",
@@ -49,18 +50,18 @@ def test_plugin_render_budget_ignores_non_plugin_render_group():
     assert failures == []
 
 
-def test_load_benchmarks_returns_empty_for_missing_file(tmp_path):
+def test_load_benchmarks_returns_empty_for_missing_file(tmp_path: Path) -> None:
     missing = tmp_path / "missing-benchmarks.json"
     assert gate._load_benchmarks(str(missing)) == []
 
 
-def test_load_benchmarks_returns_empty_for_invalid_json(tmp_path):
+def test_load_benchmarks_returns_empty_for_invalid_json(tmp_path: Path) -> None:
     invalid = tmp_path / "invalid-benchmarks.json"
     invalid.write_text("{not-json", encoding="utf-8")
     assert gate._load_benchmarks(str(invalid)) == []
 
 
-def test_load_benchmarks_filters_non_mapping_rows(tmp_path):
+def test_load_benchmarks_filters_non_mapping_rows(tmp_path: Path) -> None:
     bench_file = tmp_path / "benchmarks.json"
     bench_file.write_text(
         json.dumps({"benchmarks": [{"name": "ok"}, "bad-row", 123]}),
@@ -69,26 +70,28 @@ def test_load_benchmarks_filters_non_mapping_rows(tmp_path):
     assert gate._load_benchmarks(str(bench_file)) == [{"name": "ok"}]
 
 
-def test_cold_start_budget_uses_median():
+def test_cold_start_budget_uses_median() -> None:
     failures = gate.evaluate_cold_start_budget([2.9, 3.1, 2.8], max_median_s=3.0)
     assert failures == []
 
 
-def test_cold_start_budget_fails_when_median_exceeds():
+def test_cold_start_budget_fails_when_median_exceeds() -> None:
     failures = gate.evaluate_cold_start_budget([3.1, 3.2, 3.0], max_median_s=3.0)
     assert failures
     assert "exceeds budget" in failures[0]
 
 
-def test_parse_env_float_falls_back_for_invalid_value(monkeypatch, capsys):
+def test_parse_env_float_falls_back_for_invalid_value(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
     monkeypatch.setenv("PERF_COLD_START_BUDGET_S", "3s")
     assert gate._parse_env_float("PERF_COLD_START_BUDGET_S", 3.0) == 3.0
     assert "ignoring malformed PERF_COLD_START_BUDGET_S" in capsys.readouterr().err
 
 
 def test_run_cold_start_samples_keeps_successful_runs_after_failures(
-    monkeypatch, capsys
-):
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
     results = iter(
         [
             subprocess.CompletedProcess(
@@ -113,7 +116,9 @@ def test_run_cold_start_samples_keeps_successful_runs_after_failures(
     assert "cold-start warning:" in capsys.readouterr().err
 
 
-def test_run_cold_start_samples_raises_when_all_samples_fail(monkeypatch):
+def test_run_cold_start_samples_raises_when_all_samples_fail(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     results = iter(
         [
             subprocess.CompletedProcess(

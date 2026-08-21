@@ -9,7 +9,10 @@ the response must be ``application/json``.
 
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
+from flask.testing import FlaskClient
 
 # Payloads that would execute if reflected un-escaped into an HTML context.
 _XSS_PAYLOADS = [
@@ -22,7 +25,9 @@ _XSS_PAYLOADS = [
 
 
 @pytest.mark.parametrize("payload", _XSS_PAYLOADS)
-def test_history_redisplay_rejects_xss_filename(client, payload):
+def test_history_redisplay_rejects_xss_filename(
+    client: FlaskClient, payload: Any
+) -> None:
     resp = client.post("/history/redisplay", json={"filename": payload})
     assert resp.status_code in (400, 404)
     assert resp.mimetype == "application/json"
@@ -36,7 +41,7 @@ def test_history_redisplay_rejects_xss_filename(client, payload):
 
 
 @pytest.mark.parametrize("payload", _XSS_PAYLOADS)
-def test_history_delete_rejects_xss_filename(client, payload):
+def test_history_delete_rejects_xss_filename(client: FlaskClient, payload: Any) -> None:
     resp = client.post("/history/delete", json={"filename": payload})
     assert resp.status_code in (400, 404)
     assert resp.mimetype == "application/json"
@@ -48,7 +53,7 @@ def test_history_delete_rejects_xss_filename(client, payload):
     assert "<iframe" not in body.lower()
 
 
-def test_history_redisplay_rejects_non_json_body(client):
+def test_history_redisplay_rejects_non_json_body(client: FlaskClient) -> None:
     # Non-JSON body exercises the ``BadRequest`` branch that used to build
     # an error response inside the helper. Result must still be generic.
     resp = client.post(
@@ -62,7 +67,7 @@ def test_history_redisplay_rejects_non_json_body(client):
     assert "<script" not in body.lower()
 
 
-def test_history_delete_rejects_non_object_body(client):
+def test_history_delete_rejects_non_object_body(client: FlaskClient) -> None:
     resp = client.post("/history/delete", json=["<script>alert(1)</script>"])
     assert resp.status_code == 400
     assert resp.mimetype == "application/json"
@@ -71,7 +76,7 @@ def test_history_delete_rejects_non_object_body(client):
     assert "Request body must be a JSON object" in body
 
 
-def test_history_redisplay_missing_filename(client):
+def test_history_redisplay_missing_filename(client: FlaskClient) -> None:
     resp = client.post("/history/redisplay", json={})
     assert resp.status_code == 400
     assert resp.mimetype == "application/json"
@@ -79,7 +84,7 @@ def test_history_redisplay_missing_filename(client):
     assert "filename is required" in body
 
 
-def test_history_delete_empty_filename(client):
+def test_history_delete_empty_filename(client: FlaskClient) -> None:
     resp = client.post("/history/delete", json={"filename": "   "})
     assert resp.status_code == 400
     assert resp.mimetype == "application/json"
@@ -87,7 +92,7 @@ def test_history_delete_empty_filename(client):
     assert "filename is required" in body
 
 
-def test_history_image_invalid_filename_not_reflected(client):
+def test_history_image_invalid_filename_not_reflected(client: FlaskClient) -> None:
     # ``history_image`` uses ``_resolve_history_path`` directly and returns
     # ``_ERR_INVALID_FILENAME``; confirm traversal attempts don't reflect.
     resp = client.get("/history/image/%3Cscript%3Ealert(1)%3C%2Fscript%3E")

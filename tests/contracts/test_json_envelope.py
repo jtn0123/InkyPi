@@ -32,6 +32,9 @@ from __future__ import annotations
 
 import json
 
+from flask import Flask
+from flask.testing import FlaskClient
+
 
 def _assert_success_envelope(payload: dict) -> None:
     assert isinstance(payload, dict), f"response not a dict: {payload!r}"
@@ -58,7 +61,7 @@ def _assert_error_envelope(payload: dict) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_plugin_order_success_envelope(client, flask_app):
+def test_plugin_order_success_envelope(client: FlaskClient, flask_app: Flask) -> None:
     """POST /api/plugin_order returns the canonical success envelope."""
     device_config = flask_app.config["DEVICE_CONFIG"]
     plugin_ids = sorted({p["id"] for p in device_config.get_plugins()})
@@ -71,7 +74,7 @@ def test_plugin_order_success_envelope(client, flask_app):
     _assert_success_envelope(resp.get_json())
 
 
-def test_health_plugins_success_envelope(client):
+def test_health_plugins_success_envelope(client: FlaskClient) -> None:
     """GET /api/health/plugins returns the canonical success envelope."""
     resp = client.get("/api/health/plugins")
     assert resp.status_code == 200
@@ -80,14 +83,14 @@ def test_health_plugins_success_envelope(client):
     assert "items" in body
 
 
-def test_health_system_success_envelope(client):
+def test_health_system_success_envelope(client: FlaskClient) -> None:
     """GET /api/health/system returns the canonical success envelope."""
     resp = client.get("/api/health/system")
     assert resp.status_code == 200
     _assert_success_envelope(resp.get_json())
 
 
-def test_isolation_get_success_envelope(client):
+def test_isolation_get_success_envelope(client: FlaskClient) -> None:
     """GET /settings/isolation returns the canonical success envelope."""
     resp = client.get("/settings/isolation")
     assert resp.status_code == 200
@@ -96,7 +99,7 @@ def test_isolation_get_success_envelope(client):
     assert "isolated_plugins" in body
 
 
-def test_safe_reset_success_envelope(client):
+def test_safe_reset_success_envelope(client: FlaskClient) -> None:
     """POST /settings/safe_reset returns the canonical success envelope."""
     resp = client.post("/settings/safe_reset")
     assert resp.status_code == 200
@@ -108,7 +111,7 @@ def test_safe_reset_success_envelope(client):
 # ---------------------------------------------------------------------------
 
 
-def test_plugin_order_validation_error_envelope(client):
+def test_plugin_order_validation_error_envelope(client: FlaskClient) -> None:
     """POST /api/plugin_order with a bad body returns the error envelope."""
     resp = client.post(
         "/api/plugin_order",
@@ -119,7 +122,7 @@ def test_plugin_order_validation_error_envelope(client):
     _assert_error_envelope(resp.get_json())
 
 
-def test_isolation_bad_json_error_envelope(client):
+def test_isolation_bad_json_error_envelope(client: FlaskClient) -> None:
     """POST /settings/isolation with a non-object body returns the error envelope."""
     resp = client.post(
         "/settings/isolation",
@@ -130,14 +133,14 @@ def test_isolation_bad_json_error_envelope(client):
     _assert_error_envelope(resp.get_json())
 
 
-def test_delete_api_key_invalid_error_envelope(client):
+def test_delete_api_key_invalid_error_envelope(client: FlaskClient) -> None:
     """POST /settings/delete_api_key with an unknown key returns the error envelope."""
     resp = client.post("/settings/delete_api_key", data={"key": "NOT_A_REAL_KEY"})
     assert resp.status_code == 400
     _assert_error_envelope(resp.get_json())
 
 
-def test_plugin_history_invalid_name_error_envelope(client):
+def test_plugin_history_invalid_name_error_envelope(client: FlaskClient) -> None:
     """GET /api/plugins/instance/<bad>/history returns the error envelope."""
     # '/' is not in the allowed name charset; flask routing will 404 before
     # the handler runs, so pick something that passes the path but fails the
@@ -152,7 +155,7 @@ def test_plugin_history_invalid_name_error_envelope(client):
 # ---------------------------------------------------------------------------
 
 
-def test_request_id_header_round_trip(client):
+def test_request_id_header_round_trip(client: FlaskClient) -> None:
     """If the client supplies X-Request-Id, the envelope echoes it."""
     rid = "test-req-id-12345"
     resp = client.get("/api/health/system", headers={"X-Request-Id": rid})

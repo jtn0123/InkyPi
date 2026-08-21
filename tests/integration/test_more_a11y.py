@@ -47,13 +47,14 @@ import os
 from pathlib import Path
 
 import pytest
+from flask.testing import FlaskClient
 
 
 @pytest.mark.skipif(
     os.getenv("SKIP_A11Y", "").lower() in ("1", "true"),
     reason="A11y checks skipped by env",
 )
-def test_plugin_settings_accessibility(client):
+def test_plugin_settings_accessibility(client: FlaskClient) -> None:
     pytest.importorskip("playwright.sync_api", reason="playwright not available")
     resp = client.get("/plugin/clock")
     assert resp.status_code == 200
@@ -89,7 +90,7 @@ def test_plugin_settings_accessibility(client):
     os.getenv("SKIP_A11Y", "").lower() in ("1", "true"),
     reason="A11y checks skipped by env",
 )
-def test_settings_page_accessibility(client):
+def test_settings_page_accessibility(client: FlaskClient) -> None:
     pytest.importorskip("playwright.sync_api", reason="playwright not available")
     resp = client.get("/settings")
     assert resp.status_code == 200
@@ -131,7 +132,7 @@ def test_settings_page_accessibility(client):
     os.getenv("SKIP_A11Y", "").lower() in ("1", "true"),
     reason="A11y checks skipped by env",
 )
-def test_history_page_accessibility(client):
+def test_history_page_accessibility(client: FlaskClient) -> None:
     pytest.importorskip("playwright.sync_api", reason="playwright not available")
     resp = client.get("/history")
     assert resp.status_code == 200

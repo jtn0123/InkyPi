@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import os
 from io import BytesIO
+from pathlib import Path
 
 import pytest
 from PIL import Image
@@ -87,7 +88,7 @@ def _make_valid_webp() -> bytes:
 # ---------------------------------------------------------------------------
 
 
-def test_valid_png_passes():
+def test_valid_png_passes() -> None:
     """A genuine PNG is accepted and content is returned."""
     content = _make_valid_png()
     f = _FakeFile("photo.png", content)
@@ -96,7 +97,7 @@ def test_valid_png_passes():
     assert result_content == content
 
 
-def test_valid_jpeg_passes():
+def test_valid_jpeg_passes() -> None:
     """A genuine JPEG is accepted."""
     content = _make_valid_jpeg()
     f = _FakeFile("photo.jpg", content)
@@ -105,7 +106,7 @@ def test_valid_jpeg_passes():
     assert result_content == content
 
 
-def test_valid_gif_passes():
+def test_valid_gif_passes() -> None:
     """A genuine GIF is accepted."""
     content = _make_valid_gif()
     f = _FakeFile("anim.gif", content)
@@ -114,7 +115,7 @@ def test_valid_gif_passes():
     assert result_content == content
 
 
-def test_valid_webp_passes():
+def test_valid_webp_passes() -> None:
     """A genuine WebP is accepted."""
     content = _make_valid_webp()
     f = _FakeFile("img.webp", content)
@@ -123,7 +124,7 @@ def test_valid_webp_passes():
     assert result_content == content
 
 
-def test_text_file_renamed_to_png_rejected():
+def test_text_file_renamed_to_png_rejected() -> None:
     """A plain-text file renamed to .png is rejected with RuntimeError."""
     content = b"Hello, world! This is definitely not an image."
     f = _FakeFile("evil.png", content)
@@ -131,7 +132,7 @@ def test_text_file_renamed_to_png_rejected():
         app_utils._validate_and_read_file(f, "evil.png")
 
 
-def test_random_binary_renamed_to_png_rejected():
+def test_random_binary_renamed_to_png_rejected() -> None:
     """Random bytes with a .png extension are rejected."""
     content = os.urandom(512)
     f = _FakeFile("evil.png", content)
@@ -139,14 +140,14 @@ def test_random_binary_renamed_to_png_rejected():
         app_utils._validate_and_read_file(f, "evil.png")
 
 
-def test_empty_file_rejected():
+def test_empty_file_rejected() -> None:
     """An empty file is rejected regardless of extension."""
     f = _FakeFile("empty.png", b"")
     with pytest.raises(RuntimeError, match="not a valid image"):
         app_utils._validate_and_read_file(f, "empty.png")
 
 
-def test_truncated_png_header_rejected():
+def test_truncated_png_header_rejected() -> None:
     """Bytes that start with PNG magic but are not a valid PNG are rejected."""
     content = b"\x89PNG\r\n\x1a\n" + b"\x00" * 20  # valid magic, corrupt body
     f = _FakeFile("truncated.png", content)
@@ -154,7 +155,7 @@ def test_truncated_png_header_rejected():
         app_utils._validate_and_read_file(f, "truncated.png")
 
 
-def test_jpeg_bytes_with_png_extension_rejected():
+def test_jpeg_bytes_with_png_extension_rejected() -> None:
     """JPEG content uploaded as .png must be rejected (magic mismatch)."""
     content = _make_valid_jpeg()
     f = _FakeFile("photo.png", content)
@@ -162,7 +163,7 @@ def test_jpeg_bytes_with_png_extension_rejected():
         app_utils._validate_and_read_file(f, "photo.png")
 
 
-def test_png_bytes_with_jpeg_extension_rejected():
+def test_png_bytes_with_jpeg_extension_rejected() -> None:
     """PNG content uploaded as .jpg must be rejected (magic mismatch)."""
     content = _make_valid_png()
     f = _FakeFile("photo.jpg", content)
@@ -170,7 +171,7 @@ def test_png_bytes_with_jpeg_extension_rejected():
         app_utils._validate_and_read_file(f, "photo.jpg")
 
 
-def test_exe_renamed_to_png_rejected():
+def test_exe_renamed_to_png_rejected() -> None:
     """A Windows PE executable renamed to .png is rejected."""
     # MZ header — the DOS stub of PE executables
     content = b"MZ" + b"\x90" * 510
@@ -184,7 +185,9 @@ def test_exe_renamed_to_png_rejected():
 # ---------------------------------------------------------------------------
 
 
-def test_handle_request_files_accepts_valid_png(monkeypatch, tmp_path):
+def test_handle_request_files_accepts_valid_png(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     """handle_request_files saves valid images and returns the file path."""
     monkeypatch.setattr(
         app_utils,
@@ -202,7 +205,9 @@ def test_handle_request_files_accepts_valid_png(monkeypatch, tmp_path):
     assert len(paths) == 1
 
 
-def test_handle_request_files_rejects_bad_magic(monkeypatch, tmp_path):
+def test_handle_request_files_rejects_bad_magic(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     """handle_request_files propagates RuntimeError for files with bad magic."""
     monkeypatch.setattr(
         app_utils,
@@ -221,37 +226,37 @@ def test_handle_request_files_rejects_bad_magic(monkeypatch, tmp_path):
 # ---------------------------------------------------------------------------
 
 
-def test_check_magic_bytes_png_valid():
+def test_check_magic_bytes_png_valid() -> None:
     assert app_utils._check_magic_bytes(b"\x89PNG\r\n\x1a\n" + b"\x00" * 20, "png")
 
 
-def test_check_magic_bytes_png_invalid():
+def test_check_magic_bytes_png_invalid() -> None:
     assert not app_utils._check_magic_bytes(b"NOTPNG", "png")
 
 
-def test_check_magic_bytes_jpeg_valid():
+def test_check_magic_bytes_jpeg_valid() -> None:
     assert app_utils._check_magic_bytes(b"\xff\xd8\xff" + b"\x00" * 20, "jpg")
 
 
-def test_check_magic_bytes_gif87a_valid():
+def test_check_magic_bytes_gif87a_valid() -> None:
     assert app_utils._check_magic_bytes(b"GIF87a" + b"\x00" * 20, "gif")
 
 
-def test_check_magic_bytes_gif89a_valid():
+def test_check_magic_bytes_gif89a_valid() -> None:
     assert app_utils._check_magic_bytes(b"GIF89a" + b"\x00" * 20, "gif")
 
 
-def test_check_magic_bytes_webp_valid():
+def test_check_magic_bytes_webp_valid() -> None:
     content = b"RIFF" + b"\x00\x00\x00\x00" + b"WEBP" + b"\x00" * 20
     assert app_utils._check_magic_bytes(content, "webp")
 
 
-def test_check_magic_bytes_webp_invalid_brand():
+def test_check_magic_bytes_webp_invalid_brand() -> None:
     content = b"RIFF" + b"\x00\x00\x00\x00" + b"AVI " + b"\x00" * 20
     assert not app_utils._check_magic_bytes(content, "webp")
 
 
-def test_check_magic_bytes_heic_defers_to_pil():
+def test_check_magic_bytes_heic_defers_to_pil() -> None:
     """HEIF/HEIC/AVIF have no simple prefix — magic check always returns True."""
     assert app_utils._check_magic_bytes(b"\x00" * 32, "heic")
     assert app_utils._check_magic_bytes(b"\x00" * 32, "heif")

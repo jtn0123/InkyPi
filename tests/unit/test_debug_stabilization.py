@@ -2,6 +2,7 @@ import json
 import threading
 import time
 from pathlib import Path
+from typing import Any
 
 import pytest
 from PIL import Image
@@ -13,10 +14,10 @@ from refresh_task import ManualRefresh, RefreshTask
 class FileLoggingPlugin:
     config = {"image_settings": []}
 
-    def __init__(self, cfg):
+    def __init__(self, cfg: Any) -> None:
         self.cfg = cfg
 
-    def generate_image(self, settings, device_config):
+    def generate_image(self, settings: Any, device_config: Any) -> Any:
         log_path = Path(self.cfg["log_path"])
         with log_path.open("a", encoding="utf-8") as fh:
             fh.write(f"{self.cfg['id']}\n")
@@ -27,10 +28,10 @@ class FileLoggingPlugin:
 class TimeoutMarkerPlugin:
     config = {"image_settings": []}
 
-    def __init__(self, cfg):
+    def __init__(self, cfg: Any) -> None:
         self.cfg = cfg
 
-    def generate_image(self, settings, device_config):
+    def generate_image(self, settings: Any, device_config: Any) -> Any:
         Path(self.cfg["started_path"]).write_text("started", encoding="utf-8")
         time.sleep(float(self.cfg.get("sleep_s", 0.4)))
         Path(self.cfg["completed_path"]).write_text("completed", encoding="utf-8")
@@ -40,10 +41,10 @@ class TimeoutMarkerPlugin:
 class RetryFilePlugin:
     config = {"image_settings": []}
 
-    def __init__(self, cfg):
+    def __init__(self, cfg: Any) -> None:
         self.cfg = cfg
 
-    def generate_image(self, settings, device_config):
+    def generate_image(self, settings: Any, device_config: Any) -> Any:
         counter_path = Path(self.cfg["counter_path"])
         count = 0
         if counter_path.exists():
@@ -55,7 +56,7 @@ class RetryFilePlugin:
         return Image.new("RGB", device_config.get_resolution(), "white")
 
 
-def _plugin_factory(cfg):
+def _plugin_factory(cfg: Any) -> Any:
     plugin_type = cfg.get("plugin_type")
     if plugin_type == "timeout":
         return TimeoutMarkerPlugin(cfg)
@@ -65,8 +66,8 @@ def _plugin_factory(cfg):
 
 
 def test_manual_updates_are_queued_without_drops(
-    device_config_dev, monkeypatch, tmp_path
-):
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     log_path = tmp_path / "manual-order.log"
     configs = {
         "one": {"id": "one", "class": "Test", "log_path": str(log_path)},
@@ -81,7 +82,7 @@ def test_manual_updates_are_queued_without_drops(
     task = RefreshTask(device_config_dev, DisplayManager(device_config_dev))
     results = []
 
-    def _run_refresh(plugin_id, sleep_s):
+    def _run_refresh(plugin_id: Any, sleep_s: Any) -> None:
         metrics = task.manual_update(ManualRefresh(plugin_id, {"sleep_s": sleep_s}))
         results.append((plugin_id, metrics))
 
@@ -110,8 +111,8 @@ def test_manual_updates_are_queued_without_drops(
 
 
 def test_plugin_timeout_terminates_child_before_retry_continues(
-    device_config_dev, monkeypatch, tmp_path
-):
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     started_path = tmp_path / "started.txt"
     completed_path = tmp_path / "completed.txt"
     config = {
@@ -143,8 +144,8 @@ def test_plugin_timeout_terminates_child_before_retry_continues(
 
 
 def test_plugin_retry_succeeds_with_process_isolation(
-    device_config_dev, monkeypatch, tmp_path
-):
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     counter_path = tmp_path / "retry-count.txt"
     config = {
         "id": "retrying",
@@ -170,11 +171,13 @@ def test_plugin_retry_succeeds_with_process_isolation(
         task.stop()
 
 
-def test_config_write_is_atomic_under_concurrent_writers(device_config_dev):
+def test_config_write_is_atomic_under_concurrent_writers(
+    device_config_dev: Any,
+) -> None:
     errors = []
     barrier = threading.Barrier(2)
 
-    def _writer(key, value):
+    def _writer(key: Any, value: Any) -> None:
         try:
             barrier.wait(timeout=2)
             for _ in range(10):
@@ -197,11 +200,13 @@ def test_config_write_is_atomic_under_concurrent_writers(device_config_dev):
     assert saved["beta"] == 2
 
 
-def test_display_manager_raises_clear_error_when_inky_driver_missing(monkeypatch):
+def test_display_manager_raises_clear_error_when_inky_driver_missing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> Any:
     import display.display_manager as display_manager_mod
 
     class DummyConfig:
-        def get_config(self, key, default=None):
+        def get_config(self, key: Any, default: Any = None) -> Any:
             if key == "display_type":
                 return "inky"
             return default
@@ -212,11 +217,13 @@ def test_display_manager_raises_clear_error_when_inky_driver_missing(monkeypatch
         display_manager_mod.DisplayManager(DummyConfig())
 
 
-def test_display_manager_raises_clear_error_when_waveshare_driver_missing(monkeypatch):
+def test_display_manager_raises_clear_error_when_waveshare_driver_missing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> Any:
     import display.display_manager as display_manager_mod
 
     class DummyConfig:
-        def get_config(self, key, default=None):
+        def get_config(self, key: Any, default: Any = None) -> Any:
             if key == "display_type":
                 return "epd7in3f"
             return default

@@ -2,7 +2,7 @@ import re
 from pathlib import Path
 
 
-def test_duplicate_preset_focuses_value_input_first():
+def test_duplicate_preset_focuses_value_input_first() -> None:
     js = (
         Path(__file__).resolve().parents[2]
         / "src"

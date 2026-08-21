@@ -8,8 +8,10 @@ back-ends that don't emit the legacy ``field_errors`` map.
 
 from __future__ import annotations
 
+from flask.testing import FlaskClient
 
-def test_playlist_script_exposes_field_error_helper(client):
+
+def test_playlist_script_exposes_field_error_helper(client: FlaskClient) -> None:
     resp = client.get("/static/scripts/playlist/form.js")
     assert resp.status_code == 200
     js = resp.get_data(as_text=True)
@@ -25,7 +27,7 @@ def test_playlist_script_exposes_field_error_helper(client):
     assert "setFieldError" in js
 
 
-def test_playlist_template_exposes_inline_time_errors(client):
+def test_playlist_template_exposes_inline_time_errors(client: FlaskClient) -> None:
     """Start/end-time inputs must advertise an inline error region so
     FormState.setFieldError can render the message inline rather than via a
     toast the user can dismiss in under a second."""

@@ -4,6 +4,7 @@ import os
 import threading
 import time
 from datetime import UTC, datetime
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -16,24 +17,26 @@ from refresh_task import RefreshTask
 # ---------------------------------------------------------------------------
 
 
-def _make_task(device_config_dev):
+def _make_task(device_config_dev: Any) -> Any:
     dm = MagicMock()
     return RefreshTask(device_config_dev, dm)
 
 
-def _fake_action(plugin_id="test_plugin"):
+def _fake_action(plugin_id: Any = "test_plugin") -> Any:
     action = MagicMock()
     action.get_plugin_id.return_value = plugin_id
     return action
 
 
-def _make_fake_plugin(image=None, sleep_s=0.0, cancel_aware=False):
+def _make_fake_plugin(
+    image: Any = None, sleep_s: Any = 0.0, cancel_aware: Any = False
+) -> Any:
     """Return a fake plugin whose generate_image optionally blocks."""
 
     class FakePlugin:
         config = {"image_settings": []}
 
-        def generate_image(self, settings, cfg):
+        def generate_image(self, settings: Any, cfg: Any) -> Any:
             if sleep_s > 0:
                 time.sleep(sleep_s)
             return image or Image.new("RGB", (10, 10), "blue")
@@ -47,7 +50,9 @@ def _make_fake_plugin(image=None, sleep_s=0.0, cancel_aware=False):
 
 
 class TestExecuteInprocessSuccess:
-    def test_returns_image_and_meta(self, device_config_dev, monkeypatch):
+    def test_returns_image_and_meta(
+        self, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> Any:
         task = _make_task(device_config_dev)
         action = _fake_action()
         expected_img = Image.new("RGB", (10, 10), "red")
@@ -55,10 +60,10 @@ class TestExecuteInprocessSuccess:
         class FakePlugin:
             config = {"image_settings": []}
 
-            def generate_image(self, settings, cfg):
+            def generate_image(self, settings: Any, cfg: Any) -> Any:
                 return expected_img
 
-            def get_latest_metadata(self):
+            def get_latest_metadata(self) -> Any:
                 return {"foo": "bar"}
 
         action.execute.return_value = expected_img
@@ -72,7 +77,9 @@ class TestExecuteInprocessSuccess:
         assert img is expected_img
         assert meta == {"foo": "bar"}
 
-    def test_zombie_count_unchanged_on_success(self, device_config_dev, monkeypatch):
+    def test_zombie_count_unchanged_on_success(
+        self, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> Any:
         """Successful execution must not increment the zombie counter."""
         task = _make_task(device_config_dev)
         action = _fake_action()
@@ -81,7 +88,7 @@ class TestExecuteInprocessSuccess:
         class FakePlugin:
             config = {"image_settings": []}
 
-            def generate_image(self, settings, cfg):
+            def generate_image(self, settings: Any, cfg: Any) -> Any:
                 return expected_img
 
         action.execute.return_value = expected_img
@@ -99,7 +106,9 @@ class TestExecuteInprocessSuccess:
 
 
 class TestExecuteInprocessTimeout:
-    def test_timeout_raises_timeout_error(self, device_config_dev, monkeypatch):
+    def test_timeout_raises_timeout_error(
+        self, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> Any:
         """A slow plugin should cause TimeoutError to be raised."""
         task = _make_task(device_config_dev)
         action = _fake_action()
@@ -107,7 +116,7 @@ class TestExecuteInprocessTimeout:
         class SlowPlugin:
             config = {"image_settings": []}
 
-            def generate_image(self, settings, cfg):
+            def generate_image(self, settings: Any, cfg: Any) -> Any:
                 time.sleep(10)  # longer than test timeout
                 return Image.new("RGB", (10, 10), "red")
 
@@ -129,8 +138,8 @@ class TestExecuteInprocessTimeout:
                 task._execute_inprocess(action, {"id": "slow"}, datetime.now(UTC))
 
     def test_timeout_sets_cancel_event_via_zombie_decrement(
-        self, device_config_dev, monkeypatch
-    ):
+        self, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> Any:
         """Verify cancel_event is set on timeout by observing zombie-count decrement.
 
         The cancel_event's ``is_set()`` state is indirectly proven by the fact
@@ -144,7 +153,7 @@ class TestExecuteInprocessTimeout:
         class ReleasablePlugin:
             config = {"image_settings": []}
 
-            def generate_image(self, settings, cfg):
+            def generate_image(self, settings: Any, cfg: Any) -> Any:
                 release.wait(timeout=5)
                 return Image.new("RGB", (10, 10), "red")
 
@@ -185,7 +194,9 @@ class TestExecuteInprocessTimeout:
             RefreshTask._zombie_thread_count == 0
         ), "cancel_event must have been set — zombie finally block decremented the count"
 
-    def test_timeout_increments_zombie_count(self, device_config_dev, monkeypatch):
+    def test_timeout_increments_zombie_count(
+        self, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> Any:
         """Each timeout must increment _zombie_thread_count by 1."""
         task = _make_task(device_config_dev)
         action = _fake_action()
@@ -198,7 +209,7 @@ class TestExecuteInprocessTimeout:
         class BlockedPlugin:
             config = {"image_settings": []}
 
-            def generate_image(self, settings, cfg):
+            def generate_image(self, settings: Any, cfg: Any) -> Any:
                 # Signal that we are inside, then block until released
                 barrier.wait()
                 barrier.wait()  # Wait for test to release
@@ -227,7 +238,7 @@ class TestExecuteInprocessTimeout:
         class SlowPlugin:
             config = {"image_settings": []}
 
-            def generate_image(self, settings, cfg):
+            def generate_image(self, settings: Any, cfg: Any) -> Any:
                 time.sleep(10)
                 return Image.new("RGB", (10, 10), "red")
 
@@ -254,8 +265,8 @@ class TestExecuteInprocessTimeout:
         assert RefreshTask._zombie_thread_count == before + 1
 
     def test_zombie_count_decremented_when_thread_finishes(
-        self, device_config_dev, monkeypatch
-    ):
+        self, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> Any:
         """When a zombie thread eventually finishes, the count decrements."""
         task = _make_task(device_config_dev)
         action = _fake_action("slow_finish")
@@ -266,7 +277,7 @@ class TestExecuteInprocessTimeout:
         class ReleasablePlugin:
             config = {"image_settings": []}
 
-            def generate_image(self, settings, cfg):
+            def generate_image(self, settings: Any, cfg: Any) -> Any:
                 release_event.wait(timeout=5)
                 return Image.new("RGB", (10, 10), "red")
 
@@ -315,8 +326,8 @@ class TestExecuteInprocessTimeout:
 
 class TestCancelEventCooperative:
     def test_cancel_event_available_to_cooperative_plugin(
-        self, device_config_dev, monkeypatch
-    ):
+        self, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> Any:
         """A cooperative plugin can exit early by checking cancel_event."""
         task = _make_task(device_config_dev)
         action = _fake_action("cooperative")
@@ -324,7 +335,7 @@ class TestCancelEventCooperative:
         class CooperativePlugin:
             config = {"image_settings": []}
 
-            def generate_image(self, settings, cfg):
+            def generate_image(self, settings: Any, cfg: Any) -> Any:
                 # Simulate a cooperative plugin that checks cancellation
                 # We can't directly access the cancel_event from here in the
                 # current implementation, but the event is set on timeout.
@@ -365,14 +376,16 @@ class TestCancelEventCooperative:
 
 
 class TestExecuteInprocessError:
-    def test_plugin_exception_is_propagated(self, device_config_dev, monkeypatch):
+    def test_plugin_exception_is_propagated(
+        self, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         task = _make_task(device_config_dev)
         action = _fake_action()
 
         class BrokenPlugin:
             config = {"image_settings": []}
 
-            def generate_image(self, settings, cfg):
+            def generate_image(self, settings: Any, cfg: Any) -> None:
                 raise ValueError("plugin error")
 
         action.execute.side_effect = lambda plugin, cfg, dt: plugin.generate_image(
@@ -393,15 +406,15 @@ class TestExecuteInprocessError:
                 task._execute_inprocess(action, {"id": "broken"}, datetime.now(UTC))
 
     def test_zombie_count_unchanged_on_plugin_error(
-        self, device_config_dev, monkeypatch
-    ):
+        self, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         task = _make_task(device_config_dev)
         action = _fake_action()
 
         class BrokenPlugin:
             config = {"image_settings": []}
 
-            def generate_image(self, settings, cfg):
+            def generate_image(self, settings: Any, cfg: Any) -> None:
                 raise RuntimeError("boom")
 
         action.execute.side_effect = lambda plugin, cfg, dt: plugin.generate_image(
@@ -432,11 +445,11 @@ class TestExecuteInprocessError:
 
 
 class TestZombieCountThreadSafety:
-    def test_zombie_lock_exists(self):
+    def test_zombie_lock_exists(self) -> None:
         """_zombie_thread_lock must be a threading.Lock (or RLock)."""
         assert isinstance(RefreshTask._zombie_thread_lock, type(threading.Lock()))
 
-    def test_zombie_count_initial_value(self):
+    def test_zombie_count_initial_value(self) -> None:
         """_zombie_thread_count should be an int (may be non-zero across tests)."""
         assert isinstance(RefreshTask._zombie_thread_count, int)
         assert RefreshTask._zombie_thread_count >= 0

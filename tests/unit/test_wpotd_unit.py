@@ -9,40 +9,42 @@ import plugins.wpotd.wpotd as wpotd_mod
 
 
 class DummyDevice:
-    def __init__(self, resolution=(100, 100)):
+    def __init__(self, resolution: Any = (100, 100)) -> None:
         self._resolution = resolution
 
-    def get_resolution(self):
+    def get_resolution(self) -> Any:
         return self._resolution
 
 
-def make_png_bytes():
+def make_png_bytes() -> Any:
     bio = BytesIO()
     Image.new("RGB", (10, 10), color=(10, 20, 30)).save(bio, format="PNG")
     return bio.getvalue()
 
 
-def test_determine_date_custom():
+def test_determine_date_custom() -> None:
     p = wpotd_mod.Wpotd({"id": "wpotd"})
     d = p._determine_date({"customDate": "2020-02-03"})
     assert d == date(2020, 2, 3)
 
 
-def test_determine_date_invalid_custom_date_falls_back(monkeypatch):
+def test_determine_date_invalid_custom_date_falls_back(
+    monkeypatch: pytest.MonkeyPatch,
+) -> Any:
     p = wpotd_mod.Wpotd({"id": "wpotd"})
 
     class FrozenDateTime:
         @staticmethod
-        def today():
+        def today() -> Any:
             return datetime(2024, 1, 2)
 
         @staticmethod
-        def now(tz=None):
-            # Mirror today(); tests pin the date, tz is ignored.
+        def now(tz: Any = None):
+            # Mirror today() -> Any -> Any; tests pin the date, tz is ignored.
             return datetime(2024, 1, 2)
 
         @staticmethod
-        def strptime(value, fmt):
+        def strptime(value: Any, fmt: Any) -> Any:
             return datetime.strptime(value, fmt)
 
     from datetime import datetime
@@ -52,13 +54,13 @@ def test_determine_date_invalid_custom_date_falls_back(monkeypatch):
     assert d == date(2024, 1, 2)
 
 
-def test_download_image_svg_unsupported():
+def test_download_image_svg_unsupported() -> None:
     p = wpotd_mod.Wpotd({"id": "wpotd"})
     with pytest.raises(RuntimeError):
         p._download_image("http://example.com/file.svg")
 
 
-def test_download_image_unidentified(monkeypatch):
+def test_download_image_unidentified(monkeypatch: pytest.MonkeyPatch) -> None:
     p = wpotd_mod.Wpotd({"id": "wpotd"})
 
     monkeypatch.setattr(p.image_loader, "from_url", lambda *a, **k: None)
@@ -67,7 +69,7 @@ def test_download_image_unidentified(monkeypatch):
         p._download_image("http://example.com/image.png")
 
 
-def test_download_image_success(monkeypatch):
+def test_download_image_success(monkeypatch: pytest.MonkeyPatch) -> None:
     p = wpotd_mod.Wpotd({"id": "wpotd"})
     fake_image = Image.new("RGB", (10, 10), "white")
 
@@ -76,11 +78,11 @@ def test_download_image_success(monkeypatch):
     assert img is fake_image
 
 
-def test_fetch_potd_and_fetch_image_src(monkeypatch):
+def test_fetch_potd_and_fetch_image_src(monkeypatch: pytest.MonkeyPatch) -> Any:
     p = wpotd_mod.Wpotd({"id": "wpotd"})
 
     # Mock _make_request to first return a structure with images list
-    def fake_make_request_first(params):
+    def fake_make_request_first(params: Any) -> Any:
         return {"query": {"pages": [{"images": [{"title": "File:Example.png"}]}]}}
 
     monkeypatch.setattr(
@@ -97,7 +99,7 @@ def test_fetch_potd_and_fetch_image_src(monkeypatch):
     assert result["image_src"] == "http://example.com/img.png"
 
 
-def test_fetch_potd_missing_images(monkeypatch):
+def test_fetch_potd_missing_images(monkeypatch: pytest.MonkeyPatch) -> None:
     p = wpotd_mod.Wpotd({"id": "wpotd"})
     monkeypatch.setattr(
         wpotd_mod.Wpotd, "_make_request", staticmethod(lambda params: {})
@@ -106,7 +108,7 @@ def test_fetch_potd_missing_images(monkeypatch):
         p._fetch_potd(date(2021, 1, 1))
 
 
-def test_fetch_image_src_success_and_missing(monkeypatch):
+def test_fetch_image_src_success_and_missing(monkeypatch: pytest.MonkeyPatch) -> None:
     p = wpotd_mod.Wpotd({"id": "wpotd"})
 
     # success case
@@ -126,7 +128,7 @@ def test_fetch_image_src_success_and_missing(monkeypatch):
         p._fetch_image_src("File:NoUrl.png")
 
 
-def test_shrink_to_fit_no_change_and_resize():
+def test_shrink_to_fit_no_change_and_resize() -> None:
     p = wpotd_mod.Wpotd({"id": "wpotd"})
     # small image, no resize
     img = Image.new("RGB", (10, 10), "white")
@@ -144,39 +146,39 @@ def test_shrink_to_fit_no_change_and_resize():
 # ---------------------------------------------------------------------------
 
 
-def test_wpotd_validate_settings_rejects_date_before_archive():
+def test_wpotd_validate_settings_rejects_date_before_archive() -> None:
     p = wpotd_mod.Wpotd({"id": "wpotd"})
     err = p.validate_settings({"customDate": "1990-01-01"})
     assert err is not None
     assert "Wikipedia POTD archive start" in err
 
 
-def test_wpotd_validate_settings_rejects_future_date():
+def test_wpotd_validate_settings_rejects_future_date() -> None:
     p = wpotd_mod.Wpotd({"id": "wpotd"})
     err = p.validate_settings({"customDate": "9999-12-31"})
     assert err is not None
     assert "on or before" in err
 
 
-def test_wpotd_validate_settings_rejects_malformed_date():
+def test_wpotd_validate_settings_rejects_malformed_date() -> None:
     p = wpotd_mod.Wpotd({"id": "wpotd"})
     err = p.validate_settings({"customDate": "not-a-date"})
     assert err is not None
     assert "Invalid date format" in err
 
 
-def test_wpotd_validate_settings_ignores_date_when_randomized():
+def test_wpotd_validate_settings_ignores_date_when_randomized() -> None:
     p = wpotd_mod.Wpotd({"id": "wpotd"})
     err = p.validate_settings({"randomizeWpotd": "true", "customDate": "1990-01-01"})
     assert err is None
 
 
-def test_wpotd_validate_settings_accepts_blank_custom_date():
+def test_wpotd_validate_settings_accepts_blank_custom_date() -> None:
     p = wpotd_mod.Wpotd({"id": "wpotd"})
     assert p.validate_settings({"customDate": ""}) is None
     assert p.validate_settings({}) is None
 
 
-def test_wpotd_validate_settings_accepts_valid_date():
+def test_wpotd_validate_settings_accepts_valid_date() -> None:
     p = wpotd_mod.Wpotd({"id": "wpotd"})
     assert p.validate_settings({"customDate": "2023-01-01"}) is None

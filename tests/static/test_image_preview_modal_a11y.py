@@ -8,11 +8,13 @@ existing element, satisfying WCAG 2.1 SC 4.1.2 (Name, Role, Value).
 import re
 from pathlib import Path
 
+from flask.testing import FlaskClient
+
 _TEMPLATES_DIR = Path(__file__).resolve().parents[2] / "src" / "templates"
 _SCRIPTS_DIR = Path(__file__).resolve().parents[2] / "src" / "static" / "scripts"
 
 
-def test_plugin_html_image_preview_modal_has_aria_labelledby():
+def test_plugin_html_image_preview_modal_has_aria_labelledby() -> None:
     """plugin.html must render the image preview modal via the a11y-compliant macro.
 
     The modal was refactored to use the shared `modal()` macro (JTN-503) which
@@ -36,7 +38,7 @@ def test_plugin_html_image_preview_modal_has_aria_labelledby():
     ), "modal() macro must emit aria-labelledby for the accessible name"
 
 
-def test_plugin_html_image_preview_modal_labelledby_target_exists():
+def test_plugin_html_image_preview_modal_labelledby_target_exists() -> None:
     """The id referenced by aria-labelledby must exist inside the modal.
 
     Either rendered directly in plugin.html, or emitted by the shared modal()
@@ -68,7 +70,7 @@ def test_plugin_html_image_preview_modal_labelledby_target_exists():
     ), "modal() macro must create an h2 with id=<modal_id>Title for a11y"
 
 
-def test_lightbox_js_dynamic_modal_uses_aria_labelledby():
+def test_lightbox_js_dynamic_modal_uses_aria_labelledby() -> None:
     """lightbox.js must use aria-labelledby (not just aria-label) on the dynamically created modal."""
     content = (_SCRIPTS_DIR / "lightbox.js").read_text(encoding="utf-8")
     assert (
@@ -79,7 +81,7 @@ def test_lightbox_js_dynamic_modal_uses_aria_labelledby():
     ), "lightbox.js must reference 'imagePreviewTitle' for aria-labelledby"
 
 
-def test_lightbox_js_dynamic_modal_creates_heading_element():
+def test_lightbox_js_dynamic_modal_creates_heading_element() -> None:
     """lightbox.js must create an h2 heading with id='imagePreviewTitle' for screen readers."""
     content = (_SCRIPTS_DIR / "lightbox.js").read_text(encoding="utf-8")
     assert re.search(
@@ -90,7 +92,7 @@ def test_lightbox_js_dynamic_modal_creates_heading_element():
     ), "lightbox.js must set heading.id = 'imagePreviewTitle'"
 
 
-def test_plugin_page_rendered_modal_has_aria_labelledby(client):
+def test_plugin_page_rendered_modal_has_aria_labelledby(client: FlaskClient) -> None:
     """Rendered plugin page must contain the modal with aria-labelledby and the target id."""
     resp = client.get("/plugin/clock")
     assert resp.status_code == 200

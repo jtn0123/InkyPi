@@ -4,32 +4,36 @@
 from __future__ import annotations
 
 import json
+from typing import Any
+
+from flask import Flask
+from flask.testing import FlaskClient
 
 # ---------------------------------------------------------------------------
 # GET /api/docs — Swagger UI HTML page
 # ---------------------------------------------------------------------------
 
 
-def test_api_docs_returns_200(client):
+def test_api_docs_returns_200(client: FlaskClient) -> None:
     """GET /api/docs should return 200 OK."""
     resp = client.get("/api/docs")
     assert resp.status_code == 200
 
 
-def test_api_docs_content_type_is_html(client):
+def test_api_docs_content_type_is_html(client: FlaskClient) -> None:
     """GET /api/docs should serve an HTML response."""
     resp = client.get("/api/docs")
     assert "text/html" in resp.content_type
 
 
-def test_api_docs_contains_swagger_ui(client):
+def test_api_docs_contains_swagger_ui(client: FlaskClient) -> None:
     """GET /api/docs HTML must reference swagger-ui so the browser loads the explorer."""
     resp = client.get("/api/docs")
     body = resp.data.decode("utf-8")
     assert "swagger-ui" in body.lower()
 
 
-def test_api_docs_points_to_openapi_spec(client):
+def test_api_docs_points_to_openapi_spec(client: FlaskClient) -> None:
     """Swagger UI page must reference /api/openapi.json as its spec URL."""
     resp = client.get("/api/docs")
     body = resp.data.decode("utf-8")
@@ -41,26 +45,26 @@ def test_api_docs_points_to_openapi_spec(client):
 # ---------------------------------------------------------------------------
 
 
-def test_openapi_json_returns_200(client):
+def test_openapi_json_returns_200(client: FlaskClient) -> None:
     """GET /api/openapi.json should return 200 OK."""
     resp = client.get("/api/openapi.json")
     assert resp.status_code == 200
 
 
-def test_openapi_json_content_type(client):
+def test_openapi_json_content_type(client: FlaskClient) -> None:
     """GET /api/openapi.json must set Content-Type: application/json."""
     resp = client.get("/api/openapi.json")
     assert "application/json" in resp.content_type
 
 
-def test_openapi_json_is_valid_json(client):
+def test_openapi_json_is_valid_json(client: FlaskClient) -> None:
     """Response body must parse as JSON without error."""
     resp = client.get("/api/openapi.json")
     spec = json.loads(resp.data)
     assert isinstance(spec, dict)
 
 
-def test_openapi_spec_has_required_fields(client):
+def test_openapi_spec_has_required_fields(client: FlaskClient) -> None:
     """Spec must contain openapi, info, paths keys (OpenAPI 3.0 minimum)."""
     resp = client.get("/api/openapi.json")
     spec = json.loads(resp.data)
@@ -70,14 +74,14 @@ def test_openapi_spec_has_required_fields(client):
     assert "paths" in spec
 
 
-def test_openapi_spec_info_title(client):
+def test_openapi_spec_info_title(client: FlaskClient) -> None:
     """info.title must be 'InkyPi API'."""
     resp = client.get("/api/openapi.json")
     spec = json.loads(resp.data)
     assert spec["info"]["title"] == "InkyPi API"
 
 
-def test_openapi_spec_info_has_version(client):
+def test_openapi_spec_info_has_version(client: FlaskClient) -> None:
     """info.version must be a non-empty string."""
     resp = client.get("/api/openapi.json")
     spec = json.loads(resp.data)
@@ -90,7 +94,7 @@ def test_openapi_spec_info_has_version(client):
 # ---------------------------------------------------------------------------
 
 
-def test_openapi_paths_exist_in_url_map(client, flask_app):
+def test_openapi_paths_exist_in_url_map(client: FlaskClient, flask_app: Flask) -> Any:
     """Every path in the OpenAPI spec must correspond to a real route in the app.
 
     This test prevents the spec from documenting endpoints that were removed or
@@ -130,7 +134,7 @@ def test_openapi_paths_exist_in_url_map(client, flask_app):
 # ---------------------------------------------------------------------------
 
 
-def test_openapi_spec_has_at_least_six_endpoints(client):
+def test_openapi_spec_has_at_least_six_endpoints(client: FlaskClient) -> None:
     """Spec must document at least 6 distinct paths (MVP requirement)."""
     resp = client.get("/api/openapi.json")
     spec = json.loads(resp.data)

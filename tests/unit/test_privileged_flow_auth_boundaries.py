@@ -10,8 +10,10 @@ continues to live in the dedicated settings/update/system test modules.
 from __future__ import annotations
 
 import importlib
+from typing import Any
 
 import pytest
+from flask import Flask
 
 PIN = "2468"
 READONLY_TOKEN = "jtn-760-readonly-token"
@@ -59,13 +61,13 @@ def _bearer(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
-def _assert_redirects_to_login(resp) -> None:
+def _assert_redirects_to_login(resp: Any) -> None:
     assert resp.status_code == 302
     assert "/login" in resp.headers["Location"]
 
 
 @pytest.fixture()
-def secured_app(device_config_dev, monkeypatch):
+def secured_app(device_config_dev: Any, monkeypatch: pytest.MonkeyPatch) -> Any:
     """Build the real Flask app with PIN auth and read-only token enabled."""
     import inkypi
     from app_setup import security_middleware
@@ -86,7 +88,7 @@ def secured_app(device_config_dev, monkeypatch):
     inkypi = importlib.reload(inkypi)
     security_middleware._mutation_limiter = SlidingWindowLimiter(100000, 60)
 
-    def _fake_init_core_services(app):
+    def _fake_init_core_services(app: Flask) -> Any:
         display_manager = DisplayManager(device_config_dev)
         refresh_task = RefreshTask(device_config_dev, display_manager)
         load_plugins(device_config_dev.get_plugins())
@@ -96,7 +98,7 @@ def secured_app(device_config_dev, monkeypatch):
         app.config["WEB_ONLY"] = False
         return device_config_dev
 
-    def _setup_csrf_token_only(app):
+    def _setup_csrf_token_only(app: Flask) -> Any:
         import secrets as _secrets
 
         from flask import session as _session
@@ -107,7 +109,7 @@ def secured_app(device_config_dev, monkeypatch):
             return _session["_csrf_token"]
 
         @app.context_processor
-        def _inject_csrf_token():
+        def _inject_csrf_token() -> Any:
             return {"csrf_token": _generate_csrf_token}
 
     monkeypatch.setattr(inkypi, "_init_core_services", _fake_init_core_services)
@@ -118,28 +120,30 @@ def secured_app(device_config_dev, monkeypatch):
 
 
 @pytest.fixture()
-def secured_client(secured_app):
+def secured_client(secured_app: Any) -> Any:
     return secured_app.test_client()
 
 
 class TestPrivilegedRoutesRequirePinSession:
     @pytest.mark.parametrize("path", _PRIVILEGED_GET_CASES)
-    def test_unauthenticated_get_redirects_to_login(self, secured_client, path):
+    def test_unauthenticated_get_redirects_to_login(
+        self, secured_client: Any, path: Any
+    ) -> None:
         resp = secured_client.get(path, follow_redirects=False)
         _assert_redirects_to_login(resp)
 
     @pytest.mark.parametrize(("path", "request_kwargs"), _PRIVILEGED_POST_CASES)
     def test_unauthenticated_post_redirects_to_login(
-        self, secured_client, path, request_kwargs
-    ):
+        self, secured_client: Any, path: Any, request_kwargs: Any
+    ) -> None:
         resp = secured_client.post(path, follow_redirects=False, **request_kwargs)
         _assert_redirects_to_login(resp)
 
 
 class TestReadonlyTokenCannotBypassPrivilegedRoutes:
     def test_readonly_token_sanity_check_still_allows_monitoring_route(
-        self, secured_client
-    ):
+        self, secured_client: Any
+    ) -> None:
         resp = secured_client.get(
             "/api/version/info",
             headers=_bearer(READONLY_TOKEN),
@@ -149,8 +153,8 @@ class TestReadonlyTokenCannotBypassPrivilegedRoutes:
 
     @pytest.mark.parametrize("path", _PRIVILEGED_GET_CASES)
     def test_readonly_token_get_still_redirects_on_privileged_route(
-        self, secured_client, path
-    ):
+        self, secured_client: Any, path: Any
+    ) -> None:
         resp = secured_client.get(
             path,
             headers=_bearer(READONLY_TOKEN),
@@ -160,8 +164,8 @@ class TestReadonlyTokenCannotBypassPrivilegedRoutes:
 
     @pytest.mark.parametrize(("path", "request_kwargs"), _PRIVILEGED_POST_CASES)
     def test_readonly_token_post_still_redirects_on_privileged_route(
-        self, secured_client, path, request_kwargs
-    ):
+        self, secured_client: Any, path: Any, request_kwargs: Any
+    ) -> None:
         resp = secured_client.post(
             path,
             headers=_bearer(READONLY_TOKEN),

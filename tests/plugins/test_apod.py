@@ -1,18 +1,20 @@
 # pyright: reportMissingImports=false
 import logging
+from typing import Any
 from unittest.mock import MagicMock, patch
 from urllib.parse import urlparse
 
 import pytest
+from flask.testing import FlaskClient
 
 
 def test_apod_success(
-    monkeypatch,
-    caplog,
-    device_config_dev,
-    realistic_nasa_apod_response,
-    fake_image_response,
-):
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+    device_config_dev: Any,
+    realistic_nasa_apod_response: Any,
+    fake_image_response: Any,
+) -> Any:
     from plugins.apod.apod import Apod
 
     # Mock env key
@@ -22,7 +24,7 @@ def test_apod_success(
     api_resp.status_code = 200
     api_resp.json.return_value = realistic_nasa_apod_response
 
-    def fake_get(url, params=None, **kwargs):
+    def fake_get(url: Any, params: Any = None, **kwargs: Any) -> Any:
         assert urlparse(url).netloc == "api.nasa.gov"
         return api_resp
 
@@ -45,7 +47,9 @@ def test_apod_success(
     assert "APOD image candidates:" in caplog.text
 
 
-def test_apod_requires_key(monkeypatch, device_config_dev):
+def test_apod_requires_key(
+    monkeypatch: pytest.MonkeyPatch, device_config_dev: Any
+) -> None:
     from plugins.apod.apod import Apod
 
     monkeypatch.delenv("NASA_SECRET", raising=False)
@@ -56,7 +60,7 @@ def test_apod_requires_key(monkeypatch, device_config_dev):
         pass
 
 
-def test_apod_missing_key(client):
+def test_apod_missing_key(client: FlaskClient) -> None:
     import os
 
     if "NASA_SECRET" in os.environ:
@@ -69,7 +73,7 @@ def test_apod_missing_key(client):
 
 
 @patch("plugins.apod.apod.get_http_session")
-def test_apod_success_via_client(mock_get_session, client):
+def test_apod_success_via_client(mock_get_session: Any, client: FlaskClient) -> None:
     import os
 
     from PIL import Image
@@ -97,7 +101,9 @@ def test_apod_success_via_client(mock_get_session, client):
     assert resp.status_code == 200
 
 
-def test_apod_randomize_date(monkeypatch, device_config_dev):
+def test_apod_randomize_date(
+    monkeypatch: pytest.MonkeyPatch, device_config_dev: Any
+) -> None:
     """Test APOD plugin with random date generation."""
     from plugins.apod.apod import Apod
 
@@ -132,7 +138,9 @@ def test_apod_randomize_date(monkeypatch, device_config_dev):
         assert result is not None
 
 
-def test_apod_custom_date(monkeypatch, device_config_dev):
+def test_apod_custom_date(
+    monkeypatch: pytest.MonkeyPatch, device_config_dev: Any
+) -> None:
     """Test APOD plugin with custom date."""
     from plugins.apod.apod import Apod
 
@@ -168,7 +176,9 @@ def test_apod_custom_date(monkeypatch, device_config_dev):
         assert result is not None
 
 
-def test_apod_api_error_response(device_config_dev, monkeypatch):
+def test_apod_api_error_response(
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Test APOD plugin with NASA API error response."""
     from plugins.apod.apod import Apod
 
@@ -191,7 +201,9 @@ def test_apod_api_error_response(device_config_dev, monkeypatch):
             p.generate_image({}, device_config_dev)
 
 
-def test_apod_hdurl_preference_on_non_low_resource(device_config_dev, monkeypatch):
+def test_apod_hdurl_preference_on_non_low_resource(
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Test APOD plugin prefers HD URL on non-low-resource devices."""
     from plugins.apod.apod import Apod
 
@@ -229,8 +241,8 @@ def test_apod_hdurl_preference_on_non_low_resource(device_config_dev, monkeypatc
 
 
 def test_apod_prefers_regular_url_on_low_resource_device(
-    device_config_dev, monkeypatch
-):
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Low-memory devices should avoid NASA's HD asset when a regular URL exists."""
     from plugins.apod.apod import Apod
 
@@ -262,7 +274,9 @@ def test_apod_prefers_regular_url_on_low_resource_device(
         assert result is not None
 
 
-def test_apod_image_download_failure(device_config_dev, monkeypatch):
+def test_apod_image_download_failure(
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Test APOD plugin errors when no candidate image URL can be loaded."""
     from plugins.apod.apod import Apod
 
@@ -290,7 +304,7 @@ def test_apod_image_download_failure(device_config_dev, monkeypatch):
                 p.generate_image({}, device_config_dev)
 
 
-def test_apod_settings_template():
+def test_apod_settings_template() -> None:
     """Test APOD plugin settings template generation."""
     from plugins.apod.apod import Apod
 
@@ -306,8 +320,8 @@ def test_apod_settings_template():
 
 
 def test_apod_falls_back_to_second_url_when_first_load_fails(
-    device_config_dev, monkeypatch
-):
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """APOD should try the alternate URL if the preferred one fails to load."""
     from plugins.apod.apod import Apod
 
@@ -352,7 +366,9 @@ def test_apod_falls_back_to_second_url_when_first_load_fails(
         assert result is fake_image
 
 
-def test_apod_missing_hdurl_fallback(device_config_dev, monkeypatch):
+def test_apod_missing_hdurl_fallback(
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Test APOD plugin falls back to regular URL when HD URL is missing."""
     from plugins.apod.apod import Apod
 
@@ -392,7 +408,7 @@ def test_apod_missing_hdurl_fallback(device_config_dev, monkeypatch):
 # ---------------------------------------------------------------------------
 
 
-def test_apod_validate_settings_rejects_date_before_archive_start():
+def test_apod_validate_settings_rejects_date_before_archive_start() -> None:
     from plugins.apod.apod import Apod
 
     p = Apod({"id": "apod"})
@@ -401,7 +417,7 @@ def test_apod_validate_settings_rejects_date_before_archive_start():
     assert "1995-06-16" in err
 
 
-def test_apod_validate_settings_rejects_future_date():
+def test_apod_validate_settings_rejects_future_date() -> None:
     from plugins.apod.apod import Apod
 
     p = Apod({"id": "apod"})
@@ -410,7 +426,7 @@ def test_apod_validate_settings_rejects_future_date():
     assert "on or before" in err
 
 
-def test_apod_validate_settings_rejects_malformed_date():
+def test_apod_validate_settings_rejects_malformed_date() -> None:
     from plugins.apod.apod import Apod
 
     p = Apod({"id": "apod"})
@@ -419,7 +435,7 @@ def test_apod_validate_settings_rejects_malformed_date():
     assert "Invalid date format" in err
 
 
-def test_apod_validate_settings_ignores_custom_date_when_randomized():
+def test_apod_validate_settings_ignores_custom_date_when_randomized() -> None:
     from plugins.apod.apod import Apod
 
     p = Apod({"id": "apod"})
@@ -428,7 +444,7 @@ def test_apod_validate_settings_ignores_custom_date_when_randomized():
     assert err is None
 
 
-def test_apod_validate_settings_accepts_blank_custom_date():
+def test_apod_validate_settings_accepts_blank_custom_date() -> None:
     from plugins.apod.apod import Apod
 
     p = Apod({"id": "apod"})
@@ -436,7 +452,7 @@ def test_apod_validate_settings_accepts_blank_custom_date():
     assert p.validate_settings({}) is None
 
 
-def test_apod_validate_settings_accepts_valid_date():
+def test_apod_validate_settings_accepts_valid_date() -> None:
     from plugins.apod.apod import Apod
 
     p = Apod({"id": "apod"})
@@ -448,7 +464,9 @@ def test_apod_validate_settings_accepts_valid_date():
 # ---------------------------------------------------------------------------
 
 
-def test_apod_request_timeout_falls_back_when_env_invalid(monkeypatch):
+def test_apod_request_timeout_falls_back_when_env_invalid(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     from plugins.apod.apod import Apod
 
     monkeypatch.setenv("INKYPI_HTTP_TIMEOUT_DEFAULT_S", "not-a-number")
@@ -456,7 +474,9 @@ def test_apod_request_timeout_falls_back_when_env_invalid(monkeypatch):
     assert p._request_timeout() == 20.0
 
 
-def test_apod_request_timeout_uses_env_when_valid(monkeypatch):
+def test_apod_request_timeout_uses_env_when_valid(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     from plugins.apod.apod import Apod
 
     monkeypatch.setenv("INKYPI_HTTP_TIMEOUT_DEFAULT_S", "5")
@@ -469,7 +489,9 @@ def test_apod_request_timeout_uses_env_when_valid(monkeypatch):
 # ---------------------------------------------------------------------------
 
 
-def test_apod_raises_when_media_type_is_video(device_config_dev, monkeypatch):
+def test_apod_raises_when_media_type_is_video(
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     from plugins.apod.apod import Apod
 
     monkeypatch.setattr(device_config_dev, "load_env_key", lambda key: "test_key")
@@ -489,7 +511,9 @@ def test_apod_raises_when_media_type_is_video(device_config_dev, monkeypatch):
             p.generate_image({}, device_config_dev)
 
 
-def test_apod_raises_when_no_candidate_urls_available(device_config_dev, monkeypatch):
+def test_apod_raises_when_no_candidate_urls_available(
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """If NASA returns media_type=image but no url/hdurl, raise an error."""
     from plugins.apod.apod import Apod
 
@@ -508,7 +532,7 @@ def test_apod_raises_when_no_candidate_urls_available(device_config_dev, monkeyp
             p.generate_image({}, device_config_dev)
 
 
-def test_apod_candidate_image_urls_dedupes_when_url_equals_hdurl():
+def test_apod_candidate_image_urls_dedupes_when_url_equals_hdurl() -> None:
     """If url and hdurl are identical, only one candidate should be returned."""
     from plugins.apod.apod import Apod
 
@@ -518,7 +542,7 @@ def test_apod_candidate_image_urls_dedupes_when_url_equals_hdurl():
     assert candidates == [same]
 
 
-def test_apod_candidate_image_urls_empty_when_no_urls():
+def test_apod_candidate_image_urls_empty_when_no_urls() -> None:
     from plugins.apod.apod import Apod
 
     p = Apod({"id": "apod"})

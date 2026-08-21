@@ -6,8 +6,10 @@ import json
 import queue
 import threading
 import time
+from typing import Any
 
 import pytest
+from flask.testing import FlaskClient
 
 # ---------------------------------------------------------------------------
 # EventBus unit tests
@@ -15,32 +17,32 @@ import pytest
 
 
 @pytest.fixture()
-def bus():
+def bus() -> Any:
     from utils.event_bus import EventBus
 
     return EventBus(max_subscribers=3)
 
 
 class TestEventBus:
-    def test_subscribe_returns_queue(self, bus):
+    def test_subscribe_returns_queue(self, bus: Any) -> None:
         q = bus.subscribe()
         assert q is not None
         assert isinstance(q, queue.Queue)
 
-    def test_unsubscribe_removes_queue(self, bus):
+    def test_unsubscribe_removes_queue(self, bus: Any) -> None:
         q = bus.subscribe()
         assert bus.subscriber_count() == 1
         bus.unsubscribe(q)
         assert bus.subscriber_count() == 0
 
-    def test_publish_delivers_to_subscriber(self, bus):
+    def test_publish_delivers_to_subscriber(self, bus: Any) -> None:
         q = bus.subscribe()
         bus.publish("refresh_started", {"plugin": "clock", "ts": "2025-01-01T00:00:00"})
         item = q.get_nowait()
         assert item["event"] == "refresh_started"
         assert item["plugin"] == "clock"
 
-    def test_publish_delivers_to_multiple_subscribers(self, bus):
+    def test_publish_delivers_to_multiple_subscribers(self, bus: Any) -> None:
         q1 = bus.subscribe()
         q2 = bus.subscribe()
         bus.publish("refresh_complete", {"plugin": "clock", "duration_ms": 123})
@@ -49,7 +51,7 @@ class TestEventBus:
         assert i1["event"] == "refresh_complete"
         assert i2["event"] == "refresh_complete"
 
-    def test_max_subscriber_cap_enforced(self, bus):
+    def test_max_subscriber_cap_enforced(self, bus: Any) -> None:
         # bus has max_subscribers=3
         q1 = bus.subscribe()
         q2 = bus.subscribe()
@@ -61,11 +63,11 @@ class TestEventBus:
         assert q4 is None
         assert bus.subscriber_count() == 3
 
-    def test_unsubscribe_nonexistent_is_safe(self, bus):
+    def test_unsubscribe_nonexistent_is_safe(self, bus: Any) -> None:
         q: queue.Queue = queue.Queue()
         bus.unsubscribe(q)  # should not raise
 
-    def test_publish_includes_ts(self, bus):
+    def test_publish_includes_ts(self, bus: Any) -> None:
         q = bus.subscribe()
         before = time.time()
         bus.publish("plugin_failed", {"plugin": "broken", "error": "boom"})
@@ -73,7 +75,7 @@ class TestEventBus:
         item = q.get_nowait()
         assert before <= item["ts"] <= after
 
-    def test_subscriber_count(self, bus):
+    def test_subscriber_count(self, bus: Any) -> None:
         assert bus.subscriber_count() == 0
         q1 = bus.subscribe()
         assert bus.subscriber_count() == 1
@@ -88,7 +90,7 @@ class TestEventBus:
 class TestEventBusStream:
     """Tests for the stream() generator."""
 
-    def test_stream_yields_sse_formatted_event(self, bus):
+    def test_stream_yields_sse_formatted_event(self, bus: Any) -> None:
         q = bus.subscribe()
         bus.publish("refresh_started", {"plugin": "weather"})
 
@@ -102,12 +104,12 @@ class TestEventBusStream:
         payload = json.loads(chunks[0].split("data:", 1)[1].strip())
         assert payload["plugin"] == "weather"
 
-    def test_stream_yields_heartbeat_when_idle(self, bus):
+    def test_stream_yields_heartbeat_when_idle(self, bus: Any) -> None:
         q = bus.subscribe()
 
         chunks = []
 
-        def _read():
+        def _read() -> None:
             gen = bus.stream(q, heartbeat_s=0.05)
             chunks.append(next(gen))
             gen.close()
@@ -118,7 +120,7 @@ class TestEventBusStream:
         assert chunks, "No chunk received"
         assert chunks[0] == ": ping\n\n"
 
-    def test_disconnected_subscriber_cleaned_up(self):
+    def test_disconnected_subscriber_cleaned_up(self) -> None:
         """A full subscriber queue is evicted on next publish."""
         from utils.event_bus import EventBus
 
@@ -141,7 +143,9 @@ class TestEventBusStream:
 
 
 class TestEventsEndpoint:
-    def test_get_api_events_returns_200_sse_content_type(self, client, monkeypatch):
+    def test_get_api_events_returns_200_sse_content_type(
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+    ) -> Any:
         """GET /api/events must return 200 with text/event-stream."""
         from utils.event_bus import get_event_bus
 
@@ -152,7 +156,7 @@ class TestEventsEndpoint:
 
         original_subscribe = bus.subscribe
 
-        def _subscribe_once():
+        def _subscribe_once() -> Any:
             q = original_subscribe()
             if q is not None:
                 # Pre-load an event so the generator doesn't block
@@ -169,7 +173,9 @@ class TestEventsEndpoint:
         for q in called:
             bus.unsubscribe(q)
 
-    def test_get_api_events_cap_returns_503(self, client, monkeypatch):
+    def test_get_api_events_cap_returns_503(
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """When subscriber cap is reached, /api/events returns 503."""
         from utils.event_bus import get_event_bus
 
@@ -180,13 +186,15 @@ class TestEventsEndpoint:
         response = client.get("/api/events")
         assert response.status_code == 503
 
-    def test_get_api_events_cache_control_header(self, client, monkeypatch):
+    def test_get_api_events_cache_control_header(
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+    ) -> Any:
         from utils.event_bus import get_event_bus
 
         bus = get_event_bus()
         original_subscribe = bus.subscribe
 
-        def _subscribe_once():
+        def _subscribe_once() -> Any:
             q = original_subscribe()
             if q is not None:
                 q.put({"event": "refresh_complete", "plugin": "test", "ts": 0.0})
@@ -197,7 +205,9 @@ class TestEventsEndpoint:
         response = client.get("/api/events")
         assert response.headers.get("Cache-Control") == "no-cache"
 
-    def test_publish_from_refresh_task_flows_to_subscriber(self, monkeypatch):
+    def test_publish_from_refresh_task_flows_to_subscriber(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Publishing via event_bus flows through to the subscriber queue."""
         from utils.event_bus import EventBus
 
@@ -222,26 +232,32 @@ class TestEventsEndpoint:
 class TestRefreshTaskHooks:
     """Verify that event_bus.publish is called during a refresh cycle."""
 
-    def _make_task(self, device_config_dev, monkeypatch):
+    def _make_task(
+        self, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> Any:
         from display.display_manager import DisplayManager
         from refresh_task.task import RefreshTask
 
         dm = DisplayManager(device_config_dev)
         return RefreshTask(device_config_dev, dm)
 
-    def test_refresh_task_has_event_bus(self, device_config_dev, monkeypatch):
+    def test_refresh_task_has_event_bus(
+        self, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         task = self._make_task(device_config_dev, monkeypatch)
         from utils.event_bus import EventBus
 
         assert isinstance(task.event_bus, EventBus)
 
-    def test_refresh_started_published(self, device_config_dev, monkeypatch):
+    def test_refresh_started_published(
+        self, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """event_bus.publish called with refresh_started during _perform_refresh."""
         task = self._make_task(device_config_dev, monkeypatch)
 
         published: list[tuple[str, dict]] = []
 
-        def _capture(event_type, data):
+        def _capture(event_type: Any, data: Any) -> None:
             published.append((event_type, data))
 
         monkeypatch.setattr(task.event_bus, "publish", _capture)
@@ -296,13 +312,15 @@ class TestRefreshTaskHooks:
         assert "refresh_started" in event_types
         assert "refresh_complete" in event_types
 
-    def test_plugin_failed_published(self, device_config_dev, monkeypatch):
+    def test_plugin_failed_published(
+        self, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """event_bus.publish called with plugin_failed when exception raised."""
         task = self._make_task(device_config_dev, monkeypatch)
 
         published: list[tuple[str, dict]] = []
 
-        def _capture(event_type, data):
+        def _capture(event_type: Any, data: Any) -> None:
             published.append((event_type, data))
 
         monkeypatch.setattr(task.event_bus, "publish", _capture)
@@ -310,7 +328,7 @@ class TestRefreshTaskHooks:
         monkeypatch.setattr(task, "_update_plugin_health", lambda **kw: None)
         monkeypatch.setattr(task, "_stale_display_path", lambda: None)
 
-        def _fail(*a, **kw):
+        def _fail(*a: Any, **kw: Any) -> None:
             raise RuntimeError("plugin boom")
 
         monkeypatch.setattr(task, "_execute_with_policy", _fail)

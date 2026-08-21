@@ -15,11 +15,19 @@ to a typed 503 ``backend_unavailable``.
 
 from __future__ import annotations
 
+from typing import Any
+
+import pytest
+from flask import Flask
+from flask.testing import FlaskClient
+
 
 class TestUpdateNowTimeoutDirect:
     """/update_now must map ``TimeoutError`` to HTTP 504 on the direct path."""
 
-    def test_timeout_error_returns_504(self, client, flask_app, monkeypatch):
+    def test_timeout_error_returns_504(
+        self, client: FlaskClient, flask_app: Flask, monkeypatch: pytest.MonkeyPatch
+    ) -> Any:
         """Plugin raising ``TimeoutError`` -> 504 ``manual_update_timeout``."""
         # Force the direct path: if the app fixture defaults
         # ``refresh_task.running`` to True, the request would route through
@@ -31,10 +39,10 @@ class TestUpdateNowTimeoutDirect:
 
         from plugins.plugin_registry import get_plugin_instance as _real_get
 
-        def _boom(plugin_config):
+        def _boom(plugin_config: Any) -> Any:
             inst = _real_get(plugin_config)
 
-            def _raise(*a, **kw):
+            def _raise(*a: Any, **kw: Any) -> None:
                 raise TimeoutError("Plugin 'clock' timed out after 60s")
 
             inst.generate_image = _raise  # type: ignore[method-assign]
@@ -76,15 +84,15 @@ class TestUpdateNowTimeoutViaRefreshTask:
     """
 
     def test_timeout_error_from_refresh_task_returns_504(
-        self, client, flask_app, monkeypatch
-    ):
+        self, client: FlaskClient, flask_app: Flask, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         from utils.plugin_errors import MANUAL_UPDATE_TIMEOUT_MSG
 
         # Force the outer path: refresh_task.running=True + manual_update raises.
         refresh_task = flask_app.config["REFRESH_TASK"]
         monkeypatch.setattr(refresh_task, "running", True)
 
-        def _raise(_refresh_action):
+        def _raise(_refresh_action: Any) -> None:
             raise TimeoutError("Plugin 'clock' timed out after 60s")
 
         monkeypatch.setattr(refresh_task, "manual_update", _raise)

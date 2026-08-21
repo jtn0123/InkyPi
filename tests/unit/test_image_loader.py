@@ -2,18 +2,20 @@
 """Tests for utils/image_loader.py — AdaptiveImageLoader."""
 
 from io import BytesIO
+from pathlib import Path
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 from PIL import Image
 
 
-def _png_bytes(size=(200, 150), color="red"):
+def _png_bytes(size: Any = (200, 150), color: Any = "red") -> Any:
     buf = BytesIO()
     Image.new("RGB", size, color).save(buf, format="PNG")
     return buf.getvalue()
 
 
-def _make_session_response(content, status_code=200):
+def _make_session_response(content: Any, status_code: Any = 200) -> Any:
     resp = MagicMock()
     resp.raise_for_status = MagicMock()
     resp.content = content
@@ -25,7 +27,7 @@ def _make_session_response(content, status_code=200):
 # ---- _is_low_resource_device ----
 
 
-def test_is_low_resource_device_low_ram():
+def test_is_low_resource_device_low_ram() -> None:
     from utils.image_loader import _is_low_resource_device
 
     mock_mem = MagicMock()
@@ -34,7 +36,7 @@ def test_is_low_resource_device_low_ram():
         assert _is_low_resource_device() is True
 
 
-def test_is_low_resource_device_high_ram():
+def test_is_low_resource_device_high_ram() -> None:
     from utils.image_loader import _is_low_resource_device
 
     mock_mem = MagicMock()
@@ -43,7 +45,7 @@ def test_is_low_resource_device_high_ram():
         assert _is_low_resource_device() is False
 
 
-def test_is_low_resource_device_error():
+def test_is_low_resource_device_error() -> None:
     from utils.image_loader import _is_low_resource_device
 
     with patch(
@@ -55,7 +57,7 @@ def test_is_low_resource_device_error():
 # ---- from_url (fast path) ----
 
 
-def test_from_url_fast_success():
+def test_from_url_fast_success() -> None:
     from utils.image_loader import AdaptiveImageLoader
 
     img_bytes = _png_bytes()
@@ -70,7 +72,7 @@ def test_from_url_fast_success():
     assert result.size == (100, 75)
 
 
-def test_from_url_fast_request_error():
+def test_from_url_fast_request_error() -> None:
     import requests
 
     from utils.image_loader import AdaptiveImageLoader
@@ -85,7 +87,7 @@ def test_from_url_fast_request_error():
     assert result is None
 
 
-def test_from_url_fast_no_resize():
+def test_from_url_fast_no_resize() -> None:
     from utils.image_loader import AdaptiveImageLoader
 
     img_bytes = _png_bytes((200, 150))
@@ -103,7 +105,7 @@ def test_from_url_fast_no_resize():
     assert result.size == (200, 150)
 
 
-def test_from_url_fast_custom_headers():
+def test_from_url_fast_custom_headers() -> None:
     from utils.image_loader import AdaptiveImageLoader
 
     img_bytes = _png_bytes()
@@ -123,7 +125,7 @@ def test_from_url_fast_custom_headers():
 # ---- from_url (low-mem path) ----
 
 
-def test_from_url_lowmem_success(tmp_path):
+def test_from_url_lowmem_success(tmp_path: Path) -> None:
     from utils.image_loader import AdaptiveImageLoader
 
     img_bytes = _png_bytes()
@@ -137,7 +139,7 @@ def test_from_url_lowmem_success(tmp_path):
     assert isinstance(result, Image.Image)
 
 
-def test_from_url_lowmem_request_error():
+def test_from_url_lowmem_request_error() -> None:
     import requests
 
     from utils.image_loader import AdaptiveImageLoader
@@ -155,7 +157,7 @@ def test_from_url_lowmem_request_error():
 # ---- from_file ----
 
 
-def test_from_file_fast_success(tmp_path):
+def test_from_file_fast_success(tmp_path: Path) -> None:
     from utils.image_loader import AdaptiveImageLoader
 
     img_path = tmp_path / "test.png"
@@ -168,7 +170,7 @@ def test_from_file_fast_success(tmp_path):
     assert result.size == (100, 75)
 
 
-def test_from_file_not_found():
+def test_from_file_not_found() -> None:
     from utils.image_loader import AdaptiveImageLoader
 
     with patch("utils.image_loader._is_low_resource_device", return_value=False):
@@ -177,7 +179,7 @@ def test_from_file_not_found():
     assert result is None
 
 
-def test_from_file_error(tmp_path):
+def test_from_file_error(tmp_path: Path) -> None:
     from utils.image_loader import AdaptiveImageLoader
 
     bad_file = tmp_path / "bad.png"
@@ -189,7 +191,7 @@ def test_from_file_error(tmp_path):
     assert result is None
 
 
-def test_from_file_lowmem_success(tmp_path):
+def test_from_file_lowmem_success(tmp_path: Path) -> None:
     from utils.image_loader import AdaptiveImageLoader
 
     img_path = tmp_path / "test.png"
@@ -201,7 +203,7 @@ def test_from_file_lowmem_success(tmp_path):
     assert isinstance(result, Image.Image)
 
 
-def test_from_file_lowmem_memory_error(tmp_path):
+def test_from_file_lowmem_memory_error(tmp_path: Path) -> None:
     from utils.image_loader import AdaptiveImageLoader
 
     img_path = tmp_path / "test.png"
@@ -217,7 +219,7 @@ def test_from_file_lowmem_memory_error(tmp_path):
 # ---- from_bytesio ----
 
 
-def test_from_bytesio_success():
+def test_from_bytesio_success() -> None:
     from utils.image_loader import AdaptiveImageLoader
 
     buf = BytesIO()
@@ -231,7 +233,7 @@ def test_from_bytesio_success():
     assert result.size == (100, 75)
 
 
-def test_from_bytesio_no_resize():
+def test_from_bytesio_no_resize() -> None:
     from utils.image_loader import AdaptiveImageLoader
 
     buf = BytesIO()
@@ -245,7 +247,7 @@ def test_from_bytesio_no_resize():
     assert result.size == (200, 150)
 
 
-def test_from_bytesio_error():
+def test_from_bytesio_error() -> None:
     from utils.image_loader import AdaptiveImageLoader
 
     buf = BytesIO(b"not an image")
@@ -259,7 +261,7 @@ def test_from_bytesio_error():
 # ---- _process_and_resize ----
 
 
-def test_process_and_resize_rgba():
+def test_process_and_resize_rgba() -> None:
     from utils.image_loader import AdaptiveImageLoader
 
     img = Image.new("RGBA", (200, 150), (255, 0, 0, 128))
@@ -271,7 +273,7 @@ def test_process_and_resize_rgba():
     assert result.size == (100, 75)
 
 
-def test_process_and_resize_la():
+def test_process_and_resize_la() -> None:
     from utils.image_loader import AdaptiveImageLoader
 
     img = Image.new("LA", (200, 150))
@@ -282,7 +284,7 @@ def test_process_and_resize_la():
     assert result.mode == "RGB"
 
 
-def test_process_and_resize_p():
+def test_process_and_resize_p() -> None:
     from utils.image_loader import AdaptiveImageLoader
 
     img = Image.new("P", (200, 150))
@@ -296,7 +298,7 @@ def test_process_and_resize_p():
 # ---- resize strategies ----
 
 
-def test_resize_low_resource_two_stage():
+def test_resize_low_resource_two_stage() -> None:
     from utils.image_loader import AdaptiveImageLoader
 
     img = Image.new("RGB", (2000, 1500), "green")
@@ -307,7 +309,7 @@ def test_resize_low_resource_two_stage():
     assert result.size == (100, 75)
 
 
-def test_resize_low_resource_direct():
+def test_resize_low_resource_direct() -> None:
     from utils.image_loader import AdaptiveImageLoader
 
     img = Image.new("RGB", (150, 100), "green")
@@ -318,7 +320,7 @@ def test_resize_low_resource_direct():
     assert result.size == (100, 75)
 
 
-def test_resize_high_performance():
+def test_resize_high_performance() -> None:
     from utils.image_loader import AdaptiveImageLoader
 
     img = Image.new("RGB", (2000, 1500), "green")
@@ -332,7 +334,7 @@ def test_resize_high_performance():
 # ---- Additional edge-case tests ----
 
 
-def test_from_url_lowmem_temp_cleanup_on_error():
+def test_from_url_lowmem_temp_cleanup_on_error() -> None:
     """Download error returns None without leaving temp files."""
     import requests
 
@@ -349,7 +351,7 @@ def test_from_url_lowmem_temp_cleanup_on_error():
     # No temp files should be left behind (checked implicitly - no error)
 
 
-def test_from_url_lowmem_custom_headers():
+def test_from_url_lowmem_custom_headers() -> None:
     """Headers are merged in low-mem path."""
     from utils.image_loader import AdaptiveImageLoader
 
@@ -371,7 +373,7 @@ def test_from_url_lowmem_custom_headers():
     assert "InkyPi" in call_kwargs["headers"]["User-Agent"]
 
 
-def test_from_file_fast_corrupt_file(tmp_path):
+def test_from_file_fast_corrupt_file(tmp_path: Path) -> None:
     """Corrupt file on fast path returns None."""
     from utils.image_loader import AdaptiveImageLoader
 
@@ -384,7 +386,7 @@ def test_from_file_fast_corrupt_file(tmp_path):
     assert result is None
 
 
-def test_resize_low_resource_portrait_two_stage():
+def test_resize_low_resource_portrait_two_stage() -> None:
     """Portrait (tall) image on low-resource two-stage resize path."""
     from utils.image_loader import AdaptiveImageLoader
 
@@ -397,7 +399,7 @@ def test_resize_low_resource_portrait_two_stage():
     assert result.size == (100, 75)
 
 
-def test_from_url_fast_processing_error():
+def test_from_url_fast_processing_error() -> None:
     """Successful download but corrupt image data returns None."""
     from utils.image_loader import AdaptiveImageLoader
 
@@ -411,7 +413,7 @@ def test_from_url_fast_processing_error():
     assert result is None
 
 
-def test_from_bytesio_rgba_conversion():
+def test_from_bytesio_rgba_conversion() -> None:
     """RGBA image is converted to RGB through from_bytesio path."""
     from utils.image_loader import AdaptiveImageLoader
 

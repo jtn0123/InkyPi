@@ -14,6 +14,9 @@ in a live container so the peak RSS sample actually reflects a real
 
 from __future__ import annotations
 
+from collections.abc import Iterator
+from typing import Any
+
 import pytest
 from flask import Flask
 
@@ -38,7 +41,9 @@ class _StubPlugin:
         self._image = image or _StubImage()
         self.calls = 0
 
-    def generate_image(self, settings, device_config):  # pragma: no cover - trivial
+    def generate_image(
+        self, settings: Any, device_config: Any
+    ) -> Any:  # pragma: no cover - trivial
         self.calls += 1
         return self._image
 
@@ -47,7 +52,7 @@ class _StubDeviceConfig:
     def __init__(self, plugins: dict) -> None:
         self._plugins = plugins
 
-    def get_plugin(self, plugin_id):
+    def get_plugin(self, plugin_id: Any) -> Any:
         return self._plugins.get(plugin_id)
 
 
@@ -72,7 +77,7 @@ def _make_app(
 
 
 @pytest.fixture(autouse=True)
-def _restore_registry(request):
+def _restore_registry(request: pytest.FixtureRequest) -> Iterator[Any]:
     """Restore plugins.plugin_registry.get_plugin_instance after each test."""
     yield
     try:
@@ -86,7 +91,9 @@ def _restore_registry(request):
         pass
 
 
-def test_smoke_render_not_registered_without_env_var(monkeypatch):
+def test_smoke_render_not_registered_without_env_var(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.delenv(SMOKE_RENDER_ENV_VAR, raising=False)
     assert smoke_render_enabled() is False
 
@@ -103,18 +110,24 @@ def test_smoke_render_not_registered_without_env_var(monkeypatch):
 
 
 @pytest.mark.parametrize("value", ["1", "true", "yes", "TRUE", "Yes"])
-def test_smoke_render_enabled_truthy_values(monkeypatch, value):
+def test_smoke_render_enabled_truthy_values(
+    monkeypatch: pytest.MonkeyPatch, value: Any
+) -> None:
     monkeypatch.setenv(SMOKE_RENDER_ENV_VAR, value)
     assert smoke_render_enabled() is True
 
 
 @pytest.mark.parametrize("value", ["", "0", "no", "false", "off", "maybe"])
-def test_smoke_render_disabled_falsy_values(monkeypatch, value):
+def test_smoke_render_disabled_falsy_values(
+    monkeypatch: pytest.MonkeyPatch, value: Any
+) -> None:
     monkeypatch.setenv(SMOKE_RENDER_ENV_VAR, value)
     assert smoke_render_enabled() is False
 
 
-def test_smoke_render_registered_when_env_var_set(monkeypatch):
+def test_smoke_render_registered_when_env_var_set(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setenv(SMOKE_RENDER_ENV_VAR, "1")
     stub_plugin = _StubPlugin(_StubImage(width=800, height=480))
     device_config = _StubDeviceConfig({"clock": {"plugin_id": "clock"}})
@@ -124,7 +137,7 @@ def test_smoke_render_registered_when_env_var_set(monkeypatch):
     assert SMOKE_RENDER_PATH in rules
 
 
-def test_smoke_render_calls_generate_image(monkeypatch):
+def test_smoke_render_calls_generate_image(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv(SMOKE_RENDER_ENV_VAR, "1")
     stub_plugin = _StubPlugin(_StubImage(width=800, height=480))
     device_config = _StubDeviceConfig({"clock": {"plugin_id": "clock"}})
@@ -148,7 +161,9 @@ def test_smoke_render_calls_generate_image(monkeypatch):
     assert stub_plugin.calls == 2
 
 
-def test_smoke_render_missing_plugin_id_returns_422(monkeypatch):
+def test_smoke_render_missing_plugin_id_returns_422(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setenv(SMOKE_RENDER_ENV_VAR, "1")
     device_config = _StubDeviceConfig({})
     app = _make_app(device_config=device_config, stub_plugin=_StubPlugin())
@@ -158,7 +173,9 @@ def test_smoke_render_missing_plugin_id_returns_422(monkeypatch):
     assert resp.status_code == 422
 
 
-def test_smoke_render_unknown_plugin_returns_404(monkeypatch):
+def test_smoke_render_unknown_plugin_returns_404(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setenv(SMOKE_RENDER_ENV_VAR, "1")
     device_config = _StubDeviceConfig({})  # no plugins at all
     app = _make_app(device_config=device_config, stub_plugin=_StubPlugin())
@@ -168,11 +185,13 @@ def test_smoke_render_unknown_plugin_returns_404(monkeypatch):
     assert resp.status_code == 404
 
 
-def test_smoke_render_generate_image_exception_returns_500(monkeypatch):
+def test_smoke_render_generate_image_exception_returns_500(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setenv(SMOKE_RENDER_ENV_VAR, "1")
 
     class _Boom(_StubPlugin):
-        def generate_image(self, settings, device_config):
+        def generate_image(self, settings: Any, device_config: Any) -> None:
             raise RuntimeError("boom")
 
     device_config = _StubDeviceConfig({"clock": {"plugin_id": "clock"}})
@@ -183,15 +202,17 @@ def test_smoke_render_generate_image_exception_returns_500(monkeypatch):
     assert resp.status_code == 500
 
 
-def test_smoke_render_does_not_touch_display_manager(monkeypatch):
+def test_smoke_render_does_not_touch_display_manager(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """The endpoint must NOT push to the display — that's not what we measure."""
     monkeypatch.setenv(SMOKE_RENDER_ENV_VAR, "1")
 
     class _TrackingDisplay:
-        def __init__(self):
+        def __init__(self) -> None:
             self.calls = 0
 
-        def display_image(self, *args, **kwargs):
+        def display_image(self, *args: Any, **kwargs: Any) -> None:
             self.calls += 1
 
     stub_plugin = _StubPlugin()
@@ -208,7 +229,9 @@ def test_smoke_render_does_not_touch_display_manager(monkeypatch):
     ), "smoke render endpoint must not push to the display manager"
 
 
-def test_smoke_render_csrf_exempt_in_security_middleware(monkeypatch):
+def test_smoke_render_csrf_exempt_in_security_middleware(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """JTN-613: the CSRF middleware must let /__smoke/render through when enabled.
 
     This is a behavioural guard: if a future refactor drops the
@@ -234,7 +257,9 @@ def test_smoke_render_csrf_exempt_in_security_middleware(monkeypatch):
     )
 
 
-def test_smoke_render_csrf_still_enforced_for_other_paths(monkeypatch):
+def test_smoke_render_csrf_still_enforced_for_other_paths(
+    monkeypatch: pytest.MonkeyPatch,
+) -> Any:
     """Sanity: enabling the smoke env var must not open up CSRF globally."""
     monkeypatch.setenv(SMOKE_RENDER_ENV_VAR, "1")
     from app_setup.security_middleware import setup_csrf_protection
@@ -243,7 +268,7 @@ def test_smoke_render_csrf_still_enforced_for_other_paths(monkeypatch):
     setup_csrf_protection(app)
 
     @app.route("/other_mutation", methods=["POST"])
-    def _other():
+    def _other() -> Any:
         return "ok", 200
 
     client = app.test_client()

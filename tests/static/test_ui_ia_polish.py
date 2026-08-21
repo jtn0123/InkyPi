@@ -4,6 +4,8 @@
 import re
 from pathlib import Path
 
+from flask.testing import FlaskClient
+
 ROOT = Path(__file__).resolve().parents[2]
 _STYLES_DIR = Path(__file__).resolve().parents[2] / "src" / "static" / "styles"
 _SCRIPTS_DIR = Path(__file__).resolve().parents[2] / "src" / "static" / "scripts"
@@ -31,7 +33,9 @@ def _plugin_page_source() -> str:
     )
 
 
-def test_settings_page_contains_section_nav_and_loading_panels(client):
+def test_settings_page_contains_section_nav_and_loading_panels(
+    client: FlaskClient,
+) -> None:
     resp = client.get("/settings")
     assert resp.status_code == 200
     html = resp.get_data(as_text=True)
@@ -45,7 +49,9 @@ def test_settings_page_contains_section_nav_and_loading_panels(client):
     assert 'id="isolationSummary"' in html and "loading-panel" in html
 
 
-def test_plugin_page_contains_status_chips_and_unique_schedule_ids(client):
+def test_plugin_page_contains_status_chips_and_unique_schedule_ids(
+    client: FlaskClient,
+) -> None:
     resp = client.get("/plugin/clock")
     assert resp.status_code == 200
     html = resp.get_data(as_text=True)
@@ -66,7 +72,7 @@ def test_plugin_page_contains_status_chips_and_unique_schedule_ids(client):
     assert re.search(r"\bdisabled\b", schedule_time_tag)
 
 
-def test_mobile_shell_has_primary_navigation_replacement():
+def test_mobile_shell_has_primary_navigation_replacement() -> None:
     html = SIDEBAR_HTML.read_text(encoding="utf-8")
     css = _read_all_css()
 
@@ -85,7 +91,7 @@ def test_mobile_shell_has_primary_navigation_replacement():
     assert ".mobile-site-nav-panel" in css
 
 
-def test_main_css_contains_new_ia_polish_classes(client):
+def test_main_css_contains_new_ia_polish_classes(client: FlaskClient) -> None:
     css = _read_all_css()
 
     assert ".section-nav" in css
@@ -94,7 +100,7 @@ def test_main_css_contains_new_ia_polish_classes(client):
     assert ".section-focus" in css
 
 
-def test_settings_time_format_defaults_to_24h_when_config_is_missing():
+def test_settings_time_format_defaults_to_24h_when_config_is_missing() -> None:
     html = SETTINGS_HTML.read_text(encoding="utf-8")
 
     assert (
@@ -106,7 +112,9 @@ def test_settings_time_format_defaults_to_24h_when_config_is_missing():
     )
 
 
-def test_plugin_page_updates_generated_preview_after_success(client):
+def test_plugin_page_updates_generated_preview_after_success(
+    client: FlaskClient,
+) -> None:
     resp = client.get("/static/scripts/plugin_page.js")
     assert resp.status_code == 200
     js = _plugin_page_source()
@@ -122,7 +130,9 @@ def test_plugin_page_updates_generated_preview_after_success(client):
     assert "button.disabled = false" in js
 
 
-def test_settings_logs_toggle_shares_action_bar_and_mobile_stays_in_flow(client):
+def test_settings_logs_toggle_shares_action_bar_and_mobile_stays_in_flow(
+    client: FlaskClient,
+) -> None:
     """The live-logs action should share the settings footer and avoid
     reintroducing the old fixed mobile FAB contract."""
     css = _read_all_css()
@@ -147,7 +157,7 @@ def test_settings_logs_toggle_shares_action_bar_and_mobile_stays_in_flow(client)
     )
 
 
-def test_second_validation_mobile_and_feedback_polish_contracts():
+def test_second_validation_mobile_and_feedback_polish_contracts() -> None:
     css = _read_all_css()
     api_js = (ROOT / "src" / "static" / "scripts" / "api_keys_page.js").read_text(
         encoding="utf-8"
@@ -174,7 +184,7 @@ def test_second_validation_mobile_and_feedback_polish_contracts():
     assert 'setToggleLabel(button, "Editing")' in api_js
 
 
-def test_image_url_schema_has_inline_url_validation(client):
+def test_image_url_schema_has_inline_url_validation(client: FlaskClient) -> None:
     resp = client.get("/plugin/image_url")
     assert resp.status_code == 200
     html = resp.get_data(as_text=True)

@@ -2,8 +2,10 @@
 from __future__ import annotations
 
 import os
+from typing import Any
 
 import pytest
+from playwright.sync_api import Page
 from tests.integration.browser_helpers import navigate_and_wait, prepare_playlist
 
 pytestmark = pytest.mark.skipif(
@@ -12,7 +14,9 @@ pytestmark = pytest.mark.skipif(
 )
 
 
-def test_playlist_card_toggle(live_server, device_config_dev, mobile_page):
+def test_playlist_card_toggle(
+    live_server: str, device_config_dev: Any, mobile_page: Page
+) -> None:
     """On mobile viewport, toggling a playlist card expands/collapses its body."""
     prepare_playlist(device_config_dev)
     page = mobile_page
@@ -39,7 +43,7 @@ def test_playlist_card_toggle(live_server, device_config_dev, mobile_page):
     assert not body.is_visible(), "Playlist card body should be hidden after collapse"
 
 
-def test_settings_tabs_switch(live_server, browser_page):
+def test_settings_tabs_switch(live_server: str, browser_page: Page) -> None:
     """Settings page tabs switch between content panels."""
     page = browser_page
     navigate_and_wait(page, live_server, "/settings")
@@ -58,7 +62,9 @@ def test_settings_tabs_switch(live_server, browser_page):
         assert page.locator("#saveSettingsBtn").is_visible()
 
 
-def test_plugin_style_accordion_chevron_flips(live_server, browser_page):
+def test_plugin_style_accordion_chevron_flips(
+    live_server: str, browser_page: Page
+) -> None:
     """JTN-643: The collapsible accordion chevron must visually flip between the
     collapsed (▼) and expanded (▲) states.
 
@@ -125,7 +131,9 @@ def test_plugin_style_accordion_chevron_flips(live_server, browser_page):
     assert transform_collapsed_again in ("none", "matrix(1, 0, 0, 1, 0, 0)")
 
 
-def test_playlist_details_expand(live_server, device_config_dev, browser_page):
+def test_playlist_details_expand(
+    live_server: str, device_config_dev: Any, browser_page: Page
+) -> None:
     """Playlist details stay expanded on desktop; the mobile toggle may be hidden."""
     prepare_playlist(device_config_dev)
     page = browser_page
@@ -141,8 +149,8 @@ def test_playlist_details_expand(live_server, device_config_dev, browser_page):
 
 
 def test_playlist_toggle_is_not_noop_if_visible_on_desktop(
-    live_server, device_config_dev, browser_page
-):
+    live_server: str, device_config_dev: Any, browser_page: Page
+) -> None:
     """JTN-692: if the mobile-only toggle becomes visible on desktop, it must still work."""
     prepare_playlist(device_config_dev)
     page = browser_page

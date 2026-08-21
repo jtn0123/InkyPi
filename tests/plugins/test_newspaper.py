@@ -1,14 +1,16 @@
+from typing import Any
+
 import pytest
 from PIL import Image
 
 from plugins.newspaper.constants import NEWSPAPERS
 
 
-def _png_image(size=(600, 800), color="white"):
+def _png_image(size: Any = (600, 800), color: Any = "white") -> Any:
     return Image.new("RGB", size, color)
 
 
-def test_newspaper_initialization():
+def test_newspaper_initialization() -> None:
     from plugins.newspaper.newspaper import Newspaper
 
     plugin = Newspaper({"id": "newspaper"})
@@ -17,11 +19,13 @@ def test_newspaper_initialization():
     assert template["newspapers"] == sorted(NEWSPAPERS, key=lambda n: n["name"])
 
 
-def test_newspaper_success_with_expand_height(monkeypatch, device_config_dev):
+def test_newspaper_success_with_expand_height(
+    monkeypatch: pytest.MonkeyPatch, device_config_dev: Any
+) -> Any:
     from plugins.newspaper.newspaper import Newspaper
 
     # Mock utils.image_utils.get_image to return a portrait image on first try
-    def fake_get_image(url):
+    def fake_get_image(url: Any) -> Any:
         return _png_image((400, 800))
 
     monkeypatch.setattr("plugins.newspaper.newspaper.get_image", fake_get_image)
@@ -36,7 +40,9 @@ def test_newspaper_success_with_expand_height(monkeypatch, device_config_dev):
     assert img.size == (400, 240)
 
 
-def test_newspaper_tries_multiple_days_then_fails(monkeypatch, device_config_dev):
+def test_newspaper_tries_multiple_days_then_fails(
+    monkeypatch: pytest.MonkeyPatch, device_config_dev: Any
+) -> None:
     from plugins.newspaper.newspaper import Newspaper
 
     # Always return None from get_image to simulate missing newspapers
@@ -51,11 +57,13 @@ def test_newspaper_tries_multiple_days_then_fails(monkeypatch, device_config_dev
         pass
 
 
-def test_newspaper_slug_case_variants(monkeypatch, device_config_dev):
+def test_newspaper_slug_case_variants(
+    monkeypatch: pytest.MonkeyPatch, device_config_dev: Any
+) -> Any:
     from plugins.newspaper.newspaper import Newspaper
 
     # Succeeds only for uppercase slug to ensure we try variants
-    def fake_get_image(url):
+    def fake_get_image(url: Any) -> Any:
         if url.endswith("/WSJ.jpg"):
             return _png_image((300, 600))
         return None
@@ -68,7 +76,9 @@ def test_newspaper_slug_case_variants(monkeypatch, device_config_dev):
     assert img is not None
 
 
-def test_newspaper_missing_slug_falls_back_to_default(monkeypatch, device_config_dev):
+def test_newspaper_missing_slug_falls_back_to_default(
+    monkeypatch: pytest.MonkeyPatch, device_config_dev: Any
+) -> Any:
     """JTN-784: missing/empty slug falls back to NY_NYT at render time so a
     bare /update_now produces a visible render."""
     from plugins.newspaper import newspaper as np_mod
@@ -76,7 +86,7 @@ def test_newspaper_missing_slug_falls_back_to_default(monkeypatch, device_config
 
     captured: dict = {}
 
-    def fake_get_image(url):
+    def fake_get_image(url: Any) -> Any:
         captured["url"] = url
         return _png_image((400, 800))
 
@@ -88,7 +98,7 @@ def test_newspaper_missing_slug_falls_back_to_default(monkeypatch, device_config
         assert "NY_NYT" in captured["url"]
 
 
-def test_newspaper_invalid_slug_raises(device_config_dev):
+def test_newspaper_invalid_slug_raises(device_config_dev: Any) -> None:
     from plugins.newspaper.newspaper import Newspaper
 
     with pytest.raises(RuntimeError, match="Invalid newspaper selection"):
@@ -98,7 +108,9 @@ def test_newspaper_invalid_slug_raises(device_config_dev):
         )
 
 
-def test_newspaper_image_wider_than_display(monkeypatch, device_config_dev):
+def test_newspaper_image_wider_than_display(
+    monkeypatch: pytest.MonkeyPatch, device_config_dev: Any
+) -> Any:
     """Image wider than display ratio is returned without height expansion."""
     from plugins.newspaper.newspaper import Newspaper
 
@@ -106,7 +118,7 @@ def test_newspaper_image_wider_than_display(monkeypatch, device_config_dev):
     # desired_ratio = 800/480 = 1.667
     # For no expansion, img_ratio must be >= desired_ratio
     # Use 1000x500 image: img_ratio = 2.0 > 1.667, so no expansion
-    def fake_get_image(url):
+    def fake_get_image(url: Any) -> Any:
         return _png_image((1000, 500))
 
     monkeypatch.setattr("plugins.newspaper.newspaper.get_image", fake_get_image)
@@ -119,14 +131,16 @@ def test_newspaper_image_wider_than_display(monkeypatch, device_config_dev):
     assert img.size == (1000, 500)
 
 
-def test_newspaper_vertical_orientation(monkeypatch, device_config_dev):
+def test_newspaper_vertical_orientation(
+    monkeypatch: pytest.MonkeyPatch, device_config_dev: Any
+) -> Any:
     """Vertical orientation swaps dimensions."""
     from plugins.newspaper.newspaper import Newspaper
 
     # Set orientation to vertical
     device_config_dev.update_value("orientation", "vertical")
 
-    def fake_get_image(url):
+    def fake_get_image(url: Any) -> Any:
         return _png_image((400, 800))
 
     monkeypatch.setattr("plugins.newspaper.newspaper.get_image", fake_get_image)
@@ -142,14 +156,16 @@ def test_newspaper_vertical_orientation(monkeypatch, device_config_dev):
     assert img.size == (400, 666)
 
 
-def test_newspaper_finds_on_second_day(monkeypatch, device_config_dev):
+def test_newspaper_finds_on_second_day(
+    monkeypatch: pytest.MonkeyPatch, device_config_dev: Any
+) -> Any:
     """Newspaper found on second day in retry sequence."""
 
     from plugins.newspaper.newspaper import Newspaper
 
     call_count = [0]
 
-    def fake_get_image(url):
+    def fake_get_image(url: Any) -> Any:
         call_count[0] += 1
         # Fail on first call (tomorrow), succeed on second call (today)
         if call_count[0] == 1:

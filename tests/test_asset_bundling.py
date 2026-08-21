@@ -12,6 +12,9 @@ import json
 import subprocess
 import sys
 from pathlib import Path
+from typing import Any
+
+from flask import Flask
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 BUILD_SCRIPT = REPO_ROOT / "scripts" / "build_assets.py"
@@ -156,7 +159,7 @@ class TestBundledAssetHelper:
         p.write_text(json.dumps(data), encoding="utf-8")
         return p
 
-    def _get_helper(self, manifest_path: Path):
+    def _get_helper(self, manifest_path: Path) -> Any:
         """Import asset_helpers with the manifest path overridden."""
         import app_setup.asset_helpers as ah
 
@@ -206,7 +209,7 @@ class TestBundledAssetHelper:
 
 
 class TestSetupAssetHelpers:
-    def test_jinja_global_registered(self, tmp_path: Path, flask_app) -> None:
+    def test_jinja_global_registered(self, tmp_path: Path, flask_app: Flask) -> None:
         """setup_asset_helpers must register 'bundled_asset' as a Jinja global."""
         import app_setup.asset_helpers as ah
 
@@ -221,7 +224,9 @@ class TestSetupAssetHelpers:
         assert "bundled_asset" in flask_app.jinja_env.globals
         assert callable(flask_app.jinja_env.globals["bundled_asset"])
 
-    def test_bundled_assets_enabled_global(self, tmp_path: Path, flask_app) -> None:
+    def test_bundled_assets_enabled_global(
+        self, tmp_path: Path, flask_app: Flask
+    ) -> None:
         import app_setup.asset_helpers as ah
 
         manifest_path = tmp_path / "manifest.json"
@@ -235,7 +240,7 @@ class TestSetupAssetHelpers:
         assert flask_app.jinja_env.globals["bundled_assets_enabled"] is True
 
     def test_bundled_assets_disabled_when_no_manifest(
-        self, tmp_path: Path, flask_app
+        self, tmp_path: Path, flask_app: Flask
     ) -> None:
         import app_setup.asset_helpers as ah
 

@@ -7,7 +7,7 @@ from PIL import Image
 from werkzeug.datastructures import FileStorage, ImmutableMultiDict
 
 
-def test_generate_startup_image_default():
+def test_generate_startup_image_default() -> None:
     """Test generate_startup_image creates image with default dimensions."""
     from utils.app_utils import generate_startup_image
 
@@ -18,7 +18,7 @@ def test_generate_startup_image_default():
     assert img.mode == "RGBA"
 
 
-def test_generate_startup_image_custom_dimensions():
+def test_generate_startup_image_custom_dimensions() -> None:
     """Test generate_startup_image with custom dimensions."""
     from utils.app_utils import generate_startup_image
 
@@ -27,7 +27,7 @@ def test_generate_startup_image_custom_dimensions():
     assert img.size == (400, 300)
 
 
-def test_generate_startup_image_font_fallback():
+def test_generate_startup_image_font_fallback() -> None:
     """Test generate_startup_image falls back to default font if custom font fails."""
     from utils.app_utils import generate_startup_image
 
@@ -38,7 +38,7 @@ def test_generate_startup_image_font_fallback():
         # Should still create image with fallback font
 
 
-def test_parse_form_with_list_params():
+def test_parse_form_with_list_params() -> None:
     """Test parse_form handles list parameters (keys ending with [])."""
     from utils.app_utils import parse_form
 
@@ -52,7 +52,7 @@ def test_parse_form_with_list_params():
     assert result["tags[]"] == ["tag1", "tag2", "tag3"]
 
 
-def test_get_fonts_returns_list():
+def test_get_fonts_returns_list() -> None:
     """Test get_fonts returns properly formatted font list."""
     from utils.app_utils import get_fonts
 
@@ -68,7 +68,7 @@ def test_get_fonts_returns_list():
         assert "font_style" in font
 
 
-def test_get_font_path():
+def test_get_font_path() -> None:
     """Test get_font_path returns correct path."""
     from utils.app_utils import get_font_path
 
@@ -86,7 +86,7 @@ def test_get_font_path():
         pass
 
 
-def test_handle_request_files_with_valid_file():
+def test_handle_request_files_with_valid_file() -> None:
     """Test handle_request_files processes valid image files."""
     from utils.app_utils import handle_request_files
 
@@ -108,7 +108,7 @@ def test_handle_request_files_with_valid_file():
     assert result["image"] is not None
 
 
-def test_handle_request_files_skips_invalid_extension():
+def test_handle_request_files_skips_invalid_extension() -> None:
     """Test handle_request_files skips files with invalid extensions."""
     from utils.app_utils import handle_request_files
 
@@ -124,7 +124,7 @@ def test_handle_request_files_skips_invalid_extension():
     assert "file" not in result or not result.get("file")
 
 
-def test_handle_request_files_skips_empty_filename():
+def test_handle_request_files_skips_empty_filename() -> None:
     """Test handle_request_files skips files with empty filename."""
     from utils.app_utils import handle_request_files
 

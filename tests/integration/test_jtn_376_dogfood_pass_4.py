@@ -7,8 +7,10 @@ the API keys page accessibility improvements.
 
 import json
 from pathlib import Path
+from typing import Any
 
 import pytest
+from flask.testing import FlaskClient
 
 # Root path to the JS scripts directory (resolved once).
 _JS_DIR = Path(__file__).resolve().parents[2] / "src" / "static" / "scripts"
@@ -19,7 +21,7 @@ def _read_js_asset(filename: str) -> str:
     return (_JS_DIR / filename).read_text(encoding="utf-8")
 
 
-def _save_plugin(client, data, *, expect_status=400):
+def _save_plugin(client: FlaskClient, data: Any, *, expect_status: Any = 400) -> Any:
     """POST to /save_plugin_settings and return (response, json_body)."""
     resp = client.post("/save_plugin_settings", data=data)
     assert resp.status_code == expect_status
@@ -109,13 +111,17 @@ _REJECT_CASES = [
     [(d, s) for _, d, s in _REJECT_CASES],
     ids=[tid for tid, _, _ in _REJECT_CASES],
 )
-def test_save_plugin_rejects_invalid(client, form_data, error_substr):
+def test_save_plugin_rejects_invalid(
+    client: FlaskClient, form_data: Any, error_substr: Any
+) -> None:
     """Plugin validation rejects bad input with a 400 and a descriptive error."""
     _, body = _save_plugin(client, form_data, expect_status=400)
     assert error_substr.lower() in body.get("error", "").lower()
 
 
-def test_image_url_save_rejects_nonsense_url_with_error_body(client):
+def test_image_url_save_rejects_nonsense_url_with_error_body(
+    client: FlaskClient,
+) -> None:
     """Nonsense URLs should fail for URL validation, not an unrelated 400."""
     _, body = _save_plugin(
         client,
@@ -166,7 +172,7 @@ _ACCEPT_CASES = [
     [d for _, d in _ACCEPT_CASES],
     ids=[tid for tid, _ in _ACCEPT_CASES],
 )
-def test_save_plugin_accepts_valid(client, form_data):
+def test_save_plugin_accepts_valid(client: FlaskClient, form_data: Any) -> None:
     """Valid plugin settings are accepted with a 200."""
     _save_plugin(client, form_data, expect_status=200)
 
@@ -176,7 +182,7 @@ def test_save_plugin_accepts_valid(client, form_data):
 # ---------------------------------------------------------------------------
 
 
-def _setup_default_playlist(device_config_dev):
+def _setup_default_playlist(device_config_dev: Any) -> None:
     """Ensure a Default playlist exists for interval-rejection tests."""
     pm = device_config_dev.get_playlist_manager()
     if not pm.get_playlist("Default"):
@@ -190,8 +196,8 @@ def _setup_default_playlist(device_config_dev):
     ids=["above_999", "zero"],
 )
 def test_add_plugin_rejects_bad_interval(
-    client, device_config_dev, interval, instance_name
-):
+    client: FlaskClient, device_config_dev: Any, interval: Any, instance_name: Any
+) -> None:
     _setup_default_playlist(device_config_dev)
     resp = client.post(
         "/add_plugin",
@@ -218,7 +224,7 @@ def test_add_plugin_rejects_bad_interval(
 # ---------------------------------------------------------------------------
 
 
-def test_api_keys_page_js_addrow_uses_password_type():
+def test_api_keys_page_js_addrow_uses_password_type() -> None:
     """JS-built API key rows must use type=password for value inputs."""
     js = _read_js_asset("api_keys_page.js")
     assert 'valInput.type = "password"' in js
@@ -230,14 +236,14 @@ def test_api_keys_page_js_addrow_uses_password_type():
 # ---------------------------------------------------------------------------
 
 
-def test_refresh_settings_manager_js_validates_interval_range():
+def test_refresh_settings_manager_js_validates_interval_range() -> None:
     """The JS RefreshSettingsManager must check interval upper bound (999)."""
     js = _read_js_asset("refresh_settings_manager.js")
     assert "999" in js
     assert "between 1 and 999" in js
 
 
-def test_refresh_settings_manager_js_scheduled_time_hhmm_only():
+def test_refresh_settings_manager_js_scheduled_time_hhmm_only() -> None:
     """JS scheduled-time regex must match backend contract (HH:MM only, no seconds)."""
     js = _read_js_asset("refresh_settings_manager.js")
     # Strict HH:MM-only pattern must be present
@@ -251,13 +257,13 @@ def test_refresh_settings_manager_js_scheduled_time_hhmm_only():
 # ---------------------------------------------------------------------------
 
 
-def test_settings_page_js_benchmark_empty_state_message():
+def test_settings_page_js_benchmark_empty_state_message() -> None:
     """When no benchmark data exists, show a human message instead of null JSON."""
     js = _read_js_asset("settings/diagnostics.js")
     assert "No benchmark data recorded" in js
 
 
-def test_settings_page_js_isolation_human_messages():
+def test_settings_page_js_isolation_human_messages() -> None:
     """Isolation actions should show human-readable messages."""
     js = _read_js_asset("settings/diagnostics.js")
     assert "has been ${past}" in js

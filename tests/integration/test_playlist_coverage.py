@@ -2,12 +2,17 @@
 
 import json
 from datetime import datetime, timedelta
+from typing import Any
 from unittest.mock import MagicMock
+
+import pytest
+from flask import Flask
+from flask.testing import FlaskClient
 
 # --- update_device_cycle endpoint tests ---
 
 
-def test_update_device_cycle_success(client, flask_app):
+def test_update_device_cycle_success(client: FlaskClient, flask_app: Flask) -> None:
     """Successfully update device cycle interval."""
     resp = client.put("/update_device_cycle", json={"minutes": 30})
     assert resp.status_code == 200
@@ -18,7 +23,7 @@ def test_update_device_cycle_success(client, flask_app):
     assert device_config.get_config("plugin_cycle_interval_seconds") == 30 * 60
 
 
-def test_update_device_cycle_min_boundary(client):
+def test_update_device_cycle_min_boundary(client: FlaskClient) -> None:
     """Minimum valid value is 1 minute."""
     resp = client.put("/update_device_cycle", json={"minutes": 1})
     assert resp.status_code == 200
@@ -29,7 +34,7 @@ def test_update_device_cycle_min_boundary(client):
     assert "between 1 and 1440" in resp2.get_json().get("error", "")
 
 
-def test_update_device_cycle_max_boundary(client):
+def test_update_device_cycle_max_boundary(client: FlaskClient) -> None:
     """Maximum valid value is 1440 minutes (24 hours)."""
     resp = client.put("/update_device_cycle", json={"minutes": 1440})
     assert resp.status_code == 200
@@ -39,20 +44,22 @@ def test_update_device_cycle_max_boundary(client):
     assert resp2.status_code == 400
 
 
-def test_update_device_cycle_invalid_minutes(client):
+def test_update_device_cycle_invalid_minutes(client: FlaskClient) -> None:
     """Invalid minutes value."""
     resp = client.put("/update_device_cycle", json={"minutes": "abc"})
     assert resp.status_code == 400
     assert "Invalid minutes" in resp.get_json().get("error", "")
 
 
-def test_update_device_cycle_missing_minutes(client):
+def test_update_device_cycle_missing_minutes(client: FlaskClient) -> None:
     """Missing minutes defaults to 0 which is invalid."""
     resp = client.put("/update_device_cycle", json={})
     assert resp.status_code == 400
 
 
-def test_update_device_cycle_signals_refresh_task(client, flask_app, monkeypatch):
+def test_update_device_cycle_signals_refresh_task(
+    client: FlaskClient, flask_app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Signals refresh task on successful update."""
     mock_signal = MagicMock()
     flask_app.config["REFRESH_TASK"].signal_config_change = mock_signal
@@ -62,10 +69,12 @@ def test_update_device_cycle_signals_refresh_task(client, flask_app, monkeypatch
     mock_signal.assert_called_once()
 
 
-def test_update_device_cycle_handles_signal_exception(client, flask_app, monkeypatch):
+def test_update_device_cycle_handles_signal_exception(
+    client: FlaskClient, flask_app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Handles exception from signal_config_change gracefully."""
 
-    def raise_error():
+    def raise_error() -> None:
         raise RuntimeError("signal failed")
 
     flask_app.config["REFRESH_TASK"].signal_config_change = raise_error
@@ -78,7 +87,7 @@ def test_update_device_cycle_handles_signal_exception(client, flask_app, monkeyp
 # --- create_playlist overlapping times tests ---
 
 
-def test_create_playlist_overlapping_times(client):
+def test_create_playlist_overlapping_times(client: FlaskClient) -> None:
     """Reject playlist with overlapping time window."""
     # Create first playlist
     resp1 = client.post(
@@ -96,7 +105,7 @@ def test_create_playlist_overlapping_times(client):
     assert "overlaps" in resp2.get_json().get("error", "").lower()
 
 
-def test_create_playlist_non_overlapping(client):
+def test_create_playlist_non_overlapping(client: FlaskClient) -> None:
     """Allow non-overlapping playlist."""
     # Create first playlist
     client.post(
@@ -112,7 +121,7 @@ def test_create_playlist_non_overlapping(client):
     assert resp.status_code == 200
 
 
-def test_create_playlist_24hour_end_time(client):
+def test_create_playlist_24hour_end_time(client: FlaskClient) -> None:
     """Playlist with 24:00 end time (midnight next day)."""
     resp = client.post(
         "/create_playlist",
@@ -121,7 +130,7 @@ def test_create_playlist_24hour_end_time(client):
     assert resp.status_code == 200
 
 
-def test_create_playlist_overnight_window(client):
+def test_create_playlist_overnight_window(client: FlaskClient) -> None:
     resp = client.post(
         "/create_playlist",
         json={"playlist_name": "Late", "start_time": "22:00", "end_time": "05:00"},
@@ -132,7 +141,7 @@ def test_create_playlist_overnight_window(client):
 # --- update_playlist overlapping times tests ---
 
 
-def test_update_playlist_overlapping_excluded_self(client):
+def test_update_playlist_overlapping_excluded_self(client: FlaskClient) -> None:
     """Update should not consider current playlist as overlap."""
     # Create two playlists
     client.post(
@@ -152,7 +161,7 @@ def test_update_playlist_overlapping_excluded_self(client):
     assert resp.status_code == 200
 
 
-def test_update_playlist_overlapping_with_other(client):
+def test_update_playlist_overlapping_with_other(client: FlaskClient) -> None:
     """Update that would overlap with another playlist should fail."""
     # Create two playlists
     client.post(
@@ -173,14 +182,16 @@ def test_update_playlist_overlapping_with_other(client):
     assert "overlaps" in resp.get_json().get("error", "").lower()
 
 
-def test_update_playlist_invalid_json_payload(client):
+def test_update_playlist_invalid_json_payload(client: FlaskClient) -> None:
     resp = client.put(
         "/update_playlist/Any", data="not-json", content_type="text/plain"
     )
     assert resp.status_code == 400
 
 
-def test_update_playlist_cycle_minutes_override(client, flask_app):
+def test_update_playlist_cycle_minutes_override(
+    client: FlaskClient, flask_app: Flask
+) -> None:
     """Cycle minutes override is applied."""
     # Create playlist
     client.post(
@@ -209,21 +220,23 @@ def test_update_playlist_cycle_minutes_override(client, flask_app):
 # --- display_next_in_playlist tests ---
 
 
-def test_display_next_in_playlist_missing_name(client):
+def test_display_next_in_playlist_missing_name(client: FlaskClient) -> None:
     """Missing playlist_name returns error."""
     resp = client.post("/display_next_in_playlist", json={})
     assert resp.status_code == 400
     assert "required" in resp.get_json().get("error", "").lower()
 
 
-def test_display_next_in_playlist_not_found(client):
+def test_display_next_in_playlist_not_found(client: FlaskClient) -> None:
     """Non-existent playlist returns error."""
     resp = client.post("/display_next_in_playlist", json={"playlist_name": "NoSuch"})
     assert resp.status_code == 400
     assert "not found" in resp.get_json().get("error", "").lower()
 
 
-def test_display_next_in_playlist_no_eligible(client, flask_app):
+def test_display_next_in_playlist_no_eligible(
+    client: FlaskClient, flask_app: Flask
+) -> None:
     """Playlist with no eligible plugins returns error."""
     pm = flask_app.config["DEVICE_CONFIG"].get_playlist_manager()
     pm.add_playlist("Empty", "00:00", "24:00")
@@ -234,7 +247,9 @@ def test_display_next_in_playlist_no_eligible(client, flask_app):
     assert "no eligible" in resp.get_json().get("error", "").lower()
 
 
-def test_display_next_in_playlist_success(client, flask_app, monkeypatch):
+def test_display_next_in_playlist_success(
+    client: FlaskClient, flask_app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Successfully triggers manual update for next eligible plugin."""
     pm = flask_app.config["DEVICE_CONFIG"].get_playlist_manager()
     pm.add_playlist("Test", "00:00", "24:00")
@@ -262,7 +277,9 @@ def test_display_next_in_playlist_success(client, flask_app, monkeypatch):
 # --- add_plugin scheduled type tests ---
 
 
-def test_add_plugin_scheduled_type_success(client, device_config_dev):
+def test_add_plugin_scheduled_type_success(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     """Successfully add plugin with scheduled refresh type."""
     pm = device_config_dev.get_playlist_manager()
     pm.add_playlist("Default", "00:00", "24:00")
@@ -287,7 +304,7 @@ def test_add_plugin_scheduled_type_success(client, device_config_dev):
 # --- reorder_plugins edge cases ---
 
 
-def test_reorder_plugins_playlist_not_found(client):
+def test_reorder_plugins_playlist_not_found(client: FlaskClient) -> None:
     """Reorder on non-existent playlist returns error."""
     payload = {
         "playlist_name": "NoSuch",
@@ -298,7 +315,7 @@ def test_reorder_plugins_playlist_not_found(client):
     assert "not found" in resp.get_json().get("error", "").lower()
 
 
-def test_reorder_plugins_invalid_order(client, flask_app):
+def test_reorder_plugins_invalid_order(client: FlaskClient, flask_app: Flask) -> None:
     """Invalid order payload returns error."""
     pm = flask_app.config["DEVICE_CONFIG"].get_playlist_manager()
     pm.add_playlist("Test", "00:00", "24:00")
@@ -322,7 +339,7 @@ def test_reorder_plugins_invalid_order(client, flask_app):
     assert resp.status_code == 400
 
 
-def test_reorder_plugins_missing_fields(client):
+def test_reorder_plugins_missing_fields(client: FlaskClient) -> None:
     """Missing required fields returns error."""
     resp = client.post("/reorder_plugins", json={"playlist_name": "Test"})
     assert resp.status_code == 400
@@ -331,7 +348,7 @@ def test_reorder_plugins_missing_fields(client):
 # --- playlist_eta edge cases ---
 
 
-def test_playlist_eta_empty_playlist(client, flask_app):
+def test_playlist_eta_empty_playlist(client: FlaskClient, flask_app: Flask) -> None:
     """ETA for empty playlist returns empty map."""
     pm = flask_app.config["DEVICE_CONFIG"].get_playlist_manager()
     pm.add_playlist("Empty", "00:00", "24:00")
@@ -343,7 +360,7 @@ def test_playlist_eta_empty_playlist(client, flask_app):
     assert j.get("eta") == {}
 
 
-def test_playlist_eta_caching(client, flask_app):
+def test_playlist_eta_caching(client: FlaskClient, flask_app: Flask) -> None:
     """ETA is cached per minute."""
     pm = flask_app.config["DEVICE_CONFIG"].get_playlist_manager()
     pm.add_playlist("Cached", "00:00", "24:00")
@@ -371,7 +388,7 @@ def test_playlist_eta_caching(client, flask_app):
 # --- format_relative_time edge cases ---
 
 
-def test_format_relative_time_no_timezone_assumes_utc():
+def test_format_relative_time_no_timezone_assumes_utc() -> None:
     """Bug 13: Naive datetime without timezone should assume UTC, not raise."""
     from blueprints.playlist import format_relative_time
 
@@ -380,7 +397,7 @@ def test_format_relative_time_no_timezone_assumes_utc():
     assert len(result) > 0
 
 
-def test_format_relative_time_edge_boundaries():
+def test_format_relative_time_edge_boundaries() -> None:
     """Test boundary conditions for relative time formatting."""
     from blueprints.playlist import format_relative_time
 

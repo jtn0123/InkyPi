@@ -3,6 +3,7 @@
 
 import re
 from pathlib import Path
+from typing import Any
 from urllib.parse import urlparse
 
 import pytest
@@ -17,7 +18,7 @@ DOCS_DIR = REPO_ROOT / "docs"
 # ---- Helpers ----
 
 
-def _read(name):
+def _read(name: Any) -> Any:
     return (INSTALL_DIR / name).read_text()
 
 
@@ -26,31 +27,31 @@ def _read(name):
 
 class TestSystemdService:
     @pytest.fixture(autouse=True)
-    def _load(self):
+    def _load(self) -> None:
         self.content = _read("inkypi.service")
 
-    def test_service_has_required_sections(self):
+    def test_service_has_required_sections(self) -> None:
         for section in ["[Unit]", "[Service]", "[Install]"]:
             assert section in self.content
 
-    def test_service_exec_start(self):
+    def test_service_exec_start(self) -> None:
         assert "ExecStart=/usr/local/bin/inkypi run" in self.content
 
-    def test_service_type_notify(self):
+    def test_service_type_notify(self) -> None:
         assert "Type=notify" in self.content
 
-    def test_service_restart_policy(self):
+    def test_service_restart_policy(self) -> None:
         assert "Restart=on-failure" in self.content
         assert "RestartSec=60" in self.content
 
-    def test_service_resource_limits(self):
+    def test_service_resource_limits(self) -> None:
         assert "CPUQuota=40%" in self.content
 
     def test_service_has_no_memory_caps_in_base_unit(self):
         # JTN-785: The base unit must NOT hardcode MemoryHigh/MemoryMax.
         # install.sh and update.sh write device-specific caps to a drop-in at
         # /etc/systemd/system/inkypi.service.d/memory.conf so Pi Zero 2 W
-        # (512 MB) gets a 350M/500M tier while ≥1 GB Pis keep the 250M/350M
+        # (512 MB) -> None -> None gets a 350M/500M tier while ≥1 GB Pis keep the 250M/350M
         # tier. Baking caps into the git-tracked unit file was the root cause
         # of the chromium OOM-kill incident on 512 MB boards.
         assert "MemoryHigh=" not in self.content, (
@@ -66,7 +67,7 @@ class TestSystemdService:
         # JTN-601: During memory crunch on Pi Zero 2 W, earlyoom was killing
         # sshd and making the Pi unreachable. Positive OOMScoreAdjust makes
         # inkypi the preferred OOM victim so we can still SSH in to debug.
-        # Value MUST be positive (+500); a negative value would protect
+        # Value MUST be positive (+500) -> None -> None; a negative value would protect
         # inkypi and sacrifice sshd — the opposite of what we want.
         assert "OOMScoreAdjust=500" in self.content
 
@@ -84,10 +85,10 @@ class TestSystemdService:
         # and get sshd killed — exactly the opposite of what we want.
         assert "OOMScoreAdjust=-500" not in self.content
 
-    def test_service_watchdog(self):
+    def test_service_watchdog(self) -> None:
         assert "WatchdogSec=120" in self.content
 
-    def test_service_execstartpre_checks_install_lockfile(self):
+    def test_service_execstartpre_checks_install_lockfile(self) -> None:
         # JTN-607: Defense-in-depth for JTN-600. If install.sh is running it
         # creates /var/lib/inkypi/.install-in-progress; the service must
         # refuse to start while the lockfile exists so systemd cannot thrash
@@ -119,7 +120,7 @@ class TestSystemdService:
             pre_pos < exec_start_pos
         ), "ExecStartPre must appear before ExecStart in the service file"
 
-    def test_service_working_directory(self):
+    def test_service_working_directory(self) -> None:
         assert "RuntimeDirectory=inkypi" in self.content
         assert "WorkingDirectory=/run/inkypi" in self.content
 
@@ -127,7 +128,7 @@ class TestSystemdService:
         # JTN-671: Without StartLimitBurst the JTN-665 incident demonstrated
         # that inkypi.service can restart 4,091+ times before detection (~68 h
         # @ 60 s apart). StartLimitBurst=5 caps that to 5 attempts in
-        # StartLimitIntervalSec=1800 (30 min), after which systemd enters the
+        # StartLimitIntervalSec=1800 (30 min) -> None -> None, after which systemd enters the
         # "start-limit-hit" state and stops retrying silently.
         assert "StartLimitBurst=5" in self.content, (
             "inkypi.service must set StartLimitBurst=5 in [Unit] to bound "
@@ -153,7 +154,7 @@ class TestSystemdService:
     def test_service_on_failure_references_failure_helper(self):
         # JTN-671: OnFailure= activates the sentinel-writer unit when the
         # start-limit is hit, making the failure detectable without parsing
-        # journalctl (status LED, healthcheck, future webhook).
+        # journalctl (status LED, healthcheck, future webhook) -> None -> None.
         assert "OnFailure=inkypi-failure.service" in self.content, (
             "inkypi.service must declare OnFailure=inkypi-failure.service in "
             "[Unit] so the failure sentinel is written on start-limit-hit (JTN-671)"
@@ -170,10 +171,10 @@ class TestSystemdService:
 
 class TestSystemdFailureService:
     @pytest.fixture(autouse=True)
-    def _load(self):
+    def _load(self) -> None:
         self.content = _read("inkypi-failure.service")
 
-    def test_failure_service_has_required_sections(self):
+    def test_failure_service_has_required_sections(self) -> None:
         # JTN-671: inkypi-failure.service is a oneshot helper activated by
         # OnFailure= in inkypi.service when the start-limit is hit.
         for section in ["[Unit]", "[Service]"]:
@@ -181,12 +182,12 @@ class TestSystemdFailureService:
                 section in self.content
             ), f"inkypi-failure.service must contain a {section} section (JTN-671)"
 
-    def test_failure_service_is_oneshot(self):
+    def test_failure_service_is_oneshot(self) -> None:
         assert (
             "Type=oneshot" in self.content
         ), "inkypi-failure.service must be Type=oneshot (JTN-671)"
 
-    def test_failure_service_writes_sentinel_file(self):
+    def test_failure_service_writes_sentinel_file(self) -> None:
         # The unit must touch /var/lib/inkypi/.start-limit-hit so the
         # healthcheck / status LED can detect the broken service state.
         assert "/var/lib/inkypi/.start-limit-hit" in self.content, (
@@ -200,26 +201,26 @@ class TestSystemdFailureService:
 
 class TestCLIWrapper:
     @pytest.fixture(autouse=True)
-    def _load(self):
+    def _load(self) -> None:
         self.content = _read("inkypi")
 
-    def test_cli_exports_required_vars(self):
+    def test_cli_exports_required_vars(self) -> None:
         for var in ["APPNAME", "PROGRAM_PATH", "VENV_PATH", "PROJECT_DIR", "SRC_DIR"]:
             assert f"export {var}=" in self.content
 
-    def test_cli_routes_run_command(self):
+    def test_cli_routes_run_command(self) -> None:
         assert "run)" in self.content
         assert "run_app" in self.content
 
-    def test_cli_routes_plugin_command(self):
+    def test_cli_routes_plugin_command(self) -> None:
         assert "plugin)" in self.content
         assert "run_plugin_cli" in self.content
 
-    def test_cli_routes_help(self):
+    def test_cli_routes_help(self) -> None:
         assert "-h|--help|help)" in self.content
         assert "usage" in self.content
 
-    def test_cli_unknown_command_exits(self):
+    def test_cli_unknown_command_exits(self) -> None:
         assert "*)" in self.content
         assert "exit 1" in self.content
 
@@ -229,7 +230,7 @@ class TestCLIWrapper:
 
 class TestInstallScript:
     @pytest.fixture(autouse=True)
-    def _load(self):
+    def _load(self) -> None:
         self.content = _read("install.sh")
         # JTN-674: shared helpers (stop_service, setup_zramswap_service,
         # get_os_version, echo_*, show_loader) live in _common.sh and are
@@ -237,31 +238,31 @@ class TestInstallScript:
         # should use self.combined so they keep passing after the refactor.
         self.combined = self.content + "\n" + _read("_common.sh")
 
-    def test_install_enables_spi(self):
+    def test_install_enables_spi(self) -> None:
         assert "dtparam=spi=" in self.content
 
-    def test_install_enables_i2c(self):
+    def test_install_enables_i2c(self) -> None:
         assert "dtparam=i2c_arm=" in self.content
 
-    def test_install_creates_venv(self):
+    def test_install_creates_venv(self) -> None:
         assert "python3 -m venv" in self.content
 
-    def test_install_installs_pip_requirements(self):
+    def test_install_installs_pip_requirements(self) -> None:
         assert "pip install" in self.content
         assert "requirements.txt" in self.content
 
-    def test_install_copies_service_file(self):
+    def test_install_copies_service_file(self) -> None:
         assert "systemctl" in self.content
         assert "enable" in self.content
 
-    def test_install_builds_css(self):
+    def test_install_builds_css(self) -> None:
         assert "build_css" in self.content
 
     def test_install_skips_zramtools_when_zram_swap_already_active(self):
         # JTN-569: Pi OS Trixie preinstalls zram-swap which configures /dev/zram0 at
         # boot. Installing zram-tools on top fights over /dev/zram0 and makes
         # `systemctl start zramswap` exit 1. The guard must run before apt-get.
-        # JTN-674: setup_zramswap_service() now lives in _common.sh — check combined.
+        # JTN-674: setup_zramswap_service() -> None -> None now lives in _common.sh — check combined.
         guard = 'grep -q "^/dev/zram" /proc/swaps'
         apt_install = "apt-get install -y zram-tools"
         assert guard in self.combined
@@ -277,18 +278,18 @@ class TestInstallScript:
     def test_install_enables_zramswap_on_bookworm_and_trixie(self):
         # JTN-528: zramswap must be enabled on Bullseye/Bookworm/Trixie so the
         # Pi Zero 2 W (512 MB RAM) doesn't OOM during pip install. The previous
-        # check only matched Bookworm (12) exactly, leaving Trixie users broken.
+        # check only matched Bookworm (12) -> None -> None exactly, leaving Trixie users broken.
         assert "os_version=$(get_os_version)" in self.content
         assert '[[ "$os_version" =~ ^(11|12|13)$ ]]' in self.content
         assert "setup_zramswap_service" in self.content
         # The skip branch should still exist for unknown future releases.
         assert "skipping zramswap setup" in self.content
 
-    def test_install_waits_for_clock(self):
+    def test_install_waits_for_clock(self) -> None:
         # JTN-592: wait_for_clock function must be defined in install.sh
         assert "wait_for_clock() {" in self.content
 
-    def test_install_calls_wait_for_clock_before_apt(self):
+    def test_install_calls_wait_for_clock_before_apt(self) -> None:
         # JTN-592: wait_for_clock must be called before install_debian_dependencies
         lines = self.content.splitlines()
         wait_line = None
@@ -309,13 +310,13 @@ class TestInstallScript:
             f"install_debian_dependencies (line {apt_line})"
         )
 
-    def test_wait_for_clock_uses_timedatectl(self):
+    def test_wait_for_clock_uses_timedatectl(self) -> None:
         # JTN-592: the function must reference timedatectl to check NTP sync
         assert "timedatectl show -p NTPSynchronized" in self.content
 
     def test_wait_for_clock_warns_but_does_not_fail_on_timeout(self):
         # JTN-592: on timeout the function must return 0, not exit 1
-        # Find the function body between wait_for_clock() { and the closing }
+        # Find the function body between wait_for_clock() -> None -> None { and the closing }
         lines = self.content.splitlines()
         in_func = False
         depth = 0
@@ -340,7 +341,7 @@ class TestInstallScript:
     def test_install_os_version_comment_lists_correct_codenames(self):
         # The comment near get_os_version should list 11/12/13 with correct
         # codenames — including the 'Trixie' typo fix from JTN-528.
-        # JTN-674: get_os_version() now lives in _common.sh — check combined.
+        # JTN-674: get_os_version() -> None -> None now lives in _common.sh — check combined.
         assert "11=Bullseye" in self.combined
         assert "12=Bookworm" in self.combined
         assert "13=Trixie" in self.combined
@@ -355,7 +356,7 @@ class TestInstallScript:
 
         # Parse "# Get OS release number, e.g. 11=Bullseye, 12=Bookworm, 13=Trixie"
         # Capture every "<digit(s)>=<Codename>" pair from the comment line
-        # immediately above the get_os_version() function definition.
+        # immediately above the get_os_version() -> None -> None function definition.
         comment_versions = set()
         lines = self.combined.splitlines()
         for i, line in enumerate(lines):
@@ -393,11 +394,11 @@ class TestInstallScript:
 
     def test_install_disables_dphys_swapfile_when_zram_active(self):
         # JTN-593: maybe_disable_dphys_swapfile must be defined in install.sh
-        # so it can reclaim /var/swap (~425 MB) when zram is already active.
+        # so it can reclaim /var/swap (~425 MB) -> None -> None when zram is already active.
         assert "maybe_disable_dphys_swapfile()" in self.content
         assert "dphys-swapfile" in self.content
 
-    def test_install_calls_disable_dphys_after_zramswap(self):
+    def test_install_calls_disable_dphys_after_zramswap(self) -> None:
         # JTN-593: The call to maybe_disable_dphys_swapfile must appear AFTER
         # the zramswap setup conditional and BEFORE setup_earlyoom_service so
         # we never attempt to reclaim /var/swap before zram is guaranteed active.
@@ -421,7 +422,7 @@ class TestInstallScript:
             "and before setup_earlyoom_service in install.sh"
         )
 
-    def test_install_configures_persistent_journal_via_shared_helper(self):
+    def test_install_configures_persistent_journal_via_shared_helper(self) -> None:
         assert "configure_persistent_journal() {" in self.combined
         assert "Storage=persistent" in self.combined
         assert "SystemMaxUse=50M" in self.combined
@@ -437,7 +438,7 @@ class TestInstallScript:
             "and before copying the repo into place"
         )
 
-    def test_install_disables_wifi_powersave_via_shared_helper(self):
+    def test_install_disables_wifi_powersave_via_shared_helper(self) -> None:
         assert "disable_wifi_powersave() {" in self.combined
         assert "iw dev wlan0 set power_save off" in self.combined
         assert "100-inkypi-wifi-powersave.conf" in self.combined
@@ -453,7 +454,7 @@ class TestInstallScript:
             "before the source/venv work begins"
         )
 
-    def test_disable_dphys_only_runs_when_zram_active(self):
+    def test_disable_dphys_only_runs_when_zram_active(self) -> None:
         # JTN-593: The function must check /proc/swaps for /dev/zram BEFORE
         # removing anything — it must be a no-op on systems without zram.
         fn_start = self.content.index("maybe_disable_dphys_swapfile() {")
@@ -475,7 +476,7 @@ class TestInstallScript:
             guard_pos < rm_pos
         ), "/dev/zram guard must appear before rm -f /var/swap in maybe_disable_dphys_swapfile()"
 
-    def test_disable_dphys_does_not_fail_if_package_missing(self):
+    def test_disable_dphys_does_not_fail_if_package_missing(self) -> None:
         # JTN-593: All dphys-swapfile commands must have || true guards so the
         # function is safe on systems where the package is already gone.
         fn_start = self.content.index("maybe_disable_dphys_swapfile() {")
@@ -502,7 +503,7 @@ class TestInstallScript:
         # JTN-600: stop_service() must DISABLE (not just stop) the service so
         # systemd cannot auto-restart the half-installed service during the ~15 min
         # install window and cause a memory-thrash cascade on the Pi Zero 2 W.
-        # JTN-674: stop_service() now lives in _common.sh — check combined.
+        # JTN-674: stop_service() -> None -> None now lives in _common.sh — check combined.
         fn_start = self.combined.index("stop_service() {")
         fn_end = self.combined.index("\n}", fn_start)
         fn_body = self.combined[fn_start:fn_end]
@@ -513,7 +514,7 @@ class TestInstallScript:
 
     def test_install_re_enables_service_at_end(self):
         # JTN-600: Regression guard — install_app_service() must re-enable the
-        # service at the end of the install after stop_service() disabled it.
+        # service at the end of the install after stop_service() -> None -> None disabled it.
         fn_start = self.content.index("install_app_service() {")
         fn_end = self.content.index("\n}", fn_start)
         fn_body = self.content[fn_start:fn_end]
@@ -523,7 +524,7 @@ class TestInstallScript:
         )
 
     def test_install_app_service_installs_failure_helper(self):
-        # JTN-671: install_app_service() must also copy inkypi-failure.service
+        # JTN-671: install_app_service() -> None -> None must also copy inkypi-failure.service
         # into /etc/systemd/system/ so the OnFailure= directive can resolve.
         fn_start = self.content.index("install_app_service() {")
         fn_end = self.content.index("\n}", fn_start)
@@ -538,7 +539,7 @@ class TestInstallScript:
         # early in the main script body (after check_permissions) so any
         # concurrent systemctl start attempt hits the ExecStartPre guard.
         # Locate the call site — must appear after check_permissions and
-        # before the later install steps (install_debian_dependencies etc.).
+        # before the later install steps (install_debian_dependencies etc.) -> None -> None.
         assert (
             "/var/lib/inkypi" in self.content
         ), "install.sh must reference /var/lib/inkypi for the lockfile (JTN-607)"
@@ -575,7 +576,7 @@ class TestInstallScript:
         # start. The removal must come AFTER install_app_service and the CSS
         # build so a failure in any earlier step leaves the lockfile in place.
         # JTN-674: CSS build is now called via build_css_bundle (shared helper
-        # in _common.sh). The call site is still in install.sh's main body.
+        # in _common.sh) -> None -> None. The call site is still in install.sh's main body.
         main_start = self.content.index('parse_arguments "$@"')
         main_body = self.content[main_start:]
 
@@ -602,7 +603,7 @@ class TestInstallScript:
         # JTN-695: systemctl enable / install_app_service must only run AFTER
         # vendor download + CSS build both succeed. If either step fails, the
         # service must be left untouched so `systemctl is-enabled inkypi`
-        # reflects reality (not "enabled but main.css missing").
+        # reflects reality (not "enabled but main.css missing") -> None -> None.
         main_start = self.content.index('parse_arguments "$@"')
         main_body = self.content[main_start:]
 
@@ -627,7 +628,7 @@ class TestInstallScript:
         # JTN-695: After build_css_bundle, install.sh must assert that
         # src/static/styles/main.css exists AND is non-empty (`-s`) before the
         # service is enabled. This catches silent truncation where the file
-        # exists (so `-f` passes) but is zero bytes — which would otherwise
+        # exists (so `-f` passes) -> None -> None but is zero bytes — which would otherwise
         # slip past build_css_bundle's existence-only check and leave the
         # service enabled against an unusable stylesheet.
         main_start = self.content.index('parse_arguments "$@"')
@@ -656,7 +657,7 @@ class TestInstallScript:
 
     def test_install_lockfile_not_removed_by_error_trap(self):
         # JTN-607: On failure exit, the lockfile must be LEFT in place so the
-        # user is forced to rerun install.sh (or manually rm the file) before
+        # user is forced to rerun install.sh (or manually rm the file) -> None -> None before
         # the service can start. This means there must be NO trap that
         # removes the lockfile on EXIT/ERR/INT/TERM — only the explicit
         # rm -f at the end of a successful run.
@@ -672,7 +673,7 @@ class TestInstallScript:
                 f"rerun install.sh before the service can start (JTN-607): {line!r}"
             )
 
-    def test_install_uses_flock_concurrent_guard(self):
+    def test_install_uses_flock_concurrent_guard(self) -> None:
         # JTN-696: install.sh must acquire an `flock -n` on a well-known lock
         # path before running the real install steps, so two simultaneous
         # `sudo bash install.sh` invocations fail fast instead of racing
@@ -710,7 +711,7 @@ class TestInstallScript:
         )
 
     def test_install_uses_atomic_swap_not_in_place_rm(self):
-        # JTN-696: install_src() must NOT do an in-place `rm -rf
+        # JTN-696: install_src() -> None -> None must NOT do an in-place `rm -rf
         # "$INSTALL_PATH"` — that pattern left dangling symlinks / a
         # half-populated directory if the user hit Ctrl+C mid-delete.
         # The replacement pattern stages the new tree, then swaps it in
@@ -739,7 +740,7 @@ class TestInstallScript:
         # JTN-696: The EXIT trap added to clean up staging dirs on an
         # interrupted install must NOT touch $LOCKFILE (that would defeat
         # JTN-607) and must NOT rm -rf $INSTALL_PATH itself (that would
-        # destroy the prior install we're trying to protect).
+        # destroy the prior install we're trying to protect) -> None -> None.
         trap_lines = [
             line
             for line in self.content.splitlines()
@@ -771,7 +772,7 @@ class TestInstallScript:
     def test_stop_service_disable_tolerates_already_disabled(self):
         # JTN-600: The disable call must not fail if the service is already
         # disabled (e.g. fresh install). Must use '|| true' or '2>/dev/null'.
-        # JTN-674: stop_service() now lives in _common.sh — check combined.
+        # JTN-674: stop_service() -> None -> None now lives in _common.sh — check combined.
         fn_start = self.combined.index("stop_service() {")
         fn_end = self.combined.index("\n}", fn_start)
         fn_body = self.combined[fn_start:fn_end]
@@ -789,7 +790,7 @@ class TestInstallScript:
     def test_install_uses_no_cache_dir(self):
         # JTN-602: every pip install invocation in install.sh must include
         # --no-cache-dir to avoid wasting ~200 MB of SD card space and ~50 MB
-        # of RAM on a Pi Zero 2 W (pip runs once per install cycle, cache is useless).
+        # of RAM on a Pi Zero 2 W (pip runs once per install cycle, cache is useless) -> None -> None.
         pip_install_lines = [
             line.strip()
             for line in self.content.splitlines()
@@ -802,7 +803,7 @@ class TestInstallScript:
             ), f"pip install invocation is missing --no-cache-dir (JTN-602): {line!r}"
 
     def test_install_installs_uv_into_venv(self):
-        # JTN-605: uv (Rust-based pip replacement) must be installed into the
+        # JTN-605: uv (Rust-based pip replacement) -> None -> None must be installed into the
         # venv BEFORE the main dependency install so the resolver uses ~10-20 MB
         # peak instead of pip's ~100-150 MB on a Pi Zero 2 W.
         lines = self.content.splitlines()
@@ -858,7 +859,7 @@ class TestInstallScript:
     def test_install_uses_uv_for_main_dependency_install(self):
         # JTN-605: the main dependency install should prefer uv when available.
         # Structural: there must be a `uv pip install ... -r ... requirements.txt`
-        # invocation in create_venv() that carries --no-cache and --require-hashes.
+        # invocation in create_venv() -> None -> None that carries --no-cache and --require-hashes.
         fn_start = self.content.index("create_venv(){")
         fn_end_marker = "\n}"
         fn_end = self.content.index(fn_end_marker, fn_start)
@@ -898,7 +899,7 @@ class TestInstallScript:
         # --default-timeout as a CLI flag; it reads UV_HTTP_TIMEOUT from the
         # environment. Every `uv pip install` invocation must prefix
         # UV_HTTP_TIMEOUT (on the same source line as the command, so bash
-        # scopes it to that subprocess only) otherwise uv can block
+        # scopes it to that subprocess only) -> None -> None otherwise uv can block
         # indefinitely on a network hiccup.
         fn_start = self.content.index("create_venv(){")
         fn_end = self.content.index("\n}", fn_start)
@@ -923,7 +924,7 @@ class TestInstallScript:
         # JTN-605: if uv cannot be installed or run (e.g. unsupported arch,
         # wheel download failure), install.sh must cleanly fall back to plain
         # pip. Structural grep: both a uv branch and a pip fallback branch must
-        # exist inside create_venv(), and the pip fallback must still install
+        # exist inside create_venv() -> None -> None, and the pip fallback must still install
         # the main requirements.
         fn_start = self.content.index("create_venv(){")
         fn_end = self.content.index("\n}", fn_start)
@@ -957,7 +958,7 @@ class TestInstallScript:
         assert "--require-hashes" in joined
         assert "--no-cache-dir" in joined
 
-    def test_install_uv_path_available_before_main_install(self):
+    def test_install_uv_path_available_before_main_install(self) -> Any:
         # JTN-605: uv must be installed into the venv BEFORE the main
         # dependency install — otherwise the uv branch can never be taken.
         fn_start = self.content.index("create_venv(){")
@@ -993,7 +994,7 @@ class TestInstallScript:
         ), "uv must be installed into the venv before the first 'uv pip install' call"
 
     def test_install_no_cache_dir_in_all_venv_pip_calls(self):
-        # JTN-602: parse the create_venv() function body and assert every
+        # JTN-602: parse the create_venv() -> None -> None function body and assert every
         # pip install call inside it carries --no-cache-dir.
         lines = self.content.splitlines()
 
@@ -1044,10 +1045,10 @@ class TestCommonWheelhouseFunctions:
     """
 
     @pytest.fixture(autouse=True)
-    def _load(self):
+    def _load(self) -> None:
         self.content = _read("_common.sh")
 
-    def _fetch_fn_body(self):
+    def _fetch_fn_body(self) -> Any:
         fn_start = self.content.index("fetch_wheelhouse() {")
         # Function body ends at the first matching closing brace at depth 0.
         depth = 0
@@ -1063,11 +1064,11 @@ class TestCommonWheelhouseFunctions:
             i += 1
         raise AssertionError("fetch_wheelhouse() body not terminated")
 
-    def test_fetch_wheelhouse_function_defined(self):
+    def test_fetch_wheelhouse_function_defined(self) -> None:
         assert "fetch_wheelhouse() {" in self.content
         assert "cleanup_wheelhouse() {" in self.content
 
-    def test_respects_skip_opt_out_env_var(self):
+    def test_respects_skip_opt_out_env_var(self) -> None:
         # INKYPI_SKIP_WHEELHOUSE=1 must short-circuit the fetch before any
         # network call. The check must live near the top of the function.
         body = self._fetch_fn_body()
@@ -1080,14 +1081,14 @@ class TestCommonWheelhouseFunctions:
             skip_pos < curl_pos
         ), "INKYPI_SKIP_WHEELHOUSE check must precede the curl download"
 
-    def test_uses_uname_to_pick_arch(self):
+    def test_uses_uname_to_pick_arch(self) -> None:
         body = self._fetch_fn_body()
         assert "uname -m" in body
         # Must support both Pi Zero 2 W (armv7l) and Pi 4/5 (aarch64/arm64).
         assert "armv7l" in body
         assert "aarch64" in body
 
-    def test_downloads_from_jtn0123_fork(self):
+    def test_downloads_from_jtn0123_fork(self) -> None:
         # The wheelhouse download URL must target the fork, not upstream,
         # since that's where our release workflow publishes artifacts.
         body = self._fetch_fn_body()
@@ -1098,13 +1099,13 @@ class TestCommonWheelhouseFunctions:
         assert "releases/download" in body
         assert "fatihak/InkyPi" not in body
 
-    def test_fetch_reads_version_file(self):
+    def test_fetch_reads_version_file(self) -> None:
         body = self._fetch_fn_body()
         # Must derive the tag from the VERSION file rather than hard-coding it.
         assert "VERSION" in body
         assert "$SCRIPT_DIR/../VERSION" in body
 
-    def test_fetch_is_graceful_on_curl_failure(self):
+    def test_fetch_is_graceful_on_curl_failure(self) -> None:
         body = self._fetch_fn_body()
         # On curl failure we must return 1 (not exit) and clean up the temp dir
         # so the caller can continue with the normal source install.
@@ -1115,7 +1116,7 @@ class TestCommonWheelhouseFunctions:
         # see in logs which path was taken.
         assert "falling back" in body.lower()
 
-    def test_fetch_verifies_optional_checksum(self):
+    def test_fetch_verifies_optional_checksum(self) -> None:
         body = self._fetch_fn_body()
         # Checksum verification must be opportunistic — a missing sha256 file
         # is OK (continues), but a mismatch must fail and fall back.
@@ -1123,13 +1124,13 @@ class TestCommonWheelhouseFunctions:
         assert "sha256sum" in body or "shasum -a 256" in body
         assert "checksum mismatch" in body.lower()
 
-    def test_fetch_checks_tarball_has_wheels(self):
+    def test_fetch_checks_tarball_has_wheels(self) -> None:
         # Guard against an empty or corrupted tarball masquerading as a
         # successful bundle — at least one .whl must exist after extract.
         body = self._fetch_fn_body()
         assert "*.whl" in body
 
-    def test_fetch_sets_temp_dir_and_cleans_on_failure(self):
+    def test_fetch_sets_temp_dir_and_cleans_on_failure(self) -> None:
         body = self._fetch_fn_body()
         # mktemp must be used so parallel invocations don't collide, and
         # every failure path must rm -rf the temp dir.
@@ -1139,7 +1140,7 @@ class TestCommonWheelhouseFunctions:
     def test_fetch_wheelhouse_verifies_integrity(self):
         # JTN-697: After extraction, every wheel must be integrity-checked.
         # The original "at least one .whl exists" gate let truncated bundles
-        # (zero-byte numpy wheels, corrupt zips) pass, with ImportError only
+        # (zero-byte numpy wheels, corrupt zips) -> None -> None pass, with ImportError only
         # surfacing on first display refresh.
         body = self._fetch_fn_body()
 
@@ -1180,7 +1181,9 @@ class TestCommonWheelhouseFunctions:
         assert "Wheelhouse integrity check failed" in body
         assert "manifest sha256 mismatch" in body.lower()
 
-    def test_fetch_wheelhouse_rejects_empty_wheel_integration(self, tmp_path):
+    def test_fetch_wheelhouse_rejects_empty_wheel_integration(
+        self, tmp_path: Path
+    ) -> None:
         # JTN-697 integration: craft a wheelhouse tarball containing a
         # zero-byte .whl, then invoke fetch_wheelhouse with curl stubbed
         # to serve it from disk. Expect non-zero exit + empty WHEELHOUSE_DIR.
@@ -1272,15 +1275,15 @@ class TestInstallWheelhouseFetch:
     """
 
     @pytest.fixture(autouse=True)
-    def _load(self):
+    def _load(self) -> None:
         self.content = _read("install.sh")
 
-    def test_install_sources_common(self):
+    def test_install_sources_common(self) -> None:
         # JTN-669: functions live in _common.sh now; install.sh must source it.
         assert "_common.sh" in self.content
         assert 'source "$SCRIPT_DIR/_common.sh"' in self.content
 
-    def test_create_venv_calls_fetch_wheelhouse(self):
+    def test_create_venv_calls_fetch_wheelhouse(self) -> None:
         # fetch_wheelhouse must be invoked from inside create_venv so the
         # bundle is downloaded before the main pip install runs.
         fn_start = self.content.index("create_venv(){")
@@ -1296,7 +1299,7 @@ class TestInstallWheelhouseFetch:
         assert "fetch_wheelhouse" in body
         assert "cleanup_wheelhouse" in body
 
-    def test_pip_install_uses_find_links_when_available(self):
+    def test_pip_install_uses_find_links_when_available(self) -> None:
         # create_venv must pass --find-links $WHEELHOUSE_DIR --prefer-binary
         # to the main pip install so local wheels take precedence.
         fn_start = self.content.index("create_venv(){")
@@ -1312,7 +1315,7 @@ class TestInstallWheelhouseFetch:
         assert "--prefer-binary" in body
         assert "WHEELHOUSE_DIR" in body
 
-    def test_no_cache_dir_still_present_after_wheelhouse_change(self):
+    def test_no_cache_dir_still_present_after_wheelhouse_change(self) -> None:
         # Regression guard for JTN-602 — the wheelhouse change must not
         # accidentally drop --no-cache-dir from create_venv's pip calls.
         fn_start = self.content.index("create_venv(){")
@@ -1341,24 +1344,24 @@ class TestWheelhouseBuildWorkflow:
     WORKFLOW_PATH = REPO_ROOT / ".github" / "workflows" / "build-wheelhouse.yml"
 
     @pytest.fixture(autouse=True)
-    def _load(self):
+    def _load(self) -> None:
         assert (
             self.WORKFLOW_PATH.exists()
         ), f"Expected workflow file at {self.WORKFLOW_PATH}"
         self.content = self.WORKFLOW_PATH.read_text()
 
-    def test_workflow_triggers_on_release_published(self):
+    def test_workflow_triggers_on_release_published(self) -> None:
         # The workflow must run on release publish so every tagged release
         # automatically gets a wheelhouse attached.
         assert "release:" in self.content
         assert "published" in self.content
 
-    def test_workflow_supports_manual_rebuild(self):
+    def test_workflow_supports_manual_rebuild(self) -> None:
         # workflow_dispatch lets maintainers rebuild a wheelhouse for an
         # existing tag without cutting a new release.
         assert "workflow_dispatch:" in self.content
 
-    def test_workflow_supports_reusable_invocation(self):
+    def test_workflow_supports_reusable_invocation(self) -> None:
         # JTN-745: release.yml calls this workflow directly so a failed
         # wheelhouse upload makes the main Release workflow fail too.
         assert "workflow_call:" in self.content
@@ -1366,44 +1369,44 @@ class TestWheelhouseBuildWorkflow:
         assert "required: true" in self.content
 
     def test_workflow_builds_both_target_architectures(self):
-        # Pi Zero 2 W (armv7) + Pi 4/5 (aarch64) are the two supported
+        # Pi Zero 2 W (armv7) + Pi 4/5 (aarch64) -> None -> None are the two supported
         # InkyPi targets — both must be built.
         assert "linux_armv7l" in self.content
         assert "linux_aarch64" in self.content
         assert "linux/arm/v7" in self.content
         assert "linux/arm64" in self.content
 
-    def test_workflow_uses_qemu_and_docker(self):
+    def test_workflow_uses_qemu_and_docker(self) -> None:
         # The wheels are built inside a QEMU-emulated Debian Trixie container
         # so wheel tags match what the Pi will install them against.
         assert "docker/setup-qemu-action" in self.content
         assert "debian:trixie" in self.content
 
-    def test_workflow_installs_native_build_dependencies(self):
+    def test_workflow_installs_native_build_dependencies(self) -> None:
         # JTN-745 regression guards: armv7l source builds need libsystemd-dev
         # for cysystemd and libheif-dev for pi-heif when PyPI lacks a wheel.
         assert "libsystemd-dev" in self.content
         assert "libheif-dev" in self.content
 
-    def test_workflow_runs_pip_wheel_against_requirements(self):
+    def test_workflow_runs_pip_wheel_against_requirements(self) -> None:
         assert "pip wheel" in self.content
         assert "install/requirements.txt" in self.content
 
-    def test_workflow_produces_expected_tarball_name(self):
+    def test_workflow_produces_expected_tarball_name(self) -> None:
         # Name must exactly match the format install.sh downloads.
         assert "inkypi-wheels-" in self.content
         assert ".tar.gz" in self.content
 
-    def test_workflow_uploads_release_asset(self):
+    def test_workflow_uploads_release_asset(self) -> None:
         assert "softprops/action-gh-release" in self.content
 
-    def test_workflow_attaches_sha256_alongside_tarball(self):
+    def test_workflow_attaches_sha256_alongside_tarball(self) -> None:
         # sha256 checksum must travel with the tarball so install.sh can
         # verify the download.
         assert "sha256sum" in self.content
         assert ".sha256" in self.content
 
-    def test_workflow_publishes_per_wheel_manifest(self):
+    def test_workflow_publishes_per_wheel_manifest(self) -> None:
         # JTN-697: In addition to the tarball-level sha256, publish a
         # per-wheel sha256 manifest so install.sh can detect individual
         # truncated/corrupt wheels hiding inside an otherwise-valid tarball.
@@ -1419,13 +1422,13 @@ class TestPiImageBuildWorkflow:
     WORKFLOW_PATH = REPO_ROOT / ".github" / "workflows" / "build-pi-image.yml"
 
     @pytest.fixture(autouse=True)
-    def _load(self):
+    def _load(self) -> None:
         assert (
             self.WORKFLOW_PATH.exists()
         ), f"Expected workflow file at {self.WORKFLOW_PATH}"
         self.content = self.WORKFLOW_PATH.read_text()
 
-    def test_workflow_is_valid_yaml(self):
+    def test_workflow_is_valid_yaml(self) -> None:
         import yaml
 
         doc = yaml.safe_load(self.content)
@@ -1434,17 +1437,17 @@ class TestPiImageBuildWorkflow:
         assert "on" in doc or True in doc
         assert "jobs" in doc
 
-    def test_workflow_triggers_on_release_published(self):
+    def test_workflow_triggers_on_release_published(self) -> None:
         # Must run on every tagged release so each release ships an image.
         assert "release:" in self.content
         assert "published" in self.content
 
     def test_workflow_supports_manual_rebuild(self):
         # workflow_dispatch lets maintainers rebuild an image for an existing
-        # tag without cutting a new release (same pattern as JTN-604).
+        # tag without cutting a new release (same pattern as JTN-604) -> None -> None.
         assert "workflow_dispatch:" in self.content
 
-    def test_workflow_pins_pi_os_image_url_in_env_block(self):
+    def test_workflow_pins_pi_os_image_url_in_env_block(self) -> None:
         # The Pi OS base image URL must live in a clearly-labeled top-of-file
         # variable so bumping the base image is a single-line change.
         match = re.search(r"PI_OS_IMAGE_URL:\s*(https?://\S+)", self.content)
@@ -1456,7 +1459,7 @@ class TestPiImageBuildWorkflow:
             "maintainers know exactly how to bump the Pi OS image"
         )
 
-    def test_workflow_pins_pi_os_image_sha256(self):
+    def test_workflow_pins_pi_os_image_sha256(self) -> None:
         # Defense against a compromised CDN — SHA must travel with the URL.
         assert "PI_OS_IMAGE_SHA256:" in self.content
         # A real 64-char lowercase hex sha256 must be present in the env
@@ -1466,11 +1469,11 @@ class TestPiImageBuildWorkflow:
             sha_match is not None
         ), "PI_OS_IMAGE_SHA256 must be a 64-char lowercase hex digest"
 
-    def test_workflow_verifies_base_image_checksum(self):
+    def test_workflow_verifies_base_image_checksum(self) -> None:
         # The downloaded base image must be checksum-verified before use.
         assert "sha256sum -c" in self.content
 
-    def test_workflow_uses_qemu_user_static_and_chroot(self):
+    def test_workflow_uses_qemu_user_static_and_chroot(self) -> None:
         # Building arm64 binaries on an x86_64 runner requires
         # qemu-user-static for binfmt + chroot + copy of qemu-aarch64-static
         # into the mounted rootfs.
@@ -1478,14 +1481,14 @@ class TestPiImageBuildWorkflow:
         assert "qemu-aarch64-static" in self.content
         assert "chroot" in self.content
 
-    def test_workflow_bind_mounts_proc_sys_dev(self):
+    def test_workflow_bind_mounts_proc_sys_dev(self) -> None:
         # chroot needs /proc, /sys, /dev visible for install.sh to succeed.
         assert "/proc" in self.content
         assert "/sys" in self.content
         assert "/dev" in self.content
         assert "mount --bind" in self.content
 
-    def test_workflow_clones_at_release_tag_not_main(self):
+    def test_workflow_clones_at_release_tag_not_main(self) -> None:
         # Must build from the release tag so install.sh/requirements match
         # the shipped version.
         assert "--branch" in self.content
@@ -1494,11 +1497,11 @@ class TestPiImageBuildWorkflow:
         assert "--branch main" not in self.content
         assert "--branch master" not in self.content
 
-    def test_workflow_runs_install_sh_in_chroot(self):
+    def test_workflow_runs_install_sh_in_chroot(self) -> None:
         # The whole point — chroot + install.sh is what produces the image.
         assert "install/install.sh" in self.content or "install.sh" in self.content
 
-    def test_workflow_does_not_modify_install_sh(self):
+    def test_workflow_does_not_modify_install_sh(self) -> None:
         # JTN-533 constraint: install.sh must stay self-contained for
         # source-install users. The workflow uses PATH stubs, not a patched
         # install.sh, to deal with raspi-config/systemctl in a chroot.
@@ -1515,7 +1518,7 @@ class TestPiImageBuildWorkflow:
             )
         )
 
-    def test_workflow_pishrink_pinned_by_commit(self):
+    def test_workflow_pishrink_pinned_by_commit(self) -> None:
         # pishrink.sh has no tagged releases — must be pinned by full SHA.
         assert "PISHRINK_COMMIT:" in self.content
         sha_match = re.search(r"PISHRINK_COMMIT:\s*([0-9a-f]{40})", self.content)
@@ -1523,25 +1526,25 @@ class TestPiImageBuildWorkflow:
             sha_match is not None
         ), "PISHRINK_COMMIT must be a 40-char lowercase hex commit SHA"
 
-    def test_workflow_runs_pishrink(self):
+    def test_workflow_runs_pishrink(self) -> None:
         assert "pishrink.sh" in self.content
 
-    def test_workflow_zero_fills_free_space_before_compression(self):
+    def test_workflow_zero_fills_free_space_before_compression(self) -> None:
         # Better xz ratio — zero-fill unused blocks so they compress away.
         assert "dd if=/dev/zero" in self.content
 
-    def test_workflow_recompresses_with_xz(self):
+    def test_workflow_recompresses_with_xz(self) -> None:
         assert "xz -9" in self.content
 
-    def test_workflow_produces_expected_image_name(self):
+    def test_workflow_produces_expected_image_name(self) -> None:
         assert "inkypi-" in self.content
         assert "pi-zero-2-w.img" in self.content
 
-    def test_workflow_generates_sha256_sidecar(self):
+    def test_workflow_generates_sha256_sidecar(self) -> None:
         assert "sha256sum" in self.content
         assert ".sha256" in self.content
 
-    def test_workflow_has_boot_verification_job(self):
+    def test_workflow_has_boot_verification_job(self) -> None:
         # JTN-533: unverified images must not ship. A separate job boots the
         # image in qemu and grep's for "login:" before attach-release runs.
         assert "verify-boot" in self.content or "boot-verify" in self.content
@@ -1550,7 +1553,7 @@ class TestPiImageBuildWorkflow:
         )
         assert "login:" in self.content
 
-    def test_workflow_attach_release_requires_boot_verification(self):
+    def test_workflow_attach_release_requires_boot_verification(self) -> None:
         # The attach job must `needs: verify-boot` AND gate on its verified
         # output so a failed boot cannot silently upload an image.
         assert "needs: [build-image, verify-boot]" in self.content or (
@@ -1560,18 +1563,18 @@ class TestPiImageBuildWorkflow:
 
     def test_workflow_uses_pinned_action_versions(self):
         # Supply-chain: every external action must be pinned by major version.
-        # (SHA pinning is stronger but the rest of the repo uses @v4/@v2.)
+        # (SHA pinning is stronger but the rest of the repo uses @v4/@v2.) -> None -> None
         assert "actions/checkout@v4" in self.content
         assert "softprops/action-gh-release@v2" in self.content
         assert "actions/upload-artifact@v4" in self.content
         assert "actions/download-artifact@v4" in self.content
 
-    def test_workflow_uploads_release_asset(self):
+    def test_workflow_uploads_release_asset(self) -> None:
         assert "softprops/action-gh-release" in self.content
 
     def test_workflow_attach_gated_on_release_event(self):
         # attach-release step must only fire on `release` events, never on
-        # workflow_dispatch (which is a dry run).
+        # workflow_dispatch (which is a dry run) -> None -> None.
         assert "github.event_name == 'release'" in self.content
 
 
@@ -1581,18 +1584,18 @@ class TestReleaseWorkflow:
     WORKFLOW_PATH = REPO_ROOT / ".github" / "workflows" / "release.yml"
 
     @pytest.fixture(autouse=True)
-    def _load(self):
+    def _load(self) -> None:
         assert (
             self.WORKFLOW_PATH.exists()
         ), f"Expected workflow file at {self.WORKFLOW_PATH}"
         self.content = self.WORKFLOW_PATH.read_text()
 
-    def test_release_exports_tag_for_downstream_jobs(self):
+    def test_release_exports_tag_for_downstream_jobs(self) -> None:
         assert "outputs:" in self.content
         assert "steps.resolve_tag.outputs.tag" in self.content
         assert "steps.resolve_tag.outputs.released" in self.content
 
-    def test_release_invokes_reusable_wheelhouse_workflow(self):
+    def test_release_invokes_reusable_wheelhouse_workflow(self) -> None:
         assert "uses: ./.github/workflows/build-wheelhouse.yml" in self.content
         assert "needs: release" in self.content
         assert "needs.release.outputs.released == 'true'" in self.content
@@ -1603,24 +1606,24 @@ class TestInstallationDocPreBuiltImage:
     """JTN-533: docs/installation.md must surface the pre-built image path."""
 
     @pytest.fixture(autouse=True)
-    def _load(self):
+    def _load(self) -> None:
         self.content = (DOCS_DIR / "installation.md").read_text()
 
-    def test_documents_prebuilt_image_option(self):
+    def test_documents_prebuilt_image_option(self) -> None:
         # Users should see the .img.xz option front and center.
         assert "Pre-built image" in self.content or "pre-built image" in self.content
 
-    def test_documents_image_file_extension(self):
+    def test_documents_image_file_extension(self) -> None:
         assert ".img.xz" in self.content
 
-    def test_documents_sha256_verification(self):
+    def test_documents_sha256_verification(self) -> None:
         assert ".sha256" in self.content
 
-    def test_documents_pi_zero_2_w_only_scope(self):
+    def test_documents_pi_zero_2_w_only_scope(self) -> None:
         # Callers on other Pi models must be pointed at install.sh instead.
         assert "Pi Zero 2 W" in self.content
 
-    def test_references_jtn_533(self):
+    def test_references_jtn_533(self) -> None:
         assert "JTN-533" in self.content
 
 
@@ -1639,10 +1642,10 @@ class TestUpdateVendorsScript:
     """
 
     @pytest.fixture(autouse=True)
-    def _load(self):
+    def _load(self) -> None:
         self.content = _read("update_vendors.sh")
 
-    def test_script_anchors_cwd_to_repo_root(self):
+    def test_script_anchors_cwd_to_repo_root(self) -> None:
         # The fix uses BASH_SOURCE + cd. Assert both pieces are present so
         # a future refactor can't accidentally drop the cd without tripping
         # this regression gate.
@@ -1654,7 +1657,7 @@ class TestUpdateVendorsScript:
             "cd " in self.content
         ), "update_vendors.sh must cd to the repo root before invoking curl"
 
-    def test_script_mentions_jtn_615(self):
+    def test_script_mentions_jtn_615(self) -> None:
         assert "JTN-615" in self.content, (
             "update_vendors.sh should reference JTN-615 in a comment explaining "
             "the cwd-anchoring requirement so the intent survives future edits"
@@ -1664,7 +1667,7 @@ class TestUpdateVendorsScript:
         # Every VENDORS entry has the form "name|url|output_path" on its own
         # line inside the `declare -a VENDORS=( ... )` block. The output paths
         # must still start with `src/static/` (not `../src/static/` or an
-        # absolute path) — the fix is to cd *into* the repo root, not to
+        # absolute path) -> None -> None — the fix is to cd *into* the repo root, not to
         # rewrite every destination.
         import re
 
@@ -1682,7 +1685,7 @@ class TestUpdateVendorsScript:
 
     def test_install_sh_invokes_update_vendors(self):
         # Sanity check that install.sh still actually calls update_vendors.sh
-        # (the consumer side of the contract this test exists to protect).
+        # (the consumer side of the contract this test exists to protect) -> None -> None.
         install_sh = _read("install.sh")
         assert "update_vendors.sh" in install_sh
 
@@ -1692,7 +1695,7 @@ class TestUpdateVendorsScript:
 
 class TestUpdateScript:
     @pytest.fixture(autouse=True)
-    def _load(self):
+    def _load(self) -> None:
         self.content = _read("update.sh")
         # JTN-674: shared helpers (stop_service, setup_zramswap_service,
         # get_os_version, echo_*, show_loader) live in _common.sh and are
@@ -1700,11 +1703,11 @@ class TestUpdateScript:
         # should use self.combined so they keep passing after the refactor.
         self.combined = self.content + "\n" + _read("_common.sh")
 
-    def test_update_rebuilds_css(self):
+    def test_update_rebuilds_css(self) -> None:
         assert "build_css" in self.content
 
     def test_update_restarts_service(self):
-        # JTN-666: update.sh now stops first then starts (not restart), because
+        # JTN-666: update.sh now stops first then starts (not restart) -> None -> None, because
         # stop_service is called before any file changes and update_app_service
         # re-enables + starts the service at the end.
         assert "systemctl" in self.content
@@ -1713,7 +1716,7 @@ class TestUpdateScript:
     def test_update_stop_service_before_pip(self):
         # JTN-666: stop_service() must be called before pip install to prevent
         # systemd from restart-looping the half-installed venv during update.
-        # JTN-674: stop_service() now lives in _common.sh — check combined.
+        # JTN-674: stop_service() -> None -> None now lives in _common.sh — check combined.
         assert "stop_service" in self.content
         # stop_service() must DISABLE (not just stop) so systemd cannot auto-restart.
         fn_start = self.combined.index("stop_service() {")
@@ -1730,7 +1733,7 @@ class TestUpdateScript:
         ), "stop_service must be called before pip install to prevent mid-update thrash"
 
     def test_update_lockfile_created_before_stop_service(self):
-        # JTN-666: The install-in-progress lockfile (JTN-607 parity) must be
+        # JTN-666: The install-in-progress lockfile (JTN-607 parity) -> None -> None must be
         # created before stop_service is called, providing defense-in-depth so
         # that even a manual `systemctl start` cannot start mid-update.
         assert 'LOCKFILE_DIR="/var/lib/inkypi"' in self.content
@@ -1749,7 +1752,7 @@ class TestUpdateScript:
     def test_update_lockfile_removed_before_service_start(self):
         # JTN-685: The lockfile must be removed BEFORE update_app_service() is
         # called so that ExecStartPre does not see the lockfile and reject the
-        # `systemctl start` invocation.  The old ordering (rm after start) caused
+        # `systemctl start` invocation.  The old ordering (rm after start) -> None -> None caused
         # the first service-start after every update to fail.
         assert 'rm -f "$LOCKFILE"' in self.content
         # rm must come BEFORE update_app_service call (last occurrence, which is
@@ -1767,7 +1770,7 @@ class TestUpdateScript:
         # stale /var/lib/inkypi/.install-in-progress. On non-zero exit the
         # trap also writes /var/lib/inkypi/.last-update-failure with
         # structured metadata (timestamp, exit_code, last_command,
-        # recent_journal_lines) for UI surfacing and diagnostics.
+        # recent_journal_lines) -> None -> None for UI surfacing and diagnostics.
         assert "trap " in self.content, "update.sh must set a trap for EXIT"
         # The new policy must not keep the lockfile on failure — the stale
         # _lockfile_keep sentinel from the old JTN-685 implementation must be
@@ -1814,7 +1817,7 @@ class TestUpdateScript:
             trap_pos > lockfile_pos
         ), "EXIT trap must be registered after the lockfile is created"
 
-    def test_update_exposes_test_failure_injection_env_var(self):
+    def test_update_exposes_test_failure_injection_env_var(self) -> None:
         # JTN-704: The integration test needs a guarded env-var hook to
         # simulate a mid-update failure without touching production paths.
         # The hook is a no-op unless INKYPI_UPDATE_TEST_FAIL_AT is set.
@@ -1824,13 +1827,13 @@ class TestUpdateScript:
             "test can simulate failure at a named step (JTN-704)"
         )
 
-    def test_update_upgrades_pip_deps(self):
+    def test_update_upgrades_pip_deps(self) -> None:
         assert "pip install" in self.content
 
     def test_update_enables_zramswap_on_bullseye_bookworm_trixie(self):
         # JTN-667: update.sh must use the same multi-release zramswap guard as
         # install.sh — previously it only matched Bookworm (12) so Trixie (13)
-        # and Bullseye (11) users would OOM during pip install on update.
+        # and Bullseye (11) -> None -> None users would OOM during pip install on update.
         assert "os_version=$(get_os_version)" in self.content
         assert '[[ "$os_version" =~ ^(11|12|13)$ ]]' in self.content
         assert "setup_zramswap_service" in self.content
@@ -1840,7 +1843,7 @@ class TestUpdateScript:
     def test_update_skips_zramtools_when_zram_swap_already_active(self):
         # JTN-667: setup_zramswap_service in update.sh must guard against
         # Trixie's preinstalled zram-swap to avoid /dev/zram0 conflicts.
-        # JTN-674: setup_zramswap_service() now lives in _common.sh — check combined.
+        # JTN-674: setup_zramswap_service() -> None -> None now lives in _common.sh — check combined.
         guard = 'grep -q "^/dev/zram" /proc/swaps'
         apt_install = "apt-get install -y zram-tools"
         assert guard in self.combined
@@ -1855,18 +1858,18 @@ class TestUpdateScript:
 
     def test_update_codename_comment_has_no_trixie_typo(self):
         # JTN-667: The comment near get_os_version must spell Trixie correctly.
-        # JTN-674: get_os_version() now lives in _common.sh — check combined.
+        # JTN-674: get_os_version() -> None -> None now lives in _common.sh — check combined.
         assert "13=Trixie" in self.combined
         assert "Trixe" not in self.combined  # typo guard
 
-    def test_update_sources_common(self):
+    def test_update_sources_common(self) -> None:
         # JTN-669: update.sh must source _common.sh to gain access to
         # fetch_wheelhouse / cleanup_wheelhouse so every update can use
         # pre-built wheels instead of source-compiling on the Pi.
         assert "_common.sh" in self.content
         assert 'source "$SCRIPT_DIR/_common.sh"' in self.content
 
-    def test_update_configures_persistent_journal_via_shared_helper(self):
+    def test_update_configures_persistent_journal_via_shared_helper(self) -> None:
         assert "configure_persistent_journal() {" in self.combined
         assert "Storage=persistent" in self.combined
         assert "RuntimeMaxUse=50M" in self.combined
@@ -1879,7 +1882,7 @@ class TestUpdateScript:
             "and before venv / pip work starts"
         )
 
-    def test_update_disables_wifi_powersave_via_shared_helper(self):
+    def test_update_disables_wifi_powersave_via_shared_helper(self) -> None:
         assert "disable_wifi_powersave() {" in self.combined
         assert "iw dev wlan0 set power_save off" in self.combined
         assert "100-inkypi-wifi-powersave.conf" in self.combined
@@ -1893,27 +1896,27 @@ class TestUpdateScript:
             "before dependency updates begin"
         )
 
-    def test_update_calls_fetch_wheelhouse(self):
+    def test_update_calls_fetch_wheelhouse(self) -> None:
         # JTN-669: fetch_wheelhouse must be called before the pip upgrade
         # so the pre-built bundle is available when pip resolves packages.
         assert "fetch_wheelhouse" in self.content
 
-    def test_update_calls_cleanup_wheelhouse(self):
+    def test_update_calls_cleanup_wheelhouse(self) -> None:
         # The temp wheelhouse dir must always be cleaned up after install.
         assert "cleanup_wheelhouse" in self.content
 
-    def test_update_reports_version_from_checked_out_repo(self):
+    def test_update_reports_version_from_checked_out_repo(self) -> None:
         assert "$SCRIPT_DIR/../VERSION" in self.content
         assert "$INSTALL_PATH/VERSION" not in self.content
 
-    def test_update_pip_uses_find_links_when_available(self):
+    def test_update_pip_uses_find_links_when_available(self) -> None:
         # When the wheelhouse is available, pip must be pointed at it via
         # --find-links so binary wheels are preferred over source builds.
         assert "--find-links" in self.content
         assert "--prefer-binary" in self.content
         assert "WHEELHOUSE_DIR" in self.content
 
-    def test_update_pip_uses_no_cache_dir(self):
+    def test_update_pip_uses_no_cache_dir(self) -> None:
         # JTN-602 parity: --no-cache-dir saves ~200 MB on the SD card.
         # The pip install line in update.sh must carry the flag.
         pip_lines = [
@@ -1930,7 +1933,7 @@ class TestUpdateScript:
     def test_update_installs_uv_into_venv(self):
         # JTN-670 / JTN-605 parity: uv must be installed into the venv so that
         # every update uses the low-memory uv resolver (~10-20 MB peak vs pip's
-        # ~100-150 MB). This prevents OOM thrashing on Pi Zero 2 W updates.
+        # ~100-150 MB) -> None -> None. This prevents OOM thrashing on Pi Zero 2 W updates.
         uv_install_lines = [
             line
             for line in self.content.splitlines()
@@ -1951,7 +1954,7 @@ class TestUpdateScript:
         # `apt-get install` so a stale /var/lib/apt/lists/ cache does not
         # abort the update when the Raspberry Pi archive has published a
         # package point-release since the last update. The previous
-        # implementation backgrounded `apt-get update` (with `&`), which
+        # implementation backgrounded `apt-get update` (with `&`) -> None -> None, which
         # raced against the install and left it reading a stale index in
         # practice.
         apt_update_lines = [
@@ -1984,7 +1987,7 @@ class TestUpdateScript:
 
     def test_update_does_not_abort_on_apt_update_failure(self):
         # JTN-788: A transient apt-get update failure (offline, DNS, mirror
-        # hiccup) must NOT abort a bugfix-only update. The failure path
+        # hiccup) -> None -> None must NOT abort a bugfix-only update. The failure path
         # should warn and continue; the subsequent apt-get install decides
         # whether the stale index is actually fatal.
         assert "WARNING: apt-get update" in self.content, (
@@ -1999,12 +2002,12 @@ class TestUpdateScript:
 
     def test_update_uses_uv_pip_install_for_requirements(self):
         # JTN-670 / JTN-605 parity: update.sh must prefer uv pip install when uv
-        # is available, mirroring install.sh's create_venv() pattern.
+        # is available, mirroring install.sh's create_venv() -> None -> None pattern.
         assert (
             "uv pip install" in self.content
         ), "update.sh must use 'uv pip install' for dependency install (JTN-670)"
 
-    def test_update_uses_require_hashes(self):
+    def test_update_uses_require_hashes(self) -> None:
         # JTN-670 / JTN-516 parity: supply-chain integrity must be enforced on
         # every update, not just fresh installs. Both the uv path and the pip
         # fallback must carry --require-hashes.
@@ -2036,7 +2039,7 @@ class TestUpdateScript:
                 f"(JTN-670/JTN-516): {block!r}"
             )
 
-    def test_update_uv_install_has_http_timeout(self):
+    def test_update_uv_install_has_http_timeout(self) -> None:
         # JTN-670 / JTN-534 parity: uv pip install invocations must prefix
         # UV_HTTP_TIMEOUT=60 to survive flaky Wi-Fi on Pi Zero 2 W.
         # uv doesn't accept --default-timeout as a CLI flag; the env var scopes
@@ -2055,7 +2058,7 @@ class TestUpdateScript:
                 "for Wi-Fi resilience (JTN-534)"
             )
 
-    def test_update_has_uv_pip_fallback_with_require_hashes(self):
+    def test_update_has_uv_pip_fallback_with_require_hashes(self) -> None:
         # JTN-670 / JTN-605 parity: if uv is unavailable, update.sh must fall
         # back to pip with --require-hashes preserved. The pip install and the
         # -r <requirements> flag are on separate continuation lines, so join them.
@@ -2096,7 +2099,7 @@ class TestUpdateScript:
 
     def test_update_uv_install_uses_no_cache(self):
         # JTN-670 / JTN-602 parity: uv pip install must use --no-cache (uv's
-        # equivalent of pip's --no-cache-dir) to avoid wasting SD space on updates.
+        # equivalent of pip's --no-cache-dir) -> None -> None to avoid wasting SD space on updates.
         lines = self.content.splitlines()
         current: list[str] = []
         uv_req_blocks: list[str] = []
@@ -2119,7 +2122,7 @@ class TestUpdateScript:
             ), f"uv pip install in update.sh missing --no-cache (JTN-602 parity): {block!r}"
 
     def test_update_app_service_checks_is_active_after_start(self):
-        # JTN-684: update_app_service() must verify the service reached active
+        # JTN-684: update_app_service() -> None -> None must verify the service reached active
         # state after systemctl start. systemctl start exits 0 even when the
         # service subsequently fails, so an explicit is-active check is required.
         fn_start = self.content.index("update_app_service() {")
@@ -2137,7 +2140,7 @@ class TestUpdateScript:
             is_active_pos > start_pos
         ), "'systemctl is-active' check must appear after 'systemctl start' (JTN-684)"
 
-    def test_update_app_service_exits_nonzero_on_start_failure(self):
+    def test_update_app_service_exits_nonzero_on_start_failure(self) -> None:
         # JTN-684: if the service is not active after starting, the script must
         # exit non-zero so callers know the update failed.
         fn_start = self.content.index("update_app_service() {")
@@ -2147,7 +2150,7 @@ class TestUpdateScript:
             "exit 1" in fn_body
         ), "update_app_service must 'exit 1' when service fails to start (JTN-684)"
 
-    def test_update_app_service_dumps_journal_on_start_failure(self):
+    def test_update_app_service_dumps_journal_on_start_failure(self) -> None:
         # JTN-684: on service-start failure, the user must see journal output
         # instead of a misleading "Update completed" success message.
         fn_start = self.content.index("update_app_service() {")
@@ -2196,7 +2199,7 @@ class TestUpdateScript:
     def test_update_service_wait_uses_timeout_bound(self):
         # JTN-706: the 3-attempt sleep 1 loop (total cap 3s) was replaced with
         # a bounded wait via `timeout 45` so slow boots on Pi Zero 2 W (which
-        # routinely take 5-8s) no longer trigger false-failure reports.
+        # routinely take 5-8s) -> None -> None no longer trigger false-failure reports.
         fn_start = self.content.index("update_app_service() {")
         fn_end = self.content.index("\n}", fn_start) + 2
         fn_body = self.content[fn_start:fn_end]
@@ -2245,10 +2248,10 @@ class TestRollbackScript:
     """
 
     @pytest.fixture(autouse=True)
-    def _load(self):
+    def _load(self) -> None:
         self.content = _read("rollback.sh")
 
-    def test_rollback_sets_strict_mode(self):
+    def test_rollback_sets_strict_mode(self) -> None:
         # set -euo pipefail is the only acceptable shape — `set -e` alone
         # silently drops unset-var errors, which we must not allow for a
         # script that touches prev_version / git refs.
@@ -2256,12 +2259,12 @@ class TestRollbackScript:
             "set -euo pipefail" in self.content
         ), "rollback.sh must use 'set -euo pipefail'"
 
-    def test_rollback_shebang_is_bash(self):
+    def test_rollback_shebang_is_bash(self) -> None:
         assert self.content.startswith(
             "#!/bin/bash"
         ), "rollback.sh must have a bash shebang"
 
-    def test_rollback_uses_distinct_exit_codes(self):
+    def test_rollback_uses_distinct_exit_codes(self) -> None:
         # Exit code hygiene: operators must be able to tell "no breadcrumb"
         # from "invalid breadcrumb" from "tag unavailable" from generic errors.
         for code in ("exit 10", "exit 11", "exit 12"):
@@ -2270,7 +2273,7 @@ class TestRollbackScript:
             ), f"rollback.sh must use {code!r} for a distinct failure mode"
 
     def test_rollback_delegates_to_update_sh(self):
-        # exec'ing update.sh lets its EXIT trap (JTN-704) record any failure
+        # exec'ing update.sh lets its EXIT trap (JTN-704) -> None -> None record any failure
         # during the rollback to .last-update-failure for UI surfacing — the
         # same recovery path as a forward update.
         assert (
@@ -2280,28 +2283,28 @@ class TestRollbackScript:
 
 class TestUninstallScript:
     @pytest.fixture(autouse=True)
-    def _load(self):
+    def _load(self) -> None:
         self.content = _read("uninstall.sh")
 
-    def test_uninstall_stops_service(self):
+    def test_uninstall_stops_service(self) -> None:
         assert "systemctl stop" in self.content or "systemctl is-active" in self.content
 
-    def test_uninstall_disables_service(self):
+    def test_uninstall_disables_service(self) -> None:
         assert "systemctl disable" in self.content
 
-    def test_uninstall_removes_install_dir(self):
+    def test_uninstall_removes_install_dir(self) -> None:
         assert "rm -rf" in self.content
 
 
 # ---- Cross-file consistency ----
 
 
-def test_requirements_files_exist():
+def test_requirements_files_exist() -> None:
     assert (INSTALL_DIR / "requirements.txt").exists()
     assert (INSTALL_DIR / "debian-requirements.txt").exists()
 
 
-def test_debian_requirements_includes_build_headers_for_pinned_python_deps():
+def test_debian_requirements_includes_build_headers_for_pinned_python_deps() -> None:
     """Regression: JTN-675.
 
     `install/requirements.txt` pins `cffi` and `cysystemd`, which need native
@@ -2336,7 +2339,7 @@ def test_debian_requirements_includes_build_headers_for_pinned_python_deps():
         )
 
 
-def test_service_exec_matches_cli_wrapper():
+def test_service_exec_matches_cli_wrapper() -> None:
     service = _read("inkypi.service")
     # ExecStart references /usr/local/bin/inkypi
     assert "/usr/local/bin/inkypi" in service
@@ -2345,7 +2348,7 @@ def test_service_exec_matches_cli_wrapper():
     assert "PROGRAM_PATH=/usr/local/inkypi" in cli
 
 
-def test_install_references_valid_config_base():
+def test_install_references_valid_config_base() -> None:
     assert (INSTALL_DIR / "config_base").is_dir()
 
 
@@ -2355,17 +2358,17 @@ def test_install_references_valid_config_base():
 class TestCloudInitCleanScript:
     """Structural validation for the cloud-init cleanup helper (JTN-591)."""
 
-    def test_script_exists(self):
+    def test_script_exists(self) -> None:
         assert (SCRIPTS_DIR / "cloud_init_clean.sh").exists()
 
-    def test_script_is_executable(self):
+    def test_script_is_executable(self) -> None:
         import stat
 
         path = SCRIPTS_DIR / "cloud_init_clean.sh"
         mode = path.stat().st_mode
         assert mode & stat.S_IXUSR, "cloud_init_clean.sh is not user-executable"
 
-    def test_script_syntax_valid(self):
+    def test_script_syntax_valid(self) -> None:
         import subprocess
 
         result = subprocess.run(
@@ -2375,15 +2378,15 @@ class TestCloudInitCleanScript:
         )
         assert result.returncode == 0, f"bash -n failed:\n{result.stderr}"
 
-    def test_script_has_set_euo_pipefail(self):
+    def test_script_has_set_euo_pipefail(self) -> None:
         content = (SCRIPTS_DIR / "cloud_init_clean.sh").read_text()
         assert "set -euo pipefail" in content
 
-    def test_script_checks_cloud_init_installed(self):
+    def test_script_checks_cloud_init_installed(self) -> None:
         content = (SCRIPTS_DIR / "cloud_init_clean.sh").read_text()
         assert "command -v cloud-init" in content
 
-    def test_script_calls_cloud_init_clean(self):
+    def test_script_calls_cloud_init_clean(self) -> None:
         content = (SCRIPTS_DIR / "cloud_init_clean.sh").read_text()
         assert "cloud-init clean" in content
 
@@ -2392,26 +2395,26 @@ class TestInstallationDocCloudInit:
     """Verify the cloud-init runcmd one-shot trap is documented (JTN-591)."""
 
     @pytest.fixture(autouse=True)
-    def _load(self):
+    def _load(self) -> None:
         self.content = (DOCS_DIR / "installation.md").read_text()
 
-    def test_cloud_init_re_edit_section_exists(self):
+    def test_cloud_init_re_edit_section_exists(self) -> None:
         # The section header must mention both cloud-init and re-editing user-data.
         assert "Re-editing user-data after first boot" in self.content
 
-    def test_documents_per_instance_one_shot_behaviour(self):
+    def test_documents_per_instance_one_shot_behaviour(self) -> None:
         assert "per-instance" in self.content
 
-    def test_documents_instance_id_file_path(self):
+    def test_documents_instance_id_file_path(self) -> None:
         assert "/var/lib/cloud/data/instance-id" in self.content
 
-    def test_documents_clean_logs_recovery_command(self):
+    def test_documents_clean_logs_recovery_command(self) -> None:
         assert "cloud-init clean --logs" in self.content
 
-    def test_documents_reboot_after_clean(self):
+    def test_documents_reboot_after_clean(self) -> None:
         assert "sudo reboot" in self.content
 
-    def test_references_jtn_591(self):
+    def test_references_jtn_591(self) -> None:
         assert "JTN-591" in self.content
 
 
@@ -2429,17 +2432,17 @@ class TestInstallMemcapSmoke:
     """
 
     @pytest.fixture(autouse=True)
-    def _load(self):
+    def _load(self) -> None:
         self.path = SCRIPTS_DIR / "test_install_memcap.sh"
         self.content = self.path.read_text()
 
-    def test_script_exists_and_is_executable(self):
+    def test_script_exists_and_is_executable(self) -> None:
         import stat
 
         assert self.path.exists()
         assert self.path.stat().st_mode & stat.S_IXUSR
 
-    def test_script_syntax_valid(self):
+    def test_script_syntax_valid(self) -> None:
         import subprocess
 
         result = subprocess.run(
@@ -2449,12 +2452,12 @@ class TestInstallMemcapSmoke:
         )
         assert result.returncode == 0, f"bash -n failed:\n{result.stderr}"
 
-    def test_phase4_hard_budgets_unchanged(self):
+    def test_phase4_hard_budgets_unchanged(self) -> None:
         # JTN-613 must not regress the JTN-608 thresholds.
         assert "IDLE_RSS_HARD_MB=200" in self.content
         assert "PEAK_RSS_HARD_MB=300" in self.content
 
-    def test_phase4_enables_smoke_force_render_env_var(self):
+    def test_phase4_enables_smoke_force_render_env_var(self) -> None:
         # The Phase 3 Dockerfile must set the opt-in env var so the smoke
         # render endpoint actually registers inside the container.
         assert "INKYPI_SMOKE_FORCE_RENDER=1" in self.content, (
@@ -2462,18 +2465,18 @@ class TestInstallMemcapSmoke:
             "the /__smoke/render endpoint is registered (JTN-613)."
         )
 
-    def test_phase4_hits_smoke_render_endpoint(self):
+    def test_phase4_hits_smoke_render_endpoint(self) -> None:
         # The render-exercise loop must call the opt-in endpoint.
         assert "/__smoke/render" in self.content, (
             "Phase 4 must POST to /__smoke/render so the render path is "
             "actually exercised (JTN-613)."
         )
 
-    def test_phase4_posts_clock_plugin_to_smoke_render(self):
+    def test_phase4_posts_clock_plugin_to_smoke_render(self) -> None:
         # We stress the clock plugin because it has no external HTTP deps.
         assert "plugin_id=clock" in self.content
 
-    def test_phase4_no_longer_uses_update_now_to_trigger_render(self):
+    def test_phase4_no_longer_uses_update_now_to_trigger_render(self) -> None:
         # JTN-613 root cause: POST /update_now was blocked by CSRF in web-only
         # mode so the render path never ran. The smoke test must no longer
         # rely on /update_now for peak RSS measurement.
@@ -2493,7 +2496,7 @@ class TestInstallMemcapSmoke:
             f"{curl_lines}"
         )
 
-    def test_phase4_asserts_peak_greater_than_idle(self):
+    def test_phase4_asserts_peak_greater_than_idle(self) -> None:
         # JTN-613 sanity gate: a valid Phase 4 run must show peak > idle. If
         # they're equal, the render exercise never ran and we must fail loud.
         assert "PEAK_RSS_MIN_DELTA_MB" in self.content, (
@@ -2509,7 +2512,7 @@ class TestInstallMemcapSmoke:
             or "RSS_DELTA_MB < PEAK_RSS_MIN_DELTA_MB" in self.content
         ), "Phase 4 must compare delta against the minimum and exit on failure."
 
-    def test_phase4_smoke_render_failure_aborts_the_script(self):
+    def test_phase4_smoke_render_failure_aborts_the_script(self) -> None:
         # If /__smoke/render returns anything other than 200, the harness is
         # broken and we must fail loud — not silently skip the peak budget.
         assert '${SMOKE_RENDER_STATUS}" != "200"' in self.content, (
@@ -2517,7 +2520,7 @@ class TestInstallMemcapSmoke:
             "(JTN-613)."
         )
 
-    def test_phase4_renders_multiple_times_for_sustained_working_set(self):
+    def test_phase4_renders_multiple_times_for_sustained_working_set(self) -> None:
         # Rendering once can get optimised away by Python's allocator; we hit
         # the endpoint repeatedly so peak RSS reflects the sustained footprint.
         # The exact count is not load-bearing — just assert there is a loop.
@@ -2534,7 +2537,7 @@ class TestInstallMemcapSmoke:
             "(JTN-613)."
         )
 
-    def test_phase4_references_jtn_613(self):
+    def test_phase4_references_jtn_613(self) -> None:
         # Traceability: the JTN-613 fix must be discoverable by grepping.
         assert "JTN-613" in self.content
 
@@ -2548,7 +2551,7 @@ class TestInstallMatrixWorkflow:
     """Structural guards for the arm64 install.sh matrix CI job (JTN-530)."""
 
     @pytest.fixture(autouse=True)
-    def _load(self):
+    def _load(self) -> None:
         self.ci_yaml = (WORKFLOWS_DIR / "ci.yml").read_text()
         # JTN-616: the install matrix now lives in a reusable workflow that
         # ci.yml calls via `workflow_call`. Structural assertions about the
@@ -2559,10 +2562,10 @@ class TestInstallMatrixWorkflow:
         self.dockerfile = (SCRIPTS_DIR / "Dockerfile.install-matrix").read_text()
         self.verify_script = (SCRIPTS_DIR / "ci_install_matrix_verify.sh").read_text()
 
-    def test_install_matrix_job_defined(self):
+    def test_install_matrix_job_defined(self) -> None:
         assert "install-matrix:" in self.ci_yaml
 
-    def test_install_matrix_wired_as_reusable_workflow(self):
+    def test_install_matrix_wired_as_reusable_workflow(self) -> None:
         # JTN-616: ci.yml must call the reusable install-matrix workflow so
         # the PR gate and manual reruns share a single implementation.
         import yaml
@@ -2576,7 +2579,7 @@ class TestInstallMatrixWorkflow:
         # Debian 11 ships Python 3.9.2 while InkyPi's requirements pin
         # packages that need Python>=3.10 (anyio==4.13.0 is the first to
         # bomb the uv resolver). pyproject.toml also targets py311. The
-        # standalone Install matrix (arm64 e2e) workflow still exercises
+        # standalone Install matrix (arm64 e2e) -> None -> None workflow still exercises
         # bullseye via test_install_memcap.sh because that path uses a
         # python:3.12-slim base image and therefore isn't blocked by the
         # codename's own interpreter version.
@@ -2587,18 +2590,18 @@ class TestInstallMatrixWorkflow:
         codenames = job["strategy"]["matrix"]["codename"]
         assert set(codenames) == {"bookworm", "trixie"}
 
-    def test_install_matrix_runs_on_arm64(self):
+    def test_install_matrix_runs_on_arm64(self) -> None:
         assert "linux/arm64" in self.install_matrix_yaml
         assert "setup-qemu-action" in self.install_matrix_yaml
 
-    def test_install_matrix_uses_512m_memory_cap(self):
+    def test_install_matrix_uses_512m_memory_cap(self) -> None:
         assert "--memory=512m" in self.install_matrix_yaml
         assert "--memory-swap=512m" in self.install_matrix_yaml
 
-    def test_install_matrix_invokes_verify_script(self):
+    def test_install_matrix_invokes_verify_script(self) -> None:
         assert "ci_install_matrix_verify.sh" in self.install_matrix_yaml
 
-    def test_install_matrix_feeds_ci_gate(self):
+    def test_install_matrix_feeds_ci_gate(self) -> None:
         import yaml
 
         data = yaml.safe_load(self.ci_yaml)
@@ -2607,34 +2610,34 @@ class TestInstallMatrixWorkflow:
         gate_steps_raw = yaml.safe_dump(gate["steps"])
         assert "install-matrix" in gate_steps_raw
 
-    def test_dockerfile_uses_plain_debian_codename(self):
+    def test_dockerfile_uses_plain_debian_codename(self) -> None:
         assert "FROM debian:${CODENAME}" in self.dockerfile
         assert "CODENAME=trixie" in self.dockerfile
 
-    def test_dockerfile_adds_pi_os_apt_repo(self):
+    def test_dockerfile_adds_pi_os_apt_repo(self) -> None:
         assert "archive.raspberrypi.com/debian" in self.dockerfile
 
-    def test_dockerfile_ships_raspi_config_shim(self):
+    def test_dockerfile_ships_raspi_config_shim(self) -> None:
         assert "/usr/sbin/raspi-config" in self.dockerfile
 
-    def test_dockerfile_ships_systemctl_shim(self):
+    def test_dockerfile_ships_systemctl_shim(self) -> None:
         assert "/usr/bin/systemctl" in self.dockerfile
 
-    def test_dockerfile_installs_systemd_package(self):
+    def test_dockerfile_installs_systemd_package(self) -> None:
         assert "systemd" in self.dockerfile
 
-    def test_dockerfile_creates_boot_config_stub(self):
+    def test_dockerfile_creates_boot_config_stub(self) -> None:
         assert "/boot/firmware/config.txt" in self.dockerfile
 
-    def test_verify_script_asserts_install_exit_zero(self):
+    def test_verify_script_asserts_install_exit_zero(self) -> None:
         assert "./install.sh" in self.verify_script
         assert "exit" in self.verify_script
 
-    def test_verify_script_asserts_venv_created(self):
+    def test_verify_script_asserts_venv_created(self) -> None:
         assert "/usr/local/inkypi/venv_inkypi" in self.verify_script
 
     def test_verify_script_asserts_required_imports(self):
-        # JTN-615: the check was rewritten to use importlib.metadata.version()
+        # JTN-615: the check was rewritten to use importlib.metadata.version() -> None -> None
         # because waitress has no module-level __version__ attribute and Flask
         # 3.2 deprecates its own `__version__`. The test now asserts the three
         # distribution names are still covered rather than pinning a specific
@@ -2647,18 +2650,18 @@ class TestInstallMatrixWorkflow:
         for mod in ("flask", "waitress", "PIL"):
             assert mod in self.verify_script
 
-    def test_verify_script_runs_systemd_analyze(self):
+    def test_verify_script_runs_systemd_analyze(self) -> None:
         assert "systemd-analyze verify" in self.verify_script
         assert "inkypi.service" in self.verify_script
 
-    def test_verify_script_skips_wheelhouse(self):
+    def test_verify_script_skips_wheelhouse(self) -> None:
         assert "INKYPI_SKIP_WHEELHOUSE=1" in self.verify_script
 
-    def test_verify_script_has_shebang_and_strict_mode(self):
+    def test_verify_script_has_shebang_and_strict_mode(self) -> None:
         assert self.verify_script.startswith("#!/usr/bin/env bash")
         assert "set -euo pipefail" in self.verify_script
 
-    def test_verify_script_is_executable(self):
+    def test_verify_script_is_executable(self) -> None:
         import stat
 
         path = SCRIPTS_DIR / "ci_install_matrix_verify.sh"
@@ -2675,54 +2678,54 @@ class TestOsDriftNightlyWorkflow:
     WORKFLOW_PATH = WORKFLOWS_DIR / "os-drift-nightly.yml"
 
     @pytest.fixture(autouse=True)
-    def _load(self):
+    def _load(self) -> None:
         assert self.WORKFLOW_PATH.exists(), (
             "os-drift-nightly.yml is missing — the JTN-535 drift detector "
             "must not be deleted without an explicit follow-up issue."
         )
         self.content = self.WORKFLOW_PATH.read_text()
 
-    def test_workflow_file_exists(self):
+    def test_workflow_file_exists(self) -> None:
         assert self.WORKFLOW_PATH.is_file()
 
-    def test_has_schedule_block(self):
+    def test_has_schedule_block(self) -> None:
         assert re.search(r"^\s*schedule:", self.content, flags=re.MULTILINE)
         assert re.search(r"cron:\s*['\"]0 8 \* \* \*['\"]", self.content)
 
-    def test_has_workflow_dispatch(self):
+    def test_has_workflow_dispatch(self) -> None:
         assert "workflow_dispatch:" in self.content
 
-    def test_is_not_a_pr_gate(self):
+    def test_is_not_a_pr_gate(self) -> None:
         assert "pull_request:" not in self.content
 
-    def test_matrix_covers_all_three_codenames(self):
+    def test_matrix_covers_all_three_codenames(self) -> None:
         for codename in ("trixie", "bookworm", "bullseye"):
             assert codename in self.content
 
-    def test_uses_unpinned_debian_images(self):
+    def test_uses_unpinned_debian_images(self) -> None:
         assert re.search(
             r"image:\s*debian:\$\{\{\s*matrix\.codename\s*\}\}",
             self.content,
         )
 
-    def test_asserts_debian_and_pip_requirements(self):
+    def test_asserts_debian_and_pip_requirements(self) -> None:
         assert "install/debian-requirements.txt" in self.content
         assert "install/requirements.txt" in self.content
         assert "apt-cache show" in self.content
         assert "--dry-run" in self.content
 
-    def test_runs_end_to_end_install_sim(self):
+    def test_runs_end_to_end_install_sim(self) -> None:
         assert "scripts/sim_install.sh" in self.content
 
-    def test_files_issue_on_failure(self):
+    def test_files_issue_on_failure(self) -> None:
         assert "actions/github-script" in self.content
         assert "os-drift" in self.content
         assert "issues.create" in self.content
 
-    def test_references_jtn_535(self):
+    def test_references_jtn_535(self) -> None:
         assert "JTN-535" in self.content
 
-    def test_workflow_parses_as_yaml(self):
+    def test_workflow_parses_as_yaml(self) -> None:
         parsed = yaml.safe_load(self.content)
         assert isinstance(parsed, dict)
         assert "on" in parsed or True in parsed
@@ -2824,7 +2827,7 @@ class TestWaveshareManifest:
     here so a silent upstream change cannot break a working device."""
 
     @pytest.fixture(autouse=True)
-    def _load(self):
+    def _load(self) -> None:
         self.manifest_path = INSTALL_DIR / "waveshare-manifest.txt"
         assert self.manifest_path.exists(), (
             f"{self.manifest_path} must exist — install.sh reads it to verify "
@@ -2837,10 +2840,10 @@ class TestWaveshareManifest:
                 continue
             self.rows.append(stripped.split())
 
-    def test_manifest_has_entries(self):
+    def test_manifest_has_entries(self) -> None:
         assert len(self.rows) > 0, "manifest must contain at least one pinned driver"
 
-    def test_waveshare_manifest_is_sha_pinned(self):
+    def test_waveshare_manifest_is_sha_pinned(self) -> None:
         """Every row: <driver_name> <40-char git sha> <64-char sha256>."""
         sha_re = re.compile(r"^[0-9a-f]{40}$")
         hash_re = re.compile(r"^[0-9a-f]{64}$")
@@ -2857,7 +2860,7 @@ class TestWaveshareManifest:
                 sha256
             ), f"sha256 for {name} must be 64 lowercase hex chars; got: {sha256}"
 
-    def test_manifest_covers_common_displays(self):
+    def test_manifest_covers_common_displays(self) -> None:
         """Regression guard: drop a widely-used display out of the manifest
         only intentionally. epd7in3e (main InkyPi target) + epdconfig must stay."""
         names = {parts[0] for parts in self.rows}
@@ -2865,7 +2868,7 @@ class TestWaveshareManifest:
         missing = required - names
         assert not missing, f"manifest missing required drivers: {sorted(missing)}"
 
-    def test_manifest_has_no_duplicate_entries(self):
+    def test_manifest_has_no_duplicate_entries(self) -> None:
         names = [parts[0] for parts in self.rows]
         assert len(names) == len(set(names)), (
             "duplicate driver entries in manifest: "
@@ -2878,22 +2881,22 @@ class TestInstallShUsesPinManifestAndJsonHelper:
     device.json with sed."""
 
     @pytest.fixture(autouse=True)
-    def _load(self):
+    def _load(self) -> None:
         self.content = _read("install.sh")
 
-    def test_install_references_waveshare_manifest(self):
+    def test_install_references_waveshare_manifest(self) -> None:
         assert (
             "waveshare-manifest.txt" in self.content
         ), "install.sh must read the pin manifest to verify Waveshare drivers."
 
-    def test_install_verifies_sha256_of_downloaded_drivers(self):
+    def test_install_verifies_sha256_of_downloaded_drivers(self) -> None:
         # The pin verification must actually compare hashes, not just look them up.
         assert "sha256" in self.content.lower()
         assert (
             "sha256sum" in self.content or "shasum -a 256" in self.content
         ), "install.sh must compute the downloaded driver's sha256 to verify the pin."
 
-    def test_install_pins_waveshare_url_to_commit_sha_not_master(self):
+    def test_install_pins_waveshare_url_to_commit_sha_not_master(self) -> None:
         """The old URL hard-coded `/master/` — a rolling tag. The pinned version
         must interpolate the commit sha from the manifest instead."""
         old_url = (
@@ -2904,7 +2907,7 @@ class TestInstallShUsesPinManifestAndJsonHelper:
             old_url not in self.content
         ), "install.sh must not hard-code the `master` branch — that defeats the pin."
 
-    def test_device_json_mutation_uses_python_helper(self):
+    def test_device_json_mutation_uses_python_helper(self) -> None:
         """update_config must NOT sed device.json. Must call the Python helper."""
         match = re.search(
             r"^update_config\(\)\s*\{(.*?)^\}",
@@ -2936,14 +2939,14 @@ class TestDeviceJsonHelper:
     mutation path. Must preserve unrelated keys and refuse malformed input."""
 
     @pytest.fixture(autouse=True)
-    def _load(self):
+    def _load(self) -> None:
         self.helper_path = INSTALL_DIR / "_device_json.py"
         assert self.helper_path.exists(), f"{self.helper_path} must exist (JTN-701)"
 
-    def test_helper_is_valid_python(self):
+    def test_helper_is_valid_python(self) -> None:
         compile(self.helper_path.read_text(), str(self.helper_path), "exec")
 
-    def _run(self, device_json_path, display_type):
+    def _run(self, device_json_path: Any, display_type: Any) -> Any:
         import subprocess
         import sys as _sys
 
@@ -2957,7 +2960,7 @@ class TestDeviceJsonHelper:
         ]
         return subprocess.run(cmd, capture_output=True, text=True)
 
-    def test_device_json_helper_preserves_unrelated_keys(self, tmp_path):
+    def test_device_json_helper_preserves_unrelated_keys(self, tmp_path: Path) -> None:
         """Unit: load → set display → dump — every other key stays exactly
         as-is (including ordering)."""
         import json as _json
@@ -2987,7 +2990,9 @@ class TestDeviceJsonHelper:
         ), f"helper reordered existing keys; got {keys}"
         assert keys[-1] == "display_type"
 
-    def test_device_json_helper_updates_existing_display_type_in_place(self, tmp_path):
+    def test_device_json_helper_updates_existing_display_type_in_place(
+        self, tmp_path: Path
+    ) -> None:
         """When display_type already exists, its position must not move."""
         import json as _json
 
@@ -3009,7 +3014,7 @@ class TestDeviceJsonHelper:
             original.keys()
         ), "existing display_type position must be preserved"
 
-    def test_device_json_helper_rejects_malformed_json(self, tmp_path):
+    def test_device_json_helper_rejects_malformed_json(self, tmp_path: Path) -> None:
         """Malformed input must produce a clean non-zero exit, not a silently
         corrupted file."""
         device_json = tmp_path / "device.json"
@@ -3023,7 +3028,7 @@ class TestDeviceJsonHelper:
             device_json.read_text() == bad
         ), "malformed input file was mutated — helper must be atomic"
 
-    def test_device_json_helper_rejects_non_object_root(self, tmp_path):
+    def test_device_json_helper_rejects_non_object_root(self, tmp_path: Path) -> None:
         """A JSON array or scalar at the root is not a valid device.json."""
         device_json = tmp_path / "device.json"
         device_json.write_text("[1, 2, 3]")
@@ -3032,12 +3037,14 @@ class TestDeviceJsonHelper:
         assert result.returncode != 0
         assert "object" in result.stderr.lower()
 
-    def test_device_json_helper_rejects_missing_file(self, tmp_path):
+    def test_device_json_helper_rejects_missing_file(self, tmp_path: Path) -> None:
         result = self._run(tmp_path / "does-not-exist.json", "epd7in3e")
         assert result.returncode != 0
         assert "not a file" in result.stderr.lower()
 
-    def test_device_json_helper_rejects_empty_display_type(self, tmp_path):
+    def test_device_json_helper_rejects_empty_display_type(
+        self, tmp_path: Path
+    ) -> None:
         import json as _json
 
         device_json = tmp_path / "device.json"
@@ -3045,7 +3052,7 @@ class TestDeviceJsonHelper:
         result = self._run(device_json, "")
         assert result.returncode != 0
 
-    def test_device_json_helper_atomic_write_uses_tempfile_and_replace(self):
+    def test_device_json_helper_atomic_write_uses_tempfile_and_replace(self) -> None:
         """Source inspection: the helper must write via a tempfile + os.replace
         so Ctrl+C / power loss cannot leave device.json partially written."""
         src = self.helper_path.read_text()
@@ -3077,7 +3084,7 @@ class TestInstallPreflight:
 
     INSTALL_SH = REPO_ROOT / "install" / "install.sh"
 
-    def _base_env(self, tmp_path):
+    def _base_env(self, tmp_path: Path) -> Any:
         """Build a valid set of preflight env vars pointing at tmp dirs.
 
         Individual tests then override ONE var to simulate one failure, so
@@ -3107,7 +3114,7 @@ class TestInstallPreflight:
             "INKYPI_PREFLIGHT_SRC_PATH": str(src_path),
         }
 
-    def _run(self, env_overrides):
+    def _run(self, env_overrides: Any) -> Any:
         import os as _os
         import shutil as _shutil
         import subprocess as _sp
@@ -3129,7 +3136,7 @@ class TestInstallPreflight:
 
     # --- Happy path ---------------------------------------------------------
 
-    def test_preflight_passes_when_all_checks_satisfied(self, tmp_path):
+    def test_preflight_passes_when_all_checks_satisfied(self, tmp_path: Path) -> None:
         """Baseline: with every precondition valid, preflight returns 0 and
         the test short-circuit exits cleanly. This gates every failure test
         below — if the baseline regresses, the failure-path assertions would
@@ -3147,7 +3154,9 @@ class TestInstallPreflight:
 
     # --- Disk-space failures ------------------------------------------------
 
-    def test_preflight_fails_when_usr_local_below_min_free(self, tmp_path):
+    def test_preflight_fails_when_usr_local_below_min_free(
+        self, tmp_path: Path
+    ) -> None:
         """Simulate <500 MB free on /usr/local by bumping the threshold above
         what any real filesystem would have free. A threshold of 10 PB (~10M
         MB) is guaranteed to exceed actual free space on any test host."""
@@ -3168,7 +3177,7 @@ class TestInstallPreflight:
             or "usr_local" in combined
         )
 
-    def test_preflight_disk_error_includes_remediation(self, tmp_path):
+    def test_preflight_disk_error_includes_remediation(self, tmp_path: Path) -> None:
         """Actionable error messages are in the acceptance criteria — every
         failure must include a 'remediation:' suggestion."""
         env = self._base_env(tmp_path)
@@ -3181,7 +3190,9 @@ class TestInstallPreflight:
 
     # --- Writable-target failures ------------------------------------------
 
-    def test_preflight_fails_when_install_parent_not_writable(self, tmp_path):
+    def test_preflight_fails_when_install_parent_not_writable(
+        self, tmp_path: Path
+    ) -> None:
         """A RO install parent is the exact permission mode this preflight is
         designed to catch. chmod 0o500 (r-x------) removes write for the
         owner so even the EUID running the script cannot create $INSTALL_PATH."""
@@ -3204,7 +3215,9 @@ class TestInstallPreflight:
             install_parent in combined
         ), f"error must name the failing path; got: {combined!r}"
 
-    def test_preflight_fails_when_systemd_dir_not_writable(self, tmp_path):
+    def test_preflight_fails_when_systemd_dir_not_writable(
+        self, tmp_path: Path
+    ) -> None:
         import os as _os
 
         env = self._base_env(tmp_path)
@@ -3219,7 +3232,7 @@ class TestInstallPreflight:
         assert "not writable" in combined
         assert systemd_dir in combined
 
-    def test_preflight_fails_when_systemd_dir_missing(self, tmp_path):
+    def test_preflight_fails_when_systemd_dir_missing(self, tmp_path: Path) -> None:
         """A missing /etc/systemd/system means we are not on a systemd host.
         Preflight should abort rather than silently try to copy a unit file
         to a nonexistent directory."""
@@ -3233,7 +3246,7 @@ class TestInstallPreflight:
         assert "does not exist" in combined
         assert "systemd" in combined.lower()
 
-    def test_preflight_fails_when_state_dir_not_writable(self, tmp_path):
+    def test_preflight_fails_when_state_dir_not_writable(self, tmp_path: Path) -> None:
         import os as _os
 
         env = self._base_env(tmp_path)
@@ -3250,7 +3263,7 @@ class TestInstallPreflight:
 
     # --- git-repo failure ---------------------------------------------------
 
-    def test_preflight_fails_when_src_is_not_a_git_repo(self, tmp_path):
+    def test_preflight_fails_when_src_is_not_a_git_repo(self, tmp_path: Path) -> None:
         """A downloaded tarball (no .git dir) would silently break
         git-describe-based version reporting and waveshare pin verification.
         Abort early with a clear message."""
@@ -3268,7 +3281,7 @@ class TestInstallPreflight:
         assert env["INKYPI_PREFLIGHT_SRC_PATH"] in combined
         assert "remediation" in combined.lower()
 
-    def test_preflight_fails_when_src_path_missing(self, tmp_path):
+    def test_preflight_fails_when_src_path_missing(self, tmp_path: Path) -> None:
         import shutil as _shutil
 
         env = self._base_env(tmp_path)
@@ -3281,7 +3294,7 @@ class TestInstallPreflight:
 
     # --- Runs early: no apt/pip side effects -------------------------------
 
-    def test_preflight_fails_before_any_install_work(self, tmp_path):
+    def test_preflight_fails_before_any_install_work(self, tmp_path: Path) -> None:
         """Acceptance: preflight must run BEFORE any apt/pip work. If it
         trips on a failure, nothing downstream should have run — no vendor
         download, no wheelhouse, no zramswap setup."""
@@ -3314,7 +3327,9 @@ class TestInstallPreflight:
 
     # --- git dubious-ownership regression (CodeRabbit review #546) ---------
 
-    def test_preflight_git_check_survives_dubious_ownership(self, tmp_path):
+    def test_preflight_git_check_survives_dubious_ownership(
+        self, tmp_path: Path
+    ) -> None:
         """Regression gate for CodeRabbit review on PR #546.
 
         Canonical production flow:
@@ -3386,7 +3401,7 @@ class TestInstallPreflight:
 
     # --- Source inspection: env-var override contract ---------------------
 
-    def test_install_sh_declares_preflight_env_hooks(self):
+    def test_install_sh_declares_preflight_env_hooks(self) -> None:
         """Source inspection: the preflight env-var contract documented in
         the module header must actually exist in install.sh. Guards against
         a future refactor that drops a hook without updating the tests."""
@@ -3405,7 +3420,7 @@ class TestInstallPreflight:
                 var in content
             ), f"install.sh must reference preflight env hook {var} (JTN-699)"
 
-    def test_install_sh_runs_preflight_before_lockfile_setup(self):
+    def test_install_sh_runs_preflight_before_lockfile_setup(self) -> None:
         """Preflight must be called BEFORE the $LOCKFILE touch, because an
         unwritable $LOCKFILE_DIR should surface as a clean preflight error,
         not as a cryptic `touch: cannot touch ...` message."""
@@ -3436,7 +3451,7 @@ class TestMemoryCapTiering:
 
     COMMON_SH = INSTALL_DIR / "_common.sh"
 
-    def _invoke_pick(self, meminfo_body: str, tmp_path):
+    def _invoke_pick(self, meminfo_body: str, tmp_path: Path) -> Any:
         """Write a stub /proc/meminfo body to tmp_path and shell out to
         pick_memory_caps with INKYPI_MEMINFO_PATH pointing at it."""
         import subprocess
@@ -3462,38 +3477,40 @@ class TestMemoryCapTiering:
         )
         return result.stdout.strip()
 
-    def test_pick_caps_512mb_pi_zero_2w(self, tmp_path):
+    def test_pick_caps_512mb_pi_zero_2w(self, tmp_path: Path) -> None:
         # Pi Zero 2 W reports ~498 MB MemTotal after kernel + GPU carveout.
         out = self._invoke_pick("MemTotal:         498064 kB\n", tmp_path)
         assert (
             out == "350 500 low-mem"
         ), f"512 MB Pi must get low-mem tier (350M/500M); got {out!r}"
 
-    def test_pick_caps_1gb_pi3(self, tmp_path):
+    def test_pick_caps_1gb_pi3(self, tmp_path: Path) -> None:
         # Pi 3B reports ~920 MB.
         out = self._invoke_pick("MemTotal:         940000 kB\n", tmp_path)
         assert (
             out == "250 350 standard"
         ), f"1 GB Pi must get standard tier (250M/350M); got {out!r}"
 
-    def test_pick_caps_4gb_pi4(self, tmp_path):
+    def test_pick_caps_4gb_pi4(self, tmp_path: Path) -> None:
         out = self._invoke_pick("MemTotal:        3900000 kB\n", tmp_path)
         assert out == "250 350 standard"
 
-    def test_pick_caps_missing_meminfo_defaults_to_standard(self, tmp_path):
+    def test_pick_caps_missing_meminfo_defaults_to_standard(
+        self, tmp_path: Path
+    ) -> None:
         # Safer to under-cap a fast Pi than to wrongly raise caps on an
         # unidentified device. No MemTotal line → default to standard tier.
         out = self._invoke_pick("Buffers: 0 kB\n", tmp_path)
         assert out == "250 350 standard"
 
-    def test_pick_caps_threshold_boundary(self, tmp_path):
-        # Exactly 700000 kB (the threshold) → low-mem. 700001 kB → standard.
+    def test_pick_caps_threshold_boundary(self, tmp_path: Path):
+        # Exactly 700000 kB (the threshold) -> None -> None → low-mem. 700001 kB → standard.
         out_at = self._invoke_pick("MemTotal:         700000 kB\n", tmp_path)
         out_over = self._invoke_pick("MemTotal:         700001 kB\n", tmp_path)
         assert out_at == "350 500 low-mem"
         assert out_over == "250 350 standard"
 
-    def test_install_memory_dropin_writes_low_mem_tier(self, tmp_path):
+    def test_install_memory_dropin_writes_low_mem_tier(self, tmp_path: Path) -> None:
         import subprocess
 
         meminfo = tmp_path / "meminfo"
@@ -3525,7 +3542,7 @@ class TestMemoryCapTiering:
         # Filename must NOT collide with the JTN-783 plugin-isolation drop-in.
         assert dropin.name == "memory.conf"
 
-    def test_install_memory_dropin_writes_standard_tier(self, tmp_path):
+    def test_install_memory_dropin_writes_standard_tier(self, tmp_path: Path) -> None:
         import subprocess
 
         meminfo = tmp_path / "meminfo"
@@ -3550,7 +3567,7 @@ class TestMemoryCapTiering:
         assert "MemoryHigh=250M" in body
         assert "MemoryMax=350M" in body
 
-    def test_install_memory_dropin_is_idempotent(self, tmp_path):
+    def test_install_memory_dropin_is_idempotent(self, tmp_path: Path) -> None:
         """Rewriting the same caps on every install/update must be safe."""
         import subprocess
 
@@ -3575,27 +3592,29 @@ class TestMemoryCapTiering:
         assert "MemoryHigh=350M" in body
         assert "MemoryMax=500M" in body
 
-    def test_install_sh_calls_install_memory_dropin(self):
+    def test_install_sh_calls_install_memory_dropin(self) -> None:
         content = (REPO_ROOT / "install" / "install.sh").read_text()
         assert "install_memory_dropin" in content, (
             "install.sh must call install_memory_dropin so fresh installs "
             "get device-scaled caps (JTN-785)"
         )
 
-    def test_update_sh_calls_install_memory_dropin(self):
+    def test_update_sh_calls_install_memory_dropin(self) -> None:
         content = (REPO_ROOT / "install" / "update.sh").read_text()
         assert "install_memory_dropin" in content, (
             "update.sh must call install_memory_dropin so existing installs "
             "pick up the per-device caps on next update (JTN-785)"
         )
 
-    def test_do_update_reads_target_version_file(self):
+    def test_do_update_reads_target_version_file(self) -> None:
         content = (REPO_ROOT / "install" / "do_update.sh").read_text()
         assert 'TARGET_VERSION_FILE="$LOCKFILE_DIR/update-target-version"' in content
         assert '[ -r "$TARGET_VERSION_FILE" ]' in content
         assert 'head -n 1 "$TARGET_VERSION_FILE"' in content
 
-    def test_dropin_filename_does_not_collide_with_plugin_isolation(self, tmp_path):
+    def test_dropin_filename_does_not_collide_with_plugin_isolation(
+        self, tmp_path: Path
+    ) -> None:
         """JTN-783 ships a plugin-isolation.conf drop-in. The JTN-785 drop-in
         must use a distinct filename (memory.conf) so both coexist in
         inkypi.service.d/ without stomping."""
@@ -3625,7 +3644,7 @@ class TestMemoryCapTiering:
             "memory.conf"
         ], f"install_memory_dropin wrote unexpected files: {written}"
 
-    def test_common_sh_syntax_valid(self):
+    def test_common_sh_syntax_valid(self) -> None:
         import subprocess
 
         result = subprocess.run(

@@ -1,17 +1,22 @@
 from __future__ import annotations
 
 import time
+from typing import Any
+
+import pytest
+from flask import Flask
+from flask.testing import FlaskClient
 
 
 def test_display_hang_fault_times_out_and_surfaces_error(
-    client, flask_app, monkeypatch
-):
+    client: FlaskClient, flask_app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
     refresh_task = flask_app.config["REFRESH_TASK"]
     display_manager = flask_app.config["DISPLAY_MANAGER"]
 
     monkeypatch.setenv("INKYPI_MANUAL_UPDATE_WAIT_S", "0.05")
 
-    def _hung_display(*_args, **_kwargs):
+    def _hung_display(*_args: Any, **_kwargs: Any) -> None:
         time.sleep(0.4)
         # Include "timed out" so that if the raw exception wins a timing race
         # with the manual-update timeout wrapper, the diagnostic text still

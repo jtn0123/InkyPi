@@ -55,7 +55,7 @@ def _import_config_body() -> str:
     raise AssertionError("unbalanced braces in importConfig — could not find end")
 
 
-def test_import_config_validates_file_before_disabling_button():
+def test_import_config_validates_file_before_disabling_button() -> None:
     """The 'no file' early-return must run *before* the button is flipped to
     `disabled` + `Restoring…`, otherwise the button stays stuck on the
     failure path."""
@@ -73,7 +73,7 @@ def test_import_config_validates_file_before_disabling_button():
     )
 
 
-def test_import_config_finally_block_restores_label_and_disabled_state():
+def test_import_config_finally_block_restores_label_and_disabled_state() -> None:
     """The finally block must restore the button text and reflect the
     file-input state (disabled iff no file selected). It must not leave the
     button stuck on "Restoring…"."""

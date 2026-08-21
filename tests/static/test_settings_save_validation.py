@@ -33,7 +33,7 @@ def _read_html() -> str:
     return HTML_PATH.read_text()
 
 
-def test_check_dirty_enforces_form_validity():
+def test_check_dirty_enforces_form_validity() -> None:
     """JTN-350: Save must stay disabled while ``form.checkValidity()`` is false.
 
     The dirty-check is the gate that enables the Save button as the user
@@ -55,7 +55,7 @@ def test_check_dirty_enforces_form_validity():
     )
 
 
-def test_handle_action_calls_report_validity_before_submit():
+def test_handle_action_calls_report_validity_before_submit() -> None:
     """JTN-350: handleAction must trigger the browser's native popup on click.
 
     Even when the disabled gate is bypassed (e.g. by programmatic click),
@@ -77,7 +77,7 @@ def test_handle_action_calls_report_validity_before_submit():
     )
 
 
-def test_handle_action_focuses_first_invalid_field():
+def test_handle_action_focuses_first_invalid_field() -> None:
     """The first ``:invalid`` field should receive focus when Save is blocked."""
     js = _read_js()
     assert ":invalid" in js, (
@@ -86,7 +86,7 @@ def test_handle_action_focuses_first_invalid_field():
     )
 
 
-def test_settings_form_declares_required_constraints():
+def test_settings_form_declares_required_constraints() -> None:
     """Regression guard: the constraints the JS now enforces must still exist.
 
     If a future refactor strips ``required`` from ``deviceName`` or ``min="1"``
@@ -107,7 +107,7 @@ def test_settings_form_declares_required_constraints():
     assert 'min="1"' in interval_line, 'interval must keep min="1"'
 
 
-def test_device_name_declares_client_side_length_cap():
+def test_device_name_declares_client_side_length_cap() -> None:
     """JTN-780: the browser must cap deviceName at the server's 64-char limit.
 
     Before this fix the server enforced a 64-char cap (JTN-746) but the
@@ -125,7 +125,7 @@ def test_device_name_declares_client_side_length_cap():
     )
 
 
-def test_device_name_declares_control_char_pattern():
+def test_device_name_declares_control_char_pattern() -> None:
     """JTN-780: deviceName must forbid control chars (except tab) client-side.
 
     The server rejects names containing characters in Unicode category ``Cc``
@@ -154,7 +154,7 @@ def test_device_name_declares_control_char_pattern():
     ), "pattern inputs should carry a title= for the native validation popup"
 
 
-def test_handle_action_surfaces_field_level_validation_errors_inline():
+def test_handle_action_surfaces_field_level_validation_errors_inline() -> None:
     """JTN-780: server validation errors must render inline, not just in a toast.
 
     The ``_field_error`` helper in ``src/blueprints/settings/_config.py``
@@ -176,7 +176,7 @@ def test_handle_action_surfaces_field_level_validation_errors_inline():
     )
 
 
-def test_handle_action_preserves_bad_input_on_field_level_error():
+def test_handle_action_preserves_bad_input_on_field_level_error() -> None:
     """JTN-780: when a field-level error is surfaced, don't erase the bad value.
 
     Pre-fix, every non-OK response restored the form from the last-known-good

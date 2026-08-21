@@ -1,14 +1,19 @@
 # pyright: reportMissingImports=false
 """Error recovery tests for graceful failure handling."""
 
+from typing import Any
+
 import pytest
+from flask.testing import FlaskClient
 
 
-def test_config_write_failure_returns_error(client, monkeypatch):
+def test_config_write_failure_returns_error(
+    client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Monkeypatch write_config to raise IOError -> server returns error."""
     import config as config_mod
 
-    def bad_write(self):
+    def bad_write(self) -> None:
         raise OSError("Disk full")
 
     monkeypatch.setattr(config_mod.Config, "write_config", bad_write)
@@ -28,7 +33,9 @@ def test_config_write_failure_returns_error(client, monkeypatch):
             assert result.get("success") is False or "error" in str(result).lower()
 
 
-def test_plugin_generate_image_timeout(client, monkeypatch):
+def test_plugin_generate_image_timeout(
+    client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Plugin generate_image raising TimeoutError returns error response."""
     from plugins.plugin_registry import get_plugin_instance, get_registered_plugin_ids
 
@@ -37,7 +44,7 @@ def test_plugin_generate_image_timeout(client, monkeypatch):
 
     plugin = get_plugin_instance({"id": "clock", "class": "Clock"})
 
-    def slow_generate(*args, **kwargs):
+    def slow_generate(*args: Any, **kwargs: Any) -> None:
         raise TimeoutError("Screenshot timed out")
 
     monkeypatch.setattr(plugin, "generate_image", slow_generate)
@@ -54,7 +61,7 @@ def test_plugin_generate_image_timeout(client, monkeypatch):
             assert result.get("success") is False or "error" in str(result).lower()
 
 
-def test_missing_plugin_update_now(client):
+def test_missing_plugin_update_now(client: FlaskClient) -> None:
     """Requesting update_now for non-existent plugin returns error."""
     data = {"plugin_id": "nonexistent_plugin_xyz"}
     resp = client.post("/update_now", data=data)
@@ -65,7 +72,7 @@ def test_missing_plugin_update_now(client):
             assert result.get("success") is False
 
 
-def test_invalid_json_body(client):
+def test_invalid_json_body(client: FlaskClient) -> None:
     """POST with invalid content type doesn't crash."""
     resp = client.post(
         "/save_settings",

@@ -1,8 +1,12 @@
 import importlib.util
 from pathlib import Path
+from typing import Any
+
+import pytest
+from flask.testing import FlaskClient
 
 
-def test_api_keys_page_loads(client):
+def test_api_keys_page_loads(client: FlaskClient) -> None:
     resp = client.get("/settings/api-keys")
     assert resp.status_code == 200
     body = resp.data.decode("utf-8")
@@ -14,7 +18,9 @@ def test_api_keys_page_loads(client):
     # the header (see test_managed_api_keys_renders_all_six_providers).
 
 
-def test_api_keys_page_shows_configured_count(client, device_config_dev):
+def test_api_keys_page_shows_configured_count(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     device_config_dev.set_env_key("NASA_SECRET", "nasa-test-key")
     device_config_dev.set_env_key("OPEN_AI_SECRET", "openai-test-key")
 
@@ -24,7 +30,9 @@ def test_api_keys_page_shows_configured_count(client, device_config_dev):
     assert body.count('data-role="key-chip">Configured</span>') == 2
 
 
-def test_save_api_keys_and_read_back(client, monkeypatch, tmp_path):
+def test_save_api_keys_and_read_back(
+    client: FlaskClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     monkeypatch.setenv("PROJECT_DIR", str(tmp_path))
     # Save a key
     resp = client.post(
@@ -43,7 +51,9 @@ def test_save_api_keys_and_read_back(client, monkeypatch, tmp_path):
     assert cfg.load_env_key("NASA_SECRET") == "route-test-123"
 
 
-def test_save_api_keys_empty_value_preserves_existing(client, monkeypatch, tmp_path):
+def test_save_api_keys_empty_value_preserves_existing(
+    client: FlaskClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     """JTN-598: an empty posted value must not overwrite the existing .env entry."""
     monkeypatch.setenv("PROJECT_DIR", str(tmp_path))
     src_dir = Path(__file__).resolve().parents[2] / "src"
@@ -66,8 +76,8 @@ def test_save_api_keys_empty_value_preserves_existing(client, monkeypatch, tmp_p
 
 
 def test_save_api_keys_bullet_placeholder_preserves_existing(
-    client, monkeypatch, tmp_path
-):
+    client: FlaskClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     """JTN-598: a value of pure U+2022 characters (the legacy placeholder) must
     not overwrite the existing key — even from a stale cached page."""
     monkeypatch.setenv("PROJECT_DIR", str(tmp_path))
@@ -94,8 +104,8 @@ def test_save_api_keys_bullet_placeholder_preserves_existing(
 
 
 def test_api_keys_page_does_not_prefill_bullets_in_value_attribute(
-    client, device_config_dev
-):
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     """JTN-598: the server-rendered page must not include literal U+2022 chars
     in any <input value=...>. Pre-filling with bullets is the root cause of the
     data-destruction bug."""
@@ -117,8 +127,8 @@ def test_api_keys_page_does_not_prefill_bullets_in_value_attribute(
 
 
 def test_api_keys_page_configured_fields_have_leave_blank_placeholder(
-    client, device_config_dev
-):
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     """JTN-598: a configured provider's input should render with a placeholder
     telling the user that leaving it blank keeps the existing key — instead of
     the generic 'Enter <provider> API key' placeholder used for unconfigured."""
@@ -136,7 +146,9 @@ def test_api_keys_page_configured_fields_have_leave_blank_placeholder(
     assert "enter unsplash" in unsplash_input.group(0).lower()
 
 
-def test_api_key_toggle_buttons_keep_accessible_names(client, device_config_dev):
+def test_api_key_toggle_buttons_keep_accessible_names(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     """Icon-only responsive states must still expose unique button names."""
     device_config_dev.set_env_key("OPEN_AI_SECRET", "real-openai-key-abc123")
 
@@ -154,8 +166,8 @@ def test_api_key_toggle_buttons_keep_accessible_names(client, device_config_dev)
 
 
 def test_save_api_keys_whitespace_padded_bullets_are_rejected(
-    client, monkeypatch, tmp_path
-):
+    client: FlaskClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     """JTN-598 (CodeRabbit follow-up): the bullet-placeholder rejection must
     also catch values where leading/trailing whitespace has been added by a
     client (e.g. '  ••••  '). Otherwise a stale page could send a whitespace-
@@ -182,8 +194,8 @@ def test_save_api_keys_whitespace_padded_bullets_are_rejected(
 
 
 def test_save_api_keys_whitespace_only_is_treated_as_unchanged(
-    client, monkeypatch, tmp_path
-):
+    client: FlaskClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     """JTN-598 (CodeRabbit follow-up): a whitespace-only submission must be
     treated the same as empty (leave current key unchanged), not saved as a
     whitespace string."""
@@ -210,8 +222,8 @@ def test_save_api_keys_whitespace_only_is_treated_as_unchanged(
 
 
 def test_save_api_keys_mixed_bullet_and_real_chars_is_accepted(
-    client, monkeypatch, tmp_path
-):
+    client: FlaskClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     """JTN-598: the rejection rule only fires when the value is **solely** U+2022
     characters. A value like 'abc•••' is a legitimate (if oddly-chosen) password
     and must be saved normally — we must not silently drop real keys that
@@ -238,8 +250,8 @@ def test_save_api_keys_mixed_bullet_and_real_chars_is_accepted(
 
 
 def test_save_api_keys_normal_response_omits_skipped_placeholder_field(
-    client, monkeypatch, tmp_path
-):
+    client: FlaskClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     """JTN-598: the new `skipped_placeholder` field should only appear in the
     response when at least one value was actually skipped. A clean save should
     have the same response shape as before the fix (forward compatibility)."""
@@ -255,7 +267,9 @@ def test_save_api_keys_normal_response_omits_skipped_placeholder_field(
     assert "skipped_placeholder" not in body
 
 
-def test_save_api_keys_partial_placeholder_reject(client, monkeypatch, tmp_path):
+def test_save_api_keys_partial_placeholder_reject(
+    client: FlaskClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     """JTN-598: posting a mix of real + bullet values should save the real ones
     and skip the bullet ones, and the response must name the skipped keys."""
     monkeypatch.setenv("PROJECT_DIR", str(tmp_path))
@@ -284,7 +298,7 @@ def test_save_api_keys_partial_placeholder_reject(client, monkeypatch, tmp_path)
     assert cfg.load_env_key("NASA_SECRET") == "new-nasa-real-key"
 
 
-def test_api_keys_js_no_longer_references_mask_placeholder():
+def test_api_keys_js_no_longer_references_mask_placeholder() -> None:
     """JTN-598: after the fix, api_keys_page.js should no longer reference
     `maskPlaceholder` anywhere — the constant was removed and the function that
     used it (`updateConfiguredStatus`) should clear the field instead of
@@ -308,7 +322,7 @@ def test_api_keys_js_no_longer_references_mask_placeholder():
     )
 
 
-def test_api_keys_template_no_longer_references_bullet_placeholder():
+def test_api_keys_template_no_longer_references_bullet_placeholder() -> None:
     """JTN-598: the api_keys.html template and api_key_card.html macro must
     not contain the literal bullet sequence. Static check against regression."""
     template_path = (
@@ -336,7 +350,9 @@ def test_api_keys_template_no_longer_references_bullet_placeholder():
     )
 
 
-def test_api_keys_responsive_css_reserves_short_viewport_sticky_rule_for_settings():
+def test_api_keys_responsive_css_reserves_short_viewport_sticky_rule_for_settings() -> (
+    None
+):
     """JTN-599: API keys no longer uses a bottom sticky save bar.
 
     The short-viewport sticky treatment is now intentionally reserved for
@@ -361,7 +377,9 @@ def test_api_keys_responsive_css_reserves_short_viewport_sticky_rule_for_setting
     assert ".api-keys-frame .buttons-container" not in content
 
 
-def test_delete_api_key(client, monkeypatch, tmp_path):
+def test_delete_api_key(
+    client: FlaskClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     monkeypatch.setenv("PROJECT_DIR", str(tmp_path))
     # Prime .env
     src_dir = Path(__file__).resolve().parents[2] / "src"

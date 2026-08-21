@@ -15,8 +15,10 @@ from __future__ import annotations
 import json
 import os
 import re
+from typing import Any
 
 import pytest
+from playwright.sync_api import Page
 from tests.integration.browser_helpers import navigate_and_wait
 
 pytestmark = pytest.mark.skipif(
@@ -25,10 +27,10 @@ pytestmark = pytest.mark.skipif(
 )
 
 
-def _stub_api_version(page, payload: dict) -> None:
+def _stub_api_version(page: Page, payload: dict) -> None:
     """Route /api/version (and /api/version?force=1) to return a known payload."""
 
-    def handler(route):
+    def handler(route: Any) -> None:
         route.fulfill(
             status=200,
             content_type="application/json",
@@ -40,7 +42,7 @@ def _stub_api_version(page, payload: dict) -> None:
     page.route(re.compile(r".*/api/version(?:\?.*)?$"), handler)
 
 
-def _open_maintenance_tab(page):
+def _open_maintenance_tab(page: Page) -> None:
     page.locator('[data-settings-tab="maintenance"]').first.click()
     page.wait_for_function(
         """() => {
@@ -52,7 +54,7 @@ def _open_maintenance_tab(page):
     page.wait_for_selector("#checkUpdatesBtn", state="visible", timeout=5000)
 
 
-def _click_check_and_wait(page):
+def _click_check_and_wait(page: Page) -> None:
     page.locator("#checkUpdatesBtn").click()
     # Wait until the check button leaves its "Checking..." state —
     # actions.js swaps the `.btn-label` text back and re-enables the
@@ -68,7 +70,9 @@ def _click_check_and_wait(page):
     )
 
 
-def test_update_available_renders_badge_notes_and_whats_new(live_server, browser_page):
+def test_update_available_renders_badge_notes_and_whats_new(
+    live_server: str, browser_page: Page
+) -> None:
     """When update_available=true: the inline "updateBadge" chip has been
     removed (sidebar carries the signal; check button carries the loading
     state), notes render as HTML, version span populates, What's-new
@@ -122,7 +126,9 @@ def test_update_available_renders_badge_notes_and_whats_new(live_server, browser
     assert state["updateBtnDisabled"] is False
 
 
-def test_updates_tab_hydrates_from_sidebar_version_cache(live_server, browser_page):
+def test_updates_tab_hydrates_from_sidebar_version_cache(
+    live_server: str, browser_page: Page
+) -> None:
     """If the global update indicator already found an update, the Updates
     tab should show that same state immediately without another manual check."""
     page = browser_page
@@ -164,7 +170,9 @@ def test_updates_tab_hydrates_from_sidebar_version_cache(live_server, browser_pa
     assert state["updateBtnDisabled"] is False
 
 
-def test_up_to_date_hides_whats_new_and_disables_update(live_server, browser_page):
+def test_up_to_date_hides_whats_new_and_disables_update(
+    live_server: str, browser_page: Page
+) -> None:
     """When already on latest: What's-new hidden, Update-now disabled, but
     release notes disclosure still renders so the user can read the last
     changelog. The inline status chip no longer exists."""
@@ -198,7 +206,9 @@ def test_up_to_date_hides_whats_new_and_disables_update(live_server, browser_pag
     assert state["notesVersion"] == "\u00b7 v0.64.1"
 
 
-def test_no_release_notes_hides_disclosure(live_server, browser_page):
+def test_no_release_notes_hides_disclosure(
+    live_server: str, browser_page: Page
+) -> None:
     """When release_notes is null the disclosure must stay hidden rather
     than rendering an empty details element."""
     page = browser_page
@@ -226,7 +236,9 @@ def test_no_release_notes_hides_disclosure(live_server, browser_page):
     assert state["whatsNewHidden"] is True
 
 
-def test_render_release_notes_helper_converts_markdown(live_server, browser_page):
+def test_render_release_notes_helper_converts_markdown(
+    live_server: str, browser_page: Page
+) -> None:
     """Unit-check the exposed markdown helper in isolation — no network."""
     page = browser_page
     navigate_and_wait(page, live_server, "/settings")

@@ -7,12 +7,15 @@ browser autofill could not distinguish them.
 
 from pathlib import Path
 
+import pytest
+from flask.testing import FlaskClient
+
 # --- Server-rendered rows (Jinja loop) ---
 
 
 def test_server_rendered_api_keys_rows_have_id_name_and_aria_label(
-    client, tmp_path, monkeypatch
-):
+    client: FlaskClient, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Each row in the server-rendered /api-keys response must have id, name,
     and aria-label on both the key input and the value input."""
     env_file = tmp_path / ".env"
@@ -50,7 +53,7 @@ def _js_path() -> Path:
     )
 
 
-def test_api_keys_page_js_addrow_sets_id_name_and_aria_label():
+def test_api_keys_page_js_addrow_sets_id_name_and_aria_label() -> None:
     """addRow() must set id, name, and aria-label on both inputs (JTN-383)."""
     js = _js_path().read_text(encoding="utf-8")
 
@@ -64,7 +67,7 @@ def test_api_keys_page_js_addrow_sets_id_name_and_aria_label():
     assert 'keyInput.setAttribute("aria-label", "API key name")' in js
 
 
-def test_api_keys_page_js_has_dynamic_aria_label_updater():
+def test_api_keys_page_js_has_dynamic_aria_label_updater() -> None:
     """The value input's aria-label must track the current key name (JTN-383).
 
     ``updateRowAriaLabels`` is wired as an input listener on the key input so
@@ -79,7 +82,7 @@ def test_api_keys_page_js_has_dynamic_aria_label_updater():
     assert 'keyInput.addEventListener("input"' in js
 
 
-def test_api_keys_page_js_removes_generic_delete_aria_label():
+def test_api_keys_page_js_removes_generic_delete_aria_label() -> None:
     """The old generic ``Delete API key`` aria-label must no longer be the
     sole setting — it's now computed dynamically via updateRowAriaLabels."""
     js = _js_path().read_text(encoding="utf-8")

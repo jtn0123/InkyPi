@@ -1,11 +1,15 @@
+from pathlib import Path
+from typing import Any
+
+import pytest
 from PIL import Image
 
 
-def _dummy_plugin(device_config, marker=None):
+def _dummy_plugin(device_config: Any, marker: Any = None) -> Any:
     class DummyPlugin:
         config = {"image_settings": []}
 
-        def generate_image(self, settings, cfg):
+        def generate_image(self, settings: Any, cfg: Any) -> Any:
             if marker is not None:
                 marker.write_text("called", encoding="utf-8")
             return Image.new("RGB", cfg.get_resolution(), "white")
@@ -13,7 +17,9 @@ def _dummy_plugin(device_config, marker=None):
     return DummyPlugin()
 
 
-def test_manual_refresh_uses_execute(device_config_dev, monkeypatch, tmp_path):
+def test_manual_refresh_uses_execute(
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     """Ensure ManualRefresh exercises the plugin generate_image path."""
     from display.display_manager import DisplayManager
     from refresh_task import ManualRefresh, RefreshTask
@@ -39,7 +45,9 @@ def test_manual_refresh_uses_execute(device_config_dev, monkeypatch, tmp_path):
         task.stop()
 
 
-def test_playlist_refresh_uses_execute(device_config_dev, monkeypatch, tmp_path):
+def test_playlist_refresh_uses_execute(
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> Any:
     """Ensure PlaylistRefresh exercises the plugin generate_image path.
 
     Uses manual_update with a PlaylistRefresh to avoid timing issues
@@ -66,10 +74,10 @@ def test_playlist_refresh_uses_execute(device_config_dev, monkeypatch, tmp_path)
         name = "inst"
         settings = {}
 
-        def get_image_path(self):
+        def get_image_path(self) -> Any:
             return "dummy.png"
 
-        def should_refresh(self, dt):
+        def should_refresh(self, dt: Any) -> Any:
             return True
 
     fake_instance = FakePluginInstance()

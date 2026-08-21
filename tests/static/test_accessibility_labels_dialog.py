@@ -4,7 +4,7 @@ import re
 from pathlib import Path
 
 
-def test_github_colors_widget_has_labels():
+def test_github_colors_widget_has_labels() -> None:
     """Each color picker in github_colors.html must have an associated label."""
     content = Path("src/templates/widgets/github_colors.html").read_text()
     for level in ["None", "Low", "Medium", "High", "Very High"]:
@@ -12,7 +12,7 @@ def test_github_colors_widget_has_labels():
     assert 'id="contributionColor' in content
 
 
-def test_weather_map_modal_has_dialog_role():
+def test_weather_map_modal_has_dialog_role() -> None:
     """The weather map modal must have role=dialog and aria-modal=true."""
     content = Path("src/templates/widgets/weather_map.html").read_text()
     assert 'role="dialog"' in content
@@ -20,14 +20,14 @@ def test_weather_map_modal_has_dialog_role():
     assert "aria-labelledby=" in content
 
 
-def test_weather_map_close_button_is_button_element():
+def test_weather_map_close_button_is_button_element() -> None:
     """The close button must be a <button>, not a <span>."""
     content = Path("src/templates/widgets/weather_map.html").read_text()
     span_close = re.search(r'<span[^>]*class="[^"]*close-button', content)
     assert span_close is None, "close-button should be <button>, not <span>"
 
 
-def test_response_modal_has_accessible_name():
+def test_response_modal_has_accessible_name() -> None:
     """The shared response modal must expose a stable accessible name."""
     content = Path("src/templates/response_modal.html").read_text()
     assert 'role="alertdialog"' in content
@@ -36,7 +36,7 @@ def test_response_modal_has_accessible_name():
     assert 'aria-describedby="modalMessage"' in content
 
 
-def test_weather_map_uses_local_leaflet_assets():
+def test_weather_map_uses_local_leaflet_assets() -> None:
     """The weather map template must point at vendored Leaflet files."""
     content = Path("src/templates/widgets/weather_map.html").read_text()
     assert "vendor/leaflet/leaflet.css" in content

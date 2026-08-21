@@ -7,6 +7,9 @@ is detected, so CI can upload the file as a GitHub Actions artifact.
 
 from __future__ import annotations
 
+from pathlib import Path
+from typing import Any
+
 import pytest
 from PIL import Image
 from tests.snapshots.snapshot_helper import (
@@ -17,7 +20,7 @@ from tests.snapshots.snapshot_helper import (
 
 
 @pytest.fixture()
-def _snapshot_sandbox(tmp_path, monkeypatch):
+def _snapshot_sandbox(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Any:
     """Redirect snapshot roots to a temp directory for isolation."""
     monkeypatch.setattr("tests.snapshots.snapshot_helper._SNAPSHOTS_ROOT", tmp_path)
     monkeypatch.setattr(
@@ -34,7 +37,9 @@ def _make_image(color: tuple[int, int, int] = (255, 0, 0)) -> Image.Image:
 class TestSnapshotMismatchSavesActual:
     """assert_image_snapshot must persist the actual PNG on mismatch."""
 
-    def test_actual_png_and_diff_written_on_mismatch(self, _snapshot_sandbox):
+    def test_actual_png_and_diff_written_on_mismatch(
+        self, _snapshot_sandbox: Any
+    ) -> None:
         sandbox = _snapshot_sandbox
         plugin, case = "test_plugin", "my_case"
 
@@ -59,7 +64,7 @@ class TestSnapshotMismatchSavesActual:
         saved = Image.open(actual_png)
         assert _image_sha256(saved) == _image_sha256(actual)
 
-    def test_error_message_mentions_artifact(self, _snapshot_sandbox):
+    def test_error_message_mentions_artifact(self, _snapshot_sandbox: Any) -> None:
         plugin, case = "test_plugin", "hint_case"
 
         baseline = _make_image((255, 0, 0))
@@ -72,7 +77,9 @@ class TestSnapshotMismatchSavesActual:
         # Also verify the hint about the CI artifact.
         assert "'snapshot-failures' artifact" in str(exc_info.value)
 
-    def test_small_delta_within_tolerance_passes(self, _snapshot_sandbox, monkeypatch):
+    def test_small_delta_within_tolerance_passes(
+        self, _snapshot_sandbox: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         plugin, case = "test_plugin", "threshold_case"
         monkeypatch.setenv("SNAPSHOT_CHANNEL_THRESHOLD", "10")
         monkeypatch.setenv("SNAPSHOT_MAX_CHANGED_PCT", "0.5")
@@ -84,7 +91,7 @@ class TestSnapshotMismatchSavesActual:
         actual = _make_image((102, 100, 100))
         assert_image_snapshot(actual, plugin, case)
 
-    def test_no_actual_png_on_match(self, _snapshot_sandbox):
+    def test_no_actual_png_on_match(self, _snapshot_sandbox: Any) -> None:
         sandbox = _snapshot_sandbox
         plugin, case = "test_plugin", "match_case"
 

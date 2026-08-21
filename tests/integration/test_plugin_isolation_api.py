@@ -1,4 +1,12 @@
-def test_failing_plugin_does_not_block_successful_plugin(client, monkeypatch):
+from typing import Any
+
+import pytest
+from flask.testing import FlaskClient
+
+
+def test_failing_plugin_does_not_block_successful_plugin(
+    client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
     # Arrange playlist with two plugins: one will error, one succeeds
     app = client.application
     device_config = app.config["DEVICE_CONFIG"]
@@ -29,7 +37,7 @@ def test_failing_plugin_does_not_block_successful_plugin(client, monkeypatch):
     # Force ai_text plugin to raise during generate_image
     import plugins.ai_text.ai_text as ai_text_mod
 
-    def boom(settings, cfg):
+    def boom(settings: Any, cfg: Any) -> None:
         raise RuntimeError("synthetic failure")
 
     monkeypatch.setattr(

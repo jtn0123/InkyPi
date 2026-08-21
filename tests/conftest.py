@@ -4,10 +4,13 @@ import json
 import os
 import sys
 import threading
+from collections.abc import Iterator
 from functools import lru_cache
 from pathlib import Path
+from typing import Any
 
 import pytest
+from flask import Flask
 from PIL import Image
 from werkzeug.serving import make_server
 
@@ -82,7 +85,7 @@ MANAGED_API_KEY_ENV_VARS = (
 )
 
 
-def pytest_addoption(parser):
+def pytest_addoption(parser: Any) -> None:
     parser.addoption(
         "--update-snapshots",
         action="store_true",
@@ -91,7 +94,7 @@ def pytest_addoption(parser):
     )
 
 
-def pytest_configure(config):
+def pytest_configure(config: Any) -> None:
     if config.getoption("--update-snapshots"):
         os.environ["SNAPSHOT_UPDATE"] = "1"
 
@@ -122,7 +125,7 @@ def _playwright_browser_available() -> bool:
         return False
 
 
-def pytest_ignore_collect(collection_path, config):
+def pytest_ignore_collect(collection_path: Any, config: Any) -> Any:
     path = Path(str(collection_path))
     group = _browser_test_group(path)
     if group is None:
@@ -150,7 +153,7 @@ def pytest_ignore_collect(collection_path, config):
 
 
 @pytest.fixture(autouse=True)
-def disable_plugin_process_isolation(monkeypatch):
+def disable_plugin_process_isolation(monkeypatch: pytest.MonkeyPatch) -> None:
     """Run plugins in-process during tests.
 
     The production code spawns a subprocess per plugin execution to isolate
@@ -164,7 +167,7 @@ def disable_plugin_process_isolation(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
-def clear_managed_api_key_env(monkeypatch):
+def clear_managed_api_key_env(monkeypatch: pytest.MonkeyPatch) -> None:
     # Keep tests hermetic even when earlier tests or the parent shell export real
     # API credentials that would otherwise leak into "missing key" cases.
     for env_var in MANAGED_API_KEY_ENV_VARS:
@@ -183,7 +186,7 @@ def clear_managed_api_key_env(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
-def reset_plugin_registry_state():
+def reset_plugin_registry_state() -> Iterator[Any]:
     """Prevent plugin registry globals from leaking between tests."""
     from plugins.plugin_registry import reset_plugin_registry
 
@@ -193,9 +196,9 @@ def reset_plugin_registry_state():
 
 
 @pytest.fixture(autouse=True)
-def mock_screenshot(monkeypatch):
+def mock_screenshot(monkeypatch: pytest.MonkeyPatch) -> Any:
     # Return a simple in-memory image instead of invoking chromium
-    def _fake_screenshot(*args, **kwargs):
+    def _fake_screenshot(*args: Any, **kwargs: Any) -> Any:
         dims = args[1] if len(args) > 1 else kwargs.get("dimensions", (800, 480))
         width, height = dims
         return Image.new("RGB", (width, height), "white")
@@ -222,7 +225,7 @@ def mock_screenshot(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
-def reset_utils_singletons():
+def reset_utils_singletons() -> Iterator[Any]:
     """Reset utils module-level singletons before each test.
 
     Prevents HTTP session state, cache contents, and i18n locale state from
@@ -242,7 +245,7 @@ def reset_utils_singletons():
 
 
 @pytest.fixture(autouse=True)
-def reset_display_next_cooldown():
+def reset_display_next_cooldown() -> Iterator[Any]:
     """Reset the /display-next rate limiter between tests."""
     from blueprints.main import _reset_display_next_cooldown
 
@@ -252,7 +255,7 @@ def reset_display_next_cooldown():
 
 
 @pytest.fixture()
-def device_config_dev(tmp_path, monkeypatch):
+def device_config_dev(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Any:
     # Create a temp device config mirroring device_dev.json
     cfg = {
         "name": "InkyPi Test",
@@ -311,7 +314,7 @@ def device_config_dev(tmp_path, monkeypatch):
 
 
 @pytest.fixture()
-def flask_app(device_config_dev, monkeypatch):
+def flask_app(device_config_dev: Any, monkeypatch: pytest.MonkeyPatch) -> Any:
     # Build the app through the production bootstrap path so tests exercise the
     # same middleware registration that ships in inkypi.py.
     import secrets as _secrets
@@ -339,7 +342,7 @@ def flask_app(device_config_dev, monkeypatch):
     monkeypatch.setenv("INKYPI_RATE_LIMIT_MUTATING", "100000/60")
     security_middleware._mutation_limiter = SlidingWindowLimiter(100000, 60)
 
-    def _fake_init_core_services(app):
+    def _fake_init_core_services(app: Flask) -> Any:
         display_manager = DisplayManager(device_config_dev)
         refresh_task = RefreshTask(device_config_dev, display_manager)
         load_plugins(device_config_dev.get_plugins())
@@ -349,14 +352,14 @@ def flask_app(device_config_dev, monkeypatch):
         app.config["WEB_ONLY"] = False
         return device_config_dev
 
-    def _setup_csrf_token_only(app):
+    def _setup_csrf_token_only(app: Flask) -> Any:
         def _generate_csrf_token() -> str:
             if "_csrf_token" not in _session:
                 _session["_csrf_token"] = _secrets.token_hex(32)
             return _session["_csrf_token"]
 
         @app.context_processor
-        def _inject_csrf_token():
+        def _inject_csrf_token() -> Any:
             return {"csrf_token": _generate_csrf_token}
 
     monkeypatch.setattr(inkypi, "_init_core_services", _fake_init_core_services)
@@ -367,17 +370,17 @@ def flask_app(device_config_dev, monkeypatch):
 
 
 @pytest.fixture()
-def client(flask_app):
+def client(flask_app: Flask) -> Any:
     return flask_app.test_client()
 
 
 @pytest.fixture()
 def live_server(
-    flask_app, free_tcp_port_factory, monkeypatch
+    flask_app: Flask, free_tcp_port_factory: Any, monkeypatch: pytest.MonkeyPatch
 ):  # free_tcp_port_factory: from anyio pytest plugin
     # Relax CSP for integration tests so Playwright's page.add_script_tag(content=...)
     # (used by axe-core and other in-page probes) isn't blocked as an inline script.
-    # Unit CSP tests (tests/test_csp_report.py) use the `client` fixture instead and
+    # Unit CSP tests (tests/test_csp_report.py) -> Iterator[Any] -> Iterator[Any] use the `client` fixture instead and
     # override INKYPI_CSP in their own monkeypatch scope.
     monkeypatch.setenv(
         "INKYPI_CSP",

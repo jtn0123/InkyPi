@@ -1,5 +1,7 @@
 import json
 import os
+from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -8,7 +10,9 @@ import pytest
 # ---------------------------------------------------------------------------
 
 
-def _patch_paths_to_tmp(config_mod, tmp_path, monkeypatch):
+def _patch_paths_to_tmp(
+    config_mod: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     monkeypatch.setattr(
         config_mod.Config, "current_image_file", str(tmp_path / "current_image.png")
     )
@@ -25,7 +29,7 @@ def _patch_paths_to_tmp(config_mod, tmp_path, monkeypatch):
     os.makedirs(str(tmp_path / "history"), exist_ok=True)
 
 
-def _write_min_config(path, name="Original"):
+def _write_min_config(path: Any, name: Any = "Original") -> None:
     cfg = {
         "name": name,
         "display_type": "mock",
@@ -49,7 +53,7 @@ def _write_min_config(path, name="Original"):
 # ---------------------------------------------------------------------------
 
 
-def test_device_config_valid_ok(device_config_dev):
+def test_device_config_valid_ok(device_config_dev: Any) -> None:
     # Fixture already constructs a valid Config; validation should pass implicitly
     assert device_config_dev.get_config("orientation") in ("horizontal", "vertical")
 
@@ -59,7 +63,9 @@ def test_device_config_valid_ok(device_config_dev):
 # ---------------------------------------------------------------------------
 
 
-def test_device_config_invalid_orientation_raises(tmp_path, monkeypatch):
+def test_device_config_invalid_orientation_raises(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     cfg = {
         "name": "InkyPi Test",
         "display_type": "mock",
@@ -101,7 +107,9 @@ def test_device_config_invalid_orientation_raises(tmp_path, monkeypatch):
 # ---------------------------------------------------------------------------
 
 
-def test_invalid_orientation_raises_value_error(tmp_path, monkeypatch):
+def test_invalid_orientation_raises_value_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     # Craft a minimal device config with invalid orientation
     bad_cfg = {
         "name": "InkyPi Test",
@@ -156,7 +164,7 @@ def test_invalid_orientation_raises_value_error(tmp_path, monkeypatch):
 # ---------------------------------------------------------------------------
 
 
-def test_sanitize_config_masks_and_summarizes():
+def test_sanitize_config_masks_and_summarizes() -> None:
     from config import Config
 
     cfg = {
@@ -200,7 +208,9 @@ def test_sanitize_config_masks_and_summarizes():
 # ---------------------------------------------------------------------------
 
 
-def test_bootstrap_idempotent_when_prod_exists(monkeypatch, tmp_path):
+def test_bootstrap_idempotent_when_prod_exists(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     import config as config_mod
 
     # Create a src-like structure with existing device.json

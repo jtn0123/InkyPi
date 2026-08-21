@@ -1,15 +1,18 @@
 # pyright: reportMissingImports=false
 import tempfile
 from io import BytesIO
+from pathlib import Path
+from typing import Any
 
 import pytest
+from flask.testing import FlaskClient
 from PIL import Image
 
 import plugins.image_upload.image_upload as _image_upload_mod
 
 
 @pytest.fixture(autouse=True)
-def _patch_upload_dir(monkeypatch):
+def _patch_upload_dir(monkeypatch: pytest.MonkeyPatch) -> None:
     """Point _get_upload_dir to the system temp directory so that tests using
     tempfile.NamedTemporaryFile pass path validation."""
     monkeypatch.setattr(
@@ -17,30 +20,30 @@ def _patch_upload_dir(monkeypatch):
     )
 
 
-def build_upload(name: str, content: bytes, content_type: str = "image/png"):
+def build_upload(name: str, content: bytes, content_type: str = "image/png") -> Any:
     class F:
-        def __init__(self, n, b, ct):
+        def __init__(self, n: Any, b: Any, ct: Any) -> Any:
             self.filename = n
             self._b = b
             self.content_type = ct
             self._pos = 0
 
             class S:
-                def __init__(self, outer):
+                def __init__(self, outer: Any) -> None:
                     self._outer = outer
 
-                def tell(self):
+                def tell(self) -> Any:
                     return self._outer._pos
 
             self.stream = S(self)
 
-        def read(self):
+        def read(self) -> Any:
             return self._b
 
-        def seek(self, pos):
+        def seek(self, pos: Any) -> None:
             self._pos = pos
 
-        def save(self, fp):
+        def save(self, fp: Any) -> None:
             with open(fp, "wb") as f:
                 f.write(self._b)
 
@@ -48,17 +51,22 @@ def build_upload(name: str, content: bytes, content_type: str = "image/png"):
 
 
 class MultiDict:
-    def __init__(self, items):
+    def __init__(self, items: Any) -> None:
         self._items = items
 
-    def items(self, multi=False):
+    def items(self, multi: Any = False) -> Any:
         return self._items
 
-    def keys(self):
+    def keys(self) -> Any:
         return [k for (k, _v) in self._items]
 
 
-def test_image_upload_success(client, monkeypatch, device_config_dev, tmp_path):
+def test_image_upload_success(
+    client: FlaskClient,
+    monkeypatch: pytest.MonkeyPatch,
+    device_config_dev: Any,
+    tmp_path: Path,
+) -> Any:
     # Ensure request.files handling saves and plugin loads correctly
     buf = BytesIO()
     Image.new("RGB", (100, 50), "white").save(buf, format="PNG")
@@ -79,7 +87,7 @@ def test_image_upload_success(client, monkeypatch, device_config_dev, tmp_path):
     real_upload_dir = app_utils.resolve_path("static/images/saved")
     monkeypatch.setattr(_image_upload_mod, "_get_upload_dir", lambda: real_upload_dir)
 
-    def fake_handle_request_files(request_files, form_data=None):
+    def fake_handle_request_files(request_files: Any, form_data: Any = None) -> Any:
         if form_data is None:
             form_data = {}
         return app_utils.handle_request_files(
@@ -96,14 +104,16 @@ def test_image_upload_success(client, monkeypatch, device_config_dev, tmp_path):
     assert resp.status_code == 200
 
 
-def test_image_upload_rejects_non_image(client, monkeypatch):
+def test_image_upload_rejects_non_image(
+    client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> Any:
     bad_content = b"%PDF-1.4 Not an image"
 
     upload = build_upload("doc.pdf", bad_content, "application/pdf")
 
     import utils.app_utils as app_utils
 
-    def fake_handle_request_files(request_files, form_data=None):
+    def fake_handle_request_files(request_files: Any, form_data: Any = None) -> Any:
         # Should skip non-allowed extension and thus not crash; return empty map
         if form_data is None:
             form_data = {}
@@ -122,8 +132,10 @@ def test_image_upload_rejects_non_image(client, monkeypatch):
     assert resp.status_code == 400
 
 
-def test_image_upload_rejects_oversize(client, monkeypatch):
-    # 11MB fake PNG-like bytes (not decodable)
+def test_image_upload_rejects_oversize(
+    client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+):
+    # 11MB fake PNG-like bytes (not decodable) -> Any -> Any
     big = b"\x89PNG\r\n" + b"0" * (11 * 1024 * 1024)
 
     upload = build_upload("huge.png", big, "image/png")
@@ -132,7 +144,7 @@ def test_image_upload_rejects_oversize(client, monkeypatch):
 
     import utils.app_utils as app_utils
 
-    def fake_handle_request_files(request_files, form_data=None):
+    def fake_handle_request_files(request_files: Any, form_data: Any = None) -> Any:
         if form_data is None:
             form_data = {}
         return app_utils.handle_request_files(
@@ -149,7 +161,9 @@ def test_image_upload_rejects_oversize(client, monkeypatch):
     assert resp.status_code == 500
 
 
-def test_image_upload_rejects_decode_error(client, monkeypatch):
+def test_image_upload_rejects_decode_error(
+    client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> Any:
     # Small bytes with PNG extension but invalid image data
     invalid = b"not-an-image"
 
@@ -157,7 +171,7 @@ def test_image_upload_rejects_decode_error(client, monkeypatch):
 
     import utils.app_utils as app_utils
 
-    def fake_handle_request_files(request_files, form_data=None):
+    def fake_handle_request_files(request_files: Any, form_data: Any = None) -> Any:
         if form_data is None:
             form_data = {}
         return app_utils.handle_request_files(
@@ -174,7 +188,9 @@ def test_image_upload_rejects_decode_error(client, monkeypatch):
     assert resp.status_code == 500
 
 
-def test_image_upload_success_returns_sized_image(monkeypatch, device_config_dev):
+def test_image_upload_success_returns_sized_image(
+    monkeypatch: pytest.MonkeyPatch, device_config_dev: Any
+) -> None:
     # Directly invoke plugin.generate_image to verify contain/pad
     from plugins.image_upload.image_upload import ImageUpload
 
@@ -199,7 +215,7 @@ def test_image_upload_success_returns_sized_image(monkeypatch, device_config_dev
         assert img.size == (w, h)
 
 
-def test_image_upload_open_image_no_images():
+def test_image_upload_open_image_no_images() -> None:
     from plugins.image_upload.image_upload import ImageUpload
 
     plugin = ImageUpload({"id": "image_upload"})
@@ -207,7 +223,9 @@ def test_image_upload_open_image_no_images():
         plugin.open_image(0, [])
 
 
-def test_image_upload_open_image_invalid_file(monkeypatch, tmp_path):
+def test_image_upload_open_image_invalid_file(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     from PIL import Image
 
     from plugins.image_upload.image_upload import ImageUpload
@@ -219,7 +237,7 @@ def test_image_upload_open_image_invalid_file(monkeypatch, tmp_path):
     monkeypatch.setattr(_image_upload_mod, "_get_upload_dir", lambda: str(tmp_path))
     fake_path = str(tmp_path / "missing.png")
 
-    def mock_open(path):
+    def mock_open(path: Any) -> None:
         raise OSError("File not found")
 
     monkeypatch.setattr(Image, "open", mock_open)
@@ -228,7 +246,9 @@ def test_image_upload_open_image_invalid_file(monkeypatch, tmp_path):
         plugin.open_image(0, [fake_path])
 
 
-def test_image_upload_generate_image_index_out_of_range(monkeypatch, device_config_dev):
+def test_image_upload_generate_image_index_out_of_range(
+    monkeypatch: pytest.MonkeyPatch, device_config_dev: Any
+) -> None:
     import tempfile
 
     from plugins.image_upload.image_upload import ImageUpload
@@ -251,7 +271,9 @@ def test_image_upload_generate_image_index_out_of_range(monkeypatch, device_conf
         assert result is not None
 
 
-def test_image_upload_generate_image_randomize(monkeypatch, device_config_dev):
+def test_image_upload_generate_image_randomize(
+    monkeypatch: pytest.MonkeyPatch, device_config_dev: Any
+) -> None:
     import tempfile
 
     from plugins.image_upload.image_upload import ImageUpload
@@ -280,8 +302,8 @@ def test_image_upload_generate_image_randomize(monkeypatch, device_config_dev):
 
 
 def test_image_upload_generate_image_vertical_orientation(
-    monkeypatch, device_config_dev
-):
+    monkeypatch: pytest.MonkeyPatch, device_config_dev: Any
+) -> Any:
     import tempfile
 
     from plugins.image_upload.image_upload import ImageUpload
@@ -289,7 +311,7 @@ def test_image_upload_generate_image_vertical_orientation(
     plugin = ImageUpload({"id": "image_upload"})
 
     # Mock vertical orientation and resolution
-    def mock_get_config(key, default=None):
+    def mock_get_config(key: Any, default: Any = None) -> Any:
         if key == "orientation":
             return "vertical"
         if key == "resolution":
@@ -312,7 +334,9 @@ def test_image_upload_generate_image_vertical_orientation(
         assert result is not None
 
 
-def test_image_upload_missing_background_color(monkeypatch, device_config_dev):
+def test_image_upload_missing_background_color(
+    monkeypatch: pytest.MonkeyPatch, device_config_dev: Any
+) -> None:
     """Bug 11: Missing backgroundColor should not crash ImageColor.getcolor."""
     import tempfile
 
@@ -337,7 +361,9 @@ def test_image_upload_missing_background_color(monkeypatch, device_config_dev):
         assert result.size == (w, h)
 
 
-def test_image_upload_generate_image_with_padding(monkeypatch, device_config_dev):
+def test_image_upload_generate_image_with_padding(
+    monkeypatch: pytest.MonkeyPatch, device_config_dev: Any
+) -> None:
     import tempfile
 
     from plugins.image_upload.image_upload import ImageUpload
@@ -363,7 +389,7 @@ def test_image_upload_generate_image_with_padding(monkeypatch, device_config_dev
         assert result is not None
 
 
-def test_image_upload_background_option_labels_match_sibling_plugins():
+def test_image_upload_background_option_labels_match_sibling_plugins() -> Any:
     """JTN-358: Image Upload's Background Fill options must use the same
     labels ('Blur' / 'Color') as Image Folder and Image Album so that all
     three image plugins present a consistent UI. Previously Image Upload
@@ -372,7 +398,7 @@ def test_image_upload_background_option_labels_match_sibling_plugins():
     from plugins.image_folder.image_folder import ImageFolder
     from plugins.image_upload.image_upload import ImageUpload
 
-    def _find_background_option_labels(obj):
+    def _find_background_option_labels(obj: Any) -> Any:
         """Recursively locate the backgroundOption field and return its
         ordered (value, label) pairs."""
         if isinstance(obj, dict):
@@ -423,8 +449,8 @@ def test_image_upload_background_option_labels_match_sibling_plugins():
 
 
 def test_image_upload_invalid_background_color_falls_back(
-    monkeypatch, device_config_dev
-):
+    monkeypatch: pytest.MonkeyPatch, device_config_dev: Any
+) -> None:
     import tempfile
 
     from plugins.image_upload.image_upload import ImageUpload
@@ -451,7 +477,7 @@ def test_image_upload_invalid_background_color_falls_back(
         assert result is not None
 
 
-def test_image_upload_background_option_has_default_blur_in_schema():
+def test_image_upload_background_option_has_default_blur_in_schema() -> Any:
     """JTN-632: The Background Fill radio_segment must declare a default so
     that DRAFT renders pre-select one option (Blur). Without a default,
     neither radio is checked and users can save in an indeterminate state."""
@@ -459,7 +485,7 @@ def test_image_upload_background_option_has_default_blur_in_schema():
 
     sch = ImageUpload({"id": "image_upload"}).build_settings_schema()
 
-    def _find_field(obj, name):
+    def _find_field(obj: Any, name: Any) -> Any:
         if isinstance(obj, dict):
             if obj.get("name") == name:
                 return obj
@@ -482,7 +508,7 @@ def test_image_upload_background_option_has_default_blur_in_schema():
     )
 
 
-def test_image_upload_draft_page_preselects_blur_radio(client):
+def test_image_upload_draft_page_preselects_blur_radio(client: FlaskClient) -> None:
     """JTN-632: Rendering /plugin/image_upload with no saved instance
     (DRAFT mode) must pre-check exactly one Background Fill radio option."""
     import re

@@ -2,23 +2,26 @@ from typing import Any
 
 import pytest
 import requests
+from flask import Flask
 
 
-def test_http_get_user_agent_and_default_timeout(monkeypatch):
+def test_http_get_user_agent_and_default_timeout(
+    monkeypatch: pytest.MonkeyPatch,
+) -> Any:
     import utils.http_utils as http_utils
 
     http_utils._reset_shared_session_for_tests()
 
     captured = {}
 
-    def fake_get(self, url, **kwargs):  # type: ignore[no-redef]
+    def fake_get(self, url: Any, **kwargs: Any) -> Any:  # type: ignore[no-redef]
         captured["headers"] = kwargs.get("headers")
         captured["timeout"] = kwargs.get("timeout")
 
         class R:
             status_code = 200
 
-            def json(self):
+            def json(self) -> Any:
                 return {}
 
             content = b""
@@ -34,7 +37,7 @@ def test_http_get_user_agent_and_default_timeout(monkeypatch):
     assert captured.get("timeout") == http_utils.DEFAULT_TIMEOUT_SECONDS
 
 
-def test_http_get_timeout_override(monkeypatch):
+def test_http_get_timeout_override(monkeypatch: pytest.MonkeyPatch) -> Any:
     import utils.http_utils as http_utils
 
     http_utils._reset_shared_session_for_tests()
@@ -49,13 +52,13 @@ def test_http_get_timeout_override(monkeypatch):
 
     captured = {}
 
-    def fake_get(self, url, **kwargs):  # type: ignore[no-redef]
+    def fake_get(self, url: Any, **kwargs: Any) -> Any:  # type: ignore[no-redef]
         captured["timeout"] = kwargs.get("timeout")
 
         class R:
             status_code = 200
 
-            def json(self):
+            def json(self) -> Any:
                 return {}
 
             content = b""
@@ -68,7 +71,7 @@ def test_http_get_timeout_override(monkeypatch):
     assert captured.get("timeout") == 5
 
 
-def test_shared_session_retry_configuration(monkeypatch):
+def test_shared_session_retry_configuration(monkeypatch: pytest.MonkeyPatch) -> None:
     from urllib3.util.retry import Retry
 
     import utils.http_utils as http_utils
@@ -84,7 +87,7 @@ def test_shared_session_retry_configuration(monkeypatch):
     assert 503 in (retry.status_forcelist or set())
 
 
-def test_shared_session_thread_isolation():
+def test_shared_session_thread_isolation() -> None:
     import threading
 
     import requests
@@ -101,7 +104,7 @@ def test_shared_session_thread_isolation():
     # Different threads should get distinct sessions
     other_session: list[requests.Session] = []
 
-    def worker():
+    def worker() -> None:
         other_session.append(http_utils.get_shared_session())
 
     t = threading.Thread(target=worker)
@@ -114,8 +117,6 @@ def test_shared_session_thread_isolation():
 
 from unittest.mock import Mock, patch  # noqa: E402
 
-from flask import Flask  # noqa: E402
-
 from src.utils.http_utils import (  # noqa: E402
     APIError,
     json_error,
@@ -127,7 +128,7 @@ from src.utils.http_utils import (  # noqa: E402
 
 
 @pytest.fixture
-def app():
+def app() -> Any:
     """Create a test Flask application."""
     return Flask(__name__)
 
@@ -135,7 +136,7 @@ def app():
 class TestAPIError:
     """Test cases for the APIError exception class."""
 
-    def test_api_error_basic(self):
+    def test_api_error_basic(self) -> None:
         """Test basic APIError creation."""
         error = APIError("Test error")
         assert error.message == "Test error"
@@ -143,7 +144,7 @@ class TestAPIError:
         assert error.code is None
         assert error.details is None
 
-    def test_api_error_with_all_params(self):
+    def test_api_error_with_all_params(self) -> None:
         """Test APIError with all parameters."""
         details = {"field": "test"}
         error = APIError("Test error", status=500, code="TEST_001", details=details)
@@ -152,7 +153,7 @@ class TestAPIError:
         assert error.code == "TEST_001"
         assert error.details == details
 
-    def test_api_error_inheritance(self):
+    def test_api_error_inheritance(self) -> None:
         """Test that APIError properly inherits from Exception."""
         error = APIError("Test error")
         assert isinstance(error, Exception)
@@ -162,7 +163,7 @@ class TestAPIError:
 class TestJsonError:
     """Test cases for the json_error function."""
 
-    def test_json_error_basic(self, app):
+    def test_json_error_basic(self, app: Flask) -> None:
         """Test basic json_error response."""
         with app.app_context():
             response, status = json_error("Test error")
@@ -174,7 +175,9 @@ class TestJsonError:
             assert "code" not in response_data
             assert "details" not in response_data
 
-    def test_json_error_includes_request_id_when_present(self, app, monkeypatch):
+    def test_json_error_includes_request_id_when_present(
+        self, app: Flask, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """json_error should echo request_id if available via header/context."""
         with app.test_request_context("/", headers={"X-Request-Id": "abc-123"}):
             response, status = json_error("oops")
@@ -183,7 +186,7 @@ class TestJsonError:
             assert data.get("error") == "oops"
             assert data.get("request_id") == "abc-123"
 
-    def test_reissue_json_error_uses_fallback_message(self, app):
+    def test_reissue_json_error_uses_fallback_message(self, app: Flask) -> None:
         """reissue_json_error should ignore upstream error text."""
         with app.app_context():
             upstream, status = json_error(
@@ -203,7 +206,7 @@ class TestJsonError:
             assert "details" not in data
 
 
-def test_http_get_timeout_tuple_from_env(monkeypatch):
+def test_http_get_timeout_tuple_from_env(monkeypatch: pytest.MonkeyPatch) -> Any:
     import requests
 
     import src.utils.http_utils as http_utils
@@ -224,14 +227,14 @@ def test_http_get_timeout_tuple_from_env(monkeypatch):
 
     captured = {}
 
-    def fake_get(self, url, **kwargs):  # type: ignore[no-redef]
+    def fake_get(self, url: Any, **kwargs: Any) -> Any:  # type: ignore[no-redef]
         captured["timeout"] = kwargs.get("timeout")
 
         class R:
             status_code = 200
             content = b"ok"
 
-            def json(self):
+            def json(self) -> Any:
                 return {}
 
         return R()
@@ -243,7 +246,9 @@ def test_http_get_timeout_tuple_from_env(monkeypatch):
     assert isinstance(t, tuple) and t == (1.5, 3.0)
 
 
-def test_http_get_latency_logging_success_and_failure(monkeypatch, caplog):
+def test_http_get_latency_logging_success_and_failure(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> Any:
     import logging
 
     import requests
@@ -257,12 +262,12 @@ def test_http_get_latency_logging_success_and_failure(monkeypatch, caplog):
     caplog.set_level(logging.INFO, logger=http_utils.__name__)
 
     # Success path
-    def ok_get(self, url, **kwargs):  # type: ignore[no-redef]
+    def ok_get(self, url: Any, **kwargs: Any) -> Any:  # type: ignore[no-redef]
         class R:
             status_code = 200
             content = b"x"
 
-            def json(self):
+            def json(self) -> Any:
                 return {}
 
         return R()
@@ -275,7 +280,7 @@ def test_http_get_latency_logging_success_and_failure(monkeypatch, caplog):
     )
 
     # Failure path
-    def err_get(self, url, **kwargs):  # type: ignore[no-redef]
+    def err_get(self, url: Any, **kwargs: Any) -> None:  # type: ignore[no-redef]
         raise requests.exceptions.ConnectionError("boom")
 
     caplog.clear()
@@ -291,7 +296,7 @@ def test_http_get_latency_logging_success_and_failure(monkeypatch, caplog):
     )
 
 
-def test_retry_backoff_env_configuration(monkeypatch):
+def test_retry_backoff_env_configuration(monkeypatch: pytest.MonkeyPatch) -> None:
     import src.utils.http_utils as http_utils
 
     # Override env-based values by monkeypatching the helper accessors indirectly
@@ -317,7 +322,7 @@ def test_retry_backoff_env_configuration(monkeypatch):
     assert retry.status == 4
     assert retry.backoff_factor == 0.25
 
-    def test_json_error_with_code(self, app):
+    def test_json_error_with_code(self, app: Flask) -> None:
         """Test json_error with error code."""
         with app.app_context():
             response, status = json_error("Test error", code="TEST_001")
@@ -325,7 +330,7 @@ def test_retry_backoff_env_configuration(monkeypatch):
             assert response_data["error"] == "Test error"
             assert response_data["code"] == "TEST_001"
 
-    def test_json_error_with_details(self, app):
+    def test_json_error_with_details(self, app: Flask) -> None:
         """Test json_error with details."""
         details = {"field": "username", "issue": "required"}
         with app.app_context():
@@ -334,7 +339,7 @@ def test_retry_backoff_env_configuration(monkeypatch):
             assert response_data["error"] == "Validation error"
             assert response_data["details"] == details
 
-    def test_json_error_custom_status(self, app):
+    def test_json_error_custom_status(self, app: Flask) -> None:
         """Test json_error with custom HTTP status."""
         with app.app_context():
             response, status = json_error("Not found", status=404)
@@ -346,7 +351,7 @@ def test_retry_backoff_env_configuration(monkeypatch):
 class TestJsonInternalError:
     """Test cases for the json_internal_error function."""
 
-    def test_json_internal_error_basic(self, app):
+    def test_json_internal_error_basic(self, app: Flask) -> None:
         """Test default json_internal_error response."""
         with app.app_context():
             response, status = json_internal_error("test context")
@@ -356,7 +361,7 @@ class TestJsonInternalError:
             assert response_data["code"] == "internal_error"
             assert response_data["details"] == {"context": "test context"}
 
-    def test_json_internal_error_with_details(self, app):
+    def test_json_internal_error_with_details(self, app: Flask) -> None:
         """Test json_internal_error with additional details."""
         details = {"hint": "try again"}
         with app.app_context():
@@ -370,7 +375,7 @@ class TestJsonInternalError:
                 "hint": "try again",
             }
 
-    def test_json_internal_error_custom_status_and_code(self, app):
+    def test_json_internal_error_custom_status_and_code(self, app: Flask) -> None:
         """Test custom status and error code propagation."""
         with app.app_context():
             response, status = json_internal_error(
@@ -386,7 +391,7 @@ class TestJsonInternalError:
 class TestJsonSuccess:
     """Test cases for the json_success function."""
 
-    def test_json_success_basic(self, app):
+    def test_json_success_basic(self, app: Flask) -> None:
         """Test basic json_success response."""
         with app.app_context():
             response, status = json_success()
@@ -395,7 +400,7 @@ class TestJsonSuccess:
             assert response_data["success"] is True
             assert "message" not in response_data
 
-    def test_json_success_with_message(self, app):
+    def test_json_success_with_message(self, app: Flask) -> None:
         """Test json_success with message."""
         with app.app_context():
             response, status = json_success("Operation completed")
@@ -403,7 +408,7 @@ class TestJsonSuccess:
             assert response_data["success"] is True
             assert response_data["message"] == "Operation completed"
 
-    def test_json_success_with_payload(self, app):
+    def test_json_success_with_payload(self, app: Flask) -> None:
         """Test json_success with additional payload data."""
         with app.app_context():
             response, status = json_success("Created", id=123, name="test")
@@ -413,7 +418,7 @@ class TestJsonSuccess:
             assert response_data["id"] == 123
             assert response_data["name"] == "test"
 
-    def test_json_success_custom_status(self, app):
+    def test_json_success_custom_status(self, app: Flask) -> None:
         """Test json_success with custom status."""
         with app.app_context():
             response, status = json_success(status=201)
@@ -423,7 +428,7 @@ class TestJsonSuccess:
 class TestWantsJson:
     """Test cases for the wants_json function."""
 
-    def test_wants_json_api_path(self):
+    def test_wants_json_api_path(self) -> None:
         """Test that API paths are detected as wanting JSON."""
         mock_request = Mock()
         mock_request.path = "/api/settings"
@@ -435,7 +440,7 @@ class TestWantsJson:
         with patch("src.utils.http_utils.request", mock_request):
             assert wants_json() is True
 
-    def test_wants_json_accept_header(self):
+    def test_wants_json_accept_header(self) -> None:
         """Test that JSON accept header is detected."""
         mock_request = Mock()
         mock_request.path = "/settings"
@@ -447,7 +452,7 @@ class TestWantsJson:
         with patch("src.utils.http_utils.request", mock_request):
             assert wants_json() is True
 
-    def test_wants_json_content_type(self):
+    def test_wants_json_content_type(self) -> None:
         """Test that JSON content type is detected."""
         mock_request = Mock()
         mock_request.path = "/settings"
@@ -459,7 +464,7 @@ class TestWantsJson:
         with patch("src.utils.http_utils.request", mock_request):
             assert wants_json() is True
 
-    def test_wants_json_false_for_html(self):
+    def test_wants_json_false_for_html(self) -> None:
         """Test that HTML requests don't want JSON."""
         mock_request = Mock()
         mock_request.path = "/settings"
@@ -471,7 +476,7 @@ class TestWantsJson:
         with patch("src.utils.http_utils.request", mock_request):
             assert wants_json() is False
 
-    def test_wants_json_false_for_unknown_path(self):
+    def test_wants_json_false_for_unknown_path(self) -> None:
         """Test that unknown paths default to not wanting JSON."""
         mock_request = Mock()
         mock_request.path = "/unknown"
@@ -483,7 +488,7 @@ class TestWantsJson:
         with patch("src.utils.http_utils.request", mock_request):
             assert wants_json() is False
 
-    def test_wants_json_exception_handling(self):
+    def test_wants_json_exception_handling(self) -> None:
         """Test that exceptions are handled gracefully."""
         mock_request = Mock()
         mock_request.path = "/some/path"  # Use a path that won't trigger API detection
@@ -495,7 +500,7 @@ class TestWantsJson:
         with patch("src.utils.http_utils.request", mock_request):
             assert wants_json() is False
 
-    def test_wants_json_with_provided_request(self):
+    def test_wants_json_with_provided_request(self) -> None:
         """Test wants_json with explicitly provided request object."""
         mock_request = Mock()
         mock_request.path = "/api/test"
@@ -506,7 +511,7 @@ class TestWantsJson:
 
         assert wants_json(mock_request) is True
 
-    def test_wants_json_no_global_request(self):
+    def test_wants_json_no_global_request(self) -> None:
         """Test wants_json when no global request exists."""
         mock_request = Mock()
         mock_request.path = "/api/test"
@@ -518,7 +523,7 @@ class TestWantsJson:
         with patch("src.utils.http_utils.request", None):
             assert wants_json(mock_request) is True
 
-    def test_wants_json_get_json_exception_handling(self):
+    def test_wants_json_get_json_exception_handling(self) -> None:
         """Test wants_json with exception in get_json."""
         mock_request = Mock()
         mock_request.path = "/test"
@@ -530,7 +535,7 @@ class TestWantsJson:
         with patch("src.utils.http_utils.request", mock_request):
             assert wants_json() is False
 
-    def test_wants_json_general_exception_handling(self):
+    def test_wants_json_general_exception_handling(self) -> None:
         """Test wants_json with general exception in request processing."""
         mock_request = Mock()
         mock_request.path = "/test"
@@ -551,12 +556,12 @@ class TestWantsJson:
         with patch("src.utils.http_utils.request", mock_request):
             assert wants_json() is False
 
-    def test_wants_json_outer_exception_handling(self):
+    def test_wants_json_outer_exception_handling(self) -> None:
         """Test wants_json with exception that triggers outer catch block."""
 
         # Create a mock request that raises an exception when accessing any attribute
         class ExceptionRequest:
-            def __getattr__(self, name):
+            def __getattr__(self, name: Any) -> None:
                 raise Exception("Test outer exception")
 
         mock_request = ExceptionRequest()

@@ -6,6 +6,7 @@ import importlib.util
 import json
 import tarfile
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -14,7 +15,7 @@ import pytest
 # ---------------------------------------------------------------------------
 
 
-def _load_script(script_name: str):
+def _load_script(script_name: str) -> Any:
     """Load a scripts/ module by file path, avoiding sys.path pollution."""
     scripts_dir = Path(__file__).parent.parent / "scripts"
     spec = importlib.util.spec_from_file_location(
@@ -26,7 +27,7 @@ def _load_script(script_name: str):
 
 
 @pytest.fixture(scope="module")
-def diag_mod():
+def diag_mod() -> Any:
     return _load_script("diagnostic_snapshot")
 
 
@@ -70,7 +71,7 @@ def _make_log_file(base: Path, lines: int = 20) -> Path:
 
 
 class TestDiagnosticSnapshot:
-    def test_tarball_is_created(self, diag_mod, tmp_path):
+    def test_tarball_is_created(self, diag_mod: Any, tmp_path: Path) -> None:
         """run_snapshot creates a valid .tar.gz file."""
         config_dir = _make_config_dir(tmp_path)
         output = str(tmp_path / "diag.tar.gz")
@@ -86,7 +87,7 @@ class TestDiagnosticSnapshot:
         assert (tmp_path / "diag.tar.gz").is_file()
         assert tarfile.is_tarfile(output)
 
-    def test_manifest_present_and_valid(self, diag_mod, tmp_path):
+    def test_manifest_present_and_valid(self, diag_mod: Any, tmp_path: Path) -> None:
         """Tarball contains manifest.json with required fields."""
         config_dir = _make_config_dir(tmp_path)
         output = str(tmp_path / "diag.tar.gz")
@@ -108,7 +109,7 @@ class TestDiagnosticSnapshot:
         assert isinstance(manifest["files"], list)
         assert len(manifest["files"]) >= 1
 
-    def test_system_info_present(self, diag_mod, tmp_path):
+    def test_system_info_present(self, diag_mod: Any, tmp_path: Path) -> None:
         """Tarball contains system_info.txt."""
         config_dir = _make_config_dir(tmp_path)
         output = str(tmp_path / "diag.tar.gz")
@@ -125,7 +126,9 @@ class TestDiagnosticSnapshot:
 
         assert "system_info.txt" in names
 
-    def test_system_info_has_expected_sections(self, diag_mod, tmp_path):
+    def test_system_info_has_expected_sections(
+        self, diag_mod: Any, tmp_path: Path
+    ) -> None:
         """system_info.txt mentions uname, disk, python sections."""
         config_dir = _make_config_dir(tmp_path)
         output = str(tmp_path / "diag.tar.gz")
@@ -143,7 +146,7 @@ class TestDiagnosticSnapshot:
         assert "uname" in text.lower() or "system" in text.lower()
         assert "python" in text.lower()
 
-    def test_redacted_config_present(self, diag_mod, tmp_path):
+    def test_redacted_config_present(self, diag_mod: Any, tmp_path: Path) -> None:
         """Tarball contains config_redacted.json."""
         config_dir = _make_config_dir(tmp_path)
         output = str(tmp_path / "diag.tar.gz")
@@ -160,7 +163,7 @@ class TestDiagnosticSnapshot:
 
         assert "config_redacted.json" in names
 
-    def test_api_key_is_redacted(self, diag_mod, tmp_path):
+    def test_api_key_is_redacted(self, diag_mod: Any, tmp_path: Path) -> None:
         """config_redacted.json must NOT contain the raw api_key value."""
         config_dir = _make_config_dir(tmp_path)
         output = str(tmp_path / "diag.tar.gz")
@@ -180,7 +183,7 @@ class TestDiagnosticSnapshot:
         raw_json = json.dumps(redacted)
         assert "super-secret-api-key-12345" not in raw_json
 
-    def test_token_is_redacted(self, diag_mod, tmp_path):
+    def test_token_is_redacted(self, diag_mod: Any, tmp_path: Path) -> None:
         """Keys containing 'token' are redacted."""
         config_dir = _make_config_dir(tmp_path)
         output = str(tmp_path / "diag.tar.gz")
@@ -199,7 +202,7 @@ class TestDiagnosticSnapshot:
         raw_json = json.dumps(redacted)
         assert "hidden-weather-token" not in raw_json
 
-    def test_password_is_redacted(self, diag_mod, tmp_path):
+    def test_password_is_redacted(self, diag_mod: Any, tmp_path: Path) -> None:
         """Keys containing 'password' are redacted."""
         config_dir = _make_config_dir(tmp_path)
         output = str(tmp_path / "diag.tar.gz")
@@ -218,7 +221,7 @@ class TestDiagnosticSnapshot:
         raw_json = json.dumps(redacted)
         assert "hunter2" not in raw_json
 
-    def test_pin_is_redacted(self, diag_mod, tmp_path):
+    def test_pin_is_redacted(self, diag_mod: Any, tmp_path: Path) -> None:
         """Keys containing 'pin' are redacted."""
         config_dir = _make_config_dir(tmp_path)
         output = str(tmp_path / "diag.tar.gz")
@@ -235,7 +238,7 @@ class TestDiagnosticSnapshot:
 
         assert redacted.get("secret_pin") == "***REDACTED***"
 
-    def test_non_secret_keys_preserved(self, diag_mod, tmp_path):
+    def test_non_secret_keys_preserved(self, diag_mod: Any, tmp_path: Path) -> None:
         """Non-secret keys like 'name' and 'safe_setting' must survive redaction."""
         config_dir = _make_config_dir(tmp_path)
         output = str(tmp_path / "diag.tar.gz")
@@ -255,7 +258,7 @@ class TestDiagnosticSnapshot:
         assert redacted.get("another_safe") == 42
         assert redacted.get("timezone") == "UTC"
 
-    def test_log_included_when_file_exists(self, diag_mod, tmp_path):
+    def test_log_included_when_file_exists(self, diag_mod: Any, tmp_path: Path) -> None:
         """recent_logs.txt is included when log_path points to an existing file."""
         config_dir = _make_config_dir(tmp_path)
         log_file = _make_log_file(tmp_path, lines=30)
@@ -280,7 +283,9 @@ class TestDiagnosticSnapshot:
         assert "line 0" not in text
         assert "line 19" not in text
 
-    def test_missing_log_file_handled_gracefully(self, diag_mod, tmp_path):
+    def test_missing_log_file_handled_gracefully(
+        self, diag_mod: Any, tmp_path: Path
+    ) -> None:
         """run_snapshot succeeds even when the log file does not exist."""
         config_dir = _make_config_dir(tmp_path)
         output = str(tmp_path / "diag.tar.gz")
@@ -300,7 +305,9 @@ class TestDiagnosticSnapshot:
         # recent_logs.txt should be absent, not an error entry
         assert "recent_logs.txt" not in names
 
-    def test_missing_log_omitted_from_manifest(self, diag_mod, tmp_path):
+    def test_missing_log_omitted_from_manifest(
+        self, diag_mod: Any, tmp_path: Path
+    ) -> None:
         """When log is missing, manifest.files should not list recent_logs.txt."""
         config_dir = _make_config_dir(tmp_path)
         output = str(tmp_path / "diag.tar.gz")
@@ -317,7 +324,9 @@ class TestDiagnosticSnapshot:
 
         assert "recent_logs.txt" not in manifest["files"]
 
-    def test_missing_device_json_handled_gracefully(self, diag_mod, tmp_path):
+    def test_missing_device_json_handled_gracefully(
+        self, diag_mod: Any, tmp_path: Path
+    ) -> None:
         """run_snapshot does not crash when device.json is absent."""
         empty_config = tmp_path / "empty_config"
         empty_config.mkdir()
@@ -333,7 +342,7 @@ class TestDiagnosticSnapshot:
         assert rc == 0
         assert tarfile.is_tarfile(output)
 
-    def test_redact_dict_nested(self, diag_mod):
+    def test_redact_dict_nested(self, diag_mod: Any) -> None:
         """_redact_dict handles nested structures recursively."""
         data = {
             "outer": "visible",
@@ -353,13 +362,13 @@ class TestDiagnosticSnapshot:
         assert result["list_field"][0]["token"] == "***REDACTED***"
         assert result["list_field"][1]["plain"] == "list-plain"
 
-    def test_default_output_path_format(self, diag_mod):
+    def test_default_output_path_format(self, diag_mod: Any) -> None:
         """_default_output_path returns an inkypi-diag-*.tar.gz string."""
         path = diag_mod._default_output_path()
         assert path.startswith("inkypi-diag-")
         assert path.endswith(".tar.gz")
 
-    def test_is_secret_key_detection(self, diag_mod):
+    def test_is_secret_key_detection(self, diag_mod: Any) -> None:
         """_is_secret_key correctly identifies secret-like key names."""
         assert diag_mod._is_secret_key("api_key") is True
         assert diag_mod._is_secret_key("weather_token") is True

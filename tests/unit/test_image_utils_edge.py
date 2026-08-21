@@ -1,17 +1,19 @@
 # pyright: reportMissingImports=false
 import importlib
 from io import BytesIO
+from typing import Any
 
+import pytest
 from PIL import Image
 
 
-def _png_bytes(size=(5, 5), color="white"):
+def _png_bytes(size: Any = (5, 5), color: Any = "white") -> Any:
     buf = BytesIO()
     Image.new("RGB", size, color).save(buf, format="PNG")
     return buf.getvalue()
 
 
-def test_get_image_timeout_fallback_success(monkeypatch):
+def test_get_image_timeout_fallback_success(monkeypatch: pytest.MonkeyPatch) -> Any:
     import socket
 
     import utils.image_utils as image_utils
@@ -24,7 +26,9 @@ def test_get_image_timeout_fallback_success(monkeypatch):
         status_code = 200
         content = png
 
-    def fake_get(url, timeout=None, stream=False, **kwargs):
+    def fake_get(
+        url: Any, timeout: Any = None, stream: Any = False, **kwargs: Any
+    ) -> Any:
         if calls["n"] == 0:
             calls["n"] += 1
             raise TypeError("timeout arg not supported")
@@ -43,12 +47,14 @@ def test_get_image_timeout_fallback_success(monkeypatch):
     assert img.size == (5, 5)
 
 
-def test_get_image_timeout_fallback_failure(monkeypatch):
+def test_get_image_timeout_fallback_failure(monkeypatch: pytest.MonkeyPatch) -> None:
     import utils.image_utils as image_utils
 
     calls = {"n": 0}
 
-    def fake_get(url, timeout=None, stream=False, **kwargs):
+    def fake_get(
+        url: Any, timeout: Any = None, stream: Any = False, **kwargs: Any
+    ) -> None:
         if calls["n"] == 0:
             calls["n"] += 1
             raise TypeError("timeout arg not supported")
@@ -59,7 +65,7 @@ def test_get_image_timeout_fallback_failure(monkeypatch):
     assert img is None
 
 
-def test_get_image_decode_error(monkeypatch):
+def test_get_image_decode_error(monkeypatch: pytest.MonkeyPatch) -> None:
     import utils.image_utils as image_utils
 
     class Resp:
@@ -71,7 +77,7 @@ def test_get_image_decode_error(monkeypatch):
     assert img is None
 
 
-def test_take_screenshot_html_success(monkeypatch):
+def test_take_screenshot_html_success(monkeypatch: pytest.MonkeyPatch) -> Any:
     import utils.image_utils as image_utils
 
     # Reload to restore real functions after autouse fixture monkeypatch
@@ -86,13 +92,13 @@ def test_take_screenshot_html_success(monkeypatch):
     monkeypatch.setattr("utils.image_utils.os.remove", lambda p: None)
 
     class _Ctx:
-        def __init__(self, size=(10, 6)):
+        def __init__(self, size: Any = (10, 6)) -> None:
             self._img = Image.new("RGB", size, "white")
 
-        def __enter__(self):
+        def __enter__(self) -> Any:
             return self._img
 
-        def __exit__(self, exc_type, exc, tb):
+        def __exit__(self, exc_type: Any, exc: Any, tb: Any) -> Any:
             return False
 
     monkeypatch.setattr("utils.image_utils.Image.open", lambda p: _Ctx())
@@ -102,7 +108,7 @@ def test_take_screenshot_html_success(monkeypatch):
     assert out.size == (10, 6)
 
 
-def test_take_screenshot_html_failure(monkeypatch):
+def test_take_screenshot_html_failure(monkeypatch: pytest.MonkeyPatch) -> None:
     import utils.image_utils as image_utils
 
     # Reload to restore real functions after autouse fixture monkeypatch

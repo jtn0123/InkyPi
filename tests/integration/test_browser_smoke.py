@@ -4,9 +4,11 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
+from typing import Any
 
 import pytest
 from PIL import Image
+from playwright.sync_api import Page
 from scripts.ui_audit import TOP_LEVEL_ROUTES, discover_plugin_ids
 
 REQUIRE_BROWSER_SMOKE = os.getenv("REQUIRE_BROWSER_SMOKE", "").lower() in ("1", "true")
@@ -84,7 +86,7 @@ def _leaflet_stub_js() -> str:
     """
 
 
-def _attach_runtime_collectors(page, base_url: str):
+def _attach_runtime_collectors(page: Page, base_url: str) -> Any:
     runtime = {
         "console_errors": [],
         "page_errors": [],
@@ -92,7 +94,7 @@ def _attach_runtime_collectors(page, base_url: str):
         "response_failures": [],
     }
 
-    def handle_console(msg):
+    def handle_console(msg: Any) -> None:
         if msg.type != "error":
             return
         text = msg.text
@@ -153,7 +155,9 @@ def _attach_runtime_collectors(page, base_url: str):
     return runtime
 
 
-def _assert_clean_runtime(page, runtime: dict, screenshot_dir: Path, name: str):
+def _assert_clean_runtime(
+    page: Page, runtime: dict, screenshot_dir: Path, name: str
+) -> None:
     failures = []
 
     if runtime["page_errors"]:
@@ -172,13 +176,13 @@ def _assert_clean_runtime(page, runtime: dict, screenshot_dir: Path, name: str):
         pytest.fail("\n".join(failures + [f"screenshot: {screenshot_path}"]))
 
 
-def _assert_skip_link_present(page):
+def _assert_skip_link_present(page: Page) -> None:
     """Skip links are an accessibility requirement — verify they exist."""
     html = page.content()
     assert "skip-link" in html or "Skip to main content" in html
 
 
-def _assert_plugin_page_ready(page, plugin_id: str):
+def _assert_plugin_page_ready(page: Page, plugin_id: str) -> None:
     page.wait_for_selector("#settingsForm", state="attached")
     interactive_fields = page.locator(
         "#settingsForm input, #settingsForm select, #settingsForm textarea"
@@ -201,7 +205,7 @@ def _assert_plugin_page_ready(page, plugin_id: str):
         assert page.locator("#fileNames").count() == 1
 
 
-def _new_page(browser, viewport: dict, theme: str):
+def _new_page(browser: Any, viewport: dict, theme: str) -> Any:
     page = browser.new_page(
         viewport={"width": viewport["width"], "height": viewport["height"]}
     )
@@ -216,7 +220,7 @@ def _new_page(browser, viewport: dict, theme: str):
     return page
 
 
-def _assert_no_horizontal_overflow(page):
+def _assert_no_horizontal_overflow(page: Page) -> None:
     widths = page.evaluate("""
         () => ({
             innerWidth: window.innerWidth,
@@ -227,7 +231,7 @@ def _assert_no_horizontal_overflow(page):
     assert widths["scrollWidth"] <= widths["clientWidth"] + 2, widths
 
 
-def _assert_action_visible(page, selector: str):
+def _assert_action_visible(page: Page, selector: str) -> None:
     locator = page.locator(selector).first
     locator.scroll_into_view_if_needed()
     box = locator.bounding_box()
@@ -238,7 +242,7 @@ def _assert_action_visible(page, selector: str):
     assert box["y"] + box["height"] <= viewport["height"] + 160
 
 
-def _maybe_capture_baseline(page, screenshot_dir: Path, name: str):
+def _maybe_capture_baseline(page: Page, screenshot_dir: Path, name: str) -> None:
     if os.getenv("CAPTURE_MOBILE_SCREENSHOTS", "").lower() not in ("1", "true"):
         return
     screenshot_dir.mkdir(parents=True, exist_ok=True)
@@ -246,8 +250,8 @@ def _maybe_capture_baseline(page, screenshot_dir: Path, name: str):
 
 
 def _open_and_check(
-    page, base_url: str, route_name: str, route_path: str, screenshot_dir: Path
-):
+    page: Page, base_url: str, route_name: str, route_path: str, screenshot_dir: Path
+) -> Any:
     runtime = _attach_runtime_collectors(page, base_url)
     page.goto(f"{base_url}{route_path}", wait_until="domcontentloaded", timeout=30000)
     page.wait_for_selector("[data-page-shell]", timeout=10000)
@@ -263,7 +267,7 @@ def _artifact_dir(tmp_path: Path) -> Path:
     return tmp_path / "browser_smoke_failures"
 
 
-def _wait_for_toast_text(page, expected: str, timeout: int = 10000):
+def _wait_for_toast_text(page: Page, expected: str, timeout: int = 10000) -> None:
     page.wait_for_function(
         """(needle) => Array.from(document.querySelectorAll('.toast-content'))
             .some((el) => (el.textContent || '').includes(needle))
@@ -273,7 +277,7 @@ def _wait_for_toast_text(page, expected: str, timeout: int = 10000):
     )
 
 
-def _open_settings_tab(page, tab_name: str):
+def _open_settings_tab(page: Page, tab_name: str) -> None:
     tab = page.locator(f'[data-settings-tab="{tab_name}"]').first
     tab.click()
     page.wait_for_function(
@@ -286,7 +290,7 @@ def _open_settings_tab(page, tab_name: str):
     )
 
 
-def _expand_settings_section(page, section_id: str):
+def _expand_settings_section(page: Page, section_id: str) -> None:
     toggle = page.locator(f"{section_id} [data-collapsible-toggle]").first
     toggle.wait_for(state="attached", timeout=8000)
     if toggle.get_attribute("aria-expanded") != "true":
@@ -301,7 +305,7 @@ def _expand_settings_section(page, section_id: str):
         )
 
 
-def _seed_history_entries(history_dir: Path, count: int = 12):
+def _seed_history_entries(history_dir: Path, count: int = 12) -> Any:
     history_dir.mkdir(parents=True, exist_ok=True)
     names = []
     for idx in range(count):
@@ -321,7 +325,7 @@ def _seed_history_entries(history_dir: Path, count: int = 12):
     return names
 
 
-def test_top_level_tabs_boot_cleanly(live_server, tmp_path):
+def test_top_level_tabs_boot_cleanly(live_server: str, tmp_path: Path) -> None:
     from playwright.sync_api import sync_playwright
 
     screenshot_dir = _artifact_dir(tmp_path)
@@ -346,7 +350,9 @@ def test_top_level_tabs_boot_cleanly(live_server, tmp_path):
             browser.close()
 
 
-def test_jtn_730_settings_deep_high_risk_paths(live_server, tmp_path):
+def test_jtn_730_settings_deep_high_risk_paths(
+    live_server: str, tmp_path: Path
+) -> None:
     """JTN-730: Exercise high-risk /settings interactions end-to-end."""
     from playwright.sync_api import sync_playwright
 
@@ -451,7 +457,9 @@ def test_jtn_730_settings_deep_high_risk_paths(live_server, tmp_path):
             browser.close()
 
 
-def test_jtn_731_history_deep_high_risk_paths(live_server, tmp_path, device_config_dev):
+def test_jtn_731_history_deep_high_risk_paths(
+    live_server: str, tmp_path: Path, device_config_dev: Any
+) -> None:
     """JTN-731: Exercise high-risk /history actions and pagination end-to-end."""
     from playwright.sync_api import sync_playwright
 
@@ -532,7 +540,9 @@ def test_jtn_731_history_deep_high_risk_paths(live_server, tmp_path, device_conf
 
 
 @pytest.mark.parametrize("plugin_id", PLUGIN_IDS)
-def test_plugin_pages_boot_cleanly(live_server, tmp_path, plugin_id):
+def test_plugin_pages_boot_cleanly(
+    live_server: str, tmp_path: Path, plugin_id: Any
+) -> None:
     from playwright.sync_api import sync_playwright
 
     screenshot_dir = _artifact_dir(tmp_path)
@@ -556,7 +566,9 @@ def test_plugin_pages_boot_cleanly(live_server, tmp_path, plugin_id):
 
 @pytest.mark.parametrize("viewport", MOBILE_VIEWPORTS, ids=lambda item: item["label"])
 @pytest.mark.parametrize("theme", ("light", "dark"))
-def test_top_level_tabs_phone_layout(live_server, tmp_path, viewport, theme):
+def test_top_level_tabs_phone_layout(
+    live_server: str, tmp_path: Path, viewport: Any, theme: Any
+) -> None:
     from playwright.sync_api import sync_playwright
 
     screenshot_dir = _artifact_dir(tmp_path)
@@ -591,7 +603,9 @@ def test_top_level_tabs_phone_layout(live_server, tmp_path, viewport, theme):
 @pytest.mark.parametrize("viewport", MOBILE_VIEWPORTS, ids=lambda item: item["label"])
 @pytest.mark.parametrize("theme", ("light", "dark"))
 @pytest.mark.parametrize("plugin_id", MOBILE_PLUGIN_IDS)
-def test_plugin_pages_phone_layout(live_server, tmp_path, viewport, theme, plugin_id):
+def test_plugin_pages_phone_layout(
+    live_server: str, tmp_path: Path, viewport: Any, theme: Any, plugin_id: Any
+) -> None:
     from playwright.sync_api import sync_playwright
 
     screenshot_dir = _artifact_dir(tmp_path)

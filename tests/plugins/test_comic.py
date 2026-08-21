@@ -1,22 +1,23 @@
 # pyright: reportMissingImports=false
 from io import BytesIO
+from typing import Any
 
 import pytest
 from PIL import Image
 
 
 @pytest.fixture()
-def plugin_config():
+def plugin_config() -> Any:
     return {"id": "comic", "class": "Comic", "name": "Comic"}
 
 
-def _png_bytes(size=(30, 20), color="black"):
+def _png_bytes(size: Any = (30, 20), color: Any = "black") -> Any:
     buf = BytesIO()
     Image.new("RGB", size, color).save(buf, format="PNG")
     return buf.getvalue()
 
 
-def test_generate_settings_template_contains_comics(plugin_config):
+def test_generate_settings_template_contains_comics(plugin_config: Any) -> None:
     from plugins.comic.comic import COMICS, Comic
 
     p = Comic(plugin_config)
@@ -27,8 +28,8 @@ def test_generate_settings_template_contains_comics(plugin_config):
 
 
 def test_generate_image_valid_flow_horizontal(
-    monkeypatch, plugin_config, device_config_dev
-):
+    monkeypatch: pytest.MonkeyPatch, plugin_config: Any, device_config_dev: Any
+) -> Any:
     from plugins.comic.comic import Comic
 
     # mock get_panel (upstream uses comic_parser.get_panel instead of get_image_url)
@@ -46,7 +47,7 @@ def test_generate_image_valid_flow_horizontal(
         status_code = 200
         raw = BytesIO(_png_bytes((400, 300)))
 
-        def raise_for_status(self):
+        def raise_for_status(self) -> Any:
             return None
 
     monkeypatch.setattr("requests.get", lambda url, **kwargs: Resp())
@@ -58,8 +59,8 @@ def test_generate_image_valid_flow_horizontal(
 
 
 def test_generate_image_vertical_orientation(
-    monkeypatch, plugin_config, device_config_dev
-):
+    monkeypatch: pytest.MonkeyPatch, plugin_config: Any, device_config_dev: Any
+) -> Any:
     from plugins.comic.comic import Comic
 
     # set device to vertical
@@ -78,7 +79,7 @@ def test_generate_image_vertical_orientation(
         status_code = 200
         raw = BytesIO(_png_bytes((400, 300)))
 
-        def raise_for_status(self):
+        def raise_for_status(self) -> Any:
             return None
 
     monkeypatch.setattr("requests.get", lambda url, **kwargs: Resp())
@@ -92,8 +93,8 @@ def test_generate_image_vertical_orientation(
 
 
 def test_generate_image_invalid_comic_falls_back_to_xkcd(
-    monkeypatch, plugin_config, device_config_dev
-):
+    monkeypatch: pytest.MonkeyPatch, plugin_config: Any, device_config_dev: Any
+) -> Any:
     """JTN-784: an invalid `comic` setting silently falls back to XKCD at
     render time so a bare /update_now renders. Form validation is in the
     settings schema, not here."""
@@ -102,7 +103,7 @@ def test_generate_image_invalid_comic_falls_back_to_xkcd(
 
     captured = {}
 
-    def fake_get_panel(name):
+    def fake_get_panel(name: Any) -> Any:
         captured["comic"] = name
         return {"image_url": "http://img/latest.png", "title": "", "caption": ""}
 
@@ -113,7 +114,9 @@ def test_generate_image_invalid_comic_falls_back_to_xkcd(
     assert captured["comic"] == "XKCD"
 
 
-def test_generate_image_centering(monkeypatch, plugin_config, device_config_dev):
+def test_generate_image_centering(
+    monkeypatch: pytest.MonkeyPatch, plugin_config: Any, device_config_dev: Any
+) -> Any:
     from plugins.comic.comic import Comic
 
     monkeypatch.setattr(
@@ -128,7 +131,7 @@ def test_generate_image_centering(monkeypatch, plugin_config, device_config_dev)
         status_code = 200
         raw = BytesIO(_png_bytes((src_w, src_h), color="black"))
 
-        def raise_for_status(self):
+        def raise_for_status(self) -> Any:
             return None
 
     monkeypatch.setattr("requests.get", lambda url, **kwargs: Resp())

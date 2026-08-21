@@ -16,7 +16,7 @@ from src.utils.progress import (
 class TestProgressStep:
     """Test the ProgressStep dataclass."""
 
-    def test_progress_step_creation(self):
+    def test_progress_step_creation(self) -> None:
         """Test creating a ProgressStep instance."""
         step = ProgressStep(
             name="test_step",
@@ -32,7 +32,7 @@ class TestProgressStep:
         assert step.error_message is None
         assert step.substeps == []
 
-    def test_progress_step_with_error(self):
+    def test_progress_step_with_error(self) -> None:
         """Test creating a ProgressStep with error information."""
         step = ProgressStep(
             name="failed_step",
@@ -45,7 +45,7 @@ class TestProgressStep:
         assert step.status == "failed"
         assert step.error_message == "Something went wrong"
 
-    def test_progress_step_with_substeps(self):
+    def test_progress_step_with_substeps(self) -> None:
         """Test creating a ProgressStep with substeps."""
         substeps = ["Connect to API", "Parse response", "Validate data"]
         step = ProgressStep(
@@ -62,7 +62,7 @@ class TestProgressStep:
 class TestProgressTracker:
     """Test the ProgressTracker class."""
 
-    def test_tracker_initialization(self):
+    def test_tracker_initialization(self) -> None:
         """Test ProgressTracker initialization."""
         tracker = ProgressTracker()
 
@@ -70,7 +70,7 @@ class TestProgressTracker:
         assert tracker._current_step is None
         assert not tracker.is_step_active()
 
-    def test_simple_step_recording(self):
+    def test_simple_step_recording(self) -> None:
         """Test recording simple completed steps."""
         tracker = ProgressTracker()
 
@@ -89,7 +89,7 @@ class TestProgressTracker:
         assert steps[1].description == "Second step description"
         assert steps[1].status == "completed"
 
-    def test_step_with_progress_tracking(self):
+    def test_step_with_progress_tracking(self) -> None:
         """Test step tracking with start/update/complete flow."""
         tracker = ProgressTracker()
 
@@ -120,7 +120,7 @@ class TestProgressTracker:
         assert steps[0].description == "Operation completed successfully"
         assert steps[0].elapsed_ms > 0
 
-    def test_step_failure_tracking(self):
+    def test_step_failure_tracking(self) -> None:
         """Test step failure tracking."""
         tracker = ProgressTracker()
 
@@ -135,7 +135,7 @@ class TestProgressTracker:
         assert steps[0].error_message == "Network connection failed"
         assert steps[0].elapsed_ms > 0
 
-    def test_total_elapsed_time(self):
+    def test_total_elapsed_time(self) -> None:
         """Test total elapsed time calculation."""
         tracker = ProgressTracker()
 
@@ -147,7 +147,7 @@ class TestProgressTracker:
         total_time = tracker.get_total_elapsed_ms()
         assert total_time > 0
 
-    def test_multiple_steps_timing(self):
+    def test_multiple_steps_timing(self) -> None:
         """Test that multiple steps have proper timing."""
         tracker = ProgressTracker()
 
@@ -171,7 +171,7 @@ class TestProgressTracker:
 class TestProgressContextManager:
     """Test the progress tracking context manager."""
 
-    def test_track_progress_context(self):
+    def test_track_progress_context(self) -> None:
         """Test the track_progress context manager."""
         # Initially no tracker
         assert get_current_tracker() is None
@@ -191,7 +191,7 @@ class TestProgressContextManager:
         # Tracker should be None after context
         assert get_current_tracker() is None
 
-    def test_nested_progress_tracking(self):
+    def test_nested_progress_tracking(self) -> None:
         """Test that nested tracking works correctly."""
         with track_progress() as outer_tracker:
             outer_tracker.step("outer_step", "Outer step")
@@ -208,12 +208,12 @@ class TestProgressContextManager:
 class TestProgressHelperFunctions:
     """Test the progress tracking helper functions."""
 
-    def test_record_step_without_tracker(self):
+    def test_record_step_without_tracker(self) -> None:
         """Test record_step when no tracker is active."""
         # Should not raise an error
         record_step("test_step", "Test description")
 
-    def test_record_step_with_tracker(self):
+    def test_record_step_with_tracker(self) -> None:
         """Test record_step with active tracker."""
         with track_progress() as tracker:
             record_step("helper_step", "Step via helper function")
@@ -223,7 +223,7 @@ class TestProgressHelperFunctions:
             assert steps[0].name == "helper_step"
             assert steps[0].description == "Step via helper function"
 
-    def test_start_step_helper(self):
+    def test_start_step_helper(self) -> None:
         """Test start_step helper function."""
         with track_progress() as tracker:
             start_step("async_step", "Starting async operation")
@@ -231,7 +231,7 @@ class TestProgressHelperFunctions:
             assert tracker.is_step_active()
             assert tracker.get_current_step_name() == "async_step"
 
-    def test_update_step_helper(self):
+    def test_update_step_helper(self) -> None:
         """Test update_step helper function."""
         with track_progress() as tracker:
             start_step("update_test", "Initial description")
@@ -241,7 +241,7 @@ class TestProgressHelperFunctions:
             assert steps[0].description == "Updated description"
             assert steps[0].substeps == ["substep1", "substep2"]
 
-    def test_complete_step_helper(self):
+    def test_complete_step_helper(self) -> None:
         """Test complete_step helper function."""
         with track_progress() as tracker:
             start_step("complete_test", "Will be completed")
@@ -253,7 +253,7 @@ class TestProgressHelperFunctions:
             assert steps[0].status == "completed"
             assert steps[0].description == "Completed successfully"
 
-    def test_fail_step_helper(self):
+    def test_fail_step_helper(self) -> None:
         """Test fail_step helper function."""
         with track_progress() as tracker:
             start_step("fail_test", "Will fail")
@@ -265,7 +265,7 @@ class TestProgressHelperFunctions:
             assert steps[0].status == "failed"
             assert steps[0].error_message == "Failed with error"
 
-    def test_helper_functions_without_tracker(self):
+    def test_helper_functions_without_tracker(self) -> None:
         """Test that helper functions don't error without active tracker."""
         # None of these should raise errors
         start_step("test", "test")
@@ -277,7 +277,7 @@ class TestProgressHelperFunctions:
 class TestProgressTrackerEdgeCases:
     """Test edge cases and error conditions."""
 
-    def test_complete_step_without_active_step(self):
+    def test_complete_step_without_active_step(self) -> None:
         """Test completing a step when none is active."""
         tracker = ProgressTracker()
 
@@ -287,7 +287,7 @@ class TestProgressTrackerEdgeCases:
         # Should have no steps
         assert len(tracker.get_steps()) == 0
 
-    def test_update_step_without_active_step(self):
+    def test_update_step_without_active_step(self) -> None:
         """Test updating a step when none is active."""
         tracker = ProgressTracker()
 
@@ -297,7 +297,7 @@ class TestProgressTrackerEdgeCases:
         # Should have no steps
         assert len(tracker.get_steps()) == 0
 
-    def test_fail_step_without_active_step(self):
+    def test_fail_step_without_active_step(self) -> None:
         """Test failing a step when none is active."""
         tracker = ProgressTracker()
 
@@ -307,7 +307,7 @@ class TestProgressTrackerEdgeCases:
         # Should have no steps
         assert len(tracker.get_steps()) == 0
 
-    def test_multiple_start_steps_without_completion(self):
+    def test_multiple_start_steps_without_completion(self) -> None:
         """Test starting multiple steps without completing previous ones."""
         tracker = ProgressTracker()
 
@@ -326,7 +326,7 @@ class TestProgressTrackerEdgeCases:
 class TestProgressTrackerIntegration:
     """Test integration scenarios."""
 
-    def test_mixed_step_types(self):
+    def test_mixed_step_types(self) -> None:
         """Test mixing simple steps with complex start/complete steps."""
         tracker = ProgressTracker()
 
@@ -354,7 +354,7 @@ class TestProgressTrackerIntegration:
         assert steps[2].name == "simple2"
         assert steps[2].status == "completed"
 
-    def test_step_description_defaults(self):
+    def test_step_description_defaults(self) -> None:
         """Test that step descriptions default appropriately."""
         tracker = ProgressTracker()
 

@@ -13,7 +13,10 @@ Covers:
 import logging
 import os
 from datetime import UTC, datetime
+from typing import Any
 from unittest.mock import MagicMock
+
+import pytest
 
 from model import Playlist, PluginInstance
 from refresh_task import RefreshTask
@@ -23,12 +26,12 @@ from refresh_task import RefreshTask
 # ---------------------------------------------------------------------------
 
 
-def _make_task(device_config_dev):
+def _make_task(device_config_dev: Any) -> Any:
     dm = MagicMock()
     return RefreshTask(device_config_dev, dm)
 
 
-def _make_plugin_instance(plugin_id="weather", name="my_weather"):
+def _make_plugin_instance(plugin_id: Any = "weather", name: Any = "my_weather") -> Any:
     return PluginInstance(
         plugin_id=plugin_id,
         name=name,
@@ -37,7 +40,7 @@ def _make_plugin_instance(plugin_id="weather", name="my_weather"):
     )
 
 
-def _add_plugin_to_pm(device_config_dev, plugin_instance):
+def _add_plugin_to_pm(device_config_dev: Any, plugin_instance: Any) -> Any:
     """Add a plugin instance to the Default playlist of the playlist manager."""
     pm = device_config_dev.get_playlist_manager()
     playlist = pm.get_playlist("Default")
@@ -54,7 +57,7 @@ def _add_plugin_to_pm(device_config_dev, plugin_instance):
 
 
 class TestCircuitBreakerThreshold:
-    def test_default_threshold_is_5(self):
+    def test_default_threshold_is_5(self) -> None:
         original = os.environ.copy()
         os.environ.pop("PLUGIN_FAILURE_THRESHOLD", None)
         try:
@@ -63,15 +66,17 @@ class TestCircuitBreakerThreshold:
             os.environ.clear()
             os.environ.update(original)
 
-    def test_env_var_overrides_threshold(self, monkeypatch):
+    def test_env_var_overrides_threshold(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("PLUGIN_FAILURE_THRESHOLD", "3")
         assert RefreshTask._get_circuit_breaker_threshold() == 3
 
-    def test_invalid_env_var_falls_back_to_5(self, monkeypatch):
+    def test_invalid_env_var_falls_back_to_5(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         monkeypatch.setenv("PLUGIN_FAILURE_THRESHOLD", "notanumber")
         assert RefreshTask._get_circuit_breaker_threshold() == 5
 
-    def test_minimum_threshold_is_1(self, monkeypatch):
+    def test_minimum_threshold_is_1(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("PLUGIN_FAILURE_THRESHOLD", "0")
         assert RefreshTask._get_circuit_breaker_threshold() == 1
 
@@ -83,8 +88,8 @@ class TestCircuitBreakerThreshold:
 
 class TestCircuitBreakerFailures:
     def test_consecutive_failures_increment_counter(
-        self, device_config_dev, monkeypatch
-    ):
+        self, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         monkeypatch.setenv("PLUGIN_FAILURE_THRESHOLD", "5")
         task = _make_task(device_config_dev)
         pi = _make_plugin_instance()
@@ -102,8 +107,8 @@ class TestCircuitBreakerFailures:
             assert not pi.paused
 
     def test_five_consecutive_failures_pause_plugin(
-        self, device_config_dev, monkeypatch
-    ):
+        self, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         monkeypatch.setenv("PLUGIN_FAILURE_THRESHOLD", "5")
         task = _make_task(device_config_dev)
         pi = _make_plugin_instance()
@@ -122,8 +127,8 @@ class TestCircuitBreakerFailures:
         assert pi.consecutive_failure_count == 5
 
     def test_counter_does_not_increment_once_paused(
-        self, device_config_dev, monkeypatch
-    ):
+        self, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         monkeypatch.setenv("PLUGIN_FAILURE_THRESHOLD", "5")
         task = _make_task(device_config_dev)
         pi = _make_plugin_instance()
@@ -149,7 +154,9 @@ class TestCircuitBreakerFailures:
         )
         assert pi.consecutive_failure_count == 5  # still at threshold
 
-    def test_configurable_threshold_honored(self, device_config_dev, monkeypatch):
+    def test_configurable_threshold_honored(
+        self, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         monkeypatch.setenv("PLUGIN_FAILURE_THRESHOLD", "3")
         task = _make_task(device_config_dev)
         pi = _make_plugin_instance()
@@ -167,7 +174,9 @@ class TestCircuitBreakerFailures:
         assert pi.paused is True
         assert pi.consecutive_failure_count == 3
 
-    def test_no_plugin_instance_does_not_crash(self, device_config_dev, monkeypatch):
+    def test_no_plugin_instance_does_not_crash(
+        self, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Health update without a matching PluginInstance should not raise."""
         monkeypatch.setenv("PLUGIN_FAILURE_THRESHOLD", "5")
         task = _make_task(device_config_dev)
@@ -189,7 +198,9 @@ class TestCircuitBreakerFailures:
 
 
 class TestCircuitBreakerReset:
-    def test_success_resets_counter_to_zero(self, device_config_dev, monkeypatch):
+    def test_success_resets_counter_to_zero(
+        self, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         monkeypatch.setenv("PLUGIN_FAILURE_THRESHOLD", "5")
         task = _make_task(device_config_dev)
         pi = _make_plugin_instance()
@@ -217,7 +228,9 @@ class TestCircuitBreakerReset:
         assert pi.consecutive_failure_count == 0
         assert pi.paused is False
 
-    def test_success_unpauses_plugin(self, device_config_dev, monkeypatch):
+    def test_success_unpauses_plugin(
+        self, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         monkeypatch.setenv("PLUGIN_FAILURE_THRESHOLD", "5")
         task = _make_task(device_config_dev)
         pi = _make_plugin_instance()
@@ -237,7 +250,9 @@ class TestCircuitBreakerReset:
         assert pi.paused is False
         assert pi.consecutive_failure_count == 0
 
-    def test_manual_reset_circuit_breaker(self, device_config_dev, monkeypatch):
+    def test_manual_reset_circuit_breaker(
+        self, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         task = _make_task(device_config_dev)
         pi = _make_plugin_instance()
         _add_plugin_to_pm(device_config_dev, pi)
@@ -251,15 +266,15 @@ class TestCircuitBreakerReset:
         assert pi.consecutive_failure_count == 0
 
     def test_manual_reset_returns_false_for_unknown_instance(
-        self, device_config_dev, monkeypatch
-    ):
+        self, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         task = _make_task(device_config_dev)
         result = task.reset_circuit_breaker("weather", "does_not_exist")
         assert result is False
 
     def test_manual_reset_persists_and_clears_metric(
-        self, device_config_dev, monkeypatch
-    ):
+        self, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Manual reset should persist config and clear the circuit-breaker metric."""
         task = _make_task(device_config_dev)
         pi = _make_plugin_instance()
@@ -286,8 +301,8 @@ class TestCircuitBreakerReset:
         assert len(write_calls) == 1
 
     def test_manual_reset_no_persist_when_unchanged(
-        self, device_config_dev, monkeypatch
-    ):
+        self, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Reset on an already-clean instance should not persist config."""
         task = _make_task(device_config_dev)
         pi = _make_plugin_instance()
@@ -311,7 +326,7 @@ class TestCircuitBreakerReset:
 
 
 class TestCircuitBreakerScheduler:
-    def _setup_playlist(self, device_config_dev, plugin_instances):
+    def _setup_playlist(self, device_config_dev: Any, plugin_instances: Any) -> Any:
         """Create a fresh playlist with the given plugin instances."""
         pm = device_config_dev.get_playlist_manager()
         # Remove existing playlists and add a clean one
@@ -323,8 +338,11 @@ class TestCircuitBreakerScheduler:
         return pm
 
     def test_paused_plugin_skipped_by_scheduler(
-        self, device_config_dev, monkeypatch, caplog
-    ):
+        self,
+        device_config_dev: Any,
+        monkeypatch: pytest.MonkeyPatch,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
         from model import RefreshInfo
 
         monkeypatch.setenv("PLUGIN_FAILURE_THRESHOLD", "5")
@@ -356,7 +374,9 @@ class TestCircuitBreakerScheduler:
         assert plugin.paused is False
         assert "failures=5 reason=last API error" in caplog.text
 
-    def test_all_paused_returns_none(self, device_config_dev, monkeypatch):
+    def test_all_paused_returns_none(
+        self, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         from model import RefreshInfo
 
         monkeypatch.setenv("PLUGIN_FAILURE_THRESHOLD", "5")
@@ -381,7 +401,9 @@ class TestCircuitBreakerScheduler:
 
         assert plugin is None
 
-    def test_non_paused_plugin_not_skipped(self, device_config_dev, monkeypatch):
+    def test_non_paused_plugin_not_skipped(
+        self, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         from model import RefreshInfo
 
         monkeypatch.setenv("PLUGIN_FAILURE_THRESHOLD", "5")
@@ -411,12 +433,12 @@ class TestCircuitBreakerScheduler:
 
 
 class TestPluginInstanceCircuitBreakerFields:
-    def test_default_values(self):
+    def test_default_values(self) -> None:
         pi = PluginInstance("weather", "inst", {}, {"interval": 3600})
         assert pi.consecutive_failure_count == 0
         assert pi.paused is False
 
-    def test_to_dict_includes_circuit_breaker_fields(self):
+    def test_to_dict_includes_circuit_breaker_fields(self) -> None:
         pi = PluginInstance("weather", "inst", {}, {"interval": 3600})
         pi.consecutive_failure_count = 3
         pi.paused = True
@@ -424,7 +446,7 @@ class TestPluginInstanceCircuitBreakerFields:
         assert d["consecutive_failure_count"] == 3
         assert d["paused"] is True
 
-    def test_from_dict_restores_circuit_breaker_fields(self):
+    def test_from_dict_restores_circuit_breaker_fields(self) -> None:
         data = {
             "plugin_id": "weather",
             "name": "inst",
@@ -437,7 +459,7 @@ class TestPluginInstanceCircuitBreakerFields:
         assert pi.consecutive_failure_count == 4
         assert pi.paused is True
 
-    def test_from_dict_defaults_when_fields_absent(self):
+    def test_from_dict_defaults_when_fields_absent(self) -> None:
         data = {
             "plugin_id": "weather",
             "name": "inst",
@@ -455,7 +477,7 @@ class TestPluginInstanceCircuitBreakerFields:
 
 
 class TestForceRetryEndpoint:
-    def _make_app(self, device_config_dev, refresh_task):
+    def _make_app(self, device_config_dev: Any, refresh_task: Any) -> Any:
         """Create a minimal Flask test app with the plugin blueprint."""
         import sys
 
@@ -477,7 +499,7 @@ class TestForceRetryEndpoint:
         app.register_blueprint(plugin_bp)
         return app
 
-    def test_force_retry_resets_paused_plugin(self, device_config_dev):
+    def test_force_retry_resets_paused_plugin(self, device_config_dev: Any) -> None:
         task = _make_task(device_config_dev)
         pi = _make_plugin_instance("weather", "my_weather")
         pi.paused = True
@@ -494,14 +516,18 @@ class TestForceRetryEndpoint:
         assert pi.paused is False
         assert pi.consecutive_failure_count == 0
 
-    def test_force_retry_returns_404_for_unknown_instance(self, device_config_dev):
+    def test_force_retry_returns_404_for_unknown_instance(
+        self, device_config_dev: Any
+    ) -> None:
         task = _make_task(device_config_dev)
         app = self._make_app(device_config_dev, task)
         with app.test_client() as client:
             resp = client.post("/plugin_instance/weather/nonexistent/force_retry")
             assert resp.status_code == 404
 
-    def test_force_retry_returns_503_when_no_refresh_task(self, device_config_dev):
+    def test_force_retry_returns_503_when_no_refresh_task(
+        self, device_config_dev: Any
+    ) -> None:
         app = self._make_app(device_config_dev, None)
         with app.test_client() as client:
             resp = client.post("/plugin_instance/weather/my_weather/force_retry")

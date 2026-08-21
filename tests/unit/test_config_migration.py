@@ -73,9 +73,9 @@ def _expected_cycle_interval_seconds(playlist_dict: dict) -> int | None:
 @pytest.mark.parametrize("fixture_name", LEGACY_FIXTURE_VERSIONS)
 def test_legacy_configs_load_and_preserve_sentinel_fields(
     fixture_name: str,
-    monkeypatch,
-    tmp_path,
-):
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
     fixture_path = _fixture_device_path(fixture_name)
     raw_fixture = _load_json(fixture_path)
 
@@ -123,9 +123,9 @@ def test_legacy_configs_load_and_preserve_sentinel_fields(
 
 
 def test_corrupt_but_recoverable_fixture_uses_safe_refresh_defaults(
-    monkeypatch,
-    tmp_path,
-):
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
     fixture_path = _fixture_device_path("corrupt_recoverable")
     config_path = tmp_path / "device.json"
     shutil.copyfile(fixture_path, config_path)
@@ -139,9 +139,9 @@ def test_corrupt_but_recoverable_fixture_uses_safe_refresh_defaults(
 
 
 def test_renamed_key_without_migration_is_detected(
-    monkeypatch,
-    tmp_path,
-):
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
     baseline = _load_json(_fixture_device_path("v0.40"))
     # Use a sentinel timezone that Config() will never default to so the
     # assertion cannot silently pass if the loader supplies a matching default.
@@ -162,7 +162,7 @@ def test_renamed_key_without_migration_is_detected(
         )
 
 
-def test_legacy_settings_alias_survives_when_plugin_settings_missing():
+def test_legacy_settings_alias_survives_when_plugin_settings_missing() -> None:
     """Verify ``PluginInstance.from_dict`` honours the legacy ``settings`` alias.
 
     The v0.40 fixture ships with both ``plugin_settings`` and ``settings`` to
@@ -184,7 +184,7 @@ def test_legacy_settings_alias_survives_when_plugin_settings_missing():
     assert plugin.settings.get("api_token") == legacy_api_token
 
 
-def test_plugin_settings_precedence_over_legacy_settings():
+def test_plugin_settings_precedence_over_legacy_settings() -> None:
     """Loader prefers ``plugin_settings`` when both fields coexist."""
     from model import PluginInstance
 
@@ -208,7 +208,7 @@ def test_plugin_settings_precedence_over_legacy_settings():
     assert plugin.settings.get("api_token") == "token-from-plugin-settings"
 
 
-def test_malformed_plugin_settings_falls_back_to_legacy_settings():
+def test_malformed_plugin_settings_falls_back_to_legacy_settings() -> None:
     """When plugin_settings is non-dict but legacy settings is a dict, use legacy."""
     from model import PluginInstance
 

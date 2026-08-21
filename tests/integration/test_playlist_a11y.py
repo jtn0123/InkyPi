@@ -2,13 +2,15 @@
 import os
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 import pytest
+from flask.testing import FlaskClient
 
 from model import RefreshInfo
 
 
-def _fixed_now(_device_config):
+def _fixed_now(_device_config: Any) -> Any:
     return datetime(2025, 1, 1, 8, 0, 0, tzinfo=UTC)
 
 
@@ -16,7 +18,9 @@ def _fixed_now(_device_config):
     os.getenv("SKIP_A11Y", "").lower() in ("1", "true"),
     reason="A11y checks skipped by env",
 )
-def test_playlist_accessibility_with_axe(client, device_config_dev, monkeypatch):
+def test_playlist_accessibility_with_axe(
+    client: FlaskClient, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     pytest.importorskip("playwright.sync_api", reason="playwright not available")
     monkeypatch.setattr("utils.time_utils.now_device_tz", _fixed_now, raising=True)
 

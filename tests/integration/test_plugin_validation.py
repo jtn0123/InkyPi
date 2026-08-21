@@ -1,8 +1,13 @@
 # pyright: reportMissingImports=false
 """Tests for server-side plugin settings validation (JTN-187)."""
 
+from pathlib import Path
+from typing import Any
 
-def test_save_rejects_missing_required_fields(client):
+from flask.testing import FlaskClient
+
+
+def test_save_rejects_missing_required_fields(client: FlaskClient) -> None:
     """Saving plugin settings with empty required fields should return 400."""
     resp = client.post(
         "/save_plugin_settings",
@@ -14,7 +19,9 @@ def test_save_rejects_missing_required_fields(client):
     assert "Folder Path" in data.get("error", "")
 
 
-def test_save_accepts_valid_required_fields(client, tmp_path):
+def test_save_accepts_valid_required_fields(
+    client: FlaskClient, tmp_path: Path
+) -> None:
     """Saving with all required fields filled should not return 400."""
     from PIL import Image
 
@@ -30,7 +37,7 @@ def test_save_accepts_valid_required_fields(client, tmp_path):
     assert resp.status_code != 400
 
 
-def test_save_rejects_whitespace_only_required_fields(client):
+def test_save_rejects_whitespace_only_required_fields(client: FlaskClient) -> None:
     """Whitespace-only values should be treated as empty for required fields."""
     resp = client.post(
         "/save_plugin_settings",
@@ -41,7 +48,7 @@ def test_save_rejects_whitespace_only_required_fields(client):
     assert "Required" in data.get("error", "")
 
 
-def test_save_alias_rejects_missing_required_fields(client):
+def test_save_alias_rejects_missing_required_fields(client: FlaskClient) -> None:
     """The alias save route also validates required fields."""
     resp = client.post(
         "/plugin/image_folder/save",
@@ -52,7 +59,7 @@ def test_save_alias_rejects_missing_required_fields(client):
     assert "Required" in data.get("error", "")
 
 
-def test_save_skips_validation_for_plugin_without_schema(client):
+def test_save_skips_validation_for_plugin_without_schema(client: FlaskClient) -> None:
     """Plugins that do not define build_settings_schema should not fail validation."""
     # clock plugin exists but we just verify it does not 400 due to missing schema
     resp = client.post(
@@ -63,7 +70,9 @@ def test_save_skips_validation_for_plugin_without_schema(client):
     assert resp.status_code == 200
 
 
-def test_update_instance_rejects_missing_required_fields(client, device_config_dev):
+def test_update_instance_rejects_missing_required_fields(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     """Updating an existing plugin instance validates required fields."""
     # Create an instance first via save
     pm = device_config_dev.get_playlist_manager()
@@ -90,8 +99,8 @@ def test_update_instance_rejects_missing_required_fields(client, device_config_d
 
 
 def test_update_instance_accepts_valid_required_fields(
-    client, device_config_dev, tmp_path
-):
+    client: FlaskClient, device_config_dev: Any, tmp_path: Path
+) -> None:
     """Updating an existing instance with valid required fields should succeed."""
     from PIL import Image
 

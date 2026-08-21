@@ -2,8 +2,11 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
+from typing import Any
 
 import pytest
+from playwright.sync_api import Page
 
 pytestmark = pytest.mark.skipif(
     os.getenv("SKIP_UI", "").lower() in ("1", "true"),
@@ -17,8 +20,8 @@ from tests.integration.browser_helpers import (  # noqa: E402
 
 
 def test_display_next_button_exists(
-    live_server, device_config_dev, browser_page, tmp_path
-):
+    live_server: str, device_config_dev: Any, browser_page: Page, tmp_path: Path
+) -> None:
     prepare_playlist(device_config_dev)
     page = browser_page
     rc = navigate_and_wait(page, live_server, "/")
@@ -31,8 +34,8 @@ def test_display_next_button_exists(
 
 
 def test_display_next_sends_request(
-    live_server, device_config_dev, browser_page, tmp_path
-):
+    live_server: str, device_config_dev: Any, browser_page: Page, tmp_path: Path
+) -> None:
     prepare_playlist(device_config_dev)
     page = browser_page
     rc = navigate_and_wait(page, live_server, "/")
@@ -75,8 +78,8 @@ def test_display_next_sends_request(
 
 
 def test_display_next_no_js_errors(
-    live_server, device_config_dev, browser_page, tmp_path
-):
+    live_server: str, device_config_dev: Any, browser_page: Page, tmp_path: Path
+) -> None:
     prepare_playlist(device_config_dev)
     page = browser_page
     rc = navigate_and_wait(page, live_server, "/")
@@ -105,8 +108,8 @@ def test_display_next_no_js_errors(
 
 
 def test_quick_switch_sends_playlist_request(
-    live_server, device_config_dev, browser_page, tmp_path
-):
+    live_server: str, device_config_dev: Any, browser_page: Page, tmp_path: Path
+) -> None:
     prepare_playlist(device_config_dev)
     pm = device_config_dev.get_playlist_manager()
     if not pm.get_playlist("Focus"):
@@ -215,8 +218,8 @@ def test_quick_switch_sends_playlist_request(
 
 
 def test_refresh_cell_shows_forward_looking_eta(
-    live_server, device_config_dev, browser_page, tmp_path
-):
+    live_server: str, device_config_dev: Any, browser_page: Page, tmp_path: Path
+) -> None:
     prepare_playlist(device_config_dev)
     page = browser_page
     rc = navigate_and_wait(page, live_server, "/")

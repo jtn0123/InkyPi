@@ -15,6 +15,8 @@ import os
 import uuid
 
 import pytest
+from flask.testing import FlaskClient
+from playwright.sync_api import Page
 
 pytestmark = [
     pytest.mark.journey,
@@ -46,7 +48,9 @@ def _read_env_keys(env_path: str) -> dict[str, str]:
     return dict(dotenv_values(env_path))
 
 
-def test_api_key_add_edit_delete_roundtrip(live_server, browser_page, client):
+def test_api_key_add_edit_delete_roundtrip(
+    live_server: str, browser_page: Page, client: FlaskClient
+) -> None:
     """Full lifecycle: add via UI, edit via API, delete via UI — persisted at each step."""
     from tests.integration.browser_helpers import navigate_and_wait
 

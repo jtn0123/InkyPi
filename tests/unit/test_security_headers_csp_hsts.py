@@ -1,8 +1,13 @@
 import importlib
 import sys
+from typing import Any
+
+import pytest
 
 
-def _reload_inkypi(monkeypatch, argv=None, env=None):
+def _reload_inkypi(
+    monkeypatch: pytest.MonkeyPatch, argv: Any = None, env: Any = None
+) -> Any:
     if argv is None:
         argv = ["inkypi.py"]
     if env is None:
@@ -23,7 +28,7 @@ def _reload_inkypi(monkeypatch, argv=None, env=None):
     return mod
 
 
-def test_csp_enforcement_and_report_only(monkeypatch):
+def test_csp_enforcement_and_report_only(monkeypatch: pytest.MonkeyPatch) -> None:
     mod = _reload_inkypi(monkeypatch)
     app = mod.app
     client = app.test_client()
@@ -48,7 +53,9 @@ def test_csp_enforcement_and_report_only(monkeypatch):
     assert r3.headers.get(header_name, "").startswith("default-src 'none'")
 
 
-def test_csp_nonce_present_and_unique_per_request(monkeypatch):
+def test_csp_nonce_present_and_unique_per_request(
+    monkeypatch: pytest.MonkeyPatch,
+) -> Any:
     """Each request generates a unique nonce that appears in the CSP header."""
     mod = _reload_inkypi(monkeypatch)
     app = mod.app
@@ -69,7 +76,7 @@ def test_csp_nonce_present_and_unique_per_request(monkeypatch):
     # Nonces must differ between requests (collision probability ~2^-96).
     import re
 
-    def _extract_nonce(csp):
+    def _extract_nonce(csp: Any) -> Any:
         m = re.search(r"nonce-([A-Za-z0-9_=-]+)", csp)
         return m.group(1) if m else None
 
@@ -78,7 +85,9 @@ def test_csp_nonce_present_and_unique_per_request(monkeypatch):
     ), "CSP nonce must be unique per request"
 
 
-def test_csp_nonce_not_injected_when_custom_csp_set(monkeypatch):
+def test_csp_nonce_not_injected_when_custom_csp_set(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Custom INKYPI_CSP values are used verbatim — no nonce is injected."""
     mod = _reload_inkypi(monkeypatch, env={"INKYPI_CSP_REPORT_ONLY": "0"})
     app = mod.app
@@ -93,7 +102,9 @@ def test_csp_nonce_not_injected_when_custom_csp_set(monkeypatch):
     assert "nonce-" not in csp
 
 
-def test_hsts_only_under_https_or_forward_proto(monkeypatch):
+def test_hsts_only_under_https_or_forward_proto(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     mod = _reload_inkypi(monkeypatch)
     app = mod.app
     client = app.test_client()

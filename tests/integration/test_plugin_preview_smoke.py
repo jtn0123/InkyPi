@@ -28,6 +28,8 @@ from __future__ import annotations
 import os
 
 import pytest
+from flask import Flask
+from playwright.sync_api import Page
 from tests.integration.browser_helpers import RuntimeCollector, stub_leaflet
 from tests.integration.fixtures.plugin_inputs import (
     PLUGIN_FORM_INPUTS,
@@ -46,7 +48,7 @@ pytestmark = pytest.mark.skipif(
 _UPDATE_PREVIEW_TIMEOUT_MS = 15000
 
 
-def _preview_src(page) -> str | None:
+def _preview_src(page: Page) -> str | None:
     """Return the current ``#previewImage`` src (or None if missing)."""
     return page.evaluate(
         "() => document.getElementById('previewImage')?.getAttribute('src') || null"
@@ -59,8 +61,12 @@ def _preview_src(page) -> str | None:
     ids=lambda pid: pid,
 )
 def test_update_preview_changes_image_src(
-    live_server, browser_page, flask_app, monkeypatch, plugin_id: str
-):
+    live_server: str,
+    browser_page: Page,
+    flask_app: Flask,
+    monkeypatch: pytest.MonkeyPatch,
+    plugin_id: str,
+) -> None:
     """Update Preview must flip ``#previewImage`` src for each plugin.
 
     We force the refresh task OFF so ``/update_now`` takes the direct path

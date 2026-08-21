@@ -23,6 +23,10 @@ Covers:
 from __future__ import annotations
 
 import socket
+from typing import Any
+
+import pytest
+from flask.testing import FlaskClient
 
 # ---------------------------------------------------------------------------
 # image_url plugin
@@ -32,7 +36,7 @@ import socket
 class TestImageUrlValidation:
     """/update_now with plugin_id=image_url must reject unsafe URLs with 4xx."""
 
-    def test_file_scheme_returns_422(self, client):
+    def test_file_scheme_returns_422(self, client: FlaskClient) -> None:
         """file:// URL is a validation error, not a server error."""
         resp = client.post(
             "/update_now",
@@ -48,7 +52,7 @@ class TestImageUrlValidation:
         # Must NOT be the generic internal-error message.
         assert body["error"] != "An internal error occurred"
 
-    def test_loopback_literal_returns_422(self, client):
+    def test_loopback_literal_returns_422(self, client: FlaskClient) -> None:
         """http://127.0.0.1/... is SSRF-blocked -> 422, not 500."""
         resp = client.post(
             "/update_now",
@@ -63,7 +67,7 @@ class TestImageUrlValidation:
         assert "Invalid URL" in body["error"]
         assert "private" in body["error"] or "loopback" in body["error"]
 
-    def test_link_local_imds_returns_422(self, client):
+    def test_link_local_imds_returns_422(self, client: FlaskClient) -> None:
         """http://169.254.169.254/ (cloud metadata) must be rejected with 422."""
         resp = client.post(
             "/update_now",
@@ -77,7 +81,9 @@ class TestImageUrlValidation:
         assert body["code"] == "validation_error"
         assert "Invalid URL" in body["error"]
 
-    def test_private_dns_returns_422(self, client, monkeypatch):
+    def test_private_dns_returns_422(
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Hostname that resolves to a private IP must be rejected with 422."""
         # Resolve *any* hostname to 10.0.0.5 (RFC1918).
         monkeypatch.setattr(
@@ -99,7 +105,7 @@ class TestImageUrlValidation:
         assert body["code"] == "validation_error"
         assert "Invalid URL" in body["error"]
 
-    def test_malformed_url_no_hostname_returns_422(self, client):
+    def test_malformed_url_no_hostname_returns_422(self, client: FlaskClient) -> None:
         """A URL missing a hostname (scheme-only) is a validation error."""
         resp = client.post(
             "/update_now",
@@ -110,7 +116,7 @@ class TestImageUrlValidation:
         assert body["code"] == "validation_error"
         assert "Invalid URL" in body["error"]
 
-    def test_details_field_points_at_url(self, client):
+    def test_details_field_points_at_url(self, client: FlaskClient) -> None:
         """Validation failures should identify the offending field for the UI."""
         resp = client.post(
             "/update_now",
@@ -122,8 +128,8 @@ class TestImageUrlValidation:
         assert details.get("field") == "url"
 
     def test_url_validation_failure_does_not_record_history_sidecar(
-        self, client, device_config_dev
-    ):
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
         """ISSUE-006 — a rejected URL must NOT bump Dashboard "Refreshes" /
         "Errors" KPIs.  The dashboard derives those numbers by counting
         history JSON sidecars in ``device_config.history_image_dir``;
@@ -175,7 +181,7 @@ class TestImageUrlValidation:
 class TestScreenshotUrlValidation:
     """/update_now with plugin_id=screenshot must reject unsafe URLs with 4xx."""
 
-    def test_file_scheme_returns_422(self, client):
+    def test_file_scheme_returns_422(self, client: FlaskClient) -> None:
         resp = client.post(
             "/update_now",
             data={"plugin_id": "screenshot", "url": "file:///etc/passwd"},
@@ -185,7 +191,7 @@ class TestScreenshotUrlValidation:
         assert body["code"] == "validation_error"
         assert "Invalid URL" in body["error"]
 
-    def test_malformed_url_returns_422(self, client):
+    def test_malformed_url_returns_422(self, client: FlaskClient) -> None:
         """Non-URL input like ``not-a-url-at-all`` is rejected as a validation error.
 
         urlparse treats this as a path-only URL (no scheme) so ``validate_url``
@@ -213,7 +219,9 @@ class TestNonUrlFailuresStillOpaque:
     out of the HTTP response body — only URL validator messages may leak through.
     """
 
-    def test_ai_image_missing_key_still_returns_400_generic(self, client):
+    def test_ai_image_missing_key_still_returns_400_generic(
+        self, client: FlaskClient
+    ) -> None:
         """ai_image without API key -> RuntimeError, must stay generic (JTN-326)."""
         resp = client.post(
             "/update_now",
@@ -231,14 +239,16 @@ class TestNonUrlFailuresStillOpaque:
         # No plugin exception text should leak.
         assert "API Key" not in body["error"]
 
-    def test_unexpected_exception_returns_500(self, client, monkeypatch):
+    def test_unexpected_exception_returns_500(
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+    ) -> Any:
         """Non-URL, non-RuntimeError plugin failures must still be 500 internal_error."""
         from plugins.plugin_registry import get_plugin_instance as _real_get
 
-        def _boom(plugin_config):
+        def _boom(plugin_config: Any) -> Any:
             inst = _real_get(plugin_config)
 
-            def _raise(*a, **kw):
+            def _raise(*a: Any, **kw: Any) -> None:
                 raise ValueError("unexpected internal failure")
 
             inst.generate_image = _raise  # type: ignore[method-assign]

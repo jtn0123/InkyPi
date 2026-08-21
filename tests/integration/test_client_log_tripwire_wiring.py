@@ -22,9 +22,11 @@ from __future__ import annotations
 import json
 import os
 
+from flask.testing import FlaskClient
 
-def test_client_log_endpoint_routable_and_capture_env_set(client):
-    # The autouse integration fixture (tests/integration/conftest.py) must
+
+def test_client_log_endpoint_routable_and_capture_env_set(client: FlaskClient):
+    # The autouse integration fixture (tests/integration/conftest.py) -> None -> None must
     # turn capture on — otherwise the tripwire cannot observe anything.
     assert os.environ.get("INKYPI_TEST_CAPTURE_CLIENT_LOG", "").lower() in {
         "1",
@@ -54,7 +56,7 @@ def test_client_log_endpoint_routable_and_capture_env_set(client):
     )
 
 
-def test_client_error_endpoint_routable(client):
+def test_client_error_endpoint_routable(client: FlaskClient) -> None:
     """Sibling /api/client-error blueprint must also be registered."""
     # Empty body → blueprint rejects with 400 for missing required "message".
     resp = client.post(

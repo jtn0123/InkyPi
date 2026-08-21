@@ -9,8 +9,10 @@ JTN-347/348/331/332: "Show last progress" button must produce visible feedback
 """
 
 from pathlib import Path
+from typing import Any
 
 import pytest
+from flask.testing import FlaskClient
 
 _SCRIPTS_DIR = Path(__file__).resolve().parents[2] / "src" / "static" / "scripts"
 
@@ -31,7 +33,7 @@ def _plugin_page_source() -> str:
 # ---------------------------------------------------------------------------
 
 
-def test_plugin_schema_exposes_sync_remove_button_states(client):
+def test_plugin_schema_exposes_sync_remove_button_states(client: FlaskClient) -> None:
     """JTN-311: plugin_schema.js must define syncRemoveButtonStates."""
     resp = client.get("/static/scripts/plugin_schema.js")
     assert resp.status_code == 200
@@ -43,7 +45,7 @@ def test_plugin_schema_exposes_sync_remove_button_states(client):
     )
 
 
-def test_sync_remove_button_states_disables_on_single_row(client):
+def test_sync_remove_button_states_disables_on_single_row(client: FlaskClient) -> None:
     """JTN-311: syncRemoveButtonStates must set disabled=true when count <= 1."""
     resp = client.get("/static/scripts/plugin_schema.js")
     assert resp.status_code == 200
@@ -56,7 +58,7 @@ def test_sync_remove_button_states_disables_on_single_row(client):
     )
 
 
-def test_sync_remove_button_states_sets_tooltip(client):
+def test_sync_remove_button_states_sets_tooltip(client: FlaskClient) -> None:
     """JTN-311: syncRemoveButtonStates must set a tooltip explaining why removal is blocked."""
     resp = client.get("/static/scripts/plugin_schema.js")
     assert resp.status_code == 200
@@ -68,7 +70,7 @@ def test_sync_remove_button_states_sets_tooltip(client):
     )
 
 
-def test_sync_remove_called_on_init_and_add(client):
+def test_sync_remove_called_on_init_and_add(client: FlaskClient) -> None:
     """JTN-311: syncRemoveButtonStates must be called during initCalendarRepeater
     (on page load) and when a new calendar row is added."""
     resp = client.get("/static/scripts/plugin_schema.js")
@@ -83,7 +85,7 @@ def test_sync_remove_called_on_init_and_add(client):
     )
 
 
-def test_handle_remove_click_no_shake_animation(client):
+def test_handle_remove_click_no_shake_animation(client: FlaskClient) -> None:
     """JTN-311: handleRemoveClick must not show the shake animation as feedback —
     the button is disabled instead, so the shake branch is unreachable."""
     resp = client.get("/static/scripts/plugin_schema.js")
@@ -97,7 +99,7 @@ def test_handle_remove_click_no_shake_animation(client):
     )
 
 
-def test_calendar_page_renders_remove_button(client):
+def test_calendar_page_renders_remove_button(client: FlaskClient) -> None:
     """JTN-311: The rendered calendar plugin page must include a remove button."""
     resp = client.get("/plugin/calendar")
     assert resp.status_code == 200
@@ -111,7 +113,7 @@ def test_calendar_page_renders_remove_button(client):
     ), "Remove button must have an accessible aria-label (JTN-311)"
 
 
-def test_create_calendar_entry_assigns_unique_label_ids(client):
+def test_create_calendar_entry_assigns_unique_label_ids(client: FlaskClient) -> None:
     """JTN-349: dynamically added calendar rows must have a unique label id and
     numbered aria-label so screen readers can distinguish them."""
     resp = client.get("/static/scripts/plugin_schema.js")
@@ -142,7 +144,7 @@ def test_create_calendar_entry_assigns_unique_label_ids(client):
 # ---------------------------------------------------------------------------
 
 
-def test_show_last_progress_uses_set_hidden(client):
+def test_show_last_progress_uses_set_hidden(client: FlaskClient) -> None:
     """JTN-312: showLastProgress must use setHidden(progress, false) to reveal
     the progress panel, not style.display which is overridden by the `hidden`
     HTML attribute."""
@@ -157,7 +159,7 @@ def test_show_last_progress_uses_set_hidden(client):
     )
 
 
-def test_show_last_progress_does_not_use_style_display(client):
+def test_show_last_progress_does_not_use_style_display(client: FlaskClient) -> None:
     """JTN-312: showLastProgress must not rely on style.display to show the
     progress block — the HTML `hidden` attribute overrides inline styles."""
     resp = client.get("/static/scripts/plugin_page.js")
@@ -171,7 +173,7 @@ def test_show_last_progress_does_not_use_style_display(client):
     )
 
 
-def test_show_last_progress_btn_present_on_calendar_page(client):
+def test_show_last_progress_btn_present_on_calendar_page(client: FlaskClient) -> None:
     """JTN-312: The rendered calendar plugin page must include the Last progress button."""
     resp = client.get("/plugin/calendar")
     assert resp.status_code == 200
@@ -182,7 +184,7 @@ def test_show_last_progress_btn_present_on_calendar_page(client):
     ), "Calendar plugin page must render showLastProgressBtn (JTN-312)"
 
 
-def test_show_last_progress_no_data_shows_modal(client):
+def test_show_last_progress_no_data_shows_modal(client: FlaskClient) -> None:
     """JTN-312 / JTN-634: When localStorage has no data, showLastProgress
     must surface a user-visible empty-state message. Originally (JTN-312)
     this went through showResponseModal; JTN-634 moved the message inside
@@ -199,7 +201,7 @@ def test_show_last_progress_no_data_shows_modal(client):
     )
 
 
-def test_request_progress_block_present_on_calendar_page(client):
+def test_request_progress_block_present_on_calendar_page(client: FlaskClient) -> None:
     """JTN-312: The rendered calendar plugin page must include the requestProgress
     block that showLastProgress reveals."""
     resp = client.get("/plugin/calendar")
@@ -217,7 +219,7 @@ def test_request_progress_block_present_on_calendar_page(client):
 # ---------------------------------------------------------------------------
 
 
-def test_show_last_progress_clears_inline_display_style(client):
+def test_show_last_progress_clears_inline_display_style(client: FlaskClient) -> None:
     """JTN-347: showLastProgress must clear inline style.display left by
     progress.stop(), otherwise the progress block stays invisible even
     after the hidden attribute is removed."""
@@ -232,7 +234,7 @@ def test_show_last_progress_clears_inline_display_style(client):
     )
 
 
-def test_progress_stop_does_not_set_display_none(client):
+def test_progress_stop_does_not_set_display_none(client: FlaskClient) -> None:
     """JTN-347: progress.stop() must hide via the hidden attribute only,
     not set style.display='none' which conflicts with showLastProgress."""
     resp = client.get("/static/scripts/plugin_form.js")
@@ -256,7 +258,9 @@ def test_progress_stop_does_not_set_display_none(client):
     ["clock", "todo_list", "calendar", "screenshot"],
     ids=["JTN-347-clock", "JTN-348-todo", "JTN-331-calendar", "JTN-332-screenshot"],
 )
-def test_show_last_progress_btn_present_on_plugin_page(client, plugin_id):
+def test_show_last_progress_btn_present_on_plugin_page(
+    client: FlaskClient, plugin_id: Any
+) -> None:
     """JTN-347/348/331/332: Each affected plugin page must render the
     showLastProgressBtn so users get visible feedback."""
     resp = client.get(f"/plugin/{plugin_id}")
@@ -273,7 +277,9 @@ def test_show_last_progress_btn_present_on_plugin_page(client, plugin_id):
     ["clock", "todo_list", "calendar", "screenshot"],
     ids=["JTN-347-clock", "JTN-348-todo", "JTN-331-calendar", "JTN-332-screenshot"],
 )
-def test_request_progress_block_present_on_plugin_page(client, plugin_id):
+def test_request_progress_block_present_on_plugin_page(
+    client: FlaskClient, plugin_id: Any
+) -> None:
     """JTN-347/348/331/332: Each affected plugin page must include the
     requestProgress block that showLastProgress reveals."""
     resp = client.get(f"/plugin/{plugin_id}")
@@ -295,7 +301,9 @@ def test_request_progress_block_present_on_plugin_page(client, plugin_id):
     ["weather", "ai_image"],
     ids=["JTN-634-weather", "JTN-634-ai_image"],
 )
-def test_show_last_progress_btn_present_on_weather_and_ai_image(client, plugin_id):
+def test_show_last_progress_btn_present_on_weather_and_ai_image(
+    client: FlaskClient, plugin_id: Any
+) -> None:
     """JTN-634: Weather and AI Image plugin pages must render the
     showLastProgressBtn so users get visible feedback — these plugins were
     not covered by the PR #377 regression suite and still silently no-oped
@@ -313,7 +321,7 @@ def test_show_last_progress_btn_present_on_weather_and_ai_image(client, plugin_i
     ), f"{plugin_id} plugin page must render requestProgress block (JTN-634)"
 
 
-def test_show_last_progress_no_data_reveals_progress_block(client):
+def test_show_last_progress_no_data_reveals_progress_block(client: FlaskClient) -> None:
     """JTN-634: When localStorage has no snapshot, showLastProgress must
     reveal the requestProgress block with an empty-state message — not only
     emit a toast. Anchoring feedback to the button's visual target is what

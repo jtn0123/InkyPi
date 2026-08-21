@@ -4,6 +4,7 @@ from __future__ import annotations
 import os
 
 import pytest
+from playwright.sync_api import Page
 from tests.integration.browser_helpers import navigate_and_wait
 
 pytestmark = pytest.mark.skipif(
@@ -12,7 +13,7 @@ pytestmark = pytest.mark.skipif(
 )
 
 
-def test_response_modal_close_button(live_server, browser_page):
+def test_response_modal_close_button(live_server: str, browser_page: Page) -> None:
     """Show response modal in legacy mode, close via button."""
     page = browser_page
     navigate_and_wait(page, live_server, "/")
@@ -28,7 +29,7 @@ def test_response_modal_close_button(live_server, browser_page):
     assert not modal.is_visible()
 
 
-def test_response_toast_appears(live_server, browser_page):
+def test_response_toast_appears(live_server: str, browser_page: Page) -> None:
     """Show response via default toast mode, verify toast appears."""
     page = browser_page
     navigate_and_wait(page, live_server, "/")
@@ -39,7 +40,9 @@ def test_response_toast_appears(live_server, browser_page):
     assert toast.first.is_visible()
 
 
-def test_response_modal_close_button_is_button(live_server, browser_page):
+def test_response_modal_close_button_is_button(
+    live_server: str, browser_page: Page
+) -> None:
     """Response modal close button is a <button> element for a11y."""
     page = browser_page
     navigate_and_wait(page, live_server, "/")
@@ -49,7 +52,7 @@ def test_response_modal_close_button_is_button(live_server, browser_page):
     assert tag == "button", f"Close button should be <button>, got <{tag}>"
 
 
-def test_playlist_create_modal_lifecycle(live_server, browser_page):
+def test_playlist_create_modal_lifecycle(live_server: str, browser_page: Page) -> None:
     """Open playlist create modal, verify visible, close via button."""
     page = browser_page
     navigate_and_wait(page, live_server, "/playlist")
@@ -64,7 +67,7 @@ def test_playlist_create_modal_lifecycle(live_server, browser_page):
     assert not modal.is_visible()
 
 
-def test_playlist_modal_backdrop_close(live_server, browser_page):
+def test_playlist_modal_backdrop_close(live_server: str, browser_page: Page) -> None:
     """Open playlist modal, close via backdrop click."""
     page = browser_page
     navigate_and_wait(page, live_server, "/playlist")

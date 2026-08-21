@@ -8,7 +8,7 @@ CSS_PATH = ROOT / "src" / "static" / "styles" / "partials" / "_settings.css"
 SETTINGS_HTML = ROOT / "src" / "templates" / "settings.html"
 
 
-def test_settings_summary_device_name_truncates_cleanly():
+def test_settings_summary_device_name_truncates_cleanly() -> None:
     """Long device names in the settings summary should ellipsize."""
     css = CSS_PATH.read_text(encoding="utf-8")
     assert ".settings-device-name" in css
@@ -38,7 +38,7 @@ def test_settings_summary_device_name_truncates_cleanly():
     assert 'title="{{ device_settings.name }}"' in html
 
 
-def test_settings_form_reserves_space_for_sticky_save_bar():
+def test_settings_form_reserves_space_for_sticky_save_bar() -> None:
     """The sticky save bar needs a dedicated spacer on /settings."""
     css = CSS_PATH.read_text(encoding="utf-8")
     assert ".settings-form--sticky-save" in css

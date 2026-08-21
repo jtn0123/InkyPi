@@ -49,7 +49,7 @@ def _make_server(*, ready: bool, version: str | None) -> Any:
             self.send_response(404)
             self.end_headers()
 
-        def log_message(self, *_args) -> None:  # silence per-request stderr noise
+        def log_message(self, *_args: Any) -> None:  # silence per-request stderr noise
             return
 
     server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)

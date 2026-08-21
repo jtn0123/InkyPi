@@ -19,7 +19,7 @@ class _Playlist:
     name: str
     plugins: list[_PluginInstance] = field(default_factory=list)
 
-    def find_plugin(self, plugin_id: str, instance_name: str):
+    def find_plugin(self, plugin_id: str, instance_name: str) -> Any:
         return next(
             (
                 inst
@@ -38,17 +38,19 @@ class _Playlist:
 
 
 class _PlaylistManager:
-    def __init__(self):
+    def __init__(self) -> None:
         self.playlists: list[_Playlist] = []
 
-    def get_playlist(self, name: str):
+    def get_playlist(self, name: str) -> Any:
         return next((pl for pl in self.playlists if pl.name == name), None)
 
-    def add_playlist(self, name: str, start_time=None, end_time=None):
+    def add_playlist(
+        self, name: str, start_time: Any = None, end_time: Any = None
+    ) -> Any:
         self.playlists.append(_Playlist(name=name))
         return True
 
-    def to_dict(self):
+    def to_dict(self) -> Any:
         return {
             "playlists": [
                 {
@@ -68,26 +70,26 @@ class _PlaylistManager:
 
 
 class _DeviceConfig:
-    def __init__(self, plugin_config=None):
+    def __init__(self, plugin_config: Any = None) -> None:
         self.plugin_config = plugin_config
         self.playlist_manager = _PlaylistManager()
         self.config_file = "/tmp/inkypi-device.json"
         self.updated_payloads: list[dict[str, Any]] = []
 
-    def get_plugin(self, plugin_id: str):
+    def get_plugin(self, plugin_id: str) -> Any:
         return self.plugin_config
 
-    def update_atomic(self, update_fn):
+    def update_atomic(self, update_fn: Any) -> None:
         payload: dict[str, Any] = {}
         update_fn(payload)
         self.updated_payloads.append(payload)
 
 
 class _Plugin:
-    def __init__(self, validation_error: str | None = None):
+    def __init__(self, validation_error: str | None = None) -> None:
         self.validation_error = validation_error
 
-    def validate_settings(self, settings: dict[str, Any]):
+    def validate_settings(self, settings: dict[str, Any]) -> Any:
         return self.validation_error
 
 
@@ -95,7 +97,7 @@ def _plugin_workflows_mod() -> ModuleType:
     return importlib.import_module("services.plugin_workflows")
 
 
-def test_build_saved_settings_instance_name():
+def test_build_saved_settings_instance_name() -> None:
     plugin_workflows_mod = _plugin_workflows_mod()
 
     assert (
@@ -104,7 +106,7 @@ def test_build_saved_settings_instance_name():
     )
 
 
-def test_ensure_playlist_creates_default_playlist():
+def test_ensure_playlist_creates_default_playlist() -> None:
     plugin_workflows_mod = _plugin_workflows_mod()
     manager = _PlaylistManager()
 
@@ -117,13 +119,15 @@ def test_ensure_playlist_creates_default_playlist():
     assert playlist.name == plugin_workflows_mod.DEFAULT_PLAYLIST_NAME
 
 
-def test_save_plugin_settings_workflow_creates_saved_settings_instance():
+def test_save_plugin_settings_workflow_creates_saved_settings_instance() -> None:
     plugin_workflows_mod = _plugin_workflows_mod()
     device_config = _DeviceConfig(plugin_config={"id": "weather"})
     manager = device_config.playlist_manager
     calls: list[tuple[str, str, dict[str, Any], dict[str, Any]]] = []
 
-    def _record_change(config_dir, instance_name, before, after):
+    def _record_change(
+        config_dir: Any, instance_name: Any, before: Any, after: Any
+    ) -> None:
         calls.append((config_dir, instance_name, before, after))
 
     result = plugin_workflows_mod.save_plugin_settings_workflow(
@@ -150,7 +154,7 @@ def test_save_plugin_settings_workflow_creates_saved_settings_instance():
     )
 
 
-def test_save_plugin_settings_workflow_updates_existing_instance():
+def test_save_plugin_settings_workflow_updates_existing_instance() -> None:
     plugin_workflows_mod = _plugin_workflows_mod()
     device_config = _DeviceConfig(plugin_config={"id": "weather"})
     manager = device_config.playlist_manager
@@ -185,7 +189,7 @@ def test_save_plugin_settings_workflow_updates_existing_instance():
     assert calls[0][2] == {"city": "Paris", "units": "metric"}
 
 
-def test_save_plugin_settings_workflow_rejects_missing_plugin():
+def test_save_plugin_settings_workflow_rejects_missing_plugin() -> None:
     plugin_workflows_mod = _plugin_workflows_mod()
     device_config = _DeviceConfig(plugin_config=None)
     result = plugin_workflows_mod.save_plugin_settings_workflow(
@@ -201,7 +205,7 @@ def test_save_plugin_settings_workflow_rejects_missing_plugin():
     assert result.error.message == "Plugin not found"
 
 
-def test_save_plugin_settings_workflow_rejects_validation_error():
+def test_save_plugin_settings_workflow_rejects_validation_error() -> None:
     plugin_workflows_mod = _plugin_workflows_mod()
     device_config = _DeviceConfig(plugin_config={"id": "weather"})
     result = plugin_workflows_mod.save_plugin_settings_workflow(

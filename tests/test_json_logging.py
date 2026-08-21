@@ -39,13 +39,13 @@ def _record(
     return r
 
 
-def test_format_logrecord_all_spec_fields():
+def test_format_logrecord_all_spec_fields() -> None:
     data = json.loads(JsonFormatter().format(_record()))
     for field in ("ts", "level", "logger", "msg", "module", "func", "line", "pid"):
         assert field in data, f"Missing spec field: {field}"
 
 
-def test_exception_record_has_exc_fields():
+def test_exception_record_has_exc_fields() -> None:
     try:
         raise RuntimeError("kaboom")
     except RuntimeError:
@@ -59,13 +59,13 @@ def test_exception_record_has_exc_fields():
     assert "RuntimeError" in data["exc_traceback"]
 
 
-def test_extras_present_in_output():
+def test_extras_present_in_output() -> None:
     data = json.loads(JsonFormatter().format(_record(trace_id="t-1", user="alice")))
     assert data["extra"]["trace_id"] == "t-1"
     assert data["extra"]["user"] == "alice"
 
 
-def test_non_serialisable_extra_does_not_crash():
+def test_non_serialisable_extra_does_not_crash() -> None:
     class _Blob:
         pass
 
@@ -73,7 +73,7 @@ def test_non_serialisable_extra_does_not_crash():
     assert "blob" in data["extra"]
 
 
-def test_json_formatter_uses_configured_log_timezone():
+def test_json_formatter_uses_configured_log_timezone() -> None:
     try:
         set_log_timezone("America/Los_Angeles")
         record = _record()

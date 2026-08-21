@@ -38,14 +38,14 @@ def _make_pair(directory: Path, stem: str, age_seconds: float = 0) -> tuple[Path
 # ---------------------------------------------------------------------------
 
 
-def test_empty_dir_is_noop(tmp_path):
+def test_empty_dir_is_noop(tmp_path: Path) -> None:
     result = cleanup_history(str(tmp_path))
     assert result.deleted_count == 0
     assert result.freed_bytes == 0
     assert result.remaining_count == 0
 
 
-def test_nonexistent_dir_returns_empty_result(tmp_path):
+def test_nonexistent_dir_returns_empty_result(tmp_path: Path) -> None:
     result = cleanup_history(str(tmp_path / "nonexistent"))
     assert result.deleted_count == 0
 
@@ -55,7 +55,7 @@ def test_nonexistent_dir_returns_empty_result(tmp_path):
 # ---------------------------------------------------------------------------
 
 
-def test_max_age_deletes_old_files(tmp_path):
+def test_max_age_deletes_old_files(tmp_path: Path) -> None:
     """Files older than max_age_days should be removed."""
     _make_png(tmp_path, "old.png", age_seconds=31 * 86400)  # 31 days old
     _make_png(tmp_path, "new.png", age_seconds=1 * 86400)  # 1 day old
@@ -70,7 +70,7 @@ def test_max_age_deletes_old_files(tmp_path):
     assert result.remaining_count == 1
 
 
-def test_max_age_deletes_sidecar_too(tmp_path):
+def test_max_age_deletes_sidecar_too(tmp_path: Path) -> None:
     """When an old PNG is deleted its JSON sidecar must go too."""
     png, sidecar = _make_pair(
         tmp_path, "display_20200101_000000", age_seconds=40 * 86400
@@ -85,7 +85,7 @@ def test_max_age_deletes_sidecar_too(tmp_path):
     assert not sidecar.exists()
 
 
-def test_max_age_zero_disables_age_check(tmp_path):
+def test_max_age_zero_disables_age_check(tmp_path: Path) -> None:
     """max_age_days=0 should leave all files untouched."""
     _make_png(tmp_path, "ancient.png", age_seconds=365 * 86400)
 
@@ -102,7 +102,7 @@ def test_max_age_zero_disables_age_check(tmp_path):
 # ---------------------------------------------------------------------------
 
 
-def test_max_count_keeps_newest(tmp_path):
+def test_max_count_keeps_newest(tmp_path: Path) -> None:
     """When over the limit, oldest files should be deleted first."""
     for i in range(5):
         _make_png(tmp_path, f"img_{i:02d}.png", age_seconds=(5 - i) * 3600)
@@ -123,7 +123,7 @@ def test_max_count_keeps_newest(tmp_path):
     assert (tmp_path / "img_04.png").exists()
 
 
-def test_max_count_zero_disables_count_check(tmp_path):
+def test_max_count_zero_disables_count_check(tmp_path: Path) -> None:
     """max_count=0 should leave all files untouched."""
     for i in range(10):
         _make_png(tmp_path, f"img_{i}.png")
@@ -136,7 +136,7 @@ def test_max_count_zero_disables_count_check(tmp_path):
     assert result.remaining_count == 10
 
 
-def test_max_count_under_limit_is_noop(tmp_path):
+def test_max_count_under_limit_is_noop(tmp_path: Path) -> None:
     """If file count <= max_count, nothing should be deleted."""
     for i in range(3):
         _make_png(tmp_path, f"img_{i}.png")
@@ -154,7 +154,7 @@ def test_max_count_under_limit_is_noop(tmp_path):
 # ---------------------------------------------------------------------------
 
 
-def test_min_free_bytes_triggers_when_disk_full(tmp_path):
+def test_min_free_bytes_triggers_when_disk_full(tmp_path: Path) -> None:
     """When free space is below the threshold, oldest files should be evicted."""
     # Create 5 files, 1 KB each; oldest first
     for i in range(5):
@@ -172,7 +172,7 @@ def test_min_free_bytes_triggers_when_disk_full(tmp_path):
     assert result.deleted_count == 5
 
 
-def test_min_free_bytes_zero_disables_space_check(tmp_path):
+def test_min_free_bytes_zero_disables_space_check(tmp_path: Path) -> None:
     """min_free_bytes=0 should disable the free-space eviction pass."""
     _make_png(tmp_path, "img.png")
     fake_usage = type("DiskUsage", (), {"total": 10**9, "used": 10**9, "free": 0})()
@@ -185,7 +185,7 @@ def test_min_free_bytes_zero_disables_space_check(tmp_path):
     assert result.deleted_count == 0
 
 
-def test_min_free_bytes_not_triggered_when_space_ok(tmp_path):
+def test_min_free_bytes_not_triggered_when_space_ok(tmp_path: Path) -> None:
     """If free space is already above the threshold, no files should be deleted."""
     for i in range(5):
         _make_png(tmp_path, f"img_{i}.png")
@@ -209,7 +209,7 @@ def test_min_free_bytes_not_triggered_when_space_ok(tmp_path):
 # ---------------------------------------------------------------------------
 
 
-def test_symlinks_are_skipped(tmp_path):
+def test_symlinks_are_skipped(tmp_path: Path) -> None:
     """Symlinks inside history_dir must never be followed or deleted."""
     # Create a real file outside the history dir
     outside = tmp_path / "secret.txt"
@@ -239,7 +239,7 @@ def test_symlinks_are_skipped(tmp_path):
 # ---------------------------------------------------------------------------
 
 
-def test_no_files_outside_history_dir_deleted(tmp_path):
+def test_no_files_outside_history_dir_deleted(tmp_path: Path) -> None:
     """The cleanup must never touch files that aren't inside history_dir."""
     history_dir = tmp_path / "history"
     history_dir.mkdir()
@@ -265,7 +265,7 @@ def test_no_files_outside_history_dir_deleted(tmp_path):
 # ---------------------------------------------------------------------------
 
 
-def test_cleanup_result_defaults():
+def test_cleanup_result_defaults() -> None:
     r = CleanupResult()
     assert r.deleted_count == 0
     assert r.freed_bytes == 0

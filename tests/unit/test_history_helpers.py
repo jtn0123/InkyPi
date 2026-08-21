@@ -2,8 +2,13 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+from typing import Any
 
-def test_resolve_history_entry_path_returns_real_file(tmp_path):
+import pytest
+
+
+def test_resolve_history_entry_path_returns_real_file(tmp_path: Path) -> None:
     from blueprints.history import _resolve_history_entry_path
 
     history_dir = tmp_path / "history"
@@ -16,7 +21,9 @@ def test_resolve_history_entry_path_returns_real_file(tmp_path):
     assert resolved == str(image)
 
 
-def test_resolve_history_entry_path_returns_none_for_missing_file(tmp_path):
+def test_resolve_history_entry_path_returns_none_for_missing_file(
+    tmp_path: Path,
+) -> None:
     from blueprints.history import _resolve_history_entry_path
 
     history_dir = tmp_path / "history"
@@ -25,7 +32,9 @@ def test_resolve_history_entry_path_returns_none_for_missing_file(tmp_path):
     assert _resolve_history_entry_path(str(history_dir), "missing.png") is None
 
 
-def test_resolve_history_entry_path_returns_none_for_directory_entry(tmp_path):
+def test_resolve_history_entry_path_returns_none_for_directory_entry(
+    tmp_path: Path,
+) -> None:
     from blueprints.history import _resolve_history_entry_path
 
     history_dir = tmp_path / "history"
@@ -35,7 +44,9 @@ def test_resolve_history_entry_path_returns_none_for_directory_entry(tmp_path):
     assert _resolve_history_entry_path(str(history_dir), "nested") is None
 
 
-def test_resolve_history_entry_path_returns_none_for_symlink_escape(tmp_path):
+def test_resolve_history_entry_path_returns_none_for_symlink_escape(
+    tmp_path: Path,
+) -> None:
     from blueprints.history import _resolve_history_entry_path
 
     history_dir = tmp_path / "history"
@@ -49,14 +60,14 @@ def test_resolve_history_entry_path_returns_none_for_symlink_escape(tmp_path):
 
 
 def test_resolve_history_entry_path_returns_none_when_listdir_fails(
-    tmp_path, monkeypatch
-):
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     from blueprints.history import _resolve_history_entry_path
 
     history_dir = tmp_path / "history"
     history_dir.mkdir()
 
-    def raise_oserror(_path):
+    def raise_oserror(_path: Any) -> None:
         raise OSError("boom")
 
     monkeypatch.setattr("blueprints.history.os.listdir", raise_oserror)
@@ -64,7 +75,7 @@ def test_resolve_history_entry_path_returns_none_when_listdir_fails(
     assert _resolve_history_entry_path(str(history_dir), "display.png") is None
 
 
-def test_remove_history_entry_by_name_deletes_file(tmp_path):
+def test_remove_history_entry_by_name_deletes_file(tmp_path: Path) -> None:
     from blueprints.history import _remove_history_entry_by_name
 
     history_dir = tmp_path / "history"

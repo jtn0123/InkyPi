@@ -1,11 +1,15 @@
 import importlib
 import sys
+from typing import Any
 from unittest.mock import MagicMock
 
+import pytest
 from flask import Flask
 
 
-def _reload_inkypi(monkeypatch, argv=None, env=None):
+def _reload_inkypi(
+    monkeypatch: pytest.MonkeyPatch, argv: Any = None, env: Any = None
+) -> Any:
     if argv is None:
         argv = ["inkypi.py"]
     if env is None:
@@ -37,7 +41,9 @@ def _reload_inkypi(monkeypatch, argv=None, env=None):
     return mod
 
 
-def test_create_app_before_request_starts_refresh(monkeypatch):
+def test_create_app_before_request_starts_refresh(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     # Simulate dev mode but set WERKZEUG_RUN_MAIN so before_request will attempt to start
     mod = _reload_inkypi(monkeypatch, argv=["inkypi.py", "--dev"], env={})
     app = getattr(mod, "app", None)
@@ -60,7 +66,9 @@ def test_create_app_before_request_starts_refresh(monkeypatch):
     assert rt.running is True
 
 
-def test_create_app_before_request_web_only_skip(monkeypatch):
+def test_create_app_before_request_web_only_skip(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Test that before_request skips refresh task start when WEB_ONLY is True."""
     mod = _reload_inkypi(monkeypatch, argv=["inkypi.py", "--dev", "--web-only"], env={})
     app = getattr(mod, "app", None)
@@ -81,7 +89,9 @@ def test_create_app_before_request_web_only_skip(monkeypatch):
     assert rt.running is False
 
 
-def test_fast_dev_mode_config_exception_handling(monkeypatch):
+def test_fast_dev_mode_config_exception_handling(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Test that fast dev mode handles config update exceptions gracefully."""
     with monkeypatch.context() as m:
         m.setattr("sys.argv", ["inkypi.py", "--dev", "--fast-dev"])
@@ -109,7 +119,7 @@ def test_fast_dev_mode_config_exception_handling(monkeypatch):
                 assert app is not None
 
 
-def test_error_handlers_api_error(monkeypatch):
+def test_error_handlers_api_error(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test APIError handler code path is covered."""
     mod = _reload_inkypi(monkeypatch, argv=["inkypi.py"], env={})
     app = getattr(mod, "app", None)
@@ -142,7 +152,7 @@ def test_error_handlers_api_error(monkeypatch):
                 assert error.status == 400
 
 
-def test_error_handlers_coverage(monkeypatch):
+def test_error_handlers_coverage(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test that error handler code paths are covered."""
     mod = _reload_inkypi(monkeypatch, argv=["inkypi.py"], env={})
     app = getattr(mod, "app", None)
@@ -163,7 +173,7 @@ def test_error_handlers_coverage(monkeypatch):
         )
 
 
-def test_security_headers_coverage(monkeypatch):
+def test_security_headers_coverage(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test that security headers code paths are covered."""
     mod = _reload_inkypi(monkeypatch, argv=["inkypi.py"], env={})
     app = getattr(mod, "app", None)
@@ -176,7 +186,7 @@ def test_security_headers_coverage(monkeypatch):
     assert resp.headers["Referrer-Policy"] == "no-referrer"
 
 
-def test_security_headers_basic(monkeypatch):
+def test_security_headers_basic(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test basic security headers are set."""
     mod = _reload_inkypi(monkeypatch, argv=["inkypi.py"], env={})
     app = getattr(mod, "app", None)
@@ -189,7 +199,7 @@ def test_security_headers_basic(monkeypatch):
     assert "Referrer-Policy" in resp.headers
 
 
-def test_security_headers_hsts_conditions(monkeypatch):
+def test_security_headers_hsts_conditions(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test HSTS header conditions are covered."""
     mod = _reload_inkypi(monkeypatch, argv=["inkypi.py"], env={})
     app = getattr(mod, "app", None)
@@ -207,7 +217,7 @@ def test_security_headers_hsts_conditions(monkeypatch):
     assert "Strict-Transport-Security" in proxy_resp.headers
 
 
-def test_startup_image_generation_execution(monkeypatch):
+def test_startup_image_generation_execution(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test that startup image generation code path is covered."""
     # This test ensures the startup image generation logic is executed
     # by simulating the conditions that trigger it

@@ -1,5 +1,7 @@
 """Verify the managed API Keys page renders all 6 provider cards."""
 
+from flask.testing import FlaskClient
+
 ALL_INPUT_IDS = [
     "openai-input",
     "openweather-input",
@@ -10,7 +12,7 @@ ALL_INPUT_IDS = [
 ]
 
 
-def test_managed_api_keys_renders_all_six_providers(client):
+def test_managed_api_keys_renders_all_six_providers(client: FlaskClient) -> None:
     resp = client.get("/settings/api-keys")
     assert resp.status_code == 200
     body = resp.data.decode("utf-8")

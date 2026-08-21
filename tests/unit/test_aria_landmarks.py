@@ -12,8 +12,10 @@ Verifies that:
 
 import re
 from pathlib import Path
+from typing import Any
 
 import pytest
+from flask.testing import FlaskClient
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -29,7 +31,7 @@ MAIN_PAGES = [
 ]
 
 
-def _html(client, path: str) -> str:
+def _html(client: FlaskClient, path: str) -> str:
     resp = client.get(path)
     assert resp.status_code == 200, f"Expected 200 for {path}, got {resp.status_code}"
     return resp.get_data(as_text=True)
@@ -40,7 +42,7 @@ def _html(client, path: str) -> str:
 # ---------------------------------------------------------------------------
 
 
-def test_base_template_has_skip_link(client):
+def test_base_template_has_skip_link(client: FlaskClient) -> None:
     """Every page rendered from base.html must have a visible-on-focus skip link."""
     html = _html(client, "/")
     assert 'href="#main-content"' in html, "Skip link href='#main-content' not found"
@@ -48,7 +50,7 @@ def test_base_template_has_skip_link(client):
 
 
 @pytest.mark.parametrize("path", MAIN_PAGES)
-def test_all_pages_have_skip_link(client, path):
+def test_all_pages_have_skip_link(client: FlaskClient, path: Any) -> None:
     """All main pages must include the skip-to-content link."""
     html = _html(client, path)
     assert 'href="#main-content"' in html, f"Skip link missing on {path}"
@@ -60,7 +62,7 @@ def test_all_pages_have_skip_link(client, path):
 
 
 @pytest.mark.parametrize("path", MAIN_PAGES)
-def test_all_pages_have_main_landmark(client, path):
+def test_all_pages_have_main_landmark(client: FlaskClient, path: Any) -> None:
     """All main pages must have <main> (or role='main') with id='main-content'."""
     html = _html(client, path)
     has_main_tag = bool(re.search(r'<main\b[^>]*id=["\']main-content["\']', html))
@@ -74,7 +76,7 @@ def test_all_pages_have_main_landmark(client, path):
 
 
 @pytest.mark.parametrize("path", MAIN_PAGES)
-def test_main_element_has_tabindex_minus_one(client, path):
+def test_main_element_has_tabindex_minus_one(client: FlaskClient, path: Any) -> None:
     """<main id='main-content'> must have tabindex='-1' so skip link can move focus.
 
     Without tabindex='-1', activating the skip link scrolls the viewport but does
@@ -108,7 +110,9 @@ BANNER_PAGES = [p for p in MAIN_PAGES if not p.startswith("/plugin")]
 
 
 @pytest.mark.parametrize("path", BANNER_PAGES)
-def test_shared_layout_pages_have_banner_landmark(client, path):
+def test_shared_layout_pages_have_banner_landmark(
+    client: FlaskClient, path: Any
+) -> None:
     """Shared-layout pages (non-plugin) must have <header role='banner'>."""
     html = _html(client, path)
     has_banner = bool(re.search(r'role=["\']banner["\']', html))
@@ -120,7 +124,7 @@ def test_shared_layout_pages_have_banner_landmark(client, path):
 # ---------------------------------------------------------------------------
 
 
-def test_dashboard_has_navigation_landmark(client):
+def test_dashboard_has_navigation_landmark(client: FlaskClient) -> None:
     """Dashboard (home) page must expose role='navigation' for the site nav."""
     html = _html(client, "/")
     has_nav_tag = "<nav " in html or "<nav>" in html
@@ -135,7 +139,7 @@ def test_dashboard_has_navigation_landmark(client):
 # ---------------------------------------------------------------------------
 
 
-def test_skip_link_css_offscreen():
+def test_skip_link_css_offscreen() -> None:
     """The .skip-link rule must use a negative top/left or clip to hide off-screen."""
     a11y_css = (
         Path(__file__).parent.parent.parent
@@ -172,7 +176,7 @@ def test_skip_link_css_offscreen():
 # ---------------------------------------------------------------------------
 
 
-def test_logs_panel_toggle_buttons_have_aria_pressed(client):
+def test_logs_panel_toggle_buttons_have_aria_pressed(client: FlaskClient) -> None:
     """Auto-Scroll and Wrap toggle buttons must expose aria-pressed (JTN-472)."""
     html = _html(client, "/settings")
     # logsAutoScrollBtn must have aria-pressed attribute

@@ -2,6 +2,8 @@
 """Tests for utils.security_utils — URL and file-path validation."""
 
 import socket
+from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -16,25 +18,27 @@ from utils.security_utils import (
 # ---------------------------------------------------------------------------
 
 
-def _mock_getaddrinfo_public(host, port, *args, **kwargs):
+def _mock_getaddrinfo_public(host: Any, port: Any, *args: Any, **kwargs: Any) -> Any:
     """Return a fake getaddrinfo result pointing to a public IP."""
     return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("93.184.216.34", 0))]
 
 
-def _mock_getaddrinfo_private(host, port, *args, **kwargs):
+def _mock_getaddrinfo_private(host: Any, port: Any, *args: Any, **kwargs: Any) -> Any:
     """Return a fake getaddrinfo result pointing to a private IP."""
     return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("192.168.1.1", 0))]
 
 
-def _mock_getaddrinfo_loopback(host, port, *args, **kwargs):
+def _mock_getaddrinfo_loopback(host: Any, port: Any, *args: Any, **kwargs: Any) -> Any:
     return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("127.0.0.1", 0))]
 
 
-def _mock_getaddrinfo_link_local(host, port, *args, **kwargs):
+def _mock_getaddrinfo_link_local(
+    host: Any, port: Any, *args: Any, **kwargs: Any
+) -> Any:
     return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("169.254.169.254", 0))]
 
 
-def _mock_getaddrinfo_fail(host, port, *args, **kwargs):
+def _mock_getaddrinfo_fail(host: Any, port: Any, *args: Any, **kwargs: Any) -> None:
     raise socket.gaierror("Name resolution failed")
 
 
@@ -44,22 +48,22 @@ def _mock_getaddrinfo_fail(host, port, *args, **kwargs):
 
 
 class TestValidateUrlAccepted:
-    def test_http_url_passes(self, monkeypatch):
+    def test_http_url_passes(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr(socket, "getaddrinfo", _mock_getaddrinfo_public)
         assert validate_url("http://example.com") == "http://example.com"
 
-    def test_https_url_passes(self, monkeypatch):
+    def test_https_url_passes(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr(socket, "getaddrinfo", _mock_getaddrinfo_public)
         assert validate_url("https://example.com/page") == "https://example.com/page"
 
-    def test_url_with_port_passes(self, monkeypatch):
+    def test_url_with_port_passes(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr(socket, "getaddrinfo", _mock_getaddrinfo_public)
         assert (
             validate_url("http://example.com:8080/path")
             == "http://example.com:8080/path"
         )
 
-    def test_url_with_query_passes(self, monkeypatch):
+    def test_url_with_query_passes(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr(socket, "getaddrinfo", _mock_getaddrinfo_public)
         url = "https://example.com/search?q=test&page=1"
         assert validate_url(url) == url
@@ -71,23 +75,23 @@ class TestValidateUrlAccepted:
 
 
 class TestValidateUrlSchemeRejected:
-    def test_file_scheme_rejected(self):
+    def test_file_scheme_rejected(self) -> None:
         with pytest.raises(ValueError, match="scheme must be http or https"):
             validate_url("file:///etc/passwd")
 
-    def test_javascript_scheme_rejected(self):
+    def test_javascript_scheme_rejected(self) -> None:
         with pytest.raises(ValueError, match="scheme must be http or https"):
             validate_url("javascript:alert(1)")
 
-    def test_data_scheme_rejected(self):
+    def test_data_scheme_rejected(self) -> None:
         with pytest.raises(ValueError, match="scheme must be http or https"):
             validate_url("data:text/html,<h1>hi</h1>")
 
-    def test_ftp_scheme_rejected(self):
+    def test_ftp_scheme_rejected(self) -> None:
         with pytest.raises(ValueError, match="scheme must be http or https"):
             validate_url("ftp://files.example.com/readme.txt")
 
-    def test_empty_string_rejected(self):
+    def test_empty_string_rejected(self) -> None:
         with pytest.raises(ValueError, match="must not be empty"):
             validate_url("")
 
@@ -98,15 +102,15 @@ class TestValidateUrlSchemeRejected:
 
 
 class TestValidateUrlHostname:
-    def test_no_hostname_rejected(self):
+    def test_no_hostname_rejected(self) -> None:
         with pytest.raises(ValueError, match="must include a hostname"):
             validate_url("http://")
 
-    def test_localhost_rejected(self):
+    def test_localhost_rejected(self) -> None:
         with pytest.raises(ValueError, match="must not target localhost"):
             validate_url("http://localhost:8080")
 
-    def test_localhost_case_insensitive(self):
+    def test_localhost_case_insensitive(self) -> None:
         with pytest.raises(ValueError, match="must not target localhost"):
             validate_url("http://LOCALHOST/path")
 
@@ -117,14 +121,14 @@ class TestValidateUrlHostname:
 
 
 class TestValidateUrlIpRejected:
-    def test_loopback_ipv4_rejected(self, monkeypatch):
+    def test_loopback_ipv4_rejected(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr(socket, "getaddrinfo", _mock_getaddrinfo_loopback)
         with pytest.raises(
             ValueError, match="private.*loopback.*link-local.*reserved.*multicast"
         ):
             validate_url("http://127.0.0.1")
 
-    def test_ipv6_loopback_rejected(self, monkeypatch):
+    def test_ipv6_loopback_rejected(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr(
             socket,
             "getaddrinfo",
@@ -135,7 +139,7 @@ class TestValidateUrlIpRejected:
         with pytest.raises(ValueError):
             validate_url("http://[::1]")
 
-    def test_private_10x_rejected(self, monkeypatch):
+    def test_private_10x_rejected(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr(
             socket,
             "getaddrinfo",
@@ -146,7 +150,7 @@ class TestValidateUrlIpRejected:
         with pytest.raises(ValueError):
             validate_url("http://10.0.0.1")
 
-    def test_private_172_16_rejected(self, monkeypatch):
+    def test_private_172_16_rejected(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr(
             socket,
             "getaddrinfo",
@@ -157,12 +161,12 @@ class TestValidateUrlIpRejected:
         with pytest.raises(ValueError):
             validate_url("http://172.16.0.1")
 
-    def test_private_192_168_rejected(self, monkeypatch):
+    def test_private_192_168_rejected(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr(socket, "getaddrinfo", _mock_getaddrinfo_private)
         with pytest.raises(ValueError):
             validate_url("http://192.168.1.1")
 
-    def test_link_local_rejected(self, monkeypatch):
+    def test_link_local_rejected(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr(socket, "getaddrinfo", _mock_getaddrinfo_link_local)
         with pytest.raises(ValueError):
             validate_url("http://169.254.169.254/latest/meta-data/")
@@ -174,26 +178,32 @@ class TestValidateUrlIpRejected:
 
 
 class TestValidateUrlDns:
-    def test_dns_resolving_to_private_rejected(self, monkeypatch):
+    def test_dns_resolving_to_private_rejected(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         monkeypatch.setattr(socket, "getaddrinfo", _mock_getaddrinfo_private)
         with pytest.raises(ValueError):
             validate_url("http://evil.example.com")
 
-    def test_unresolvable_host_rejected(self, monkeypatch):
+    def test_unresolvable_host_rejected(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr(socket, "getaddrinfo", _mock_getaddrinfo_fail)
         with pytest.raises(ValueError, match="Cannot resolve hostname"):
             validate_url("http://nonexistent.invalid")
 
-    def test_overlong_hostname_rejected_before_dns(self, monkeypatch):
-        def fail_getaddrinfo(*args, **kwargs):
+    def test_overlong_hostname_rejected_before_dns(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        def fail_getaddrinfo(*args: Any, **kwargs: Any) -> None:
             pytest.fail("overlong hostnames should be rejected before DNS lookup")
 
         monkeypatch.setattr(socket, "getaddrinfo", fail_getaddrinfo)
         with pytest.raises(ValueError, match="Cannot resolve hostname"):
             validate_url(f"https://{'a' * 64}.example.com/image.jpg")
 
-    def test_idna_resolution_error_is_normalized(self, monkeypatch):
-        def raise_unicode_error(*args, **kwargs):
+    def test_idna_resolution_error_is_normalized(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        def raise_unicode_error(*args: Any, **kwargs: Any) -> None:
             raise UnicodeError("label too long")
 
         monkeypatch.setattr(socket, "getaddrinfo", raise_unicode_error)
@@ -207,7 +217,7 @@ class TestValidateUrlDns:
 
 
 class TestValidateFilePathAccepted:
-    def test_valid_path_within_directory(self, tmp_path):
+    def test_valid_path_within_directory(self, tmp_path: Path) -> None:
         allowed = tmp_path / "uploads"
         allowed.mkdir()
         target = allowed / "image.png"
@@ -215,7 +225,7 @@ class TestValidateFilePathAccepted:
         result = validate_file_path(str(target), str(allowed))
         assert result == str(target.resolve())
 
-    def test_nested_subdirectory(self, tmp_path):
+    def test_nested_subdirectory(self, tmp_path: Path) -> None:
         allowed = tmp_path / "uploads"
         sub = allowed / "sub" / "deep"
         sub.mkdir(parents=True)
@@ -231,20 +241,20 @@ class TestValidateFilePathAccepted:
 
 
 class TestValidateFilePathRejected:
-    def test_traversal_rejected(self, tmp_path):
+    def test_traversal_rejected(self, tmp_path: Path) -> None:
         allowed = tmp_path / "uploads"
         allowed.mkdir()
         malicious = str(allowed / ".." / ".." / "etc" / "passwd")
         with pytest.raises(ValueError, match="outside the allowed directory"):
             validate_file_path(malicious, str(allowed))
 
-    def test_absolute_path_outside_rejected(self, tmp_path):
+    def test_absolute_path_outside_rejected(self, tmp_path: Path) -> None:
         allowed = tmp_path / "uploads"
         allowed.mkdir()
         with pytest.raises(ValueError, match="outside the allowed directory"):
             validate_file_path("/etc/passwd", str(allowed))
 
-    def test_symlink_escaping_rejected(self, tmp_path):
+    def test_symlink_escaping_rejected(self, tmp_path: Path) -> None:
         allowed = tmp_path / "uploads"
         allowed.mkdir()
         outside = tmp_path / "secret.txt"
@@ -264,23 +274,23 @@ class TestURLValidationError:
     """The typed error must stay catchable as RuntimeError *and* return a
     whitelisted response message that breaks CodeQL taint flow."""
 
-    def test_is_runtime_error(self):
+    def test_is_runtime_error(self) -> None:
         err = URLValidationError("Invalid URL: scheme must be http or https")
         assert isinstance(err, RuntimeError)
         assert "Invalid URL" in str(err)
 
-    def test_safe_message_passes_through_whitelisted_reason(self):
+    def test_safe_message_passes_through_whitelisted_reason(self) -> None:
         err = URLValidationError("Invalid URL: URL scheme must be http or https")
         # The reason "URL scheme must be http or https" is one of the hardcoded
         # validator strings, so safe_message must return it verbatim.
         assert err.safe_message() == "Invalid URL: URL scheme must be http or https"
 
-    def test_safe_message_falls_back_for_unknown_reason(self):
+    def test_safe_message_falls_back_for_unknown_reason(self) -> None:
         err = URLValidationError("Invalid URL: something the user typed")
         # Unknown reason -> generic fallback (this is what satisfies CodeQL).
         assert err.safe_message() == "Invalid URL: URL failed validation"
 
-    def test_safe_message_whitelist_covers_all_validator_errors(self):
+    def test_safe_message_whitelist_covers_all_validator_errors(self) -> None:
         """Every ValueError that validate_url raises must map to a whitelisted
         safe_message. If a new validator error is added without updating the
         whitelist, this test will fail."""

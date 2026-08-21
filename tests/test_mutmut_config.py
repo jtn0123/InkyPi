@@ -24,22 +24,22 @@ def _load_mutmut_config() -> dict:
 
 
 class TestMutmutConfig:
-    def test_section_exists(self):
+    def test_section_exists(self) -> None:
         cfg = _load_mutmut_config()
         assert cfg, "[tool.mutmut] section is missing from pyproject.toml"
 
-    def test_paths_to_mutate_present(self):
+    def test_paths_to_mutate_present(self) -> None:
         cfg = _load_mutmut_config()
         assert (
             "paths_to_mutate" in cfg
         ), "paths_to_mutate key missing from [tool.mutmut]"
 
-    def test_paths_to_mutate_not_empty(self):
+    def test_paths_to_mutate_not_empty(self) -> None:
         cfg = _load_mutmut_config()
         paths = cfg.get("paths_to_mutate", "")
         assert paths.strip(), "paths_to_mutate must not be empty"
 
-    def test_expected_files_in_scope(self):
+    def test_expected_files_in_scope(self) -> None:
         cfg = _load_mutmut_config()
         paths = cfg.get("paths_to_mutate", "")
         configured = {p.strip() for p in paths.split(",") if p.strip()}
@@ -49,18 +49,18 @@ class TestMutmutConfig:
                 "do not remove files from mutation scope without a deliberate decision"
             )
 
-    def test_tests_dir_configured(self):
+    def test_tests_dir_configured(self) -> None:
         cfg = _load_mutmut_config()
         assert (
             cfg.get("tests_dir") == "tests/"
         ), "tests_dir should be 'tests/' in [tool.mutmut]"
 
-    def test_runner_configured(self):
+    def test_runner_configured(self) -> None:
         cfg = _load_mutmut_config()
         runner = cfg.get("runner", "")
         assert "pytest" in runner, "runner should invoke pytest"
 
-    def test_scoped_files_exist_on_disk(self):
+    def test_scoped_files_exist_on_disk(self) -> None:
         root = PYPROJECT.parent
         cfg = _load_mutmut_config()
         paths = cfg.get("paths_to_mutate", "")

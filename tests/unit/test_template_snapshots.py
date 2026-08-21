@@ -1,10 +1,13 @@
 # pyright: reportMissingImports=false
 """Template structure snapshot tests."""
 
+from typing import Any
+
 import pytest
+from flask.testing import FlaskClient
 
 
-def test_settings_page_structure(client):
+def test_settings_page_structure(client: FlaskClient) -> None:
     """Settings page contains key form elements."""
     resp = client.get("/settings")
     assert resp.status_code == 200
@@ -17,7 +20,7 @@ def test_settings_page_structure(client):
     assert 'id="main-content"' in html
 
 
-def test_playlist_page_structure(client):
+def test_playlist_page_structure(client: FlaskClient) -> None:
     """Playlist page contains new playlist button and list container."""
     resp = client.get("/playlist")
     assert resp.status_code == 200
@@ -27,7 +30,7 @@ def test_playlist_page_structure(client):
     assert "data-page-shell" in html
 
 
-def test_plugin_page_structure(client):
+def test_plugin_page_structure(client: FlaskClient) -> None:
     """Plugin page contains settings form and update button."""
     resp = client.get("/plugin/clock")
     assert resp.status_code == 200
@@ -37,7 +40,7 @@ def test_plugin_page_structure(client):
     assert "data-page-shell" in html
 
 
-def test_api_keys_page_structure(client):
+def test_api_keys_page_structure(client: FlaskClient) -> None:
     """API keys page contains save button and key management elements."""
     resp = client.get("/api-keys")
     assert resp.status_code == 200
@@ -47,7 +50,7 @@ def test_api_keys_page_structure(client):
     assert "data-page-shell" in html
 
 
-def test_home_page_structure(client):
+def test_home_page_structure(client: FlaskClient) -> None:
     """Home page contains preview image and plugin grid."""
     resp = client.get("/")
     assert resp.status_code == 200
@@ -68,7 +71,9 @@ def test_home_page_structure(client):
         ("/api-keys", "data-page-shell"),
     ],
 )
-def test_all_pages_include_shell(client, path, shell_attr):
+def test_all_pages_include_shell(
+    client: FlaskClient, path: Any, shell_attr: Any
+) -> None:
     """All main pages include the page shell attribute."""
     resp = client.get(path)
     assert resp.status_code == 200
@@ -86,7 +91,7 @@ def test_all_pages_include_shell(client, path, shell_attr):
         "/api-keys",
     ],
 )
-def test_all_pages_include_theme_toggle(client, path):
+def test_all_pages_include_theme_toggle(client: FlaskClient, path: Any) -> None:
     """All main pages include the theme toggle."""
     resp = client.get(path)
     assert resp.status_code == 200
@@ -104,7 +109,9 @@ def test_all_pages_include_theme_toggle(client, path):
         "/api-keys",
     ],
 )
-def test_all_pages_include_sidebar_system_footer(client, monkeypatch, path):
+def test_all_pages_include_sidebar_system_footer(
+    client: FlaskClient, monkeypatch: pytest.MonkeyPatch, path: Any
+) -> None:
     """All main pages keep the bottom-left online/load footer visible."""
     monkeypatch.setattr("os.getloadavg", lambda: (0.0, 0.0, 0.0), raising=False)
 
@@ -118,7 +125,7 @@ def test_all_pages_include_sidebar_system_footer(client, monkeypatch, path):
     assert 'class="sys-load" aria-label="Load average">0.00 avg</span>' in html
 
 
-def test_plugin_page_keeps_progress_timer_contract(client):
+def test_plugin_page_keeps_progress_timer_contract(client: FlaskClient) -> None:
     """Plugin pages keep the elapsed timer and progress log hooks present."""
     resp = client.get("/plugin/clock")
     assert resp.status_code == 200
@@ -140,7 +147,7 @@ def test_plugin_page_keeps_progress_timer_contract(client):
         "/api-keys",
     ],
 )
-def test_all_pages_include_navigation(client, path):
+def test_all_pages_include_navigation(client: FlaskClient, path: Any) -> None:
     """All main pages include navigation elements."""
     resp = client.get(path)
     assert resp.status_code == 200
@@ -154,7 +161,7 @@ def test_all_pages_include_navigation(client, path):
 # ---------------------------------------------------------------------------
 
 
-def test_playlist_refresh_interval_has_aria_label(client):
+def test_playlist_refresh_interval_has_aria_label(client: FlaskClient) -> None:
     """The interval number input in the refresh settings form has an aria-label."""
     resp = client.get("/playlist")
     assert resp.status_code == 200
@@ -165,7 +172,7 @@ def test_playlist_refresh_interval_has_aria_label(client):
     assert 'aria-label="Refresh interval"' in html
 
 
-def test_playlist_refresh_unit_has_aria_label(client):
+def test_playlist_refresh_unit_has_aria_label(client: FlaskClient) -> None:
     """The unit select in the refresh settings form has an aria-label."""
     resp = client.get("/playlist")
     assert resp.status_code == 200
@@ -174,7 +181,7 @@ def test_playlist_refresh_unit_has_aria_label(client):
     assert 'aria-label="Refresh interval unit"' in html
 
 
-def test_playlist_refresh_time_has_aria_label(client):
+def test_playlist_refresh_time_has_aria_label(client: FlaskClient) -> None:
     """The refreshTime time input in the refresh settings form has an aria-label."""
     resp = client.get("/playlist")
     assert resp.status_code == 200
@@ -183,7 +190,7 @@ def test_playlist_refresh_time_has_aria_label(client):
     assert 'aria-label="Daily refresh time"' in html
 
 
-def test_calendar_url_input_has_aria_label(client):
+def test_calendar_url_input_has_aria_label(client: FlaskClient) -> None:
     """The calendarURLs[] input in the calendar plugin page has an aria-label."""
     resp = client.get("/plugin/calendar")
     assert resp.status_code == 200
@@ -197,7 +204,7 @@ def test_calendar_url_input_has_aria_label(client):
 # ---------------------------------------------------------------------------
 
 
-def test_api_keys_existing_row_uses_password_input(client):
+def test_api_keys_existing_row_uses_password_input(client: FlaskClient) -> None:
     """Existing-key rows render as type=password with empty value (JTN-382).
 
     The old implementation used type=text with literal U+25CF bullet characters

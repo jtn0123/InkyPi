@@ -4,6 +4,9 @@ from __future__ import annotations
 
 import io
 import json
+from typing import Any
+
+from flask.testing import FlaskClient
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -11,8 +14,11 @@ import json
 
 
 def _add_plugin_instance(
-    device_config, plugin_id="clock", name="My Clock", settings=None
-):
+    device_config: Any,
+    plugin_id: Any = "clock",
+    name: Any = "My Clock",
+    settings: Any = None,
+) -> Any:
     """Insert a plugin instance into the Default playlist and persist."""
     if settings is None:
         settings = {"time_format": "24h"}
@@ -40,8 +46,8 @@ def _add_plugin_instance(
 
 class TestExportSingleInstance:
     def test_export_existing_instance_returns_attachment(
-        self, client, device_config_dev
-    ):
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
         _add_plugin_instance(device_config_dev, name="Living Room")
 
         resp = client.get("/api/plugins/export?instance=Living+Room")
@@ -56,11 +62,15 @@ class TestExportSingleInstance:
         assert inst["name"] == "Living Room"
         assert "settings" in inst
 
-    def test_export_nonexistent_instance_returns_404(self, client, device_config_dev):
+    def test_export_nonexistent_instance_returns_404(
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
         resp = client.get("/api/plugins/export?instance=DoesNotExist")
         assert resp.status_code == 404
 
-    def test_export_single_instance_settings_match(self, client, device_config_dev):
+    def test_export_single_instance_settings_match(
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
         settings = {"time_format": "12h", "show_seconds": True}
         _add_plugin_instance(device_config_dev, name="Bedroom", settings=settings)
 
@@ -77,7 +87,9 @@ class TestExportSingleInstance:
 
 
 class TestExportAllInstances:
-    def test_export_all_returns_array(self, client, device_config_dev):
+    def test_export_all_returns_array(
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
         _add_plugin_instance(device_config_dev, name="Inst1")
         _add_plugin_instance(device_config_dev, name="Inst2", settings={"x": "y"})
 
@@ -90,16 +102,16 @@ class TestExportAllInstances:
         assert "Inst2" in names
 
     def test_export_all_empty_playlist_returns_empty_array(
-        self, client, device_config_dev
-    ):
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
         resp = client.get("/api/plugins/export")
         assert resp.status_code == 200
         body = json.loads(resp.data)
         assert body["instances"] == []
 
     def test_export_all_content_disposition_has_filename(
-        self, client, device_config_dev
-    ):
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
         resp = client.get("/api/plugins/export")
         assert "attachment" in resp.headers.get("Content-Disposition", "")
 
@@ -110,7 +122,12 @@ class TestExportAllInstances:
 
 
 class TestImportValid:
-    def _payload(self, plugin_id="clock", name="Imported Clock", settings=None):
+    def _payload(
+        self,
+        plugin_id: Any = "clock",
+        name: Any = "Imported Clock",
+        settings: Any = None,
+    ) -> Any:
         return {
             "version": 1,
             "exported_at": "2026-01-01T00:00:00+00:00",
@@ -123,7 +140,9 @@ class TestImportValid:
             ],
         }
 
-    def test_import_valid_json_adds_instance(self, client, device_config_dev):
+    def test_import_valid_json_adds_instance(
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
         resp = client.post(
             "/api/plugins/import",
             json=self._payload(name="Test Import"),
@@ -139,7 +158,9 @@ class TestImportValid:
         found = pm.find_plugin("clock", "Test Import")
         assert found is not None
 
-    def test_import_preserves_settings(self, client, device_config_dev):
+    def test_import_preserves_settings(
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
         settings = {"time_format": "12h", "color": "blue"}
         payload = self._payload(name="Settings Test", settings=settings)
         resp = client.post("/api/plugins/import", json=payload)
@@ -151,7 +172,9 @@ class TestImportValid:
         assert inst.settings.get("time_format") == "12h"
         assert inst.settings.get("color") == "blue"
 
-    def test_import_multiple_instances(self, client, device_config_dev):
+    def test_import_multiple_instances(
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
         payload = {
             "version": 1,
             "exported_at": "2026-01-01T00:00:00+00:00",
@@ -172,7 +195,9 @@ class TestImportValid:
 
 
 class TestImportInvalid:
-    def test_import_empty_body_returns_400(self, client, device_config_dev):
+    def test_import_empty_body_returns_400(
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
         resp = client.post(
             "/api/plugins/import",
             data="not-json",
@@ -180,31 +205,37 @@ class TestImportInvalid:
         )
         assert resp.status_code == 400
 
-    def test_import_missing_version_returns_400(self, client, device_config_dev):
+    def test_import_missing_version_returns_400(
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
         payload = {"instances": [{"plugin_id": "clock", "name": "x", "settings": {}}]}
         resp = client.post("/api/plugins/import", json=payload)
         assert resp.status_code == 400
 
-    def test_import_missing_instances_returns_400(self, client, device_config_dev):
+    def test_import_missing_instances_returns_400(
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
         payload = {"version": 1}
         resp = client.post("/api/plugins/import", json=payload)
         assert resp.status_code == 400
 
-    def test_import_instances_not_array_returns_400(self, client, device_config_dev):
+    def test_import_instances_not_array_returns_400(
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
         payload = {"version": 1, "instances": "not-a-list"}
         resp = client.post("/api/plugins/import", json=payload)
         assert resp.status_code == 400
 
     def test_import_instance_missing_plugin_id_returns_400(
-        self, client, device_config_dev
-    ):
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
         payload = {"version": 1, "instances": [{"name": "x", "settings": {}}]}
         resp = client.post("/api/plugins/import", json=payload)
         assert resp.status_code == 400
 
     def test_import_instance_missing_settings_returns_400(
-        self, client, device_config_dev
-    ):
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
         payload = {"version": 1, "instances": [{"plugin_id": "clock", "name": "x"}]}
         resp = client.post("/api/plugins/import", json=payload)
         assert resp.status_code == 400
@@ -216,7 +247,9 @@ class TestImportInvalid:
 
 
 class TestImportSkipsUnknown:
-    def test_import_unknown_plugin_id_skipped(self, client, device_config_dev):
+    def test_import_unknown_plugin_id_skipped(
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
         payload = {
             "version": 1,
             "exported_at": "2026-01-01T00:00:00+00:00",
@@ -230,7 +263,9 @@ class TestImportSkipsUnknown:
         assert body["imported"] == 0
         assert "nonexistent_plugin_xyz" in body["skipped"]
 
-    def test_import_mixed_known_unknown(self, client, device_config_dev):
+    def test_import_mixed_known_unknown(
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
         payload = {
             "version": 1,
             "exported_at": "2026-01-01T00:00:00+00:00",
@@ -252,7 +287,9 @@ class TestImportSkipsUnknown:
 
 
 class TestImportNameCollision:
-    def test_import_collision_appends_imported(self, client, device_config_dev):
+    def test_import_collision_appends_imported(
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
         # Pre-add an instance with the name we'll try to import
         _add_plugin_instance(device_config_dev, name="Clock One")
 
@@ -274,7 +311,9 @@ class TestImportNameCollision:
         pm = device_config_dev.get_playlist_manager()
         assert pm.find_plugin("clock", "Clock One (imported)") is not None
 
-    def test_import_double_collision_increments_suffix(self, client, device_config_dev):
+    def test_import_double_collision_increments_suffix(
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
         _add_plugin_instance(device_config_dev, name="Widget")
         _add_plugin_instance(device_config_dev, name="Widget (imported)", settings={})
 
@@ -301,8 +340,8 @@ class TestImportNameCollision:
 
 class TestRoundTrip:
     def test_export_then_import_produces_equal_instances(
-        self, client, device_config_dev
-    ):
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
         settings = {"time_format": "24h", "show_date": True}
         _add_plugin_instance(device_config_dev, name="Round Trip", settings=settings)
 
@@ -338,7 +377,9 @@ class TestRoundTrip:
 
 
 class TestImportMultipart:
-    def test_import_via_file_upload(self, client, device_config_dev):
+    def test_import_via_file_upload(
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
         payload = {
             "version": 1,
             "exported_at": "2026-01-01T00:00:00+00:00",
@@ -369,8 +410,8 @@ class TestExportXSSRegression:
     """The 404 response for a missing instance must not echo user input."""
 
     def test_xss_payload_in_instance_name_not_reflected(
-        self, client, device_config_dev
-    ):
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
         payload = "<script>alert('xss')</script>"
         resp = client.get("/api/plugins/export", query_string={"instance": payload})
         assert resp.status_code == 404
@@ -383,8 +424,8 @@ class TestExportXSSRegression:
         assert "Plugin instance not found" in body
 
     def test_html_entities_in_instance_name_not_reflected(
-        self, client, device_config_dev
-    ):
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
         resp = client.get(
             "/api/plugins/export", query_string={"instance": '"><img src=x>'}
         )

@@ -16,6 +16,7 @@ All ``time.sleep`` paths in production code are mocked.
 import os
 import threading
 from datetime import UTC, datetime
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -30,14 +31,14 @@ from refresh_task.actions import PlaylistRefresh
 # ---------------------------------------------------------------------------
 
 
-def _make_task(device_config_dev):
+def _make_task(device_config_dev: Any) -> Any:
     dm = MagicMock()
     dm.display_image.return_value = {"display_ms": 10, "preprocess_ms": 5}
     task = RefreshTask(device_config_dev, dm)
     return task, dm
 
 
-def _empty_refresh_info():
+def _empty_refresh_info() -> Any:
     """A RefreshInfo with no prior image so hash-based caching does not short-circuit."""
     return RefreshInfo(
         refresh_type="Manual Update",
@@ -47,7 +48,9 @@ def _empty_refresh_info():
     )
 
 
-def _make_plugin_instance(plugin_id="chaos_plugin", name="chaos_inst"):
+def _make_plugin_instance(
+    plugin_id: Any = "chaos_plugin", name: Any = "chaos_inst"
+) -> Any:
     return PluginInstance(
         plugin_id=plugin_id,
         name=name,
@@ -56,7 +59,7 @@ def _make_plugin_instance(plugin_id="chaos_plugin", name="chaos_inst"):
     )
 
 
-def _add_plugin_to_pm(device_config_dev, plugin_instance):
+def _add_plugin_to_pm(device_config_dev: Any, plugin_instance: Any) -> Any:
     pm = device_config_dev.get_playlist_manager()
     playlist = pm.get_playlist("Default")
     if playlist is None:
@@ -74,7 +77,7 @@ def _add_plugin_to_pm(device_config_dev, plugin_instance):
 class TestSubprocessHangTimeout:
     """Verify that a hung subprocess is terminated and the circuit breaker fires."""
 
-    def test_timed_out_process_is_terminated(self, device_config_dev):
+    def test_timed_out_process_is_terminated(self, device_config_dev: Any) -> None:
         """Process that never finishes → terminate() + TimeoutError raised."""
         task, _dm = _make_task(device_config_dev)
         task.running = True
@@ -114,8 +117,8 @@ class TestSubprocessHangTimeout:
         fake_proc.terminate.assert_called_once()
 
     def test_timed_out_process_increments_circuit_breaker(
-        self, device_config_dev, monkeypatch
-    ):
+        self, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> Any:
         """Hang → TimeoutError → _update_plugin_health(ok=False) increments counter."""
         monkeypatch.setenv("INKYPI_PLUGIN_ISOLATION", "none")
         monkeypatch.setenv("INKYPI_PLUGIN_RETRY_MAX", "0")
@@ -130,14 +133,14 @@ class TestSubprocessHangTimeout:
         monkeypatch.setattr(device_config_dev, "get_plugin", lambda pid: dummy_cfg)
 
         class HangingPlugin:
-            def generate_image(self, settings, cfg):
-                # Simulate a long-running operation — the timeout (0.01s) will
+            def generate_image(self, settings: Any, cfg: Any):
+                # Simulate a long-running operation — the timeout (0.01s) -> None -> None will
                 # fire before this finishes.
                 import time
 
                 time.sleep(60)
 
-            def get_latest_metadata(self):
+            def get_latest_metadata(self) -> Any:
                 return None
 
         monkeypatch.setattr(
@@ -155,7 +158,9 @@ class TestSubprocessHangTimeout:
         # Circuit breaker must have been incremented
         assert pi.consecutive_failure_count >= 1
 
-    def test_timed_out_subprocess_fallback_pushed(self, device_config_dev, monkeypatch):
+    def test_timed_out_subprocess_fallback_pushed(
+        self, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> Any:
         """Hang → TimeoutError → fallback image pushed to display."""
         monkeypatch.setenv("INKYPI_PLUGIN_ISOLATION", "none")
         monkeypatch.setenv("INKYPI_PLUGIN_RETRY_MAX", "0")
@@ -170,12 +175,12 @@ class TestSubprocessHangTimeout:
         monkeypatch.setattr(device_config_dev, "get_plugin", lambda pid: dummy_cfg)
 
         class HangingPlugin:
-            def generate_image(self, settings, cfg):
+            def generate_image(self, settings: Any, cfg: Any) -> None:
                 import time
 
                 time.sleep(60)
 
-            def get_latest_metadata(self):
+            def get_latest_metadata(self) -> Any:
                 return None
 
         monkeypatch.setattr(
@@ -190,7 +195,7 @@ class TestSubprocessHangTimeout:
         fallback_calls = []
         original_push = task._push_fallback_image
 
-        def _tracking_push(*args, **kwargs):
+        def _tracking_push(*args: Any, **kwargs: Any) -> Any:
             fallback_calls.append(True)
             return original_push(*args, **kwargs)
 
@@ -210,7 +215,9 @@ class TestSubprocessHangTimeout:
 class TestOutputQueueOverflow:
     """Verify backpressure when the manual update queue is at capacity."""
 
-    def test_queue_at_capacity_raises_runtime_error(self, device_config_dev):
+    def test_queue_at_capacity_raises_runtime_error(
+        self, device_config_dev: Any
+    ) -> None:
         """Filling the deque to maxlen → manual_update raises RuntimeError."""
         task, _dm = _make_task(device_config_dev)
         task.running = True
@@ -229,12 +236,12 @@ class TestOutputQueueOverflow:
         with pytest.raises(RuntimeError, match="queue is full"):
             task.manual_update(action)
 
-    def test_queue_capacity_is_fifty(self, device_config_dev):
+    def test_queue_capacity_is_fifty(self, device_config_dev: Any) -> None:
         """Confirm the documented capacity of 50 manual update slots."""
         task, _ = _make_task(device_config_dev)
         assert task.manual_update_requests.maxlen == 50
 
-    def test_queue_drain_allows_new_requests(self, device_config_dev):
+    def test_queue_drain_allows_new_requests(self, device_config_dev: Any) -> None:
         """After draining the queue a new request can be enqueued."""
         task, _dm = _make_task(device_config_dev)
         task.running = True
@@ -259,8 +266,8 @@ class TestDisplayManagerFailure:
     """DisplayManager.display_image raises → no crashed state, next cycle works."""
 
     def test_display_failure_raises_from_push_to_display(
-        self, device_config_dev, monkeypatch
-    ):
+        self, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> Any:
         """_push_to_display propagates display errors so the caller can record them."""
         monkeypatch.setenv("INKYPI_PLUGIN_ISOLATION", "none")
         monkeypatch.setenv("INKYPI_PLUGIN_RETRY_MAX", "0")
@@ -276,10 +283,10 @@ class TestDisplayManagerFailure:
         monkeypatch.setattr(device_config_dev, "get_plugin", lambda pid: dummy_cfg)
 
         class GoodPlugin:
-            def generate_image(self, settings, cfg):
+            def generate_image(self, settings: Any, cfg: Any) -> Any:
                 return Image.new("RGB", cfg.get_resolution(), "blue")
 
-            def get_latest_metadata(self):
+            def get_latest_metadata(self) -> Any:
                 return None
 
         monkeypatch.setattr(
@@ -296,8 +303,8 @@ class TestDisplayManagerFailure:
             task._perform_refresh(refresh_action, _empty_refresh_info(), current_dt)
 
     def test_display_failure_circuit_breaker_incremented(
-        self, device_config_dev, monkeypatch
-    ):
+        self, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> Any:
         """display() failure increments the circuit breaker for that plugin."""
         monkeypatch.setenv("INKYPI_PLUGIN_ISOLATION", "none")
         monkeypatch.setenv("INKYPI_PLUGIN_RETRY_MAX", "0")
@@ -313,10 +320,10 @@ class TestDisplayManagerFailure:
         monkeypatch.setattr(device_config_dev, "get_plugin", lambda pid: dummy_cfg)
 
         class GoodPlugin:
-            def generate_image(self, settings, cfg):
+            def generate_image(self, settings: Any, cfg: Any) -> Any:
                 return Image.new("RGB", cfg.get_resolution(), "green")
 
-            def get_latest_metadata(self):
+            def get_latest_metadata(self) -> Any:
                 return None
 
         monkeypatch.setattr(
@@ -335,8 +342,8 @@ class TestDisplayManagerFailure:
         assert pi.consecutive_failure_count >= 1
 
     def test_task_survives_display_failure_in_run_loop(
-        self, device_config_dev, monkeypatch
-    ):
+        self, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> Any:
         """_run() catches exceptions and continues; task stays runnable after error."""
         monkeypatch.setenv("INKYPI_PLUGIN_ISOLATION", "none")
         monkeypatch.setenv("INKYPI_PLUGIN_RETRY_MAX", "0")
@@ -347,7 +354,7 @@ class TestDisplayManagerFailure:
         # First call raises; subsequent calls succeed so the task can be verified
         call_count = {"n": 0}
 
-        def _display_side_effect(*args, **kwargs):
+        def _display_side_effect(*args: Any, **kwargs: Any) -> Any:
             call_count["n"] += 1
             if call_count["n"] == 1:
                 raise RuntimeError("Transient display fault")
@@ -362,10 +369,10 @@ class TestDisplayManagerFailure:
         monkeypatch.setattr(device_config_dev, "get_plugin", lambda pid: dummy_cfg)
 
         class GoodPlugin:
-            def generate_image(self, settings, cfg):
+            def generate_image(self, settings: Any, cfg: Any) -> Any:
                 return Image.new("RGB", cfg.get_resolution(), "yellow")
 
-            def get_latest_metadata(self):
+            def get_latest_metadata(self) -> Any:
                 return None
 
         monkeypatch.setattr(
@@ -406,8 +413,8 @@ class TestConfigReloadMidRefresh:
     """Simulate Config.load() being called concurrently during a refresh."""
 
     def test_config_reload_during_refresh_does_not_crash(
-        self, device_config_dev, monkeypatch
-    ):
+        self, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> Any:
         """Calling device_config.reload() mid-refresh does not crash the task."""
         monkeypatch.setenv("INKYPI_PLUGIN_ISOLATION", "none")
         monkeypatch.setenv("INKYPI_PLUGIN_RETRY_MAX", "0")
@@ -423,13 +430,13 @@ class TestConfigReloadMidRefresh:
         reload_triggered = threading.Event()
 
         class ReloadingPlugin:
-            def generate_image(self, settings, cfg):
+            def generate_image(self, settings: Any, cfg: Any) -> Any:
                 # Trigger a config re-read mid-render
                 cfg.get_config("plugin_cycle_interval_seconds", default=60)
                 reload_triggered.set()
                 return Image.new("RGB", cfg.get_resolution(), "purple")
 
-            def get_latest_metadata(self):
+            def get_latest_metadata(self) -> Any:
                 return None
 
         monkeypatch.setattr(
@@ -450,8 +457,8 @@ class TestConfigReloadMidRefresh:
         assert result_info is not None
 
     def test_config_write_during_refresh_does_not_corrupt(
-        self, device_config_dev, monkeypatch
-    ):
+        self, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> Any:
         """write_config() called concurrently with _perform_refresh does not raise."""
         monkeypatch.setenv("INKYPI_PLUGIN_ISOLATION", "none")
         monkeypatch.setenv("INKYPI_PLUGIN_RETRY_MAX", "0")
@@ -467,8 +474,8 @@ class TestConfigReloadMidRefresh:
         write_events = []
 
         class WriteRacingPlugin:
-            def generate_image(self, settings, cfg):
-                # Simulate concurrent write (e.g. another route saving settings)
+            def generate_image(self, settings: Any, cfg: Any):
+                # Simulate concurrent write (e.g. another route saving settings) -> Any -> Any
                 try:
                     cfg.write_config()
                     write_events.append("write_ok")
@@ -476,7 +483,7 @@ class TestConfigReloadMidRefresh:
                     write_events.append(f"write_error:{exc}")
                 return Image.new("RGB", cfg.get_resolution(), "orange")
 
-            def get_latest_metadata(self):
+            def get_latest_metadata(self) -> Any:
                 return None
 
         monkeypatch.setattr(

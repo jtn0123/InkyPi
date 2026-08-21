@@ -4,8 +4,10 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 
 import pytest
+from playwright.sync_api import Page
 
 REQUIRE_BROWSER_SMOKE = os.getenv("REQUIRE_BROWSER_SMOKE", "").lower() in ("1", "true")
 pytestmark = pytest.mark.skipif(
@@ -28,7 +30,7 @@ def _leaflet_stub_js() -> str:
     """
 
 
-def _stub_leaflet(page):
+def _stub_leaflet(page: Page) -> None:
     page.route(
         "**/static/vendor/leaflet/leaflet.css",
         lambda route: route.fulfill(status=200, content_type="text/css", body=""),
@@ -41,7 +43,7 @@ def _stub_leaflet(page):
     )
 
 
-def test_settings_save_submit(live_server, tmp_path):
+def test_settings_save_submit(live_server: str, tmp_path: Path) -> None:
     from playwright.sync_api import sync_playwright
 
     with sync_playwright() as p:
@@ -101,7 +103,7 @@ def test_settings_save_submit(live_server, tmp_path):
             browser.close()
 
 
-def test_settings_save_shows_response(live_server, tmp_path):
+def test_settings_save_shows_response(live_server: str, tmp_path: Path) -> None:
     from playwright.sync_api import sync_playwright
 
     with sync_playwright() as p:
@@ -131,7 +133,7 @@ def test_settings_save_shows_response(live_server, tmp_path):
             browser.close()
 
 
-def test_playlist_page_has_create_button(live_server, tmp_path):
+def test_playlist_page_has_create_button(live_server: str, tmp_path: Path) -> None:
     from playwright.sync_api import sync_playwright
 
     with sync_playwright() as p:
@@ -152,7 +154,7 @@ def test_playlist_page_has_create_button(live_server, tmp_path):
             browser.close()
 
 
-def test_plugin_config_form_exists(live_server, tmp_path):
+def test_plugin_config_form_exists(live_server: str, tmp_path: Path) -> None:
     from playwright.sync_api import sync_playwright
 
     with sync_playwright() as p:
@@ -176,7 +178,7 @@ def test_plugin_config_form_exists(live_server, tmp_path):
             browser.close()
 
 
-def test_api_keys_page_has_save_button(live_server, tmp_path):
+def test_api_keys_page_has_save_button(live_server: str, tmp_path: Path) -> None:
     from playwright.sync_api import sync_playwright
 
     with sync_playwright() as p:

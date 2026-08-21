@@ -6,6 +6,8 @@ innerHTML slip would otherwise expose stored XSS.  (JTN-657)
 
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 from flask import Flask
 
@@ -13,14 +15,14 @@ from src.utils.http_utils import json_error
 
 
 @pytest.fixture
-def app():
+def app() -> Any:
     return Flask(__name__)
 
 
 class TestJsonErrorDetailsEscape:
     """Verify that string values in the details dict are HTML-escaped."""
 
-    def test_script_tag_escaped_in_details_string(self, app):
+    def test_script_tag_escaped_in_details_string(self, app: Flask) -> None:
         """A bare <script> payload in a details value must have < and > escaped."""
         payload = "<script>alert(1)</script>"
         with app.app_context():
@@ -37,7 +39,7 @@ class TestJsonErrorDetailsEscape:
         assert "&lt;" in field_value
         assert "&gt;" in field_value
 
-    def test_nested_details_string_escaped(self, app):
+    def test_nested_details_string_escaped(self, app: Flask) -> None:
         """String leaves inside nested dicts are escaped."""
         with app.app_context():
             response, _ = json_error(
@@ -48,7 +50,7 @@ class TestJsonErrorDetailsEscape:
         assert "<b>" not in data["details"]["outer"]["inner"]
         assert "&lt;b&gt;" in data["details"]["outer"]["inner"]
 
-    def test_list_details_strings_escaped(self, app):
+    def test_list_details_strings_escaped(self, app: Flask) -> None:
         """Strings inside a list value are escaped."""
         with app.app_context():
             response, _ = json_error(
@@ -60,7 +62,7 @@ class TestJsonErrorDetailsEscape:
         assert "&lt;bad&gt;" in data["details"]["errors"][0]
         assert data["details"]["errors"][1] == "ok"
 
-    def test_non_string_values_unchanged(self, app):
+    def test_non_string_values_unchanged(self, app: Flask) -> None:
         """Non-string scalars (int, bool, None) pass through without modification."""
         with app.app_context():
             response, _ = json_error(
@@ -72,7 +74,7 @@ class TestJsonErrorDetailsEscape:
         assert data["details"]["flag"] is True
         assert data["details"]["missing"] is None
 
-    def test_ampersand_escaped(self, app):
+    def test_ampersand_escaped(self, app: Flask) -> None:
         """Ampersands are HTML-escaped as well."""
         with app.app_context():
             response, _ = json_error(
@@ -83,7 +85,7 @@ class TestJsonErrorDetailsEscape:
         assert "&" not in data["details"]["msg"].replace("&amp;", "")
         assert "&amp;" in data["details"]["msg"]
 
-    def test_none_details_omitted(self, app):
+    def test_none_details_omitted(self, app: Flask) -> None:
         """When details is None the key is absent from the response."""
         with app.app_context():
             response, _ = json_error("err", details=None)

@@ -1,5 +1,7 @@
 # pyright: reportMissingImports=false
 import threading
+from collections.abc import Iterator
+from typing import Any
 
 import pytest
 import requests
@@ -9,32 +11,32 @@ from utils.http_client import close_http_session, get_http_session, reset_for_te
 
 
 @pytest.fixture(autouse=True)
-def reset_http_session():
+def reset_http_session() -> Iterator[Any]:
     """Ensure the module-level singleton is None before each test."""
     http_client_mod._HTTP_SESSION = None
     yield
     http_client_mod._HTTP_SESSION = None
 
 
-def test_get_http_session_returns_session():
+def test_get_http_session_returns_session() -> None:
     session = get_http_session()
     assert isinstance(session, requests.Session)
 
 
-def test_get_http_session_singleton():
+def test_get_http_session_singleton() -> None:
     session1 = get_http_session()
     session2 = get_http_session()
     assert session1 is session2
 
 
-def test_session_has_user_agent():
+def test_session_has_user_agent() -> None:
     import utils.http_utils as http_utils
 
     session = get_http_session()
     assert session.headers.get("User-Agent") == http_utils.DEFAULT_HEADERS["User-Agent"]
 
 
-def test_session_has_retry_strategy():
+def test_session_has_retry_strategy() -> None:
     session = get_http_session()
     # Both http:// and https:// should be mounted with our custom adapter
     http_adapter = session.get_adapter("http://example.com")
@@ -50,7 +52,7 @@ def test_session_has_retry_strategy():
     )
 
 
-def test_close_http_session():
+def test_close_http_session() -> None:
     session1 = get_http_session()
     assert http_client_mod._HTTP_SESSION is not None
 
@@ -63,10 +65,10 @@ def test_close_http_session():
     assert session2 is not session1
 
 
-def test_thread_safety():
+def test_thread_safety() -> None:
     results = []
 
-    def fetch():
+    def fetch() -> None:
         results.append(get_http_session())
 
     t1 = threading.Thread(target=fetch)
@@ -83,14 +85,14 @@ def test_thread_safety():
 # ---- Additional edge-case tests ----
 
 
-def test_close_when_none():
+def test_close_when_none() -> None:
     """Close with no session initialized → no crash."""
     assert http_client_mod._HTTP_SESSION is None
     close_http_session()  # should not raise
     assert http_client_mod._HTTP_SESSION is None
 
 
-def test_close_idempotent():
+def test_close_idempotent() -> None:
     """Close twice → second is no-op, no crash."""
     get_http_session()
     close_http_session()
@@ -99,11 +101,11 @@ def test_close_idempotent():
     assert http_client_mod._HTTP_SESSION is None
 
 
-def test_concurrent_init_same_instance():
+def test_concurrent_init_same_instance() -> None:
     """10 threads calling get_http_session all get the same object."""
     results = []
 
-    def fetch():
+    def fetch() -> None:
         results.append(get_http_session())
 
     threads = [threading.Thread(target=fetch) for _ in range(10)]
@@ -116,7 +118,7 @@ def test_concurrent_init_same_instance():
     assert all(r is results[0] for r in results)
 
 
-def test_retry_adapter_pool_config():
+def test_retry_adapter_pool_config() -> None:
     """Adapter has pool_connections=10 and pool_maxsize=10."""
     session = get_http_session()
     adapter = session.get_adapter("https://example.com")
@@ -124,7 +126,7 @@ def test_retry_adapter_pool_config():
     assert adapter._pool_maxsize == 10
 
 
-def test_retry_allowed_methods():
+def test_retry_allowed_methods() -> None:
     """Only GET, HEAD, OPTIONS are retried (not POST)."""
     session = get_http_session()
     adapter = session.get_adapter("https://example.com")
@@ -135,7 +137,7 @@ def test_retry_allowed_methods():
     assert "POST" not in allowed
 
 
-def test_atexit_registered():
+def test_atexit_registered() -> None:
     """atexit.register is called with close_http_session during init."""
     import atexit
     from unittest.mock import patch as _patch
@@ -148,7 +150,7 @@ def test_atexit_registered():
         mock_register.assert_called_with(close_http_session)
 
 
-def test_reset_for_tests_closes_and_clears():
+def test_reset_for_tests_closes_and_clears() -> None:
     """reset_for_tests() closes any open session and resets singleton to None."""
     session = get_http_session()
     assert http_client_mod._HTTP_SESSION is not None
@@ -159,7 +161,7 @@ def test_reset_for_tests_closes_and_clears():
     assert new_session is not session
 
 
-def test_reset_for_tests_when_none():
+def test_reset_for_tests_when_none() -> None:
     """reset_for_tests() is safe to call when no session exists."""
     assert http_client_mod._HTTP_SESSION is None
     reset_for_tests()  # must not raise

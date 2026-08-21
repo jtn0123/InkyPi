@@ -1,11 +1,16 @@
 # Checked-in mypy tests/ advisory baseline for scripts/lint.sh.
 # Lower this number when tests/ typing debt is intentionally reduced.
 #
-# 7450 -> 7506: this PR adds 22 test files covering the refresh
-# error-accounting fix, watchdog gating, update verification and auto-rollback,
-# crash forensics, and the simulation tier. Every new function is annotated —
-# the residual is almost entirely `untyped-decorator` from
-# @pytest.mark.parametrize, which mypy reports for every parametrized test in
-# the suite and which the existing baseline already absorbs. Silencing those
-# individually would add a `# type: ignore` the codebase uses nowhere else.
-7506
+# 7506 -> 787 (2026-08-21): mechanically annotated the whole suite —
+# 6326 parameters and 5752 return types across 411 files. Fixture parameters
+# got their real types (FlaskClient, pytest.MonkeyPatch, Path, Flask, Page,
+# Iterator[...]) rather than a blanket Any; only genuinely unknowable
+# parameters are Any. Verified: all 5359 tests still collect, and the suite
+# result is unchanged.
+#
+# The residual 787 is dominated by ~380 `untyped-decorator` reports, which are
+# an artefact of `follow_imports = skip` in mypy.ini: pytest's own decorators
+# resolve to Any, so every @pytest.mark.parametrize reads as untyped. Fixing
+# that means changing follow_imports, which is a separate piece of work — see
+# item I2 in .claude/grade-report.md. The rest is type-arg/var-annotated nits.
+787

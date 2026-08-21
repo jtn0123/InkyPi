@@ -7,7 +7,7 @@ from PIL import Image
 
 
 class FakeMonoEPD:
-    def __init__(self):
+    def __init__(self) -> None:
         self.width = 800
         self.height = 480
         self.inited = False
@@ -15,24 +15,24 @@ class FakeMonoEPD:
         self.displayed = []
         self.slept = False
 
-    def Init(self):
+    def Init(self) -> None:
         self.inited = True
 
-    def getbuffer(self, img):
+    def getbuffer(self, img: Any) -> Any:
         return ("buf", img.size)
 
-    def display(self, buf, *args):
+    def display(self, buf: Any, *args: Any) -> None:
         self.displayed.append((buf, args))
 
-    def Clear(self):
+    def Clear(self) -> None:
         self.cleared = True
 
-    def sleep(self):
+    def sleep(self) -> None:
         self.slept = True
 
 
 class FakeBiColorEPD:
-    def __init__(self):
+    def __init__(self) -> None:
         self.width = 800
         self.height = 480
         self.inited = False
@@ -40,24 +40,26 @@ class FakeBiColorEPD:
         self.displayed = []
         self.slept = False
 
-    def Init(self):
+    def Init(self) -> None:
         self.inited = True
 
-    def getbuffer(self, img):
+    def getbuffer(self, img: Any) -> Any:
         return ("buf", img.size)
 
-    def display(self, buf1, buf2):
-        # tests expect (buf1, buf2) where both are tuples from getbuffer
+    def display(self, buf1: Any, buf2: Any):
+        # tests expect (buf1, buf2) -> None -> None where both are tuples from getbuffer
         self.displayed.append((buf1, buf2))
 
-    def Clear(self):
+    def Clear(self) -> None:
         self.cleared = True
 
-    def sleep(self):
+    def sleep(self) -> None:
         self.slept = True
 
 
-def install_fake_epd_module(monkeypatch, module_name: str, epd_class):
+def install_fake_epd_module(
+    monkeypatch: pytest.MonkeyPatch, module_name: str, epd_class: Any
+) -> None:
     # Ensure the real display package is imported first
     if "display" not in sys.modules:
         try:
@@ -95,7 +97,9 @@ def install_fake_epd_module(monkeypatch, module_name: str, epd_class):
     sys.modules[f"display.waveshare_epd.{module_name}"] = epd_mod
 
 
-def test_waveshare_initialize_sets_resolution(monkeypatch, device_config_dev):
+def test_waveshare_initialize_sets_resolution(
+    monkeypatch: pytest.MonkeyPatch, device_config_dev: Any
+) -> None:
     device_config_dev.update_value("display_type", "epd7in3e")
     device_config_dev.update_value("resolution", None)
 
@@ -109,7 +113,9 @@ def test_waveshare_initialize_sets_resolution(monkeypatch, device_config_dev):
     assert device_config_dev.get_config("resolution") == [800, 480]
 
 
-def test_waveshare_display_image_mono(monkeypatch, device_config_dev):
+def test_waveshare_display_image_mono(
+    monkeypatch: pytest.MonkeyPatch, device_config_dev: Any
+) -> None:
     device_config_dev.update_value("display_type", "epd7in3e")
     install_fake_epd_module(monkeypatch, "epd7in3e", FakeMonoEPD)
 
@@ -129,7 +135,9 @@ def test_waveshare_display_image_mono(monkeypatch, device_config_dev):
     assert epd.slept is True
 
 
-def test_waveshare_display_image_bicolor(monkeypatch, device_config_dev):
+def test_waveshare_display_image_bicolor(
+    monkeypatch: pytest.MonkeyPatch, device_config_dev: Any
+) -> None:
     device_config_dev.update_value("display_type", "epd7in3e")
     install_fake_epd_module(monkeypatch, "epd7in3e", FakeBiColorEPD)
 
@@ -151,7 +159,9 @@ def test_waveshare_display_image_bicolor(monkeypatch, device_config_dev):
     assert epd.slept is True
 
 
-def test_waveshare_init_unsupported_module(monkeypatch, device_config_dev):
+def test_waveshare_init_unsupported_module(
+    monkeypatch: pytest.MonkeyPatch, device_config_dev: Any
+) -> None:
     # Do not install fake module; expect ValueError
     device_config_dev.update_value("display_type", "epdXunknown")
     from display.waveshare_display import WaveshareDisplay
@@ -160,7 +170,7 @@ def test_waveshare_init_unsupported_module(monkeypatch, device_config_dev):
         WaveshareDisplay(device_config_dev)
 
 
-def test_waveshare_init_rejects_unsafe_display_type(device_config_dev):
+def test_waveshare_init_rejects_unsafe_display_type(device_config_dev: Any) -> None:
     device_config_dev.update_value("display_type", "../epd7in3e")
     from display.waveshare_display import WaveshareDisplay
 
@@ -168,7 +178,7 @@ def test_waveshare_init_rejects_unsafe_display_type(device_config_dev):
         WaveshareDisplay(device_config_dev)
 
 
-def test_waveshare_init_missing_display_type(device_config_dev):
+def test_waveshare_init_missing_display_type(device_config_dev: Any) -> None:
     """Test that WaveshareDisplay raises ValueError when display_type is missing."""
     device_config_dev.update_value("display_type", None)
     from display.waveshare_display import WaveshareDisplay
@@ -180,7 +190,9 @@ def test_waveshare_init_missing_display_type(device_config_dev):
         WaveshareDisplay(device_config_dev)
 
 
-def test_waveshare_display_image_none_raises(monkeypatch, device_config_dev):
+def test_waveshare_display_image_none_raises(
+    monkeypatch: pytest.MonkeyPatch, device_config_dev: Any
+) -> None:
     """Test that display_image raises ValueError on None (not truthy check on PIL Image)."""
     device_config_dev.update_value("display_type", "epd7in3e")
     install_fake_epd_module(monkeypatch, "epd7in3e", FakeMonoEPD)
@@ -194,8 +206,8 @@ def test_waveshare_display_image_none_raises(monkeypatch, device_config_dev):
 
 
 def test_waveshare_display_image_valid_pil_image_not_rejected(
-    monkeypatch, device_config_dev
-):
+    monkeypatch: pytest.MonkeyPatch, device_config_dev: Any
+) -> None:
     """Test that a valid PIL Image is not incorrectly rejected by the None check.
 
     Pillow 10.x raises a TypeError if you use `if not image:` on a PIL Image object.
@@ -234,10 +246,12 @@ class FakeGrayscaleModeEPD:
     def init(self, mode: Any) -> None:
         self.init_modes.append(mode)
 
-    def getbuffer(self, img: Any):
+    def getbuffer(self, img: Any) -> Any:
         return ("buf", img.size)
 
-    def getbuffer_4Gray(self, img: Any):  # noqa: N802 — mirrors the vendor driver
+    def getbuffer_4Gray(
+        self, img: Any
+    ) -> Any:  # noqa: N802 — mirrors the vendor driver
         return ("buf4", img.size)
 
     def display_1Gray(self, buf: Any) -> None:  # noqa: N802 — mirrors the vendor driver
@@ -266,7 +280,7 @@ class FakeClearWithColorEPD(FakeMonoEPD):
 
 
 def test_grayscale_mode_driver_initializes_without_typeerror(
-    monkeypatch, device_config_dev
+    monkeypatch: pytest.MonkeyPatch, device_config_dev: Any
 ) -> None:
     """epd3in7 is in the driver manifest, so it must actually load."""
     device_config_dev.update_value("display_type", "epd3in7")
@@ -285,7 +299,7 @@ def test_grayscale_mode_driver_initializes_without_typeerror(
 
 
 def test_grayscale_mode_driver_renders_via_display_1gray(
-    monkeypatch, device_config_dev
+    monkeypatch: pytest.MonkeyPatch, device_config_dev: Any
 ) -> None:
     device_config_dev.update_value("display_type", "epd3in7")
     install_fake_epd_module(monkeypatch, "epd3in7", FakeGrayscaleModeEPD)
@@ -325,7 +339,7 @@ def test_mode_argument_with_a_default_is_not_treated_as_mode_driven(
 
 
 def test_clear_receives_a_color_when_the_driver_requires_one(
-    monkeypatch, device_config_dev
+    monkeypatch: pytest.MonkeyPatch, device_config_dev: Any
 ) -> None:
     device_config_dev.update_value("display_type", "epd7in3e")
     install_fake_epd_module(monkeypatch, "epd7in3e", FakeClearWithColorEPD)

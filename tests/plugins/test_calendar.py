@@ -1,5 +1,6 @@
 # pyright: reportMissingImports=false
 from datetime import UTC, date, datetime, timedelta
+from typing import Any
 from unittest.mock import patch
 from zoneinfo import ZoneInfo
 
@@ -7,11 +8,11 @@ import pytest
 
 
 def _make_calendar_settings(
-    view="timeGridDay",
-    urls=None,
-    colors=None,
-    extra=None,
-):
+    view: Any = "timeGridDay",
+    urls: Any = None,
+    colors: Any = None,
+    extra: Any = None,
+) -> Any:
     settings = {
         "viewMode": view,
         "calendarURLs[]": urls if urls is not None else ["http://example.com/a.ics"],
@@ -22,7 +23,7 @@ def _make_calendar_settings(
     return settings
 
 
-def test_generate_image_missing_view_raises(device_config_dev):
+def test_generate_image_missing_view_raises(device_config_dev: Any) -> None:
     from plugins.calendar.calendar import Calendar
 
     p = Calendar({"id": "calendar"})
@@ -33,7 +34,7 @@ def test_generate_image_missing_view_raises(device_config_dev):
         )
 
 
-def test_generate_image_invalid_view_raises(device_config_dev):
+def test_generate_image_invalid_view_raises(device_config_dev: Any) -> None:
     from plugins.calendar.calendar import Calendar
 
     p = Calendar({"id": "calendar"})
@@ -41,7 +42,7 @@ def test_generate_image_invalid_view_raises(device_config_dev):
         p.generate_image(_make_calendar_settings(view="invalid"), device_config_dev)
 
 
-def test_generate_image_missing_urls_raises(device_config_dev):
+def test_generate_image_missing_urls_raises(device_config_dev: Any) -> None:
     from plugins.calendar.calendar import Calendar
 
     p = Calendar({"id": "calendar"})
@@ -49,7 +50,7 @@ def test_generate_image_missing_urls_raises(device_config_dev):
         p.generate_image({"viewMode": "timeGridDay"}, device_config_dev)
 
 
-def test_generate_image_blank_url_raises(device_config_dev):
+def test_generate_image_blank_url_raises(device_config_dev: Any) -> None:
     from plugins.calendar.calendar import Calendar
 
     p = Calendar({"id": "calendar"})
@@ -57,7 +58,7 @@ def test_generate_image_blank_url_raises(device_config_dev):
         p.generate_image(_make_calendar_settings(urls=[" "]), device_config_dev)
 
 
-def test_get_view_range_timeGridDay():
+def test_get_view_range_timeGridDay() -> None:
     from plugins.calendar.calendar import Calendar
 
     p = Calendar({"id": "calendar"})
@@ -67,7 +68,7 @@ def test_get_view_range_timeGridDay():
     assert end == start + timedelta(days=1)
 
 
-def test_get_view_range_timeGridWeek_default():
+def test_get_view_range_timeGridWeek_default() -> None:
     from plugins.calendar.calendar import Calendar
 
     p = Calendar({"id": "calendar"})
@@ -77,7 +78,7 @@ def test_get_view_range_timeGridWeek_default():
     assert end == start + timedelta(days=7)
 
 
-def test_get_view_range_timeGridWeek_display_previous_days():
+def test_get_view_range_timeGridWeek_display_previous_days() -> None:
     from plugins.calendar.calendar import Calendar
 
     p = Calendar({"id": "calendar"})
@@ -87,7 +88,7 @@ def test_get_view_range_timeGridWeek_display_previous_days():
     assert end == start + timedelta(days=7)
 
 
-def test_get_view_range_dayGridMonth():
+def test_get_view_range_dayGridMonth() -> None:
     from plugins.calendar.calendar import Calendar
 
     p = Calendar({"id": "calendar"})
@@ -97,7 +98,7 @@ def test_get_view_range_dayGridMonth():
     assert end == datetime(2025, 2, 12, 0, 0)  # 2025-01-01 plus 6 weeks
 
 
-def test_get_view_range_listMonth():
+def test_get_view_range_listMonth() -> None:
     from plugins.calendar.calendar import Calendar
 
     p = Calendar({"id": "calendar"})
@@ -108,20 +109,20 @@ def test_get_view_range_listMonth():
 
 
 class FakeEvent:
-    def __init__(self, mapping):
+    def __init__(self, mapping: Any) -> None:
         self._mapping = dict(mapping)
 
-    def decoded(self, key):
+    def decoded(self, key: Any) -> Any:
         return self._mapping[key]
 
-    def __contains__(self, key):
+    def __contains__(self, key: Any) -> Any:
         return key in self._mapping
 
-    def get(self, key, default=None):
+    def get(self, key: Any, default: Any = None) -> Any:
         return self._mapping.get(key, default)
 
 
-def test_parse_data_points_datetime_with_dtend():
+def test_parse_data_points_datetime_with_dtend() -> None:
     from plugins.calendar.calendar import Calendar
 
     p = Calendar({"id": "calendar"})
@@ -141,7 +142,7 @@ def test_parse_data_points_datetime_with_dtend():
     assert all_day is False
 
 
-def test_parse_data_points_date_all_day_and_duration():
+def test_parse_data_points_date_all_day_and_duration() -> None:
     from plugins.calendar.calendar import Calendar
 
     p = Calendar({"id": "calendar"})
@@ -160,12 +161,12 @@ def test_parse_data_points_date_all_day_and_duration():
     assert all_day is True
 
 
-def test_fetch_calendar_timeout_raises(monkeypatch):
+def test_fetch_calendar_timeout_raises(monkeypatch: pytest.MonkeyPatch) -> None:
     import requests
 
     from plugins.calendar.calendar import Calendar
 
-    def raise_timeout(url, **kwargs):
+    def raise_timeout(url: Any, **kwargs: Any) -> None:
         raise requests.exceptions.Timeout("timeout")
 
     mock_session = type("S", (), {"get": staticmethod(raise_timeout)})()
@@ -178,13 +179,13 @@ def test_fetch_calendar_timeout_raises(monkeypatch):
         p.fetch_calendar("http://example.com/a.ics")
 
 
-def test_fetch_calendar_http_error_raises(monkeypatch):
+def test_fetch_calendar_http_error_raises(monkeypatch: pytest.MonkeyPatch) -> None:
     import requests
 
     from plugins.calendar.calendar import Calendar
 
     class Resp:
-        def raise_for_status(self):
+        def raise_for_status(self) -> None:
             raise requests.HTTPError("bad status")
 
     mock_session = type("S", (), {"get": staticmethod(lambda url, **kwargs: Resp())})()
@@ -197,13 +198,13 @@ def test_fetch_calendar_http_error_raises(monkeypatch):
         p.fetch_calendar("http://example.com/a.ics")
 
 
-def test_fetch_calendar_bad_ical_raises(monkeypatch):
+def test_fetch_calendar_bad_ical_raises(monkeypatch: pytest.MonkeyPatch) -> Any:
     from plugins.calendar.calendar import Calendar
 
     class Resp:
         text = "not an ical"
 
-        def raise_for_status(self):
+        def raise_for_status(self) -> Any:
             return None
 
     # Return a 200 OK but break ical parsing
@@ -214,7 +215,7 @@ def test_fetch_calendar_bad_ical_raises(monkeypatch):
 
     class FakeCal:
         @staticmethod
-        def from_ical(_text):
+        def from_ical(_text: Any) -> None:
             raise ValueError("parse error")
 
     import plugins.calendar.calendar as cal_mod
@@ -231,7 +232,7 @@ def test_fetch_calendar_bad_ical_raises(monkeypatch):
         p.fetch_calendar("http://example.com/a.ics")
 
 
-def test_get_contrast_color_threshold():
+def test_get_contrast_color_threshold() -> None:
     from plugins.calendar.calendar import Calendar
 
     p = Calendar({"id": "calendar"})
@@ -241,7 +242,9 @@ def test_get_contrast_color_threshold():
     assert p.get_contrast_color("#959595") == "#ffffff"
 
 
-def test_generate_image_vertical_orientation(device_config_dev, monkeypatch):
+def test_generate_image_vertical_orientation(
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Test image generation with vertical orientation."""
     from plugins.calendar.calendar import Calendar
 
@@ -265,7 +268,7 @@ def test_generate_image_vertical_orientation(device_config_dev, monkeypatch):
         assert "orientation" not in str(e)
 
 
-def test_parse_data_points_datetime_without_dtend():
+def test_parse_data_points_datetime_without_dtend() -> None:
     """Test parsing events without dtend (zero-duration events)."""
     from plugins.calendar.calendar import Calendar
 
@@ -283,7 +286,7 @@ def test_parse_data_points_datetime_without_dtend():
     assert all_day is False
 
 
-def test_parse_data_points_datetime_with_duration():
+def test_parse_data_points_datetime_with_duration() -> None:
     """Test parsing events with duration instead of dtend."""
     from plugins.calendar.calendar import Calendar
 
@@ -303,7 +306,7 @@ def test_parse_data_points_datetime_with_duration():
     assert all_day is False
 
 
-def test_parse_data_points_date_all_day():
+def test_parse_data_points_date_all_day() -> None:
     """Test parsing all-day events with date objects."""
     from plugins.calendar.calendar import Calendar
 
@@ -322,7 +325,7 @@ def test_parse_data_points_date_all_day():
     assert all_day is True
 
 
-def test_get_view_range_timeGridWeek_no_previous_days():
+def test_get_view_range_timeGridWeek_no_previous_days() -> None:
     """Test timeGridWeek view without displayPreviousDays setting."""
     from plugins.calendar.calendar import Calendar
 
@@ -334,7 +337,7 @@ def test_get_view_range_timeGridWeek_no_previous_days():
     assert end == start + timedelta(days=7)
 
 
-def test_get_view_range_invalid_view():
+def test_get_view_range_invalid_view() -> None:
     """Test get_view_range with invalid view (should not crash)."""
     from plugins.calendar.calendar import Calendar
 
@@ -348,7 +351,7 @@ def test_get_view_range_invalid_view():
         pass  # Expected to potentially raise
 
 
-def test_fetch_ics_events_empty_calendar():
+def test_fetch_ics_events_empty_calendar() -> None:
     """Test fetching events from empty calendar."""
     from plugins.calendar.calendar import Calendar
 
@@ -356,7 +359,7 @@ def test_fetch_ics_events_empty_calendar():
 
     # Mock empty calendar response
     class MockCal:
-        def __init__(self):
+        def __init__(self) -> None:
             pass
 
     with patch.object(p, "fetch_calendar", return_value=MockCal()):
@@ -372,7 +375,7 @@ def test_fetch_ics_events_empty_calendar():
             assert events == []
 
 
-def test_fetch_ics_events_multiple_calendars():
+def test_fetch_ics_events_multiple_calendars() -> None:
     """Test fetching events from multiple calendar URLs."""
     from plugins.calendar.calendar import Calendar
 
@@ -380,7 +383,7 @@ def test_fetch_ics_events_multiple_calendars():
 
     # Mock calendar responses
     class MockCal:
-        def __init__(self, event_count=1):
+        def __init__(self, event_count: Any = 1) -> None:
             self.event_count = event_count
 
     mock_event = FakeEvent(
@@ -407,7 +410,7 @@ def test_fetch_ics_events_multiple_calendars():
             assert events[1]["backgroundColor"] == "#00FF00"
 
 
-def test_generate_settings_template():
+def test_generate_settings_template() -> None:
     """Test that settings template includes required parameters."""
     from plugins.calendar.calendar import Calendar
 
@@ -419,13 +422,13 @@ def test_generate_settings_template():
     assert "locale_map" in template
 
 
-def test_fetch_calendar_connection_error(monkeypatch):
+def test_fetch_calendar_connection_error(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test fetch_calendar with connection errors."""
     import requests
 
     from plugins.calendar.calendar import Calendar
 
-    def raise_connection_error(url, **kwargs):
+    def raise_connection_error(url: Any, **kwargs: Any) -> None:
         raise requests.exceptions.ConnectionError("connection failed")
 
     mock_session = type("S", (), {"get": staticmethod(raise_connection_error)})()
@@ -438,14 +441,14 @@ def test_fetch_calendar_connection_error(monkeypatch):
         p.fetch_calendar("http://example.com/a.ics")
 
 
-def test_fetch_calendar_decode_error(monkeypatch):
+def test_fetch_calendar_decode_error(monkeypatch: pytest.MonkeyPatch) -> Any:
     """Test fetch_calendar with response decoding errors."""
     from plugins.calendar.calendar import Calendar
 
     class BadResponse:
         text = "invalid utf-8: \xff\xfe"
 
-        def raise_for_status(self):
+        def raise_for_status(self) -> Any:
             return None
 
     mock_session = type(
@@ -460,7 +463,7 @@ def test_fetch_calendar_decode_error(monkeypatch):
         p.fetch_calendar("http://example.com/a.ics")
 
 
-def test_get_contrast_color_edge_cases():
+def test_get_contrast_color_edge_cases() -> None:
     """Test get_contrast_color with edge cases."""
     from plugins.calendar.calendar import Calendar
 
@@ -476,7 +479,7 @@ def test_get_contrast_color_edge_cases():
     assert p.get_contrast_color("#969696") == "#000000"  # yiq = 150
 
 
-def test_get_view_range_returns_tz_aware_datetimes():
+def test_get_view_range_returns_tz_aware_datetimes() -> None:
     """Verify get_view_range preserves timezone info from current_dt (JTN-233)."""
     from plugins.calendar.calendar import Calendar
 
@@ -490,7 +493,7 @@ def test_get_view_range_returns_tz_aware_datetimes():
         assert end.tzinfo is not None, f"{view}: end is naive"
 
 
-def test_get_view_range_tz_aware_timeGridWeek_display_previous_days():
+def test_get_view_range_tz_aware_timeGridWeek_display_previous_days() -> None:
     """Verify displayPreviousDays path also yields tz-aware datetimes (JTN-233)."""
     from plugins.calendar.calendar import Calendar
 

@@ -16,8 +16,11 @@ markup and route contract; this browser journey verifies the full user flow:
 from __future__ import annotations
 
 import os
+from collections.abc import Iterator
+from typing import Any
 
 import pytest
+from playwright.sync_api import Page
 
 pytestmark = [
     pytest.mark.integration,
@@ -36,13 +39,13 @@ from tests.integration.browser_helpers import (  # noqa: E402
 
 
 @pytest.fixture
-def device_action_calls(monkeypatch):
+def device_action_calls(monkeypatch: pytest.MonkeyPatch) -> Any:
     """Capture reboot/shutdown subprocess calls without touching the host."""
     import subprocess
 
     calls: list[list[str]] = []
 
-    def _fake_run(cmd, check=True):
+    def _fake_run(cmd: Any, check: Any = True) -> None:
         calls.append(list(cmd))
 
     monkeypatch.setattr(subprocess, "run", _fake_run)
@@ -50,7 +53,7 @@ def device_action_calls(monkeypatch):
 
 
 @pytest.fixture
-def reset_shutdown_limiter():
+def reset_shutdown_limiter() -> Iterator[Any]:
     """Keep the shared shutdown limiter from leaking into later tests.
 
     Yields a zero-argument callable that resets the limiter so tests can clear
@@ -58,7 +61,7 @@ def reset_shutdown_limiter():
     """
     import blueprints.settings as settings_mod
 
-    def _reset():
+    def _reset() -> None:
         settings_mod._shutdown_limiter.reset()
 
     _reset()
@@ -66,7 +69,7 @@ def reset_shutdown_limiter():
     _reset()
 
 
-def _open_settings_device_panel(page, live_server: str) -> RuntimeCollector:
+def _open_settings_device_panel(page: Page, live_server: str) -> RuntimeCollector:
     stub_leaflet(page)
     collector = RuntimeCollector(page, live_server)
     page.goto(
@@ -91,7 +94,7 @@ def _open_settings_device_panel(page, live_server: str) -> RuntimeCollector:
     return collector
 
 
-def _assert_response_message(page, text: str) -> None:
+def _assert_response_message(page: Page, text: str) -> None:
     page.wait_for_function(
         """(expected) => {
             const messages = window.__journeyMessages || [];
@@ -107,11 +110,11 @@ def _assert_response_message(page, text: str) -> None:
 
 
 def test_device_actions_confirm_cancel_paths(
-    live_server,
-    browser_page,
-    device_action_calls,
-    reset_shutdown_limiter,
-):
+    live_server: str,
+    browser_page: Page,
+    device_action_calls: Any,
+    reset_shutdown_limiter: Any,
+) -> None:
     """Reboot/shutdown only execute on confirm, never on initial click/cancel."""
     page = browser_page
     collector = _open_settings_device_panel(page, live_server)

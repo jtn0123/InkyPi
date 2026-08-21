@@ -1,14 +1,18 @@
 import random
+from pathlib import Path
+from typing import Any
 
+import pytest
+from flask.testing import FlaskClient
 from PIL import Image
 
 
-def _make_img(path: str, size=(64, 48), color=(200, 100, 50)):
+def _make_img(path: str, size: Any = (64, 48), color: Any = (200, 100, 50)) -> None:
     img = Image.new("RGB", size, color)
     img.save(path)
 
 
-def test_list_files_in_folder_filters_hidden_and_non_images(tmp_path):
+def test_list_files_in_folder_filters_hidden_and_non_images(tmp_path: Path) -> None:
     from plugins.image_folder.image_folder import list_files_in_folder
 
     # files
@@ -28,7 +32,9 @@ def test_list_files_in_folder_filters_hidden_and_non_images(tmp_path):
     assert str(p4) not in result
 
 
-def test_generate_image_happy(monkeypatch, device_config_dev, tmp_path):
+def test_generate_image_happy(
+    monkeypatch: pytest.MonkeyPatch, device_config_dev: Any, tmp_path: Path
+) -> None:
     from plugins.image_folder.image_folder import ImageFolder
 
     folder = tmp_path / "imgs"
@@ -50,7 +56,7 @@ def test_generate_image_happy(monkeypatch, device_config_dev, tmp_path):
     assert isinstance(img, Image.Image)
 
 
-def test_generate_image_errors(tmp_path, device_config_dev):
+def test_generate_image_errors(tmp_path: Path, device_config_dev: Any) -> None:
     from plugins.image_folder.image_folder import ImageFolder
 
     plugin = ImageFolder(
@@ -92,7 +98,7 @@ def test_generate_image_errors(tmp_path, device_config_dev):
         assert "No image files found" in str(e)
 
 
-def test_image_folder_initializes_without_name_error():
+def test_image_folder_initializes_without_name_error() -> None:
     """Plugin should be importable and instantiable without NameError."""
     from plugins.image_folder.image_folder import ImageFolder
 
@@ -103,8 +109,8 @@ def test_image_folder_initializes_without_name_error():
 
 
 def test_generate_image_invalid_background_color_falls_back(
-    monkeypatch, device_config_dev, tmp_path
-):
+    monkeypatch: pytest.MonkeyPatch, device_config_dev: Any, tmp_path: Path
+) -> None:
     from plugins.image_folder.image_folder import ImageFolder
 
     folder = tmp_path / "imgs"
@@ -127,7 +133,7 @@ def test_generate_image_invalid_background_color_falls_back(
     assert img is not None
 
 
-def test_image_folder_background_option_has_default_blur_in_schema():
+def test_image_folder_background_option_has_default_blur_in_schema() -> Any:
     """JTN-632: The Background Fill radio_segment must declare a default so
     that DRAFT renders pre-select one option (Blur). Without a default,
     neither radio is checked and users can save in an indeterminate state."""
@@ -135,7 +141,7 @@ def test_image_folder_background_option_has_default_blur_in_schema():
 
     sch = ImageFolder({"id": "image_folder"}).build_settings_schema()
 
-    def _find_field(obj, name):
+    def _find_field(obj: Any, name: Any) -> Any:
         if isinstance(obj, dict):
             if obj.get("name") == name:
                 return obj
@@ -158,7 +164,7 @@ def test_image_folder_background_option_has_default_blur_in_schema():
     )
 
 
-def test_image_folder_draft_page_preselects_blur_radio(client):
+def test_image_folder_draft_page_preselects_blur_radio(client: FlaskClient) -> None:
     """JTN-632: Rendering /plugin/image_folder with no saved instance
     (DRAFT mode) must pre-check exactly one Background Fill radio option."""
     import re

@@ -1,10 +1,16 @@
+from typing import Any
+
 # pyright: reportMissingImports=false
 from unittest.mock import MagicMock, patch
 
 import pytest
+from flask import Flask
+from flask.testing import FlaskClient
 
 
-def test_ai_text_generate_settings_template(monkeypatch, device_config_dev):
+def test_ai_text_generate_settings_template(
+    monkeypatch: pytest.MonkeyPatch, device_config_dev: Any
+) -> None:
     from plugins.ai_text.ai_text import AIText
 
     plugin = AIText({"id": "ai_text"})
@@ -23,7 +29,9 @@ def test_ai_text_generate_settings_template(monkeypatch, device_config_dev):
     assert "settings_schema" in template
 
 
-def test_ai_text_model_labels_show_input_and_output_prices(device_config_dev):
+def test_ai_text_model_labels_show_input_and_output_prices(
+    device_config_dev: Any,
+) -> Any:
     """Regression for JTN-635: model labels must show both input AND output prices."""
     import re
 
@@ -33,7 +41,7 @@ def test_ai_text_model_labels_show_input_and_output_prices(device_config_dev):
     schema_dict = plugin.build_settings_schema()
 
     # Find the textModel field recursively
-    def _find_field(node, name):
+    def _find_field(node: Any, name: Any) -> Any:
         if isinstance(node, dict):
             if node.get("name") == name:
                 return node
@@ -72,7 +80,9 @@ def test_ai_text_model_labels_show_input_and_output_prices(device_config_dev):
         assert "in" in label.lower() and "out" in label.lower()
 
 
-def test_ai_text_generate_image_missing_text_model(client, flask_app, monkeypatch):
+def test_ai_text_generate_image_missing_text_model(
+    client: FlaskClient, flask_app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
     import os
 
     os.environ["OPEN_AI_SECRET"] = "test"
@@ -93,7 +103,9 @@ def test_ai_text_generate_image_missing_text_model(client, flask_app, monkeypatc
     assert body["error"] == "An internal error occurred"
 
 
-def test_ai_text_generate_image_missing_text_prompt(client, flask_app, monkeypatch):
+def test_ai_text_generate_image_missing_text_prompt(
+    client: FlaskClient, flask_app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
     import os
 
     os.environ["OPEN_AI_SECRET"] = "test"
@@ -115,8 +127,11 @@ def test_ai_text_generate_image_missing_text_prompt(client, flask_app, monkeypat
 
 @patch("plugins.ai_text.ai_text.OpenAI")
 def test_ai_text_generate_image_openai_error(
-    mock_openai, client, flask_app, monkeypatch
-):
+    mock_openai: Any,
+    client: FlaskClient,
+    flask_app: Flask,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     import os
 
     os.environ["OPEN_AI_SECRET"] = "test"
@@ -143,37 +158,42 @@ def test_ai_text_generate_image_openai_error(
 )
 @patch("plugins.ai_text.ai_text.OpenAI")
 def test_ai_text_generate_image_orientation(
-    mock_openai, client, flask_app, monkeypatch, orientation, resolution
-):
+    mock_openai: Any,
+    client: FlaskClient,
+    flask_app: Flask,
+    monkeypatch: pytest.MonkeyPatch,
+    orientation: Any,
+    resolution: Any,
+) -> Any:
     import os
 
     os.environ["OPEN_AI_SECRET"] = "test"
 
     class FakeMsg:
-        def __init__(self, content):
+        def __init__(self, content: Any) -> None:
             self.content = content
 
     class Choice:
-        def __init__(self, content):
+        def __init__(self, content: Any) -> None:
             self.message = FakeMsg(content)
 
     class FakeChat:
-        def __init__(self):
+        def __init__(self) -> None:
             self.completions = self
 
-        def create(self, *args, **kwargs):
+        def create(self, *args: Any, **kwargs: Any) -> Any:
             class Resp:
                 choices = [Choice("Hello World")]
 
             return Resp()
 
     class FakeOpenAI:
-        def __init__(self, api_key=None):
+        def __init__(self, api_key: Any = None) -> None:
             self.chat = FakeChat()
 
     mock_openai.return_value = FakeOpenAI()
 
-    def mock_get_config(key, default=None):
+    def mock_get_config(key: Any, default: Any = None) -> Any:
         if key == "orientation":
             return orientation
         if key == "resolution":
@@ -194,7 +214,9 @@ def test_ai_text_generate_image_orientation(
     assert resp.status_code == 200
 
 
-def test_ai_text_generate_image_missing_key(client, flask_app, monkeypatch):
+def test_ai_text_generate_image_missing_key(
+    client: FlaskClient, flask_app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
     import os
 
     if "OPEN_AI_SECRET" in os.environ:
@@ -216,31 +238,36 @@ def test_ai_text_generate_image_missing_key(client, flask_app, monkeypatch):
 
 
 @patch("plugins.ai_text.ai_text.OpenAI")
-def test_ai_text_generate_image_success(mock_openai, client, flask_app, monkeypatch):
+def test_ai_text_generate_image_success(
+    mock_openai: Any,
+    client: FlaskClient,
+    flask_app: Flask,
+    monkeypatch: pytest.MonkeyPatch,
+) -> Any:
     import os
 
     os.environ["OPEN_AI_SECRET"] = "test"
 
     class FakeMsg:
-        def __init__(self, content):
+        def __init__(self, content: Any) -> None:
             self.content = content
 
     class Choice:
-        def __init__(self, content):
+        def __init__(self, content: Any) -> None:
             self.message = FakeMsg(content)
 
     class FakeChat:
-        def __init__(self):
+        def __init__(self) -> None:
             self.completions = self
 
-        def create(self, *args, **kwargs):
+        def create(self, *args: Any, **kwargs: Any) -> Any:
             class Resp:
                 choices = [Choice("Hello World")]
 
             return Resp()
 
     class FakeOpenAI:
-        def __init__(self, api_key=None):
+        def __init__(self, api_key: Any = None) -> None:
             self.chat = FakeChat()
 
     mock_openai.return_value = FakeOpenAI()
@@ -255,7 +282,7 @@ def test_ai_text_generate_image_success(mock_openai, client, flask_app, monkeypa
     assert resp.status_code == 200
 
 
-def test_ai_text_google_missing_key(device_config_dev):
+def test_ai_text_google_missing_key(device_config_dev: Any) -> None:
     """Test ai_text plugin with missing Google API key."""
     from plugins.ai_text.ai_text import AIText
 
@@ -271,7 +298,9 @@ def test_ai_text_google_missing_key(device_config_dev):
             plugin.generate_image(settings, device_config_dev)
 
 
-def test_ai_text_google_success(device_config_dev, monkeypatch):
+def test_ai_text_google_success(
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Test ai_text plugin with Google provider success."""
     import sys
 

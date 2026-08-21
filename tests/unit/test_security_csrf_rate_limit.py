@@ -2,13 +2,14 @@
 """Tests for CSRF protection, rate limiting, and XSS prevention."""
 
 import secrets
+from typing import Any
 
 import pytest
 from flask import Flask, session
 
 
 @pytest.fixture()
-def csrf_app():
+def csrf_app() -> Any:
     """Minimal Flask app with CSRF protection matching inkypi.py."""
     from collections import defaultdict, deque
 
@@ -21,17 +22,17 @@ def csrf_app():
     _CSRF_SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
     _CSRF_EXEMPT_PATHS = frozenset({"/healthz", "/readyz"})
 
-    def _generate_csrf_token():
+    def _generate_csrf_token() -> Any:
         if "_csrf_token" not in session:
             session["_csrf_token"] = secrets.token_hex(32)
         return session["_csrf_token"]
 
     @app.context_processor
-    def _inject_csrf():
+    def _inject_csrf() -> Any:
         return {"csrf_token": _generate_csrf_token}
 
     @app.before_request
-    def _check_csrf():
+    def _check_csrf() -> Any:
         from flask import request
 
         if request.method in _CSRF_SAFE_METHODS:
@@ -66,7 +67,7 @@ def csrf_app():
     _MUTATE_MAX = 5  # Low limit for testing
 
     @app.before_request
-    def _rate_limit():
+    def _rate_limit() -> Any:
         import time as _time
 
         from flask import request
@@ -86,30 +87,30 @@ def csrf_app():
         return None
 
     @app.route("/test-post", methods=["POST"])
-    def test_post():
+    def test_post() -> Any:
         return {"ok": True}
 
     @app.route("/healthz", methods=["POST"])
-    def healthz_post():
+    def healthz_post() -> Any:
         return {"ok": True}
 
     return app
 
 
 class TestCSRFProtection:
-    def test_get_requests_bypass_csrf(self, csrf_app):
+    def test_get_requests_bypass_csrf(self, csrf_app: Any) -> None:
         client = csrf_app.test_client()
         # GET requests should not need CSRF
         # (no POST route for GET, just verify no 403 on a page)
         with client.session_transaction() as sess:
             sess["_csrf_token"] = "testtoken123"
 
-    def test_post_without_token_returns_403(self, csrf_app):
+    def test_post_without_token_returns_403(self, csrf_app: Any) -> None:
         client = csrf_app.test_client()
         resp = client.post("/test-post")
         assert resp.status_code == 403
 
-    def test_post_with_valid_header_token(self, csrf_app):
+    def test_post_with_valid_header_token(self, csrf_app: Any) -> None:
         client = csrf_app.test_client()
         # First, establish session with a token
         with client.session_transaction() as sess:
@@ -117,14 +118,14 @@ class TestCSRFProtection:
         resp = client.post("/test-post", headers={"X-CSRFToken": "valid-token-abc123"})
         assert resp.status_code == 200
 
-    def test_post_with_invalid_token_returns_403(self, csrf_app):
+    def test_post_with_invalid_token_returns_403(self, csrf_app: Any) -> None:
         client = csrf_app.test_client()
         with client.session_transaction() as sess:
             sess["_csrf_token"] = "correct-token"
         resp = client.post("/test-post", headers={"X-CSRFToken": "wrong-token"})
         assert resp.status_code == 403
 
-    def test_post_with_form_csrf_token(self, csrf_app):
+    def test_post_with_form_csrf_token(self, csrf_app: Any) -> None:
         client = csrf_app.test_client()
         with client.session_transaction() as sess:
             sess["_csrf_token"] = "form-token-xyz"
@@ -135,12 +136,12 @@ class TestCSRFProtection:
         )
         assert resp.status_code == 200
 
-    def test_exempt_paths_skip_csrf(self, csrf_app):
+    def test_exempt_paths_skip_csrf(self, csrf_app: Any) -> None:
         client = csrf_app.test_client()
         resp = client.post("/healthz")
         assert resp.status_code == 200
 
-    def test_first_post_without_session_returns_403(self, csrf_app):
+    def test_first_post_without_session_returns_403(self, csrf_app: Any) -> None:
         """First POST without any session should be rejected (no exemption)."""
         client = csrf_app.test_client()
         resp = client.post("/test-post")
@@ -150,7 +151,9 @@ class TestCSRFProtection:
 
     # --- JTN-224: CSRF bypass on first POST in new session ---
 
-    def test_jtn224_new_session_post_rejected_not_allowed_through(self, csrf_app):
+    def test_jtn224_new_session_post_rejected_not_allowed_through(
+        self, csrf_app: Any
+    ) -> None:
         """JTN-224: A POST with no existing session token must be rejected, not passed through."""
         client = csrf_app.test_client()
         # Fresh client — no session cookie, no token
@@ -160,7 +163,7 @@ class TestCSRFProtection:
         assert data is not None
         assert "CSRF" in data.get("error", "")
 
-    def test_jtn224_get_then_post_with_token_succeeds(self, csrf_app):
+    def test_jtn224_get_then_post_with_token_succeeds(self, csrf_app: Any) -> None:
         """JTN-224: After a GET establishes the session token, POST with that token succeeds."""
         # Simulate: manually set session token (as a GET would), then POST with it
         client = csrf_app.test_client()
@@ -173,7 +176,7 @@ class TestCSRFProtection:
 
     # --- JTN-257: sendBeacon CSRF token in JSON body ---
 
-    def test_jtn257_json_body_csrf_token_accepted(self, csrf_app):
+    def test_jtn257_json_body_csrf_token_accepted(self, csrf_app: Any) -> None:
         """JTN-257: CSRF token included in JSON body (_csrf_token) must be accepted."""
         import json
 
@@ -187,7 +190,7 @@ class TestCSRFProtection:
         )
         assert resp.status_code == 200
 
-    def test_jtn257_json_body_wrong_csrf_token_rejected(self, csrf_app):
+    def test_jtn257_json_body_wrong_csrf_token_rejected(self, csrf_app: Any) -> None:
         """JTN-257: Wrong _csrf_token in JSON body must return 403."""
         import json
 
@@ -201,7 +204,7 @@ class TestCSRFProtection:
         )
         assert resp.status_code == 403
 
-    def test_jtn257_json_body_missing_csrf_token_rejected(self, csrf_app):
+    def test_jtn257_json_body_missing_csrf_token_rejected(self, csrf_app: Any) -> None:
         """JTN-257: JSON body without _csrf_token and no header must return 403."""
         import json
 
@@ -219,7 +222,7 @@ class TestCSRFProtection:
 class TestClientErrorsJsCSRF:
     """JTN-257: Structural tests verifying client_errors.js includes CSRF token support."""
 
-    def test_client_errors_js_reads_csrf_meta_tag(self):
+    def test_client_errors_js_reads_csrf_meta_tag(self) -> None:
         """client_errors.js must include getCsrfToken() reading the csrf-token meta tag."""
         import os
 
@@ -244,7 +247,7 @@ class TestClientErrorsJsCSRF:
             "getCsrfToken" in source
         ), "client_errors.js must define a getCsrfToken helper"
 
-    def test_client_errors_js_fetch_sends_x_csrftoken_header(self):
+    def test_client_errors_js_fetch_sends_x_csrftoken_header(self) -> None:
         """fetch() fallback in client_errors.js must send X-CSRFToken header."""
         import os
 
@@ -263,7 +266,7 @@ class TestClientErrorsJsCSRF:
 
 
 class TestRateLimiting:
-    def test_rate_limit_allows_within_threshold(self, csrf_app):
+    def test_rate_limit_allows_within_threshold(self, csrf_app: Any) -> None:
         client = csrf_app.test_client()
         with client.session_transaction() as sess:
             sess["_csrf_token"] = "rl-token"
@@ -271,7 +274,7 @@ class TestRateLimiting:
             resp = client.post("/test-post", headers={"X-CSRFToken": "rl-token"})
             assert resp.status_code == 200
 
-    def test_rate_limit_blocks_over_threshold(self, csrf_app):
+    def test_rate_limit_blocks_over_threshold(self, csrf_app: Any) -> None:
         client = csrf_app.test_client()
         with client.session_transaction() as sess:
             sess["_csrf_token"] = "rl-token"
@@ -282,7 +285,7 @@ class TestRateLimiting:
         resp = client.post("/test-post", headers={"X-CSRFToken": "rl-token"})
         assert resp.status_code == 429
 
-    def test_rate_limit_exempt_paths(self, csrf_app):
+    def test_rate_limit_exempt_paths(self, csrf_app: Any) -> None:
         """Exempt paths should not count against rate limit."""
         client = csrf_app.test_client()
         for _ in range(10):
@@ -291,14 +294,14 @@ class TestRateLimiting:
 
 
 class TestRSSXSSPrevention:
-    def test_sanitize_strips_script_tags(self):
+    def test_sanitize_strips_script_tags(self) -> None:
         from plugins.rss.rss import Rss
 
         result = Rss._sanitize_text('<script>alert("xss")</script>Safe text')
         assert "<script>" not in result
         assert "Safe text" in result
 
-    def test_sanitize_strips_html_tags(self):
+    def test_sanitize_strips_html_tags(self) -> None:
         from plugins.rss.rss import Rss
 
         result = Rss._sanitize_text("<b>Bold</b> and <em>italic</em>")
@@ -307,13 +310,13 @@ class TestRSSXSSPrevention:
         assert "Bold" in result
         assert "italic" in result
 
-    def test_sanitize_decodes_entities(self):
+    def test_sanitize_decodes_entities(self) -> None:
         from plugins.rss.rss import Rss
 
         result = Rss._sanitize_text("Tom &amp; Jerry &lt;3")
         assert result == "Tom & Jerry <3"
 
-    def test_sanitize_handles_nested_tags(self):
+    def test_sanitize_handles_nested_tags(self) -> None:
         from plugins.rss.rss import Rss
 
         result = Rss._sanitize_text(
@@ -323,19 +326,19 @@ class TestRSSXSSPrevention:
         assert "Text" in result
         assert "link" in result
 
-    def test_sanitize_handles_img_onerror(self):
+    def test_sanitize_handles_img_onerror(self) -> None:
         from plugins.rss.rss import Rss
 
         result = Rss._sanitize_text("<img src=x onerror=alert(1)>")
         assert "<" not in result
         assert "onerror" not in result
 
-    def test_sanitize_empty_string(self):
+    def test_sanitize_empty_string(self) -> None:
         from plugins.rss.rss import Rss
 
         assert Rss._sanitize_text("") == ""
 
-    def test_sanitize_plain_text_unchanged(self):
+    def test_sanitize_plain_text_unchanged(self) -> None:
         from plugins.rss.rss import Rss
 
         assert Rss._sanitize_text("Hello World") == "Hello World"

@@ -7,67 +7,67 @@ from utils.time_utils import (
 )
 
 
-def test_calculate_seconds_minute():
+def test_calculate_seconds_minute() -> None:
     assert calculate_seconds(3, "minute") == 180
 
 
-def test_calculate_seconds_hour():
+def test_calculate_seconds_hour() -> None:
     assert calculate_seconds(2, "hour") == 7200
 
 
-def test_calculate_seconds_day():
+def test_calculate_seconds_day() -> None:
     assert calculate_seconds(1, "day") == 86400
 
 
-def test_calculate_seconds_default_value_for_unrecognized_unit():
+def test_calculate_seconds_default_value_for_unrecognized_unit() -> None:
     assert calculate_seconds(99, "weeks") == 300
 
 
 # ---- parse_cron_field ----
 
 
-def test_parse_cron_field_wildcard():
+def test_parse_cron_field_wildcard() -> None:
     result = parse_cron_field("*", 0, 59)
     assert result == set(range(60))
 
 
-def test_parse_cron_field_single_value():
+def test_parse_cron_field_single_value() -> None:
     result = parse_cron_field("5", 0, 59)
     assert result == {5}
 
 
-def test_parse_cron_field_range():
+def test_parse_cron_field_range() -> None:
     result = parse_cron_field("0-5", 0, 59)
     assert result == {0, 1, 2, 3, 4, 5}
 
 
-def test_parse_cron_field_reversed_range():
+def test_parse_cron_field_reversed_range() -> None:
     """Reversed range like '5-0' should be normalized."""
     result = parse_cron_field("5-0", 0, 59)
     assert result == {0, 1, 2, 3, 4, 5}
 
 
-def test_parse_cron_field_comma_list():
+def test_parse_cron_field_comma_list() -> None:
     result = parse_cron_field("1,3,5", 0, 59)
     assert result == {1, 3, 5}
 
 
-def test_parse_cron_field_out_of_range_ignored():
+def test_parse_cron_field_out_of_range_ignored() -> None:
     result = parse_cron_field("60", 0, 59)
     assert result == set()
 
 
-def test_parse_cron_field_invalid_value_ignored():
+def test_parse_cron_field_invalid_value_ignored() -> None:
     result = parse_cron_field("abc", 0, 59)
     assert result == set()
 
 
-def test_parse_cron_field_empty_string():
+def test_parse_cron_field_empty_string() -> None:
     result = parse_cron_field("", 0, 59)
     assert result == set()
 
 
-def test_parse_cron_field_none():
+def test_parse_cron_field_none() -> None:
     result = parse_cron_field(None, 0, 59)
     assert result == set()
 
@@ -75,7 +75,7 @@ def test_parse_cron_field_none():
 # ---- get_next_occurrence ----
 
 
-def test_next_occurrence_every_minute():
+def test_next_occurrence_every_minute() -> None:
     """'* * * * *' should match the very next minute."""
     now = datetime(2025, 6, 15, 10, 30, 0, tzinfo=UTC)
     result = get_next_occurrence("* * * * *", now)
@@ -83,7 +83,7 @@ def test_next_occurrence_every_minute():
     assert result == datetime(2025, 6, 15, 10, 31, 0, tzinfo=UTC)
 
 
-def test_next_occurrence_hourly():
+def test_next_occurrence_hourly() -> None:
     """'0 * * * *' matches minute 0 of the next hour."""
     now = datetime(2025, 6, 15, 10, 30, 0, tzinfo=UTC)
     result = get_next_occurrence("0 * * * *", now)
@@ -92,7 +92,7 @@ def test_next_occurrence_hourly():
     assert result.hour == 11
 
 
-def test_next_occurrence_daily_at_noon():
+def test_next_occurrence_daily_at_noon() -> None:
     """'0 12 * * *' should find next occurrence at 12:00."""
     now = datetime(2025, 6, 15, 13, 0, 0, tzinfo=UTC)
     result = get_next_occurrence("0 12 * * *", now)
@@ -100,7 +100,7 @@ def test_next_occurrence_daily_at_noon():
     assert result == datetime(2025, 6, 16, 12, 0, 0, tzinfo=UTC)
 
 
-def test_next_occurrence_specific_minute():
+def test_next_occurrence_specific_minute() -> None:
     """'30 * * * *' should find minute 30 of the current or next hour."""
     now = datetime(2025, 6, 15, 10, 0, 0, tzinfo=UTC)
     result = get_next_occurrence("30 * * * *", now)
@@ -109,7 +109,7 @@ def test_next_occurrence_specific_minute():
     assert result.hour == 10
 
 
-def test_next_occurrence_range_expression():
+def test_next_occurrence_range_expression() -> None:
     """'0-30 10 * * *' should match minutes 0-30 in hour 10."""
     now = datetime(2025, 6, 15, 10, 25, 0, tzinfo=UTC)
     result = get_next_occurrence("0-30 10 * * *", now)
@@ -118,7 +118,7 @@ def test_next_occurrence_range_expression():
     assert result.hour == 10
 
 
-def test_next_occurrence_step_expression_via_comma():
+def test_next_occurrence_step_expression_via_comma() -> None:
     """Test step-like behavior using comma-separated values (*/5 equivalent)."""
     # parse_cron_field doesn't support */5 syntax, so use comma list
     now = datetime(2025, 6, 15, 10, 0, 0, tzinfo=UTC)
@@ -127,7 +127,7 @@ def test_next_occurrence_step_expression_via_comma():
     assert result.minute == 5
 
 
-def test_next_occurrence_midnight_crossing():
+def test_next_occurrence_midnight_crossing() -> None:
     """'0 0 * * *' at 23:59 should find next day 00:00."""
     now = datetime(2025, 6, 15, 23, 59, 0, tzinfo=UTC)
     result = get_next_occurrence("0 0 * * *", now)
@@ -135,7 +135,7 @@ def test_next_occurrence_midnight_crossing():
     assert result == datetime(2025, 6, 16, 0, 0, 0, tzinfo=UTC)
 
 
-def test_next_occurrence_specific_day_of_week():
+def test_next_occurrence_specific_day_of_week() -> None:
     """'0 9 * * 1' (Monday) should find next Monday at 9:00."""
     # June 15, 2025 is a Sunday (weekday=6, cron_dow=0)
     now = datetime(2025, 6, 15, 10, 0, 0, tzinfo=UTC)
@@ -147,7 +147,7 @@ def test_next_occurrence_specific_day_of_week():
     assert result.minute == 0
 
 
-def test_next_occurrence_invalid_cron_wrong_field_count():
+def test_next_occurrence_invalid_cron_wrong_field_count() -> None:
     """Invalid cron expression with wrong number of fields returns None."""
     now = datetime(2025, 6, 15, 10, 0, 0, tzinfo=UTC)
     assert get_next_occurrence("* * *", now) is None
@@ -155,7 +155,7 @@ def test_next_occurrence_invalid_cron_wrong_field_count():
     assert get_next_occurrence("", now) is None
 
 
-def test_next_occurrence_specific_month():
+def test_next_occurrence_specific_month() -> None:
     """'0 0 1 12 *' should find December 1st at midnight."""
     now = datetime(2025, 6, 15, 0, 0, 0, tzinfo=UTC)
     result = get_next_occurrence("0 0 1 12 *", now)
@@ -164,14 +164,14 @@ def test_next_occurrence_specific_month():
     assert result.day == 1
 
 
-def test_next_occurrence_uses_utc_default():
+def test_next_occurrence_uses_utc_default() -> None:
     """When no `now` is provided, function uses UTC."""
     result = get_next_occurrence("* * * * *")
     assert result is not None
     assert result.tzinfo is not None
 
 
-def test_next_occurrence_near_midnight_23_59():
+def test_next_occurrence_near_midnight_23_59() -> None:
     """From 23:58, '59 23 * * *' should find 23:59 same day."""
     now = datetime(2025, 6, 15, 23, 58, 0, tzinfo=UTC)
     result = get_next_occurrence("59 23 * * *", now)
@@ -179,7 +179,7 @@ def test_next_occurrence_near_midnight_23_59():
     assert result == datetime(2025, 6, 15, 23, 59, 0, tzinfo=UTC)
 
 
-def test_next_occurrence_dom_and_dow_both_specified():
+def test_next_occurrence_dom_and_dow_both_specified() -> None:
     """When both day-of-month and day-of-week are non-wildcard, cron OR's them."""
     # '0 0 15 * 1' means: minute=0, hour=0, day=15 OR Monday
     now = datetime(2025, 6, 14, 0, 0, 0, tzinfo=UTC)

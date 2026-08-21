@@ -1,9 +1,15 @@
 import shutil
 import sqlite3
 from pathlib import Path
+from typing import Any
+
+import pytest
+from flask.testing import FlaskClient
 
 
-def test_config_loads_legacy_fixture(monkeypatch, tmp_path):
+def test_config_loads_legacy_fixture(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     import config as config_mod
 
     fixture = (
@@ -19,7 +25,9 @@ def test_config_loads_legacy_fixture(monkeypatch, tmp_path):
     assert cfg.get_playlist_manager().playlists
 
 
-def test_invalid_legacy_refresh_info_falls_back(monkeypatch, tmp_path):
+def test_invalid_legacy_refresh_info_falls_back(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     import config as config_mod
 
     fixture = (
@@ -39,7 +47,7 @@ def test_invalid_legacy_refresh_info_falls_back(monkeypatch, tmp_path):
     assert refresh_info.plugin_id == ""
 
 
-def test_benchmark_schema_upgrades_legacy_columns(tmp_path):
+def test_benchmark_schema_upgrades_legacy_columns(tmp_path: Path) -> None:
     from benchmarks.benchmark_storage import _ensure_schema
 
     db_path = tmp_path / "legacy.db"
@@ -75,7 +83,9 @@ def test_benchmark_schema_upgrades_legacy_columns(tmp_path):
     assert "extra_json" in stage_columns
 
 
-def test_benchmarks_api_handles_legacy_schema(client, device_config_dev, tmp_path):
+def test_benchmarks_api_handles_legacy_schema(
+    client: FlaskClient, device_config_dev: Any, tmp_path: Path
+) -> None:
     db_path = tmp_path / "legacy_api.db"
     conn = sqlite3.connect(db_path)
     conn.execute("""

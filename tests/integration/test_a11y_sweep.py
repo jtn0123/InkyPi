@@ -46,6 +46,7 @@ from typing import Any
 
 import pytest
 import yaml
+from playwright.sync_api import Page
 from tests.integration.test_click_sweep import (
     PAGES_TO_SWEEP,
     _discover_plugin_ids,
@@ -135,7 +136,7 @@ def _allowlist_for(
     return base
 
 
-def _run_axe_on_page(page, url: str, marker: str | None) -> dict[str, Any]:
+def _run_axe_on_page(page: Page, url: str, marker: str | None) -> dict[str, Any]:
     page.goto(url, wait_until="domcontentloaded", timeout=_GOTO_TIMEOUT_MS)
     if marker:
         try:
@@ -184,7 +185,9 @@ _MAIN_PAGES = tuple(p for p in PAGES_TO_SWEEP if not p.path.startswith("/plugin/
 
 @skip_env
 @pytest.mark.parametrize("sweep", _MAIN_PAGES, ids=lambda s: s.label)
-def test_a11y_sweep_main_pages(live_server, browser_page, sweep):
+def test_a11y_sweep_main_pages(
+    live_server: str, browser_page: Page, sweep: Any
+) -> None:
     """WCAG AA sweep over every main route in ``PAGES_TO_SWEEP``."""
     allowlist_bundle = _load_allowlist()
     allowed = _allowlist_for(sweep.label, is_plugin=False, bundle=allowlist_bundle)
@@ -213,7 +216,9 @@ _PLUGIN_IDS: tuple[str, ...] = _discover_plugin_ids()
 @skip_env
 @pytest.mark.plugin_sweep
 @pytest.mark.parametrize("plugin_id", _PLUGIN_IDS, ids=list(_PLUGIN_IDS))
-def test_a11y_sweep_plugin_pages(live_server, browser_page, plugin_id: str):
+def test_a11y_sweep_plugin_pages(
+    live_server: str, browser_page: Page, plugin_id: str
+) -> None:
     """WCAG AA sweep over every ``/plugin/<id>`` page.
 
     Parametrised the same way as
@@ -248,7 +253,7 @@ def test_a11y_sweep_plugin_pages(live_server, browser_page, plugin_id: str):
 # sync with the pages being swept.
 
 
-def test_a11y_allowlist_is_well_formed():
+def test_a11y_allowlist_is_well_formed() -> None:
     """The YAML parses and every entry carries a non-empty ``reason``."""
     bundle = _load_allowlist()
     # ``_load_allowlist`` already raises on malformed entries; the assertions
@@ -260,7 +265,7 @@ def test_a11y_allowlist_is_well_formed():
         assert reason, "Every allowlist entry requires a non-empty reason."
 
 
-def test_a11y_allowlist_pages_exist():
+def test_a11y_allowlist_pages_exist() -> None:
     """Every ``pages:`` override maps to a real page the sweep will visit.
 
     Stops the allowlist rotting once a page is renamed or removed — a

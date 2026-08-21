@@ -5,13 +5,21 @@ Theme 2 of dogfood pass 3: weather lat/lon, calendar URL, and image_folder path
 fields must reject invalid data at save time with a clear error.
 """
 
+from pathlib import Path
+from typing import Any
 from unittest.mock import patch
+
+import pytest
+from flask import Flask
+from flask.testing import FlaskClient
 
 
 class TestWeatherValidation:
     """Weather plugin must reject out-of-range lat/lon at save time."""
 
-    def test_weather_save_rejects_out_of_range_latitude(self, client):
+    def test_weather_save_rejects_out_of_range_latitude(
+        self, client: FlaskClient
+    ) -> None:
         resp = client.post(
             "/save_plugin_settings",
             data={
@@ -26,7 +34,9 @@ class TestWeatherValidation:
         data = resp.get_json()
         assert "Latitude" in data["error"] or "latitude" in data["error"].lower()
 
-    def test_weather_save_rejects_out_of_range_longitude(self, client):
+    def test_weather_save_rejects_out_of_range_longitude(
+        self, client: FlaskClient
+    ) -> None:
         resp = client.post(
             "/save_plugin_settings",
             data={
@@ -41,7 +51,9 @@ class TestWeatherValidation:
         data = resp.get_json()
         assert "Longitude" in data["error"] or "longitude" in data["error"].lower()
 
-    def test_weather_save_rejects_non_numeric_latitude(self, client):
+    def test_weather_save_rejects_non_numeric_latitude(
+        self, client: FlaskClient
+    ) -> None:
         resp = client.post(
             "/save_plugin_settings",
             data={
@@ -54,7 +66,7 @@ class TestWeatherValidation:
         )
         assert resp.status_code == 400
 
-    def test_weather_save_rejects_missing_latitude(self, client):
+    def test_weather_save_rejects_missing_latitude(self, client: FlaskClient) -> None:
         resp = client.post(
             "/save_plugin_settings",
             data={
@@ -67,7 +79,7 @@ class TestWeatherValidation:
         )
         assert resp.status_code == 400
 
-    def test_weather_save_accepts_valid_coordinates(self, client):
+    def test_weather_save_accepts_valid_coordinates(self, client: FlaskClient) -> None:
         resp = client.post(
             "/save_plugin_settings",
             data={
@@ -84,7 +96,7 @@ class TestWeatherValidation:
 class TestCalendarValidation:
     """Calendar plugin must reject invalid URLs at save time."""
 
-    def test_calendar_save_rejects_non_url(self, client):
+    def test_calendar_save_rejects_non_url(self, client: FlaskClient) -> None:
         resp = client.post(
             "/save_plugin_settings",
             data={
@@ -98,7 +110,7 @@ class TestCalendarValidation:
         data = resp.get_json()
         assert "not valid" in data["error"].lower() or "url" in data["error"].lower()
 
-    def test_calendar_save_rejects_javascript_url(self, client):
+    def test_calendar_save_rejects_javascript_url(self, client: FlaskClient) -> None:
         resp = client.post(
             "/save_plugin_settings",
             data={
@@ -110,7 +122,7 @@ class TestCalendarValidation:
         )
         assert resp.status_code == 400
 
-    def test_calendar_save_rejects_empty_url(self, client):
+    def test_calendar_save_rejects_empty_url(self, client: FlaskClient) -> None:
         resp = client.post(
             "/save_plugin_settings",
             data={
@@ -122,7 +134,7 @@ class TestCalendarValidation:
         )
         assert resp.status_code == 400
 
-    def test_calendar_save_accepts_valid_url(self, client):
+    def test_calendar_save_accepts_valid_url(self, client: FlaskClient) -> None:
         resp = client.post(
             "/save_plugin_settings",
             data={
@@ -138,7 +150,9 @@ class TestCalendarValidation:
 class TestImageFolderValidation:
     """Image Folder plugin must reject non-existent folder paths at save time."""
 
-    def test_image_folder_save_rejects_nonexistent_path(self, client):
+    def test_image_folder_save_rejects_nonexistent_path(
+        self, client: FlaskClient
+    ) -> None:
         resp = client.post(
             "/save_plugin_settings",
             data={
@@ -150,7 +164,9 @@ class TestImageFolderValidation:
         data = resp.get_json()
         assert "not" in data["error"].lower() or "exist" in data["error"].lower()
 
-    def test_image_folder_save_rejects_folder_with_no_images(self, client, tmp_path):
+    def test_image_folder_save_rejects_folder_with_no_images(
+        self, client: FlaskClient, tmp_path: Path
+    ) -> None:
         """An existing folder with zero image files should be rejected."""
         empty = tmp_path / "empty-folder"
         empty.mkdir()
@@ -166,7 +182,9 @@ class TestImageFolderValidation:
         data = resp.get_json()
         assert "no image" in data["error"].lower() or "image" in data["error"].lower()
 
-    def test_image_folder_save_rejects_unreadable_folder(self, client, tmp_path):
+    def test_image_folder_save_rejects_unreadable_folder(
+        self, client: FlaskClient, tmp_path: Path
+    ) -> None:
         """A folder without read permission should be rejected."""
         import os
 
@@ -193,7 +211,7 @@ class TestImageFolderValidation:
             # Restore permissions so pytest can clean up
             os.chmod(folder, 0o700)
 
-    def test_image_folder_save_rejects_empty_path(self, client):
+    def test_image_folder_save_rejects_empty_path(self, client: FlaskClient) -> None:
         resp = client.post(
             "/save_plugin_settings",
             data={
@@ -207,7 +225,7 @@ class TestImageFolderValidation:
 class TestPluginValidateSettingsException:
     """If validate_settings raises an exception, the error must be surfaced."""
 
-    def test_validate_settings_exception_returns_400(self, client):
+    def test_validate_settings_exception_returns_400(self, client: FlaskClient) -> None:
         """A validate_settings method that raises should return 400, not silently succeed."""
         with patch(
             "plugins.weather.weather.Weather.validate_settings",
@@ -227,7 +245,9 @@ class TestPluginValidateSettingsException:
             data = resp.get_json()
             assert "validation failed" in data["error"].lower()
 
-    def test_validate_settings_exception_htmx_returns_error_partial(self, client):
+    def test_validate_settings_exception_htmx_returns_error_partial(
+        self, client: FlaskClient
+    ) -> None:
         """HTMX clients should receive an HTML error partial, not JSON."""
         with patch(
             "plugins.weather.weather.Weather.validate_settings",
@@ -249,7 +269,9 @@ class TestPluginValidateSettingsException:
             body = resp.get_data(as_text=True)
             assert "validation failed" in body.lower()
 
-    def test_get_plugin_instance_exception_allows_save(self, client, tmp_path):
+    def test_get_plugin_instance_exception_allows_save(
+        self, client: FlaskClient, tmp_path: Path
+    ) -> None:
         """If get_plugin_instance raises, save should still succeed (plugin=None skips validation)."""
         from PIL import Image
 
@@ -273,8 +295,8 @@ class TestPluginValidateSettingsException:
             assert resp.status_code == 200
 
     def test_validate_required_fields_exception_continues_to_validate_settings(
-        self, client, tmp_path
-    ):
+        self, client: FlaskClient, tmp_path: Path
+    ) -> None:
         """If validate_plugin_required_fields raises, we still reach validate_settings."""
         from PIL import Image
 
@@ -302,7 +324,9 @@ class TestPluginValidateSettingsException:
 class TestPluginIdLogSanitization:
     """Regression test for pythonsecurity:S5145 — user input must be sanitized in logs."""
 
-    def test_save_with_malicious_plugin_id_sanitizes_log(self, client, caplog):
+    def test_save_with_malicious_plugin_id_sanitizes_log(
+        self, client: FlaskClient, caplog: pytest.LogCaptureFixture
+    ) -> None:
         """A plugin_id containing newlines should not leak into logs verbatim."""
         import logging
 
@@ -324,7 +348,9 @@ class TestPluginIdLogSanitization:
 class TestUpdatePluginInstanceValidation:
     """update_plugin_instance route must enforce validation (JTN-349)."""
 
-    def _add_instance(self, flask_app, plugin_id, instance_name, settings=None):
+    def _add_instance(
+        self, flask_app: Flask, plugin_id: Any, instance_name: Any, settings: Any = None
+    ) -> Any:
         """Seed a plugin instance on the Default playlist for update tests."""
         device_config = flask_app.config["DEVICE_CONFIG"]
         pm = device_config.get_playlist_manager()
@@ -342,7 +368,9 @@ class TestUpdatePluginInstanceValidation:
         )
         return instance_name
 
-    def test_update_rejects_out_of_range_latitude(self, client, flask_app):
+    def test_update_rejects_out_of_range_latitude(
+        self, client: FlaskClient, flask_app: Flask
+    ) -> None:
         name = self._add_instance(flask_app, "weather", "weather_test_invalid")
         resp = client.put(
             f"/update_plugin_instance/{name}",
@@ -358,7 +386,9 @@ class TestUpdatePluginInstanceValidation:
         data = resp.get_json()
         assert "latitude" in data["error"].lower()
 
-    def test_update_surfaces_validate_settings_exception(self, client, flask_app):
+    def test_update_surfaces_validate_settings_exception(
+        self, client: FlaskClient, flask_app: Flask
+    ) -> None:
         name = self._add_instance(flask_app, "weather", "weather_test_raise")
         with patch(
             "plugins.weather.weather.Weather.validate_settings",
@@ -379,8 +409,8 @@ class TestUpdatePluginInstanceValidation:
             assert "validation failed" in data["error"].lower()
 
     def test_update_continues_when_get_plugin_instance_raises(
-        self, client, flask_app, tmp_path
-    ):
+        self, client: FlaskClient, flask_app: Flask, tmp_path: Path
+    ) -> None:
         from PIL import Image
 
         folder = tmp_path / "pics"

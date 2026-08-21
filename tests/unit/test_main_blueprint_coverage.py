@@ -3,32 +3,40 @@
 
 import os
 import time
+from typing import Any
 from unittest.mock import MagicMock, patch
 
+import pytest
+from flask import Flask
+from flask.testing import FlaskClient
 from PIL import Image
 
 
-def _save_png(path, size=(800, 480), color="white"):
+def _save_png(path: Any, size: Any = (800, 480), color: Any = "white") -> None:
     Image.new("RGB", size, color).save(path)
 
 
 # ---- /preview ----
 
 
-def test_preview_image_processed_exists(client, device_config_dev):
+def test_preview_image_processed_exists(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     _save_png(device_config_dev.processed_image_file)
     resp = client.get("/preview")
     assert resp.status_code == 200
 
 
-def test_preview_image_fallback_current(client, device_config_dev):
+def test_preview_image_fallback_current(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     # No processed image, but current image exists
     _save_png(device_config_dev.current_image_file)
     resp = client.get("/preview")
     assert resp.status_code == 200
 
 
-def test_preview_image_404(client, device_config_dev):
+def test_preview_image_404(client: FlaskClient, device_config_dev: Any) -> None:
     # Ensure neither image exists
     for p in (
         device_config_dev.processed_image_file,
@@ -43,7 +51,9 @@ def test_preview_image_404(client, device_config_dev):
 # ---- /dev/mock-frame ----
 
 
-def test_dev_mock_frame_served_in_dev_mode(client, flask_app, monkeypatch):
+def test_dev_mock_frame_served_in_dev_mode(
+    client: FlaskClient, flask_app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
     monkeypatch.setenv("INKYPI_ENV", "dev")
     frame_path = flask_app.config["DISPLAY_MANAGER"].display.mock_frame_path
     _save_png(frame_path)
@@ -53,7 +63,9 @@ def test_dev_mock_frame_served_in_dev_mode(client, flask_app, monkeypatch):
     assert resp.mimetype == "image/png"
 
 
-def test_dev_mock_frame_404_outside_dev_mode(client, flask_app, monkeypatch):
+def test_dev_mock_frame_404_outside_dev_mode(
+    client: FlaskClient, flask_app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
     monkeypatch.setenv("INKYPI_ENV", "production")
     frame_path = flask_app.config["DISPLAY_MANAGER"].display.mock_frame_path
     _save_png(frame_path)
@@ -62,7 +74,9 @@ def test_dev_mock_frame_404_outside_dev_mode(client, flask_app, monkeypatch):
     assert resp.status_code == 404
 
 
-def test_dev_mock_frame_404_when_missing(client, flask_app, monkeypatch):
+def test_dev_mock_frame_404_when_missing(
+    client: FlaskClient, flask_app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
     monkeypatch.setenv("INKYPI_ENV", "dev")
     frame_path = flask_app.config["DISPLAY_MANAGER"].display.mock_frame_path
     if os.path.exists(frame_path):
@@ -75,7 +89,7 @@ def test_dev_mock_frame_404_when_missing(client, flask_app, monkeypatch):
 # ---- /api/current_image ----
 
 
-def test_current_image_not_found(client, device_config_dev):
+def test_current_image_not_found(client: FlaskClient, device_config_dev: Any) -> None:
     # Ensure image file doesn't exist
     if os.path.exists(device_config_dev.current_image_file):
         os.remove(device_config_dev.current_image_file)
@@ -85,7 +99,9 @@ def test_current_image_not_found(client, device_config_dev):
     assert "error" in data
 
 
-def test_current_image_if_modified_since_fresh(client, device_config_dev):
+def test_current_image_if_modified_since_fresh(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     _save_png(device_config_dev.current_image_file)
     # Set If-Modified-Since far in the future
     resp = client.get(
@@ -95,7 +111,9 @@ def test_current_image_if_modified_since_fresh(client, device_config_dev):
     assert resp.status_code == 304
 
 
-def test_current_image_if_modified_since_stale(client, device_config_dev):
+def test_current_image_if_modified_since_stale(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     _save_png(device_config_dev.current_image_file)
     resp = client.get(
         "/api/current_image",
@@ -104,7 +122,9 @@ def test_current_image_if_modified_since_stale(client, device_config_dev):
     assert resp.status_code == 200
 
 
-def test_current_image_if_modified_since_malformed(client, device_config_dev):
+def test_current_image_if_modified_since_malformed(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     _save_png(device_config_dev.current_image_file)
     resp = client.get(
         "/api/current_image",
@@ -113,7 +133,9 @@ def test_current_image_if_modified_since_malformed(client, device_config_dev):
     assert resp.status_code == 200
 
 
-def test_current_image_if_modified_since_utc_returns_304(client, device_config_dev):
+def test_current_image_if_modified_since_utc_returns_304(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     """Verify parsedate_to_datetime correctly handles UTC timestamps for 304 responses.
 
     This guards against the bug where strptime with %Z would treat parsed time
@@ -137,12 +159,14 @@ def test_current_image_if_modified_since_utc_returns_304(client, device_config_d
 # ---- /display-next ----
 
 
-def test_display_next_no_playlist(client, device_config_dev):
+def test_display_next_no_playlist(client: FlaskClient, device_config_dev: Any) -> None:
     resp = client.post("/display-next")
     assert resp.status_code == 400
 
 
-def test_display_next_first_request_not_rate_limited(client, device_config_dev):
+def test_display_next_first_request_not_rate_limited(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     """First POST to /display-next should not be rate-limited (returns 400 for no playlist, not 429)."""
     from blueprints.main import _reset_display_next_cooldown
 
@@ -152,8 +176,8 @@ def test_display_next_first_request_not_rate_limited(client, device_config_dev):
 
 
 def test_display_next_second_request_within_cooldown_returns_429(
-    client, device_config_dev
-):
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     """Second immediate successful POST within cooldown returns 429."""
     from blueprints.main import _reset_display_next_cooldown
 
@@ -182,7 +206,7 @@ def test_display_next_second_request_within_cooldown_returns_429(
     assert "wait" in body["error"].lower()
 
 
-def test_display_next_failed_requests_do_not_arm_cooldown(client):
+def test_display_next_failed_requests_do_not_arm_cooldown(client: FlaskClient) -> None:
     from blueprints.main import _reset_display_next_cooldown
 
     _reset_display_next_cooldown()
@@ -194,8 +218,8 @@ def test_display_next_failed_requests_do_not_arm_cooldown(client):
 
 
 def test_display_next_after_successful_request_respects_cooldown(
-    client, device_config_dev, monkeypatch
-):
+    client: FlaskClient, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """After the cooldown period elapses, the endpoint should accept successful requests again."""
     from blueprints.main import _reset_display_next_cooldown
 
@@ -230,7 +254,9 @@ def test_display_next_after_successful_request_respects_cooldown(
     assert resp3.status_code == 200
 
 
-def test_display_next_exception(client, flask_app, device_config_dev):
+def test_display_next_exception(
+    client: FlaskClient, flask_app: Flask, device_config_dev: Any
+) -> None:
     """Plugin generation error via manual_update returns 400 without leaking exception text."""
     mock_playlist = MagicMock()
     mock_plugin_inst = MagicMock()
@@ -259,8 +285,8 @@ def test_display_next_exception(client, flask_app, device_config_dev):
 
 
 def test_display_next_direct_generate_error_no_leak(
-    client, flask_app, device_config_dev
-):
+    client: FlaskClient, flask_app: Flask, device_config_dev: Any
+) -> None:
     """Direct (non-refresh_task) path must not leak RuntimeError text.
 
     Regression for CodeQL py/stack-trace-exposure (src/blueprints/main.py:360).
@@ -307,7 +333,7 @@ def test_display_next_direct_generate_error_no_leak(
 # ---- /api/plugin_order ----
 
 
-def test_plugin_order_invalid_json(client):
+def test_plugin_order_invalid_json(client: FlaskClient) -> None:
     resp = client.post(
         "/api/plugin_order",
         data="not json",
@@ -316,17 +342,19 @@ def test_plugin_order_invalid_json(client):
     assert resp.status_code == 400
 
 
-def test_plugin_order_non_list(client):
+def test_plugin_order_non_list(client: FlaskClient) -> None:
     resp = client.post("/api/plugin_order", json={"order": "not-a-list"})
     assert resp.status_code == 400
 
 
-def test_plugin_order_non_string_items(client):
+def test_plugin_order_non_string_items(client: FlaskClient) -> None:
     resp = client.post("/api/plugin_order", json={"order": [1, 2, 3]})
     assert resp.status_code == 400
 
 
-def test_plugin_order_duplicate_items(client, device_config_dev):
+def test_plugin_order_duplicate_items(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     plugins = device_config_dev.get_plugins()
     assert plugins, "No plugins registered in dev config"
     plugin_id = plugins[0]["id"]
@@ -335,7 +363,9 @@ def test_plugin_order_duplicate_items(client, device_config_dev):
     assert "duplicate" in resp.get_json()["error"].lower()
 
 
-def test_plugin_order_missing_items(client, device_config_dev):
+def test_plugin_order_missing_items(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     plugins = device_config_dev.get_plugins()
     assert plugins, "No plugins registered in dev config"
     resp = client.post("/api/plugin_order", json={"order": [plugins[0]["id"]]})
@@ -343,7 +373,7 @@ def test_plugin_order_missing_items(client, device_config_dev):
     assert "include every plugin id exactly once" in resp.get_json()["error"].lower()
 
 
-def test_plugin_order_unknown_ids_not_reflected(client):
+def test_plugin_order_unknown_ids_not_reflected(client: FlaskClient) -> None:
     """Regression test for CodeQL py/reflective-xss at main.py:280.
 
     User-supplied plugin IDs must not be echoed back in the error response,

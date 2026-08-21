@@ -1,9 +1,13 @@
 import importlib
 import os
 import sys
+from pathlib import Path
+from typing import Any
+
+import pytest
 
 
-def _write_min_device_config(path):
+def _write_min_device_config(path: Any) -> None:
     import json
 
     cfg = {
@@ -31,11 +35,13 @@ def _write_min_device_config(path):
     path.write_text(json.dumps(cfg))
 
 
-def _nop_load_plugins(_conf):
+def _nop_load_plugins(_conf: Any) -> Any:
     return None
 
 
-def test_secret_key_dev_persisted(tmp_path, monkeypatch):
+def test_secret_key_dev_persisted(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     # Prepare minimal device config and environment
     cfg_path = tmp_path / "device.json"
     _write_min_device_config(cfg_path)
@@ -66,7 +72,9 @@ def test_secret_key_dev_persisted(tmp_path, monkeypatch):
     assert env_text.strip().split("SECRET_KEY=")[-1].strip() != ""
 
 
-def test_secret_key_prod_persisted(tmp_path, monkeypatch):
+def test_secret_key_prod_persisted(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     # Prepare minimal device config and environment
     cfg_path = tmp_path / "device.json"
     _write_min_device_config(cfg_path)
@@ -104,7 +112,9 @@ def test_secret_key_prod_persisted(tmp_path, monkeypatch):
     assert "SECRET_KEY=" in env_text
 
 
-def _reload_inkypi(monkeypatch, argv=None, env=None):
+def _reload_inkypi(
+    monkeypatch: pytest.MonkeyPatch, argv: Any = None, env: Any = None
+) -> Any:
     if argv is None:
         argv = ["inkypi.py"]
     if env is None:
@@ -134,7 +144,7 @@ def _reload_inkypi(monkeypatch, argv=None, env=None):
     return mod
 
 
-def test_secret_key_from_env(monkeypatch, tmp_path):
+def test_secret_key_from_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     # SECRET_KEY present in environment should be used as-is
     mod = _reload_inkypi(
         monkeypatch,
@@ -146,7 +156,9 @@ def test_secret_key_from_env(monkeypatch, tmp_path):
     assert app.secret_key == "from-env"
 
 
-def test_secret_key_persisted_in_dev_env_file(monkeypatch, tmp_path):
+def test_secret_key_persisted_in_dev_env_file(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     # No SECRET_KEY in process env; should generate and persist to .env in dev
     env = {"INKYPI_ENV": "dev", "PROJECT_DIR": str(tmp_path)}
     mod = _reload_inkypi(monkeypatch, argv=["inkypi.py"], env=env)
@@ -168,7 +180,9 @@ def test_secret_key_persisted_in_dev_env_file(monkeypatch, tmp_path):
     assert app2.secret_key == generated
 
 
-def test_secret_key_stable_in_prod_after_persist(monkeypatch, tmp_path):
+def test_secret_key_stable_in_prod_after_persist(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     # Production mode: if missing, it should generate AND persist to .env
     # so subsequent restarts reuse the same key
     env = {"INKYPI_ENV": "production", "PROJECT_DIR": str(tmp_path)}

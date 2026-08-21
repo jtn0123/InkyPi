@@ -22,6 +22,11 @@ These tests cover:
 import json
 import logging
 import os
+from typing import Any
+
+import pytest
+from flask import Flask
+from flask.testing import FlaskClient
 
 # ---------------------------------------------------------------------------
 # 1. End-to-end happy path for the clock preview
@@ -29,8 +34,11 @@ import os
 
 
 def test_clock_update_preview_populates_latest_plugin_image(
-    client, monkeypatch, flask_app, device_config_dev
-):
+    client: FlaskClient,
+    monkeypatch: pytest.MonkeyPatch,
+    flask_app: Flask,
+    device_config_dev: Any,
+) -> None:
     """Clock Update Preview must make /plugin_latest_image/clock serve an image.
 
     Reproduces JTN-341: previously the direct update_now path called
@@ -97,8 +105,11 @@ def test_clock_update_preview_populates_latest_plugin_image(
 
 
 def test_clock_update_preview_runtime_error_returns_400_and_logs(
-    client, monkeypatch, flask_app, caplog
-):
+    client: FlaskClient,
+    monkeypatch: pytest.MonkeyPatch,
+    flask_app: Flask,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
     """When generate_image raises RuntimeError, we must return a user-facing
     4xx with a safe message AND call logger.exception so the failure is
     captured in logs (JTN-318 pattern).
@@ -107,7 +118,7 @@ def test_clock_update_preview_runtime_error_returns_400_and_logs(
 
     plugin_authored_message = "Failed to display clock."
 
-    def boom(*args, **kwargs):
+    def boom(*args: Any, **kwargs: Any) -> None:
         raise RuntimeError(plugin_authored_message)
 
     # Patch both the cached instance (non-dev mode reuses it) and the class.
@@ -153,8 +164,11 @@ def test_clock_update_preview_runtime_error_returns_400_and_logs(
 
 
 def test_clock_update_preview_unexpected_exception_returns_500_and_logs(
-    client, monkeypatch, flask_app, caplog
-):
+    client: FlaskClient,
+    monkeypatch: pytest.MonkeyPatch,
+    flask_app: Flask,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
     """Unexpected (non-RuntimeError) exceptions must return 500 with a
     generic message — never ``str(exc)`` — and must logger.exception.
     """
@@ -162,7 +176,7 @@ def test_clock_update_preview_unexpected_exception_returns_500_and_logs(
 
     secret_marker = "SECRET_DB_CONNSTRING=postgres://u:p@internal"
 
-    def boom(*args, **kwargs):
+    def boom(*args: Any, **kwargs: Any) -> None:
         raise ValueError(secret_marker)
 
     clock_inst = get_plugin_instance({"id": "clock", "class": "Clock"})

@@ -8,7 +8,7 @@ def _mk_inst(pid: str, name: str) -> PluginInstance:
     return PluginInstance(pid, name, {}, {"interval": 60})
 
 
-def test_reorder_plugins_accepts_dicts_and_tuples():
+def test_reorder_plugins_accepts_dicts_and_tuples() -> None:
     pl = Playlist("P", "00:00", "24:00")
     pl.plugins = [_mk_inst("a", "A"), _mk_inst("b", "B"), _mk_inst("c", "C")]
 
@@ -27,7 +27,7 @@ def test_reorder_plugins_accepts_dicts_and_tuples():
     ]
 
 
-def test_reorder_plugins_rejects_missing_or_wrong_length():
+def test_reorder_plugins_rejects_missing_or_wrong_length() -> None:
     pl = Playlist("P", "00:00", "24:00")
     pl.plugins = [_mk_inst("a", "A"), _mk_inst("b", "B")]
 
@@ -52,7 +52,7 @@ def test_reorder_plugins_rejects_missing_or_wrong_length():
     )
 
 
-def test_get_next_eligible_advances_and_wraps():
+def test_get_next_eligible_advances_and_wraps() -> None:
     pl = Playlist("P", "00:00", "24:00")
     pl.plugins = [_mk_inst("a", "A"), _mk_inst("b", "B")]
     pl.current_plugin_index = None

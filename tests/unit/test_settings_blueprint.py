@@ -2,7 +2,12 @@
 """Tests for settings blueprint — logs, health, misc routes, and helpers."""
 
 import time
+from pathlib import Path
+from typing import Any
 from unittest.mock import MagicMock, patch
+
+import pytest
+from flask.testing import FlaskClient
 
 # ---------------------------------------------------------------------------
 # /settings/client_log (POST) - client error logging
@@ -10,7 +15,7 @@ from unittest.mock import MagicMock, patch
 
 
 class TestClientLog:
-    def test_client_log_info(self, client):
+    def test_client_log_info(self, client: FlaskClient) -> None:
         resp = client.post(
             "/settings/client_log",
             json={
@@ -21,7 +26,7 @@ class TestClientLog:
         assert resp.status_code == 200
         assert resp.get_json()["success"] is True
 
-    def test_client_log_error(self, client):
+    def test_client_log_error(self, client: FlaskClient) -> None:
         resp = client.post(
             "/settings/client_log",
             json={
@@ -31,7 +36,7 @@ class TestClientLog:
         )
         assert resp.status_code == 200
 
-    def test_client_log_warning(self, client):
+    def test_client_log_warning(self, client: FlaskClient) -> None:
         resp = client.post(
             "/settings/client_log",
             json={
@@ -41,7 +46,7 @@ class TestClientLog:
         )
         assert resp.status_code == 200
 
-    def test_client_log_debug(self, client):
+    def test_client_log_debug(self, client: FlaskClient) -> None:
         resp = client.post(
             "/settings/client_log",
             json={
@@ -51,7 +56,7 @@ class TestClientLog:
         )
         assert resp.status_code == 200
 
-    def test_client_log_with_extra(self, client):
+    def test_client_log_with_extra(self, client: FlaskClient) -> None:
         resp = client.post(
             "/settings/client_log",
             json={
@@ -62,18 +67,20 @@ class TestClientLog:
         )
         assert resp.status_code == 200
 
-    def test_client_log_invalid_body(self, client):
+    def test_client_log_invalid_body(self, client: FlaskClient) -> None:
         resp = client.post(
             "/settings/client_log", data="not json", content_type="application/json"
         )
         assert resp.status_code == 400
 
-    def test_client_log_missing_fields_defaults(self, client):
+    def test_client_log_missing_fields_defaults(self, client: FlaskClient) -> None:
         """Missing level/message should default gracefully."""
         resp = client.post("/settings/client_log", json={})
         assert resp.status_code == 200
 
-    def test_client_log_unknown_level_defaults_to_info(self, client):
+    def test_client_log_unknown_level_defaults_to_info(
+        self, client: FlaskClient
+    ) -> None:
         resp = client.post(
             "/settings/client_log",
             json={
@@ -90,7 +97,9 @@ class TestClientLog:
 
 
 class TestShutdown:
-    def test_shutdown_success(self, client, monkeypatch):
+    def test_shutdown_success(
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         import subprocess
 
         monkeypatch.setattr(subprocess, "run", MagicMock())
@@ -98,7 +107,9 @@ class TestShutdown:
         assert resp.status_code == 200
         assert resp.get_json()["success"] is True
 
-    def test_reboot_success(self, client, monkeypatch):
+    def test_reboot_success(
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         import subprocess
 
         import blueprints.settings as mod
@@ -109,7 +120,9 @@ class TestShutdown:
         assert resp.status_code == 200
         assert resp.get_json()["success"] is True
 
-    def test_shutdown_rate_limited(self, client, monkeypatch):
+    def test_shutdown_rate_limited(
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         import subprocess
 
         monkeypatch.setattr(subprocess, "run", MagicMock())
@@ -120,7 +133,9 @@ class TestShutdown:
         resp2 = client.post("/shutdown", json={})
         assert resp2.status_code == 429
 
-    def test_shutdown_command_failure(self, client, monkeypatch):
+    def test_shutdown_command_failure(
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         import subprocess
 
         import blueprints.settings as mod
@@ -134,7 +149,9 @@ class TestShutdown:
         resp = client.post("/shutdown", json={})
         assert resp.status_code == 500
 
-    def test_shutdown_no_json_body(self, client, monkeypatch):
+    def test_shutdown_no_json_body(
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """POST /shutdown with no body should default to shutdown (not reboot)."""
         import subprocess
 
@@ -157,7 +174,7 @@ class TestShutdown:
 
 
 class TestApiLogs:
-    def test_api_logs_default(self, client):
+    def test_api_logs_default(self, client: FlaskClient) -> None:
         resp = client.get("/api/logs")
         assert resp.status_code == 200
         data = resp.get_json()
@@ -165,37 +182,37 @@ class TestApiLogs:
         assert "count" in data
         assert "meta" in data
 
-    def test_api_logs_with_hours(self, client):
+    def test_api_logs_with_hours(self, client: FlaskClient) -> None:
         resp = client.get("/api/logs?hours=1")
         assert resp.status_code == 200
         data = resp.get_json()
         assert data["meta"]["hours"] == 1
 
-    def test_api_logs_hours_clamped_high(self, client):
+    def test_api_logs_hours_clamped_high(self, client: FlaskClient) -> None:
         resp = client.get("/api/logs?hours=999")
         assert resp.status_code == 200
         data = resp.get_json()
         assert data["meta"]["hours"] <= 24
 
-    def test_api_logs_hours_clamped_low(self, client):
+    def test_api_logs_hours_clamped_low(self, client: FlaskClient) -> None:
         resp = client.get("/api/logs?hours=0")
         assert resp.status_code == 200
         data = resp.get_json()
         assert data["meta"]["hours"] >= 1
 
-    def test_api_logs_with_limit(self, client):
+    def test_api_logs_with_limit(self, client: FlaskClient) -> None:
         resp = client.get("/api/logs?limit=100")
         assert resp.status_code == 200
         data = resp.get_json()
         assert data["meta"]["limit"] == 100
 
-    def test_api_logs_with_contains(self, client):
+    def test_api_logs_with_contains(self, client: FlaskClient) -> None:
         resp = client.get("/api/logs?contains=test")
         assert resp.status_code == 200
         data = resp.get_json()
         assert data["meta"]["contains"] == "test"
 
-    def test_api_logs_contains_trimmed(self, client):
+    def test_api_logs_contains_trimmed(self, client: FlaskClient) -> None:
         """Contains filter >200 chars should be trimmed."""
         long_filter = "x" * 250
         resp = client.get(f"/api/logs?contains={long_filter}")
@@ -204,28 +221,32 @@ class TestApiLogs:
         assert len(data["meta"]["contains"]) == 200
         assert data["truncated"] is True
 
-    def test_api_logs_level_errors(self, client):
+    def test_api_logs_level_errors(self, client: FlaskClient) -> None:
         resp = client.get("/api/logs?level=errors")
         assert resp.status_code == 200
 
-    def test_api_logs_level_warnings(self, client):
+    def test_api_logs_level_warnings(self, client: FlaskClient) -> None:
         resp = client.get("/api/logs?level=warnings")
         assert resp.status_code == 200
 
-    def test_api_logs_invalid_hours(self, client):
+    def test_api_logs_invalid_hours(self, client: FlaskClient) -> None:
         resp = client.get("/api/logs?hours=abc")
         assert resp.status_code == 200
         data = resp.get_json()
         assert data["meta"]["hours"] == 2  # default
 
-    def test_api_logs_rate_limited(self, client, monkeypatch):
+    def test_api_logs_rate_limited(
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         import blueprints.settings as mod
 
         monkeypatch.setattr(mod, "_rate_limit_ok", lambda addr: False)
         resp = client.get("/api/logs")
         assert resp.status_code == 429
 
-    def test_api_logs_with_update_unit(self, client, monkeypatch):
+    def test_api_logs_with_update_unit(
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """When an update is running, logs should include the update unit."""
         import blueprints.settings as mod
 
@@ -245,13 +266,13 @@ class TestApiLogs:
 
 
 class TestDownloadLogs:
-    def test_download_logs_default(self, client):
+    def test_download_logs_default(self, client: FlaskClient) -> None:
         resp = client.get("/download-logs")
         assert resp.status_code == 200
         assert resp.content_type == "text/plain; charset=utf-8"
         assert "attachment" in resp.headers.get("Content-Disposition", "")
 
-    def test_download_logs_custom_hours(self, client):
+    def test_download_logs_custom_hours(self, client: FlaskClient) -> None:
         resp = client.get("/download-logs?hours=4")
         assert resp.status_code == 200
 
@@ -262,14 +283,18 @@ class TestDownloadLogs:
 
 
 class TestBenchmarkAPIs:
-    def test_benchmarks_summary_disabled(self, client, monkeypatch):
+    def test_benchmarks_summary_disabled(
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         import blueprints.settings as mod
 
         monkeypatch.setattr(mod, "_benchmarks_enabled", lambda: False)
         resp = client.get("/api/benchmarks/summary")
         assert resp.status_code == 404
 
-    def test_benchmarks_summary_enabled(self, client, monkeypatch, tmp_path):
+    def test_benchmarks_summary_enabled(
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
         import blueprints.settings as mod
 
         monkeypatch.setattr(mod, "_benchmarks_enabled", lambda: True)
@@ -281,14 +306,18 @@ class TestBenchmarkAPIs:
         assert data["success"] is True
         assert data["count"] == 0
 
-    def test_benchmarks_refreshes_disabled(self, client, monkeypatch):
+    def test_benchmarks_refreshes_disabled(
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         import blueprints.settings as mod
 
         monkeypatch.setattr(mod, "_benchmarks_enabled", lambda: False)
         resp = client.get("/api/benchmarks/refreshes")
         assert resp.status_code == 404
 
-    def test_benchmarks_refreshes_enabled(self, client, monkeypatch, tmp_path):
+    def test_benchmarks_refreshes_enabled(
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
         import blueprints.settings as mod
 
         monkeypatch.setattr(mod, "_benchmarks_enabled", lambda: True)
@@ -299,14 +328,18 @@ class TestBenchmarkAPIs:
         data = resp.get_json()
         assert data["success"] is True
 
-    def test_benchmarks_plugins_disabled(self, client, monkeypatch):
+    def test_benchmarks_plugins_disabled(
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         import blueprints.settings as mod
 
         monkeypatch.setattr(mod, "_benchmarks_enabled", lambda: False)
         resp = client.get("/api/benchmarks/plugins")
         assert resp.status_code == 404
 
-    def test_benchmarks_plugins_enabled(self, client, monkeypatch, tmp_path):
+    def test_benchmarks_plugins_enabled(
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
         import blueprints.settings as mod
 
         monkeypatch.setattr(mod, "_benchmarks_enabled", lambda: True)
@@ -317,14 +350,18 @@ class TestBenchmarkAPIs:
         data = resp.get_json()
         assert data["success"] is True
 
-    def test_benchmarks_stages_no_refresh_id(self, client, monkeypatch):
+    def test_benchmarks_stages_no_refresh_id(
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         import blueprints.settings as mod
 
         monkeypatch.setattr(mod, "_benchmarks_enabled", lambda: True)
         resp = client.get("/api/benchmarks/stages")
         assert resp.status_code == 422
 
-    def test_benchmarks_stages_with_refresh_id(self, client, monkeypatch, tmp_path):
+    def test_benchmarks_stages_with_refresh_id(
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
         import blueprints.settings as mod
 
         monkeypatch.setattr(mod, "_benchmarks_enabled", lambda: True)
@@ -335,14 +372,18 @@ class TestBenchmarkAPIs:
         data = resp.get_json()
         assert data["success"] is True
 
-    def test_benchmarks_stages_disabled(self, client, monkeypatch):
+    def test_benchmarks_stages_disabled(
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         import blueprints.settings as mod
 
         monkeypatch.setattr(mod, "_benchmarks_enabled", lambda: False)
         resp = client.get("/api/benchmarks/stages?refresh_id=abc")
         assert resp.status_code == 404
 
-    def test_benchmarks_summary_with_window(self, client, monkeypatch, tmp_path):
+    def test_benchmarks_summary_with_window(
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
         import blueprints.settings as mod
 
         monkeypatch.setattr(mod, "_benchmarks_enabled", lambda: True)
@@ -351,7 +392,9 @@ class TestBenchmarkAPIs:
         resp = client.get("/api/benchmarks/summary?window=1h")
         assert resp.status_code == 200
 
-    def test_benchmarks_refreshes_with_cursor(self, client, monkeypatch, tmp_path):
+    def test_benchmarks_refreshes_with_cursor(
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
         import blueprints.settings as mod
 
         monkeypatch.setattr(mod, "_benchmarks_enabled", lambda: True)
@@ -361,8 +404,8 @@ class TestBenchmarkAPIs:
         assert resp.status_code == 200
 
     def test_benchmarks_refreshes_invalid_cursor_is_ignored(
-        self, client, monkeypatch, tmp_path
-    ):
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
         import blueprints.settings as mod
 
         monkeypatch.setattr(mod, "_benchmarks_enabled", lambda: True)
@@ -381,19 +424,21 @@ class TestBenchmarkAPIs:
 
 
 class TestHealthAPIs:
-    def test_health_plugins(self, client):
+    def test_health_plugins(self, client: FlaskClient) -> None:
         resp = client.get("/api/health/plugins")
         assert resp.status_code == 200
         data = resp.get_json()
         assert data["success"] is True
 
-    def test_health_system(self, client):
+    def test_health_system(self, client: FlaskClient) -> None:
         resp = client.get("/api/health/system")
         assert resp.status_code == 200
         data = resp.get_json()
         assert data["success"] is True
 
-    def test_health_system_no_psutil(self, client, monkeypatch):
+    def test_health_system_no_psutil(
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+    ) -> Any:
         """When psutil is unavailable, system health returns None fields."""
         import blueprints.settings as mod
 
@@ -404,7 +449,7 @@ class TestHealthAPIs:
 
         real_import = builtins.__import__
 
-        def mock_import(name, *args, **kwargs):
+        def mock_import(name: Any, *args: Any, **kwargs: Any) -> Any:
             if name == "psutil":
                 raise ImportError("no psutil")
             return real_import(name, *args, **kwargs)
@@ -422,15 +467,15 @@ class TestHealthAPIs:
 
 
 class TestSettingsPages:
-    def test_settings_page(self, client):
+    def test_settings_page(self, client: FlaskClient) -> None:
         resp = client.get("/settings")
         assert resp.status_code == 200
 
-    def test_backup_restore_page(self, client):
+    def test_backup_restore_page(self, client: FlaskClient) -> None:
         resp = client.get("/settings/backup")
         assert resp.status_code == 200
 
-    def test_api_keys_page(self, client):
+    def test_api_keys_page(self, client: FlaskClient) -> None:
         resp = client.get("/settings/api-keys")
         assert resp.status_code == 200
 
@@ -441,39 +486,39 @@ class TestSettingsPages:
 
 
 class TestHelpers:
-    def test_window_since_seconds_hours(self):
+    def test_window_since_seconds_hours(self) -> None:
         from blueprints.settings import _window_since_seconds
 
         result = _window_since_seconds("6h")
         assert result > 0
         assert result < time.time()
 
-    def test_window_since_seconds_minutes(self):
+    def test_window_since_seconds_minutes(self) -> None:
         from blueprints.settings import _window_since_seconds
 
         result = _window_since_seconds("30m")
         assert result > 0
 
-    def test_window_since_seconds_days(self):
+    def test_window_since_seconds_days(self) -> None:
         from blueprints.settings import _window_since_seconds
 
         result = _window_since_seconds("2d")
         assert result > 0
 
-    def test_window_since_seconds_none(self):
+    def test_window_since_seconds_none(self) -> None:
         from blueprints.settings import _window_since_seconds
 
         result = _window_since_seconds(None)
         # Should default to 24h ago
         assert abs(result - (time.time() - 24 * 3600)) < 2
 
-    def test_window_since_seconds_invalid_defaults_to_24h(self):
+    def test_window_since_seconds_invalid_defaults_to_24h(self) -> None:
         from blueprints.settings import _window_since_seconds
 
         result = _window_since_seconds("abch")
         assert abs(result - (time.time() - 24 * 3600)) < 2
 
-    def test_window_since_seconds_invalid_does_not_log_raw_input(self):
+    def test_window_since_seconds_invalid_does_not_log_raw_input(self) -> None:
         from blueprints.settings import _window_since_seconds
 
         raw_window = "not-a-number\nforged-log-lineh"
@@ -485,17 +530,17 @@ class TestHelpers:
             "Invalid benchmark window provided, defaulting to 24h"
         )
 
-    def test_pct_empty(self):
+    def test_pct_empty(self) -> None:
         from blueprints.settings import _pct
 
         assert _pct([], 0.5) is None
 
-    def test_pct_values(self):
+    def test_pct_values(self) -> None:
         from blueprints.settings import _pct
 
         assert _pct([10, 20, 30, 40, 50], 0.5) == 30
 
-    def test_clamp_int(self):
+    def test_clamp_int(self) -> None:
         from blueprints.settings import _clamp_int
 
         assert _clamp_int("5", 10, 1, 100) == 5
@@ -504,19 +549,19 @@ class TestHelpers:
         assert _clamp_int(None, 10, 1, 100) == 10
         assert _clamp_int("abc", 10, 1, 100) == 10
 
-    def test_rate_limit_ok(self):
+    def test_rate_limit_ok(self) -> None:
         from blueprints.settings import _logs_limiter, _rate_limit_ok
 
         _logs_limiter._requests.clear()
         assert _rate_limit_ok("127.0.0.1") is True
 
-    def test_benchmarks_enabled_default(self, monkeypatch):
+    def test_benchmarks_enabled_default(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.delenv("INKYPI_BENCHMARK_API_ENABLED", raising=False)
         from blueprints.settings import _benchmarks_enabled
 
         assert _benchmarks_enabled() is True
 
-    def test_benchmarks_disabled(self, monkeypatch):
+    def test_benchmarks_disabled(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("INKYPI_BENCHMARK_API_ENABLED", "false")
         from blueprints.settings import _benchmarks_enabled
 
@@ -531,17 +576,21 @@ class TestHelpers:
 class TestDiagnosticsRedirect:
     """``/settings/diagnostics`` must not 404; it redirects to the accordion anchor."""
 
-    def test_diagnostics_redirects_to_settings_anchor(self, client):
+    def test_diagnostics_redirects_to_settings_anchor(
+        self, client: FlaskClient
+    ) -> None:
         resp = client.get("/settings/diagnostics", follow_redirects=False)
         assert resp.status_code == 302
         assert resp.headers["Location"].endswith("/settings#diagnostics")
 
-    def test_diagnostics_follow_redirect_renders_settings(self, client):
+    def test_diagnostics_follow_redirect_renders_settings(
+        self, client: FlaskClient
+    ) -> None:
         resp = client.get("/settings/diagnostics", follow_redirects=True)
         assert resp.status_code == 200
         # Diagnostics anchor target must be present so the fragment resolves.
         assert b'id="diagnostics"' in resp.data
 
-    def test_diagnostics_direct_not_404(self, client):
+    def test_diagnostics_direct_not_404(self, client: FlaskClient) -> None:
         resp = client.get("/settings/diagnostics")
         assert resp.status_code != 404

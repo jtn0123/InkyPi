@@ -11,8 +11,11 @@ from __future__ import annotations
 
 import json
 
+from flask import Flask
+from flask.testing import FlaskClient
 
-def test_every_page_loads_status_badge_script(client):
+
+def test_every_page_loads_status_badge_script(client: FlaskClient) -> None:
     """Every top-level page in the shared base template loads status_badge.js."""
     paths = ["/", "/playlist", "/history", "/settings", "/plugins", "/plugin/clock"]
     for path in paths:
@@ -25,7 +28,7 @@ def test_every_page_loads_status_badge_script(client):
         )
 
 
-def test_plugin_pages_opt_out_of_floating_status_badge(client):
+def test_plugin_pages_opt_out_of_floating_status_badge(client: FlaskClient) -> None:
     """Plugin list/detail pages suppress the floating badge that overlaps UI."""
     for path in ("/plugins", "/plugin/clock"):
         resp = client.get(path)
@@ -34,7 +37,9 @@ def test_plugin_pages_opt_out_of_floating_status_badge(client):
         assert '<meta name="status-badge-disabled" content="1">' in html
 
 
-def test_diagnostics_exposes_badge_contract(client, flask_app):
+def test_diagnostics_exposes_badge_contract(
+    client: FlaskClient, flask_app: Flask
+) -> None:
     """The diagnostics endpoint exposes the keys the badge consumes."""
     import blueprints.client_log as cl_mod
 
@@ -56,7 +61,9 @@ def test_diagnostics_exposes_badge_contract(client, flask_app):
     }
 
 
-def test_client_log_error_flips_recent_counter(client, flask_app):
+def test_client_log_error_flips_recent_counter(
+    client: FlaskClient, flask_app: Flask
+) -> None:
     """Posting a client-log error shows up in the diagnostics payload the badge polls."""
     import blueprints.client_log as cl_mod
 
@@ -87,7 +94,7 @@ def test_client_log_error_flips_recent_counter(client, flask_app):
     cl_mod.reset_captured_reports()
 
 
-def test_no_polling_in_test_mode_via_opt_out_meta(client):
+def test_no_polling_in_test_mode_via_opt_out_meta(client: FlaskClient) -> None:
     """The badge script respects the status-badge-disabled meta opt-out.
 
     Pages don't currently set this meta, but the script is expected to no-op

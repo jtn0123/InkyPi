@@ -1,3 +1,5 @@
+from typing import Any
+
 # pyright: reportMissingImports=false
 from unittest.mock import MagicMock, patch
 
@@ -6,11 +8,11 @@ from PIL import Image
 
 
 @pytest.fixture()
-def plugin_config():
+def plugin_config() -> Any:
     return {"id": "rss", "class": "Rss", "name": "RSS"}
 
 
-def _mock_feed_entries(entries):
+def _mock_feed_entries(entries: Any) -> Any:
     """Build a feedparser-like result with given entries."""
     feed = MagicMock()
     feed.bozo = False
@@ -18,7 +20,9 @@ def _mock_feed_entries(entries):
     return feed
 
 
-def _basic_entry(title="Article", description="Desc", image=None):
+def _basic_entry(
+    title: Any = "Article", description: Any = "Desc", image: Any = None
+) -> Any:
     entry = MagicMock()
     entry.get = lambda k, d="": {
         "title": title,
@@ -37,7 +41,9 @@ def _basic_entry(title="Article", description="Desc", image=None):
     return entry
 
 
-def test_rss_generate_success(monkeypatch, plugin_config, device_config_dev):
+def test_rss_generate_success(
+    monkeypatch: pytest.MonkeyPatch, plugin_config: Any, device_config_dev: Any
+) -> None:
     from plugins.rss.rss import Rss
 
     mock_resp = MagicMock()
@@ -58,7 +64,9 @@ def test_rss_generate_success(monkeypatch, plugin_config, device_config_dev):
     assert isinstance(result, Image.Image)
 
 
-def test_rss_media_content_image(monkeypatch, plugin_config, device_config_dev):
+def test_rss_media_content_image(
+    monkeypatch: pytest.MonkeyPatch, plugin_config: Any, device_config_dev: Any
+) -> None:
     from plugins.rss.rss import Rss
 
     mock_resp = MagicMock()
@@ -85,7 +93,9 @@ def test_rss_media_content_image(monkeypatch, plugin_config, device_config_dev):
     assert isinstance(result, Image.Image)
 
 
-def test_rss_media_thumbnail_image(monkeypatch, plugin_config, device_config_dev):
+def test_rss_media_thumbnail_image(
+    monkeypatch: pytest.MonkeyPatch, plugin_config: Any, device_config_dev: Any
+) -> None:
     from plugins.rss.rss import Rss
 
     mock_resp = MagicMock()
@@ -108,7 +118,9 @@ def test_rss_media_thumbnail_image(monkeypatch, plugin_config, device_config_dev
     assert isinstance(result, Image.Image)
 
 
-def test_rss_enclosure_image(monkeypatch, plugin_config, device_config_dev):
+def test_rss_enclosure_image(
+    monkeypatch: pytest.MonkeyPatch, plugin_config: Any, device_config_dev: Any
+) -> None:
     from plugins.rss.rss import Rss
 
     mock_resp = MagicMock()
@@ -129,7 +141,9 @@ def test_rss_enclosure_image(monkeypatch, plugin_config, device_config_dev):
     assert isinstance(result, Image.Image)
 
 
-def test_rss_html_entities_unescaped(monkeypatch, plugin_config, device_config_dev):
+def test_rss_html_entities_unescaped(
+    monkeypatch: pytest.MonkeyPatch, plugin_config: Any, device_config_dev: Any
+) -> None:
     from plugins.rss.rss import Rss
 
     mock_resp = MagicMock()
@@ -148,7 +162,9 @@ def test_rss_html_entities_unescaped(monkeypatch, plugin_config, device_config_d
     assert "&amp;" not in items[0]["title"]
 
 
-def test_rss_html_tags_stripped(monkeypatch, plugin_config, device_config_dev):
+def test_rss_html_tags_stripped(
+    monkeypatch: pytest.MonkeyPatch, plugin_config: Any, device_config_dev: Any
+) -> None:
     from plugins.rss.rss import Rss
 
     mock_resp = MagicMock()
@@ -173,7 +189,7 @@ def test_rss_html_tags_stripped(monkeypatch, plugin_config, device_config_dev):
     assert "Paragraph" in items[0]["description"]
 
 
-def test_rss_sanitize_text_static():
+def test_rss_sanitize_text_static() -> None:
     from plugins.rss.rss import Rss
 
     assert Rss._sanitize_text("") == ""
@@ -183,7 +199,9 @@ def test_rss_sanitize_text_static():
     assert Rss._sanitize_text('<a href="x">link</a> text') == "link text"
 
 
-def test_rss_max_ten_items(monkeypatch, plugin_config, device_config_dev):
+def test_rss_max_ten_items(
+    monkeypatch: pytest.MonkeyPatch, plugin_config: Any, device_config_dev: Any
+) -> None:
     from plugins.rss.rss import Rss
 
     mock_resp = MagicMock()
@@ -204,7 +222,7 @@ def test_rss_max_ten_items(monkeypatch, plugin_config, device_config_dev):
     assert isinstance(result, Image.Image)
 
 
-def test_rss_sanitize_nested_tags():
+def test_rss_sanitize_nested_tags() -> None:
     """Nested HTML tags should be fully stripped."""
     from plugins.rss.rss import Rss
 
@@ -212,7 +230,7 @@ def test_rss_sanitize_nested_tags():
     assert Rss._sanitize_text("<div><span>inner</span></div>") == "inner"
 
 
-def test_rss_sanitize_entities():
+def test_rss_sanitize_entities() -> None:
     """HTML entities should be unescaped."""
     from plugins.rss.rss import Rss
 
@@ -222,8 +240,11 @@ def test_rss_sanitize_entities():
 
 
 def test_rss_generate_with_realistic_feed(
-    monkeypatch, plugin_config, device_config_dev, realistic_rss_feed
-):
+    monkeypatch: pytest.MonkeyPatch,
+    plugin_config: Any,
+    device_config_dev: Any,
+    realistic_rss_feed: Any,
+) -> None:
     """Test RSS plugin with a realistic feed fixture."""
     from plugins.rss.rss import Rss
 

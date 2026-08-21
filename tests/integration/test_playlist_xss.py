@@ -11,6 +11,8 @@ attacker-controlled value.
 
 from __future__ import annotations
 
+from flask.testing import FlaskClient
+
 XSS_PAYLOADS = [
     "<script>alert(1)</script>",
     '"><img src=x onerror=alert(1)>',
@@ -26,7 +28,7 @@ def _assert_no_raw_reflection(body: bytes | str, payload: str) -> None:
     ), f"Response echoed raw XSS payload {payload!r}; body was: {text[:300]!r}"
 
 
-def test_create_playlist_duplicate_does_not_reflect_name(client):
+def test_create_playlist_duplicate_does_not_reflect_name(client: FlaskClient) -> None:
     """create_playlist duplicate error must not echo playlist_name."""
     # Seed a baseline playlist first
     resp = client.post(
@@ -57,7 +59,7 @@ def test_create_playlist_duplicate_does_not_reflect_name(client):
         _assert_no_raw_reflection(r.data, payload)
 
 
-def test_update_playlist_missing_does_not_reflect_name(client):
+def test_update_playlist_missing_does_not_reflect_name(client: FlaskClient) -> None:
     for payload in XSS_PAYLOADS:
         r = client.put(
             f"/update_playlist/{payload}",
@@ -72,7 +74,7 @@ def test_update_playlist_missing_does_not_reflect_name(client):
         _assert_no_raw_reflection(r.data, payload)
 
 
-def test_delete_playlist_missing_does_not_reflect_name(client):
+def test_delete_playlist_missing_does_not_reflect_name(client: FlaskClient) -> None:
     for payload in XSS_PAYLOADS:
         r = client.delete(f"/delete_playlist/{payload}")
         assert r.status_code >= 400
@@ -84,7 +86,7 @@ def test_delete_playlist_missing_does_not_reflect_name(client):
         _assert_no_raw_reflection(r.data, payload)
 
 
-def test_reorder_plugins_missing_does_not_reflect_name(client):
+def test_reorder_plugins_missing_does_not_reflect_name(client: FlaskClient) -> None:
     for payload in XSS_PAYLOADS:
         r = client.post(
             "/reorder_plugins",
@@ -95,7 +97,7 @@ def test_reorder_plugins_missing_does_not_reflect_name(client):
         _assert_no_raw_reflection(r.data, payload)
 
 
-def test_display_next_missing_does_not_reflect_name(client):
+def test_display_next_missing_does_not_reflect_name(client: FlaskClient) -> None:
     for payload in XSS_PAYLOADS:
         r = client.post(
             "/display_next_in_playlist",
@@ -106,7 +108,7 @@ def test_display_next_missing_does_not_reflect_name(client):
         _assert_no_raw_reflection(r.data, payload)
 
 
-def test_playlist_eta_missing_does_not_reflect_name(client):
+def test_playlist_eta_missing_does_not_reflect_name(client: FlaskClient) -> None:
     for payload in XSS_PAYLOADS:
         r = client.get(f"/playlist/eta/{payload}")
         assert r.status_code >= 400

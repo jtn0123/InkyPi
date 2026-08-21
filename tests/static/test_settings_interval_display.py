@@ -5,7 +5,7 @@ from pathlib import Path
 JS_PATH = Path("src/static/scripts/settings/form.js")
 
 
-def test_populate_interval_fields_clamps_sub_minute():
+def test_populate_interval_fields_clamps_sub_minute() -> None:
     """JTN-245: Values < 60 seconds must not display as '0 minutes'.
 
     Math.max(1, intervalInMinutes) ensures that sub-minute intervals
@@ -15,14 +15,14 @@ def test_populate_interval_fields_clamps_sub_minute():
     assert "Math.max(1, intervalInMinutes)" in js
 
 
-def test_populate_interval_fields_hours_branch_unchanged():
+def test_populate_interval_fields_hours_branch_unchanged() -> None:
     """The hours branch should still use the raw hour value without clamping."""
     js = JS_PATH.read_text()
     assert "intervalInput.value = String(intervalInHours)" in js
     assert 'unitSelect.value = "hour"' in js
 
 
-def test_unit_select_has_no_second_option():
+def test_unit_select_has_no_second_option() -> None:
     """The unit <select> has no 'second' option, so clamping is the correct fix."""
     html = Path("src/templates/settings.html").read_text()
     # Confirm minute and hour options exist

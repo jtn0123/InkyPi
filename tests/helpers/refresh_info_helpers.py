@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
+from typing import Any
 
 
-def seed_future_refresh_info(device_config, *, days_ahead: int = 90) -> str:
+def seed_future_refresh_info(device_config: Any, *, days_ahead: int = 90) -> str:
     """Store a future-dated refresh record for clock-skew scenarios."""
     from model import RefreshInfo
 

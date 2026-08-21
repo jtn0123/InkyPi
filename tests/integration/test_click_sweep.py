@@ -30,6 +30,8 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
+from flask import Flask
+from playwright.sync_api import Page
 from tests.integration.browser_helpers import (
     RuntimeCollector,
     authenticate_page,
@@ -285,11 +287,11 @@ _SNAPSHOT_JS = """
 """
 
 
-def _install_observer(page) -> None:
+def _install_observer(page: Page) -> None:
     page.evaluate(_INSTALL_OBSERVER_JS)
 
 
-def _snapshot(page) -> dict:
+def _snapshot(page: Page) -> dict:
     return page.evaluate(_SNAPSHOT_JS)
 
 
@@ -309,11 +311,11 @@ def _observable_change(before: dict, after: dict) -> bool:
     return bool(before.get("markerPresent") and not after.get("markerPresent"))
 
 
-def _enumerate_candidates(page) -> list[dict]:
+def _enumerate_candidates(page: Page) -> list[dict]:
     return page.evaluate(_ENUMERATE_JS, list(_SKIP_SELECTORS))
 
 
-def _click_one(page, descriptor: dict) -> tuple[dict, dict]:
+def _click_one(page: Page, descriptor: dict) -> tuple[dict, dict]:
     """Click a single candidate and return (before, after) snapshots.
 
     We try Playwright's native ``click`` first (picks up default event
@@ -349,7 +351,7 @@ def _click_one(page, descriptor: dict) -> tuple[dict, dict]:
     return before, after
 
 
-def _reset_page_state(page, base_url: str, sweep: SweepPage) -> None:
+def _reset_page_state(page: Page, base_url: str, sweep: SweepPage) -> None:
     """Return to the sweep's starting URL without re-attaching observers."""
     current = page.url
     if not current.endswith(sweep.path) and sweep.path not in current:
@@ -433,7 +435,7 @@ _CLOSE_OPEN_MODALS_JS = """
 """
 
 
-def _close_open_modals(page) -> None:
+def _close_open_modals(page: Page) -> None:
     """Best-effort close any modal dialogs opened by a click."""
     try:
         page.evaluate(_CLOSE_OPEN_MODALS_JS)
@@ -442,12 +444,12 @@ def _close_open_modals(page) -> None:
 
 
 def _run_click_sweep(
-    page,
+    page: Page,
     live_server: str,
     sweep: SweepPage,
     *,
     max_clicks: int = _MAX_CLICKS_PER_PAGE,
-    flask_app=None,
+    flask_app: Flask = None,
     authenticated: bool = False,
 ) -> None:
     """Shared click-sweep body used by both the core-pages and plugin-pages tests.
@@ -583,14 +585,14 @@ _AUTH_STATES: tuple[str, ...] = ("pre_auth", "post_auth")
 )
 @pytest.mark.parametrize("sweep", PAGES_TO_SWEEP, ids=lambda sweep: sweep.label)
 def test_click_sweep(
-    live_server,
-    flask_app,
-    request,
+    live_server: str,
+    flask_app: Flask,
+    request: pytest.FixtureRequest,
     sweep: SweepPage,
     viewport: str,
     page_fixture: str,
     auth_state: str,
-):
+) -> None:
     """Click every visible clickable on the page; assert no silent failures.
 
     Parametrized over:
@@ -631,8 +633,12 @@ def test_click_sweep(
 @pytest.mark.parametrize("auth_state", _AUTH_STATES, ids=list(_AUTH_STATES))
 @pytest.mark.parametrize("plugin_id", _PLUGIN_IDS, ids=list(_PLUGIN_IDS))
 def test_click_sweep_plugin_pages(
-    live_server, flask_app, browser_page, plugin_id: str, auth_state: str
-):
+    live_server: str,
+    flask_app: Flask,
+    browser_page: Page,
+    plugin_id: str,
+    auth_state: str,
+) -> None:
     """Sweep every ``/plugin/<id>`` page for silent-failure handlers.
 
     Uses the shared :func:`_run_click_sweep` body with a tighter click cap

@@ -7,7 +7,7 @@ gate that wires it in behind ``DEV_MODE`` / ``INKYPI_STRICT_SCHEMAS``.
 from __future__ import annotations
 
 import logging
-from typing import TypedDict
+from typing import Any, TypedDict
 
 import pytest
 from flask import Flask, jsonify
@@ -18,7 +18,7 @@ class _ToyResponse(TypedDict):
 
 
 @pytest.fixture()
-def dev_app_with_validator(monkeypatch):
+def dev_app_with_validator(monkeypatch: pytest.MonkeyPatch) -> Any:
     """A minimal Flask app with the validator registered and a toy endpoint.
 
     The endpoint map is patched to a single entry so tests stay hermetic and
@@ -30,11 +30,11 @@ def dev_app_with_validator(monkeypatch):
     app.config["TESTING"] = True
 
     @app.route("/toy/ok")
-    def toy_ok():  # endpoint auto-named "toy_ok"
+    def toy_ok() -> Any:  # endpoint auto-named "toy_ok"
         return jsonify({"value": 1})
 
     @app.route("/toy/bad")
-    def toy_bad():
+    def toy_bad() -> Any:
         return jsonify({"value": "not-an-int"})
 
     # Patch ENDPOINT_SCHEMAS to match Flask's auto-named endpoints (no
@@ -49,7 +49,9 @@ def dev_app_with_validator(monkeypatch):
     return app
 
 
-def test_dev_mode_logs_no_warning_on_valid_response(dev_app_with_validator, caplog):
+def test_dev_mode_logs_no_warning_on_valid_response(
+    dev_app_with_validator: Any, caplog: pytest.LogCaptureFixture
+) -> None:
     caplog.set_level(logging.WARNING, logger="app_setup.schema_validator")
 
     resp = dev_app_with_validator.test_client().get("/toy/ok")
@@ -63,7 +65,9 @@ def test_dev_mode_logs_no_warning_on_valid_response(dev_app_with_validator, capl
     assert drift_records == [], f"unexpected drift warnings: {drift_records}"
 
 
-def test_dev_mode_logs_warning_on_shape_drift(dev_app_with_validator, caplog):
+def test_dev_mode_logs_warning_on_shape_drift(
+    dev_app_with_validator: Any, caplog: pytest.LogCaptureFixture
+) -> None:
     caplog.set_level(logging.WARNING, logger="app_setup.schema_validator")
 
     resp = dev_app_with_validator.test_client().get("/toy/bad")
@@ -83,7 +87,7 @@ def test_dev_mode_logs_warning_on_shape_drift(dev_app_with_validator, caplog):
     assert any("$.value" in m for m in messages)
 
 
-def test_prod_mode_skips_registration(monkeypatch):
+def test_prod_mode_skips_registration(monkeypatch: pytest.MonkeyPatch) -> Any:
     """When DEV_MODE is False and INKYPI_STRICT_SCHEMAS is unset, the validator
     must not be attached to any app-level after_request chain.
     """
@@ -101,7 +105,7 @@ def test_prod_mode_skips_registration(monkeypatch):
     called = {"did": False}
     original_register = schema_validator.register
 
-    def _spy(a):
+    def _spy(a: Any) -> Any:
         called["did"] = True
         return original_register(a)
 
@@ -116,7 +120,7 @@ def test_prod_mode_skips_registration(monkeypatch):
     assert not any(app.after_request_funcs.values())
 
 
-def test_strict_env_flag_forces_registration(monkeypatch):
+def test_strict_env_flag_forces_registration(monkeypatch: pytest.MonkeyPatch) -> None:
     """The INKYPI_STRICT_SCHEMAS=1 escape hatch wires the middleware in even
     when DEV_MODE is False.
     """

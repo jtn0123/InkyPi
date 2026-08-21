@@ -9,7 +9,11 @@ Covers CodeQL rule ``py/reflective-xss`` at
 
 from __future__ import annotations
 
+from pathlib import Path
+from typing import Any
+
 import pytest
+from flask.testing import FlaskClient
 
 XSS_PAYLOADS = [
     "<script>alert(1)</script>",
@@ -27,7 +31,7 @@ def _assert_no_raw_reflection(body: bytes | str, payload: str) -> None:
 
 
 @pytest.fixture
-def _isolate_env(tmp_path, monkeypatch):
+def _isolate_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Any:
     env_file = tmp_path / ".env"
     env_file.write_text("")
     monkeypatch.setattr("blueprints.apikeys.get_env_path", lambda: str(env_file))
@@ -35,7 +39,9 @@ def _isolate_env(tmp_path, monkeypatch):
 
 
 @pytest.mark.parametrize("payload", XSS_PAYLOADS)
-def test_save_invalid_key_format_does_not_reflect_key(client, _isolate_env, payload):
+def test_save_invalid_key_format_does_not_reflect_key(
+    client: FlaskClient, _isolate_env: Any, payload: Any
+) -> None:
     """Invalid key format must not reflect attacker-controlled key in body."""
     resp = client.post(
         "/api-keys/save",
@@ -46,7 +52,9 @@ def test_save_invalid_key_format_does_not_reflect_key(client, _isolate_env, payl
 
 
 @pytest.mark.parametrize("payload", XSS_PAYLOADS)
-def test_save_non_string_value_does_not_reflect_key(client, _isolate_env, payload):
+def test_save_non_string_value_does_not_reflect_key(
+    client: FlaskClient, _isolate_env: Any, payload: Any
+) -> None:
     """Non-string value error must not reflect the (valid) key name."""
     # Key must pass the regex so we hit the value-type error path; embed the
     # payload inside the value as an integer-coerced message instead.
@@ -62,8 +70,8 @@ def test_save_non_string_value_does_not_reflect_key(client, _isolate_env, payloa
 
 @pytest.mark.parametrize("payload", XSS_PAYLOADS)
 def test_save_control_chars_in_value_does_not_reflect_key(
-    client, _isolate_env, payload
-):
+    client: FlaskClient, _isolate_env: Any, payload: Any
+) -> None:
     """Control-char value error must not reflect the (valid) key name."""
     # key used below must satisfy the regex — use a fixed safe name and place
     # the payload as part of an invalid (control-char) value.
@@ -77,7 +85,9 @@ def test_save_control_chars_in_value_does_not_reflect_key(
 
 
 @pytest.mark.parametrize("payload", XSS_PAYLOADS)
-def test_save_bad_keep_existing_does_not_reflect_key(client, _isolate_env, payload):
+def test_save_bad_keep_existing_does_not_reflect_key(
+    client: FlaskClient, _isolate_env: Any, payload: Any
+) -> None:
     """keepExisting type error must not reflect attacker-controlled key."""
     resp = client.post(
         "/api-keys/save",

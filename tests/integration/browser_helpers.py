@@ -4,9 +4,12 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 from urllib.parse import urlparse
 
 import pytest
+from flask import Flask
+from playwright.sync_api import Page
 
 CRITICAL_RESPONSE_TYPES = {"document", "script", "stylesheet", "xhr", "fetch"}
 
@@ -49,7 +52,7 @@ def leaflet_stub_js() -> str:
     """
 
 
-def stub_leaflet(page):
+def stub_leaflet(page: Page) -> None:
     """Intercept local Leaflet asset requests and return stubs."""
     page.route(
         "**/static/vendor/leaflet/leaflet.css",
@@ -66,7 +69,7 @@ def stub_leaflet(page):
 class RuntimeCollector:
     """Attach console error / JS exception listeners to a Playwright page."""
 
-    def __init__(self, page, base_url: str = ""):
+    def __init__(self, page: Page, base_url: str = "") -> None:
         self.page = page
         self.base_url = base_url
         self.console_errors: list[str] = []
@@ -74,7 +77,7 @@ class RuntimeCollector:
         self.request_failures: list[dict] = []
         self.response_failures: list[dict] = []
 
-        def handle_console(msg):
+        def handle_console(msg: Any) -> None:
             if msg.type != "error":
                 return
             text = msg.text
@@ -119,7 +122,7 @@ class RuntimeCollector:
 
     def assert_no_errors(
         self, screenshot_dir: Path | str | None = None, name: str = "page"
-    ):
+    ) -> None:
         failures = []
         if self.page_errors:
             failures.append(f"pageerror: {self.page_errors[:5]}")
@@ -145,14 +148,14 @@ class RuntimeCollector:
             pytest.fail("\n".join(failures))
 
 
-def wait_for_app_ready(page, timeout: int = 10000):
+def wait_for_app_ready(page: Page, timeout: int = 10000) -> None:
     """Wait for DOM content loaded and page shell element."""
     page.wait_for_selector("[data-page-shell]", timeout=timeout)
     page.wait_for_timeout(300)
 
 
 def navigate_and_wait(
-    page, base_url: str, path: str, timeout: int = 30000
+    page: Page, base_url: str, path: str, timeout: int = 30000
 ) -> RuntimeCollector:
     """Navigate to a page with leaflet stub, attach collectors, and wait for ready."""
     stub_leaflet(page)
@@ -162,7 +165,7 @@ def navigate_and_wait(
     return collector
 
 
-def prepare_playlist(device_config_dev):
+def prepare_playlist(device_config_dev: Any) -> None:
     """Seed device config with a Default playlist containing one clock instance."""
     from model import RefreshInfo
 
@@ -189,7 +192,7 @@ def prepare_playlist(device_config_dev):
     device_config_dev.write_config()
 
 
-def _session_cookie_for_authed_user(flask_app) -> tuple[str, str]:
+def _session_cookie_for_authed_user(flask_app: Flask) -> tuple[str, str]:
     """Return the Flask signed-session cookie (name, value) for ``authed=True``.
 
     Uses the app's real test client so the cookie is signed with the app's
@@ -244,7 +247,7 @@ def _session_cookie_for_authed_user(flask_app) -> tuple[str, str]:
     return cookie_name, raw_cookie
 
 
-def authenticate_page(page, flask_app, base_url: str) -> None:
+def authenticate_page(page: Page, flask_app: Flask, base_url: str) -> None:
     """Attach a signed ``authed=True`` session cookie to *page*'s context.
 
     Reusable by any integration test that needs a logged-in session before
@@ -274,7 +277,9 @@ def authenticate_page(page, flask_app, base_url: str) -> None:
     )
 
 
-def install_direct_manual_update(monkeypatch, flask_app):
+def install_direct_manual_update(
+    monkeypatch: pytest.MonkeyPatch, flask_app: Flask
+) -> Any:
     """Patch refresh_task.manual_update with a synchronous direct-render path.
 
     Background refresh workers are not running in browser tests, so the real
@@ -302,7 +307,7 @@ def install_direct_manual_update(monkeypatch, flask_app):
         raising=True,
     )
 
-    def _manual_update_direct(refresh_action):
+    def _manual_update_direct(refresh_action: Any) -> Any:
         plugin_config = device_config.get_plugin(refresh_action.get_plugin_id())
         plugin = get_plugin_instance(plugin_config)
         current_dt = now_device_tz(device_config)

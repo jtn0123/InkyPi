@@ -19,6 +19,7 @@ from __future__ import annotations
 import os
 
 import pytest
+from playwright.sync_api import Page
 from tests.integration.browser_helpers import stub_leaflet
 
 pytestmark = pytest.mark.skipif(
@@ -28,8 +29,8 @@ pytestmark = pytest.mark.skipif(
 
 
 def test_clock_face_picker_applies_selected_and_updates_colors(
-    live_server, browser_page
-):
+    live_server: str, browser_page: Page
+) -> None:
     """Clicking a clock face button toggles `.selected` and syncs color inputs."""
     page = browser_page
     stub_leaflet(page)

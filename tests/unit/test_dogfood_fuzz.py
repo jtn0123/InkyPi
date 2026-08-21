@@ -2,8 +2,10 @@
 """Dogfood fuzz/regression checks for settings and playlist validation."""
 
 from pathlib import Path
+from typing import Any
 
 import pytest
+from flask.testing import FlaskClient
 
 PLAYLIST_SHARED_JS = (
     Path(__file__).resolve().parents[2] / "src/static/scripts/playlist/shared.js"
@@ -30,13 +32,13 @@ class TestDeviceNameValidation:
         "contrast": "1.0",
     }
 
-    def _form(self, **overrides):
+    def _form(self, **overrides: Any) -> Any:
         """Build a valid settings payload with optional overrides."""
         form = {**self.VALID_FORM}
         form.update(overrides)
         return form
 
-    def test_device_name_length_is_capped(self, client):
+    def test_device_name_length_is_capped(self, client: FlaskClient) -> None:
         """Device names longer than the configured cap should be rejected."""
         resp = client.post(
             "/save_settings",
@@ -46,7 +48,9 @@ class TestDeviceNameValidation:
         data = resp.get_json()
         assert data["details"]["field"] == "deviceName"
 
-    def test_device_name_padding_cannot_bypass_length_cap(self, client):
+    def test_device_name_padding_cannot_bypass_length_cap(
+        self, client: FlaskClient
+    ) -> None:
         """Over-padded submissions should still honor the raw input cap."""
         padded_name = f" {'a' * 64} "
         resp = client.post("/save_settings", data=self._form(deviceName=padded_name))
@@ -66,8 +70,8 @@ class TestDeviceNameValidation:
         ],
     )
     def test_device_name_control_chars_are_rejected(
-        self, client, device_config_dev, bad_name
-    ):
+        self, client: FlaskClient, device_config_dev: Any, bad_name: Any
+    ) -> None:
         """Control characters should be rejected without mutating persisted config."""
         original_name = device_config_dev.get_config("name")
         resp = client.post("/save_settings", data=self._form(deviceName=bad_name))
@@ -76,7 +80,9 @@ class TestDeviceNameValidation:
         assert data["details"]["field"] == "deviceName"
         assert device_config_dev.get_config("name") == original_name
 
-    def test_device_name_is_trimmed_before_persisting(self, client, device_config_dev):
+    def test_device_name_is_trimmed_before_persisting(
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
         """Leading and trailing whitespace should not be persisted."""
         resp = client.post(
             "/save_settings",
@@ -85,7 +91,9 @@ class TestDeviceNameValidation:
         assert resp.status_code == 200
         assert device_config_dev.get_config("name") == "Device\tName"
 
-    def test_device_name_tab_is_allowed(self, client, device_config_dev):
+    def test_device_name_tab_is_allowed(
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
         """Tabs inside the device name are allowed and preserved."""
         name_with_tab = "Device\tName"
         resp = client.post("/save_settings", data=self._form(deviceName=name_with_tab))
@@ -93,7 +101,7 @@ class TestDeviceNameValidation:
         assert device_config_dev.get_config("name") == name_with_tab
 
 
-def test_non_ascii_playlist_names_match_ui_copy(client):
+def test_non_ascii_playlist_names_match_ui_copy(client: FlaskClient) -> None:
     """Non-ASCII playlist names should be rejected by both UI copy and server."""
     js = PLAYLIST_SHARED_JS.read_text()
     assert "^[A-Za-z0-9 _-]+$" in js

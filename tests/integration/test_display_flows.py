@@ -1,16 +1,20 @@
 # pyright: reportMissingImports=false
 from datetime import UTC, datetime
+from typing import Any
 
+import pytest
+from flask import Flask
+from flask.testing import FlaskClient
 from PIL import Image
 
 from model import RefreshInfo
 
 
-def _fixed_now(_device_config):
+def _fixed_now(_device_config: Any) -> Any:
     return datetime(2025, 1, 1, 8, 0, 0, tzinfo=UTC)
 
 
-def _prepare_playlist(device_config_dev):
+def _prepare_playlist(device_config_dev: Any) -> None:
     pm = device_config_dev.get_playlist_manager()
     if not pm.get_playlist("Default"):
         pm.add_playlist("Default", "00:00", "24:00")
@@ -44,8 +48,8 @@ def _prepare_playlist(device_config_dev):
 
 
 def test_display_plugin_instance_endpoint_success(
-    client, device_config_dev, monkeypatch
-):
+    client: FlaskClient, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     _prepare_playlist(device_config_dev)
 
     resp = client.post(
@@ -60,7 +64,9 @@ def test_display_plugin_instance_endpoint_success(
     assert resp.json.get("success") is True
 
 
-def test_display_next_in_playlist_success(client, device_config_dev, monkeypatch):
+def test_display_next_in_playlist_success(
+    client: FlaskClient, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     _prepare_playlist(device_config_dev)
     monkeypatch.setattr("utils.time_utils.now_device_tz", _fixed_now, raising=True)
 
@@ -73,8 +79,11 @@ def test_display_next_in_playlist_success(client, device_config_dev, monkeypatch
 
 
 def test_main_display_next_happy_path(
-    client, device_config_dev, monkeypatch, flask_app
-):
+    client: FlaskClient,
+    device_config_dev: Any,
+    monkeypatch: pytest.MonkeyPatch,
+    flask_app: Flask,
+) -> Any:
     # Force direct path by marking refresh_task.running = False
     rt = flask_app.config["REFRESH_TASK"]
     rt.running = False
@@ -86,7 +95,7 @@ def test_main_display_next_happy_path(
     from plugins import plugin_registry
 
     class _StubPlugin:
-        def generate_image(self, settings, device_config):
+        def generate_image(self, settings: Any, device_config: Any) -> Any:
             return Image.new("RGB", (800, 480), "white")
 
     monkeypatch.setattr(
@@ -94,7 +103,9 @@ def test_main_display_next_happy_path(
     )
     called = {"displayed": False}
 
-    def _display_image(image, image_settings=None, history_meta=None):
+    def _display_image(
+        image: Any, image_settings: Any = None, history_meta: Any = None
+    ) -> None:
         called["displayed"] = True
 
     flask_app.config["DISPLAY_MANAGER"].display_image = _display_image

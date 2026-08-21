@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
+import pytest
+
 from refresh_task.recorder import RefreshRecorder
 
 
@@ -22,7 +24,9 @@ class _EventBus:
         self.events.append((event_type, data))
 
 
-def test_publish_running_emits_progress_and_refresh_started(device_config_dev):
+def test_publish_running_emits_progress_and_refresh_started(
+    device_config_dev: Any,
+) -> None:
     progress_bus = _ProgressBus()
     event_bus = _EventBus()
     recorder = RefreshRecorder(
@@ -52,7 +56,7 @@ def test_publish_running_emits_progress_and_refresh_started(device_config_dev):
     assert event_bus.events[0][1]["plugin_id"] == "clock"
 
 
-def test_publish_error_can_emit_plugin_failed(device_config_dev):
+def test_publish_error_can_emit_plugin_failed(device_config_dev: Any) -> None:
     progress_bus = _ProgressBus()
     event_bus = _EventBus()
     recorder = RefreshRecorder(
@@ -89,7 +93,9 @@ def test_publish_error_can_emit_plugin_failed(device_config_dev):
     ]
 
 
-def test_publish_done_emits_progress_and_refresh_complete(device_config_dev):
+def test_publish_done_emits_progress_and_refresh_complete(
+    device_config_dev: Any,
+) -> None:
     progress_bus = _ProgressBus()
     event_bus = _EventBus()
     recorder = RefreshRecorder(
@@ -126,7 +132,9 @@ def test_publish_done_emits_progress_and_refresh_complete(device_config_dev):
     ]
 
 
-def test_save_stage_is_best_effort(device_config_dev, monkeypatch):
+def test_save_stage_is_best_effort(
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     recorder = RefreshRecorder(device_config_dev)
 
     def fail(*args: Any, **kwargs: Any) -> None:
@@ -137,7 +145,9 @@ def test_save_stage_is_best_effort(device_config_dev, monkeypatch):
     recorder.save_stage("refresh-4", "generate_image", 12)
 
 
-def test_save_refresh_builds_benchmark_payload(device_config_dev, monkeypatch):
+def test_save_refresh_builds_benchmark_payload(
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     recorder = RefreshRecorder(device_config_dev)
     captured: list[dict[str, Any]] = []
 

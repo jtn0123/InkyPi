@@ -17,8 +17,12 @@ from __future__ import annotations
 import os
 import time
 from datetime import UTC, datetime, timedelta
+from typing import Any
 
 import pytest
+from flask import Flask
+from flask.testing import FlaskClient
+from playwright.sync_api import Page
 
 pytestmark = [
     pytest.mark.integration,
@@ -36,7 +40,7 @@ _NEW_INTERVAL_MINUTES = 2
 _NEW_INTERVAL_SECONDS = _NEW_INTERVAL_MINUTES * 60
 
 
-def _open_settings_scheduling(page, live_server: str):
+def _open_settings_scheduling(page: Page, live_server: str) -> Any:
     from tests.integration.browser_helpers import RuntimeCollector, stub_leaflet
 
     stub_leaflet(page)
@@ -52,13 +56,13 @@ def _open_settings_scheduling(page, live_server: str):
 
 
 def test_refresh_interval_change_save_persist_cadence_respected(
-    live_server,
-    flask_app,
-    device_config_dev,
-    browser_page,
-    client,
-    monkeypatch,
-):
+    live_server: str,
+    flask_app: Flask,
+    device_config_dev: Any,
+    browser_page: Page,
+    client: FlaskClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Change cadence -> toast -> reload -> /api/diagnostics -> last_run_ts advances."""
     # INKYPI_ENV=dev keeps /api/diagnostics unauthenticated for the local
     # live_server + test client (mirrors test_diagnostics_endpoint.py).

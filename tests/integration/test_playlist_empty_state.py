@@ -1,9 +1,14 @@
 """Tests for empty-state UX on playlist pages (JTN-151, JTN-172)."""
 
 import re
+from typing import Any
+
+from flask.testing import FlaskClient
 
 
-def test_playlist_display_next_hidden_when_empty(client, device_config_dev):
+def test_playlist_display_next_hidden_when_empty(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     """Display Next button should not render for empty playlists."""
     pm = device_config_dev.get_playlist_manager()
     pm.add_playlist("Empty", "06:00", "09:00")
@@ -21,7 +26,9 @@ def test_playlist_display_next_hidden_when_empty(client, device_config_dev):
     assert "run-next-btn" not in html
 
 
-def test_playlist_display_next_shown_when_has_plugins(client, device_config_dev):
+def test_playlist_display_next_shown_when_has_plugins(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     """Display Next button should render for playlists with plugins."""
     pm = device_config_dev.get_playlist_manager()
     pm.add_playlist("WithPlugins", "06:00", "09:00")
@@ -45,7 +52,9 @@ def test_playlist_display_next_shown_when_has_plugins(client, device_config_dev)
     assert 'data-playlist="WithPlugins"' in html
 
 
-def test_playlist_plugin_actions_match_handoff_row_balance(client, device_config_dev):
+def test_playlist_plugin_actions_match_handoff_row_balance(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     """Playlist rows should keep Display visible and the utility actions compact."""
     pm = device_config_dev.get_playlist_manager()
     pm.add_playlist("WithLabels", "06:00", "09:00")
@@ -74,7 +83,9 @@ def test_playlist_plugin_actions_match_handoff_row_balance(client, device_config
     assert '<span class="sr-only">Delete plugin instance ' in html
 
 
-def test_playlist_add_plugin_link_points_to_plugins_page(client, device_config_dev):
+def test_playlist_add_plugin_link_points_to_plugins_page(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     resp = client.get("/playlist")
     assert resp.status_code == 200
     html = resp.data.decode()
@@ -88,7 +99,9 @@ def test_playlist_add_plugin_link_points_to_plugins_page(client, device_config_d
     )
 
 
-def test_playlist_display_next_mixed(client, device_config_dev):
+def test_playlist_display_next_mixed(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     """Display Next appears only for the playlist that has plugins."""
     pm = device_config_dev.get_playlist_manager()
     pm.add_playlist("HasItems", "00:00", "12:00")

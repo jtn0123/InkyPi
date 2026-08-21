@@ -13,6 +13,8 @@ Coverage targets:
 
 import json
 import os
+from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -36,7 +38,7 @@ _MINIMAL_VALID = {
 }
 
 
-def _with(**overrides):
+def _with(**overrides: Any) -> Any:
     """Return a copy of the minimal valid config with fields overridden."""
     cfg = dict(_MINIMAL_VALID)
     cfg.update(overrides)
@@ -48,7 +50,7 @@ def _with(**overrides):
 # ---------------------------------------------------------------------------
 
 
-def test_valid_minimal_config_passes():
+def test_valid_minimal_config_passes() -> None:
     """A well-formed minimal config should not raise."""
     validate_device_config(_MINIMAL_VALID)  # no exception
 
@@ -58,7 +60,7 @@ def test_valid_minimal_config_passes():
 # ---------------------------------------------------------------------------
 
 
-def test_wrong_type_resolution_raises():
+def test_wrong_type_resolution_raises() -> None:
     """resolution must be an array of integers — passing strings should fail."""
     bad = _with(resolution=["wide", "tall"])
     with pytest.raises(ConfigValidationError) as exc_info:
@@ -67,7 +69,7 @@ def test_wrong_type_resolution_raises():
     assert "resolution" in msg or "schema validation" in msg
 
 
-def test_wrong_type_plugin_cycle_interval_raises():
+def test_wrong_type_plugin_cycle_interval_raises() -> None:
     """plugin_cycle_interval_seconds must be an integer, not a string."""
     bad = _with(plugin_cycle_interval_seconds="fast")
     with pytest.raises(ConfigValidationError) as exc_info:
@@ -76,7 +78,7 @@ def test_wrong_type_plugin_cycle_interval_raises():
     assert "schema validation" in msg
 
 
-def test_invalid_orientation_raises():
+def test_invalid_orientation_raises() -> None:
     """orientation must be 'horizontal' or 'vertical'."""
     bad = _with(orientation="diagonal")
     with pytest.raises(ConfigValidationError) as exc_info:
@@ -90,7 +92,7 @@ def test_invalid_orientation_raises():
 # ---------------------------------------------------------------------------
 
 
-def test_config_validation_error_is_value_error():
+def test_config_validation_error_is_value_error() -> None:
     bad = _with(orientation="sideways")
     with pytest.raises(ValueError):
         validate_device_config(bad)
@@ -101,7 +103,7 @@ def test_config_validation_error_is_value_error():
 # ---------------------------------------------------------------------------
 
 
-def test_missing_required_playlist_item_field_raises():
+def test_missing_required_playlist_item_field_raises() -> None:
     """A playlist item without 'name' violates the schema."""
     bad = _with(
         playlist_config={
@@ -123,7 +125,7 @@ def test_missing_required_playlist_item_field_raises():
 # ---------------------------------------------------------------------------
 
 
-def test_unknown_extra_fields_pass():
+def test_unknown_extra_fields_pass() -> None:
     """Extra keys not in the schema must not cause a validation error."""
     cfg = _with(
         completely_unknown_key="hello",
@@ -137,7 +139,7 @@ def test_unknown_extra_fields_pass():
 # ---------------------------------------------------------------------------
 
 
-def test_real_device_dev_json_validates():
+def test_real_device_dev_json_validates() -> None:
     """The checked-in device_dev.json must pass schema validation."""
     dev_json_path = os.path.join(
         os.path.dirname(__file__),  # tests/unit/
@@ -163,7 +165,7 @@ def test_real_device_dev_json_validates():
 # ---------------------------------------------------------------------------
 
 
-def test_fallback_catches_bad_orientation(monkeypatch):
+def test_fallback_catches_bad_orientation(monkeypatch: pytest.MonkeyPatch) -> None:
     """When jsonschema is unavailable, the fallback catches invalid orientation."""
     monkeypatch.setattr(schema_mod, "jsonschema", None)
     bad = _with(orientation="upside_down")
@@ -174,13 +176,13 @@ def test_fallback_catches_bad_orientation(monkeypatch):
     assert "invalid value" in msg
 
 
-def test_fallback_allows_valid_orientation(monkeypatch):
+def test_fallback_allows_valid_orientation(monkeypatch: pytest.MonkeyPatch) -> None:
     """When jsonschema is unavailable, a valid orientation passes the fallback."""
     monkeypatch.setattr(schema_mod, "jsonschema", None)
     validate_device_config(_MINIMAL_VALID)  # no exception
 
 
-def test_fallback_no_orientation_key_passes(monkeypatch):
+def test_fallback_no_orientation_key_passes(monkeypatch: pytest.MonkeyPatch) -> None:
     """Fallback must not crash when orientation key is absent."""
     monkeypatch.setattr(schema_mod, "jsonschema", None)
     cfg = {k: v for k, v in _MINIMAL_VALID.items() if k != "orientation"}
@@ -192,7 +194,9 @@ def test_fallback_no_orientation_key_passes(monkeypatch):
 # ---------------------------------------------------------------------------
 
 
-def test_missing_schema_file_skips_silently(monkeypatch, tmp_path):
+def test_missing_schema_file_skips_silently(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     """If the schema file is absent, validation is skipped (no crash)."""
     missing_path = str(tmp_path / "nonexistent_schema.json")
     monkeypatch.setattr(schema_mod, "SCHEMA_PATH", missing_path)
@@ -208,7 +212,7 @@ def test_missing_schema_file_skips_silently(monkeypatch, tmp_path):
 # ---------------------------------------------------------------------------
 
 
-def test_error_message_includes_field_path():
+def test_error_message_includes_field_path() -> None:
     """ConfigValidationError message must include the offending field name/path."""
     bad = _with(orientation="sideways")
     with pytest.raises(ConfigValidationError) as exc_info:

@@ -1,3 +1,5 @@
+from typing import Any
+
 # pyright: reportMissingImports=false
 from unittest.mock import MagicMock, patch
 
@@ -12,31 +14,31 @@ from plugins.comic.comic_parser import (
 )
 
 
-def test_img_src_basic():
+def test_img_src_basic() -> None:
     html = '<img src="https://example.com/comic.png" alt="test">'
     assert _img_src(html) == "https://example.com/comic.png"
 
 
-def test_img_src_no_match():
+def test_img_src_no_match() -> None:
     assert _img_src("<div>no image here</div>") == ""
 
 
-def test_img_alt_basic():
+def test_img_alt_basic() -> None:
     html = '<img src="https://example.com/comic.png" alt="A witty caption">'
     assert _img_alt(html) == "A witty caption"
 
 
-def test_split_safe_normal():
+def test_split_safe_normal() -> None:
     assert _split_safe("Part A - Part B", " - ", 1) == "Part B"
 
 
-def test_split_safe_out_of_bounds():
+def test_split_safe_out_of_bounds() -> None:
     # Index 5 is way out of range — should return the full stripped text
     result = _split_safe("only one part", " - ", 5)
     assert result == "only one part"
 
 
-def _make_mock_feed(description, title):
+def _make_mock_feed(description: Any, title: Any) -> Any:
     """Build a minimal feedparser-like feed object."""
     entry = MagicMock()
     entry.description = description
@@ -46,7 +48,7 @@ def _make_mock_feed(description, title):
     return feed
 
 
-def test_get_panel_xkcd():
+def test_get_panel_xkcd() -> None:
     description = (
         '<img src="https://imgs.xkcd.com/comics/test.png" alt="Alt text here" />'
     )
@@ -71,7 +73,7 @@ def test_get_panel_xkcd():
     assert result["caption"] == "Alt text here"
 
 
-def test_get_panel_empty_feed():
+def test_get_panel_empty_feed() -> None:
     empty_feed = MagicMock()
     empty_feed.entries = []
 
@@ -88,7 +90,7 @@ def test_get_panel_empty_feed():
             get_panel("XKCD")
 
 
-def test_comics_dict_all_have_required_keys():
+def test_comics_dict_all_have_required_keys() -> None:
     required_keys = {"feed", "element", "url", "title", "caption"}
     for name, config in COMICS.items():
         missing = required_keys - set(config.keys())

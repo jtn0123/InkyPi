@@ -11,7 +11,7 @@ PLAYLIST_HTML = ROOT / "src" / "templates" / "playlist.html"
 class TestRefreshSettingsBtnListener:
     """Verify playlist/actions.js delegates refresh-settings actions from playlist cards."""
 
-    def test_js_delegates_playlist_actions(self):
+    def test_js_delegates_playlist_actions(self) -> None:
         js_text = PLAYLIST_ACTIONS_JS.read_text()
         assert (
             "[data-playlist-action]" in js_text
@@ -20,7 +20,7 @@ class TestRefreshSettingsBtnListener:
             "dataset.playlistAction" in js_text
         ), "playlist/actions.js must read dataset.playlistAction from the delegated target"
 
-    def test_js_handles_refresh_action(self):
+    def test_js_handles_refresh_action(self) -> None:
         js_text = PLAYLIST_ACTIONS_JS.read_text()
         assert (
             "action === 'edit-refresh'" in js_text
@@ -30,7 +30,7 @@ class TestRefreshSettingsBtnListener:
             "openRefreshModal" in js_text
         ), "playlist/actions.js must call openRefreshModal from the delegated refresh action"
 
-    def test_js_parses_data_refresh_attribute(self):
+    def test_js_parses_data_refresh_attribute(self) -> None:
         js_text = PLAYLIST_ACTIONS_JS.read_text()
         assert (
             "data-refresh" in js_text
@@ -40,13 +40,13 @@ class TestRefreshSettingsBtnListener:
 class TestRefreshSettingsBtnTemplate:
     """Verify playlist.html has the button with required data attributes."""
 
-    def test_html_has_refresh_settings_btn(self):
+    def test_html_has_refresh_settings_btn(self) -> None:
         html_text = PLAYLIST_HTML.read_text()
         assert (
             "refresh-settings-btn" in html_text
         ), "playlist.html must contain a .refresh-settings-btn element"
 
-    def test_html_btn_has_required_data_attributes(self):
+    def test_html_btn_has_required_data_attributes(self) -> None:
         html_text = PLAYLIST_HTML.read_text()
         btn_pattern = re.search(
             r'<button[^>]*class="[^"]*refresh-settings-btn[^"]*"[^>]*>',
@@ -66,7 +66,7 @@ class TestRefreshSettingsBtnTemplate:
         ):
             assert attr in btn_match, f"refresh-settings-btn must have {attr} attribute"
 
-    def test_html_has_refresh_modal(self):
+    def test_html_has_refresh_modal(self) -> None:
         html_text = PLAYLIST_HTML.read_text()
         assert (
             "refreshSettingsModal" in html_text

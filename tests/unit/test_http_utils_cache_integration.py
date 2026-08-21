@@ -1,5 +1,7 @@
 """Tests for HTTP cache integration with http_utils."""
 
+from collections.abc import Iterator
+from typing import Any
 from unittest.mock import patch
 
 import pytest
@@ -10,7 +12,7 @@ from utils.http_utils import _reset_shared_session_for_tests, http_get
 
 
 @pytest.fixture(autouse=True)
-def reset_cache_and_session():
+def reset_cache_and_session() -> Iterator[Any]:
     """Reset cache and session before each test."""
     _reset_cache_for_tests()
     _reset_shared_session_for_tests()
@@ -19,7 +21,7 @@ def reset_cache_and_session():
     _reset_shared_session_for_tests()
 
 
-def test_http_get_uses_cache():
+def test_http_get_uses_cache() -> None:
     """Test that http_get uses cache for repeated requests."""
     with requests_mock.Mocker() as m:
         url = "https://api.example.com/data"
@@ -46,7 +48,7 @@ def test_http_get_uses_cache():
         assert stats["misses"] == 1
 
 
-def test_http_get_cache_respects_params():
+def test_http_get_cache_respects_params() -> None:
     """Test that cache keys include query parameters."""
     with requests_mock.Mocker() as m:
         url = "https://api.example.com/search"
@@ -66,7 +68,7 @@ def test_http_get_cache_respects_params():
         assert m.call_count == 2
 
 
-def test_http_get_cache_bypass():
+def test_http_get_cache_bypass() -> None:
     """Test that cache can be bypassed with use_cache=False."""
     with requests_mock.Mocker() as m:
         url = "https://api.example.com/fresh"
@@ -85,7 +87,7 @@ def test_http_get_cache_bypass():
         assert m.call_count == 2  # No new request
 
 
-def test_http_get_custom_cache_ttl():
+def test_http_get_custom_cache_ttl() -> None:
     """Test that custom cache TTL is respected."""
     with patch("utils.http_cache.time") as mock_time:
         mock_time.time.return_value = 1000.0
@@ -110,7 +112,7 @@ def test_http_get_custom_cache_ttl():
             assert m.call_count == 2
 
 
-def test_http_get_streaming_bypasses_cache():
+def test_http_get_streaming_bypasses_cache() -> None:
     """Test that streaming requests bypass cache."""
     with requests_mock.Mocker() as m:
         url = "https://api.example.com/stream"
@@ -130,7 +132,7 @@ def test_http_get_streaming_bypasses_cache():
         assert stats["size"] == 0
 
 
-def test_http_get_caches_successful_responses_only():
+def test_http_get_caches_successful_responses_only() -> None:
     """Test that only successful responses are cached."""
     with requests_mock.Mocker() as m:
         url = "https://api.example.com/maybe"
@@ -149,7 +151,7 @@ def test_http_get_caches_successful_responses_only():
         assert m.call_count == 2
 
 
-def test_http_get_cache_control_headers():
+def test_http_get_cache_control_headers() -> None:
     """Test that Cache-Control headers affect caching."""
     with requests_mock.Mocker() as m:
         # Response with max-age
@@ -179,7 +181,7 @@ def test_http_get_cache_control_headers():
         assert cache_key2 not in cache._cache  # Should not be cached
 
 
-def test_http_get_cache_errors_dont_break_requests():
+def test_http_get_cache_errors_dont_break_requests() -> None:
     """Test that cache errors don't prevent HTTP requests."""
     with requests_mock.Mocker() as m:
         url = "https://api.example.com/resilient"
@@ -189,7 +191,7 @@ def test_http_get_cache_errors_dont_break_requests():
         cache = get_cache()
         original_get = cache.get
 
-        def broken_get(*args, **kwargs):
+        def broken_get(*args: Any, **kwargs: Any) -> None:
             raise RuntimeError("Cache broken")
 
         cache.get = broken_get
@@ -203,7 +205,7 @@ def test_http_get_cache_errors_dont_break_requests():
         cache.get = original_get
 
 
-def test_http_get_cache_stats_integration():
+def test_http_get_cache_stats_integration() -> None:
     """Test that cache statistics work with http_get."""
     with requests_mock.Mocker() as m:
         url = "https://api.example.com/stats"
@@ -227,7 +229,7 @@ def test_http_get_cache_stats_integration():
         assert stats["size"] >= 1
 
 
-def test_http_get_concurrent_requests_cache_safe():
+def test_http_get_concurrent_requests_cache_safe() -> None:
     """Test that concurrent requests handle cache safely."""
     import threading
 
@@ -237,7 +239,7 @@ def test_http_get_concurrent_requests_cache_safe():
 
         errors = []
 
-        def make_requests():
+        def make_requests() -> None:
             try:
                 for _ in range(5):
                     resp = http_get(url)
@@ -263,7 +265,7 @@ def test_http_get_concurrent_requests_cache_safe():
         assert stats["hits"] >= 1
 
 
-def test_http_get_cache_with_env_disabled(monkeypatch):
+def test_http_get_cache_with_env_disabled(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test that caching can be disabled via environment variable."""
     # Disable cache via environment
     monkeypatch.setenv("INKYPI_HTTP_CACHE_ENABLED", "false")
@@ -283,7 +285,7 @@ def test_http_get_cache_with_env_disabled(monkeypatch):
         assert m.call_count == 2
 
 
-def test_http_get_real_world_weather_api_pattern():
+def test_http_get_real_world_weather_api_pattern() -> None:
     """Test cache behavior with a realistic weather API pattern."""
     with requests_mock.Mocker() as m:
         weather_url = "https://api.openweathermap.org/data/3.0/onecall"

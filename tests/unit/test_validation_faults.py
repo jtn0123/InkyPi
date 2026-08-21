@@ -1,6 +1,8 @@
 import sqlite3
+from typing import Any
 
 import pytest
+from flask.testing import FlaskClient
 from PIL import Image
 
 from display.display_manager import DisplayManager
@@ -10,11 +12,13 @@ from refresh_task import ManualRefresh, RefreshTask
 class GoodPlugin:
     config = {"image_settings": []}
 
-    def generate_image(self, settings, device_config):
+    def generate_image(self, settings: Any, device_config: Any) -> Any:
         return Image.new("RGB", device_config.get_resolution(), "white")
 
 
-def test_benchmark_lock_does_not_wedge_manual_update(device_config_dev, monkeypatch):
+def test_benchmark_lock_does_not_wedge_manual_update(
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     monkeypatch.setenv("INKYPI_PLUGIN_RETRY_MAX", "0")
     device_config_dev.update_value("enable_benchmarks", True)
 
@@ -50,8 +54,8 @@ def test_benchmark_lock_does_not_wedge_manual_update(device_config_dev, monkeypa
 
 
 def test_plugin_failure_remains_actionable_and_task_recovers(
-    device_config_dev, monkeypatch
-):
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     monkeypatch.setenv("INKYPI_PLUGIN_RETRY_MAX", "0")
 
     display_manager = DisplayManager(device_config_dev)
@@ -66,7 +70,7 @@ def test_plugin_failure_remains_actionable_and_task_recovers(
     class BrokenPlugin:
         config = {"image_settings": []}
 
-        def generate_image(self, settings, device_config):
+        def generate_image(self, settings: Any, device_config: Any) -> None:
             raise OSError("broken PNG stream")
 
     current_plugin = {"instance": BrokenPlugin()}
@@ -104,11 +108,13 @@ def test_plugin_failure_remains_actionable_and_task_recovers(
         refresh_task.stop()
 
 
-def test_health_endpoints_still_respond_after_display_failure(client, monkeypatch):
+def test_health_endpoints_still_respond_after_display_failure(
+    client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
     app = client.application
     display_manager = app.config["DISPLAY_MANAGER"]
 
-    def raise_display(*args, **kwargs):
+    def raise_display(*args: Any, **kwargs: Any) -> None:
         raise RuntimeError("disk full")
 
     monkeypatch.setattr(display_manager, "display_image", raise_display, raising=True)

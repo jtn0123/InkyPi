@@ -10,17 +10,22 @@ Verifies that:
 import time
 from unittest.mock import MagicMock
 
+import pytest
+from flask.testing import FlaskClient
+
 
 class TestCheckUpdatesButtonSpinner:
     """The Check for Updates button must include a .btn-spinner element."""
 
-    def test_settings_page_has_spinner_in_check_button(self, client):
+    def test_settings_page_has_spinner_in_check_button(
+        self, client: FlaskClient
+    ) -> None:
         resp = client.get("/settings")
         assert resp.status_code == 200
         assert b'id="checkUpdatesBtn"' in resp.data
         assert b"btn-spinner" in resp.data
 
-    def test_settings_page_has_update_action_buttons(self, client):
+    def test_settings_page_has_update_action_buttons(self, client: FlaskClient) -> None:
         """The standalone `#updateBadge` chip was removed; the Updates tab
         now exposes the check / start / what's-new trio of buttons only,
         with the sidebar download chip carrying the availability signal."""
@@ -30,7 +35,7 @@ class TestCheckUpdatesButtonSpinner:
         assert b'id="startUpdateBtn"' in resp.data
         assert b'id="whatsNewBtn"' in resp.data
 
-    def test_settings_page_has_version_cards(self, client):
+    def test_settings_page_has_version_cards(self, client: FlaskClient) -> None:
         resp = client.get("/settings")
         assert resp.status_code == 200
         assert b'id="currentVersion"' in resp.data
@@ -40,7 +45,9 @@ class TestCheckUpdatesButtonSpinner:
 class TestApiVersionInlineResult:
     """The /api/version response must include fields for inline display."""
 
-    def test_returns_update_available_field(self, client, monkeypatch):
+    def test_returns_update_available_field(
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         import blueprints.settings as mod
 
         mod._VERSION_CACHE["latest"] = "99.0.0"
@@ -68,7 +75,9 @@ class TestApiVersionInlineResult:
             else:
                 client.application.config.pop("APP_VERSION", None)
 
-    def test_up_to_date_returns_false(self, client, monkeypatch):
+    def test_up_to_date_returns_false(
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         import blueprints.settings as mod
 
         # Set latest to same as current
@@ -84,7 +93,9 @@ class TestApiVersionInlineResult:
             mod._VERSION_CACHE["latest"] = None
             mod._VERSION_CACHE["checked_at"] = 0.0
 
-    def test_includes_release_notes_when_present(self, client, monkeypatch):
+    def test_includes_release_notes_when_present(
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         import blueprints.settings as mod
 
         mod._VERSION_CACHE["latest"] = "99.0.0"
@@ -99,7 +110,9 @@ class TestApiVersionInlineResult:
             mod._VERSION_CACHE["checked_at"] = 0.0
             mod._VERSION_CACHE["release_notes"] = None
 
-    def test_network_failure_returns_error_gracefully(self, client, monkeypatch):
+    def test_network_failure_returns_error_gracefully(
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         import blueprints.settings as mod
 
         # Force cache miss so it tries to fetch
@@ -128,8 +141,8 @@ class TestApiVersionInlineResult:
             mod._VERSION_CACHE["last_error"] = None
 
     def test_pre_release_tag_is_not_reported_as_network_failure(
-        self, client, monkeypatch
-    ):
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """A pre-release tag (v1.2.3-rc1) should produce a "not a stable
         release" message, not a misleading "Couldn't reach GitHub" one
         (JTN PR #590 review feedback)."""
@@ -166,7 +179,9 @@ class TestApiVersionInlineResult:
             mod._VERSION_CACHE["checked_at"] = 0.0
             mod._VERSION_CACHE["last_error"] = None
 
-    def test_force_refresh_bypasses_cache(self, client, monkeypatch):
+    def test_force_refresh_bypasses_cache(
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """?force=1 must hit the HTTP layer even if a fresh cache entry exists."""
         import blueprints.settings as mod
 

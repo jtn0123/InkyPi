@@ -6,21 +6,24 @@ power cycle. Both actions must be gated behind a confirmation modal.
 """
 
 from pathlib import Path
+from typing import Any
+
+from flask.testing import FlaskClient
 
 
-def _read_settings_html(client):
+def _read_settings_html(client: FlaskClient) -> Any:
     resp = client.get("/settings")
     assert resp.status_code == 200
     return resp.get_data(as_text=True)
 
 
-def _read_settings_js(client):
+def _read_settings_js(client: FlaskClient) -> Any:
     resp = client.get("/static/scripts/settings/actions.js")
     assert resp.status_code == 200
     return resp.get_data(as_text=True)
 
 
-def _read_settings_modals_js(client):
+def _read_settings_modals_js(client: FlaskClient) -> Any:
     resp = client.get("/static/scripts/settings/modals.js")
     assert resp.status_code == 200
     return resp.get_data(as_text=True)
@@ -31,7 +34,7 @@ def _read_settings_modals_js(client):
 # ---------------------------------------------------------------------------
 
 
-def test_reboot_confirm_modal_rendered(client):
+def test_reboot_confirm_modal_rendered(client: FlaskClient) -> None:
     """The reboot confirmation modal must be present in settings.html."""
     html = _read_settings_html(client)
     assert (
@@ -41,7 +44,7 @@ def test_reboot_confirm_modal_rendered(client):
     assert 'id="cancelRebootBtn"' in html
 
 
-def test_shutdown_confirm_modal_rendered(client):
+def test_shutdown_confirm_modal_rendered(client: FlaskClient) -> None:
     """The shutdown confirmation modal must be present in settings.html."""
     html = _read_settings_html(client)
     assert (
@@ -51,7 +54,7 @@ def test_shutdown_confirm_modal_rendered(client):
     assert 'id="cancelShutdownBtn"' in html
 
 
-def test_confirm_modals_have_destructive_copy(client):
+def test_confirm_modals_have_destructive_copy(client: FlaskClient) -> None:
     """Modals must clearly warn that physical access is required to recover."""
     html = _read_settings_html(client)
     # Reboot warns about UI unavailability.
@@ -60,7 +63,7 @@ def test_confirm_modals_have_destructive_copy(client):
     ), "Confirmation modals must warn about needing physical access to recover"
 
 
-def test_confirm_modals_use_role_dialog(client):
+def test_confirm_modals_use_role_dialog(client: FlaskClient) -> None:
     """Modals must use role=dialog and aria-modal for accessibility."""
     html = _read_settings_html(client)
     # Simple presence check — both modals share the pattern.
@@ -78,7 +81,9 @@ def test_confirm_modals_use_role_dialog(client):
 # ---------------------------------------------------------------------------
 
 
-def test_reboot_button_click_opens_confirm_modal_not_shutdown(client):
+def test_reboot_button_click_opens_confirm_modal_not_shutdown(
+    client: FlaskClient,
+) -> None:
     """The rebootBtn click handler must NOT call handleShutdown directly —
     it must open the confirmation modal instead."""
     js = _read_settings_js(client)
@@ -95,7 +100,9 @@ def test_reboot_button_click_opens_confirm_modal_not_shutdown(client):
     ), "rebootBtn still wired to fire handleShutdown directly — no confirmation!"
 
 
-def test_shutdown_button_click_opens_confirm_modal_not_shutdown(client):
+def test_shutdown_button_click_opens_confirm_modal_not_shutdown(
+    client: FlaskClient,
+) -> None:
     """The shutdownBtn click handler must NOT call handleShutdown directly."""
     js = _read_settings_js(client)
     assert "shutdownBtn" in js
@@ -109,7 +116,7 @@ def test_shutdown_button_click_opens_confirm_modal_not_shutdown(client):
     ), "shutdownBtn still wired to fire handleShutdown directly — no confirmation!"
 
 
-def test_confirm_buttons_wired_to_handle_shutdown(client):
+def test_confirm_buttons_wired_to_handle_shutdown(client: FlaskClient) -> None:
     """The confirm-action buttons inside the modals must be what actually
     invokes handleShutdown."""
     js = _read_settings_js(client)
@@ -119,7 +126,7 @@ def test_confirm_buttons_wired_to_handle_shutdown(client):
     assert "handleShutdown(false)" in js
 
 
-def test_cancel_buttons_close_modals(client):
+def test_cancel_buttons_close_modals(client: FlaskClient) -> None:
     """Cancel buttons must close the respective modal."""
     js = _read_settings_js(client)
     assert "cancelRebootBtn" in js
@@ -133,7 +140,7 @@ def test_cancel_buttons_close_modals(client):
 # ---------------------------------------------------------------------------
 
 
-def test_settings_js_on_disk_has_confirm_handlers():
+def test_settings_js_on_disk_has_confirm_handlers() -> None:
     js = Path("src/static/scripts/settings/modals.js").read_text()
     assert "openRebootConfirm" in js
     assert "openShutdownConfirm" in js
@@ -148,7 +155,7 @@ def test_settings_js_on_disk_has_confirm_handlers():
 # ---------------------------------------------------------------------------
 
 
-def test_reboot_shutdown_modals_handle_escape(client):
+def test_reboot_shutdown_modals_handle_escape(client: FlaskClient) -> None:
     """JTN-652: Escape key closes whichever confirm modal is open."""
     js = _read_settings_modals_js(client)
     assert 'event.key !== "Escape"' in js
@@ -157,7 +164,7 @@ def test_reboot_shutdown_modals_handle_escape(client):
     assert 'isDeviceActionModalOpen("shutdownConfirmModal")' in js
 
 
-def test_reboot_shutdown_modals_move_focus_on_open(client):
+def test_reboot_shutdown_modals_move_focus_on_open(client: FlaskClient) -> None:
     """JTN-652: opening the confirm modal moves focus inside it."""
     js = _read_settings_modals_js(client)
     # setDeviceActionModalOpen should query for focusable elements and focus them.
@@ -166,7 +173,7 @@ def test_reboot_shutdown_modals_move_focus_on_open(client):
     assert "DeviceActionTrigger" in js
 
 
-def test_reboot_shutdown_modals_restore_focus_on_close(client):
+def test_reboot_shutdown_modals_restore_focus_on_close(client: FlaskClient) -> None:
     """JTN-652: closing the modal restores focus to the trigger."""
     js = _read_settings_modals_js(client)
     # The close branch inside setDeviceActionModalOpen calls .focus() on the
@@ -174,7 +181,7 @@ def test_reboot_shutdown_modals_restore_focus_on_close(client):
     assert "DeviceActionTrigger.focus()" in js
 
 
-def test_reboot_shutdown_modals_toggle_is_open_class(client):
+def test_reboot_shutdown_modals_toggle_is_open_class(client: FlaskClient) -> None:
     """JTN-652: modal must get the .is-open class so body.modal-open tracks it
     and the shared CSS backdrop fires (matches scheduleModal / playlist modals).
     """
@@ -184,7 +191,7 @@ def test_reboot_shutdown_modals_toggle_is_open_class(client):
     assert "syncModalOpenState" in js
 
 
-def test_reboot_shutdown_modals_use_flex_display(client):
+def test_reboot_shutdown_modals_use_flex_display(client: FlaskClient) -> None:
     """JTN-652: modal display must be 'flex' (for centering) rather than
     'block', matching the rest of the app's modals."""
     js = _read_settings_modals_js(client)
@@ -194,7 +201,7 @@ def test_reboot_shutdown_modals_use_flex_display(client):
     assert '"block" : "none"' not in js
 
 
-def test_reboot_shutdown_modals_close_on_backdrop_click(client):
+def test_reboot_shutdown_modals_close_on_backdrop_click(client: FlaskClient) -> None:
     """JTN-652: clicking the modal backdrop closes the modal (parity with
     scheduleModal / playlist modals)."""
     js = _read_settings_modals_js(client)

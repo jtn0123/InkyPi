@@ -1,22 +1,27 @@
 from datetime import datetime
+from pathlib import Path
+from typing import Any
 
+import pytest
 from PIL import Image
 
 
-def _dummy_plugin(device_config):
+def _dummy_plugin(device_config: Any) -> Any:
     class DummyPlugin:
         config = {"image_settings": []}
 
-        def generate_image(self, settings, cfg):
+        def generate_image(self, settings: Any, cfg: Any) -> Any:
             return Image.new("RGB", cfg.get_resolution(), "white")
 
-        def get_latest_metadata(self):
+        def get_latest_metadata(self) -> Any:
             return {"meta": 1}
 
     return DummyPlugin()
 
 
-def test_wait_for_trigger_returns_manual_refresh(device_config_dev, monkeypatch):
+def test_wait_for_trigger_returns_manual_refresh(
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     from display.display_manager import DisplayManager
     from refresh_task import ManualRefresh, ManualUpdateRequest, RefreshTask
 
@@ -33,7 +38,9 @@ def test_wait_for_trigger_returns_manual_refresh(device_config_dev, monkeypatch)
     assert not task.manual_update_requests
 
 
-def test_select_refresh_action_playlist(device_config_dev, monkeypatch):
+def test_select_refresh_action_playlist(
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> Any:
     from display.display_manager import DisplayManager
     from refresh_task import PlaylistRefresh, RefreshTask
 
@@ -48,16 +55,16 @@ def test_select_refresh_action_playlist(device_config_dev, monkeypatch):
         name = "inst"
         settings = {}
 
-        def get_image_path(self):
+        def get_image_path(self) -> Any:
             return "dummy.png"
 
-        def should_refresh(self, dt):
+        def should_refresh(self, dt: Any) -> Any:
             return True
 
     fake_playlist = FakePlaylist()
     fake_plugin = FakePlugin()
 
-    def fake_determine(self, pm, latest, current_dt):
+    def fake_determine(self, pm: Any, latest: Any, current_dt: Any) -> Any:
         return fake_playlist, fake_plugin
 
     monkeypatch.setattr(
@@ -72,7 +79,7 @@ def test_select_refresh_action_playlist(device_config_dev, monkeypatch):
     assert action.plugin_instance is fake_plugin
 
 
-def test_select_refresh_action_manual(device_config_dev):
+def test_select_refresh_action_manual(device_config_dev: Any) -> None:
     from display.display_manager import DisplayManager
     from refresh_task import ManualRefresh, ManualUpdateRequest, RefreshTask
 
@@ -89,7 +96,9 @@ def test_select_refresh_action_manual(device_config_dev):
     assert request_id == "req-1"
 
 
-def test_perform_refresh_skips_when_cached(device_config_dev, monkeypatch):
+def test_perform_refresh_skips_when_cached(
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     from display.display_manager import DisplayManager
     from model import RefreshInfo
     from refresh_task import ManualRefresh, RefreshTask
@@ -123,7 +132,9 @@ def test_perform_refresh_skips_when_cached(device_config_dev, monkeypatch):
     assert info["image_hash"] == "same"
 
 
-def test_update_refresh_info_persists(device_config_dev, monkeypatch):
+def test_update_refresh_info_persists(
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     from display.display_manager import DisplayManager
     from refresh_task import RefreshTask
 
@@ -149,7 +160,7 @@ def test_update_refresh_info_persists(device_config_dev, monkeypatch):
     assert called["val"]
 
 
-def test_update_plugin_health_tracks_retained_display(device_config_dev):
+def test_update_plugin_health_tracks_retained_display(device_config_dev: Any) -> None:
     from display.display_manager import DisplayManager
     from refresh_task import RefreshTask
 
@@ -170,7 +181,9 @@ def test_update_plugin_health_tracks_retained_display(device_config_dev):
     assert datetime.fromisoformat(snapshot["dummy"]["last_seen"]).tzinfo is not None
 
 
-def test_stale_display_path_prefers_processed_image(device_config_dev, tmp_path):
+def test_stale_display_path_prefers_processed_image(
+    device_config_dev: Any, tmp_path: Path
+) -> None:
     from display.display_manager import DisplayManager
     from refresh_task import RefreshTask
 

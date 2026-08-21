@@ -7,12 +7,20 @@ from datetime import UTC, datetime
 from typing import Any
 from unittest.mock import patch
 
+import pytest
+from flask.testing import FlaskClient
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
 
-def _create_playlist(client, name="TestPlaylist", start="08:00", end="12:00"):
+def _create_playlist(
+    client: FlaskClient,
+    name: Any = "TestPlaylist",
+    start: Any = "08:00",
+    end: Any = "12:00",
+) -> Any:
     """Shortcut to create a playlist via the API and return the response."""
     return client.post(
         "/create_playlist",
@@ -21,8 +29,11 @@ def _create_playlist(client, name="TestPlaylist", start="08:00", end="12:00"):
 
 
 def _add_plugin_to_playlist(
-    client, playlist_name, instance_name="MyPlugin", plugin_id="weather"
-):
+    client: FlaskClient,
+    playlist_name: Any,
+    instance_name: Any = "MyPlugin",
+    plugin_id: Any = "weather",
+) -> Any:
     """Shortcut to add a plugin instance to a playlist via form data."""
     refresh_settings = json.dumps(
         {
@@ -39,12 +50,14 @@ def _add_plugin_to_playlist(
     )
 
 
-def test_safe_now_device_tz_falls_back_to_aware_utc(monkeypatch):
+def test_safe_now_device_tz_falls_back_to_aware_utc(
+    monkeypatch: pytest.MonkeyPatch,
+) -> Any:
     import blueprints.playlist as playlist_mod
 
     class _FallbackDateTime:
         @staticmethod
-        def now(tz=None):
+        def now(tz: Any = None) -> Any:
             return datetime(2025, 1, 1, 12, 0, 0, tzinfo=tz)
 
     monkeypatch.setattr(
@@ -66,7 +79,7 @@ def test_safe_now_device_tz_falls_back_to_aware_utc(monkeypatch):
 
 
 class TestCreatePlaylist:
-    def test_success(self, client, device_config_dev):
+    def test_success(self, client: FlaskClient, device_config_dev: Any) -> None:
         resp = _create_playlist(client, "Morning", "06:00", "10:00")
         assert resp.status_code == 200
         data = resp.get_json()
@@ -76,7 +89,7 @@ class TestCreatePlaylist:
         pm = device_config_dev.get_playlist_manager()
         assert pm.get_playlist("Morning") is not None
 
-    def test_missing_name(self, client):
+    def test_missing_name(self, client: FlaskClient) -> None:
         resp = client.post(
             "/create_playlist",
             json={"playlist_name": "", "start_time": "08:00", "end_time": "12:00"},
@@ -84,14 +97,14 @@ class TestCreatePlaylist:
         assert resp.status_code == 400
         assert resp.get_json()["success"] is False
 
-    def test_missing_name_key(self, client):
+    def test_missing_name_key(self, client: FlaskClient) -> None:
         resp = client.post(
             "/create_playlist",
             json={"start_time": "08:00", "end_time": "12:00"},
         )
         assert resp.status_code == 400
 
-    def test_missing_times(self, client):
+    def test_missing_times(self, client: FlaskClient) -> None:
         resp = client.post(
             "/create_playlist",
             json={"playlist_name": "NoTimes"},
@@ -99,33 +112,33 @@ class TestCreatePlaylist:
         assert resp.status_code == 400
         assert "time" in resp.get_json()["error"].lower()
 
-    def test_same_start_end(self, client):
+    def test_same_start_end(self, client: FlaskClient) -> None:
         resp = _create_playlist(client, "Same", "10:00", "10:00")
         assert resp.status_code == 400
         assert "same" in resp.get_json()["error"].lower()
 
-    def test_invalid_time_format(self, client):
+    def test_invalid_time_format(self, client: FlaskClient) -> None:
         resp = _create_playlist(client, "Bad", "not-a-time", "12:00")
         assert resp.status_code == 400
 
-    def test_duplicate_name(self, client):
+    def test_duplicate_name(self, client: FlaskClient) -> None:
         _create_playlist(client, "Dup", "06:00", "08:00")
         resp = _create_playlist(client, "Dup", "14:00", "16:00")
         assert resp.status_code == 400
         assert "already exists" in resp.get_json()["error"]
 
-    def test_overlapping_windows(self, client):
+    def test_overlapping_windows(self, client: FlaskClient) -> None:
         _create_playlist(client, "First", "08:00", "12:00")
         resp = _create_playlist(client, "Second", "10:00", "14:00")
         assert resp.status_code == 400
         assert "overlap" in resp.get_json()["error"].lower()
 
-    def test_non_overlapping_windows(self, client):
+    def test_non_overlapping_windows(self, client: FlaskClient) -> None:
         _create_playlist(client, "A", "08:00", "10:00")
         resp = _create_playlist(client, "B", "10:00", "12:00")
         assert resp.status_code == 200
 
-    def test_form_data_fallback(self, client):
+    def test_form_data_fallback(self, client: FlaskClient) -> None:
         resp = client.post(
             "/create_playlist",
             data={
@@ -136,7 +149,7 @@ class TestCreatePlaylist:
         )
         assert resp.status_code == 200
 
-    def test_unsupported_media_type(self, client):
+    def test_unsupported_media_type(self, client: FlaskClient) -> None:
         """POST with non-JSON content type and no form keys returns 415."""
         resp = client.post(
             "/create_playlist",
@@ -145,14 +158,16 @@ class TestCreatePlaylist:
         )
         assert resp.status_code == 415
 
-    def test_whitespace_only_name(self, client):
+    def test_whitespace_only_name(self, client: FlaskClient) -> None:
         resp = client.post(
             "/create_playlist",
             json={"playlist_name": "   ", "start_time": "08:00", "end_time": "12:00"},
         )
         assert resp.status_code == 400
 
-    def test_default_playlist_skipped_overlap_check(self, client, device_config_dev):
+    def test_default_playlist_skipped_overlap_check(
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
         """A Default playlist should not block overlap checks."""
         pm = device_config_dev.get_playlist_manager()
         pm.add_default_playlist()
@@ -168,7 +183,7 @@ class TestCreatePlaylist:
 
 
 class TestUpdatePlaylist:
-    def test_success(self, client, device_config_dev):
+    def test_success(self, client: FlaskClient, device_config_dev: Any) -> None:
         _create_playlist(client, "Old", "06:00", "10:00")
         resp = client.put(
             "/update_playlist/Old",
@@ -179,7 +194,7 @@ class TestUpdatePlaylist:
         assert pm.get_playlist("New") is not None
         assert pm.get_playlist("Old") is None
 
-    def test_nonexistent_playlist(self, client):
+    def test_nonexistent_playlist(self, client: FlaskClient) -> None:
         resp = client.put(
             "/update_playlist/DoesNotExist",
             json={"new_name": "X", "start_time": "06:00", "end_time": "10:00"},
@@ -187,7 +202,7 @@ class TestUpdatePlaylist:
         assert resp.status_code == 400
         assert "does not exist" in resp.get_json()["error"]
 
-    def test_missing_fields(self, client):
+    def test_missing_fields(self, client: FlaskClient) -> None:
         _create_playlist(client, "Exists", "06:00", "10:00")
         resp = client.put(
             "/update_playlist/Exists",
@@ -195,7 +210,7 @@ class TestUpdatePlaylist:
         )
         assert resp.status_code == 400
 
-    def test_invalid_json(self, client):
+    def test_invalid_json(self, client: FlaskClient) -> None:
         resp = client.put(
             "/update_playlist/X",
             data="not json",
@@ -203,7 +218,7 @@ class TestUpdatePlaylist:
         )
         assert resp.status_code == 400
 
-    def test_same_start_end(self, client):
+    def test_same_start_end(self, client: FlaskClient) -> None:
         _create_playlist(client, "ToUpdate", "06:00", "10:00")
         resp = client.put(
             "/update_playlist/ToUpdate",
@@ -212,7 +227,7 @@ class TestUpdatePlaylist:
         assert resp.status_code == 400
         assert "same" in resp.get_json()["error"].lower()
 
-    def test_invalid_time_format(self, client):
+    def test_invalid_time_format(self, client: FlaskClient) -> None:
         _create_playlist(client, "ToUpdate2", "06:00", "10:00")
         resp = client.put(
             "/update_playlist/ToUpdate2",
@@ -220,7 +235,7 @@ class TestUpdatePlaylist:
         )
         assert resp.status_code == 400
 
-    def test_overlap_with_other_playlist(self, client):
+    def test_overlap_with_other_playlist(self, client: FlaskClient) -> None:
         _create_playlist(client, "Existing", "08:00", "12:00")
         _create_playlist(client, "Target", "14:00", "16:00")
         resp = client.put(
@@ -230,7 +245,9 @@ class TestUpdatePlaylist:
         assert resp.status_code == 400
         assert "overlap" in resp.get_json()["error"].lower()
 
-    def test_cycle_minutes_override(self, client, device_config_dev):
+    def test_cycle_minutes_override(
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
         _create_playlist(client, "Cycled", "06:00", "10:00")
         resp = client.put(
             "/update_playlist/Cycled",
@@ -269,7 +286,7 @@ class TestUpdatePlaylist:
 
 
 class TestDeletePlaylist:
-    def test_success(self, client, device_config_dev):
+    def test_success(self, client: FlaskClient, device_config_dev: Any) -> None:
         _create_playlist(client, "ToDelete", "08:00", "12:00")
         resp = client.delete("/delete_playlist/ToDelete")
         assert resp.status_code == 200
@@ -277,7 +294,7 @@ class TestDeletePlaylist:
         pm = device_config_dev.get_playlist_manager()
         assert pm.get_playlist("ToDelete") is None
 
-    def test_nonexistent(self, client):
+    def test_nonexistent(self, client: FlaskClient) -> None:
         # JTN-782: deleting a missing playlist is a 404 with code=not_found.
         resp = client.delete("/delete_playlist/Ghost")
         assert resp.status_code == 404
@@ -293,38 +310,38 @@ class TestDeletePlaylist:
 
 
 class TestUpdateDeviceCycle:
-    def test_valid_minutes(self, client, device_config_dev):
+    def test_valid_minutes(self, client: FlaskClient, device_config_dev: Any) -> None:
         resp = client.put("/update_device_cycle", json={"minutes": 30})
         assert resp.status_code == 200
         assert resp.get_json()["success"] is True
         val = device_config_dev.get_config("plugin_cycle_interval_seconds")
         assert val == 30 * 60
 
-    def test_minimum_boundary(self, client):
+    def test_minimum_boundary(self, client: FlaskClient) -> None:
         resp = client.put("/update_device_cycle", json={"minutes": 1})
         assert resp.status_code == 200
 
-    def test_maximum_boundary(self, client):
+    def test_maximum_boundary(self, client: FlaskClient) -> None:
         resp = client.put("/update_device_cycle", json={"minutes": 1440})
         assert resp.status_code == 200
 
-    def test_below_minimum(self, client):
+    def test_below_minimum(self, client: FlaskClient) -> None:
         resp = client.put("/update_device_cycle", json={"minutes": 0})
         assert resp.status_code == 400
 
-    def test_above_maximum(self, client):
+    def test_above_maximum(self, client: FlaskClient) -> None:
         resp = client.put("/update_device_cycle", json={"minutes": 1441})
         assert resp.status_code == 400
 
-    def test_invalid_type(self, client):
+    def test_invalid_type(self, client: FlaskClient) -> None:
         resp = client.put("/update_device_cycle", json={"minutes": "abc"})
         assert resp.status_code == 400
 
-    def test_missing_minutes(self, client):
+    def test_missing_minutes(self, client: FlaskClient) -> None:
         resp = client.put("/update_device_cycle", json={})
         assert resp.status_code == 400
 
-    def test_no_json_body(self, client):
+    def test_no_json_body(self, client: FlaskClient) -> None:
         resp = client.put("/update_device_cycle")
         assert resp.status_code == 400
 
@@ -335,7 +352,7 @@ class TestUpdateDeviceCycle:
 
 
 class TestReorderPlugins:
-    def test_success(self, client, device_config_dev):
+    def test_success(self, client: FlaskClient, device_config_dev: Any) -> None:
         _create_playlist(client, "Reorder", "08:00", "12:00")
         _add_plugin_to_playlist(client, "Reorder", "PlugA", "weather")
         _add_plugin_to_playlist(client, "Reorder", "PlugB", "weather")
@@ -357,14 +374,16 @@ class TestReorderPlugins:
         )
         assert resp.status_code == 200
 
-    def test_missing_playlist_name(self, client):
+    def test_missing_playlist_name(self, client: FlaskClient) -> None:
         resp = client.post(
             "/reorder_plugins",
             json={"ordered": []},
         )
         assert resp.status_code == 400
 
-    def test_missing_ordered_list(self, client, device_config_dev):
+    def test_missing_ordered_list(
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
         _create_playlist(client, "ReorderMissing", "08:00", "12:00")
         resp = client.post(
             "/reorder_plugins",
@@ -372,14 +391,16 @@ class TestReorderPlugins:
         )
         assert resp.status_code == 400
 
-    def test_nonexistent_playlist(self, client):
+    def test_nonexistent_playlist(self, client: FlaskClient) -> None:
         resp = client.post(
             "/reorder_plugins",
             json={"playlist_name": "NoSuch", "ordered": []},
         )
         assert resp.status_code == 400
 
-    def test_invalid_order_payload(self, client, device_config_dev):
+    def test_invalid_order_payload(
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
         _create_playlist(client, "ReorderBad", "08:00", "12:00")
         _add_plugin_to_playlist(client, "ReorderBad", "OnlyPlug", "weather")
         # Wrong count -- 0 items when 1 expected
@@ -396,13 +417,15 @@ class TestReorderPlugins:
 
 
 class TestAddPlugin:
-    def test_success_interval(self, client, device_config_dev):
+    def test_success_interval(
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
         _create_playlist(client, "AddPlug", "08:00", "12:00")
         resp = _add_plugin_to_playlist(client, "AddPlug", "Weather1", "weather")
         assert resp.status_code == 200
         assert resp.get_json()["success"] is True
 
-    def test_missing_playlist(self, client):
+    def test_missing_playlist(self, client: FlaskClient) -> None:
         refresh_settings = json.dumps(
             {
                 "playlist": "",
@@ -420,7 +443,9 @@ class TestAddPlugin:
         data = resp.get_json()
         assert data["details"]["field"] == "playlist"
 
-    def test_missing_instance_name(self, client, device_config_dev):
+    def test_missing_instance_name(
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
         _create_playlist(client, "NoInst", "08:00", "12:00")
         refresh_settings = json.dumps(
             {
@@ -438,7 +463,9 @@ class TestAddPlugin:
         assert resp.status_code == 422
         assert resp.get_json()["details"]["field"] == "instance_name"
 
-    def test_instance_name_too_long(self, client, device_config_dev):
+    def test_instance_name_too_long(
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
         _create_playlist(client, "LongName", "08:00", "12:00")
         refresh_settings = json.dumps(
             {
@@ -456,7 +483,9 @@ class TestAddPlugin:
         assert resp.status_code == 422
         assert "64" in resp.get_json()["error"]
 
-    def test_instance_name_invalid_chars(self, client, device_config_dev):
+    def test_instance_name_invalid_chars(
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
         _create_playlist(client, "BadChars", "08:00", "12:00")
         refresh_settings = json.dumps(
             {
@@ -477,7 +506,9 @@ class TestAddPlugin:
             in resp.get_json()["error"]
         )
 
-    def test_missing_refresh_type(self, client, device_config_dev):
+    def test_missing_refresh_type(
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
         _create_playlist(client, "NoRefType", "08:00", "12:00")
         refresh_settings = json.dumps(
             {
@@ -493,7 +524,9 @@ class TestAddPlugin:
         assert resp.status_code == 422
         assert resp.get_json()["details"]["field"] == "refreshType"
 
-    def test_invalid_refresh_type(self, client, device_config_dev):
+    def test_invalid_refresh_type(
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
         _create_playlist(client, "BadRefType", "08:00", "12:00")
         refresh_settings = json.dumps(
             {
@@ -508,14 +541,18 @@ class TestAddPlugin:
         )
         assert resp.status_code == 422
 
-    def test_duplicate_instance(self, client, device_config_dev):
+    def test_duplicate_instance(
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
         _create_playlist(client, "DupInst", "08:00", "12:00")
         _add_plugin_to_playlist(client, "DupInst", "Same", "weather")
         resp = _add_plugin_to_playlist(client, "DupInst", "Same", "weather")
         assert resp.status_code == 400
         assert "already exists" in resp.get_json()["error"]
 
-    def test_missing_interval_unit(self, client, device_config_dev):
+    def test_missing_interval_unit(
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
         _create_playlist(client, "NoUnit", "08:00", "12:00")
         refresh_settings = json.dumps(
             {
@@ -533,7 +570,9 @@ class TestAddPlugin:
         assert resp.status_code == 422
         assert resp.get_json()["details"]["field"] == "unit"
 
-    def test_invalid_interval_unit(self, client, device_config_dev):
+    def test_invalid_interval_unit(
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
         _create_playlist(client, "BadUnit", "08:00", "12:00")
         refresh_settings = json.dumps(
             {
@@ -550,7 +589,9 @@ class TestAddPlugin:
         )
         assert resp.status_code == 422
 
-    def test_missing_interval_value(self, client, device_config_dev):
+    def test_missing_interval_value(
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
         _create_playlist(client, "NoIntVal", "08:00", "12:00")
         refresh_settings = json.dumps(
             {
@@ -567,7 +608,9 @@ class TestAddPlugin:
         )
         assert resp.status_code == 422
 
-    def test_non_numeric_interval(self, client, device_config_dev):
+    def test_non_numeric_interval(
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
         _create_playlist(client, "NaN", "08:00", "12:00")
         refresh_settings = json.dumps(
             {
@@ -585,7 +628,9 @@ class TestAddPlugin:
         assert resp.status_code == 422
         assert "number" in resp.get_json()["error"].lower()
 
-    def test_interval_out_of_range(self, client, device_config_dev):
+    def test_interval_out_of_range(
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
         _create_playlist(client, "OOR", "08:00", "12:00")
         refresh_settings = json.dumps(
             {
@@ -602,7 +647,9 @@ class TestAddPlugin:
         )
         assert resp.status_code == 422
 
-    def test_scheduled_success(self, client, device_config_dev):
+    def test_scheduled_success(
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
         _create_playlist(client, "Sched", "08:00", "12:00")
         refresh_settings = json.dumps(
             {
@@ -618,7 +665,9 @@ class TestAddPlugin:
         )
         assert resp.status_code == 200
 
-    def test_scheduled_missing_time(self, client, device_config_dev):
+    def test_scheduled_missing_time(
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
         _create_playlist(client, "SchedNoTime", "08:00", "12:00")
         refresh_settings = json.dumps(
             {
@@ -645,7 +694,9 @@ class TestAddPluginSettingsValidation:
     """JTN-451: add_plugin must call plugin-specific validate_settings
     to block unsafe values (e.g. javascript: URLs in the Screenshot plugin)."""
 
-    def test_screenshot_javascript_url_rejected(self, client, device_config_dev):
+    def test_screenshot_javascript_url_rejected(
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
         _create_playlist(client, "SecTest", "08:00", "12:00")
         refresh_settings = json.dumps(
             {
@@ -670,7 +721,9 @@ class TestAddPluginSettingsValidation:
             "URL" in data.get("error", "") or "scheme" in data.get("error", "").lower()
         )
 
-    def test_screenshot_file_url_rejected(self, client, device_config_dev):
+    def test_screenshot_file_url_rejected(
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
         _create_playlist(client, "SecTest2", "08:00", "12:00")
         refresh_settings = json.dumps(
             {
@@ -702,14 +755,14 @@ class TestAddPluginSettingsValidation:
 
 
 class TestDisplayNextInPlaylist:
-    def test_missing_playlist_name(self, client):
+    def test_missing_playlist_name(self, client: FlaskClient) -> None:
         resp = client.post(
             "/display_next_in_playlist",
             json={"playlist_name": ""},
         )
         assert resp.status_code == 400
 
-    def test_nonexistent_playlist(self, client):
+    def test_nonexistent_playlist(self, client: FlaskClient) -> None:
         resp = client.post(
             "/display_next_in_playlist",
             json={"playlist_name": "Ghost"},
@@ -717,7 +770,9 @@ class TestDisplayNextInPlaylist:
         assert resp.status_code == 400
         assert "not found" in resp.get_json()["error"]
 
-    def test_no_eligible_plugin(self, client, device_config_dev):
+    def test_no_eligible_plugin(
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
         _create_playlist(client, "Empty", "08:00", "12:00")
         resp = client.post(
             "/display_next_in_playlist",
@@ -726,7 +781,7 @@ class TestDisplayNextInPlaylist:
         assert resp.status_code == 400
         assert "eligible" in resp.get_json()["error"].lower()
 
-    def test_success(self, client, device_config_dev):
+    def test_success(self, client: FlaskClient, device_config_dev: Any) -> None:
         _create_playlist(client, "Next", "00:00", "24:00")
         _add_plugin_to_playlist(client, "Next", "Inst1", "weather")
 
@@ -749,14 +804,14 @@ class TestDisplayNextInPlaylist:
 
 
 class TestPlaylistPage:
-    def test_renders(self, client, device_config_dev):
+    def test_renders(self, client: FlaskClient, device_config_dev: Any) -> None:
         resp = client.get("/playlist")
         assert resp.status_code == 200
         assert b"html" in resp.data.lower() or b"<!doctype" in resp.data.lower()
 
     def test_uses_singular_labels_for_single_playlist_and_item(
-        self, client, device_config_dev
-    ):
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
         device_config = client.application.config["DEVICE_CONFIG"]
         playlist_manager = device_config.get_playlist_manager()
         playlist_manager.delete_playlist("Default")
@@ -788,18 +843,20 @@ class TestPlaylistPage:
 
 
 class TestPlaylistEta:
-    def test_nonexistent_playlist(self, client):
+    def test_nonexistent_playlist(self, client: FlaskClient) -> None:
         resp = client.get("/playlist/eta/NoSuch")
         assert resp.status_code == 404
 
-    def test_empty_playlist_eta(self, client, device_config_dev):
+    def test_empty_playlist_eta(
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
         _create_playlist(client, "EtaPL", "08:00", "12:00")
         resp = client.get("/playlist/eta/EtaPL")
         assert resp.status_code == 200
         data = resp.get_json()
         assert data["success"] is True
 
-    def test_with_plugins(self, client, device_config_dev):
+    def test_with_plugins(self, client: FlaskClient, device_config_dev: Any) -> None:
         _create_playlist(client, "EtaFull", "00:00", "24:00")
         _add_plugin_to_playlist(client, "EtaFull", "E1", "weather")
         _add_plugin_to_playlist(client, "EtaFull", "E2", "weather")
@@ -815,7 +872,7 @@ class TestPlaylistEta:
 
 
 class TestPlaylistNameValidation:
-    def test_create_playlist_name_too_long(self, client):
+    def test_create_playlist_name_too_long(self, client: FlaskClient) -> None:
         """Playlist name exceeding 64 characters should be rejected with field attribution."""
         resp = _create_playlist(client, "A" * 65, "08:00", "12:00")
         assert resp.status_code == 400
@@ -826,7 +883,7 @@ class TestPlaylistNameValidation:
         assert data["details"]["field"] == "playlist_name"
         assert data["code"] == "validation_error"
 
-    def test_create_playlist_name_special_chars(self, client):
+    def test_create_playlist_name_special_chars(self, client: FlaskClient) -> None:
         """Playlist names containing script tags or path traversal should be rejected."""
         resp = _create_playlist(client, "<script>alert(1)</script>", "08:00", "12:00")
         assert resp.status_code == 400
@@ -842,7 +899,7 @@ class TestPlaylistNameValidation:
         assert "../" not in data["error"]
         assert data["details"]["field"] == "playlist_name"
 
-    def test_create_playlist_name_rejects_unicode(self, client):
+    def test_create_playlist_name_rejects_unicode(self, client: FlaskClient) -> None:
         """Playlist names must stay aligned with the ASCII-only UI copy."""
         resp = _create_playlist(client, "Météo", "08:00", "12:00")
         assert resp.status_code == 400
@@ -851,7 +908,9 @@ class TestPlaylistNameValidation:
         assert data["details"]["field"] == "playlist_name"
         assert "ASCII letters" in data["error"]
 
-    def test_create_playlist_name_with_spaces(self, client, device_config_dev):
+    def test_create_playlist_name_with_spaces(
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
         """Playlist names with spaces should be accepted."""
         resp = _create_playlist(client, "My Playlist", "08:00", "12:00")
         assert resp.status_code == 200
@@ -867,7 +926,7 @@ class TestValidatorFieldAttribution:
     """Every validator in playlist.py must return ``details.field`` so the
     frontend can highlight the offending input (JTN-658)."""
 
-    def _assert_field(self, resp, field, *, status=400):
+    def _assert_field(self, resp: Any, field: Any, *, status: Any = 400) -> None:
         assert resp.status_code == status, resp.get_json()
         data = resp.get_json()
         assert data["success"] is False
@@ -876,26 +935,26 @@ class TestValidatorFieldAttribution:
 
     # --- playlist name (create + update) ---
 
-    def test_create_missing_name(self, client):
+    def test_create_missing_name(self, client: FlaskClient) -> None:
         resp = client.post(
             "/create_playlist",
             json={"playlist_name": "", "start_time": "08:00", "end_time": "12:00"},
         )
         self._assert_field(resp, "playlist_name")
 
-    def test_create_whitespace_name(self, client):
+    def test_create_whitespace_name(self, client: FlaskClient) -> None:
         resp = client.post(
             "/create_playlist",
             json={"playlist_name": "   ", "start_time": "08:00", "end_time": "12:00"},
         )
         self._assert_field(resp, "playlist_name")
 
-    def test_create_duplicate_name(self, client):
+    def test_create_duplicate_name(self, client: FlaskClient) -> None:
         _create_playlist(client, "Dup", "06:00", "08:00")
         resp = _create_playlist(client, "Dup", "14:00", "16:00")
         self._assert_field(resp, "playlist_name")
 
-    def test_update_name_invalid(self, client):
+    def test_update_name_invalid(self, client: FlaskClient) -> None:
         _create_playlist(client, "ToUpd", "06:00", "10:00")
         resp = client.put(
             "/update_playlist/ToUpd",
@@ -903,7 +962,7 @@ class TestValidatorFieldAttribution:
         )
         self._assert_field(resp, "new_name")
 
-    def test_update_nonexistent_playlist(self, client):
+    def test_update_nonexistent_playlist(self, client: FlaskClient) -> None:
         resp = client.put(
             "/update_playlist/Nope",
             json={"new_name": "X", "start_time": "06:00", "end_time": "10:00"},
@@ -912,44 +971,44 @@ class TestValidatorFieldAttribution:
 
     # --- time range ---
 
-    def test_missing_start_time(self, client):
+    def test_missing_start_time(self, client: FlaskClient) -> None:
         resp = client.post(
             "/create_playlist",
             json={"playlist_name": "T", "start_time": "", "end_time": "12:00"},
         )
         self._assert_field(resp, "start_time")
 
-    def test_missing_end_time(self, client):
+    def test_missing_end_time(self, client: FlaskClient) -> None:
         resp = client.post(
             "/create_playlist",
             json={"playlist_name": "T", "start_time": "08:00", "end_time": ""},
         )
         self._assert_field(resp, "end_time")
 
-    def test_invalid_start_time_format(self, client):
+    def test_invalid_start_time_format(self, client: FlaskClient) -> None:
         resp = client.post(
             "/create_playlist",
             json={"playlist_name": "T", "start_time": "bogus", "end_time": "12:00"},
         )
         self._assert_field(resp, "start_time")
 
-    def test_invalid_end_time_format(self, client):
+    def test_invalid_end_time_format(self, client: FlaskClient) -> None:
         resp = client.post(
             "/create_playlist",
             json={"playlist_name": "T", "start_time": "08:00", "end_time": "bogus"},
         )
         self._assert_field(resp, "end_time")
 
-    def test_same_start_end(self, client):
+    def test_same_start_end(self, client: FlaskClient) -> None:
         resp = _create_playlist(client, "Same", "10:00", "10:00")
         self._assert_field(resp, "end_time")
 
-    def test_overlapping_windows(self, client):
+    def test_overlapping_windows(self, client: FlaskClient) -> None:
         _create_playlist(client, "First", "08:00", "12:00")
         resp = _create_playlist(client, "Second", "10:00", "14:00")
         self._assert_field(resp, "start_time")
 
-    def test_update_missing_time(self, client):
+    def test_update_missing_time(self, client: FlaskClient) -> None:
         _create_playlist(client, "UpdT", "06:00", "10:00")
         resp = client.put(
             "/update_playlist/UpdT",
@@ -959,7 +1018,7 @@ class TestValidatorFieldAttribution:
 
     # --- cycle minutes ---
 
-    def test_cycle_minutes_non_integer(self, client):
+    def test_cycle_minutes_non_integer(self, client: FlaskClient) -> None:
         _create_playlist(client, "Cyc", "06:00", "10:00")
         resp = client.put(
             "/update_playlist/Cyc",
@@ -972,7 +1031,7 @@ class TestValidatorFieldAttribution:
         )
         self._assert_field(resp, "cycle_minutes")
 
-    def test_cycle_minutes_out_of_range(self, client):
+    def test_cycle_minutes_out_of_range(self, client: FlaskClient) -> None:
         _create_playlist(client, "Cyc2", "06:00", "10:00")
         resp = client.put(
             "/update_playlist/Cyc2",
@@ -987,9 +1046,9 @@ class TestValidatorFieldAttribution:
 
     # --- delete ---
 
-    def test_delete_nonexistent(self, client):
+    def test_delete_nonexistent(self, client: FlaskClient):
         # JTN-782: delete-of-missing is a 404 not_found (not a validation
-        # error), but we still attach field attribution so the UI can
+        # error) -> None -> None, but we still attach field attribution so the UI can
         # highlight the offending input.
         resp = client.delete("/delete_playlist/Ghost")
         assert resp.status_code == 404, resp.get_json()
@@ -1000,31 +1059,31 @@ class TestValidatorFieldAttribution:
 
     # --- device cycle ---
 
-    def test_device_cycle_out_of_range(self, client):
+    def test_device_cycle_out_of_range(self, client: FlaskClient) -> None:
         resp = client.put("/update_device_cycle", json={"minutes": 0})
         self._assert_field(resp, "minutes")
 
-    def test_device_cycle_invalid_type(self, client):
+    def test_device_cycle_invalid_type(self, client: FlaskClient) -> None:
         resp = client.put("/update_device_cycle", json={"minutes": "abc"})
         self._assert_field(resp, "minutes")
 
     # --- reorder ---
 
-    def test_reorder_missing_name(self, client):
+    def test_reorder_missing_name(self, client: FlaskClient) -> None:
         resp = client.post(
             "/reorder_plugins",
             json={"ordered": []},
         )
         self._assert_field(resp, "playlist_name")
 
-    def test_reorder_missing_ordered(self, client):
+    def test_reorder_missing_ordered(self, client: FlaskClient) -> None:
         resp = client.post(
             "/reorder_plugins",
             json={"playlist_name": "X"},
         )
         self._assert_field(resp, "ordered")
 
-    def test_reorder_playlist_not_found(self, client):
+    def test_reorder_playlist_not_found(self, client: FlaskClient) -> None:
         resp = client.post(
             "/reorder_plugins",
             json={"playlist_name": "Ghost", "ordered": []},
@@ -1033,37 +1092,37 @@ class TestValidatorFieldAttribution:
 
     # --- display next ---
 
-    def test_display_next_missing_name(self, client):
+    def test_display_next_missing_name(self, client: FlaskClient) -> None:
         resp = client.post("/display_next_in_playlist", json={})
         self._assert_field(resp, "playlist_name")
 
-    def test_display_next_not_found(self, client):
+    def test_display_next_not_found(self, client: FlaskClient) -> None:
         resp = client.post("/display_next_in_playlist", json={"playlist_name": "Ghost"})
         self._assert_field(resp, "playlist_name")
 
     # --- ETA ---
 
-    def test_eta_not_found(self, client):
+    def test_eta_not_found(self, client: FlaskClient) -> None:
         resp = client.get("/playlist/eta/Ghost")
         self._assert_field(resp, "playlist_name", status=404)
 
     # --- add_plugin ---
 
-    def test_add_plugin_missing_refresh(self, client):
+    def test_add_plugin_missing_refresh(self, client: FlaskClient) -> None:
         resp = client.post(
             "/add_plugin",
             data={"plugin_id": "weather"},
         )
         self._assert_field(resp, "refresh_settings")
 
-    def test_add_plugin_invalid_refresh_json(self, client):
+    def test_add_plugin_invalid_refresh_json(self, client: FlaskClient) -> None:
         resp = client.post(
             "/add_plugin",
             data={"plugin_id": "weather", "refresh_settings": "not-json"},
         )
         self._assert_field(resp, "refresh_settings")
 
-    def test_add_plugin_missing_instance(self, client):
+    def test_add_plugin_missing_instance(self, client: FlaskClient) -> None:
         _create_playlist(client, "APIPlaylist", "08:00", "12:00")
         resp = client.post(
             "/add_plugin",
@@ -1082,7 +1141,7 @@ class TestValidatorFieldAttribution:
         )
         self._assert_field(resp, "instance_name", status=422)
 
-    def test_add_plugin_duplicate_instance(self, client):
+    def test_add_plugin_duplicate_instance(self, client: FlaskClient) -> None:
         _create_playlist(client, "Dup2", "08:00", "12:00")
         _add_plugin_to_playlist(client, "Dup2", "Same", "weather")
         resp = _add_plugin_to_playlist(client, "Dup2", "Same", "weather")
@@ -1095,7 +1154,9 @@ class TestValidatorFieldAttribution:
 
 
 class TestEtaCacheThreadSafety:
-    def test_concurrent_eta_requests_no_crash(self, client, device_config_dev):
+    def test_concurrent_eta_requests_no_crash(
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
         """Concurrent ETA requests must not raise RuntimeError from dict mutation."""
         _create_playlist(client, "Conc", "00:00", "24:00")
         _add_plugin_to_playlist(client, "Conc", "P1", "weather")
@@ -1104,7 +1165,7 @@ class TestEtaCacheThreadSafety:
         errors: list[Exception] = []
         barrier = threading.Barrier(4, timeout=5)
 
-        def _hit_eta():
+        def _hit_eta() -> None:
             try:
                 barrier.wait()
                 for _ in range(10):
@@ -1121,7 +1182,7 @@ class TestEtaCacheThreadSafety:
 
         assert not errors, f"Concurrent ETA requests raised: {errors}"
 
-    def test_eta_cache_lock_exists(self):
+    def test_eta_cache_lock_exists(self) -> None:
         """Verify the lock is present at module level."""
         import blueprints.playlist as pl_mod
 
@@ -1135,7 +1196,7 @@ class TestEtaCacheThreadSafety:
 
 
 class TestDefaultOverlapWarning:
-    def test_returns_warning_when_overlapping_default(self):
+    def test_returns_warning_when_overlapping_default(self) -> None:
         from blueprints.playlist import _default_overlap_warning
         from model import Playlist
 
@@ -1149,7 +1210,7 @@ class TestDefaultOverlapWarning:
         assert "Default" in result
         assert "priority" in result
 
-    def test_returns_none_when_no_default(self):
+    def test_returns_none_when_no_default(self) -> None:
         from blueprints.playlist import _default_overlap_warning, _to_minutes
         from model import Playlist
 
@@ -1159,7 +1220,7 @@ class TestDefaultOverlapWarning:
         )
         assert result is None
 
-    def test_returns_none_when_no_overlap(self):
+    def test_returns_none_when_no_overlap(self) -> None:
         from blueprints.playlist import _default_overlap_warning, _to_minutes
         from model import Playlist
 

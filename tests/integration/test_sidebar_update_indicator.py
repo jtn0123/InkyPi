@@ -12,8 +12,10 @@ from __future__ import annotations
 
 import json
 import os
+from typing import Any
 
 import pytest
+from playwright.sync_api import Page
 from tests.integration.browser_helpers import navigate_and_wait
 
 pytestmark = pytest.mark.skipif(
@@ -22,8 +24,8 @@ pytestmark = pytest.mark.skipif(
 )
 
 
-def _stub_api_version(page, payload: dict) -> None:
-    def handler(route):
+def _stub_api_version(page: Page, payload: dict) -> None:
+    def handler(route: Any) -> None:
         route.fulfill(
             status=200,
             content_type="application/json",
@@ -33,11 +35,11 @@ def _stub_api_version(page, payload: dict) -> None:
     page.route("**/api/version", handler)
 
 
-def _stub_update_post(page, response: dict, status: int = 200) -> list[dict]:
+def _stub_update_post(page: Page, response: dict, status: int = 200) -> list[dict]:
     """Stub POST /settings/update and record each call for assertions."""
     calls: list[dict] = []
 
-    def handler(route):
+    def handler(route: Any) -> None:
         request = route.request
         calls.append({"method": request.method, "url": request.url})
         route.fulfill(
@@ -50,7 +52,7 @@ def _stub_update_post(page, response: dict, status: int = 200) -> list[dict]:
     return calls
 
 
-def _wait_for_indicator_check(page):
+def _wait_for_indicator_check(page: Page) -> None:
     """Wait until update_indicator.js finishes its /api/version round trip."""
     page.wait_for_function(
         """() => {
@@ -65,7 +67,9 @@ def _wait_for_indicator_check(page):
     )
 
 
-def test_sidebar_indicator_shows_when_update_available(live_server, browser_page):
+def test_sidebar_indicator_shows_when_update_available(
+    live_server: str, browser_page: Page
+) -> None:
     """update_available=true unhides the sidebar button with correct labels."""
     page = browser_page
     _stub_api_version(
@@ -101,7 +105,9 @@ def test_sidebar_indicator_shows_when_update_available(live_server, browser_page
     assert state["hasDot"] is True
 
 
-def test_sidebar_indicator_hidden_when_up_to_date(live_server, browser_page):
+def test_sidebar_indicator_hidden_when_up_to_date(
+    live_server: str, browser_page: Page
+) -> None:
     """update_available=false keeps the sidebar button hidden."""
     page = browser_page
     _stub_api_version(
@@ -121,7 +127,9 @@ def test_sidebar_indicator_hidden_when_up_to_date(live_server, browser_page):
     assert hidden is True
 
 
-def test_sidebar_indicator_click_opens_modal_with_versions(live_server, browser_page):
+def test_sidebar_indicator_click_opens_modal_with_versions(
+    live_server: str, browser_page: Page
+) -> None:
     """Clicking the button opens the quick-update modal with populated versions."""
     page = browser_page
     _stub_api_version(
@@ -163,7 +171,9 @@ def test_sidebar_indicator_click_opens_modal_with_versions(live_server, browser_
     assert state["hasCancel"] is True
 
 
-def test_sidebar_indicator_confirm_posts_update(live_server, browser_page):
+def test_sidebar_indicator_confirm_posts_update(
+    live_server: str, browser_page: Page
+) -> None:
     """Confirming in the modal POSTs /settings/update and closes the modal."""
     page = browser_page
     _stub_api_version(
@@ -202,7 +212,9 @@ def test_sidebar_indicator_confirm_posts_update(live_server, browser_page):
     assert calls[0]["url"].endswith("/settings/update")
 
 
-def test_settings_hash_activates_update_tab(live_server, browser_page):
+def test_settings_hash_activates_update_tab(
+    live_server: str, browser_page: Page
+) -> None:
     """Landing on /settings#section-software-update should auto-activate
     the Updates (maintenance) panel, not leave the user on the default
     Device tab. This is what the quick-update modal's "See release notes"
@@ -232,7 +244,9 @@ def test_settings_hash_activates_update_tab(live_server, browser_page):
     assert active == "maintenance"
 
 
-def test_sidebar_indicator_cancel_closes_modal_without_post(live_server, browser_page):
+def test_sidebar_indicator_cancel_closes_modal_without_post(
+    live_server: str, browser_page: Page
+) -> None:
     """Cancel dismisses the modal and must not POST /settings/update."""
     page = browser_page
     _stub_api_version(

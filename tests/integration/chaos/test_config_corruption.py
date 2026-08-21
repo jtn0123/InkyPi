@@ -2,15 +2,18 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
 import pytest
+from flask import Flask
+from flask.testing import FlaskClient
 
 
 def test_corrupt_device_json_is_reported_via_last_update_failure(
-    client,
-    flask_app,
-    chaos_diag_paths,
-):
+    client: FlaskClient,
+    flask_app: Flask,
+    chaos_diag_paths: Any,
+) -> None:
     device_config = flask_app.config["DEVICE_CONFIG"]
 
     # ``DEVICE_CONFIG.config_file`` is a shared resource across the flask_app

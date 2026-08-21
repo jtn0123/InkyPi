@@ -1,4 +1,10 @@
-def test_health_system_contract(client):
+from pathlib import Path
+from typing import Any
+
+from flask.testing import FlaskClient
+
+
+def test_health_system_contract(client: FlaskClient) -> None:
     response = client.get("/api/health/system")
     assert response.status_code == 200
     body = response.get_json()
@@ -7,7 +13,7 @@ def test_health_system_contract(client):
         assert key in body
 
 
-def test_health_plugins_contract(client):
+def test_health_plugins_contract(client: FlaskClient) -> None:
     response = client.get("/api/health/plugins")
     assert response.status_code == 200
     body = response.get_json()
@@ -15,7 +21,9 @@ def test_health_plugins_contract(client):
     assert isinstance(body["items"], dict)
 
 
-def test_benchmark_summary_contract(client, device_config_dev, tmp_path):
+def test_benchmark_summary_contract(
+    client: FlaskClient, device_config_dev: Any, tmp_path: Path
+) -> None:
     db_path = tmp_path / "contract_benchmarks.db"
     device_config_dev.update_value("benchmarks_db_path", str(db_path), write=True)
 
@@ -31,7 +39,7 @@ def test_benchmark_summary_contract(client, device_config_dev, tmp_path):
         assert set(summary[metric_name].keys()) == {"p50", "p95"}
 
 
-def test_refresh_info_contract(client):
+def test_refresh_info_contract(client: FlaskClient) -> None:
     response = client.get("/refresh-info")
     assert response.status_code == 200
     body = response.get_json()

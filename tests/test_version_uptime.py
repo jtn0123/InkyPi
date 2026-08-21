@@ -6,13 +6,16 @@ from __future__ import annotations
 import subprocess
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
+from flask import Flask
+from flask.testing import FlaskClient
 
 
 @pytest.fixture()
-def client(flask_app):
+def client(flask_app: Flask) -> Any:
     """Return a Flask test client."""
     return flask_app.test_client()
 
@@ -22,13 +25,13 @@ def client(flask_app):
 # ---------------------------------------------------------------------------
 
 
-def test_version_info_returns_200(client):
+def test_version_info_returns_200(client: FlaskClient) -> None:
     """GET /api/version/info should return HTTP 200."""
     resp = client.get("/api/version/info")
     assert resp.status_code == 200
 
 
-def test_version_info_has_expected_keys(client):
+def test_version_info_has_expected_keys(client: FlaskClient) -> None:
     """Response must contain all required keys."""
     resp = client.get("/api/version/info")
     data = resp.get_json()
@@ -37,7 +40,7 @@ def test_version_info_has_expected_keys(client):
         assert key in data, f"Missing key: {key}"
 
 
-def test_version_info_version_non_empty(client):
+def test_version_info_version_non_empty(client: FlaskClient) -> None:
     """The version field must be a non-empty string."""
     resp = client.get("/api/version/info")
     data = resp.get_json()
@@ -45,21 +48,21 @@ def test_version_info_version_non_empty(client):
     assert len(data["version"]) > 0
 
 
-def test_version_info_git_sha_is_string(client):
+def test_version_info_git_sha_is_string(client: FlaskClient) -> None:
     """git_sha must be a string (may be 'unknown' in CI without git history)."""
     resp = client.get("/api/version/info")
     data = resp.get_json()
     assert isinstance(data["git_sha"], str)
 
 
-def test_version_info_git_branch_is_string(client):
+def test_version_info_git_branch_is_string(client: FlaskClient) -> None:
     """git_branch must be a string."""
     resp = client.get("/api/version/info")
     data = resp.get_json()
     assert isinstance(data["git_branch"], str)
 
 
-def test_version_info_python_version_non_empty(client):
+def test_version_info_python_version_non_empty(client: FlaskClient) -> None:
     """python_version must be a non-empty string."""
     resp = client.get("/api/version/info")
     data = resp.get_json()
@@ -67,7 +70,7 @@ def test_version_info_python_version_non_empty(client):
     assert len(data["python_version"]) > 0
 
 
-def test_version_info_build_time_non_empty(client):
+def test_version_info_build_time_non_empty(client: FlaskClient) -> None:
     """build_time must be a non-empty string."""
     resp = client.get("/api/version/info")
     data = resp.get_json()
@@ -80,13 +83,13 @@ def test_version_info_build_time_non_empty(client):
 # ---------------------------------------------------------------------------
 
 
-def test_uptime_returns_200(client):
+def test_uptime_returns_200(client: FlaskClient) -> None:
     """GET /api/uptime should return HTTP 200."""
     resp = client.get("/api/uptime")
     assert resp.status_code == 200
 
 
-def test_uptime_has_expected_keys(client):
+def test_uptime_has_expected_keys(client: FlaskClient) -> None:
     """Response must contain all required keys."""
     resp = client.get("/api/uptime")
     data = resp.get_json()
@@ -99,7 +102,7 @@ def test_uptime_has_expected_keys(client):
         assert key in data, f"Missing key: {key}"
 
 
-def test_uptime_process_uptime_positive(client):
+def test_uptime_process_uptime_positive(client: FlaskClient) -> None:
     """process_uptime_seconds must be greater than zero."""
     resp = client.get("/api/uptime")
     data = resp.get_json()
@@ -107,7 +110,7 @@ def test_uptime_process_uptime_positive(client):
     assert data["process_uptime_seconds"] > 0
 
 
-def test_uptime_system_uptime_int_or_null(client):
+def test_uptime_system_uptime_int_or_null(client: FlaskClient) -> None:
     """system_uptime_seconds must be an integer or null (None on macOS/Windows)."""
     resp = client.get("/api/uptime")
     data = resp.get_json()
@@ -115,7 +118,7 @@ def test_uptime_system_uptime_int_or_null(client):
     assert value is None or isinstance(value, int)
 
 
-def test_uptime_process_started_at_is_valid_iso8601(client):
+def test_uptime_process_started_at_is_valid_iso8601(client: FlaskClient) -> None:
     """process_started_at must be a parseable ISO 8601 timestamp."""
     resp = client.get("/api/uptime")
     data = resp.get_json()
@@ -126,7 +129,7 @@ def test_uptime_process_started_at_is_valid_iso8601(client):
     assert parsed.tzinfo is not None, "Timestamp must include timezone info"
 
 
-def test_uptime_process_started_at_in_past(client):
+def test_uptime_process_started_at_in_past(client: FlaskClient) -> None:
     """process_started_at must be earlier than now."""
     resp = client.get("/api/uptime")
     data = resp.get_json()
@@ -139,7 +142,7 @@ def test_uptime_process_started_at_in_past(client):
 # ---------------------------------------------------------------------------
 
 
-def test_read_app_version_fallback_on_missing_file():
+def test_read_app_version_fallback_on_missing_file() -> None:
     """_read_app_version returns 'unknown' only when VERSION and pyproject both fail.
 
     JTN-624: when VERSION is missing, the function now falls back to reading
@@ -155,7 +158,7 @@ def test_read_app_version_fallback_on_missing_file():
     assert result == "unknown"
 
 
-def test_read_app_version_falls_back_to_pyproject_when_version_missing():
+def test_read_app_version_falls_back_to_pyproject_when_version_missing() -> None:
     """_read_app_version reads pyproject.toml when VERSION is unavailable (JTN-624)."""
     from blueprints.version_info import _read_app_version
 
@@ -169,7 +172,7 @@ def test_read_app_version_falls_back_to_pyproject_when_version_missing():
     assert result
 
 
-def test_read_app_version_rejects_unexpanded_placeholder():
+def test_read_app_version_rejects_unexpanded_placeholder() -> None:
     """VERSION containing the literal '{version}' placeholder falls back (JTN-595).
 
     mutmut triage: kills a surviving mutant where
@@ -195,7 +198,7 @@ def test_read_app_version_rejects_unexpanded_placeholder():
     assert result == "7.7.7"
 
 
-def test_read_app_version_rejects_bootstrap_placeholder():
+def test_read_app_version_rejects_bootstrap_placeholder() -> None:
     """VERSION containing the bootstrap '0.1.0' placeholder falls back (JTN-595).
 
     mutmut triage: kills a surviving mutant where
@@ -219,7 +222,7 @@ def test_read_app_version_rejects_bootstrap_placeholder():
     assert result == "7.7.7"
 
 
-def test_read_app_version_accepts_real_version_string():
+def test_read_app_version_accepts_real_version_string() -> None:
     """A real semver value in VERSION must be returned verbatim (JTN-595).
 
     mutmut triage: kills surviving mutants where the positive branch is
@@ -236,7 +239,7 @@ def test_read_app_version_accepts_real_version_string():
     assert result == "9.9.9"
 
 
-def test_run_git_returns_unknown_on_nonzero_returncode():
+def test_run_git_returns_unknown_on_nonzero_returncode() -> None:
     """_run_git returns 'unknown' when git exits with non-zero."""
     from blueprints.version_info import _run_git
 
@@ -249,7 +252,7 @@ def test_run_git_returns_unknown_on_nonzero_returncode():
     assert result == "unknown"
 
 
-def test_run_git_returns_unknown_on_exception():
+def test_run_git_returns_unknown_on_exception() -> None:
     """_run_git returns 'unknown' when subprocess.run raises."""
     from blueprints.version_info import _run_git
 
@@ -262,7 +265,7 @@ def test_run_git_returns_unknown_on_exception():
     assert result == "unknown"
 
 
-def test_read_build_time_uses_file_when_present(tmp_path):
+def test_read_build_time_uses_file_when_present(tmp_path: Path) -> None:
     """_read_build_time returns file content when build_time.txt exists."""
     from blueprints.version_info import _read_build_time
 
@@ -284,7 +287,7 @@ def test_read_build_time_uses_file_when_present(tmp_path):
     assert result == build_time_content
 
 
-def test_system_uptime_seconds_on_linux(tmp_path):
+def test_system_uptime_seconds_on_linux(tmp_path: Path) -> None:
     """_system_uptime_seconds returns int when /proc/uptime is readable."""
     from blueprints.version_info import _system_uptime_seconds
 
@@ -297,7 +300,7 @@ def test_system_uptime_seconds_on_linux(tmp_path):
     assert result == 12345
 
 
-def test_system_uptime_seconds_returns_none_on_error():
+def test_system_uptime_seconds_returns_none_on_error() -> None:
     """_system_uptime_seconds returns None when /proc/uptime is unreadable."""
     from blueprints.version_info import _system_uptime_seconds
 

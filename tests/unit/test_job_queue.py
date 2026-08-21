@@ -5,6 +5,8 @@ from __future__ import annotations
 
 import threading
 import time
+from collections.abc import Iterator
+from typing import Any
 
 import pytest
 
@@ -30,7 +32,7 @@ class _FakeClock:
 
 
 @pytest.fixture(autouse=True)
-def _reset_singleton():
+def _reset_singleton() -> Iterator[Any]:
     """Ensure the module-level singleton is reset between tests."""
     reset_job_queue()
     yield
@@ -40,14 +42,14 @@ def _reset_singleton():
 class TestJobQueue:
     """Core JobQueue behaviour."""
 
-    def test_enqueue_returns_job_id(self):
+    def test_enqueue_returns_job_id(self) -> None:
         q = JobQueue()
         jid = q.enqueue(lambda: 42)
         assert isinstance(jid, str)
         assert len(jid) == 32  # uuid4 hex
         q.shutdown()
 
-    def test_job_completes_with_done_status(self):
+    def test_job_completes_with_done_status(self) -> None:
         q = JobQueue()
         jid = q.enqueue(lambda: "hello")
         # Wait for completion
@@ -60,8 +62,8 @@ class TestJobQueue:
         assert info["result"] == "hello"
         q.shutdown()
 
-    def test_job_error_status(self):
-        def _fail():
+    def test_job_error_status(self) -> None:
+        def _fail() -> None:
             raise ValueError("boom")
 
         q = JobQueue()
@@ -75,16 +77,16 @@ class TestJobQueue:
         assert "boom" in info["error"]
         q.shutdown()
 
-    def test_unknown_job_id(self):
+    def test_unknown_job_id(self) -> None:
         q = JobQueue()
         info = q.get_status("nonexistent")
         assert info["status"] == "unknown"
         q.shutdown()
 
-    def test_pending_jobs_count(self):
+    def test_pending_jobs_count(self) -> None:
         barrier = threading.Event()
 
-        def _block():
+        def _block() -> None:
             barrier.wait(timeout=5)
 
         q = JobQueue(max_workers=1)
@@ -96,11 +98,11 @@ class TestJobQueue:
         barrier.set()
         q.shutdown(wait=True)
 
-    def test_job_transitions_through_running(self):
+    def test_job_transitions_through_running(self) -> Any:
         started = threading.Event()
         proceed = threading.Event()
 
-        def _slow():
+        def _slow() -> Any:
             started.set()
             proceed.wait(timeout=5)
             return "ok"
@@ -119,8 +121,8 @@ class TestJobQueue:
         assert info["status"] == STATUS_DONE
         q.shutdown()
 
-    def test_enqueue_with_args_and_kwargs(self):
-        def _add(a, b, extra=0):
+    def test_enqueue_with_args_and_kwargs(self) -> Any:
+        def _add(a: Any, b: Any, extra: Any = 0) -> Any:
             return a + b + extra
 
         q = JobQueue()
@@ -133,7 +135,7 @@ class TestJobQueue:
         assert info["result"] == 13
         q.shutdown()
 
-    def test_finished_jobs_expire_after_retention_window(self):
+    def test_finished_jobs_expire_after_retention_window(self) -> None:
         clock = _FakeClock()
         q = JobQueue(completed_ttl_seconds=10.0, clock=clock)
 
@@ -149,7 +151,7 @@ class TestJobQueue:
         assert q.get_status(jid) == {"status": "unknown", "error": "Job not found"}
         q.shutdown()
 
-    def test_finished_job_retention_cap_discards_oldest_completed_jobs(self):
+    def test_finished_job_retention_cap_discards_oldest_completed_jobs(self) -> None:
         clock = _FakeClock()
         q = JobQueue(
             completed_ttl_seconds=60.0,
@@ -177,12 +179,12 @@ class TestJobQueue:
         assert q.get_status(job_ids[2])["status"] == STATUS_DONE
         q.shutdown()
 
-    def test_finished_job_pruning_never_removes_active_jobs(self):
+    def test_finished_job_pruning_never_removes_active_jobs(self) -> Any:
         clock = _FakeClock()
         started = threading.Event()
         proceed = threading.Event()
 
-        def _slow():
+        def _slow() -> Any:
             started.set()
             proceed.wait(timeout=5)
             return "slow"
@@ -224,12 +226,12 @@ class TestJobQueue:
 class TestSingleton:
     """get_job_queue / reset_job_queue singleton management."""
 
-    def test_get_returns_same_instance(self):
+    def test_get_returns_same_instance(self) -> None:
         q1 = get_job_queue()
         q2 = get_job_queue()
         assert q1 is q2
 
-    def test_reset_creates_new_instance(self):
+    def test_reset_creates_new_instance(self) -> None:
         q1 = get_job_queue()
         reset_job_queue()
         q2 = get_job_queue()

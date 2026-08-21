@@ -17,6 +17,7 @@ import json
 import logging
 import os
 import sys
+from typing import Any
 
 import pytest
 from flask import Flask
@@ -74,7 +75,7 @@ def _make_csp_app() -> Flask:
 
 
 @pytest.fixture()
-def csp_client():
+def csp_client() -> Any:
     return _make_csp_app().test_client()
 
 
@@ -83,7 +84,7 @@ def csp_client():
 # ---------------------------------------------------------------------------
 
 
-def test_post_with_legacy_csp_report_returns_204(csp_client):
+def test_post_with_legacy_csp_report_returns_204(csp_client: Any) -> None:
     """POST with application/csp-report and a JSON body returns 204."""
     resp = csp_client.post(
         "/api/csp-report",
@@ -93,7 +94,7 @@ def test_post_with_legacy_csp_report_returns_204(csp_client):
     assert resp.status_code == 204
 
 
-def test_post_with_application_json_returns_204(csp_client):
+def test_post_with_application_json_returns_204(csp_client: Any) -> None:
     """POST with application/json and a modern report body returns 204."""
     resp = csp_client.post(
         "/api/csp-report",
@@ -103,7 +104,9 @@ def test_post_with_application_json_returns_204(csp_client):
     assert resp.status_code == 204
 
 
-def test_post_logs_warning_via_caplog(caplog, csp_client):
+def test_post_logs_warning_via_caplog(
+    caplog: pytest.LogCaptureFixture, csp_client: Any
+) -> None:
     """The violation is logged at WARNING level."""
     with caplog.at_level(logging.WARNING, logger="blueprints.csp_report"):
         csp_client.post(
@@ -120,7 +123,9 @@ def test_post_logs_warning_via_caplog(caplog, csp_client):
     ), f"Expected 'CSP violation' in warning log; got: {warning_messages}"
 
 
-def test_post_logs_report_content(caplog, csp_client):
+def test_post_logs_report_content(
+    caplog: pytest.LogCaptureFixture, csp_client: Any
+) -> None:
     """Logged message includes the violated directive."""
     with caplog.at_level(logging.WARNING, logger="blueprints.csp_report"):
         csp_client.post(
@@ -133,7 +138,9 @@ def test_post_logs_report_content(caplog, csp_client):
     assert "script-src" in combined, f"Expected directive in log; got: {combined}"
 
 
-def test_source_file_url_is_redacted(caplog, csp_client):
+def test_source_file_url_is_redacted(
+    caplog: pytest.LogCaptureFixture, csp_client: Any
+) -> None:
     """Query string is stripped from source-file URLs before logging."""
     with caplog.at_level(logging.WARNING, logger="blueprints.csp_report"):
         csp_client.post(
@@ -147,7 +154,9 @@ def test_source_file_url_is_redacted(caplog, csp_client):
     assert "secret" not in combined, f"Query string leaked into log: {combined}"
 
 
-def test_source_file_url_fragment_is_redacted(caplog, csp_client):
+def test_source_file_url_fragment_is_redacted(
+    caplog: pytest.LogCaptureFixture, csp_client: Any
+) -> None:
     """Fragment (#...) is stripped from source-file URLs before logging.
 
     JTN-595 mutmut triage: kills a surviving mutant where the ``#`` entry
@@ -176,7 +185,9 @@ def test_source_file_url_fragment_is_redacted(caplog, csp_client):
     assert "https://localhost/page" in combined, f"Redacted URL missing: {combined}"
 
 
-def test_all_url_fields_are_redacted(caplog, csp_client):
+def test_all_url_fields_are_redacted(
+    caplog: pytest.LogCaptureFixture, csp_client: Any
+) -> None:
     """Every URL-bearing key (document-uri, referrer, blocked-uri, source-file)
     must have its query string + fragment stripped before logging.
 
@@ -208,7 +219,7 @@ def test_all_url_fields_are_redacted(caplog, csp_client):
         ), f"Query token {leaked_token!r} leaked into log: {combined}"
 
 
-def test_empty_body_returns_204(csp_client):
+def test_empty_body_returns_204(csp_client: Any) -> None:
     """Empty POST body must not crash — returns 204."""
     resp = csp_client.post(
         "/api/csp-report",
@@ -218,7 +229,7 @@ def test_empty_body_returns_204(csp_client):
     assert resp.status_code == 204
 
 
-def test_invalid_json_body_returns_400(csp_client):
+def test_invalid_json_body_returns_400(csp_client: Any) -> None:
     """Malformed JSON must be rejected with HTTP 400 (JTN-628)."""
     resp = csp_client.post(
         "/api/csp-report",
@@ -230,7 +241,7 @@ def test_invalid_json_body_returns_400(csp_client):
     assert b"not-json" not in resp.data
 
 
-def test_invalid_json_body_reports_application_json(csp_client):
+def test_invalid_json_body_reports_application_json(csp_client: Any) -> None:
     """400 response uses application/json content-type."""
     resp = csp_client.post(
         "/api/csp-report",
@@ -241,7 +252,7 @@ def test_invalid_json_body_reports_application_json(csp_client):
     assert resp.content_type.startswith("application/json")
 
 
-def test_oversized_body_is_discarded(csp_client):
+def test_oversized_body_is_discarded(csp_client: Any) -> None:
     """Bodies larger than 16 KiB are discarded without logging."""
     huge = b'{"csp-report":{"blocked-uri":"' + (b"A" * 20_000) + b'"}}'
     resp = csp_client.post(
@@ -254,7 +265,7 @@ def test_oversized_body_is_discarded(csp_client):
     assert resp.status_code == 204
 
 
-def test_reports_api_v2_content_type_accepted(csp_client):
+def test_reports_api_v2_content_type_accepted(csp_client: Any) -> None:
     """application/reports+json (Reporting API v2) is accepted."""
     resp = csp_client.post(
         "/api/csp-report",
@@ -264,13 +275,13 @@ def test_reports_api_v2_content_type_accepted(csp_client):
     assert resp.status_code == 204
 
 
-def test_get_returns_405(csp_client):
+def test_get_returns_405(csp_client: Any) -> None:
     """GET /api/csp-report must be rejected with 405."""
     resp = csp_client.get("/api/csp-report")
     assert resp.status_code == 405
 
 
-def test_csp_header_includes_report_uri(monkeypatch):
+def test_csp_header_includes_report_uri(monkeypatch: pytest.MonkeyPatch) -> None:
     """The CSP response header must contain 'report-uri /api/csp-report'."""
     # Clear any custom CSP so we get the default value
     monkeypatch.delenv("INKYPI_CSP", raising=False)
@@ -293,7 +304,9 @@ def test_csp_header_includes_report_uri(monkeypatch):
     ), f"Expected 'report-uri /api/csp-report' in CSP header; got: {csp!r}"
 
 
-def test_csp_header_includes_report_uri_in_report_only_mode(monkeypatch):
+def test_csp_header_includes_report_uri_in_report_only_mode(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """report-uri is also present when the Report-Only header is used."""
     monkeypatch.delenv("INKYPI_CSP", raising=False)
     monkeypatch.setenv("INKYPI_CSP_REPORT_ONLY", "1")
@@ -315,7 +328,9 @@ def test_csp_header_includes_report_uri_in_report_only_mode(monkeypatch):
     ), f"Expected 'report-uri /api/csp-report' in Report-Only CSP; got: {csp!r}"
 
 
-def test_custom_csp_with_existing_report_uri_not_duplicated(monkeypatch):
+def test_custom_csp_with_existing_report_uri_not_duplicated(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """If INKYPI_CSP already contains 'report-uri', it must not be appended again."""
     monkeypatch.setenv(
         "INKYPI_CSP",
@@ -362,7 +377,7 @@ def _make_csp_app_with_full_middleware() -> Flask:
     return app
 
 
-def test_post_without_csrf_token_succeeds_full_middleware():
+def test_post_without_csrf_token_succeeds_full_middleware() -> None:
     """Integration: POST without CSRF token returns 204 (JTN-628)."""
     client = _make_csp_app_with_full_middleware().test_client()
     resp = client.post(
@@ -374,7 +389,7 @@ def test_post_without_csrf_token_succeeds_full_middleware():
     assert resp.status_code == 204
 
 
-def test_malformed_json_through_full_middleware_returns_400():
+def test_malformed_json_through_full_middleware_returns_400() -> None:
     """Integration: malformed JSON yields 400 even with CSRF+rate-limit registered."""
     client = _make_csp_app_with_full_middleware().test_client()
     resp = client.post(
@@ -385,7 +400,7 @@ def test_malformed_json_through_full_middleware_returns_400():
     assert resp.status_code == 400
 
 
-def test_wrong_content_type_still_accepted_if_valid_json():
+def test_wrong_content_type_still_accepted_if_valid_json() -> None:
     """Unexpected content-type with valid JSON is logged and returns 204."""
     client = _make_csp_app_with_full_middleware().test_client()
     resp = client.post(
@@ -398,7 +413,9 @@ def test_wrong_content_type_still_accepted_if_valid_json():
     assert resp.status_code == 204
 
 
-def test_modern_report_api_returns_204_and_logs(caplog, csp_client):
+def test_modern_report_api_returns_204_and_logs(
+    caplog: pytest.LogCaptureFixture, csp_client: Any
+) -> None:
     """Modern Reporting API (array payload) is parsed and logged."""
     with caplog.at_level(logging.WARNING, logger="blueprints.csp_report"):
         resp = csp_client.post(

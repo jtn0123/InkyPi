@@ -30,8 +30,12 @@ import json
 import os
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 import pytest
+from flask import Flask
+from flask.testing import FlaskClient
+from playwright.sync_api import Page
 
 pytestmark = pytest.mark.journey
 
@@ -79,7 +83,9 @@ def _latest_history_sidecar(history_dir: Path) -> dict | None:
         return None
 
 
-def test_first_run_setup_journey(client, device_config_dev, flask_app):
+def test_first_run_setup_journey(
+    client: FlaskClient, device_config_dev: Any, flask_app: Flask
+) -> None:
     """Full first-run journey with per-step assertions."""
     app = flask_app
     # Refresh task is constructed but not started in the test fixture; keep
@@ -202,8 +208,12 @@ def test_first_run_setup_journey(client, device_config_dev, flask_app):
 
 @pytest.mark.skipif(_SKIP_UI, reason="UI interactions skipped by env")
 def test_first_run_setup_journey_ui_render(
-    client, device_config_dev, flask_app, live_server, browser_page
-):
+    client: FlaskClient,
+    device_config_dev: Any,
+    flask_app: Flask,
+    live_server: str,
+    browser_page: Page,
+) -> None:
     """Browser-level companion: after API-driven setup the history page
     renders the new entry with the plugin name visible to the user.
 

@@ -1,11 +1,19 @@
 from __future__ import annotations
 
+from typing import Any
 
-def test_disk_full_fault_surfaces_through_diagnostics(client, flask_app, monkeypatch):
+import pytest
+from flask import Flask
+from flask.testing import FlaskClient
+
+
+def test_disk_full_fault_surfaces_through_diagnostics(
+    client: FlaskClient, flask_app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
     refresh_task = flask_app.config["REFRESH_TASK"]
     display_manager = flask_app.config["DISPLAY_MANAGER"]
 
-    def _raise_disk_full(*_args, **_kwargs):
+    def _raise_disk_full(*_args: Any, **_kwargs: Any) -> None:
         raise OSError("disk full while writing display artifacts")
 
     monkeypatch.setattr(

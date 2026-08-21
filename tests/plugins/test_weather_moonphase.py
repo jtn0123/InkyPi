@@ -1,7 +1,12 @@
+from typing import Any
 from unittest.mock import patch
 
+import pytest
 
-def test_weather_moon_phase_included_in_forecast(device_config_dev, monkeypatch):
+
+def test_weather_moon_phase_included_in_forecast(
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Generated forecast should include moon phase info without external calls."""
     from plugins.weather.weather import Weather
 

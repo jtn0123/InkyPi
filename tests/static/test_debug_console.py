@@ -7,6 +7,8 @@ page.  All assertions are DOM/source-level; no browser is required.
 
 from pathlib import Path
 
+from flask.testing import FlaskClient
+
 _SCRIPT_PATH = (
     Path(__file__).resolve().parents[2]
     / "src"
@@ -34,12 +36,12 @@ def _read_all_css() -> str:
 # ---------------------------------------------------------------------------
 
 
-def test_debug_console_script_exists():
+def test_debug_console_script_exists() -> None:
     """debug_console.js must be present."""
     assert _SCRIPT_PATH.exists(), "debug_console.js not found"
 
 
-def test_debug_console_uses_correct_title_label():
+def test_debug_console_uses_correct_title_label() -> None:
     """The floating button must use title='Debug console', not 'Error log'."""
     src = _SCRIPT_PATH.read_text(encoding="utf-8")
     assert "Debug console" in src, "Expected 'Debug console' label in debug_console.js"
@@ -48,7 +50,7 @@ def test_debug_console_uses_correct_title_label():
     ), "debug_console.js must not use the old 'Error log' label"
 
 
-def test_debug_console_aria_label_is_correct():
+def test_debug_console_aria_label_is_correct() -> None:
     """aria-label must reference 'debug console' (case-insensitive)."""
     src = _SCRIPT_PATH.read_text(encoding="utf-8").lower()
     assert (
@@ -56,7 +58,7 @@ def test_debug_console_aria_label_is_correct():
     ), "Expected aria-label containing 'debug console' in debug_console.js"
 
 
-def test_debug_console_panel_heading_is_correct():
+def test_debug_console_panel_heading_is_correct() -> None:
     """The panel heading text must be 'Debug console'."""
     src = _SCRIPT_PATH.read_text(encoding="utf-8")
     # The heading content is set via textContent
@@ -65,7 +67,7 @@ def test_debug_console_panel_heading_is_correct():
     ), "Panel heading must be 'Debug console' in debug_console.js"
 
 
-def test_debug_console_filters_callback_names():
+def test_debug_console_filters_callback_names() -> None:
     """isUsefulMessage must filter out raw callback-name patterns."""
     src = _SCRIPT_PATH.read_text(encoding="utf-8")
     # The regex pattern for filtering should be present
@@ -79,7 +81,7 @@ def test_debug_console_filters_callback_names():
 # ---------------------------------------------------------------------------
 
 
-def test_base_template_includes_debug_console_script():
+def test_base_template_includes_debug_console_script() -> None:
     """base.html must load debug_console.js."""
     html = _BASE_TEMPLATE.read_text(encoding="utf-8")
     assert (
@@ -92,7 +94,7 @@ def test_base_template_includes_debug_console_script():
 # ---------------------------------------------------------------------------
 
 
-def test_css_contains_debug_console_classes():
+def test_css_contains_debug_console_classes() -> None:
     """CSS partials must define the debug console widget classes."""
     css = _read_all_css()
     assert (
@@ -107,7 +109,7 @@ def test_css_contains_debug_console_classes():
 # ---------------------------------------------------------------------------
 
 
-def test_no_error_log_title_in_rendered_pages(client):
+def test_no_error_log_title_in_rendered_pages(client: FlaskClient) -> None:
     """No rendered page should expose a 'title=\"Error log\"' attribute on the
     floating debug button — the correct value is 'Debug console'."""
     for path in ("/", "/settings", "/plugin/clock"):
