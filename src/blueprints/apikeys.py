@@ -161,7 +161,7 @@ def mask_value(value: str) -> str:
     return "●" * 8 + value[-4:]
 
 
-@apikeys_bp.route("/api-keys", methods=["GET"])  # type: ignore
+@apikeys_bp.route("/api-keys", methods=["GET"])
 def apikeys_page() -> Response | str:
     """Render API keys management page."""
     env_path = get_env_path()
@@ -194,7 +194,7 @@ def apikeys_page() -> Response | str:
     )
 
 
-@apikeys_bp.route("/api-keys/save", methods=["POST"])  # type: ignore
+@apikeys_bp.route("/api-keys/save", methods=["POST"])
 def save_apikeys() -> tuple[Response | dict[str, Any], int] | Response | dict[str, Any]:
     """Save API keys to .env file."""
     try:

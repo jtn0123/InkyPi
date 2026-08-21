@@ -96,7 +96,7 @@ _mod.settings_bp.add_url_rule(
 )
 
 
-@_mod.settings_bp.route("/settings/safe_reset", methods=["POST"])  # type: ignore[untyped-decorator]
+@_mod.settings_bp.route("/settings/safe_reset", methods=["POST"])
 def safe_reset() -> Any:
     with route_error_boundary(
         "safe reset",
@@ -124,7 +124,7 @@ def safe_reset() -> Any:
         return json_success(message="Safe reset applied.")
 
 
-@_mod.settings_bp.route("/settings", methods=["GET"])  # type: ignore[untyped-decorator]
+@_mod.settings_bp.route("/settings", methods=["GET"])
 def settings_page() -> Any:
     device_config = current_app.config["DEVICE_CONFIG"]
     timezones = sorted(available_timezones())
@@ -136,7 +136,7 @@ def settings_page() -> Any:
     )
 
 
-@_mod.settings_bp.route("/settings/diagnostics", methods=["GET"])  # type: ignore[untyped-decorator]
+@_mod.settings_bp.route("/settings/diagnostics", methods=["GET"])
 def diagnostics_redirect() -> Any:
     """Redirect /settings/diagnostics to the Diagnostics accordion on /settings.
 
@@ -148,7 +148,7 @@ def diagnostics_redirect() -> Any:
     return redirect("/settings#diagnostics", code=302)
 
 
-@_mod.settings_bp.route("/settings/backup", methods=["GET"])  # type: ignore[untyped-decorator]
+@_mod.settings_bp.route("/settings/backup", methods=["GET"])
 def backup_restore_page() -> Any:
     device_config = current_app.config["DEVICE_CONFIG"]
     # For now, reuse the main settings page and anchor to a section; separate template can be added later
@@ -177,8 +177,8 @@ def _include_export_keys() -> bool:
     return str(value or "").strip().lower() in ("1", "true", "yes", "on")
 
 
-@_mod.settings_bp.route("/settings/export", methods=["GET"])  # type: ignore[untyped-decorator]
-@_mod.settings_bp.route(  # type: ignore[untyped-decorator]
+@_mod.settings_bp.route("/settings/export", methods=["GET"])
+@_mod.settings_bp.route(
     "/settings/export", methods=["POST"], endpoint="export_settings_post"
 )
 def export_settings() -> Any:
@@ -235,7 +235,7 @@ def _extract_import_payload() -> dict[str, Any] | None:
     return dict(payload)
 
 
-@_mod.settings_bp.route("/settings/import", methods=["POST"])  # type: ignore[untyped-decorator]
+@_mod.settings_bp.route("/settings/import", methods=["POST"])
 def import_settings() -> Any:
     with route_error_boundary(
         "import settings",
@@ -289,7 +289,7 @@ def import_settings() -> Any:
         return json_success(message=f"Restored {' and '.join(parts)}")
 
 
-@_mod.settings_bp.route("/settings/api-keys", methods=["GET"])  # type: ignore[untyped-decorator]
+@_mod.settings_bp.route("/settings/api-keys", methods=["GET"])
 def api_keys_page() -> Any:
     device_config = current_app.config["DEVICE_CONFIG"]
 
@@ -332,7 +332,7 @@ def api_keys_page() -> Any:
     )
 
 
-@_mod.settings_bp.route("/settings/save_api_keys", methods=["POST"])  # type: ignore[untyped-decorator]
+@_mod.settings_bp.route("/settings/save_api_keys", methods=["POST"])
 def save_api_keys() -> Any:
     device_config = current_app.config["DEVICE_CONFIG"]
     with route_error_boundary(
@@ -386,7 +386,7 @@ def save_api_keys() -> Any:
         return json_success(message="API keys saved.", updated=updated)
 
 
-@_mod.settings_bp.route("/settings/delete_api_key", methods=["POST"])  # type: ignore[untyped-decorator]
+@_mod.settings_bp.route("/settings/delete_api_key", methods=["POST"])
 def delete_api_key() -> Any:
     device_config = current_app.config["DEVICE_CONFIG"]
     key = request.form.get("key")
@@ -595,7 +595,7 @@ def _build_settings_dict(
     return settings, plugin_cycle_interval_seconds
 
 
-@_mod.settings_bp.route("/save_settings", methods=["POST"])  # type: ignore[untyped-decorator]
+@_mod.settings_bp.route("/save_settings", methods=["POST"])
 def save_settings() -> Any:
     device_config = current_app.config["DEVICE_CONFIG"]
 

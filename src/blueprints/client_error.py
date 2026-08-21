@@ -52,7 +52,7 @@ def _strip_newlines(value: str) -> str:
     return value.replace("\r", " ").replace("\n", " ")
 
 
-@client_error_bp.route("/api/client-error", methods=["POST"])  # type: ignore
+@client_error_bp.route("/api/client-error", methods=["POST"])
 def receive_client_error() -> Any:
     """Accept a browser JS error report and emit it as a WARNING log entry.
 
@@ -101,7 +101,7 @@ def receive_client_error() -> Any:
     return Response(status=204)
 
 
-@client_error_bp.route("/api/client-error", methods=["GET"])  # type: ignore
+@client_error_bp.route("/api/client-error", methods=["GET"])
 def receive_client_error_get() -> Any:
     """Explicitly reject GET to provide a clear error instead of 405 from Flask."""
     return json_error("Method not allowed", status=405)

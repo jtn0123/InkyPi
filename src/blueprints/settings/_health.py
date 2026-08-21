@@ -103,7 +103,7 @@ def _filter_health_by_window(health: dict[str, Any], window_min: int) -> dict[st
     return filtered
 
 
-@_mod.settings_bp.route("/api/health/plugins", methods=["GET"])  # type: ignore[untyped-decorator]
+@_mod.settings_bp.route("/api/health/plugins", methods=["GET"])
 def health_plugins() -> tuple[Any, int] | Response:
     try:
         rt = current_app.config["REFRESH_TASK"]
@@ -118,7 +118,7 @@ def health_plugins() -> tuple[Any, int] | Response:
         return json_internal_error("health plugins", details={"error": str(e)})
 
 
-@_mod.settings_bp.route("/api/health/system", methods=["GET"])  # type: ignore[untyped-decorator]
+@_mod.settings_bp.route("/api/health/system", methods=["GET"])
 def health_system() -> tuple[Any, int] | Response:
     try:
         data: dict[str, Any] = {}
@@ -145,7 +145,7 @@ def health_system() -> tuple[Any, int] | Response:
         return json_internal_error("health system", details={"error": str(e)})
 
 
-@_mod.settings_bp.route("/api/progress/stream", methods=["GET"])  # type: ignore[untyped-decorator]
+@_mod.settings_bp.route("/api/progress/stream", methods=["GET"])
 def progress_stream() -> Response | tuple[Any, int]:
     if not _progress_stream_enabled():
         return json_error("Progress SSE disabled", status=404)
@@ -167,7 +167,7 @@ def progress_stream() -> Response | tuple[Any, int]:
             released = True
         _release_progress_stream()
 
-    @stream_with_context  # type: ignore[untyped-decorator]
+    @stream_with_context
     def gen() -> Generator[str, None, None]:
         try:
             yield from _iter_progress_events(bus, last_seq)

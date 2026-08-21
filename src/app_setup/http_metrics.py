@@ -28,13 +28,13 @@ def _should_skip(path: str) -> bool:
 def setup_http_metrics(app: Flask) -> None:
     """Register before/after request hooks that record HTTP timing metrics."""
 
-    @app.before_request  # type: ignore
+    @app.before_request
     def _http_metrics_start() -> None:
         if _should_skip(request.path):
             return
         g._http_metrics_t0 = perf_counter()
 
-    @app.after_request  # type: ignore
+    @app.after_request
     def _http_metrics_finish(response: Response) -> Response:
         t0 = getattr(g, "_http_metrics_t0", None)
         if t0 is None:

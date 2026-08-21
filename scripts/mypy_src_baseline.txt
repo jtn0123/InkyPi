@@ -1,3 +1,26 @@
 # Checked-in mypy src/ advisory baseline for scripts/lint.sh.
 # Lower this number when src/ typing debt is intentionally reduced.
-0
+#
+# 0 -> 90 (2026-08-21). This is NOT a regression, and no new error was
+# introduced. The previous zero was an artefact of `follow_imports = skip` in
+# mypy.ini: mypy never read an imported module, so every cross-module call
+# resolved to Any and whole classes of mismatch were unreportable. Turning the
+# setting on surfaced 214 pre-existing errors; 115 of those were stale
+# `# type: ignore` comments that only looked necessary while the real types
+# were invisible, and removing them left 99. Fixing the 9 that fell inside the blocking
+# strict subset — see below — brought it to 90.
+#
+# Two of the 214 were real defects, both found the moment imports were
+# followed:
+#   * PlaylistRefresh.execute called image.save() on the result of
+#     generate_image without a None check, while the base class had been
+#     widened to allow None for control-only plugins. The PluginLike Protocol
+#     still declared `-> Image.Image`, so callers type-checked against a
+#     contract the implementation no longer honoured.
+#   * client_endpoint declared its error slot as Response when json_error can
+#     also return a plain dict (its no-app-context fallback).
+#
+# return-value, arg-type and attr-defined are the ones most likely to be real
+# defects rather than annotation noise; they are the intended next piece of
+# work (item I2 in .claude/grade-report.md). This number must only go down.
+90

@@ -33,7 +33,7 @@ _WINDOW_24H = 86_400
 _WINDOW_7D = 604_800
 
 
-@stats_bp.route("/api/stats", methods=["GET"])  # type: ignore
+@stats_bp.route("/api/stats", methods=["GET"])
 def refresh_stats() -> Any:
     """Return aggregated refresh statistics for 1h, 24h, and 7d windows."""
     device_config = current_app.config.get("DEVICE_CONFIG")

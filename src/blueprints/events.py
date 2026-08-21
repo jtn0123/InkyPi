@@ -20,8 +20,8 @@ logger = logging.getLogger(__name__)
 events_bp = Blueprint("events", __name__)
 
 
-@events_bp.route("/api/events", methods=["GET"])  # type: ignore
-@events_bp.route("/api/events", methods=["GET"])  # type: ignore
+@events_bp.route("/api/events", methods=["GET"])
+@events_bp.route("/api/events", methods=["GET"])
 def sse_events() -> Response:
     """Stream SSE events to the client.
 
@@ -38,7 +38,7 @@ def sse_events() -> Response:
         logger.warning("/api/events: subscriber cap reached, returning 503")
         return Response("Too many SSE connections", status=503, mimetype="text/plain")
 
-    @stream_with_context  # type: ignore
+    @stream_with_context
     def generate() -> Any:
         try:
             yield from bus.stream(q)

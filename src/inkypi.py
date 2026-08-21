@@ -393,7 +393,7 @@ def _configure_upload_limits(app: Flask) -> None:
 def _register_before_request_hooks(app: Flask) -> None:
     """Attach before-request hooks for refresh task, timers, and request IDs."""
 
-    @app.before_request  # type: ignore[untyped-decorator]
+    @app.before_request
     def _ensure_refresh_task_started() -> None:
         if WEB_ONLY:
             return
@@ -403,14 +403,14 @@ def _register_before_request_hooks(app: Flask) -> None:
                 logger.info("Starting refresh task (flask dev server lazy start)")
                 rt.start()
 
-    @app.before_request  # type: ignore[untyped-decorator]
+    @app.before_request
     def _start_request_timer() -> None:
         try:
             g._t0 = perf_counter()
         except Exception:
             pass
 
-    @app.before_request  # type: ignore[untyped-decorator]
+    @app.before_request
     def _attach_request_id() -> None:
         try:
             from utils.http_utils import _get_or_set_request_id

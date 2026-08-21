@@ -73,7 +73,7 @@ def _instance_exists(device_config: Any, instance_name: str) -> bool:
 
 @plugin_history_bp.route(
     "/api/plugins/instance/<string:instance_name>/history", methods=["GET"]
-)  # type: ignore
+)
 def plugin_instance_history(instance_name: str) -> Any:
     """Return recent config-change history for a plugin instance."""
     safe_name = _safe_instance_name(instance_name)
@@ -98,7 +98,7 @@ def plugin_instance_history(instance_name: str) -> Any:
 
 @plugin_history_bp.route(
     "/api/plugins/instance/<string:instance_name>/diff", methods=["GET"]
-)  # type: ignore
+)
 def plugin_instance_diff(instance_name: str) -> Any:
     """Return the diff between the two most-recent history entries."""
     safe_name = _safe_instance_name(instance_name)

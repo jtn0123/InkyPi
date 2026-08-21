@@ -16,10 +16,17 @@ from flask import Response, request
 from utils.http_utils import json_error
 from utils.rate_limit import TokenBucket
 
+#: What :func:`utils.http_utils.json_error` actually hands back. It normally
+#: returns a ``Response`` from ``jsonify``, but falls back to a plain ``dict``
+#: when there is no application context for jsonify to use. The signatures here
+#: previously admitted only ``Response``, so every error path in this module was
+#: typed as something narrower than the value it returns.
+ErrorResponse = tuple["Response | dict[str, Any]", int]
+
 
 def enforce_size_and_rate(
     rate_limiter: TokenBucket, body_max: int
-) -> tuple[bytes | None, tuple[Response, int] | None]:
+) -> tuple[bytes | None, ErrorResponse | None]:
     """Enforce body-size cap + per-IP rate-limit.
 
     Returns ``(raw_body, None)`` on success or ``(None, error_response)``.
@@ -45,7 +52,7 @@ def enforce_size_and_rate(
 
 def parse_client_report(
     rate_limiter: TokenBucket, body_max: int
-) -> tuple[dict[str, Any] | None, Response | tuple[Response, int] | None]:
+) -> tuple[dict[str, Any] | None, ErrorResponse | None]:
     """Validate body size, rate-limit, and parse JSON.
 
     Returns ``(data, None)`` on success or ``(None, error_response)`` on

@@ -231,7 +231,7 @@ def _emit(report: dict[str, object]) -> None:
             _captured_reports.append(dict(report))
 
 
-@client_log_bp.route("/api/client-log", methods=["POST"])  # type: ignore
+@client_log_bp.route("/api/client-log", methods=["POST"])
 def receive_client_log() -> tuple[Response, int] | Response | Any:
     """Accept a single entry OR an array of entries and log each as WARNING.
 
@@ -311,7 +311,7 @@ def receive_client_log() -> tuple[Response, int] | Response | Any:
     return Response(status=204)
 
 
-@client_log_bp.route("/api/client-log", methods=["GET"])  # type: ignore
+@client_log_bp.route("/api/client-log", methods=["GET"])
 def receive_client_log_get() -> tuple[Response, int] | Response | Any:
     """Explicitly reject GET to provide a clear error instead of 405 from Flask."""
     return json_error("Method not allowed", status=405)

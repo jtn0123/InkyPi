@@ -418,7 +418,7 @@ def _panel_thumb_ratio(device_config: Any) -> str | None:
     return None
 
 
-@history_bp.route("/history", methods=["GET"])  # type: ignore
+@history_bp.route("/history", methods=["GET"])
 def history_page() -> Response | str:
     device_config = current_app.config[_CONFIG_KEY]
     history_dir = device_config.history_image_dir
@@ -470,7 +470,7 @@ def history_page() -> Response | str:
     return render_template("history.html", **template_ctx)
 
 
-@history_bp.route("/history/image/<path:filename>", methods=["GET"])  # type: ignore
+@history_bp.route("/history/image/<path:filename>", methods=["GET"])
 def history_image(filename: str) -> Response | tuple[dict[str, Any], int]:
     device_config = current_app.config[_CONFIG_KEY]
     history_dir = device_config.history_image_dir
@@ -483,7 +483,7 @@ def history_image(filename: str) -> Response | tuple[dict[str, Any], int]:
     return send_from_directory(history_dir, filename)
 
 
-@history_bp.route("/history/redisplay", methods=["POST"])  # type: ignore
+@history_bp.route("/history/redisplay", methods=["POST"])
 def history_redisplay() -> tuple[dict[str, Any], int] | Any:
     device_config = current_app.config[_CONFIG_KEY]
     display_manager = current_app.config["DISPLAY_MANAGER"]
@@ -511,7 +511,7 @@ def history_redisplay() -> tuple[dict[str, Any], int] | Any:
         )
 
 
-@history_bp.route("/history/delete", methods=["POST"])  # type: ignore
+@history_bp.route("/history/delete", methods=["POST"])
 def history_delete() -> tuple[dict[str, Any], int] | Any:
     device_config = current_app.config[_CONFIG_KEY]
     history_dir = device_config.history_image_dir
@@ -558,7 +558,7 @@ def history_delete() -> tuple[dict[str, Any], int] | Any:
         )
 
 
-@history_bp.route("/history/clear", methods=["POST"])  # type: ignore
+@history_bp.route("/history/clear", methods=["POST"])
 def history_clear() -> tuple[dict[str, Any], int] | Any:
     device_config = current_app.config[_CONFIG_KEY]
     history_dir = device_config.history_image_dir
@@ -666,7 +666,7 @@ def _iter_history_csv(history_dir: str) -> Iterator[bytes]:
         yield buf.getvalue().encode("utf-8")
 
 
-@history_bp.route("/history/export.csv", methods=["GET"])  # type: ignore
+@history_bp.route("/history/export.csv", methods=["GET"])
 def history_export_csv() -> Response:
     """Return all history entries as a downloadable CSV file.
 
@@ -690,7 +690,7 @@ def history_export_csv() -> Response:
     )
 
 
-@history_bp.route("/history/storage", methods=["GET"])  # type: ignore
+@history_bp.route("/history/storage", methods=["GET"])
 def history_storage() -> tuple[Any, int]:
     """Return storage stats for the filesystem containing the history directory.
 

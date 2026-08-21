@@ -402,7 +402,7 @@ def _validate_plugin_settings_security(
     return None
 
 
-@playlist_bp.route("/add_plugin", methods=["POST"])  # type: ignore[untyped-decorator]
+@playlist_bp.route("/add_plugin", methods=["POST"])
 def add_plugin() -> Any:
     device_config = current_app.config["DEVICE_CONFIG"]
     playlist_manager = device_config.get_playlist_manager()
@@ -436,12 +436,12 @@ def add_plugin() -> Any:
     return json_success("Scheduled refresh configured.")
 
 
-@playlist_bp.route("/playlists", methods=["GET"])  # type: ignore[untyped-decorator]
+@playlist_bp.route("/playlists", methods=["GET"])
 def playlists_redirect() -> Any:
     return redirect(url_for("playlist.playlists"))
 
 
-@playlist_bp.route("/playlist", methods=["GET"])  # type: ignore[untyped-decorator]
+@playlist_bp.route("/playlist", methods=["GET"])
 def playlists() -> Any:
     device_config = current_app.config["DEVICE_CONFIG"]
     playlist_manager = device_config.get_playlist_manager()
@@ -582,7 +582,7 @@ def _parse_playlist_update_payload(
     return parsed, None
 
 
-@playlist_bp.route("/create_playlist", methods=["POST"])  # type: ignore[untyped-decorator]
+@playlist_bp.route("/create_playlist", methods=["POST"])
 def create_playlist() -> Any:
     device_config = current_app.config["DEVICE_CONFIG"]
     playlist_manager = device_config.get_playlist_manager()
@@ -667,7 +667,7 @@ def _apply_cycle_override(
         playlist.cycle_interval_seconds = cycle_minutes_int * 60
 
 
-@playlist_bp.route("/update_playlist/<string:playlist_name>", methods=["PUT"])  # type: ignore[untyped-decorator]
+@playlist_bp.route("/update_playlist/<string:playlist_name>", methods=["PUT"])
 def update_playlist(playlist_name: str) -> Any:
     device_config = current_app.config["DEVICE_CONFIG"]
     playlist_manager = device_config.get_playlist_manager()
@@ -753,7 +753,7 @@ def update_playlist(playlist_name: str) -> Any:
     return json_success("Updated playlist!")
 
 
-@playlist_bp.route("/delete_playlist/<string:playlist_name>", methods=["DELETE"])  # type: ignore[untyped-decorator]
+@playlist_bp.route("/delete_playlist/<string:playlist_name>", methods=["DELETE"])
 def delete_playlist(playlist_name: str) -> Any:
     device_config = current_app.config["DEVICE_CONFIG"]
     playlist_manager = device_config.get_playlist_manager()
@@ -798,7 +798,7 @@ def delete_playlist(playlist_name: str) -> Any:
     return json_success("Deleted playlist!")
 
 
-@playlist_bp.route("/update_device_cycle", methods=["PUT"])  # type: ignore[untyped-decorator]
+@playlist_bp.route("/update_device_cycle", methods=["PUT"])
 def update_device_cycle() -> Any:
     device_config = current_app.config["DEVICE_CONFIG"]
     refresh_task = current_app.config["REFRESH_TASK"]
@@ -823,7 +823,7 @@ def update_device_cycle() -> Any:
         return json_success("Device refresh cadence updated.")
 
 
-@playlist_bp.route("/reorder_plugins", methods=["POST"])  # type: ignore[untyped-decorator]
+@playlist_bp.route("/reorder_plugins", methods=["POST"])
 def reorder_plugins() -> Any:
     device_config = current_app.config["DEVICE_CONFIG"]
     playlist_manager = device_config.get_playlist_manager()
@@ -869,7 +869,7 @@ def reorder_plugins() -> Any:
 
 
 # Trigger next eligible instance in a specific playlist immediately
-@playlist_bp.route("/display_next_in_playlist", methods=["POST"])  # type: ignore[untyped-decorator]
+@playlist_bp.route("/display_next_in_playlist", methods=["POST"])
 def display_next_in_playlist() -> Any:
     device_config = current_app.config["DEVICE_CONFIG"]
     refresh_task = current_app.config["REFRESH_TASK"]
@@ -942,7 +942,7 @@ def display_next_in_playlist() -> Any:
         )
 
 
-@playlist_bp.route("/playlist/eta/<string:playlist_name>", methods=["GET"])  # type: ignore[untyped-decorator]
+@playlist_bp.route("/playlist/eta/<string:playlist_name>", methods=["GET"])
 def playlist_eta(playlist_name: str) -> Any:
     """Return per-instance ETA for the named playlist.
 
@@ -1026,7 +1026,7 @@ def playlist_eta(playlist_name: str) -> Any:
         return json_success("ok", eta=eta_map)
 
 
-@playlist_bp.app_template_filter("format_relative_time")  # type: ignore[untyped-decorator]
+@playlist_bp.app_template_filter("format_relative_time")
 def format_relative_time(iso_date_string: str) -> str:
     # Parse the input ISO date string
     dt = datetime.fromisoformat(iso_date_string)

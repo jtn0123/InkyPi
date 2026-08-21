@@ -318,7 +318,7 @@ def _auto_clear_stale_update_state() -> tuple[str | None, bool]:
     return failed_name, unit_failed
 
 
-@_mod.settings_bp.route("/settings/update_status", methods=["GET"])  # type: ignore
+@_mod.settings_bp.route("/settings/update_status", methods=["GET"])
 def update_status() -> Response:
     with route_error_boundary(
         "update status",
@@ -462,7 +462,7 @@ def start_rollback() -> tuple[object, int] | Response:
         raise
 
 
-@_mod.settings_bp.route("/api/version", methods=["GET"])  # type: ignore
+@_mod.settings_bp.route("/api/version", methods=["GET"])
 def api_version() -> Response:
     """Return current and latest version info.
 
