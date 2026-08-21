@@ -59,6 +59,12 @@ def _resolved_dir(candidate: str, fallback: str) -> Path:
     breadcrumbs relative to the service's working directory rather than putting
     them where the next boot looks, so requiring an absolute path is both the
     safer and the more correct reading.
+
+    SonarCloud reports S2083 (path built from user-controlled data) against the
+    write this feeds. Assessed as a false positive — these variables come from
+    the systemd unit, not from a request — and tracked, with the reasoning and
+    what was hardened anyway, in
+    ``docs/security/sonar-s2083-crash-breadcrumb-tracking.md``.
     """
     try:
         path = Path(candidate).expanduser()
