@@ -11,7 +11,7 @@ from typing import Any
 import pytest
 from flask import Flask
 
-from src.utils.http_utils import json_error
+from utils.http_utils import json_error
 
 
 @pytest.fixture

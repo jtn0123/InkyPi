@@ -1,6 +1,6 @@
 """Tests for enhanced progress tracking functionality."""
 
-from src.utils.progress import (
+from utils.progress import (
     ProgressStep,
     ProgressTracker,
     complete_step,

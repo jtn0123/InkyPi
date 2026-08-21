@@ -24,6 +24,11 @@ hypothesis>=6.0,<7
 
 # Type checking
 mypy>=1.0,<2
+# Stub packages. Without types-PyYAML mypy aborts the entire tests/ run on
+# the four modules that import yaml, so it is a hard requirement for the
+# type-check job rather than a nicety.
+types-PyYAML==6.0.12.20260815
+
 # Pin types-requests to preserve PR #301 (JTN-525) precision.
 types-requests==2.32.0.20241016
 

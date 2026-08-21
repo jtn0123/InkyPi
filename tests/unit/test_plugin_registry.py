@@ -236,12 +236,12 @@ def test_plugin_registry_reports_missing_dir_and_module(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     # Point PLUGINS_DIR to temp to force missing dirs
-    import src.plugins.plugin_registry as pr
+    import plugins.plugin_registry as pr
 
     monkeypatch.setattr(pr, "PLUGINS_DIR", "plugins", raising=True)
     # Override resolve_path to return temp path with no plugins
     monkeypatch.setattr(
-        "src.plugins.plugin_registry.resolve_path",
+        "plugins.plugin_registry.resolve_path",
         lambda p: str(tmp_path),
         raising=True,
     )
@@ -262,7 +262,7 @@ def test_plugin_registry_reports_missing_dir_and_module(
 def test_plugin_registry_hot_reload_flag(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> Any:
-    import src.plugins.plugin_registry as pr
+    import plugins.plugin_registry as pr
 
     # Simulate dev mode for hot reload path
     monkeypatch.setenv("INKYPI_ENV", "dev")

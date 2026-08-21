@@ -2,7 +2,7 @@ from typing import Any
 
 import pytest
 
-from src.model import Playlist
+from model import Playlist
 
 
 class TestPlaylist:
