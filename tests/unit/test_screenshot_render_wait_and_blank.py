@@ -119,7 +119,8 @@ class TestSkipIfBlankBehaviour:
         )
         assert result is None
         meta = plugin.get_latest_metadata()
-        assert meta and meta.get("skipped") is True
+        assert meta, "the plugin reported no metadata at all"
+        assert meta.get("skipped") is True
         assert "blank" in str(meta.get("reason")).lower()
 
     def test_blank_capture_is_still_displayed_when_disabled(

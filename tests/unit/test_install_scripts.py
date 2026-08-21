@@ -2170,9 +2170,10 @@ class TestUpdateScript:
         fn_end = self.content.index("\n}", fn_start) + 2
         fn_body = self.content[fn_start:fn_end]
 
-        assert "journalctl" in fn_body and "--no-pager" in fn_body, (
-            "the helper must still produce non-interactive journal output " "(JTN-684)"
-        )
+        # Split so a failure names which half regressed (JTN-684): the helper
+        # must read the journal, and must do so non-interactively.
+        assert "journalctl" in fn_body, "the helper no longer reads the journal"
+        assert "--no-pager" in fn_body, "journal output is no longer non-interactive"
         assert (
             "command -v journalctl" in fn_body
         ), "the helper must skip when journalctl is unavailable"

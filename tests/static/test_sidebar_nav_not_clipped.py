@@ -77,8 +77,9 @@ class TestBundleIsInSync:
     def test_fix_is_present_in_the_built_bundle(self) -> None:
         body = _block_for_selector(MAIN_CSS.read_text(), ".sidebar-nav")
         flex = re.search(r"flex:\s*([^;]+);", body)
+        assert flex, "no flex shorthand on .sidebar-nav in main.css"
         assert (
-            flex and flex.group(1).split()[1] == "0"
+            flex.group(1).split()[1] == "0"
         ), "main.css is stale — run scripts/build_css.py"
 
 

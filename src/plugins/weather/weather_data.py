@@ -447,6 +447,31 @@ def _is_daytime(
     return 0 if covered else 1
 
 
+def _first_upcoming_hour_index(times: Sequence[str], tz: tzinfo) -> int:
+    """Index of the first hourly entry that has not already passed.
+
+    Open-Meteo returns the whole of today, so the early entries are hours that
+    are already over. Unparseable timestamps are skipped rather than fatal —
+    one bad entry should not cost the whole forecast.
+
+    Returns 0 when nothing matches, which also covers the case where the series
+    starts after today: falling back to the beginning shows a real forecast,
+    where an empty list would leave the graph blank.
+    """
+    now = datetime.now(tz)
+    for i, time_str in enumerate(times):
+        try:
+            dt_hourly = datetime.fromisoformat(time_str).astimezone(tz)
+        except ValueError:
+            logger.warning(f"Could not parse time string {time_str} in hourly data.")
+            continue
+        if dt_hourly.date() == now.date() and dt_hourly.hour >= now.hour:
+            return i
+        if dt_hourly.date() > now.date():
+            break
+    return 0
+
+
 def parse_open_meteo_hourly(
     hourly_data: Mapping[str, Any],
     tz: tzinfo,
@@ -464,22 +489,7 @@ def parse_open_meteo_hourly(
     weather_codes = hourly_data.get("weather_code", [])
     sunrises = sunrises or []
     sunsets = sunsets or []
-    current_time_in_tz = datetime.now(tz)
-    start_index = 0
-    for i, time_str in enumerate(times):
-        try:
-            dt_hourly = datetime.fromisoformat(time_str).astimezone(tz)
-            if (
-                dt_hourly.date() == current_time_in_tz.date()
-                and dt_hourly.hour >= current_time_in_tz.hour
-            ):
-                start_index = i
-                break
-            if dt_hourly.date() > current_time_in_tz.date():
-                break
-        except ValueError:
-            logger.warning(f"Could not parse time string {time_str} in hourly data.")
-            continue
+    start_index = _first_upcoming_hour_index(times, tz)
 
     sliced_times = times[start_index:]
     sliced_temperatures = temperatures[start_index:]
