@@ -1,6 +1,7 @@
-# Tracking: unpatched pip advisory GHSA-58qw-9mgm-455v
+# Tracking: pip advisory GHSA-58qw-9mgm-455v — CLOSED 2026-08-21
 
 Created: 2026-04-26
+Closed: 2026-08-21
 
 ## Advisory
 
@@ -37,3 +38,22 @@ Re-check monthly until closed.
 ## GitHub Issue Attempt
 
 Preferred tracking was a GitHub issue, but `gh issue create` was blocked because the `jtn0123/InkyPi` repository has issues disabled.
+
+## Resolution — 2026-08-21
+
+Closed. Every criterion above is now met:
+
+- OSV lists the advisory as **fixed in `pip` 26.1**, so the "no patched release"
+  condition that opened this item no longer holds.
+- `install/requirements-dev.txt` pins `pip==26.2`, which is past that fix. It
+  was already on `26.1.2` — i.e. non-vulnerable to this advisory — before this
+  check; the bump to `26.2` was prompted by a *different*, newer advisory
+  (`PYSEC-2026-3721`), which `26.2` also fixes.
+- `uv.lock` and the runtime export do not pin `pip` at all; it is a dev-only
+  dependency.
+- `pip-audit` reports **0 findings** against both lockfiles.
+
+The "re-check monthly" cadence was never actually run between 2026-04-26 and
+today, which is why this stayed open for roughly four months after it had in
+fact been fixed. The scheduled dependency audit proposed as item F3 in
+`.claude/grade-report.md` would have caught it.
