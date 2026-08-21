@@ -99,7 +99,7 @@ class ImageUpload(BasePlugin):
             ),
         )
 
-    def open_image(self, img_index: int, image_locations: list[str]) -> Image:
+    def open_image(self, img_index: int, image_locations: list[str]) -> Image.Image:
         if not image_locations:
             raise RuntimeError("No images provided.")
 
@@ -121,7 +121,7 @@ class ImageUpload(BasePlugin):
 
     def generate_image(
         self, settings: Mapping[str, object], device_config: DeviceConfigLike
-    ) -> Image:
+    ) -> Image.Image:
         # Get the current index from the device json
         img_index_raw = settings.get("image_index")
         img_index = img_index_raw if isinstance(img_index_raw, int) else 0

@@ -25,6 +25,11 @@ from typing import TYPE_CHECKING
 
 from flask import Flask, Response, redirect, request, session, url_for
 
+# `redirect` and `HTTPException.get_response` both return a
+# `werkzeug.wrappers.Response`, not the `flask.wrappers.Response`
+# subclass the annotations named. Flask accepts either from a view.
+from werkzeug.wrappers import Response as WerkzeugResponse
+
 if TYPE_CHECKING:
     from config import Config
 
@@ -156,7 +161,7 @@ def init_auth(app: Flask, device_config: Config) -> None:
     logger.info("PIN auth enabled")
 
     @app.before_request
-    def _require_auth() -> Response | None:
+    def _require_auth() -> Response | WerkzeugResponse | None:
         if _should_skip_auth():
             return None
         if session.get("authed") is True:

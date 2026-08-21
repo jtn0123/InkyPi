@@ -38,14 +38,17 @@ def sse_events() -> Response:
         logger.warning("/api/events: subscriber cap reached, returning 503")
         return Response("Too many SSE connections", status=503, mimetype="text/plain")
 
-    @stream_with_context
     def generate() -> Any:
         try:
             yield from bus.stream(q)
         finally:
             bus.unsubscribe(q)
 
-    response = Response(generate(), mimetype="text/event-stream")
+    # `stream_with_context` is applied to the iterator rather than used as a
+    # decorator. Both work, but the decorator form returns a callable at
+    # runtime while its type stub declares an Iterator, so `generate()` read as
+    # calling a non-callable.
+    response = Response(stream_with_context(generate()), mimetype="text/event-stream")
     response.headers["Cache-Control"] = "no-cache"
     response.headers["X-Accel-Buffering"] = "no"  # Disable nginx buffering
     return response

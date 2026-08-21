@@ -167,13 +167,14 @@ def progress_stream() -> Response | tuple[Any, int]:
             released = True
         _release_progress_stream()
 
-    @stream_with_context
     def gen() -> Generator[str, None, None]:
         try:
             yield from _iter_progress_events(bus, last_seq)
         finally:
             release_once()
 
-    response = Response(gen(), mimetype="text/event-stream")
+    # Applied to the iterator, not used as a decorator — see the note in
+    # blueprints/events.py.
+    response = Response(stream_with_context(gen()), mimetype="text/event-stream")
     response.call_on_close(release_once)
     return response

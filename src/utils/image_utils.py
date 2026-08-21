@@ -380,7 +380,7 @@ def resolve_background_color(
         return cast(resolved, ImageColor.getcolor("#ffffff", mode))
 
 
-def pad_image_blur(img: Image, dimensions: tuple[int, int]) -> Image:
+def pad_image_blur(img: Image.Image, dimensions: tuple[int, int]) -> Image.Image:
     """Fit an image into *dimensions* with a blurred letterbox background.
 
     Creates a background by scaling the image to fill *dimensions* and

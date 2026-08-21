@@ -205,7 +205,7 @@ class ImageFolder(BasePlugin):
                 logger.debug(
                     f"Scaling to fit dimensions: {dimensions[0]}x{dimensions[1]}"
                 )
-                img = ImageOps.fit(img, dimensions, method=Image.LANCZOS)
+                img = ImageOps.fit(img, dimensions, method=Image.Resampling.LANCZOS)
 
             logger.info("=== Image Folder Plugin: Image generation complete ===")
             return img

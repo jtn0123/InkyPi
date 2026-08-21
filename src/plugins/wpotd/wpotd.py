@@ -315,7 +315,7 @@ class Wpotd(BasePlugin):
                 else:
                     new_width, new_height = orig_width, orig_height
             # Resize using high-quality resampling
-            image = image.resize((new_width, new_height), Image.LANCZOS)
+            image = image.resize((new_width, new_height), Image.Resampling.LANCZOS)
             # Create a new image with white background and paste the resized image in the center
             new_image = Image.new("RGB", (max_width, max_height), (255, 255, 255))
             new_image.paste(

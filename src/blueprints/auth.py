@@ -18,6 +18,12 @@ from flask import (
     url_for,
 )
 
+# ``flask.redirect`` returns a ``werkzeug.wrappers.Response``, not the
+# ``flask.wrappers.Response`` subclass. Flask accepts either from a view, but
+# the annotations here named only the subclass, so every redirect return was
+# typed as something it is not.
+from werkzeug.wrappers import Response as WerkzeugResponse
+
 from app_setup.auth import _verify_pin
 
 logger = logging.getLogger(__name__)
@@ -112,7 +118,7 @@ def _record_failed_attempt() -> None:
 
 
 @auth_bp.route("/login", methods=["GET"])
-def login_get() -> str | Response:
+def login_get() -> str | Response | WerkzeugResponse:
     next_url = _safe_next_url(request.args.get("next"))
     if session.get("authed") is True:
         return redirect(next_url)
@@ -120,7 +126,7 @@ def login_get() -> str | Response:
 
 
 @auth_bp.route("/login", methods=["POST"])
-def login_post() -> str | Response:
+def login_post() -> str | Response | WerkzeugResponse:
     """Validate submitted PIN and establish an authenticated session."""
     # CSRF token is checked by the global before_request handler in security_middleware.
     pin_hash = current_app.config.get("AUTH_PIN_HASH")
@@ -151,6 +157,6 @@ def login_post() -> str | Response:
 
 
 @auth_bp.route("/logout", methods=["GET"])
-def logout() -> Response:
+def logout() -> Response | WerkzeugResponse:
     session.clear()
     return redirect(url_for("auth.login_get"))

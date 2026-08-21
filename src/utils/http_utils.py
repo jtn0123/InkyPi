@@ -67,6 +67,14 @@ from utils.form_utils import sanitize_response_value
 
 logger = logging.getLogger(__name__)
 
+#: What :func:`json_error` and :func:`json_success` actually return.
+#:
+#: Normally the first element is a ``Response`` from ``jsonify``, but both fall
+#: back to a plain ``dict`` when there is no application context for jsonify to
+#: use. Callers used to annotate only the ``Response`` half, so a dozen handlers
+#: across the app were typed as something narrower than the value they return.
+JsonResponse = tuple["FlaskResponse | dict[str, Any]", int]
+
 #: Accepted shape for an inbound ``X-Request-Id``. Covers uuids, hex ids, and
 #: the ``trace:span`` forms proxies emit, without admitting markup.
 _REQUEST_ID_RE = re.compile(r"[A-Za-z0-9._:-]{1,128}")
@@ -174,7 +182,7 @@ def json_error(
     status: int = 400,
     code: int | str | None = None,
     details: dict[str, Any] | None = None,
-) -> tuple[FlaskResponse | dict[str, Any], int]:
+) -> JsonResponse:
     payload: dict[str, Any] = {"success": False, "error": message}
     if code is not None:
         payload["code"] = code
@@ -192,7 +200,7 @@ def json_error(
 
 def json_success(
     message: str | None = None, status: int = 200, **payload: Any
-) -> tuple[FlaskResponse | dict[str, Any], int]:
+) -> JsonResponse:
     body: dict[str, Any] = {"success": True}
     if message is not None:
         body["message"] = message

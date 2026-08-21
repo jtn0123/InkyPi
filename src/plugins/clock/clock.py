@@ -45,6 +45,24 @@ DEFAULT_TIMEZONE = "US/Eastern"
 DEFAULT_CLOCK_FACE = "Gradient Clock"
 
 
+def _rgb(value: object, fallback: str) -> tuple[int, int, int]:
+    """Resolve a colour setting to an RGB triple.
+
+    ``ImageColor.getcolor(..., "RGB")`` always yields a 3-tuple at runtime, but
+    its signature is ``int | tuple[int, ...]`` because it serves every mode. The
+    draw helpers below need a real triple, so narrow it here — once — instead of
+    at each call site, and fall back rather than raising on the unexpected shape
+    so a bad colour setting cannot stop the clock from rendering.
+    """
+    raw = value if isinstance(value, str) else fallback
+    resolved = ImageColor.getcolor(raw, "RGB")
+    if isinstance(resolved, tuple) and len(resolved) >= 3:
+        return (int(resolved[0]), int(resolved[1]), int(resolved[2]))
+    logger.warning("clock: unexpected colour value %r; using %s", raw, fallback)
+    fb = ImageColor.getcolor(fallback, "RGB")
+    return (int(fb[0]), int(fb[1]), int(fb[2]))  # type: ignore[index]
+
+
 class Clock(BasePlugin):
     def build_settings_schema(self) -> dict[str, object]:
         return schema(
@@ -84,22 +102,8 @@ class Clock(BasePlugin):
         raw_clock_face = settings.get("selectedClockFace")
         clock_face = raw_clock_face if isinstance(raw_clock_face, str) else ""
 
-        primary_color = ImageColor.getcolor(
-            (
-                settings.get("primaryColor")
-                if isinstance(settings.get("primaryColor"), str)
-                else "white"
-            ),
-            "RGB",
-        )
-        secondary_color = ImageColor.getcolor(
-            (
-                settings.get("secondaryColor")
-                if isinstance(settings.get("secondaryColor"), str)
-                else "black"
-            ),
-            "RGB",
-        )
+        primary_color = _rgb(settings.get("primaryColor"), "white")
+        secondary_color = _rgb(settings.get("secondaryColor"), "black")
         if not clock_face or clock_face not in [face["name"] for face in CLOCK_FACES]:
             clock_face = DEFAULT_CLOCK_FACE
 
@@ -128,6 +132,14 @@ class Clock(BasePlugin):
                 img = self.draw_word_clock(
                     dimensions, current_time, primary_color, secondary_color
                 )
+            else:
+                # Unreachable today: an unknown face is normalised to the
+                # default above. It becomes reachable the moment a face is
+                # added to CLOCK_FACES without a matching branch here, and the
+                # old code returned None for that — which the refresh task
+                # reads as "control-only plugin, nothing to display", so the
+                # clock would silently stop updating.
+                raise RuntimeError(f"No renderer for clock face {clock_face!r}")
         except Exception as e:
             logger.error(f"Failed to draw clock image: {str(e)}")
             raise RuntimeError("Failed to display clock.") from e
@@ -570,8 +582,15 @@ class Clock(BasePlugin):
         center_radius: int,
         fill_color: tuple[int, int, int] | tuple[int, int, int, int],
         outline_color: tuple[int, int, int] | tuple[int, int, int, int] | None = None,
-        width: int | None = None,
+        width: int = 1,
     ) -> None:
+        """Draw the centre hub of an analogue face.
+
+        ``width`` defaults to 1, matching PIL. It used to default to ``None``,
+        which PIL rejects with ``TypeError: 'NoneType' object cannot be
+        interpreted as an integer`` — harmless only because both callers happen
+        to pass a width, and a trap for the next one that does not.
+        """
         draw = ImageDraw.Draw(image)
         w, h = image.size
 
@@ -602,9 +621,9 @@ class Clock(BasePlugin):
         draw = ImageDraw.Draw(image)
 
         # Draw the circle
-        x, y = image.size
-        x /= 2
-        y /= 2
+        width_px, height_px = image.size
+        x = width_px / 2
+        y = height_px / 2
 
         # Draw the lines for every 30 degrees
         for angle in range(0, 360, 30):

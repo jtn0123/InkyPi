@@ -517,7 +517,7 @@ class AdaptiveImageLoader:
             logger.debug(
                 f"Stage 1: Downsampling to ~{intermediate_size[0]}x{intermediate_size[1]} using NEAREST"
             )
-            img.thumbnail(intermediate_size, Image.NEAREST)
+            img.thumbnail(intermediate_size, Image.Resampling.NEAREST)
             logger.debug(f"Stage 1 complete: {img.size[0]}x{img.size[1]}")
             gc.collect()
 
@@ -525,14 +525,14 @@ class AdaptiveImageLoader:
             logger.debug(
                 f"Stage 2: Final resize to {dimensions[0]}x{dimensions[1]} using LANCZOS"
             )
-            img = ImageOps.fit(img, dimensions, method=Image.LANCZOS)
+            img = ImageOps.fit(img, dimensions, method=Image.Resampling.LANCZOS)
             logger.debug(f"Stage 2 complete: {dimensions[0]}x{dimensions[1]}")
         else:
             # Direct resize with BICUBIC (fast, sufficient quality for e-ink)
             logger.debug(
                 f"Resizing directly from {img.size[0]}x{img.size[1]} to {dimensions[0]}x{dimensions[1]}"
             )
-            img = ImageOps.fit(img, dimensions, method=Image.BICUBIC)
+            img = ImageOps.fit(img, dimensions, method=Image.Resampling.BICUBIC)
 
         # Explicit garbage collection
         gc.collect()
@@ -549,4 +549,4 @@ class AdaptiveImageLoader:
             f"Resizing from {img.size[0]}x{img.size[1]} to {dimensions[0]}x{dimensions[1]}"
         )
 
-        return ImageOps.fit(img, dimensions, method=Image.LANCZOS)
+        return ImageOps.fit(img, dimensions, method=Image.Resampling.LANCZOS)
