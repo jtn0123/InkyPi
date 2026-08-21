@@ -258,3 +258,32 @@ def test_save_apikeys_preserves_existing_key_when_no_new_value(
     assert resp.status_code == 200
     content = Path(env_path).read_text()
     assert "original_value" in content
+
+
+class TestBareKeyInEnvFile:
+    """A line with no `=` used to break the whole API-keys page.
+
+    `dotenv_values` returns None for a bare key, `parse_env_file` declared its
+    values as `str`, and consumers iterate the value — so it surfaced as
+    `TypeError: 'NoneType' object is not iterable`. Found by mypy once imports
+    were followed.
+    """
+
+    def _parse(self, tmp_path: Path, body: str) -> list[tuple[str, str]]:
+        from blueprints.apikeys import parse_env_file
+
+        env = tmp_path / ".env"
+        env.write_text(body)
+        return parse_env_file(str(env))
+
+    def test_a_bare_key_becomes_an_empty_value(self, tmp_path: Path) -> None:
+        assert self._parse(tmp_path, "BARE_KEY\n") == [("BARE_KEY", "")]
+
+    def test_every_value_is_a_string(self, tmp_path: Path) -> None:
+        parsed = self._parse(tmp_path, "GOOD=value\nBARE_KEY\nEMPTY=\n")
+        assert all(isinstance(v, str) for _, v in parsed)
+
+    def test_normal_entries_are_untouched(self, tmp_path: Path) -> None:
+        parsed = dict(self._parse(tmp_path, "GOOD=value\nEMPTY=\n"))
+        assert parsed["GOOD"] == "value"
+        assert parsed["EMPTY"] == ""
