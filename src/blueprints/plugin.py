@@ -89,7 +89,7 @@ def _plugin_form_data(*, include_form_for_files: bool = False) -> dict[str, Any]
 
 def _plugins_dir() -> str:
     """Resolve the current plugin source directory at request time."""
-    return str(cast(Any, resolve_path)("plugins"))
+    return resolve_path("plugins")
 
 
 def _cacheable_send_file(path: str, ttl_env: str = "INKYPI_RENDER_CACHE_TTL_S") -> Any:
@@ -259,8 +259,11 @@ def ai_image_random_prompt() -> Any:
 
             from plugins.ai_image.ai_image import AIImage
 
-            client = genai.Client(api_key=api_key)
-            prompt = AIImage.fetch_image_prompt_google(client, seed_prompt)
+            # Named per provider: the two branches bind unrelated SDK client
+            # types, and sharing one name made the second look like a
+            # reassignment to an incompatible type.
+            google_client = genai.Client(api_key=api_key)
+            prompt = AIImage.fetch_image_prompt_google(google_client, seed_prompt)
         else:
             api_key = device_config.load_env_key("OPEN_AI_SECRET")
             if not api_key:
@@ -269,8 +272,8 @@ def ai_image_random_prompt() -> Any:
 
             from plugins.ai_image.ai_image import AIImage
 
-            client = OpenAI(api_key=api_key)
-            prompt = AIImage.fetch_image_prompt(client, seed_prompt)
+            openai_client = OpenAI(api_key=api_key)
+            prompt = AIImage.fetch_image_prompt(openai_client, seed_prompt)
 
         if not prompt:
             raise ClientInputError(

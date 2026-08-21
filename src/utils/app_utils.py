@@ -224,8 +224,8 @@ def _process_uploaded_file(extension: str, file_path: str, content: bytes) -> No
     _ensure_heif_opener()
     if extension in {"jpg", "jpeg"}:
         try:
-            with Image.open(BytesIO(content)) as img:
-                img = ImageOps.exif_transpose(img)
+            with Image.open(BytesIO(content)) as opened:
+                img = ImageOps.exif_transpose(opened)
                 img.save(file_path)
         except (OSError, ValueError) as e:
             raise RuntimeError("Invalid image upload") from e

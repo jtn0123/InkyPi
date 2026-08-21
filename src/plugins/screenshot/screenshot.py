@@ -136,7 +136,9 @@ class Screenshot(BasePlugin):  # type: ignore[misc, unused-ignore]
         safe_url = url.replace("\n", "").replace("\r", "")
         logger.info("Taking screenshot of url: %s", safe_url)
 
-        image = cast(Any, take_screenshot)(
+        # The `cast(Any, ...)` this replaces erased an already-correct
+        # Optional return, which is what the None check below relies on.
+        image = take_screenshot(
             url,
             dimensions,
             timeout_ms=40000,

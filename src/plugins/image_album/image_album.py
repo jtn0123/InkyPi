@@ -2,7 +2,7 @@ import logging
 from collections.abc import Mapping
 from contextlib import AbstractContextManager
 from random import choice
-from typing import Any, cast
+from typing import cast
 
 from PIL import Image, ImageOps
 
@@ -138,7 +138,7 @@ class ImmichProvider:
         # Use adaptive image loader for memory-efficient processing
         # Let loader resize when requested (when no padding will be applied)
         with self._pin():
-            img = cast(Any, self.image_loader).from_url(
+            img = self.image_loader.from_url(
                 asset_url,
                 dimensions,
                 timeout_ms=40000,
@@ -319,10 +319,9 @@ class ImageAlbum(BasePlugin):
                 logger.error(f"Unknown album provider: {album_provider}")
                 raise RuntimeError(f"Unsupported album provider: {album_provider}")
 
-        if img is None:
-            logger.error("Image is None after provider processing")
-            raise RuntimeError("Failed to load image, please check logs.")
-
+        # Every branch of the match above either binds `img` or raises, and the
+        # provider helpers are typed non-Optional, so there is no None to catch
+        # here.
         fit_mode = effective_fit_mode(requested_fit, img.size, dimensions)
 
         # Apply padding if requested (image was loaded at full size)

@@ -23,7 +23,7 @@
 # return-value, arg-type and attr-defined are the ones most likely to be real
 # defects rather than annotation noise; they are the intended next piece of
 # work (item I2 in .claude/grade-report.md). This number must only go down.
-23
+0
 
 # 90 -> 50 (2026-08-21). Worked the highest-signal rules. Three were real:
 #   * calendar.get_contrast_color unpacked ImageColor.getrgb() into three
@@ -59,3 +59,16 @@
 # 40 more `cast(Any, ...)` remain in src/. Most predate this work and exist to
 # quiet a checker that could not see across modules; they are the main source
 # of the residual `no-any-return`. Removing them is the obvious next pass.
+
+# 23 -> 0 (2026-08-21). src/ is clean with imports followed — the zero this
+# file started with was an artefact of `follow_imports = skip`; this one is
+# real, and the ratchet above will now hold it.
+#
+# Most of the remainder was one root cause: `cast(Any, ...)` wrappers written
+# to quiet a checker that could not see across modules. They did not work
+# around a problem, they created one — `cast(Any, take_screenshot)` and
+# `cast(Any, take_screenshot_html)` each erased an already-correct Optional
+# return and silently disabled the None check beneath it. One cast on
+# AdaptiveImageLoader forced seven more downstream; removing that one removed
+# all eight. The `cast(str, cast(Any, resolve_path)(...))` pattern was
+# double-casting a function that was correctly typed all along.

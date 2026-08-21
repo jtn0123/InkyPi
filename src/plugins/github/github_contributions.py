@@ -2,11 +2,14 @@ import logging
 import os
 from collections.abc import Mapping, Sequence
 from datetime import UTC, date, datetime, timedelta
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from PIL import Image
 
 from utils.http_client import get_http_session
+
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from plugins.base_plugin.base_plugin import BasePlugin
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +33,7 @@ query($username: String!) {
 
 
 def contributions_generate_image(
-    plugin_instance: Any, settings: Mapping[str, object], device_config: Any
+    plugin_instance: "BasePlugin", settings: Mapping[str, object], device_config: Any
 ) -> Image.Image:
     dimensions = plugin_instance.get_oriented_dimensions(device_config)
 
@@ -61,7 +64,7 @@ def contributions_generate_image(
     grid, month_positions = parse_contributions(data, colors)
     metrics = calculate_metrics(data)
 
-    template_params = {
+    template_params: dict[str, object] = {
         "username": github_username,
         "grid": grid,
         "month_positions": month_positions,

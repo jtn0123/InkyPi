@@ -1,6 +1,6 @@
 import logging
 from collections.abc import Mapping
-from typing import Any, cast
+from typing import cast
 
 from PIL import Image
 
@@ -83,13 +83,11 @@ class GitHub(BasePlugin):  # type: ignore[misc, unused-ignore]
             github_type = settings.get("githubType", "contributions")
 
             if github_type == "contributions":
-                return cast(Any, contributions_generate_image)(
-                    self, settings, device_config
-                )
+                return contributions_generate_image(self, settings, device_config)
             if github_type == "sponsors":
-                return cast(Any, sponsors_generate_image)(self, settings, device_config)
+                return sponsors_generate_image(self, settings, device_config)
             if github_type == "stars":
-                return cast(Any, stars_generate_image)(self, settings, device_config)
+                return stars_generate_image(self, settings, device_config)
             logger.error(f"Unknown GitHub type: {github_type}")
             raise ValueError(f"Unknown GitHub type: {github_type}")
         except Exception as e:

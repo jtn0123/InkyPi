@@ -2,7 +2,7 @@ import logging
 import os
 import random
 from collections.abc import Mapping
-from typing import Any, cast
+from typing import cast
 
 from PIL import Image, ImageOps
 
@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 
 def _get_upload_dir() -> str:
-    return cast(str, cast(Any, resolve_path)(os.path.join("static", "images", "saved")))
+    return resolve_path(os.path.join("static", "images", "saved"))
 
 
 class ImageUpload(BasePlugin):
