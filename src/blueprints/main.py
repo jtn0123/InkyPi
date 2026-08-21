@@ -163,7 +163,7 @@ def _is_dev_mode() -> bool:
     return env in {"dev", "development"}
 
 
-@main_bp.route("/", methods=["GET"])  # type: ignore
+@main_bp.route("/", methods=["GET"])
 def main_page() -> Any:
     device_config = current_app.config["DEVICE_CONFIG"]
     # Compute a non-mutating next-up preview for SSR convenience
@@ -221,7 +221,7 @@ def main_page() -> Any:
     )
 
 
-@main_bp.route("/preview", methods=["GET"])  # type: ignore
+@main_bp.route("/preview", methods=["GET"])
 def preview_image() -> Any:
     device_config = current_app.config["DEVICE_CONFIG"]
     # Prefer processed image; fall back to current raw image if missing
@@ -237,7 +237,7 @@ def preview_image() -> Any:
     return maybe_serve_webp(safe_root, filename, request.headers.get("Accept"))
 
 
-@main_bp.route("/dev/mock-frame", methods=["GET"])  # type: ignore
+@main_bp.route("/dev/mock-frame", methods=["GET"])
 def dev_mock_frame() -> Any:
     """Serve the latest simulated mock-display frame in dev mode only."""
     if not _is_dev_mode():
@@ -260,7 +260,7 @@ def dev_mock_frame() -> Any:
     )
 
 
-@main_bp.route("/api/screenshot", methods=["GET"])  # type: ignore
+@main_bp.route("/api/screenshot", methods=["GET"])
 def screenshot() -> Any:
     """Return the current display image as PNG or WebP (JTN-450).
 
@@ -300,7 +300,7 @@ def screenshot() -> Any:
     return response
 
 
-@main_bp.route("/api/current_image", methods=["GET"])  # type: ignore
+@main_bp.route("/api/current_image", methods=["GET"])
 def get_current_image() -> Any:
     """Serve current_image.png with conditional request support (If-Modified-Since) for polling."""
     device_config = current_app.config["DEVICE_CONFIG"]
@@ -376,7 +376,7 @@ def _annotate_instance_labels(payload: Any) -> Any:
     return payload
 
 
-@main_bp.route("/refresh-info", methods=["GET"])  # type: ignore
+@main_bp.route("/refresh-info", methods=["GET"])
 def refresh_info() -> Any:
     device_config = current_app.config["DEVICE_CONFIG"]
     try:
@@ -392,7 +392,7 @@ def refresh_info() -> Any:
     return jsonify(info)
 
 
-@main_bp.route("/next-up", methods=["GET"])  # type: ignore
+@main_bp.route("/next-up", methods=["GET"])
 def next_up() -> Any:
     device_config = current_app.config["DEVICE_CONFIG"]
     playlist_manager = device_config.get_playlist_manager()
@@ -420,7 +420,7 @@ def next_up() -> Any:
         return jsonify({})
 
 
-@main_bp.route("/api/plugin_order", methods=["POST"])  # type: ignore
+@main_bp.route("/api/plugin_order", methods=["POST"])
 def save_plugin_order() -> Any:
     """Save custom plugin order from dashboard drag-and-drop."""
     device_config = current_app.config["DEVICE_CONFIG"]
@@ -447,7 +447,7 @@ def save_plugin_order() -> Any:
     return json_success()
 
 
-@main_bp.route("/sw.js", methods=["GET"])  # type: ignore
+@main_bp.route("/sw.js", methods=["GET"])
 def service_worker() -> Any:
     """Serve the service worker from the origin root.
 
@@ -466,7 +466,7 @@ def service_worker() -> Any:
 
 
 # Serve static assets from src/static for test and dev environments
-@main_bp.route("/static/<path:filename>", methods=["GET"])  # type: ignore
+@main_bp.route("/static/<path:filename>", methods=["GET"])
 def static_files(filename: str) -> Any:
     try:
         static_dir = os.path.abspath(
@@ -477,7 +477,7 @@ def static_files(filename: str) -> Any:
         return ("Not found", 404)
 
 
-@main_bp.record  # type: ignore
+@main_bp.record
 def _configure_app_static(state: Any) -> None:
     """Ensure Flask's built-in static route serves from src/static for tests/dev."""
     try:
@@ -648,7 +648,7 @@ def _persist_dev_refresh_event(
         pass
 
 
-@main_bp.route("/display-next", methods=["POST"])  # type: ignore
+@main_bp.route("/display-next", methods=["POST"])
 def display_next() -> Any:
     allowed, retry_after = _display_next_limiter.check()
     if not allowed:
@@ -722,7 +722,7 @@ def display_next() -> Any:
     )
 
 
-@main_bp.route("/refresh", methods=["POST"])  # type: ignore
+@main_bp.route("/refresh", methods=["POST"])
 def refresh_alias() -> Any:
     """Backward-compatible alias for manual display advance."""
     return display_next()
@@ -733,7 +733,7 @@ def refresh_alias() -> Any:
 # ---------------------------------------------------------------------------
 
 
-@main_bp.app_template_filter("friendly_instance_label")  # type: ignore
+@main_bp.app_template_filter("friendly_instance_label")
 def _jinja_friendly_instance_label(instance_name: Any, plugin_id: Any = None) -> Any:
     """Jinja filter: return a friendly label for a plugin instance.
 
@@ -745,14 +745,14 @@ def _jinja_friendly_instance_label(instance_name: Any, plugin_id: Any = None) ->
     return friendly_instance_label(instance_name, plugin_id, display_name)
 
 
-@main_bp.app_template_filter("instance_suffix_label")  # type: ignore
+@main_bp.app_template_filter("instance_suffix_label")
 def _jinja_instance_suffix_label(instance_name: Any, plugin_id: Any = None) -> str:
     """Jinja filter: return a parenthesised-suffix label, or empty string."""
     label = instance_suffix_label(instance_name, plugin_id)
     return label or ""
 
 
-@main_bp.app_template_filter("is_auto_instance_name")  # type: ignore
+@main_bp.app_template_filter("is_auto_instance_name")
 def _jinja_is_auto_instance_name(instance_name: Any, plugin_id: Any = None) -> bool:
     """Jinja filter: True when the instance name is the auto-generated key."""
     return bool(is_auto_instance_name(instance_name, plugin_id))

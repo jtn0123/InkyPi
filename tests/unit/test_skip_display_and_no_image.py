@@ -14,7 +14,9 @@ working plugin.
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import Any
+from pathlib import Path
+from typing import Any, cast
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -225,3 +227,64 @@ class TestSkipAndNoImageAreDistinct:
         # The no-image path has no reason to report — it is the normal outcome
         # for a control-only plugin, every single cycle.
         assert _skip_reason(task, monkeypatch, reason=None) is None
+
+
+class TestPlaylistRefreshHandlesAControlOnlyPlugin:
+    """A plugin returning None must not crash the playlist path.
+
+    `RefreshTask` handles a None image correctly, but `PlaylistRefresh.execute`
+    called `image.save(...)` before returning, so it died first with
+    `AttributeError: 'NoneType' object has no attribute 'save'`. The same plugin
+    worked through `ManualRefresh`, which just returns the value — so this only
+    bit control-only plugins once they were added to a playlist.
+
+    Invisible to mypy because the `PluginLike` Protocol still declared
+    `-> Image.Image` after `BasePlugin` was widened to allow None, and
+    `follow_imports = skip` meant nothing checked the two against each other.
+    """
+
+    class _ControlOnlyPlugin:
+        """Its point is the side effect; it renders nothing."""
+
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def generate_image(self, _settings: Any, _device_config: Any) -> None:
+            self.calls += 1
+            return
+
+    class _DueInstance(_FakeInstance):
+        """Always due, so execute() takes the generate-and-save branch."""
+
+        latest_refresh_time: str | None = None
+
+        def should_refresh(self, _now: Any) -> bool:
+            return True
+
+    def _run(self, tmp_path: Path) -> tuple[Any, Any]:
+        from refresh_task.actions import PlaylistRefresh
+
+        instance = self._DueInstance({})
+        instance.latest_refresh_time = None
+        plugin = self._ControlOnlyPlugin()
+        # cast: _FakeInstance is a stand-in, not a full PluginInstanceLike.
+        action = PlaylistRefresh(_FakePlaylist(), cast(Any, instance))
+
+        device_config = MagicMock()
+        device_config.plugin_image_dir = str(tmp_path)
+        result = action.execute(plugin, device_config, datetime.now(UTC))
+        return result, (plugin, instance)
+
+    def test_returns_none_instead_of_raising(self, tmp_path: Path) -> None:
+        result, (plugin, _instance) = self._run(tmp_path)
+        assert result is None
+        assert plugin.calls == 1, "the plugin must still have been run"
+
+    def test_no_image_file_is_written(self, tmp_path: Path) -> None:
+        self._run(tmp_path)
+        assert list(tmp_path.glob("*")) == [], "nothing to save, so nothing written"
+
+    def test_the_refresh_timestamp_still_advances(self, tmp_path: Path) -> None:
+        """Otherwise the plugin is retried every single cycle."""
+        _result, (_plugin, instance) = self._run(tmp_path)
+        assert instance.latest_refresh_time is not None

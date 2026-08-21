@@ -8,11 +8,11 @@ from flask import Flask
 def register_health_endpoints(app: Flask) -> None:
     """Register /healthz (always-OK liveness) and /readyz (refresh-task readiness)."""
 
-    @app.route("/healthz", methods=["GET"])  # type: ignore
+    @app.route("/healthz", methods=["GET"])
     def healthz() -> tuple[str, int]:
         return ("OK", 200)
 
-    @app.route("/readyz", methods=["GET"])  # type: ignore
+    @app.route("/readyz", methods=["GET"])
     def readyz() -> tuple[str, int]:
         try:
             rt = app.config.get("REFRESH_TASK")

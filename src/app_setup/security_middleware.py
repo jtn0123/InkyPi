@@ -116,7 +116,7 @@ def setup_https_redirect(app: Flask, *, dev_mode: bool) -> None:
     """When INKYPI_FORCE_HTTPS=1 (and not in dev mode), redirect HTTP→HTTPS."""
     force_https = not dev_mode and _env_bool("INKYPI_FORCE_HTTPS")
 
-    @app.before_request  # type: ignore
+    @app.before_request
     def _redirect_to_https() -> Response | None:
         if not force_https:
             return None
@@ -211,11 +211,11 @@ def _extract_csrf_token_from_request() -> str | None:
 def setup_csrf_protection(app: Flask) -> None:
     """Register CSRF token generation and per-request validation."""
 
-    @app.context_processor  # type: ignore
+    @app.context_processor
     def _inject_csrf_token() -> dict[str, Any]:
         return {"csrf_token": _generate_csrf_token}
 
-    @app.before_request  # type: ignore
+    @app.before_request
     def _check_csrf_token() -> Response | None:
         if request.method in _CSRF_SAFE_METHODS:
             return None
@@ -318,7 +318,7 @@ def setup_rate_limiting(app: Flask) -> None:
     _refresh_bucket = make_refresh_bucket()
     _mutating_bucket = make_mutating_bucket()
 
-    @app.before_request  # type: ignore
+    @app.before_request
     def _rate_limit_mutations() -> Response | None:
         if request.method in _CSRF_SAFE_METHODS:
             return None
@@ -360,11 +360,11 @@ def setup_csp_nonce(app: Flask) -> None:
     intentionally NOT used.
     """
 
-    @app.before_request  # type: ignore
+    @app.before_request
     def _generate_csp_nonce() -> None:
         g.csp_nonce = secrets.token_urlsafe(16)
 
-    @app.context_processor  # type: ignore
+    @app.context_processor
     def _inject_csp_nonce() -> dict[str, Any]:
         return {"csp_nonce": getattr(g, "csp_nonce", "")}
 
@@ -505,7 +505,7 @@ def setup_security_headers(app: Flask, *, dev_mode: bool) -> None:
     cognitive complexity stays low (SonarCloud S3776).
     """
 
-    @app.after_request  # type: ignore
+    @app.after_request
     def _set_security_headers(response: Response) -> Response:
         for step in (
             _emit_request_timing_log,

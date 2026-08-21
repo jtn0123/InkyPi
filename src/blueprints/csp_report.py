@@ -114,7 +114,7 @@ def _sanitise_report(report: dict[str, Any]) -> dict[str, Any]:
     return sanitised
 
 
-@csp_report_bp.route("/api/csp-report", methods=["POST"])  # type: ignore
+@csp_report_bp.route("/api/csp-report", methods=["POST"])
 def receive_csp_report() -> Response:
     """Accept a CSP violation report and log it.
 

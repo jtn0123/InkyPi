@@ -24,7 +24,15 @@ class PluginLike(Protocol):
 
     def generate_image(
         self, settings: Mapping[str, object], device_config: object
-    ) -> Image.Image: ...
+    ) -> Image.Image | None:
+        """Mirrors ``BasePlugin.generate_image``, ``None`` included.
+
+        This protocol declared a bare ``Image.Image`` after the base class was
+        widened to allow ``None`` for control-only plugins, so every caller
+        type-checked against a contract the implementation no longer honoured.
+        That is how the missing ``None`` guard below went unnoticed.
+        """
+        ...
 
 
 class DeviceConfigLike(Protocol):
@@ -77,8 +85,13 @@ class RefreshAction:
 
     def execute(
         self, plugin: PluginLike, device_config: DeviceConfigLike, current_dt: datetime
-    ) -> Image.Image:
-        """Execute the refresh operation and return the updated image."""
+    ) -> Image.Image | None:
+        """Execute the refresh operation and return the updated image.
+
+        ``None`` means the plugin produced no image on purpose — a control-only
+        plugin whose point is the side effect. Callers must treat that as a
+        completed refresh with nothing to display, not as a failure.
+        """
         raise NotImplementedError("Subclasses must implement the execute method.")
 
     def get_refresh_info(self) -> RefreshInfo:
@@ -106,7 +119,7 @@ class ManualRefresh(RefreshAction):
 
     def execute(
         self, plugin: PluginLike, device_config: DeviceConfigLike, current_dt: datetime
-    ) -> Image.Image:
+    ) -> Image.Image | None:
         """Performs a manual refresh using the stored plugin ID and settings."""
         return plugin.generate_image(self.plugin_settings, device_config)
 
@@ -152,7 +165,7 @@ class PlaylistRefresh(RefreshAction):
 
     def execute(
         self, plugin: PluginLike, device_config: DeviceConfigLike, current_dt: datetime
-    ) -> Image.Image:
+    ) -> Image.Image | None:
         """Performs a refresh for the specified plugin instance within its playlist context."""
         # Determine the file path for the plugin's image
         plugin_image_path = os.path.join(
@@ -166,6 +179,13 @@ class PlaylistRefresh(RefreshAction):
             )
             # Generate a new image
             image = plugin.generate_image(self.plugin_instance.settings, device_config)
+            if image is None:
+                # A control-only plugin produced no image on purpose. There is
+                # nothing to persist, but the refresh did happen, so the
+                # timestamp still advances — otherwise the plugin is retried
+                # every cycle. RefreshTask handles the None from here.
+                self.plugin_instance.latest_refresh_time = current_dt.isoformat()
+                return None
             image.save(plugin_image_path)
             self.plugin_instance.latest_refresh_time = current_dt.isoformat()
         else:

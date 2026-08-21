@@ -155,7 +155,7 @@ def init_auth(app: Flask, device_config: Config) -> None:
     app.config["AUTH_PIN_HASH"] = pin_hash
     logger.info("PIN auth enabled")
 
-    @app.before_request  # type: ignore
+    @app.before_request
     def _require_auth() -> Response | None:
         if _should_skip_auth():
             return None

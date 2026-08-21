@@ -366,7 +366,7 @@ def _recent_client_log_summary() -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 
-@diagnostics_bp.route("/api/diagnostics", methods=["GET"])  # type: ignore
+@diagnostics_bp.route("/api/diagnostics", methods=["GET"])
 def api_diagnostics() -> Any:
     """Return a consolidated system + application diagnostics payload.
 

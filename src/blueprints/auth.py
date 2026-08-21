@@ -111,7 +111,7 @@ def _record_failed_attempt() -> None:
         logger.warning("PIN auth: lockout triggered after %d failed attempts", count)
 
 
-@auth_bp.route("/login", methods=["GET"])  # type: ignore
+@auth_bp.route("/login", methods=["GET"])
 def login_get() -> str | Response:
     next_url = _safe_next_url(request.args.get("next"))
     if session.get("authed") is True:
@@ -119,7 +119,7 @@ def login_get() -> str | Response:
     return render_template(_LOGIN_TEMPLATE, error=None, next=next_url)
 
 
-@auth_bp.route("/login", methods=["POST"])  # type: ignore
+@auth_bp.route("/login", methods=["POST"])
 def login_post() -> str | Response:
     """Validate submitted PIN and establish an authenticated session."""
     # CSRF token is checked by the global before_request handler in security_middleware.
@@ -150,7 +150,7 @@ def login_post() -> str | Response:
     )
 
 
-@auth_bp.route("/logout", methods=["GET"])  # type: ignore
+@auth_bp.route("/logout", methods=["GET"])
 def logout() -> Response:
     session.clear()
     return redirect(url_for("auth.login_get"))

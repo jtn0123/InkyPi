@@ -78,7 +78,7 @@ def _make_json_attachment(payload: dict[str, Any], filename: str) -> Response:
 # ---------------------------------------------------------------------------
 
 
-@plugin_io_bp.route("/api/plugins/export", methods=["GET"])  # type: ignore
+@plugin_io_bp.route("/api/plugins/export", methods=["GET"])
 def export_plugins() -> Response:
     """Export one or all plugin instances as a downloadable JSON file.
 
@@ -182,7 +182,7 @@ def _validate_payload(payload: object) -> tuple[str | None, list[dict[str, Any]]
     return None, instances
 
 
-@plugin_io_bp.route("/api/plugins/import", methods=["POST"])  # type: ignore
+@plugin_io_bp.route("/api/plugins/import", methods=["POST"])
 def import_plugins() -> (
     tuple[Response | dict[str, Any], int] | Response | dict[str, Any]
 ):

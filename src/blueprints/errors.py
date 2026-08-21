@@ -21,14 +21,14 @@ logger = logging.getLogger(__name__)
 errors_bp = Blueprint("errors", __name__)
 
 
-@errors_bp.route("/errors", methods=["GET"])  # type: ignore
+@errors_bp.route("/errors", methods=["GET"])
 def errors_page() -> Response | str:
     """Render the /errors page showing captured client-side error reports."""
     reports = get_captured_reports()
     return render_template("errors.html", reports=reports)
 
 
-@errors_bp.route("/errors/clear", methods=["POST"])  # type: ignore
+@errors_bp.route("/errors/clear", methods=["POST"])
 def errors_clear() -> Any:
     """Clear all captured client-side error reports.
 

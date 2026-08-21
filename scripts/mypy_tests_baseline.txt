@@ -1,16 +1,19 @@
 # Checked-in mypy tests/ advisory baseline for scripts/lint.sh.
 # Lower this number when tests/ typing debt is intentionally reduced.
 #
-# 7506 -> 782 (2026-08-21): mechanically annotated the whole suite —
-# 6326 parameters and 5752 return types across 411 files. Fixture parameters
-# got their real types (FlaskClient, pytest.MonkeyPatch, Path, Flask, Page,
-# Iterator[...]) rather than a blanket Any; only genuinely unknowable
-# parameters are Any. Verified: all 5359 tests still collect, and the suite
-# result is unchanged.
+# 7506 -> 782 (2026-08-21): the suite was mechanically annotated — 6326
+# parameters and 5752 return types across 411 files, with real fixture types
+# (FlaskClient, pytest.MonkeyPatch, Path, Flask, Page, Iterator[...]) rather
+# than a blanket Any.
 #
-# The residual 782 is dominated by ~380 `untyped-decorator` reports, which are
-# an artefact of `follow_imports = skip` in mypy.ini: pytest's own decorators
-# resolve to Any, so every @pytest.mark.parametrize reads as untyped. Fixing
-# that means changing follow_imports, which is a separate piece of work — see
-# item I2 in .claude/grade-report.md. The rest is type-arg/var-annotated nits.
-782
+# 782 -> 641 (2026-08-21): `follow_imports` changed from skip to normal. Most
+# of the drop is `untyped-decorator`, which was never test debt — with imports
+# skipped, pytest's own decorators resolved to Any, so every parametrized test
+# read as untyped.
+#
+# 641 -> 645 (2026-08-21): +4 from making src/ contracts honest, not from new
+# test debt. Widening PluginLike.generate_image and client_endpoint's error
+# type means test doubles like DummyDeviceConfig/FakeDeviceConfig are now
+# checked against the real DeviceConfigLike protocol, which they do not fully
+# implement. Tightening those fakes is follow-up work.
+645

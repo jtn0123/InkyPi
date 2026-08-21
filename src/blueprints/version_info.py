@@ -107,7 +107,7 @@ _PYTHON_VERSION: str = sys.version
 # ---------------------------------------------------------------------------
 
 
-@version_info_bp.route("/api/version/info", methods=["GET"])  # type: ignore
+@version_info_bp.route("/api/version/info", methods=["GET"])
 def api_version_info() -> Response:
     """Return build and runtime version metadata.
 
@@ -137,7 +137,7 @@ def _system_uptime_seconds() -> int | None:
         return None
 
 
-@version_info_bp.route("/api/uptime", methods=["GET"])  # type: ignore
+@version_info_bp.route("/api/uptime", methods=["GET"])
 def api_uptime() -> Response:
     """Return process and system uptime information."""
     process_uptime = time.monotonic() - _PROCESS_START_TIME

@@ -75,7 +75,7 @@ def register_smoke_endpoints(app: Flask) -> None:
         SMOKE_RENDER_PATH,
     )
 
-    @app.route(SMOKE_RENDER_PATH, methods=["POST"])  # type: ignore
+    @app.route(SMOKE_RENDER_PATH, methods=["POST"])
     def smoke_render() -> tuple[dict[str, Any], int] | Response | tuple[str, int]:
         """Render the named plugin in-process and return basic image metadata.
 
