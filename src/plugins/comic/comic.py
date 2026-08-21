@@ -162,7 +162,7 @@ class Comic(BasePlugin):
                 width / img.width, (height - top_padding - bottom_padding) / img.height
             )
             new_size = (int(img.width * scale), int(img.height * scale))
-            img = img.resize(new_size, Image.LANCZOS)
+            img = img.resize(new_size, Image.Resampling.LANCZOS)
 
             y_middle = (height - img.height) // 2
             y_top_bound = top_padding

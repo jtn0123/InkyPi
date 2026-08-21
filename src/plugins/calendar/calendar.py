@@ -463,7 +463,13 @@ class Calendar(BasePlugin):
         Returns '#000000' (black) or '#ffffff' (white) depending on the contrast
         against the given color.
         """
-        r, g, b = ImageColor.getrgb(color)
+        # `getrgb` returns a 4-tuple for any colour carrying alpha — an
+        # 8-digit hex like "#ff000080" is a plausible thing to paste into the
+        # per-calendar colour field — and unpacking that into three names
+        # raised `ValueError: too many values to unpack`, failing the whole
+        # calendar render. Alpha does not affect perceived brightness here, so
+        # take the colour channels and ignore it.
+        r, g, b = ImageColor.getrgb(color)[:3]
         # YIQ formula to estimate brightness
         yiq = (r * 299 + g * 587 + b * 114) / 1000
 

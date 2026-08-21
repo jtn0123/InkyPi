@@ -23,4 +23,18 @@
 # return-value, arg-type and attr-defined are the ones most likely to be real
 # defects rather than annotation noise; they are the intended next piece of
 # work (item I2 in .claude/grade-report.md). This number must only go down.
-90
+50
+
+# 90 -> 50 (2026-08-21). Worked the highest-signal rules. Three were real:
+#   * calendar.get_contrast_color unpacked ImageColor.getrgb() into three
+#     names. Alpha colours yield a 4-tuple, so a user pasting "#ff000080" as a
+#     per-calendar colour raised ValueError and failed the whole render.
+#   * Clock.draw_clock_center defaulted `width` to None, which PIL rejects with
+#     TypeError. Latent only because both callers pass one.
+#   * Deprecated Image.LANCZOS/NEAREST/BICUBIC aliases (7 sites) still work in
+#     Pillow 12 but are slated for removal, and the pin allows <13.
+#
+# The rest were annotations narrower than the values they described:
+# json_error's dict fallback (named JsonResponse in utils/http_utils), werkzeug
+# vs flask Response from redirect(), and `-> Image` naming the PIL module
+# rather than Image.Image.

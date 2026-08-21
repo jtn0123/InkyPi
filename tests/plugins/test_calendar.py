@@ -507,3 +507,39 @@ def test_get_view_range_tz_aware_timeGridWeek_display_previous_days() -> None:
     # Should be Monday of that week
     assert start.day == 13
     assert start.month == 1
+
+
+class TestContrastColourAcceptsAlpha:
+    """An 8-digit hex used to crash the whole calendar render.
+
+    `ImageColor.getrgb` returns a 4-tuple for any colour carrying alpha, and
+    `get_contrast_color` unpacked it into three names — `ValueError: too many
+    values to unpack`. The per-calendar colour is user-supplied, so pasting
+    "#ff000080" was enough to break the plugin. Surfaced by mypy once imports
+    were followed.
+    """
+
+    def _contrast(self, colour: str) -> str:
+        from plugins.calendar.calendar import Calendar
+
+        return Calendar.__new__(Calendar).get_contrast_color(colour)
+
+    @pytest.mark.parametrize(
+        ("colour", "expected"),
+        [
+            ("#ff0000", "#ffffff"),
+            ("#ffffff", "#000000"),
+            ("white", "#000000"),
+            ("black", "#ffffff"),
+        ],
+    )
+    def test_opaque_colours_are_unchanged(self, colour: str, expected: str) -> None:
+        assert self._contrast(colour) == expected
+
+    @pytest.mark.parametrize("colour", ["#ff000080", "#ffffff00", "#000000ff"])
+    def test_alpha_colours_no_longer_raise(self, colour: str) -> None:
+        assert self._contrast(colour) in {"#000000", "#ffffff"}
+
+    def test_alpha_is_ignored_not_blended(self) -> None:
+        """Transparency does not change perceived brightness here."""
+        assert self._contrast("#ffffff00") == self._contrast("#ffffff")
