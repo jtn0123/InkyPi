@@ -1,17 +1,20 @@
 import logging
 import os
 from collections.abc import Mapping
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from PIL import Image
 
 from utils.http_client import get_http_session
 
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from plugins.base_plugin.base_plugin import BasePlugin
+
 logger = logging.getLogger(__name__)
 
 
 def stars_generate_image(
-    plugin_instance: Any, settings: Mapping[str, object], device_config: Any
+    plugin_instance: "BasePlugin", settings: Mapping[str, object], device_config: Any
 ) -> Image.Image:
     raw_username = settings.get("githubUsername")
     raw_repository = settings.get("githubRepository")

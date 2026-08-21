@@ -3,7 +3,7 @@ import logging
 import re
 from collections.abc import Mapping
 from io import BytesIO
-from typing import Any, cast
+from typing import Any
 
 from openai import OpenAI
 from PIL.Image import Image as ImageType
@@ -532,7 +532,7 @@ class AIImage(BasePlugin):
         response = ai_client.images.generate(**args)
         image_base64 = response.data[0].b64_json
         image_bytes = base64.b64decode(image_base64)
-        image_loader = cast(Any, self.image_loader)
+        image_loader = self.image_loader
         target_dimensions = dimensions or (1536, 1536)
         image = image_loader.from_bytesio(
             BytesIO(image_bytes), target_dimensions, resize=dimensions is not None
@@ -575,7 +575,7 @@ class AIImage(BasePlugin):
         )
         if not response.generated_images:
             raise RuntimeError("Google Imagen returned no images")
-        image_loader = cast(Any, self.image_loader)
+        image_loader = self.image_loader
         target_dimensions = dimensions or (1536, 1536)
         image = image_loader.from_bytesio(
             BytesIO(response.generated_images[0].image.image_bytes),

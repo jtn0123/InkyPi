@@ -31,9 +31,7 @@ def _validate_plugin_module_path(
         is_registered = plugin_id in _PLUGIN_CONFIGS
     if not is_registered:
         plugin_module_path = (
-            Path(cast(str, cast(Any, resolve_path)(PLUGINS_DIR)))
-            / plugin_id
-            / f"{plugin_id}.py"
+            Path(resolve_path(PLUGINS_DIR)) / plugin_id / f"{plugin_id}.py"
         )
         if not allow_unregistered or not plugin_module_path.is_file():
             raise ValueError(f"Plugin '{plugin_id}' is not registered.")
@@ -151,7 +149,7 @@ def load_plugins(plugins_config: list[dict[str, Any]]) -> None:
     Plugin modules are not imported until first use via get_plugin_instance(),
     reducing startup memory and time on low-resource devices.
     """
-    plugins_module_path = Path(cast(str, cast(Any, resolve_path)(PLUGINS_DIR)))
+    plugins_module_path = Path(resolve_path(PLUGINS_DIR))
     for plugin in plugins_config:
         plugin_id = plugin.get("id")
         if not isinstance(plugin_id, str) or not plugin_id:

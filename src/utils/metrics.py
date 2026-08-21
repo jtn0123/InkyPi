@@ -14,8 +14,18 @@ from __future__ import annotations
 
 import logging
 import time
+from typing import Any
 
 logger = logging.getLogger(__name__)
+
+# Bound either to the real prometheus classes or to the no-op factories below,
+# decided at import time. Declared up front because mypy otherwise takes
+# whichever branch it reads first as the definitive type and reports the other
+# as an incompatible assignment.
+CollectorRegistry: Any
+Counter: Any
+Gauge: Any
+Histogram: Any
 
 try:
     from prometheus_client import (

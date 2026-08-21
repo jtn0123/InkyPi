@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 PLUGIN_API_VERSION = "1.0"
 
-PLUGINS_DIR = cast(str, cast(Any, resolve_path)("plugins"))
+PLUGINS_DIR = resolve_path("plugins")
 BASE_PLUGIN_DIR = os.path.join(PLUGINS_DIR, "base_plugin")
 BASE_PLUGIN_RENDER_DIR = os.path.join(BASE_PLUGIN_DIR, "render")
 
@@ -75,8 +75,7 @@ class BasePlugin:
         )
 
         # Initialize adaptive image loader for device-aware image processing
-        image_loader_factory = cast(Any, AdaptiveImageLoader)
-        self.image_loader = image_loader_factory()
+        self.image_loader = AdaptiveImageLoader()
 
         self.render_dir = self.get_plugin_dir("render")
         # Always initialize Jinja environment so plugins without their own

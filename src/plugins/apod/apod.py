@@ -10,7 +10,7 @@ import os
 from collections.abc import Mapping
 from datetime import UTC, date, datetime, timedelta
 from random import randint
-from typing import Any, cast
+from typing import cast
 
 from PIL import Image
 
@@ -203,7 +203,7 @@ class Apod(BasePlugin):
             raise RuntimeError("Failed to load APOD image.")
 
         for idx, image_url in enumerate(candidate_urls):
-            image = cast(Any, self.image_loader).from_url(
+            image = self.image_loader.from_url(
                 image_url,
                 dimensions=dimensions,
                 timeout_ms=timeout_ms,

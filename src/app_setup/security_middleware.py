@@ -20,9 +20,13 @@ from urllib.parse import quote, urlencode, urlunsplit
 
 from flask import Flask, Response, abort, g, redirect, request, session
 
+# `redirect` returns a werkzeug Response, and `json_error` may return a
+# plain dict when there is no app context — see utils.http_utils.
+from werkzeug.wrappers import Response as WerkzeugResponse
+
 from app_setup.smoke import SMOKE_RENDER_PATH, smoke_render_enabled
 from config import Config
-from utils.http_utils import json_error
+from utils.http_utils import JsonResponse, json_error
 from utils.rate_limit import (
     TokenBucket,
     make_auth_bucket,
@@ -117,7 +121,7 @@ def setup_https_redirect(app: Flask, *, dev_mode: bool) -> None:
     force_https = not dev_mode and _env_bool("INKYPI_FORCE_HTTPS")
 
     @app.before_request
-    def _redirect_to_https() -> Response | None:
+    def _redirect_to_https() -> Response | WerkzeugResponse | JsonResponse | None:
         if not force_https:
             return None
         if (
@@ -216,7 +220,7 @@ def setup_csrf_protection(app: Flask) -> None:
         return {"csrf_token": _generate_csrf_token}
 
     @app.before_request
-    def _check_csrf_token() -> Response | None:
+    def _check_csrf_token() -> Response | WerkzeugResponse | JsonResponse | None:
         if request.method in _CSRF_SAFE_METHODS:
             return None
         if request.path in _CSRF_EXEMPT_PATHS:
@@ -278,7 +282,9 @@ def _rate_limited_json_response(message: str, *, retry_after: str) -> Response:
     return resp
 
 
-def _apply_token_bucket_limits(path: str, addr: str) -> Response | None:
+def _apply_token_bucket_limits(
+    path: str, addr: str
+) -> Response | WerkzeugResponse | JsonResponse | None:
     """Check per-endpoint token-bucket limits; return a 429 response or None.
 
     Extracted to keep ``_rate_limit_mutations`` below SonarCloud's cognitive
@@ -319,7 +325,7 @@ def setup_rate_limiting(app: Flask) -> None:
     _mutating_bucket = make_mutating_bucket()
 
     @app.before_request
-    def _rate_limit_mutations() -> Response | None:
+    def _rate_limit_mutations() -> Response | WerkzeugResponse | JsonResponse | None:
         if request.method in _CSRF_SAFE_METHODS:
             return None
         if request.path in _RATE_EXEMPT:
