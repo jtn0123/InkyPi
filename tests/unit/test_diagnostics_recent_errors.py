@@ -9,15 +9,20 @@ a second round-trip to another endpoint.
 from __future__ import annotations
 
 import json
+from collections.abc import Iterator
+from pathlib import Path
+from typing import Any
 
 import pytest
+from flask import Flask
+from flask.testing import FlaskClient
 
 import blueprints.client_log as cl_mod
 import blueprints.diagnostics as diag
 
 
 @pytest.fixture()
-def client(flask_app):
+def client(flask_app: Flask) -> Any:
     # The conftest flask_app fixture does not register the client_log blueprint
     # by default — register it here so the diagnostics integration tests can
     # exercise the real POST -> ring-buffer -> GET pipeline.
@@ -27,7 +32,9 @@ def client(flask_app):
 
 
 @pytest.fixture(autouse=True)
-def _reset_paths_and_buffer(tmp_path, monkeypatch):
+def _reset_paths_and_buffer(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> Iterator[Any]:
     """Isolate diagnostics paths and the client-log ring buffer per test."""
     monkeypatch.setattr(diag, "_PREV_VERSION_PATH", tmp_path / "prev_version")
     monkeypatch.setattr(
@@ -39,7 +46,7 @@ def _reset_paths_and_buffer(tmp_path, monkeypatch):
     cl_mod.reset_recent_errors()
 
 
-def _post_log(client, level: str, message: str = "hi"):
+def _post_log(client: FlaskClient, level: str, message: str = "hi") -> Any:
     return client.post(
         "/api/client-log",
         data=json.dumps({"level": level, "message": message}),
@@ -47,7 +54,7 @@ def _post_log(client, level: str, message: str = "hi"):
     )
 
 
-def test_diagnostics_includes_recent_client_log_errors_key(client):
+def test_diagnostics_includes_recent_client_log_errors_key(client: FlaskClient) -> None:
     """The endpoint returns the recent_client_log_errors summary key."""
     resp = client.get("/api/diagnostics")
     assert resp.status_code == 200
@@ -67,7 +74,7 @@ def test_diagnostics_includes_recent_client_log_errors_key(client):
     assert summary["window_seconds"] == 300
 
 
-def test_counter_increments_on_client_log_error_post(client):
+def test_counter_increments_on_client_log_error_post(client: FlaskClient) -> None:
     """POST /api/client-log with level=error bumps count_5m by 1."""
     assert _post_log(client, "error", "boom").status_code == 204
     data = client.get("/api/diagnostics").get_json()
@@ -78,7 +85,7 @@ def test_counter_increments_on_client_log_error_post(client):
     assert summary["last_error_ts"] > 0
 
 
-def test_warn_counter_tracked_separately(client):
+def test_warn_counter_tracked_separately(client: FlaskClient) -> None:
     """A warn-level entry updates warn_count_5m but not count_5m."""
     assert _post_log(client, "warn", "careful").status_code == 204
     summary = client.get("/api/diagnostics").get_json()["recent_client_log_errors"]
@@ -88,7 +95,7 @@ def test_warn_counter_tracked_separately(client):
     assert summary["last_error_ts"] is None
 
 
-def test_batch_post_increments_per_entry(client):
+def test_batch_post_increments_per_entry(client: FlaskClient) -> None:
     """A batch POST increments the counter once per validated entry."""
     payload = [
         {"level": "error", "message": "a"},
@@ -106,7 +113,7 @@ def test_batch_post_increments_per_entry(client):
     assert summary["warn_count_5m"] == 1
 
 
-def test_five_minute_cutoff_excludes_old_entries():
+def test_five_minute_cutoff_excludes_old_entries() -> None:
     """Entries older than the window are excluded from count_5m."""
     cl_mod.reset_recent_errors()
     # Seed one fresh error and one entry well past the 5-minute cutoff.
@@ -121,7 +128,7 @@ def test_five_minute_cutoff_excludes_old_entries():
     assert summary["last_error_ts"] == now - 10.0
 
 
-def test_ring_buffer_is_bounded():
+def test_ring_buffer_is_bounded() -> None:
     """The ring buffer discards oldest entries when it fills up."""
     cl_mod.reset_recent_errors()
     for _ in range(cl_mod._RECENT_BUFFER_MAX + 25):
@@ -129,7 +136,7 @@ def test_ring_buffer_is_bounded():
     assert len(cl_mod._recent_errors) == cl_mod._RECENT_BUFFER_MAX
 
 
-def test_invalid_entries_do_not_count(client):
+def test_invalid_entries_do_not_count(client: FlaskClient) -> None:
     """Validation failures leave the counter untouched."""
     resp = client.post(
         "/api/client-log",

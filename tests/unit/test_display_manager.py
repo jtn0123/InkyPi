@@ -1,16 +1,20 @@
 import builtins
 import types
 from datetime import UTC, datetime
+from pathlib import Path
+from typing import Any
 
 import pytest
 from PIL import Image
 
 
-def make_image(w=320, h=240, color="white"):
+def make_image(w: Any = 320, h: Any = 240, color: Any = "white") -> Any:
     return Image.new("RGB", (w, h), color)
 
 
-def test_display_manager_mock_pipeline(device_config_dev, monkeypatch, tmp_path):
+def test_display_manager_mock_pipeline(
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> Any:
     # Force mock display
     device_config_dev.update_value("display_type", "mock")
     device_config_dev.update_value("resolution", [200, 100])
@@ -37,15 +41,15 @@ def test_display_manager_mock_pipeline(device_config_dev, monkeypatch, tmp_path)
     original_resize = image_utils.resize_image
     original_apply = image_utils.apply_image_enhancement
 
-    def spy_change(img, orientation, inverted=False):
+    def spy_change(img: Any, orientation: Any, inverted: Any = False) -> Any:
         called["change_orientation"] = True
         return original_change(img, orientation, inverted)
 
-    def spy_resize(img, desired_size, image_settings=None):
+    def spy_resize(img: Any, desired_size: Any, image_settings: Any = None) -> Any:
         called["resize_image"] = True
         return original_resize(img, desired_size, image_settings or [])
 
-    def spy_apply(img, settings):
+    def spy_apply(img: Any, settings: Any) -> Any:
         called["apply_image_enhancement"] = True
         return original_apply(img, settings)
 
@@ -71,7 +75,7 @@ def test_display_manager_mock_pipeline(device_config_dev, monkeypatch, tmp_path)
     assert Path(device_config_dev.processed_image_file).exists()
 
 
-def test_display_manager_selects_display_type_mock(device_config_dev):
+def test_display_manager_selects_display_type_mock(device_config_dev: Any) -> None:
     device_config_dev.update_value("display_type", "mock")
     from display.display_manager import DisplayManager
 
@@ -79,7 +83,7 @@ def test_display_manager_selects_display_type_mock(device_config_dev):
     assert dm.display.__class__.__name__ == "MockDisplay"
 
 
-def test_display_manager_rejects_unsupported_type(device_config_dev):
+def test_display_manager_rejects_unsupported_type(device_config_dev: Any) -> None:
     device_config_dev.update_value("display_type", "unknown")
     from display.display_manager import DisplayManager
 
@@ -87,16 +91,18 @@ def test_display_manager_rejects_unsupported_type(device_config_dev):
         DisplayManager(device_config_dev)
 
 
-def test_display_manager_selects_inky(monkeypatch, device_config_dev):
+def test_display_manager_selects_inky(
+    monkeypatch: pytest.MonkeyPatch, device_config_dev: Any
+) -> None:
     # Patch inky display import in display_manager
     device_config_dev.update_value("display_type", "inky")
 
     # Provide a dummy InkyDisplay class in the expected import path
     class FakeInky:
-        def __init__(self, cfg):
+        def __init__(self, cfg: Any) -> None:
             self.cfg = cfg
 
-        def display_image(self, img, image_settings=None):
+        def display_image(self, img: Any, image_settings: Any = None) -> None:
             self.last = (img.size, tuple(image_settings or []))
 
     _fake_mod = types.SimpleNamespace(InkyDisplay=FakeInky)
@@ -116,15 +122,17 @@ def test_display_manager_selects_inky(monkeypatch, device_config_dev):
     assert dm.display.__class__.__name__ == "FakeInky"
 
 
-def test_display_manager_selects_waveshare(monkeypatch, device_config_dev):
+def test_display_manager_selects_waveshare(
+    monkeypatch: pytest.MonkeyPatch, device_config_dev: Any
+) -> None:
     # display_type pattern epd*in* triggers waveshare
     device_config_dev.update_value("display_type", "epd7in3e")
 
     class FakeWS:
-        def __init__(self, cfg):
+        def __init__(self, cfg: Any) -> None:
             self.cfg = cfg
 
-        def display_image(self, img, image_settings=None):
+        def display_image(self, img: Any, image_settings: Any = None) -> None:
             self.last = (img.size, tuple(image_settings or []))
 
     import display.display_manager as dm_mod
@@ -137,7 +145,7 @@ def test_display_manager_selects_waveshare(monkeypatch, device_config_dev):
     assert dm.display.__class__.__name__ == "FakeWS"
 
 
-def test_display_manager_writes_history_sidecar(device_config_dev):
+def test_display_manager_writes_history_sidecar(device_config_dev: Any) -> None:
     device_config_dev.update_value("display_type", "mock")
     import json
     from pathlib import Path
@@ -163,8 +171,8 @@ def test_display_manager_writes_history_sidecar(device_config_dev):
 
 
 def test_display_manager_history_uses_device_timezone(
-    device_config_dev, monkeypatch, tmp_path
-):
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     device_config_dev.update_value("display_type", "mock")
     import json
     from pathlib import Path
@@ -188,7 +196,9 @@ def test_display_manager_history_uses_device_timezone(
     assert jsons[-1].stem == "display_20260331_224512"
 
 
-def test_display_manager_history_collision_adds_suffix(device_config_dev, monkeypatch):
+def test_display_manager_history_collision_adds_suffix(
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     device_config_dev.update_value("display_type", "mock")
     from pathlib import Path
 
@@ -211,8 +221,8 @@ def test_display_manager_history_collision_adds_suffix(device_config_dev, monkey
 
 
 def test_display_manager_hash_reset_on_failure_allows_retry(
-    device_config_dev, monkeypatch
-):
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> Any:
     """If display_image raises, _last_image_hash must be restored so the same
     image can be retried on the next refresh cycle (JTN-255)."""
     device_config_dev.update_value("display_type", "mock")
@@ -225,7 +235,7 @@ def test_display_manager_hash_reset_on_failure_allows_retry(
     call_count = {"n": 0}
     original_display = dm.display.display_image
 
-    def failing_then_ok(img, image_settings=None):
+    def failing_then_ok(img: Any, image_settings: Any = None) -> Any:
         call_count["n"] += 1
         if call_count["n"] == 1:
             raise RuntimeError("simulated display failure")
@@ -250,7 +260,9 @@ def test_display_manager_hash_reset_on_failure_allows_retry(
     assert "display_ms" in result
 
 
-def test_display_manager_display_preprocessed_image(device_config_dev, tmp_path):
+def test_display_manager_display_preprocessed_image(
+    device_config_dev: Any, tmp_path: Path
+) -> None:
     device_config_dev.update_value("display_type", "mock")
     from pathlib import Path
 
@@ -266,7 +278,9 @@ def test_display_manager_display_preprocessed_image(device_config_dev, tmp_path)
     assert Path(device_config_dev.processed_image_file).exists()
 
 
-def test_display_preprocessed_image_clears_hash(device_config_dev, tmp_path):
+def test_display_preprocessed_image_clears_hash(
+    device_config_dev: Any, tmp_path: Path
+) -> None:
     """display_preprocessed_image must clear _last_image_hash so the next
     regular refresh is not skipped due to a stale hash match (JTN-236)."""
     device_config_dev.update_value("display_type", "mock")

@@ -15,12 +15,16 @@ from __future__ import annotations
 
 import importlib
 import json
+from typing import Any
 
 import pytest
 from flask import Flask  # noqa: E402
+from flask.testing import FlaskClient
 
 
-def _fresh_module(monkeypatch=None, *, capture: bool | None = None):
+def _fresh_module(
+    monkeypatch: pytest.MonkeyPatch = None, *, capture: bool | None = None
+) -> Any:
     """Reload ``blueprints.client_log`` and return (module, Flask app)."""
     import blueprints.client_log as cl_mod
 
@@ -36,7 +40,7 @@ def _fresh_module(monkeypatch=None, *, capture: bool | None = None):
     return cl_mod, app
 
 
-def _post(client, payload):
+def _post(client: FlaskClient, payload: Any) -> Any:
     return client.post(
         "/api/client-log",
         data=json.dumps(payload),
@@ -47,7 +51,9 @@ def _post(client, payload):
 class TestCaptureOffByDefault:
     """With the env var unset the handler must match the prod path."""
 
-    def test_env_unset_returns_204_and_no_capture(self, monkeypatch):
+    def test_env_unset_returns_204_and_no_capture(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         monkeypatch.delenv("INKYPI_TEST_CAPTURE_CLIENT_LOG", raising=False)
         cl_mod, app = _fresh_module(monkeypatch, capture=False)
 
@@ -55,7 +61,7 @@ class TestCaptureOffByDefault:
         assert resp.status_code == 204
         assert cl_mod.get_captured_reports() == []
 
-    def test_env_empty_string_is_off(self, monkeypatch):
+    def test_env_empty_string_is_off(self, monkeypatch: pytest.MonkeyPatch) -> None:
         cl_mod, app = _fresh_module(monkeypatch)
         monkeypatch.setenv("INKYPI_TEST_CAPTURE_CLIENT_LOG", "")
 
@@ -63,7 +69,7 @@ class TestCaptureOffByDefault:
         assert resp.status_code == 204
         assert cl_mod.get_captured_reports() == []
 
-    def test_env_zero_is_off(self, monkeypatch):
+    def test_env_zero_is_off(self, monkeypatch: pytest.MonkeyPatch) -> None:
         cl_mod, app = _fresh_module(monkeypatch)
         monkeypatch.setenv("INKYPI_TEST_CAPTURE_CLIENT_LOG", "0")
 
@@ -75,7 +81,9 @@ class TestCaptureOffByDefault:
 class TestCaptureOn:
     """With the env var set to a truthy value the handler captures reports."""
 
-    def test_env_1_captures_single_report(self, monkeypatch):
+    def test_env_1_captures_single_report(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         cl_mod, app = _fresh_module(monkeypatch, capture=True)
 
         resp = _post(app.test_client(), {"level": "error", "message": "boom"})
@@ -86,7 +94,7 @@ class TestCaptureOn:
         assert reports[0]["level"] == "error"
         assert reports[0]["message"] == "boom"
 
-    def test_env_true_captures(self, monkeypatch):
+    def test_env_true_captures(self, monkeypatch: pytest.MonkeyPatch) -> None:
         cl_mod, app = _fresh_module(monkeypatch)
         monkeypatch.setenv("INKYPI_TEST_CAPTURE_CLIENT_LOG", "true")
 
@@ -94,7 +102,7 @@ class TestCaptureOn:
         assert resp.status_code == 204
         assert len(cl_mod.get_captured_reports()) == 1
 
-    def test_env_yes_captures(self, monkeypatch):
+    def test_env_yes_captures(self, monkeypatch: pytest.MonkeyPatch) -> None:
         cl_mod, app = _fresh_module(monkeypatch)
         monkeypatch.setenv("INKYPI_TEST_CAPTURE_CLIENT_LOG", "yes")
 
@@ -102,7 +110,9 @@ class TestCaptureOn:
         assert resp.status_code == 204
         assert len(cl_mod.get_captured_reports()) == 1
 
-    def test_multiple_posts_grow_the_list(self, monkeypatch):
+    def test_multiple_posts_grow_the_list(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         cl_mod, app = _fresh_module(monkeypatch, capture=True)
         client = app.test_client()
 
@@ -114,7 +124,7 @@ class TestCaptureOn:
         assert len(reports) == 3
         assert [r["message"] for r in reports] == ["log-0", "log-1", "log-2"]
 
-    def test_invalid_report_not_captured(self, monkeypatch):
+    def test_invalid_report_not_captured(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Invalid level returns 400 and must not be captured."""
         cl_mod, app = _fresh_module(monkeypatch, capture=True)
 
@@ -122,7 +132,7 @@ class TestCaptureOn:
         assert resp.status_code == 400
         assert cl_mod.get_captured_reports() == []
 
-    def test_reset_clears_captured_list(self, monkeypatch):
+    def test_reset_clears_captured_list(self, monkeypatch: pytest.MonkeyPatch) -> None:
         cl_mod, app = _fresh_module(monkeypatch, capture=True)
         client = app.test_client()
 
@@ -141,7 +151,9 @@ class TestCaptureOn:
 class TestCapturedReportsIsCopy:
     """get_captured_reports must return a copy; mutating it must not leak."""
 
-    def test_returned_list_is_independent(self, monkeypatch):
+    def test_returned_list_is_independent(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         cl_mod, app = _fresh_module(monkeypatch, capture=True)
         _post(app.test_client(), {"level": "warn", "message": "m"})
 
@@ -167,8 +179,8 @@ class TestProdPathUnchanged:
         ],
     )
     def test_status_codes_match_with_and_without_capture(
-        self, monkeypatch, payload, expected_status
-    ):
+        self, monkeypatch: pytest.MonkeyPatch, payload: Any, expected_status: Any
+    ) -> Any:
         # Capture off
         monkeypatch.delenv("INKYPI_TEST_CAPTURE_CLIENT_LOG", raising=False)
         _, app_off = _fresh_module(monkeypatch, capture=False)

@@ -1,7 +1,11 @@
 import os
+from pathlib import Path
+
+import pytest
+from flask.testing import FlaskClient
 
 
-def test_plugin_static_image_route(client):
+def test_plugin_static_image_route(client: FlaskClient) -> None:
     # Create a fake plugin asset
     base = os.path.abspath(
         os.path.join(os.path.dirname(__file__), "..", "..", "src", "plugins")
@@ -20,7 +24,9 @@ def test_plugin_static_image_route(client):
     assert "image" in (resp.headers.get("Content-Type") or "")
 
 
-def test_plugin_static_image_route_with_relative_src_dir(client, tmp_path, monkeypatch):
+def test_plugin_static_image_route_with_relative_src_dir(
+    client: FlaskClient, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Relative SRC_DIR values must stay rooted at the repo, not the cwd."""
     monkeypatch.setenv("SRC_DIR", "src")
     monkeypatch.chdir(tmp_path)
@@ -39,14 +45,14 @@ def test_plugin_static_image_route_with_relative_src_dir(client, tmp_path, monke
 # ---------------------------------------------------------------------------
 
 
-def test_plugin_image_allows_nested_subpath(client):
+def test_plugin_image_allows_nested_subpath(client: FlaskClient) -> None:
     """Nested filenames under a plugin dir (e.g. frames/blank.png) still work."""
     resp = client.get("/images/base_plugin/frames/blank.png")
     assert resp.status_code == 200
     assert "image" in (resp.headers.get("Content-Type") or "")
 
 
-def test_plugin_image_rejects_parent_traversal(client):
+def test_plugin_image_rejects_parent_traversal(client: FlaskClient) -> None:
     """../ in the filename must not escape the plugin directory."""
     resp = client.get("/images/ai_text/..%2ficon.png")
     # Werkzeug rejects %2f in <path:...> before we see it (404/308); either
@@ -57,26 +63,26 @@ def test_plugin_image_rejects_parent_traversal(client):
     assert resp.status_code in (404, 308, 400)
 
 
-def test_plugin_image_rejects_unknown_plugin_id(client):
+def test_plugin_image_rejects_unknown_plugin_id(client: FlaskClient) -> None:
     """Unknown plugin_id yields 404."""
     resp = client.get("/images/__does_not_exist__/icon.png")
     assert resp.status_code == 404
 
 
-def test_plugin_image_rejects_unknown_filename(client):
+def test_plugin_image_rejects_unknown_filename(client: FlaskClient) -> None:
     """Known plugin + unknown file yields 404 (not a filesystem error)."""
     resp = client.get("/images/ai_text/nope_missing.png")
     assert resp.status_code == 404
 
 
-def test_plugin_image_rejects_absolute_plugin_id(client):
+def test_plugin_image_rejects_absolute_plugin_id(client: FlaskClient) -> None:
     """An absolute path in plugin_id must be rejected."""
     # Double slash effectively makes plugin_id empty; Flask routes this to 404.
     resp = client.get("/images//etc/passwd")
     assert resp.status_code in (404, 308)
 
 
-def test_plugin_image_rejects_dot_segments(client):
+def test_plugin_image_rejects_dot_segments(client: FlaskClient) -> None:
     """Single-dot segments in filename are rejected."""
     resp = client.get("/images/ai_text/./icon.png")
     # Werkzeug may normalize or 308; either way we never serve arbitrary files.

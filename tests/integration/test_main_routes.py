@@ -2,17 +2,23 @@
 import os
 import re
 from datetime import UTC, datetime
+from typing import Any
+
+import pytest
+from flask.testing import FlaskClient
 
 from model import RefreshInfo
 
 
-def test_main_page(client):
+def test_main_page(client: FlaskClient) -> None:
     resp = client.get("/")
     assert resp.status_code == 200
     assert b"/preview" in resp.data
 
 
-def test_dashboard_header_actions_use_compact_handoff_button_pattern(client):
+def test_dashboard_header_actions_use_compact_handoff_button_pattern(
+    client: FlaskClient,
+) -> None:
     resp = client.get("/")
     html = resp.get_data(as_text=True)
 
@@ -25,7 +31,9 @@ def test_dashboard_header_actions_use_compact_handoff_button_pattern(client):
     assert 'class="action-button primary dashboard-header-button"' not in html
 
 
-def test_preview_size_mode_native_on_home(client, device_config_dev, monkeypatch):
+def test_preview_size_mode_native_on_home(
+    client: FlaskClient, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     # native: expect native sizing metadata present for controller-driven preview sizing
     device_config_dev.update_value("preview_size_mode", "native", write=True)
     resp = client.get("/")
@@ -34,7 +42,9 @@ def test_preview_size_mode_native_on_home(client, device_config_dev, monkeypatch
     assert b'id="dashboardStageCopy"' in resp.data
 
 
-def test_preview_size_mode_fit_on_home(client, device_config_dev, monkeypatch):
+def test_preview_size_mode_fit_on_home(
+    client: FlaskClient, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     # fit: expect no explicit inline width/height style and still retain metadata
     device_config_dev.update_value("preview_size_mode", "fit", write=True)
     resp = client.get("/")
@@ -43,7 +53,7 @@ def test_preview_size_mode_fit_on_home(client, device_config_dev, monkeypatch):
     assert b'data-native-width="' in resp.data
 
 
-def test_preview_404_when_no_image(client):
+def test_preview_404_when_no_image(client: FlaskClient) -> None:
     dc = client.application.config["DEVICE_CONFIG"]
     for path in (dc.processed_image_file, dc.current_image_file):
         try:
@@ -54,7 +64,9 @@ def test_preview_404_when_no_image(client):
     assert resp.status_code == 404
 
 
-def test_preview_serves_current_image_when_exists(client, device_config_dev):
+def test_preview_serves_current_image_when_exists(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     # Write a dummy current image
     from PIL import Image
 
@@ -66,7 +78,9 @@ def test_preview_serves_current_image_when_exists(client, device_config_dev):
     assert resp.mimetype == "image/png"
 
 
-def test_preview_prefers_processed_over_current(client, device_config_dev):
+def test_preview_prefers_processed_over_current(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     from PIL import Image
 
     # Create different colored images to differentiate
@@ -80,7 +94,9 @@ def test_preview_prefers_processed_over_current(client, device_config_dev):
     assert resp.mimetype == "image/png"
 
 
-def test_home_now_showing_renders_from_refresh_info(client, device_config_dev):
+def test_home_now_showing_renders_from_refresh_info(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     # Seed refresh_info in config
     device_config_dev.refresh_info = RefreshInfo(
         refresh_type="Playlist",
@@ -109,8 +125,8 @@ def test_home_now_showing_renders_from_refresh_info(client, device_config_dev):
 
 
 def test_dashboard_refresh_cell_renders_forward_eta(
-    client, device_config_dev, monkeypatch
-):
+    client: FlaskClient, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     monkeypatch.setattr(
         "blueprints.main._current_dt",
         lambda _device_config: datetime(2025, 1, 1, 7, 57, tzinfo=UTC),
@@ -135,7 +151,9 @@ def test_dashboard_refresh_cell_renders_forward_eta(
     assert "ETA 8:00 AM" in html
 
 
-def test_dashboard_plugin_cards_have_valid_hrefs(client, device_config_dev):
+def test_dashboard_plugin_cards_have_valid_hrefs(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     """JTN-214: Plugin cards must render with valid href attributes."""
     resp = client.get("/")
     assert resp.status_code == 200
@@ -147,7 +165,7 @@ def test_dashboard_plugin_cards_have_valid_hrefs(client, device_config_dev):
     assert b'href="/plugin/' in resp.data
 
 
-def test_dashboard_plugin_catalog_exposes_library_link(client):
+def test_dashboard_plugin_catalog_exposes_library_link(client: FlaskClient) -> None:
     resp = client.get("/")
     html = resp.get_data(as_text=True)
 
@@ -158,7 +176,9 @@ def test_dashboard_plugin_catalog_exposes_library_link(client):
     assert "Open library" in html
 
 
-def test_plugin_page_accessible_from_dashboard_links(client, device_config_dev):
+def test_plugin_page_accessible_from_dashboard_links(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     """JTN-214: Links from dashboard plugin cards should serve plugin pages."""
     import re
 
@@ -174,7 +194,9 @@ def test_plugin_page_accessible_from_dashboard_links(client, device_config_dev):
         ), f"Plugin page {href.decode()} should be accessible"
 
 
-def test_plugins_page_lists_plugin_cards_and_marks_sidebar_active(client):
+def test_plugins_page_lists_plugin_cards_and_marks_sidebar_active(
+    client: FlaskClient,
+) -> None:
     resp = client.get("/plugins")
     html = resp.get_data(as_text=True)
 
@@ -200,7 +222,7 @@ def test_plugins_page_lists_plugin_cards_and_marks_sidebar_active(client):
     )
 
 
-def test_shell_marks_sidebar_active_on_management_pages(client):
+def test_shell_marks_sidebar_active_on_management_pages(client: FlaskClient) -> None:
     cases = [
         ("/playlist", "/playlist"),
         ("/history", "/history"),
@@ -223,8 +245,8 @@ def test_shell_marks_sidebar_active_on_management_pages(client):
         ), f"Expected sidebar link {active_href} to be active on {path}"
 
 
-def test_next_up_endpoint_and_ssr(client, device_config_dev):
-    # Seed playlist with two items so peek returns the second when index is None (first is candidate)
+def test_next_up_endpoint_and_ssr(client: FlaskClient, device_config_dev: Any):
+    # Seed playlist with two items so peek returns the second when index is None (first is candidate) -> None -> None
     pm = device_config_dev.get_playlist_manager()
     pm.add_playlist("Default", "00:00", "24:00")
     pl = pm.get_playlist("Default")
@@ -267,8 +289,8 @@ def test_next_up_endpoint_and_ssr(client, device_config_dev):
 
 
 def test_dashboard_shows_unavailable_message_when_preview_exists_but_no_plugin_id(
-    client, device_config_dev
-):
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     """When a preview image exists but refresh_info has no plugin_id, show 'Last display info unavailable.'"""
     from PIL import Image
 
@@ -289,8 +311,8 @@ def test_dashboard_shows_unavailable_message_when_preview_exists_but_no_plugin_i
 
 
 def test_dashboard_shows_generic_message_when_no_preview_and_no_plugin_id(
-    client, device_config_dev
-):
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     """When no preview image and no plugin_id, show the generic 'Display a plugin' empty state."""
     import os
 
@@ -321,7 +343,9 @@ def test_dashboard_shows_generic_message_when_no_preview_and_no_plugin_id(
 # ---------------------------------------------------------------------------
 
 
-def test_home_hides_auto_generated_instance_suffix(client, device_config_dev):
+def test_home_hides_auto_generated_instance_suffix(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     """JTN-618: The NOW SHOWING panel must not expose raw {plugin_id}_saved_settings keys."""
     device_config_dev.refresh_info = RefreshInfo(
         refresh_type="Playlist",
@@ -341,7 +365,9 @@ def test_home_hides_auto_generated_instance_suffix(client, device_config_dev):
     assert b'id="heroNowValue"' in resp.data
 
 
-def test_home_preserves_user_supplied_instance_name(client, device_config_dev):
+def test_home_preserves_user_supplied_instance_name(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     """A user-renamed instance should still render in the parenthesised suffix."""
     device_config_dev.refresh_info = RefreshInfo(
         refresh_type="Playlist",
@@ -358,7 +384,9 @@ def test_home_preserves_user_supplied_instance_name(client, device_config_dev):
     assert b"Morning Weather" in resp.data
 
 
-def test_refresh_info_endpoint_annotates_labels(client, device_config_dev):
+def test_refresh_info_endpoint_annotates_labels(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     """JTN-618: /refresh-info must expose a friendly label and auto flag to JS."""
     device_config_dev.refresh_info = RefreshInfo(
         refresh_type="Playlist",
@@ -381,8 +409,8 @@ def test_refresh_info_endpoint_annotates_labels(client, device_config_dev):
 
 
 def test_refresh_info_endpoint_includes_next_refresh_schedule(
-    client, device_config_dev, monkeypatch
-):
+    client: FlaskClient, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     monkeypatch.setattr(
         "blueprints.main._current_dt",
         lambda _device_config: datetime(2025, 1, 1, 7, 57, tzinfo=UTC),
@@ -408,7 +436,9 @@ def test_refresh_info_endpoint_includes_next_refresh_schedule(
     assert payload["next_refresh_meta"] == "ETA 8:00 AM · Every 5 min · auto"
 
 
-def test_next_up_endpoint_annotates_labels(client, device_config_dev):
+def test_next_up_endpoint_annotates_labels(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     """JTN-618: /next-up must also annotate labels for the dashboard."""
     pm = device_config_dev.get_playlist_manager()
     pm.add_playlist("Default", "00:00", "24:00")

@@ -1,12 +1,17 @@
 import importlib
 import logging
 import sys
+from pathlib import Path
+from typing import Any
 from unittest.mock import MagicMock, patch
 
+import pytest
 from flask import Flask, abort
 
 
-def _reload_inkypi(monkeypatch, argv=None, env=None):
+def _reload_inkypi(
+    monkeypatch: pytest.MonkeyPatch, argv: Any = None, env: Any = None
+) -> Any:
     if argv is None:
         argv = ["inkypi.py"]
     if env is None:
@@ -31,7 +36,7 @@ def _reload_inkypi(monkeypatch, argv=None, env=None):
     return mod
 
 
-def test_inkypi_dev_mode_and_blueprints(monkeypatch):
+def test_inkypi_dev_mode_and_blueprints(monkeypatch: pytest.MonkeyPatch) -> None:
     mod = _reload_inkypi(monkeypatch, argv=["inkypi.py", "--dev"], env={})
 
     assert getattr(mod, "DEV_MODE", False) is True
@@ -44,7 +49,7 @@ def test_inkypi_dev_mode_and_blueprints(monkeypatch):
         assert bp_name in app.blueprints
 
 
-def test_inkypi_prod_mode_port_from_env(monkeypatch):
+def test_inkypi_prod_mode_port_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
     mod = _reload_inkypi(
         monkeypatch,
         argv=["inkypi.py"],
@@ -55,7 +60,7 @@ def test_inkypi_prod_mode_port_from_env(monkeypatch):
     assert getattr(mod, "PORT", None) == 1234
 
 
-def test_inkypi_web_only_flag(monkeypatch):
+def test_inkypi_web_only_flag(monkeypatch: pytest.MonkeyPatch) -> None:
     mod = _reload_inkypi(monkeypatch, argv=["inkypi.py", "--dev", "--web-only"], env={})
     app = getattr(mod, "app", None)
     assert isinstance(app, Flask)
@@ -65,7 +70,7 @@ def test_inkypi_web_only_flag(monkeypatch):
     assert rt.running is False
 
 
-def test_inkypi_fast_dev(monkeypatch):
+def test_inkypi_fast_dev(monkeypatch: pytest.MonkeyPatch) -> None:
     mod = _reload_inkypi(monkeypatch, argv=["inkypi.py", "--dev", "--fast-dev"], env={})
     app = getattr(mod, "app", None)
     assert isinstance(app, Flask)
@@ -73,7 +78,7 @@ def test_inkypi_fast_dev(monkeypatch):
     assert cfg.get_config("plugin_cycle_interval_seconds") == 30
 
 
-def test_inkypi_config_file_cli(monkeypatch):
+def test_inkypi_config_file_cli(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test that --config CLI flag sets the config file path."""
     _mod = _reload_inkypi(
         monkeypatch, argv=["inkypi.py", "--config", "/path/to/config.json"], env={}
@@ -83,25 +88,25 @@ def test_inkypi_config_file_cli(monkeypatch):
     assert Config.config_file == "/path/to/config.json"
 
 
-def test_inkypi_port_cli(monkeypatch):
+def test_inkypi_port_cli(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test that --port CLI flag sets the port."""
     mod = _reload_inkypi(monkeypatch, argv=["inkypi.py", "--port", "3000"], env={})
     assert getattr(mod, "PORT", None) == 3000
 
 
-def test_inkypi_port_env_inkypi_port(monkeypatch):
+def test_inkypi_port_env_inkypi_port(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test that INKYPI_PORT environment variable sets the port."""
     mod = _reload_inkypi(monkeypatch, argv=["inkypi.py"], env={"INKYPI_PORT": "4000"})
     assert getattr(mod, "PORT", None) == 4000
 
 
-def test_inkypi_port_env_port_fallback(monkeypatch):
+def test_inkypi_port_env_port_fallback(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test that PORT environment variable is used as fallback."""
     mod = _reload_inkypi(monkeypatch, argv=["inkypi.py"], env={"PORT": "5000"})
     assert getattr(mod, "PORT", None) == 5000
 
 
-def test_inkypi_port_invalid_env(monkeypatch):
+def test_inkypi_port_invalid_env(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test that invalid port in environment falls back to default."""
     mod = _reload_inkypi(
         monkeypatch, argv=["inkypi.py"], env={"INKYPI_PORT": "invalid"}
@@ -109,7 +114,7 @@ def test_inkypi_port_invalid_env(monkeypatch):
     assert getattr(mod, "PORT", None) == 80  # Production mode default
 
 
-def test_inkypi_dev_mode_env_vars(monkeypatch):
+def test_inkypi_dev_mode_env_vars(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test various ways to set dev mode via environment variables."""
     # Test INKYPI_ENV=dev
     mod = _reload_inkypi(monkeypatch, argv=["inkypi.py"], env={"INKYPI_ENV": "dev"})
@@ -132,7 +137,7 @@ def test_inkypi_dev_mode_env_vars(monkeypatch):
     assert getattr(mod, "DEV_MODE", False) is True
 
 
-def test_inkypi_web_only_env_vars(monkeypatch):
+def test_inkypi_web_only_env_vars(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test web-only mode via environment variables."""
     # Test INKYPI_NO_REFRESH=1
     mod = _reload_inkypi(
@@ -153,7 +158,7 @@ def test_inkypi_web_only_env_vars(monkeypatch):
     assert getattr(mod, "WEB_ONLY", False) is True
 
 
-def test_inkypi_fast_dev_env_vars(monkeypatch):
+def test_inkypi_fast_dev_env_vars(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test fast dev mode via environment variables."""
     mod = _reload_inkypi(monkeypatch, argv=["inkypi.py"], env={"INKYPI_FAST_DEV": "1"})
     app = getattr(mod, "app", None)
@@ -162,14 +167,14 @@ def test_inkypi_fast_dev_env_vars(monkeypatch):
     assert cfg.get_config("plugin_cycle_interval_seconds") == 30
 
 
-def test_inkypi_prod_mode_defaults(monkeypatch):
+def test_inkypi_prod_mode_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test production mode defaults."""
     mod = _reload_inkypi(monkeypatch, argv=["inkypi.py"], env={})
     assert getattr(mod, "DEV_MODE", True) is False  # Should default to False
     assert getattr(mod, "PORT", None) == 80  # Production default port
 
 
-def test_inkypi_max_content_length_env(monkeypatch):
+def test_inkypi_max_content_length_env(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test MAX_CONTENT_LENGTH environment variable handling."""
     mod = _reload_inkypi(
         monkeypatch, argv=["inkypi.py"], env={"MAX_CONTENT_LENGTH": "5242880"}
@@ -179,7 +184,7 @@ def test_inkypi_max_content_length_env(monkeypatch):
     assert app.config["MAX_CONTENT_LENGTH"] == 5242880
 
 
-def test_inkypi_max_content_length_invalid_env(monkeypatch):
+def test_inkypi_max_content_length_invalid_env(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test invalid MAX_CONTENT_LENGTH falls back to default."""
     mod = _reload_inkypi(
         monkeypatch, argv=["inkypi.py"], env={"MAX_CONTENT_LENGTH": "invalid"}
@@ -189,7 +194,7 @@ def test_inkypi_max_content_length_invalid_env(monkeypatch):
     assert app.config["MAX_CONTENT_LENGTH"] == 10 * 1024 * 1024  # Default 10MB
 
 
-def test_inkypi_max_upload_bytes_env(monkeypatch):
+def test_inkypi_max_upload_bytes_env(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test MAX_UPLOAD_BYTES environment variable as fallback."""
     mod = _reload_inkypi(
         monkeypatch, argv=["inkypi.py"], env={"MAX_UPLOAD_BYTES": "2097152"}
@@ -199,7 +204,7 @@ def test_inkypi_max_upload_bytes_env(monkeypatch):
     assert app.config["MAX_CONTENT_LENGTH"] == 2097152
 
 
-def test_inkypi_startup_image_generation(monkeypatch):
+def test_inkypi_startup_image_generation(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test startup image generation and display logic."""
     with (
         patch("utils.app_utils.generate_startup_image") as mock_generate,
@@ -235,7 +240,7 @@ def test_inkypi_startup_image_generation(monkeypatch):
         mock_config.update_value.assert_called_once_with("startup", False, write=True)
 
 
-def test_inkypi_local_ip_detection(monkeypatch):
+def test_inkypi_local_ip_detection(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test local IP detection in dev mode."""
     # This test would need to be run differently since socket is imported in __main__
     # For now, just verify dev mode is set correctly
@@ -243,14 +248,14 @@ def test_inkypi_local_ip_detection(monkeypatch):
     assert mod.DEV_MODE is True
 
 
-def test_inkypi_local_ip_detection_failure(monkeypatch):
+def test_inkypi_local_ip_detection_failure(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test graceful handling when IP detection fails."""
     # Since socket import happens in __main__, we just verify dev mode works
     mod = _reload_inkypi(monkeypatch, argv=["inkypi.py", "--dev"], env={})
     assert mod.DEV_MODE is True
 
 
-def test_inkypi_error_handlers_exist(monkeypatch):
+def test_inkypi_error_handlers_exist(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test that error handlers are registered in the Flask app."""
     mod = _reload_inkypi(monkeypatch, argv=["inkypi.py"], env={})
     app = getattr(mod, "app", None)
@@ -262,7 +267,7 @@ def test_inkypi_error_handlers_exist(monkeypatch):
     assert len(error_handlers) > 0
 
 
-def test_inkypi_security_headers(monkeypatch):
+def test_inkypi_security_headers(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test that security headers are set."""
     mod = _reload_inkypi(monkeypatch, argv=["inkypi.py"], env={})
     app = getattr(mod, "app", None)
@@ -275,7 +280,7 @@ def test_inkypi_security_headers(monkeypatch):
     assert resp.headers["Referrer-Policy"] == "no-referrer"
 
 
-def test_inkypi_refresh_task_lazy_start(monkeypatch):
+def test_inkypi_refresh_task_lazy_start(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test lazy refresh task start in Flask dev server."""
     monkeypatch.setenv("WERKZEUG_RUN_MAIN", "true")
 
@@ -293,7 +298,7 @@ def test_inkypi_refresh_task_lazy_start(monkeypatch):
     mock_rt.start.assert_called_once()
 
 
-def test_read_version_normal(tmp_path, monkeypatch):
+def test_read_version_normal(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Any:
     """Test _read_version reads and strips the VERSION file."""
     version_file = tmp_path / "VERSION"
     version_file.write_text("1.2.3\n")
@@ -301,7 +306,7 @@ def test_read_version_normal(tmp_path, monkeypatch):
 
     _real_open = open
 
-    def _patched_open(path, *args, **kwargs):
+    def _patched_open(path: Any, *args: Any, **kwargs: Any) -> Any:
         if "VERSION" in str(path):
             return _real_open(str(version_file), *args, **kwargs)
         return _real_open(path, *args, **kwargs)
@@ -310,13 +315,15 @@ def test_read_version_normal(tmp_path, monkeypatch):
     assert inkypi._read_version() == "1.2.3"
 
 
-def test_read_version_missing_file_falls_back_to_pyproject(monkeypatch):
+def test_read_version_missing_file_falls_back_to_pyproject(
+    monkeypatch: pytest.MonkeyPatch,
+) -> Any:
     """_read_version falls back to pyproject.toml when VERSION is missing (JTN-624)."""
     import inkypi
 
     _real_open = open
 
-    def _patched_open(path, *args, **kwargs):
+    def _patched_open(path: Any, *args: Any, **kwargs: Any) -> Any:
         if str(path).endswith("VERSION"):
             raise FileNotFoundError("No such file")
         return _real_open(path, *args, **kwargs)
@@ -330,13 +337,15 @@ def test_read_version_missing_file_falls_back_to_pyproject(monkeypatch):
     assert result != ""
 
 
-def test_read_version_missing_both_sources_returns_unknown(monkeypatch):
+def test_read_version_missing_both_sources_returns_unknown(
+    monkeypatch: pytest.MonkeyPatch,
+) -> Any:
     """_read_version returns 'unknown' only when both VERSION and pyproject fail."""
     import inkypi
 
     _real_open = open
 
-    def _patched_open(path, *args, **kwargs):
+    def _patched_open(path: Any, *args: Any, **kwargs: Any) -> Any:
         name = str(path)
         if name.endswith(("VERSION", "pyproject.toml")):
             raise FileNotFoundError("No such file")
@@ -346,7 +355,9 @@ def test_read_version_missing_both_sources_returns_unknown(monkeypatch):
     assert inkypi._read_version() == "unknown"
 
 
-def test_read_version_empty_file_falls_back_to_pyproject(tmp_path, monkeypatch):
+def test_read_version_empty_file_falls_back_to_pyproject(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> Any:
     """Empty VERSION file triggers the pyproject.toml fallback (JTN-624)."""
     version_file = tmp_path / "VERSION"
     version_file.write_text("")
@@ -354,7 +365,7 @@ def test_read_version_empty_file_falls_back_to_pyproject(tmp_path, monkeypatch):
 
     _real_open = open
 
-    def _patched_open(path, *args, **kwargs):
+    def _patched_open(path: Any, *args: Any, **kwargs: Any) -> Any:
         if str(path).endswith("VERSION"):
             return _real_open(str(version_file), *args, **kwargs)
         return _real_open(path, *args, **kwargs)
@@ -367,7 +378,9 @@ def test_read_version_empty_file_falls_back_to_pyproject(tmp_path, monkeypatch):
     assert result != "unknown"
 
 
-def test_read_version_placeholder_falls_back_to_pyproject(tmp_path, monkeypatch):
+def test_read_version_placeholder_falls_back_to_pyproject(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> Any:
     """VERSION containing '{version}' placeholder triggers pyproject fallback (JTN-624).
 
     Regression guard for the python-semantic-release bug where
@@ -381,7 +394,7 @@ def test_read_version_placeholder_falls_back_to_pyproject(tmp_path, monkeypatch)
 
     _real_open = open
 
-    def _patched_open(path, *args, **kwargs):
+    def _patched_open(path: Any, *args: Any, **kwargs: Any) -> Any:
         if str(path).endswith("VERSION"):
             return _real_open(str(version_file), *args, **kwargs)
         return _real_open(path, *args, **kwargs)
@@ -392,7 +405,7 @@ def test_read_version_placeholder_falls_back_to_pyproject(tmp_path, monkeypatch)
     assert result != "unknown"
 
 
-def test_version_file_on_disk_is_not_placeholder():
+def test_version_file_on_disk_is_not_placeholder() -> None:
     """The shipped VERSION file must contain a valid semver, never a placeholder.
 
     Regression test for JTN-624: historically VERSION contained the literal
@@ -423,7 +436,7 @@ def test_version_file_on_disk_is_not_placeholder():
     ), f"VERSION '{content}' is not a valid version string"
 
 
-def test_pyproject_project_version_matches_semantic_release_version():
+def test_pyproject_project_version_matches_semantic_release_version() -> None:
     """[project].version and [tool.semantic_release].version must stay in sync.
 
     Regression test for JTN-624: semantic-release was only bumping
@@ -450,27 +463,27 @@ def test_pyproject_project_version_matches_semantic_release_version():
 # --- JSON error handlers ---
 
 
-def _register_json_error_routes(app):
+def _register_json_error_routes(app: Flask) -> Any:
     from utils.http_utils import APIError
 
     @app.route("/cause_api_error")
-    def cause_api_error():
+    def cause_api_error() -> None:
         raise APIError("boom", status=418, code="X", details={"a": 1})
 
     @app.route("/cause_bad_request")
-    def cause_bad_request():
+    def cause_bad_request() -> Any:
         return abort(400)
 
     @app.route("/cause_unsupported")
-    def cause_unsupported():
+    def cause_unsupported() -> Any:
         return abort(415)
 
     @app.route("/cause_exception")
-    def cause_exception():
+    def cause_exception() -> None:
         raise RuntimeError("explode")
 
 
-def test_error_handlers_json_and_html(monkeypatch):
+def test_error_handlers_json_and_html(monkeypatch: pytest.MonkeyPatch) -> None:
     mod = _reload_inkypi(monkeypatch, argv=["inkypi.py"], env={})
     app = getattr(mod, "app", None)
     assert app is not None
@@ -509,7 +522,7 @@ def test_error_handlers_json_and_html(monkeypatch):
     assert b"Internal Server Error" in r.data
 
 
-def test_readyz_states(monkeypatch):
+def test_readyz_states(monkeypatch: pytest.MonkeyPatch) -> None:
     mod = _reload_inkypi(monkeypatch, argv=["inkypi.py"], env={})
     app = getattr(mod, "app", None)
     assert app is not None
@@ -536,8 +549,8 @@ def test_readyz_states(monkeypatch):
     assert r.status_code == 503 and b"not-ready" in r.data
 
 
-def test_csp_headers_default_and_overrides(monkeypatch):
-    # Default in production: CSP is enforced (not report-only)
+def test_csp_headers_default_and_overrides(monkeypatch: pytest.MonkeyPatch):
+    # Default in production: CSP is enforced (not report-only) -> None -> None
     mod = _reload_inkypi(monkeypatch, argv=["inkypi.py"], env={})
     app = getattr(mod, "app", None)
     assert app is not None
@@ -569,19 +582,19 @@ def test_csp_headers_default_and_overrides(monkeypatch):
 # --- Request ID and hot reload ---
 
 
-def _register_request_id_routes(app):
+def _register_request_id_routes(app: Flask) -> Any:
     from utils.http_utils import APIError, json_success
 
     @app.route("/raise_api_error")
-    def _raise_api_error():
+    def _raise_api_error() -> None:
         raise APIError("boom", status=418, code="X")
 
     @app.route("/ok")
-    def _ok():
+    def _ok() -> Any:
         return json_success("OK")
 
 
-def test_request_id_propagates_in_json_error(monkeypatch):
+def test_request_id_propagates_in_json_error(monkeypatch: pytest.MonkeyPatch) -> None:
     mod = _reload_inkypi(monkeypatch, argv=["inkypi.py"], env={})
     app = getattr(mod, "app", None)
     assert app is not None
@@ -602,7 +615,7 @@ def test_request_id_propagates_in_json_error(monkeypatch):
     assert body.get("request_id") == "rid-123"
 
 
-def test_request_id_propagates_in_json_success(monkeypatch):
+def test_request_id_propagates_in_json_success(monkeypatch: pytest.MonkeyPatch) -> None:
     mod = _reload_inkypi(monkeypatch, argv=["inkypi.py"], env={})
     app = getattr(mod, "app", None)
     assert app is not None
@@ -624,7 +637,7 @@ def test_request_id_propagates_in_json_success(monkeypatch):
     assert body.get("request_id") == "rid-456"
 
 
-def test_hot_reload_header_emitted_in_dev(monkeypatch):
+def test_hot_reload_header_emitted_in_dev(monkeypatch: pytest.MonkeyPatch) -> None:
     # Ensure DEV mode
     mod = _reload_inkypi(monkeypatch, argv=["inkypi.py", "--dev"], env={})
     app = getattr(mod, "app", None)
@@ -648,7 +661,9 @@ def test_hot_reload_header_emitted_in_dev(monkeypatch):
 # --- Timing logs ---
 
 
-def test_request_timing_log_emitted(monkeypatch, caplog):
+def test_request_timing_log_emitted(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
     # Enable timing logs and run in dev to avoid production headers affecting path
     mod = _reload_inkypi(monkeypatch, argv=["inkypi.py", "--dev"], env={})
     app = getattr(mod, "app", None)
@@ -663,7 +678,7 @@ def test_request_timing_log_emitted(monkeypatch, caplog):
     # Spy on inkypi logger to ensure timing log path executes regardless of handlers
     messages = []
 
-    def _spy_info(msg, *args, **kwargs):
+    def _spy_info(msg: Any, *args: Any, **kwargs: Any) -> None:
         try:
             messages.append(msg % args if args else msg)
         except Exception:
@@ -693,7 +708,7 @@ def test_request_timing_log_emitted(monkeypatch, caplog):
     assert found
 
 
-def test_secret_key_persisted_in_production(monkeypatch):
+def test_secret_key_persisted_in_production(monkeypatch: pytest.MonkeyPatch) -> None:
     """SECRET_KEY should be persisted via set_env_key even in production mode."""
     # Ensure no SECRET_KEY is set in environment
     monkeypatch.delenv("SECRET_KEY", raising=False)
@@ -726,7 +741,7 @@ def test_secret_key_persisted_in_production(monkeypatch):
 # --- HTTPS redirect ---
 
 
-def test_https_redirect_when_enabled(monkeypatch):
+def test_https_redirect_when_enabled(monkeypatch: pytest.MonkeyPatch) -> None:
     """INKYPI_FORCE_HTTPS=1 in production mode should 301-redirect HTTP to HTTPS."""
     mod = _reload_inkypi(
         monkeypatch,
@@ -742,7 +757,7 @@ def test_https_redirect_when_enabled(monkeypatch):
     assert resp.location.startswith("https://")
 
 
-def test_no_redirect_when_disabled(monkeypatch):
+def test_no_redirect_when_disabled(monkeypatch: pytest.MonkeyPatch) -> None:
     """Without INKYPI_FORCE_HTTPS, HTTP requests should not be redirected."""
     mod = _reload_inkypi(
         monkeypatch,
@@ -757,7 +772,7 @@ def test_no_redirect_when_disabled(monkeypatch):
     assert resp.status_code == 200
 
 
-def test_no_redirect_in_dev_mode(monkeypatch):
+def test_no_redirect_in_dev_mode(monkeypatch: pytest.MonkeyPatch) -> None:
     """Even with INKYPI_FORCE_HTTPS=1, dev mode should skip the redirect."""
     mod = _reload_inkypi(
         monkeypatch,
@@ -772,7 +787,7 @@ def test_no_redirect_in_dev_mode(monkeypatch):
     assert resp.status_code == 200
 
 
-def test_no_redirect_when_already_https(monkeypatch):
+def test_no_redirect_when_already_https(monkeypatch: pytest.MonkeyPatch) -> None:
     """Requests with X-Forwarded-Proto: https should not be redirected."""
     mod = _reload_inkypi(
         monkeypatch,

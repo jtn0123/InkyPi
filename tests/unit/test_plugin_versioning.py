@@ -3,13 +3,16 @@
 
 import json
 import logging
+from pathlib import Path
+
+import pytest
 
 # ---------------------------------------------------------------------------
 # BasePlugin: version attributes exposed on instance
 # ---------------------------------------------------------------------------
 
 
-def test_base_plugin_exposes_version_from_config():
+def test_base_plugin_exposes_version_from_config() -> None:
     """Plugin instance exposes version and api_version read from config."""
     from plugins.base_plugin.base_plugin import BasePlugin
 
@@ -18,7 +21,7 @@ def test_base_plugin_exposes_version_from_config():
     assert p.api_version == "1.0"
 
 
-def test_base_plugin_version_none_when_missing():
+def test_base_plugin_version_none_when_missing() -> None:
     """Plugin instance version/api_version are None when not in config."""
     from plugins.base_plugin.base_plugin import BasePlugin
 
@@ -27,7 +30,7 @@ def test_base_plugin_version_none_when_missing():
     assert p.api_version is None
 
 
-def test_plugin_api_version_constant_defined():
+def test_plugin_api_version_constant_defined() -> None:
     """PLUGIN_API_VERSION constant must be defined and equal '1.0'."""
     from plugins.base_plugin.base_plugin import PLUGIN_API_VERSION
 
@@ -39,7 +42,7 @@ def test_plugin_api_version_constant_defined():
 # ---------------------------------------------------------------------------
 
 
-def test_check_plugin_version_reads_fields(tmp_path):
+def test_check_plugin_version_reads_fields(tmp_path: Path) -> None:
     """_check_plugin_version returns (api_version, version) from plugin-info.json."""
     import plugins.plugin_registry as pr
 
@@ -57,7 +60,7 @@ def test_check_plugin_version_reads_fields(tmp_path):
     assert ver == "1.0.0"
 
 
-def test_check_plugin_version_missing_fields_returns_none(tmp_path):
+def test_check_plugin_version_missing_fields_returns_none(tmp_path: Path) -> None:
     """_check_plugin_version returns (None, None) when fields are absent (backward compat)."""
     import plugins.plugin_registry as pr
 
@@ -69,7 +72,9 @@ def test_check_plugin_version_missing_fields_returns_none(tmp_path):
     assert ver is None
 
 
-def test_check_plugin_version_no_info_file_returns_none(tmp_path, caplog):
+def test_check_plugin_version_no_info_file_returns_none(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
     """_check_plugin_version returns (None, None) when plugin-info.json is absent."""
     import plugins.plugin_registry as pr
 
@@ -80,7 +85,9 @@ def test_check_plugin_version_no_info_file_returns_none(tmp_path, caplog):
     assert ver is None
 
 
-def test_check_plugin_version_major_mismatch_logs_warning(tmp_path, caplog):
+def test_check_plugin_version_major_mismatch_logs_warning(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
     """Major api_version mismatch logs a warning but does not raise."""
     import plugins.plugin_registry as pr
 
@@ -101,7 +108,9 @@ def test_check_plugin_version_major_mismatch_logs_warning(tmp_path, caplog):
     assert any("Major version mismatch" in r.getMessage() for r in caplog.records)
 
 
-def test_check_plugin_version_same_major_no_warning(tmp_path, caplog):
+def test_check_plugin_version_same_major_no_warning(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
     """Matching major version logs no warning."""
     import plugins.plugin_registry as pr
 
@@ -125,7 +134,9 @@ def test_check_plugin_version_same_major_no_warning(tmp_path, caplog):
 # ---------------------------------------------------------------------------
 
 
-def test_load_plugins_stores_version_fields_from_info_json(monkeypatch, tmp_path):
+def test_load_plugins_stores_version_fields_from_info_json(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     """load_plugins copies api_version/version from plugin-info.json into stored config."""
     import plugins.plugin_registry as pr
 
@@ -155,7 +166,9 @@ def test_load_plugins_stores_version_fields_from_info_json(monkeypatch, tmp_path
     assert stored.get("version") == "1.0.0"
 
 
-def test_load_plugins_backward_compat_no_version_fields(monkeypatch, tmp_path):
+def test_load_plugins_backward_compat_no_version_fields(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     """Plugin without version fields still loads successfully."""
     import plugins.plugin_registry as pr
 
@@ -179,7 +192,9 @@ def test_load_plugins_backward_compat_no_version_fields(monkeypatch, tmp_path):
     assert stored.get("version") is None
 
 
-def test_load_plugins_major_mismatch_still_registers(monkeypatch, tmp_path, caplog):
+def test_load_plugins_major_mismatch_still_registers(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
     """Plugin with mismatched api_version major still gets registered (logs warning)."""
     import plugins.plugin_registry as pr
 

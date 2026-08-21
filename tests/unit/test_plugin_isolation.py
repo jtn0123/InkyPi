@@ -7,6 +7,7 @@ to other plugins or crash the system.
 import threading
 import time
 from pathlib import Path
+from typing import Any
 
 import pytest
 from PIL import Image
@@ -15,7 +16,7 @@ from display.display_manager import DisplayManager
 from refresh_task import ManualRefresh, RefreshTask
 
 
-def wait_until(predicate, timeout=1.0, interval=0.01):
+def wait_until(predicate: Any, timeout: Any = 1.0, interval: Any = 0.01) -> Any:
     """Poll until a condition becomes true."""
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
@@ -26,14 +27,14 @@ def wait_until(predicate, timeout=1.0, interval=0.01):
 
 
 @pytest.fixture
-def good_plugin():
+def good_plugin() -> Any:
     """A well-behaved plugin that always succeeds."""
 
     class GoodPlugin:
         config = {"image_settings": []}
         call_count = 0
 
-        def generate_image(self, settings, device_config):
+        def generate_image(self, settings: Any, device_config: Any) -> Any:
             self.call_count += 1
             time.sleep(0.001)
             return Image.new("RGB", device_config.get_resolution(), color=(0, 255, 0))
@@ -42,14 +43,14 @@ def good_plugin():
 
 
 @pytest.fixture
-def bad_plugin():
+def bad_plugin() -> Any:
     """A misbehaving plugin that always raises exceptions."""
 
     class BadPlugin:
         config = {"image_settings": []}
         call_count = 0
 
-        def generate_image(self, settings, device_config):
+        def generate_image(self, settings: Any, device_config: Any) -> None:
             self.call_count += 1
             raise RuntimeError(f"Bad plugin failure #{self.call_count}")
 
@@ -57,14 +58,14 @@ def bad_plugin():
 
 
 @pytest.fixture
-def slow_plugin():
+def slow_plugin() -> Any:
     """A slow plugin that takes a while to complete."""
 
     class SlowPlugin:
         config = {"image_settings": []}
         call_count = 0
 
-        def generate_image(self, settings, device_config):
+        def generate_image(self, settings: Any, device_config: Any) -> Any:
             self.call_count += 1
             time.sleep(0.1)
             return Image.new("RGB", device_config.get_resolution(), color=(0, 0, 255))
@@ -73,8 +74,11 @@ def slow_plugin():
 
 
 def test_single_plugin_failure_doesnt_crash_task(
-    device_config_dev, bad_plugin, good_plugin, monkeypatch
-):
+    device_config_dev: Any,
+    bad_plugin: Any,
+    good_plugin: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> Any:
     """Test that a single plugin failure doesn't crash the refresh task."""
     monkeypatch.setenv("INKYPI_PLUGIN_RETRY_MAX", "0")
     dm = DisplayManager(device_config_dev)
@@ -82,10 +86,10 @@ def test_single_plugin_failure_doesnt_crash_task(
 
     plugins = {"bad": bad_plugin, "good": good_plugin}
 
-    def get_plugin_instance(cfg):
+    def get_plugin_instance(cfg: Any) -> Any:
         return plugins[cfg["id"]]
 
-    def get_plugin(pid):
+    def get_plugin(pid: Any) -> Any:
         return {"id": pid, "class": "Test"}
 
     monkeypatch.setattr(device_config_dev, "get_plugin", get_plugin)
@@ -117,8 +121,11 @@ def test_single_plugin_failure_doesnt_crash_task(
 
 
 def test_multiple_plugins_concurrent_execution_with_failures(
-    device_config_dev, bad_plugin, good_plugin, monkeypatch
-):
+    device_config_dev: Any,
+    bad_plugin: Any,
+    good_plugin: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> Any:
     """Test that good plugins can execute while bad plugins are failing."""
     monkeypatch.setenv("INKYPI_PLUGIN_RETRY_MAX", "0")
     dm = DisplayManager(device_config_dev)
@@ -126,10 +133,10 @@ def test_multiple_plugins_concurrent_execution_with_failures(
 
     plugins = {"bad": bad_plugin, "good": good_plugin}
 
-    def get_plugin_instance(cfg):
+    def get_plugin_instance(cfg: Any) -> Any:
         return plugins[cfg["id"]]
 
-    def get_plugin(pid):
+    def get_plugin(pid: Any) -> Any:
         return {"id": pid, "class": "Test"}
 
     monkeypatch.setattr(device_config_dev, "get_plugin", get_plugin)
@@ -149,7 +156,7 @@ def test_multiple_plugins_concurrent_execution_with_failures(
             task.manual_update(ManualRefresh("bad", {}))
         errors.append("bad_error_precheck")
 
-        def run_plugin(plugin_id, iterations):
+        def run_plugin(plugin_id: Any, iterations: Any) -> None:
             for i in range(iterations):
                 try:
                     refresh = ManualRefresh(plugin_id, {})
@@ -192,8 +199,11 @@ def test_multiple_plugins_concurrent_execution_with_failures(
 
 
 def test_plugin_failure_doesnt_affect_subsequent_plugins(
-    device_config_dev, bad_plugin, good_plugin, monkeypatch
-):
+    device_config_dev: Any,
+    bad_plugin: Any,
+    good_plugin: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> Any:
     """Test that a plugin failure doesn't pollute state for subsequent plugins."""
     monkeypatch.setenv("INKYPI_PLUGIN_RETRY_MAX", "0")
     dm = DisplayManager(device_config_dev)
@@ -201,10 +211,10 @@ def test_plugin_failure_doesnt_affect_subsequent_plugins(
 
     plugins = {"bad": bad_plugin, "good": good_plugin}
 
-    def get_plugin_instance(cfg):
+    def get_plugin_instance(cfg: Any) -> Any:
         return plugins[cfg["id"]]
 
-    def get_plugin(pid):
+    def get_plugin(pid: Any) -> Any:
         return {"id": pid, "class": "Test"}
 
     monkeypatch.setattr(device_config_dev, "get_plugin", get_plugin)
@@ -236,18 +246,21 @@ def test_plugin_failure_doesnt_affect_subsequent_plugins(
 
 
 def test_plugin_timeout_isolation(
-    device_config_dev, slow_plugin, good_plugin, monkeypatch
-):
+    device_config_dev: Any,
+    slow_plugin: Any,
+    good_plugin: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> Any:
     """Test that a slow plugin doesn't block other plugins from executing."""
     dm = DisplayManager(device_config_dev)
     task = RefreshTask(device_config_dev, dm)
 
     plugins = {"slow": slow_plugin, "good": good_plugin}
 
-    def get_plugin_instance(cfg):
+    def get_plugin_instance(cfg: Any) -> Any:
         return plugins[cfg["id"]]
 
-    def get_plugin(pid):
+    def get_plugin(pid: Any) -> Any:
         return {"id": pid, "class": "Test"}
 
     monkeypatch.setattr(device_config_dev, "get_plugin", get_plugin)
@@ -261,7 +274,7 @@ def test_plugin_timeout_isolation(
         # Start slow plugin in background
         slow_result = {"done": False}
 
-        def run_slow():
+        def run_slow() -> None:
             refresh = ManualRefresh("slow", {})
             task.manual_update(refresh)
             slow_result["done"] = True
@@ -291,7 +304,9 @@ def test_plugin_timeout_isolation(
         task.stop()
 
 
-def test_plugin_exception_message_is_preserved(device_config_dev, monkeypatch):
+def test_plugin_exception_message_is_preserved(
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Test that plugin errors preserve their message across process boundaries."""
     monkeypatch.setenv("INKYPI_PLUGIN_RETRY_MAX", "0")
     dm = DisplayManager(device_config_dev)
@@ -303,7 +318,7 @@ def test_plugin_exception_message_is_preserved(device_config_dev, monkeypatch):
     class PluginWithCustomException:
         config = {"image_settings": []}
 
-        def generate_image(self, settings, device_config):
+        def generate_image(self, settings: Any, device_config: Any) -> None:
             raise CustomException("Custom plugin error")
 
     custom_plugin = PluginWithCustomException()
@@ -327,24 +342,26 @@ def test_plugin_exception_message_is_preserved(device_config_dev, monkeypatch):
         task.stop()
 
 
-def test_plugin_state_isolation(device_config_dev, monkeypatch):
+def test_plugin_state_isolation(
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> Any:
     """Test that plugin health tracking remains isolated per plugin."""
 
     class StatelessPlugin:
         config = {"image_settings": []}
 
-        def __init__(self, plugin_id):
+        def __init__(self, plugin_id: Any) -> None:
             self.plugin_id = plugin_id
 
-        def generate_image(self, settings, device_config):
+        def generate_image(self, settings: Any, device_config: Any) -> Any:
             return Image.new(
                 "RGB", device_config.get_resolution(), color=(255, 255, 255)
             )
 
-    def get_plugin_instance(cfg):
+    def get_plugin_instance(cfg: Any) -> Any:
         return StatelessPlugin(cfg["id"])
 
-    def get_plugin(pid):
+    def get_plugin(pid: Any) -> Any:
         return {"id": pid, "class": "Stateful"}
 
     monkeypatch.setattr(device_config_dev, "get_plugin", get_plugin)
@@ -375,7 +392,9 @@ def test_plugin_state_isolation(device_config_dev, monkeypatch):
         task.stop()
 
 
-def test_plugin_resource_cleanup_on_failure(device_config_dev, monkeypatch, tmp_path):
+def test_plugin_resource_cleanup_on_failure(
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> Any:
     """Test that resources are cleaned up even when plugins fail."""
     monkeypatch.setenv("INKYPI_PLUGIN_RETRY_MAX", "0")
     allocated_path = tmp_path / "allocated.txt"
@@ -384,11 +403,11 @@ def test_plugin_resource_cleanup_on_failure(device_config_dev, monkeypatch, tmp_
     class ResourceTrackingPlugin:
         config = {"image_settings": []}
 
-        def _increment(self, path: Path):
+        def _increment(self, path: Path) -> None:
             count = int(path.read_text(encoding="utf-8")) if path.exists() else 0
             path.write_text(str(count + 1), encoding="utf-8")
 
-        def generate_image(self, settings, device_config):
+        def generate_image(self, settings: Any, device_config: Any) -> Any:
             try:
                 self._increment(allocated_path)
                 # Simulate resource allocation
@@ -434,8 +453,8 @@ def test_plugin_resource_cleanup_on_failure(device_config_dev, monkeypatch, tmp_
 
 
 def test_concurrent_plugin_calls_dont_interfere(
-    device_config_dev, good_plugin, monkeypatch
-):
+    device_config_dev: Any, good_plugin: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Test that concurrent calls to the same plugin are handled correctly."""
     dm = DisplayManager(device_config_dev)
     task = RefreshTask(device_config_dev, dm)
@@ -451,7 +470,7 @@ def test_concurrent_plugin_calls_dont_interfere(
 
         results = []
 
-        def call_plugin(thread_id):
+        def call_plugin(thread_id: Any) -> None:
             for i in range(3):
                 try:
                     refresh = ManualRefresh("good", {})

@@ -11,8 +11,10 @@ Covers:
 """
 
 import logging
+from typing import Any
 from unittest.mock import MagicMock, patch
 
+import pytest
 import requests
 
 from model import PluginInstance
@@ -24,12 +26,12 @@ from utils.webhooks import send_failure_webhook
 # ---------------------------------------------------------------------------
 
 
-def _make_task(device_config_dev):
+def _make_task(device_config_dev: Any) -> Any:
     dm = MagicMock()
     return RefreshTask(device_config_dev, dm)
 
 
-def _make_plugin_instance(plugin_id="weather", name="my_weather"):
+def _make_plugin_instance(plugin_id: Any = "weather", name: Any = "my_weather") -> Any:
     return PluginInstance(
         plugin_id=plugin_id,
         name=name,
@@ -38,7 +40,7 @@ def _make_plugin_instance(plugin_id="weather", name="my_weather"):
     )
 
 
-def _add_plugin_to_pm(device_config_dev, plugin_instance):
+def _add_plugin_to_pm(device_config_dev: Any, plugin_instance: Any) -> Any:
     pm = device_config_dev.get_playlist_manager()
     playlist = pm.get_playlist("Default")
     if playlist is None:
@@ -54,7 +56,7 @@ def _add_plugin_to_pm(device_config_dev, plugin_instance):
 
 
 class TestSendFailureWebhook:
-    def test_posts_json_to_each_url(self, requests_mock):
+    def test_posts_json_to_each_url(self, requests_mock: Any) -> None:
         urls = ["https://example.com/hook1", "https://example.com/hook2"]
         for url in urls:
             requests_mock.post(url, status_code=200)
@@ -68,11 +70,11 @@ class TestSendFailureWebhook:
             assert history.url == url
             assert history.json() == payload
 
-    def test_empty_url_list_is_noop(self, requests_mock):
+    def test_empty_url_list_is_noop(self, requests_mock: Any) -> None:
         send_failure_webhook([], {"event": "plugin_failure"})
         assert requests_mock.call_count == 0
 
-    def test_timeout_does_not_raise(self, requests_mock):
+    def test_timeout_does_not_raise(self, requests_mock: Any) -> None:
         requests_mock.post(
             "https://example.com/slow",
             exc=requests.exceptions.Timeout("timed out"),
@@ -80,7 +82,7 @@ class TestSendFailureWebhook:
         # Must not raise
         send_failure_webhook(["https://example.com/slow"], {"event": "plugin_failure"})
 
-    def test_connection_error_does_not_raise(self, requests_mock):
+    def test_connection_error_does_not_raise(self, requests_mock: Any) -> None:
         requests_mock.post(
             "https://example.com/down",
             exc=requests.exceptions.ConnectionError("refused"),
@@ -88,7 +90,9 @@ class TestSendFailureWebhook:
         # Must not raise
         send_failure_webhook(["https://example.com/down"], {"event": "plugin_failure"})
 
-    def test_success_is_logged(self, requests_mock, caplog):
+    def test_success_is_logged(
+        self, requests_mock: Any, caplog: pytest.LogCaptureFixture
+    ) -> None:
         requests_mock.post("https://example.com/hook", status_code=204)
         with caplog.at_level(logging.INFO, logger="utils.webhooks"):
             send_failure_webhook(
@@ -96,7 +100,9 @@ class TestSendFailureWebhook:
             )
         assert any("sent" in r.message for r in caplog.records)
 
-    def test_failure_is_logged(self, requests_mock, caplog):
+    def test_failure_is_logged(
+        self, requests_mock: Any, caplog: pytest.LogCaptureFixture
+    ) -> None:
         requests_mock.post(
             "https://example.com/hook",
             exc=requests.exceptions.ConnectionError("refused"),
@@ -107,7 +113,9 @@ class TestSendFailureWebhook:
             )
         assert any("failed" in r.message for r in caplog.records)
 
-    def test_second_url_is_still_called_after_first_fails(self, requests_mock):
+    def test_second_url_is_still_called_after_first_fails(
+        self, requests_mock: Any
+    ) -> None:
         requests_mock.post(
             "https://example.com/hook1",
             exc=requests.exceptions.ConnectionError("refused"),
@@ -121,7 +129,7 @@ class TestSendFailureWebhook:
 
         assert requests_mock.call_count == 2
 
-    def test_uses_explicit_timeout(self, requests_mock):
+    def test_uses_explicit_timeout(self, requests_mock: Any) -> None:
         """Verify the timeout kwarg is passed through to requests.post."""
         requests_mock.post("https://example.com/hook", status_code=200)
 
@@ -140,7 +148,9 @@ class TestSendFailureWebhook:
 
 
 class TestCbOnFailureWebhookIntegration:
-    def test_webhook_called_on_plugin_failure(self, device_config_dev, monkeypatch):
+    def test_webhook_called_on_plugin_failure(
+        self, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> Any:
         """When webhook_urls is configured, _cb_on_failure should invoke the webhook."""
         monkeypatch.setenv("PLUGIN_FAILURE_THRESHOLD", "5")
 
@@ -151,7 +161,7 @@ class TestCbOnFailureWebhookIntegration:
         # Patch device_config.get_config to return a webhook URL for webhook_urls key
         original_get_config = device_config_dev.get_config
 
-        def patched_get_config(key, default=None):
+        def patched_get_config(key: Any, default: Any = None) -> Any:
             if key == "webhook_urls":
                 return ["https://example.com/hook"]
             return original_get_config(key, default)
@@ -177,8 +187,8 @@ class TestCbOnFailureWebhookIntegration:
         assert "ts" in payload
 
     def test_webhook_not_called_when_no_urls_configured(
-        self, device_config_dev, monkeypatch
-    ):
+        self, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """When webhook_urls is empty, send_failure_webhook should not be called."""
         monkeypatch.setenv("PLUGIN_FAILURE_THRESHOLD", "5")
 
@@ -198,8 +208,8 @@ class TestCbOnFailureWebhookIntegration:
         mock_send.assert_not_called()
 
     def test_webhook_called_when_circuit_breaker_trips(
-        self, device_config_dev, monkeypatch
-    ):
+        self, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> Any:
         """Webhook fires even on the failure that triggers the circuit breaker."""
         monkeypatch.setenv("PLUGIN_FAILURE_THRESHOLD", "2")
 
@@ -209,7 +219,7 @@ class TestCbOnFailureWebhookIntegration:
 
         original_get_config = device_config_dev.get_config
 
-        def patched_get_config(key, default=None):
+        def patched_get_config(key: Any, default: Any = None) -> Any:
             if key == "webhook_urls":
                 return ["https://example.com/hook"]
             return original_get_config(key, default)
@@ -218,7 +228,7 @@ class TestCbOnFailureWebhookIntegration:
 
         call_count = 0
 
-        def counting_send(urls, payload, timeout=1.0):
+        def counting_send(urls: Any, payload: Any, timeout: Any = 1.0) -> None:
             nonlocal call_count
             call_count += 1
 

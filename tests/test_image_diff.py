@@ -5,6 +5,7 @@ from __future__ import annotations
 import importlib.util
 import json
 from pathlib import Path
+from typing import Any
 
 import pytest
 from PIL import Image
@@ -14,7 +15,7 @@ from PIL import Image
 # ---------------------------------------------------------------------------
 
 
-def _load_script(script_name: str):
+def _load_script(script_name: str) -> Any:
     """Load a scripts/ module by file path, avoiding sys.path pollution."""
     scripts_dir = Path(__file__).parent.parent / "scripts"
     spec = importlib.util.spec_from_file_location(
@@ -26,7 +27,7 @@ def _load_script(script_name: str):
 
 
 @pytest.fixture(scope="module")
-def imdiff():
+def imdiff() -> Any:
     """Return the image_diff module."""
     return _load_script("image_diff")
 
@@ -53,21 +54,21 @@ def _save_image(img: Image.Image, path: Path) -> Path:
 
 
 class TestComputeDiff:
-    def test_identical_images_zero_changed(self, imdiff):
+    def test_identical_images_zero_changed(self, imdiff: Any) -> None:
         img = _solid_image((100, 150, 200, 255))
         total, changed, max_delta = imdiff.compute_diff(img, img, threshold=5)
         assert changed == 0
         assert total == 100  # 10x10
         assert max_delta == 0
 
-    def test_completely_different_images(self, imdiff):
+    def test_completely_different_images(self, imdiff: Any) -> None:
         img_a = _solid_image((0, 0, 0, 255))
         img_b = _solid_image((255, 255, 255, 255))
         total, changed, max_delta = imdiff.compute_diff(img_a, img_b, threshold=5)
         assert changed == total
         assert max_delta == 255
 
-    def test_single_pixel_changed(self, imdiff):
+    def test_single_pixel_changed(self, imdiff: Any) -> None:
         size = (5, 5)
         img_a = _solid_image((100, 100, 100, 255), size)
         # Create img_b with one pixel changed significantly
@@ -79,20 +80,20 @@ class TestComputeDiff:
         assert total == 25
         assert max_delta == 100
 
-    def test_below_threshold_treated_as_unchanged(self, imdiff):
+    def test_below_threshold_treated_as_unchanged(self, imdiff: Any) -> None:
         img_a = _solid_image((100, 100, 100, 255))
         img_b = _solid_image((103, 100, 100, 255))  # delta = 3, threshold = 5
         total, changed, max_delta = imdiff.compute_diff(img_a, img_b, threshold=5)
         assert changed == 0
         assert max_delta == 3
 
-    def test_exactly_at_threshold_treated_as_unchanged(self, imdiff):
+    def test_exactly_at_threshold_treated_as_unchanged(self, imdiff: Any) -> None:
         img_a = _solid_image((100, 100, 100, 255))
         img_b = _solid_image((105, 100, 100, 255))  # delta = 5, threshold = 5
         _total, changed, _max_delta = imdiff.compute_diff(img_a, img_b, threshold=5)
         assert changed == 0
 
-    def test_one_above_threshold_treated_as_changed(self, imdiff):
+    def test_one_above_threshold_treated_as_changed(self, imdiff: Any) -> None:
         img_a = _solid_image((100, 100, 100, 255))
         img_b = _solid_image((106, 100, 100, 255))  # delta = 6 > threshold 5
         _total, changed, _max_delta = imdiff.compute_diff(img_a, img_b, threshold=5)
@@ -100,13 +101,13 @@ class TestComputeDiff:
 
 
 class TestResizeToMatch:
-    def test_same_size_no_resize(self, imdiff):
+    def test_same_size_no_resize(self, imdiff: Any) -> None:
         img_a = _solid_image((0, 0, 0, 255), (20, 30))
         img_b = _solid_image((255, 255, 255, 255), (20, 30))
         result = imdiff.resize_to_match(img_a, img_b)
         assert result.size == (20, 30)
 
-    def test_different_size_resizes_b(self, imdiff):
+    def test_different_size_resizes_b(self, imdiff: Any) -> None:
         img_a = _solid_image((0, 0, 0, 255), (20, 30))
         img_b = _solid_image((255, 255, 255, 255), (40, 60))
         result = imdiff.resize_to_match(img_a, img_b)
@@ -114,20 +115,20 @@ class TestResizeToMatch:
 
 
 class TestBuildDiffImage:
-    def test_diff_image_same_size_as_a(self, imdiff):
+    def test_diff_image_same_size_as_a(self, imdiff: Any) -> None:
         img_a = _solid_image((100, 100, 100, 255), (8, 8))
         img_b = _solid_image((200, 100, 100, 255), (8, 8))  # all pixels differ
         diff = imdiff.build_diff_image(img_a, img_b, threshold=5)
         assert isinstance(diff, Image.Image)
         assert diff.size == img_a.size
 
-    def test_identical_images_diff_matches_original(self, imdiff):
+    def test_identical_images_diff_matches_original(self, imdiff: Any) -> None:
         img_a = _solid_image((100, 150, 200, 255), (6, 6))
         diff = imdiff.build_diff_image(img_a, img_a, threshold=5)
         # No changed pixels — diff should look the same as img_a
         assert diff.tobytes() == img_a.tobytes()
 
-    def test_changed_pixels_get_red_tint(self, imdiff):
+    def test_changed_pixels_get_red_tint(self, imdiff: Any) -> None:
         img_a = _solid_image((0, 0, 0, 255), (4, 4))
         img_b = _solid_image((255, 255, 255, 255), (4, 4))
         diff = imdiff.build_diff_image(img_a, img_b, threshold=5)
@@ -146,7 +147,7 @@ class TestBuildDiffImage:
 
 
 class TestRun:
-    def test_identical_images_zero_percent(self, imdiff, tmp_path):
+    def test_identical_images_zero_percent(self, imdiff: Any, tmp_path: Path) -> None:
         img = _solid_image((128, 64, 32, 255), (10, 10))
         path_a = str(_save_image(img, tmp_path / "a.png"))
         path_b = str(_save_image(img, tmp_path / "b.png"))
@@ -155,7 +156,7 @@ class TestRun:
         assert stats["changed_pixels"] == 0
         assert stats["change_percentage"] == 0.0
 
-    def test_single_pixel_changed_count_one(self, imdiff, tmp_path):
+    def test_single_pixel_changed_count_one(self, imdiff: Any, tmp_path: Path) -> None:
         size = (5, 5)
         img_a = _solid_image((50, 50, 50, 255), size)
         img_b = img_a.copy()
@@ -169,7 +170,7 @@ class TestRun:
         assert stats["changed_pixels"] == 1
         assert stats["total_pixels"] == 25
 
-    def test_below_threshold_no_change(self, imdiff, tmp_path):
+    def test_below_threshold_no_change(self, imdiff: Any, tmp_path: Path) -> None:
         img_a = _solid_image((100, 100, 100, 255))
         img_b = _solid_image((102, 100, 100, 255))  # delta=2 < threshold=5
         path_a = str(_save_image(img_a, tmp_path / "a.png"))
@@ -178,7 +179,7 @@ class TestRun:
         stats = imdiff.run([path_a, path_b, "--summary-only"])
         assert stats["changed_pixels"] == 0
 
-    def test_resize_handling(self, imdiff, tmp_path):
+    def test_resize_handling(self, imdiff: Any, tmp_path: Path) -> None:
         img_a = _solid_image((0, 0, 0, 255), (10, 10))
         img_b = _solid_image((0, 0, 0, 255), (20, 20))  # different size
         path_a = str(_save_image(img_a, tmp_path / "a.png"))
@@ -187,7 +188,7 @@ class TestRun:
         stats = imdiff.run([path_a, path_b, "--summary-only"])
         assert stats["total_pixels"] == 100  # resized to 10x10
 
-    def test_diff_png_output_is_valid(self, imdiff, tmp_path):
+    def test_diff_png_output_is_valid(self, imdiff: Any, tmp_path: Path) -> None:
         img_a = _solid_image((10, 20, 30, 255), (8, 8))
         img_b = _solid_image((200, 20, 30, 255), (8, 8))
         path_a = str(_save_image(img_a, tmp_path / "a.png"))
@@ -200,7 +201,7 @@ class TestRun:
         assert diff_img.size == (8, 8)
         assert stats["diff_output"] == out
 
-    def test_summary_only_skips_png_write(self, imdiff, tmp_path):
+    def test_summary_only_skips_png_write(self, imdiff: Any, tmp_path: Path) -> None:
         img = _solid_image((0, 0, 0, 255))
         path = str(_save_image(img, tmp_path / "img.png"))
         out = str(tmp_path / "should_not_exist.png")
@@ -209,7 +210,9 @@ class TestRun:
         assert not Path(out).exists()
         assert stats["diff_output"] is None
 
-    def test_json_output_format(self, imdiff, tmp_path, capsys):
+    def test_json_output_format(
+        self, imdiff: Any, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         img = _solid_image((10, 10, 10, 255))
         path = str(_save_image(img, tmp_path / "img.png"))
 
@@ -226,7 +229,7 @@ class TestRun:
         # Returned dict should match printed JSON
         assert parsed["total_pixels"] == stats["total_pixels"]
 
-    def test_custom_threshold_applied(self, imdiff, tmp_path):
+    def test_custom_threshold_applied(self, imdiff: Any, tmp_path: Path) -> None:
         img_a = _solid_image((100, 100, 100, 255))
         img_b = _solid_image((110, 100, 100, 255))  # delta=10
         path_a = str(_save_image(img_a, tmp_path / "a.png"))

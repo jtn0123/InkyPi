@@ -2,11 +2,14 @@
 """Tests for display/display_manager.py — additional coverage."""
 
 import os
+from pathlib import Path
+from typing import Any
 
+import pytest
 from PIL import Image
 
 
-def test_display_image_hash_skip(device_config_dev):
+def test_display_image_hash_skip(device_config_dev: Any) -> None:
     from display.display_manager import DisplayManager
 
     dm = DisplayManager(device_config_dev)
@@ -22,7 +25,7 @@ def test_display_image_hash_skip(device_config_dev):
     assert dm._last_image_hash == first_hash
 
 
-def test_display_image_hash_different(device_config_dev):
+def test_display_image_hash_different(device_config_dev: Any) -> None:
     from display.display_manager import DisplayManager
 
     dm = DisplayManager(device_config_dev)
@@ -38,7 +41,7 @@ def test_display_image_hash_different(device_config_dev):
     assert hash1 != hash2
 
 
-def test_display_image_inverted(device_config_dev):
+def test_display_image_inverted(device_config_dev: Any) -> None:
     from display.display_manager import DisplayManager
 
     device_config_dev.update_value("inverted_image", True)
@@ -50,7 +53,9 @@ def test_display_image_inverted(device_config_dev):
     assert dm._last_image_hash is not None
 
 
-def test_display_image_save_failure_graceful(device_config_dev, monkeypatch):
+def test_display_image_save_failure_graceful(
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     from display.display_manager import DisplayManager
 
     dm = DisplayManager(device_config_dev)
@@ -65,7 +70,7 @@ def test_display_image_save_failure_graceful(device_config_dev, monkeypatch):
     dm.display_image(img)
 
 
-def test_display_preprocessed_image(device_config_dev, tmp_path):
+def test_display_preprocessed_image(device_config_dev: Any, tmp_path: Path) -> None:
     from display.display_manager import DisplayManager
 
     dm = DisplayManager(device_config_dev)

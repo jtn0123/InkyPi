@@ -15,9 +15,11 @@ from __future__ import annotations
 import importlib
 import json
 import logging
+from typing import Any
 
 import pytest
 from flask import Flask  # noqa: E402
+from flask.testing import FlaskClient
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -45,20 +47,22 @@ def _make_app() -> Flask:
 
 
 @pytest.fixture()
-def ce_client():
+def ce_client() -> Any:
     """Flask test client for the client_error blueprint."""
     app = _make_app()
     return app.test_client()
 
 
 @pytest.fixture()
-def fresh_ce_client():
+def fresh_ce_client() -> Any:
     """Re-import module each time so rate-limiter starts fresh."""
     app = _make_app()
     return app.test_client()
 
 
-def _post(client, payload: dict | None = None, *, body: bytes | None = None):
+def _post(
+    client: FlaskClient, payload: dict | None = None, *, body: bytes | None = None
+) -> Any:
     """POST to /api/client-error with JSON payload or raw body."""
     if body is not None:
         return client.post(
@@ -79,11 +83,13 @@ def _post(client, payload: dict | None = None, *, body: bytes | None = None):
 
 
 class TestPostValidJson:
-    def test_returns_204(self, ce_client):
+    def test_returns_204(self, ce_client: Any) -> None:
         resp = _post(ce_client, {"message": "TypeError: x is undefined"})
         assert resp.status_code == 204
 
-    def test_logs_report_as_warning(self, ce_client, caplog):
+    def test_logs_report_as_warning(
+        self, ce_client: Any, caplog: pytest.LogCaptureFixture
+    ) -> None:
         with caplog.at_level(logging.WARNING, logger="blueprints.client_error"):
             resp = _post(ce_client, {"message": "something broke"})
         assert resp.status_code == 204
@@ -92,7 +98,9 @@ class TestPostValidJson:
             for rec in caplog.records
         )
 
-    def test_all_accepted_fields_logged(self, ce_client, caplog):
+    def test_all_accepted_fields_logged(
+        self, ce_client: Any, caplog: pytest.LogCaptureFixture
+    ) -> None:
         payload = {
             "message": "ReferenceError: foo is not defined",
             "source": "/static/scripts/app.js",
@@ -110,7 +118,7 @@ class TestPostValidJson:
         ]
         assert any("ReferenceError" in m for m in warning_msgs)
 
-    def test_empty_response_body(self, ce_client):
+    def test_empty_response_body(self, ce_client: Any) -> None:
         resp = _post(ce_client, {"message": "boom"})
         assert resp.data == b""
 
@@ -121,7 +129,7 @@ class TestPostValidJson:
 
 
 class TestGetReturns405:
-    def test_get_returns_405(self, ce_client):
+    def test_get_returns_405(self, ce_client: Any) -> None:
         resp = ce_client.get("/api/client-error")
         assert resp.status_code == 405
 
@@ -132,7 +140,7 @@ class TestGetReturns405:
 
 
 class TestOversizedBody:
-    def test_body_over_16kb_returns_413(self, ce_client):
+    def test_body_over_16kb_returns_413(self, ce_client: Any) -> None:
         # Build a body that exceeds 16 384 bytes
         giant_message = "x" * 20_000
         body = json.dumps({"message": giant_message}).encode()
@@ -140,7 +148,7 @@ class TestOversizedBody:
         resp = _post(ce_client, body=body)
         assert resp.status_code == 413
 
-    def test_body_under_limit_accepted(self, ce_client):
+    def test_body_under_limit_accepted(self, ce_client: Any) -> None:
         normal_message = "normal error"
         resp = _post(ce_client, {"message": normal_message})
         assert resp.status_code == 204
@@ -152,20 +160,20 @@ class TestOversizedBody:
 
 
 class TestMissingRequiredFields:
-    def test_missing_message_returns_400(self, ce_client):
+    def test_missing_message_returns_400(self, ce_client: Any) -> None:
         resp = _post(ce_client, {"source": "/app.js", "line": 10})
         assert resp.status_code == 400
 
-    def test_empty_object_returns_400(self, ce_client):
+    def test_empty_object_returns_400(self, ce_client: Any) -> None:
         resp = _post(ce_client, {})
         assert resp.status_code == 400
 
-    def test_non_object_body_returns_400(self, ce_client):
+    def test_non_object_body_returns_400(self, ce_client: Any) -> None:
         body = json.dumps(["list", "not", "object"]).encode()
         resp = _post(ce_client, body=body)
         assert resp.status_code == 400
 
-    def test_invalid_json_returns_400(self, ce_client):
+    def test_invalid_json_returns_400(self, ce_client: Any) -> None:
         resp = _post(ce_client, body=b"{not valid json}")
         assert resp.status_code == 400
 
@@ -176,7 +184,7 @@ class TestMissingRequiredFields:
 
 
 class TestRateLimit:
-    def test_rate_limit_kicks_in_after_capacity(self):
+    def test_rate_limit_kicks_in_after_capacity(self) -> None:
         """After exhausting 5-token burst capacity the next request returns 429."""
         # Reload module so we get a clean rate limiter.
         import blueprints.client_error as ce_mod
@@ -205,7 +213,9 @@ class TestRateLimit:
 
 
 class TestSecretRedactionInLogs:
-    def test_api_key_in_stack_is_redacted(self, ce_client, caplog):
+    def test_api_key_in_stack_is_redacted(
+        self, ce_client: Any, caplog: pytest.LogCaptureFixture
+    ) -> None:
         """Secrets embedded in stack traces must be stripped before hitting logs."""
         # Wire up the redaction filter the same way production does.
         from utils.logging_utils import SecretRedactionFilter
@@ -234,7 +244,9 @@ class TestSecretRedactionInLogs:
         finally:
             ce_logger.removeFilter(redaction_filter)
 
-    def test_bearer_token_in_message_is_redacted(self, ce_client, caplog):
+    def test_bearer_token_in_message_is_redacted(
+        self, ce_client: Any, caplog: pytest.LogCaptureFixture
+    ) -> None:
         from utils.logging_utils import SecretRedactionFilter
 
         ce_logger = logging.getLogger("blueprints.client_error")

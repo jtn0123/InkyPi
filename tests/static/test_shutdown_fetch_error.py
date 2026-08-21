@@ -8,7 +8,7 @@ the success message has already been shown.
 from pathlib import Path
 
 
-def test_handle_shutdown_fetch_wrapped_in_try_catch():
+def test_handle_shutdown_fetch_wrapped_in_try_catch() -> None:
     """handleShutdown must catch network errors from fetch so the device
     going offline doesn't show an error after the success modal."""
     js = Path("src/static/scripts/settings/actions.js").read_text()

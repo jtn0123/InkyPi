@@ -1,9 +1,10 @@
 # pyright: reportMissingImports=false
-
 import json
 
+from flask.testing import FlaskClient
 
-def test_update_now_metrics_format(client):
+
+def test_update_now_metrics_format(client: FlaskClient) -> None:
     """Test that /update_now returns metrics with steps in the correct format.
 
     This test ensures that the steps array contains objects with 'name' and 'elapsed_ms'
@@ -40,12 +41,12 @@ def test_update_now_metrics_format(client):
             assert isinstance(step["elapsed_ms"], int)
 
 
-def test_update_now_ai_text_missing_fields(client):
+def test_update_now_ai_text_missing_fields(client: FlaskClient) -> None:
     resp = client.post("/update_now", data={"plugin_id": "ai_text"})
     assert resp.status_code == 400
 
 
-def test_update_now_ai_image_missing_key(client):
+def test_update_now_ai_image_missing_key(client: FlaskClient) -> None:
     resp = client.post(
         "/update_now",
         data={
@@ -64,7 +65,7 @@ def test_update_now_ai_image_missing_key(client):
     assert body["error"] == "An internal error occurred"
 
 
-def test_update_now_apod_missing_key(client):
+def test_update_now_apod_missing_key(client: FlaskClient) -> None:
     resp = client.post("/update_now", data={"plugin_id": "apod"})
     assert resp.status_code == 400
     body = resp.get_json()
@@ -74,7 +75,7 @@ def test_update_now_apod_missing_key(client):
     assert "NASA" not in body["error"]
 
 
-def test_update_now_returns_generic_error_for_missing_key(client):
+def test_update_now_returns_generic_error_for_missing_key(client: FlaskClient) -> None:
     """JTN-326: /update_now must return a generic error, not the plugin
     exception text (py/stack-trace-exposure, plugin.py:705)."""
     resp = client.post("/update_now", data={"plugin_id": "apod"})

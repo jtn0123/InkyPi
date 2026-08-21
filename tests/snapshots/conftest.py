@@ -12,11 +12,14 @@ collected under ``tests/snapshots/``.
 
 from __future__ import annotations
 
+from collections.abc import Iterator
+from typing import Any
+
 import pytest
 
 
 @pytest.fixture(autouse=True)
-def mock_screenshot():
+def mock_screenshot() -> Iterator[Any]:
     """Override the parent conftest's screenshot mock.
 
     Yielding without monkeypatching leaves the real ``take_screenshot_html``

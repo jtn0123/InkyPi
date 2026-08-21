@@ -16,6 +16,9 @@ socket layer ends up using.
 from __future__ import annotations
 
 import socket
+from typing import Any
+
+import pytest
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -42,7 +45,7 @@ class _RebindingResolver:
         self.rebound = rebound
         self.calls: list[str] = []
 
-    def __call__(self, host, port=0, *args, **kwargs):
+    def __call__(self, host: Any, port: Any = 0, *args: Any, **kwargs: Any) -> Any:
         self.calls.append(host)
         # First call (validation) → benign public IP
         if len(self.calls) == 1:
@@ -56,7 +59,9 @@ class _RebindingResolver:
 # ---------------------------------------------------------------------------
 
 
-def test_validate_url_with_ips_returns_resolved_addresses(monkeypatch):
+def test_validate_url_with_ips_returns_resolved_addresses(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     from utils.security_utils import validate_url_with_ips
 
     monkeypatch.setattr(
@@ -69,11 +74,15 @@ def test_validate_url_with_ips_returns_resolved_addresses(monkeypatch):
     assert ips == ("93.184.216.34",)
 
 
-def test_validate_url_with_ips_literal_ip_shortcuts_dns(monkeypatch):
+def test_validate_url_with_ips_literal_ip_shortcuts_dns(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """A literal public IP should validate without DNS."""
     from utils.security_utils import validate_url_with_ips
 
-    def _should_not_be_called(*a, **kw):  # pragma: no cover - guard only
+    def _should_not_be_called(
+        *a: Any, **kw: Any
+    ) -> None:  # pragma: no cover - guard only
         raise AssertionError("getaddrinfo should not be invoked for literal IPs")
 
     monkeypatch.setattr(socket, "getaddrinfo", _should_not_be_called)
@@ -86,7 +95,9 @@ def test_validate_url_with_ips_literal_ip_shortcuts_dns(monkeypatch):
 # ---------------------------------------------------------------------------
 
 
-def test_pinned_dns_forces_getaddrinfo_to_return_pinned_ip(monkeypatch):
+def test_pinned_dns_forces_getaddrinfo_to_return_pinned_ip(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     from utils import http_utils
 
     # Baseline resolver always claims a private IP — rebind in effect.
@@ -100,12 +111,14 @@ def test_pinned_dns_forces_getaddrinfo_to_return_pinned_ip(monkeypatch):
     ), "pinned_dns must short-circuit DNS for the pinned hostname"
 
 
-def test_pinned_dns_does_not_affect_other_hostnames(monkeypatch):
+def test_pinned_dns_does_not_affect_other_hostnames(
+    monkeypatch: pytest.MonkeyPatch,
+) -> Any:
     from utils import http_utils
 
     seen: dict[str, int] = {}
 
-    def real_resolver(host, port=0, *a, **kw):
+    def real_resolver(host: Any, port: Any = 0, *a: Any, **kw: Any) -> Any:
         seen[host] = seen.get(host, 0) + 1
         return _ainfo("8.8.8.8", port or 0)
 
@@ -118,7 +131,9 @@ def test_pinned_dns_does_not_affect_other_hostnames(monkeypatch):
     assert seen.get("other.example.net") == 1
 
 
-def test_pinned_dns_restores_previous_resolver_on_exit(monkeypatch):
+def test_pinned_dns_restores_previous_resolver_on_exit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     from utils import http_utils
 
     monkeypatch.setattr(socket, "getaddrinfo", lambda *a, **kw: _ainfo("192.168.10.5"))
@@ -134,7 +149,9 @@ def test_pinned_dns_restores_previous_resolver_on_exit(monkeypatch):
 # ---------------------------------------------------------------------------
 
 
-def test_safe_http_get_pins_ip_across_dns_rebind(monkeypatch):
+def test_safe_http_get_pins_ip_across_dns_rebind(
+    monkeypatch: pytest.MonkeyPatch,
+) -> Any:
     """Simulate an attacker flipping DNS between validate and fetch.
 
     ``safe_http_get`` must use the IP resolved at validation time, not the
@@ -152,7 +169,7 @@ def test_safe_http_get_pins_ip_across_dns_rebind(monkeypatch):
     # Stand-in for urllib3's connect step: resolve the hostname through the
     # same socket.getaddrinfo hook that requests/urllib3 would use.  We skip
     # actually dialing a socket; the test asserts the resolver pick.
-    def fake_session_get(self, url, **kwargs):
+    def fake_session_get(self, url: Any, **kwargs: Any) -> Any:
         import urllib.parse as _urlparse
 
         host = _urlparse.urlparse(url).hostname or ""
@@ -186,7 +203,9 @@ def test_safe_http_get_pins_ip_across_dns_rebind(monkeypatch):
     assert resolver.calls[0] == "example.com"
 
 
-def test_fetch_and_resize_remote_image_pins_across_rebind(monkeypatch):
+def test_fetch_and_resize_remote_image_pins_across_rebind(
+    monkeypatch: pytest.MonkeyPatch,
+) -> Any:
     """fetch_and_resize_remote_image must not be tricked by a DNS flip."""
     import utils.http_utils as http_utils
     import utils.image_utils as image_utils
@@ -198,7 +217,7 @@ def test_fetch_and_resize_remote_image_pins_across_rebind(monkeypatch):
 
     observed_ips: list[str] = []
 
-    def fake_http_get(url, **kwargs):
+    def fake_http_get(url: Any, **kwargs: Any) -> Any:
         import urllib.parse as _urlparse
 
         host = _urlparse.urlparse(url).hostname or ""
@@ -223,7 +242,7 @@ def test_fetch_and_resize_remote_image_pins_across_rebind(monkeypatch):
     assert observed_ips == ["93.184.216.34"], observed_ips
 
 
-def test_get_image_pins_across_rebind(monkeypatch):
+def test_get_image_pins_across_rebind(monkeypatch: pytest.MonkeyPatch) -> Any:
     """get_image must resolve through the pinned IP even if DNS flips."""
     import utils.http_utils as http_utils
     import utils.image_utils as image_utils
@@ -235,7 +254,7 @@ def test_get_image_pins_across_rebind(monkeypatch):
 
     observed_ips: list[str] = []
 
-    def fake_http_get(url, **kwargs):
+    def fake_http_get(url: Any, **kwargs: Any) -> Any:
         import urllib.parse as _urlparse
 
         host = _urlparse.urlparse(url).hostname or ""
@@ -255,8 +274,8 @@ def test_get_image_pins_across_rebind(monkeypatch):
 
 
 def test_safe_http_get_rejects_private_ip_even_when_first_resolution_is_private(
-    monkeypatch,
-):
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """If the *first* DNS answer is already private, validation rejects it."""
     from utils import http_utils
 
@@ -275,7 +294,9 @@ def test_safe_http_get_rejects_private_ip_even_when_first_resolution_is_private(
 # ---------------------------------------------------------------------------
 
 
-def test_image_album_immich_uses_pinned_ip_across_rebind(monkeypatch):
+def test_image_album_immich_uses_pinned_ip_across_rebind(
+    monkeypatch: pytest.MonkeyPatch,
+) -> Any:
     """ImageAlbum + Immich must pin DNS for the base URL across the fetch."""
     from unittest.mock import MagicMock
 
@@ -288,7 +309,7 @@ def test_image_album_immich_uses_pinned_ip_across_rebind(monkeypatch):
 
     observed_hosts: list[str] = []
 
-    def _resolve_during_call(url: str, **_kwargs) -> MagicMock:
+    def _resolve_during_call(url: str, **_kwargs: Any) -> MagicMock:
         import urllib.parse as _urlparse
 
         host = _urlparse.urlparse(url).hostname or ""

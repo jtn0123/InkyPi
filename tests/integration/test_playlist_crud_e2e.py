@@ -2,8 +2,11 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
+from typing import Any
 
 import pytest
+from playwright.sync_api import Page
 
 pytestmark = pytest.mark.skipif(
     os.getenv("SKIP_UI", "").lower() in ("1", "true"),
@@ -17,8 +20,8 @@ from tests.integration.browser_helpers import (  # noqa: E402
 
 
 def test_create_playlist_via_form(
-    live_server, device_config_dev, browser_page, tmp_path
-):
+    live_server: str, device_config_dev: Any, browser_page: Page, tmp_path: Path
+) -> None:
     prepare_playlist(device_config_dev)
     page = browser_page
     rc = navigate_and_wait(page, live_server, "/playlist")
@@ -54,8 +57,8 @@ def test_create_playlist_via_form(
 
 
 def test_edit_playlist_opens_modal(
-    live_server, device_config_dev, browser_page, tmp_path
-):
+    live_server: str, device_config_dev: Any, browser_page: Page, tmp_path: Path
+) -> None:
     prepare_playlist(device_config_dev)
     page = browser_page
     rc = navigate_and_wait(page, live_server, "/playlist")
@@ -75,8 +78,8 @@ def test_edit_playlist_opens_modal(
 
 
 def test_edit_playlist_opens_modal_mobile(
-    live_server, device_config_dev, mobile_page, tmp_path
-):
+    live_server: str, device_config_dev: Any, mobile_page: Page, tmp_path: Path
+) -> None:
     prepare_playlist(device_config_dev)
     page = mobile_page
     rc = navigate_and_wait(page, live_server, "/playlist")
@@ -93,7 +96,9 @@ def test_edit_playlist_opens_modal_mobile(
     rc.assert_no_errors(str(tmp_path), "edit_playlist_modal_mobile")
 
 
-def test_delete_playlist_modal(live_server, device_config_dev, browser_page, tmp_path):
+def test_delete_playlist_modal(
+    live_server: str, device_config_dev: Any, browser_page: Page, tmp_path: Path
+) -> None:
     prepare_playlist(device_config_dev)
     # JTN-781: the server refuses to delete the canonical "Default" playlist,
     # so seed a second, deletable playlist to exercise the modal flow. Without
@@ -140,7 +145,9 @@ def test_delete_playlist_modal(live_server, device_config_dev, browser_page, tmp
     rc.assert_no_errors(str(tmp_path), "delete_playlist_modal")
 
 
-def test_delete_instance_modal(live_server, device_config_dev, browser_page, tmp_path):
+def test_delete_instance_modal(
+    live_server: str, device_config_dev: Any, browser_page: Page, tmp_path: Path
+) -> None:
     prepare_playlist(device_config_dev)
     page = browser_page
     rc = navigate_and_wait(page, live_server, "/playlist")

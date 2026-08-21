@@ -15,13 +15,15 @@ CSS transform actually applies — transforms have no visible effect on plain
 inline boxes, which would silently bring the "stuck ▼" bug back.
 """
 
+from flask.testing import FlaskClient
 
-def test_ui_helpers_script_exists(client):
+
+def test_ui_helpers_script_exists(client: FlaskClient) -> None:
     resp = client.get("/static/scripts/ui_helpers.js")
     assert resp.status_code == 200
 
 
-def test_toggle_collapsible_updates_aria_expanded(client):
+def test_toggle_collapsible_updates_aria_expanded(client: FlaskClient) -> None:
     """JTN-623: toggleCollapsible must flip aria-expanded between true/false.
 
     This is the primary a11y contract: screen readers rely on aria-expanded
@@ -40,7 +42,7 @@ def test_toggle_collapsible_updates_aria_expanded(client):
     assert 'setAttribute("aria-expanded", String(!isOpen))' in toggle_body
 
 
-def test_toggle_collapsible_does_not_mutate_icon_text(client):
+def test_toggle_collapsible_does_not_mutate_icon_text(client: FlaskClient) -> None:
     """JTN-623: Chevron rotation must come from CSS, not JS textContent.
 
     Before the fix, the JS swapped icon.textContent between ▼ and ▲ while
@@ -64,7 +66,7 @@ def test_toggle_collapsible_does_not_mutate_icon_text(client):
     assert '"▲" : "▼"' not in toggle_body
 
 
-def test_collapsible_css_rotates_icon_when_expanded(client):
+def test_collapsible_css_rotates_icon_when_expanded(client: FlaskClient) -> None:
     """The CSS contract: aria-expanded="true" rotates the chevron 180deg."""
     resp = client.get("/static/styles/main.css")
     assert resp.status_code == 200
@@ -77,7 +79,9 @@ def test_collapsible_css_rotates_icon_when_expanded(client):
     assert "rotate(180deg)" in compact
 
 
-def test_collapsible_icon_is_not_inline_so_transform_applies(client):
+def test_collapsible_icon_is_not_inline_so_transform_applies(
+    client: FlaskClient,
+) -> None:
     """JTN-643: CSS `transform` has no visible effect on plain inline boxes.
 
     The chevron span relies on being rendered as a block-level box (via
@@ -113,7 +117,7 @@ def test_collapsible_icon_is_not_inline_so_transform_applies(client):
     )
 
 
-def test_collapsible_click_is_delegated_in_ui_helpers(client):
+def test_collapsible_click_is_delegated_in_ui_helpers(client: FlaskClient) -> None:
     """JTN-623: A document-level delegated click handler guarantees that
     every `[data-collapsible-toggle]` button toggles aria-expanded, even if
     a page-specific script forgot to wire its own listener.

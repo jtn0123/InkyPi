@@ -1,8 +1,10 @@
 # pyright: reportMissingImports=false
 from typing import Any
 
+from flask.testing import FlaskClient
 
-def test_plugin_page_ai_text(client):
+
+def test_plugin_page_ai_text(client: FlaskClient) -> None:
     resp = client.get("/plugin/ai_text")
     assert resp.status_code == 200
     assert b"AI Text" in resp.data
@@ -46,14 +48,14 @@ def test_plugin_tabs_have_tabpanel_wiring(client: Any) -> None:
     assert 'aria-labelledby="pluginConfigureTab"' in body
 
 
-def test_plugin_page_apod(client):
+def test_plugin_page_apod(client: FlaskClient) -> None:
     resp = client.get("/plugin/apod")
     assert resp.status_code == 200
     assert b"APOD" in resp.data or b"NASA" in resp.data
     assert b"/preview" in resp.data
 
 
-def test_schema_backed_plugin_pages_use_shared_renderer(client):
+def test_schema_backed_plugin_pages_use_shared_renderer(client: FlaskClient) -> None:
     for plugin_id in (
         "ai_text",
         "ai_image",
@@ -70,7 +72,9 @@ def test_schema_backed_plugin_pages_use_shared_renderer(client):
         assert "data-settings-schema" in body
 
 
-def test_remaining_plugin_pages_use_shared_or_hybrid_renderer(client):
+def test_remaining_plugin_pages_use_shared_or_hybrid_renderer(
+    client: FlaskClient,
+) -> None:
     for plugin_id in (
         "image_url",
         "rss",
@@ -90,7 +94,9 @@ def test_remaining_plugin_pages_use_shared_or_hybrid_renderer(client):
         assert "data-settings-schema" in body
 
 
-def test_ai_image_page_uses_shared_select_dependency_renderer(client):
+def test_ai_image_page_uses_shared_select_dependency_renderer(
+    client: FlaskClient,
+) -> None:
     resp = client.get("/plugin/ai_image")
     assert resp.status_code == 200
     body = resp.data.decode("utf-8")
@@ -98,7 +104,7 @@ def test_ai_image_page_uses_shared_select_dependency_renderer(client):
     assert "toggleQualityDropdown" not in body
 
 
-def test_apod_page_uses_shared_visibility_rules(client):
+def test_apod_page_uses_shared_visibility_rules(client: FlaskClient) -> None:
     resp = client.get("/plugin/apod")
     assert resp.status_code == 200
     body = resp.data.decode("utf-8")
@@ -106,7 +112,7 @@ def test_apod_page_uses_shared_visibility_rules(client):
     assert "toggleDateField" not in body
 
 
-def test_weather_plugin_second_pass_polish(client):
+def test_weather_plugin_second_pass_polish(client: FlaskClient) -> None:
     resp = client.get("/plugin/weather")
     assert resp.status_code == 200
     body = resp.data.decode("utf-8")
@@ -119,7 +125,7 @@ def test_weather_plugin_second_pass_polish(client):
     assert 'data-hybrid-widget="weather-map"' in body
 
 
-def test_todo_list_plugin_uses_svg_delete_icon(client):
+def test_todo_list_plugin_uses_svg_delete_icon(client: FlaskClient) -> None:
     resp = client.get("/plugin/todo_list")
     assert resp.status_code == 200
     body = resp.data.decode("utf-8")
@@ -129,7 +135,7 @@ def test_todo_list_plugin_uses_svg_delete_icon(client):
     assert "remove.png" not in body
 
 
-def test_url_based_plugins_use_warning_callouts(client):
+def test_url_based_plugins_use_warning_callouts(client: FlaskClient) -> None:
     for plugin_id in ("rss", "screenshot", "image_url"):
         resp = client.get(f"/plugin/{plugin_id}")
         assert resp.status_code == 200
@@ -137,7 +143,9 @@ def test_url_based_plugins_use_warning_callouts(client):
         assert "settings-callout warning" in body
 
 
-def test_checkbox_false_value_not_checked(client, device_config_dev):
+def test_checkbox_false_value_not_checked(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     """Bug 2: Checkbox with 'false' value should not render as checked."""
     # Set randomizePrompt to 'false' for ai_image plugin
     device_config_dev.update_value(
@@ -171,7 +179,9 @@ def test_checkbox_false_value_not_checked(client, device_config_dev):
     ), f"Checkbox should not be checked when value is 'false': {checkbox_html}"
 
 
-def test_github_plugin_uses_hidden_state_instead_of_inline_display(client):
+def test_github_plugin_uses_hidden_state_instead_of_inline_display(
+    client: FlaskClient,
+) -> None:
     resp = client.get("/plugin/github")
     assert resp.status_code == 200
     body = resp.data.decode("utf-8")
@@ -183,14 +193,18 @@ def test_github_plugin_uses_hidden_state_instead_of_inline_display(client):
     assert 'data-visible-if-field="githubType"' in body
 
 
-def test_preview_size_mode_native_on_plugin(client, device_config_dev):
+def test_preview_size_mode_native_on_plugin(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     device_config_dev.update_value("preview_size_mode", "native", write=True)
     resp = client.get("/plugin/ai_text")
     assert resp.status_code == 200
     assert b'data-native-width="' in resp.data and b'data-native-height="' in resp.data
 
 
-def test_preview_size_mode_fit_on_plugin(client, device_config_dev):
+def test_preview_size_mode_fit_on_plugin(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     device_config_dev.update_value("preview_size_mode", "fit", write=True)
     resp = client.get("/plugin/ai_text")
     assert resp.status_code == 200
@@ -198,7 +212,7 @@ def test_preview_size_mode_fit_on_plugin(client, device_config_dev):
     assert b'data-page-shell="workflow"' in resp.data
 
 
-def test_plugin_page_status_bar_present(client):
+def test_plugin_page_status_bar_present(client: FlaskClient) -> None:
     resp = client.get("/plugin/ai_text")
     assert resp.status_code == 200
     body = resp.data
@@ -206,7 +220,7 @@ def test_plugin_page_status_bar_present(client):
     assert b'id="currentDisplayTime"' in body
 
 
-def test_plugin_page_instance_preview_shown_when_instance(client):
+def test_plugin_page_instance_preview_shown_when_instance(client: FlaskClient) -> None:
     # Create a playlist instance explicitly
     # Add to Default playlist
     resp = client.post(
@@ -229,7 +243,9 @@ def test_plugin_page_instance_preview_shown_when_instance(client):
     assert b'id="instancePreviewImage"' in body
 
 
-def test_instance_image_history_fallback(client, device_config_dev):
+def test_instance_image_history_fallback(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     # Simulate a manual update that creates history sidecar with instance name
     data = {
         "plugin_id": "ai_text",
@@ -247,7 +263,9 @@ def test_instance_image_history_fallback(client, device_config_dev):
     assert resp2.status_code in (200, 404)
 
 
-def test_api_key_indicator_shows_missing_when_no_key(client, device_config_dev):
+def test_api_key_indicator_shows_missing_when_no_key(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     """Test that API key indicator shows 'missing' status when key is not present.
 
     Regression test for: API key indicator showing warning even when keys are configured.
@@ -264,7 +282,9 @@ def test_api_key_indicator_shows_missing_when_no_key(client, device_config_dev):
     assert "API Required" in body or "API Key required" in body
 
 
-def test_plugin_page_renders_inline_api_management_card(client, device_config_dev):
+def test_plugin_page_renders_inline_api_management_card(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     """API-key backed plugins should surface the calmer in-content management card."""
     device_config_dev.unset_env_key("OPEN_WEATHER_MAP_SECRET")
 
@@ -277,7 +297,9 @@ def test_plugin_page_renders_inline_api_management_card(client, device_config_de
     assert "workflow-preview-card" in body
 
 
-def test_api_key_indicator_shows_configured_when_key_present(client, device_config_dev):
+def test_api_key_indicator_shows_configured_when_key_present(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     """Test that API key indicator shows 'configured' status when key is present.
 
     Regression test for: API key indicator showing warning even when keys are configured.
@@ -294,7 +316,9 @@ def test_api_key_indicator_shows_configured_when_key_present(client, device_conf
     assert "API Key is configured" in body or "✓" in body
 
 
-def test_action_buttons_disabled_when_api_key_missing(client, device_config_dev):
+def test_action_buttons_disabled_when_api_key_missing(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     """Buttons that need an API key are disabled when the key is absent.
 
     Regression test for JTN-162: action buttons should be disabled when the
@@ -326,7 +350,9 @@ def test_action_buttons_disabled_when_api_key_missing(client, device_config_dev)
     assert not re.search(r"(?:^|\s)disabled(?:=|\s|>)", save_segment)
 
 
-def test_action_buttons_enabled_when_api_key_present(client, device_config_dev):
+def test_action_buttons_enabled_when_api_key_present(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     """Buttons are enabled when the required API key is present."""
     device_config_dev.set_env_key("UNSPLASH_ACCESS_KEY", "test-key-123")
 
@@ -342,7 +368,9 @@ def test_action_buttons_enabled_when_api_key_present(client, device_config_dev):
     assert "disabled" not in btn_section
 
 
-def test_plugin_latest_image_endpoint(client, device_config_dev):
+def test_plugin_latest_image_endpoint(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     """Test that /plugin_latest_image serves the most recent image for a plugin.
 
     Regression test for: "Latest from this plugin" section not showing historical images.
@@ -381,7 +409,9 @@ def test_plugin_latest_image_endpoint(client, device_config_dev):
     assert resp2.status_code == 404
 
 
-def test_plugin_latest_refresh_time_populated(client, device_config_dev):
+def test_plugin_latest_refresh_time_populated(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     """Test that plugin_latest_refresh template variable is populated correctly.
 
     Regression test for: "Last generated" timestamp not showing for "Latest from this plugin".
@@ -412,7 +442,9 @@ def test_plugin_latest_refresh_time_populated(client, device_config_dev):
     assert "plugin_latest_refresh" in body or "2025-01-15" in body
 
 
-def test_plugin_page_update_instance_url_encodes_instance_name_with_spaces(client):
+def test_plugin_page_update_instance_url_encodes_instance_name_with_spaces(
+    client: FlaskClient,
+) -> None:
     """JTN-240: update_instance URL must use url_for() with the actual instance name.
 
     When plugin_instance contains spaces or special characters the old string
@@ -447,7 +479,7 @@ def test_plugin_page_update_instance_url_encodes_instance_name_with_spaces(clien
     assert "update_plugin_instance/My Instance" not in body
 
 
-def test_plugin_page_hides_raw_slug_subtitle(client):
+def test_plugin_page_hides_raw_slug_subtitle(client: FlaskClient) -> None:
     """JTN-622: Raw plugin slug must not be rendered as a visible subtitle.
 
     End users have no reason to see the internal filesystem slug
@@ -467,7 +499,7 @@ def test_plugin_page_hides_raw_slug_subtitle(client):
         assert "data-debug-slug" not in body
 
 
-def test_plugin_page_shows_slug_subtitle_in_debug_mode(client):
+def test_plugin_page_shows_slug_subtitle_in_debug_mode(client: FlaskClient) -> None:
     """JTN-622: Raw slug subtitle is available behind ?debug=1 for diagnostics."""
     resp = client.get("/plugin/ai_image?debug=1")
     assert resp.status_code == 200
@@ -476,7 +508,7 @@ def test_plugin_page_shows_slug_subtitle_in_debug_mode(client):
     assert "data-debug-slug" in body
 
 
-def test_plugin_page_draft_badge_has_explanation(client):
+def test_plugin_page_draft_badge_has_explanation(client: FlaskClient) -> None:
     """JTN-644: The Draft badge must expose an explanation via title and/or aria-describedby."""
     # A plugin page with no plugin_instance query param renders the Draft chip.
     resp = client.get("/plugin/clock")
@@ -498,7 +530,7 @@ def test_plugin_page_draft_badge_has_explanation(client):
     assert "save action" in body or "Save settings" in body
 
 
-def test_wizard_ids_not_duplicated_in_static_html(client):
+def test_wizard_ids_not_duplicated_in_static_html(client: FlaskClient) -> None:
     """JTN-220: wizardPrev and wizardNext must each appear at most once in rendered HTML.
 
     The wizard navigation is injected by progressive_disclosure.js; the template

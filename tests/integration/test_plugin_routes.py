@@ -1,13 +1,19 @@
+from typing import Any
+
+import pytest
+from flask import Flask
+from flask.testing import FlaskClient
+
 # pyright: reportMissingImports=false
 
 
-def test_plugin_page_not_found(client):
+def test_plugin_page_not_found(client: FlaskClient) -> None:
     resp = client.get("/plugin/unknown")
     assert resp.status_code == 404
     assert b"not found" in resp.data.lower()
 
 
-def test_plugin_page_sanitizes_missing_instance_name(client):
+def test_plugin_page_sanitizes_missing_instance_name(client: FlaskClient) -> None:
     """JTN-326: response body must not reflect user input — py/reflective-xss."""
     resp = client.get("/plugin/ai_text?instance=%3Cscript%3Ealert(1)%3C%2Fscript%3E")
     assert resp.status_code == 404
@@ -21,24 +27,24 @@ def test_plugin_page_sanitizes_missing_instance_name(client):
 # Skip this test - the exception handling is already covered by existing tests
 
 
-def test_plugin_images_path_traversal_prevention(client):
+def test_plugin_images_path_traversal_prevention(client: FlaskClient) -> None:
     # Attempt path traversal
     resp = client.get("/images/ai_text/../../../etc/passwd")
     assert resp.status_code == 404
 
 
-def test_plugin_images_file_not_found(client):
+def test_plugin_images_file_not_found(client: FlaskClient) -> None:
     resp = client.get("/images/ai_text/nonexistent.png")
     assert resp.status_code == 404
 
 
-def test_delete_plugin_instance_invalid_json(client):
+def test_delete_plugin_instance_invalid_json(client: FlaskClient) -> None:
     resp = client.post("/delete_plugin_instance", data="not json")
     assert resp.status_code == 415  # Flask returns 415 for unsupported media type
     # The actual validation happens later
 
 
-def test_delete_plugin_instance_playlist_not_found(client):
+def test_delete_plugin_instance_playlist_not_found(client: FlaskClient) -> None:
     resp = client.post(
         "/delete_plugin_instance",
         json={
@@ -51,7 +57,7 @@ def test_delete_plugin_instance_playlist_not_found(client):
     assert "Playlist not found" in resp.get_json().get("error", "")
 
 
-def test_delete_plugin_instance_plugin_not_found(client):
+def test_delete_plugin_instance_plugin_not_found(client: FlaskClient) -> None:
     resp = client.post(
         "/delete_plugin_instance",
         json={
@@ -64,10 +70,12 @@ def test_delete_plugin_instance_plugin_not_found(client):
     assert "Plugin instance not found" in resp.get_json().get("error", "")
 
 
-def test_delete_plugin_instance_exception_handling(client, flask_app, monkeypatch):
+def test_delete_plugin_instance_exception_handling(
+    client: FlaskClient, flask_app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
     pm = flask_app.config["DEVICE_CONFIG"].get_playlist_manager()
 
-    def mock_get_playlist(name):
+    def mock_get_playlist(name: Any) -> None:
         raise Exception("test")
 
     monkeypatch.setattr(pm, "get_playlist", mock_get_playlist)
@@ -87,18 +95,20 @@ def test_delete_plugin_instance_exception_handling(client, flask_app, monkeypatc
     assert body.get("details", {}).get("context") == "delete plugin instance"
 
 
-def test_update_plugin_instance_missing_instance_name(client):
+def test_update_plugin_instance_missing_instance_name(client: FlaskClient) -> None:
     resp = client.put("/update_plugin_instance/", data={"plugin_id": "ai_text"})
     assert resp.status_code == 404  # Flask routing gives 404 for empty path parameter
 
 
-def test_update_plugin_instance_plugin_not_found(client):
+def test_update_plugin_instance_plugin_not_found(client: FlaskClient) -> None:
     resp = client.put("/update_plugin_instance/test", data={"plugin_id": "nonexistent"})
     assert resp.status_code == 404
     assert "Plugin instance not found" in resp.get_json().get("error", "")
 
 
-def test_update_plugin_instance_does_not_reflect_instance_name(client):
+def test_update_plugin_instance_does_not_reflect_instance_name(
+    client: FlaskClient,
+) -> None:
     """JTN-326: tainted URL path must not be echoed in the response body.
 
     Regression test for py/reflective-xss CodeQL alert — error message is
@@ -116,12 +126,14 @@ def test_update_plugin_instance_does_not_reflect_instance_name(client):
     assert error == "Plugin instance not found"
 
 
-def test_update_plugin_instance_api_error_handling(client, flask_app, monkeypatch):
+def test_update_plugin_instance_api_error_handling(
+    client: FlaskClient, flask_app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
     from utils.http_utils import APIError
 
     pm = flask_app.config["DEVICE_CONFIG"].get_playlist_manager()
 
-    def mock_find_plugin(plugin_id, instance_name):
+    def mock_find_plugin(plugin_id: Any, instance_name: Any) -> None:
         raise APIError("Test API error", status=400)
 
     monkeypatch.setattr(pm, "find_plugin", mock_find_plugin)
@@ -131,7 +143,9 @@ def test_update_plugin_instance_api_error_handling(client, flask_app, monkeypatc
     assert "Test API error" in resp.get_json().get("error", "")
 
 
-def test_update_plugin_instance_exception_handling(client, flask_app, monkeypatch):
+def test_update_plugin_instance_exception_handling(
+    client: FlaskClient, flask_app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
     pm = flask_app.config["DEVICE_CONFIG"].get_playlist_manager()
     monkeypatch.setattr(
         pm, "find_plugin", lambda *args: (_ for _ in ()).throw(Exception("test"))
@@ -145,12 +159,12 @@ def test_update_plugin_instance_exception_handling(client, flask_app, monkeypatc
     assert body.get("details", {}).get("context") == "update plugin instance"
 
 
-def test_display_plugin_instance_invalid_json(client):
+def test_display_plugin_instance_invalid_json(client: FlaskClient) -> None:
     resp = client.post("/display_plugin_instance", data="not json")
     assert resp.status_code == 415  # Flask returns 415 for unsupported media type
 
 
-def test_display_plugin_instance_playlist_not_found(client):
+def test_display_plugin_instance_playlist_not_found(client: FlaskClient) -> None:
     resp = client.post(
         "/display_plugin_instance",
         json={
@@ -163,7 +177,7 @@ def test_display_plugin_instance_playlist_not_found(client):
     assert resp.get_json().get("error", "") == "Playlist not found"
 
 
-def test_display_plugin_instance_plugin_not_found(client):
+def test_display_plugin_instance_plugin_not_found(client: FlaskClient) -> None:
     resp = client.post(
         "/display_plugin_instance",
         json={
@@ -176,7 +190,9 @@ def test_display_plugin_instance_plugin_not_found(client):
     assert "Plugin instance not found" in resp.get_json().get("error", "")
 
 
-def test_display_plugin_instance_does_not_reflect_instance_name(client):
+def test_display_plugin_instance_does_not_reflect_instance_name(
+    client: FlaskClient,
+) -> None:
     """JTN-326: tainted body must not be echoed — py/reflective-xss regression."""
     resp = client.post(
         "/display_plugin_instance",
@@ -194,7 +210,9 @@ def test_display_plugin_instance_does_not_reflect_instance_name(client):
     assert error == "Plugin instance not found"
 
 
-def test_display_plugin_instance_does_not_reflect_playlist_name(client):
+def test_display_plugin_instance_does_not_reflect_playlist_name(
+    client: FlaskClient,
+) -> None:
     """JTN-326: tainted playlist_name must not be echoed — py/reflective-xss."""
     resp = client.post(
         "/display_plugin_instance",
@@ -212,7 +230,9 @@ def test_display_plugin_instance_does_not_reflect_playlist_name(client):
     assert error == "Playlist not found"
 
 
-def test_display_plugin_instance_exception_handling(client, flask_app, monkeypatch):
+def test_display_plugin_instance_exception_handling(
+    client: FlaskClient, flask_app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
     pm = flask_app.config["DEVICE_CONFIG"].get_playlist_manager()
     monkeypatch.setattr(
         pm, "get_playlist", lambda x: (_ for _ in ()).throw(Exception("test"))
@@ -233,7 +253,7 @@ def test_display_plugin_instance_exception_handling(client, flask_app, monkeypat
     assert body.get("details", {}).get("context") == "display plugin instance"
 
 
-def test_update_now_plugin_not_found(client):
+def test_update_now_plugin_not_found(client: FlaskClient) -> None:
     resp = client.post("/update_now", data={"plugin_id": "nonexistent"})
     assert resp.status_code == 404
     error = resp.get_json().get("error", "")
@@ -242,7 +262,7 @@ def test_update_now_plugin_not_found(client):
     assert "nonexistent" not in error
 
 
-def test_update_now_does_not_reflect_plugin_id(client):
+def test_update_now_does_not_reflect_plugin_id(client: FlaskClient) -> None:
     """JTN-326: tainted plugin_id form value must not be reflected."""
     resp = client.post("/update_now", data={"plugin_id": "<script>alert(1)</script>"})
     assert resp.status_code == 404
@@ -253,7 +273,7 @@ def test_update_now_does_not_reflect_plugin_id(client):
     assert error == "Plugin not found"
 
 
-def test_update_now_async_returns_202_with_job_id(client):
+def test_update_now_async_returns_202_with_job_id(client: FlaskClient) -> None:
     """POST /update_now with X-Async returns 202 Accepted with a job_id."""
     resp = client.post(
         "/update_now",
@@ -267,20 +287,20 @@ def test_update_now_async_returns_202_with_job_id(client):
     assert len(data["job_id"]) == 32
 
 
-def test_update_now_sync_still_works(client):
+def test_update_now_sync_still_works(client: FlaskClient) -> None:
     """POST /update_now without X-Async keeps the legacy synchronous path."""
     resp = client.post("/update_now", data={"plugin_id": "clock"})
     # Should be 200 (sync path), not 202
     assert resp.status_code == 200
 
 
-def test_update_now_missing_plugin_id_returns_422(client):
+def test_update_now_missing_plugin_id_returns_422(client: FlaskClient) -> None:
     """POST /update_now without plugin_id still returns 422."""
     resp = client.post("/update_now", data={})
     assert resp.status_code == 422
 
 
-def test_job_status_unknown_id(client):
+def test_job_status_unknown_id(client: FlaskClient) -> None:
     """GET /api/job/<unknown> returns status 'unknown'."""
     resp = client.get("/api/job/does_not_exist_at_all_1234")
     assert resp.status_code == 200
@@ -288,7 +308,9 @@ def test_job_status_unknown_id(client):
     assert data["status"] == "unknown"
 
 
-def test_update_now_async_poll_completes(client, flask_app, monkeypatch):
+def test_update_now_async_poll_completes(
+    client: FlaskClient, flask_app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> Any:
     """Full 202 -> poll -> done flow for async update_now."""
     import time
 
@@ -297,7 +319,7 @@ def test_update_now_async_poll_completes(client, flask_app, monkeypatch):
     import plugins.clock.clock as clock_mod
     from refresh_task.job_queue import get_job_queue
 
-    def fake_generate(self, settings, device_config):
+    def fake_generate(self, settings: Any, device_config: Any) -> Any:
         return Image.new("RGB", device_config.get_resolution(), "white")
 
     monkeypatch.setattr(clock_mod.Clock, "generate_image", fake_generate, raising=True)
@@ -340,7 +362,9 @@ def test_update_now_async_poll_completes(client, flask_app, monkeypatch):
         time.sleep(0.05)
 
 
-def test_update_now_async_poll_error(client, flask_app, monkeypatch):
+def test_update_now_async_poll_error(
+    client: FlaskClient, flask_app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Async update_now job that raises shows status 'error' when polled."""
     import time
 
@@ -376,7 +400,9 @@ def test_update_now_async_poll_error(client, flask_app, monkeypatch):
         time.sleep(0.05)
 
 
-def test_update_now_async_plugin_not_found(client, flask_app):
+def test_update_now_async_plugin_not_found(
+    client: FlaskClient, flask_app: Flask
+) -> None:
     """Plugin not found is reported via the job error status."""
     import time
 
@@ -402,7 +428,9 @@ def test_update_now_async_plugin_not_found(client, flask_app):
     assert "not found" in data["error"]
 
 
-def test_update_now_exception_handling(client, flask_app, monkeypatch):
+def test_update_now_exception_handling(
+    client: FlaskClient, flask_app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Sync path: exceptions yield 500."""
     import blueprints.plugin as plugin_mod
 
@@ -417,7 +445,9 @@ def test_update_now_exception_handling(client, flask_app, monkeypatch):
     assert "An internal error occurred" in resp.get_json().get("error", "")
 
 
-def test_save_plugin_settings_exception_handling(client, flask_app, monkeypatch):
+def test_save_plugin_settings_exception_handling(
+    client: FlaskClient, flask_app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
     dc = flask_app.config["DEVICE_CONFIG"]
     # Make update_atomic raise to simulate config failure
     monkeypatch.setattr(
@@ -434,7 +464,7 @@ def test_save_plugin_settings_exception_handling(client, flask_app, monkeypatch)
     assert "An internal error occurred" in resp.get_json().get("error", "")
 
 
-def test_save_plugin_settings_rejects_unknown_plugin_id(client):
+def test_save_plugin_settings_rejects_unknown_plugin_id(client: FlaskClient) -> None:
     resp = client.post("/save_plugin_settings", data={"plugin_id": "not_real_plugin"})
     assert resp.status_code == 404
     error = resp.get_json()["error"]
@@ -443,7 +473,9 @@ def test_save_plugin_settings_rejects_unknown_plugin_id(client):
     assert "not_real_plugin" not in error
 
 
-def test_save_plugin_settings_alias_rejects_unknown_plugin_id(client):
+def test_save_plugin_settings_alias_rejects_unknown_plugin_id(
+    client: FlaskClient,
+) -> None:
     resp = client.post("/plugin/not_real_plugin/save", data={"title": "Test"})
     assert resp.status_code == 404
     error = resp.get_json()["error"]
@@ -452,7 +484,9 @@ def test_save_plugin_settings_alias_rejects_unknown_plugin_id(client):
     assert "not_real_plugin" not in error
 
 
-def test_save_plugin_settings_alias_does_not_reflect_url_plugin_id(client):
+def test_save_plugin_settings_alias_does_not_reflect_url_plugin_id(
+    client: FlaskClient,
+) -> None:
     """JTN-326: URL-path plugin_id (py/reflective-xss alert line 756) scrubbed.
 
     The Flask route converter accepts an arbitrary non-slash string, so a
@@ -470,7 +504,7 @@ def test_save_plugin_settings_alias_does_not_reflect_url_plugin_id(client):
     assert error == "Plugin not found"
 
 
-def test_delete_plugin_instance_missing(client):
+def test_delete_plugin_instance_missing(client: FlaskClient) -> None:
     resp = client.post(
         "/delete_plugin_instance",
         json={"playlist_name": "Default", "plugin_id": "x", "plugin_instance": "nope"},
@@ -478,14 +512,16 @@ def test_delete_plugin_instance_missing(client):
     assert resp.status_code in (200, 400)
 
 
-def test_update_plugin_instance_missing(client):
+def test_update_plugin_instance_missing(client: FlaskClient) -> None:
     resp = client.put(
         "/update_plugin_instance/does-not-exist", data={"plugin_id": "ai_text"}
     )
     assert resp.status_code in (200, 404, 500)
 
 
-def test_save_plugin_settings_persist_and_load_on_plugin_page(client, monkeypatch):
+def test_save_plugin_settings_persist_and_load_on_plugin_page(
+    client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
     # First: save settings
     data = {
         "plugin_id": "ai_text",
@@ -506,12 +542,14 @@ def test_save_plugin_settings_persist_and_load_on_plugin_page(client, monkeypatc
     assert ("T1" in body) or ("Hello" in body)
 
 
-def test_plugin_instance_image_404(client):
+def test_plugin_instance_image_404(client: FlaskClient) -> None:
     resp = client.get("/instance_image/ai_text/does-not-exist")
     assert resp.status_code == 404
 
 
-def test_plugin_instance_image_serves_png(client, device_config_dev):
+def test_plugin_instance_image_serves_png(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     import os
 
     from PIL import Image
@@ -525,7 +563,7 @@ def test_plugin_instance_image_serves_png(client, device_config_dev):
     assert resp.headers.get("Content-Type", "").startswith("image/")
 
 
-def _setup_playlist_for_instance(device_config_dev):
+def _setup_playlist_for_instance(device_config_dev: Any) -> None:
     pm = device_config_dev.get_playlist_manager()
     if not pm.get_playlist("Default"):
         pm.add_playlist("Default", "00:00", "24:00")
@@ -541,7 +579,9 @@ def _setup_playlist_for_instance(device_config_dev):
     device_config_dev.write_config()
 
 
-def test_instance_image_generated_from_settings(client, device_config_dev, monkeypatch):
+def test_instance_image_generated_from_settings(
+    client: FlaskClient, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> Any:
     import io
     import os
 
@@ -554,7 +594,7 @@ def test_instance_image_generated_from_settings(client, device_config_dev, monke
         os.remove(path)
 
     class _StubPlugin:
-        def generate_image(self, settings, device_config):
+        def generate_image(self, settings: Any, device_config: Any) -> Any:
             return Image.new("RGB", (10, 10), "blue")
 
     monkeypatch.setattr(
@@ -570,8 +610,8 @@ def test_instance_image_generated_from_settings(client, device_config_dev, monke
 
 
 def test_instance_image_served_from_history_on_generation_failure(
-    client, device_config_dev, monkeypatch
-):
+    client: FlaskClient, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     import io
     import json
     import os
@@ -593,7 +633,7 @@ def test_instance_image_served_from_history_on_generation_failure(
         json.dump({"plugin_id": "ai_text", "plugin_instance": "Inst One"}, fh)
 
     class _StubPlugin:
-        def generate_image(self, settings, device_config):
+        def generate_image(self, settings: Any, device_config: Any) -> None:
             raise RuntimeError("fail")
 
     monkeypatch.setattr(
@@ -607,8 +647,8 @@ def test_instance_image_served_from_history_on_generation_failure(
 
 
 def test_instance_image_uses_latest_matching_history_entry(
-    client, device_config_dev, monkeypatch
-):
+    client: FlaskClient, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     import io
     import json
     import os
@@ -636,7 +676,7 @@ def test_instance_image_uses_latest_matching_history_entry(
         json.dump({"plugin_id": "ai_text", "plugin_instance": "Inst One"}, fh)
 
     class _StubPlugin:
-        def generate_image(self, settings, device_config):
+        def generate_image(self, settings: Any, device_config: Any) -> None:
             raise RuntimeError("fail")
 
     monkeypatch.setattr(
@@ -649,7 +689,9 @@ def test_instance_image_uses_latest_matching_history_entry(
     assert img.getpixel((0, 0)) == (0, 128, 0)
 
 
-def test_delete_plugin_instance_cleans_up_cache(client, device_config_dev):
+def test_delete_plugin_instance_cleans_up_cache(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     """Deleting a plugin instance removes its cached image file."""
     import os
 
@@ -678,15 +720,15 @@ def test_delete_plugin_instance_cleans_up_cache(client, device_config_dev):
 
 
 def test_delete_plugin_instance_calls_plugin_cleanup(
-    client, device_config_dev, monkeypatch
-):
+    client: FlaskClient, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Deleting a plugin instance calls plugin.cleanup() if available."""
     _setup_playlist_for_instance(device_config_dev)
 
     cleanup_called = {}
 
     class _StubPlugin:
-        def cleanup(self, settings):
+        def cleanup(self, settings: Any) -> None:
             cleanup_called["settings"] = settings
 
     monkeypatch.setattr(
@@ -707,7 +749,9 @@ def test_delete_plugin_instance_calls_plugin_cleanup(
     assert cleanup_called["settings"] == {}
 
 
-def _add_named_plugin_instance(device_config_dev, plugin_id, instance_name):
+def _add_named_plugin_instance(
+    device_config_dev: Any, plugin_id: Any, instance_name: Any
+) -> None:
     """Helper: add a named plugin instance to the Default playlist."""
     pm = device_config_dev.get_playlist_manager()
     if not pm.get_playlist("Default"):
@@ -725,7 +769,9 @@ def _add_named_plugin_instance(device_config_dev, plugin_id, instance_name):
     device_config_dev.write_config()
 
 
-def test_plugin_page_instance_query_param_returns_200(client, device_config_dev):
+def test_plugin_page_instance_query_param_returns_200(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     """GET /plugin/<id>?instance=<name> returns 200 when the instance exists (JTN-221)."""
     _add_named_plugin_instance(device_config_dev, "weather", "Audit weather")
 
@@ -736,8 +782,8 @@ def test_plugin_page_instance_query_param_returns_200(client, device_config_dev)
 
 
 def test_plugin_page_instance_url_plus_encoding_decoded_correctly(
-    client, device_config_dev
-):
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     """GET /plugin/<id>?instance=Name+With+Spaces decodes '+' to space (JTN-221)."""
     _add_named_plugin_instance(device_config_dev, "weather", "Audit weather")
 
@@ -747,8 +793,8 @@ def test_plugin_page_instance_url_plus_encoding_decoded_correctly(
 
 
 def test_plugin_page_instance_nonexistent_returns_friendly_404(
-    client, device_config_dev
-):
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     """GET /plugin/<id>?instance=<missing> returns 404 (JTN-221 / JTN-326).
 
     Message is now generic — instance name is only logged server-side to
@@ -763,15 +809,15 @@ def test_plugin_page_instance_nonexistent_returns_friendly_404(
     assert "nonexistent" not in error
 
 
-def test_plugin_page_without_instance_param_still_works(client):
+def test_plugin_page_without_instance_param_still_works(client: FlaskClient) -> None:
     """GET /plugin/<id> (no ?instance=) continues to work after JTN-221 fix."""
     resp = client.get("/plugin/weather")
     assert resp.status_code == 200
 
 
 def test_playlist_page_instance_image_url_has_no_playlist_name_query_param(
-    client, device_config_dev
-):
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     """Regression test for JTN-265.
 
     playlist.html used to pass playlist_name=... to url_for('plugin.plugin_instance_image'),

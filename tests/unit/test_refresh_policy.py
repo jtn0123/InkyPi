@@ -1,5 +1,6 @@
 import time
 from pathlib import Path
+from typing import Any
 
 import pytest
 from PIL import Image
@@ -11,7 +12,7 @@ from refresh_task import ManualRefresh, RefreshTask
 class SlowPlugin:
     config = {"image_settings": []}
 
-    def generate_image(self, settings, device_config):
+    def generate_image(self, settings: Any, device_config: Any) -> Any:
         time.sleep(0.2)
         return Image.new("RGB", device_config.get_resolution(), color=(255, 255, 255))
 
@@ -19,10 +20,10 @@ class SlowPlugin:
 class FlakyPlugin:
     config = {"image_settings": []}
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.calls = 0
 
-    def generate_image(self, settings, device_config):
+    def generate_image(self, settings: Any, device_config: Any) -> Any:
         self.calls += 1
         if self.calls == 1:
             raise RuntimeError("first failure")
@@ -32,10 +33,10 @@ class FlakyPlugin:
 class FileBackedFlakyPlugin:
     config = {"image_settings": []}
 
-    def __init__(self, cfg):
+    def __init__(self, cfg: Any) -> None:
         self.cfg = cfg
 
-    def generate_image(self, settings, device_config):
+    def generate_image(self, settings: Any, device_config: Any) -> Any:
         counter_path = Path(self.cfg["counter_path"])
         calls = (
             int(counter_path.read_text(encoding="utf-8"))
@@ -49,7 +50,9 @@ class FileBackedFlakyPlugin:
         return Image.new("RGB", device_config.get_resolution(), color=(0, 255, 0))
 
 
-def test_plugin_timeout_policy(device_config_dev, monkeypatch):
+def test_plugin_timeout_policy(
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     dm = DisplayManager(device_config_dev)
     task = RefreshTask(device_config_dev, dm)
 
@@ -71,7 +74,9 @@ def test_plugin_timeout_policy(device_config_dev, monkeypatch):
         task.stop()
 
 
-def test_plugin_retry_policy(device_config_dev, monkeypatch, tmp_path):
+def test_plugin_retry_policy(
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     dm = DisplayManager(device_config_dev)
     task = RefreshTask(device_config_dev, dm)
     counter_path = tmp_path / "retry-count.txt"

@@ -1,9 +1,12 @@
 import socket
+from typing import Any
 
 import pytest
 
 
-def test_image_url_happy(monkeypatch, device_config_dev):
+def test_image_url_happy(
+    monkeypatch: pytest.MonkeyPatch, device_config_dev: Any
+) -> None:
     from plugins.image_url.image_url import ImageURL
 
     monkeypatch.setattr(
@@ -24,7 +27,7 @@ def test_image_url_happy(monkeypatch, device_config_dev):
     assert img is not None
 
 
-def test_image_url_missing_url(device_config_dev):
+def test_image_url_missing_url(device_config_dev: Any) -> None:
     from plugins.image_url.image_url import ImageURL
 
     try:
@@ -34,7 +37,7 @@ def test_image_url_missing_url(device_config_dev):
         pass
 
 
-def test_image_url_rejects_localhost(device_config_dev):
+def test_image_url_rejects_localhost(device_config_dev: Any) -> None:
     """ImageURL plugin must reject localhost URLs."""
     from plugins.image_url.image_url import ImageURL
 
@@ -43,7 +46,9 @@ def test_image_url_rejects_localhost(device_config_dev):
         plugin.generate_image({"url": "http://localhost/image.jpg"}, device_config_dev)
 
 
-def test_image_url_rejects_private_ip(monkeypatch, device_config_dev):
+def test_image_url_rejects_private_ip(
+    monkeypatch: pytest.MonkeyPatch, device_config_dev: Any
+) -> None:
     """ImageURL plugin must reject private IP addresses."""
     from plugins.image_url.image_url import ImageURL
 
@@ -62,7 +67,9 @@ def test_image_url_rejects_private_ip(monkeypatch, device_config_dev):
         )
 
 
-def test_image_url_rejects_metadata_endpoint(monkeypatch, device_config_dev):
+def test_image_url_rejects_metadata_endpoint(
+    monkeypatch: pytest.MonkeyPatch, device_config_dev: Any
+) -> None:
     """ImageURL plugin must reject cloud metadata endpoints."""
     from plugins.image_url.image_url import ImageURL
 
@@ -90,7 +97,9 @@ def test_image_url_rejects_metadata_endpoint(monkeypatch, device_config_dev):
         ("http://", "hostname"),
     ],
 )
-def test_image_url_raises_url_validation_error(bad_url, expected_fragment):
+def test_image_url_raises_url_validation_error(
+    bad_url: Any, expected_fragment: Any
+) -> None:
     """JTN-776: plugins must raise URLValidationError (not bare RuntimeError)
     on bad URLs so the blueprint can map it to HTTP 422."""
     from plugins.image_url.image_url import ImageURL
@@ -102,12 +111,14 @@ def test_image_url_raises_url_validation_error(bad_url, expected_fragment):
     assert expected_fragment in str(exc_info.value)
 
 
-def test_image_url_validate_settings_uses_shared_validator(monkeypatch):
+def test_image_url_validate_settings_uses_shared_validator(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     from plugins.image_url.image_url import ImageURL
 
     seen = {}
 
-    def fake_validate_url(url):
+    def fake_validate_url(url: Any) -> None:
         seen["url"] = url
         raise ValueError("URL scheme must be http or https")
 

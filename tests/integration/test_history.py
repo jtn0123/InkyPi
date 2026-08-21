@@ -1,11 +1,16 @@
 import json
 import os
 import re
+from pathlib import Path
+from typing import Any
 
+import pytest
+from flask import Flask
+from flask.testing import FlaskClient
 from PIL import Image
 
 
-def test_history_page_lists_images(client, device_config_dev):
+def test_history_page_lists_images(client: FlaskClient, device_config_dev: Any) -> None:
     # Create two history images
     d = device_config_dev.history_image_dir
     os.makedirs(d, exist_ok=True)
@@ -19,7 +24,9 @@ def test_history_page_lists_images(client, device_config_dev):
     assert "display_20250101_000100.png" in body
 
 
-def test_history_sidecar_metadata_rendered(client, device_config_dev):
+def test_history_sidecar_metadata_rendered(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     # Create an image and matching sidecar json
     d = device_config_dev.history_image_dir
     os.makedirs(d, exist_ok=True)
@@ -44,7 +51,7 @@ def test_history_sidecar_metadata_rendered(client, device_config_dev):
     assert "ai_text" in text
 
 
-def test_history_delete_and_clear(client, device_config_dev):
+def test_history_delete_and_clear(client: FlaskClient, device_config_dev: Any) -> None:
     d = device_config_dev.history_image_dir
     os.makedirs(d, exist_ok=True)
     a = os.path.join(d, "display_20250101_000300.png")
@@ -64,7 +71,9 @@ def test_history_delete_and_clear(client, device_config_dev):
     assert not os.path.exists(b)
 
 
-def test_history_page_shows_no_history_message(client, device_config_dev):
+def test_history_page_shows_no_history_message(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     d = device_config_dev.history_image_dir
     os.makedirs(d, exist_ok=True)
     # Ensure empty
@@ -77,7 +86,7 @@ def test_history_page_shows_no_history_message(client, device_config_dev):
     assert "No history yet." in body
 
 
-def test_history_page_contains_storage_block(client):
+def test_history_page_contains_storage_block(client: FlaskClient) -> None:
     resp = client.get("/history")
     assert resp.status_code == 200
     body = resp.data.decode("utf-8")
@@ -86,7 +95,9 @@ def test_history_page_contains_storage_block(client):
     assert "Storage" in body
 
 
-def test_history_page_moves_clear_action_to_reset_cache(client, device_config_dev):
+def test_history_page_moves_clear_action_to_reset_cache(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     d = device_config_dev.history_image_dir
     os.makedirs(d, exist_ok=True)
     Image.new("RGB", (10, 10), "white").save(
@@ -100,13 +111,15 @@ def test_history_page_moves_clear_action_to_reset_cache(client, device_config_de
     assert 'id="historyClearBtn"' in body
 
 
-def test_history_image_blocks_path_traversal(client):
+def test_history_image_blocks_path_traversal(client: FlaskClient) -> None:
     """Bug 4: history_image should reject path traversal attempts."""
     resp = client.get("/history/image/../../etc/passwd")
     assert resp.status_code == 400
 
 
-def test_history_image_route_serves_png(client, device_config_dev):
+def test_history_image_route_serves_png(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     d = device_config_dev.history_image_dir
     os.makedirs(d, exist_ok=True)
     name = "display_20250101_000500.png"
@@ -119,13 +132,13 @@ def test_history_image_route_serves_png(client, device_config_dev):
     assert resp.headers.get("Content-Type", "").startswith("image/")
 
 
-def test_history_security_blocks_path_traversal_on_delete(client):
+def test_history_security_blocks_path_traversal_on_delete(client: FlaskClient) -> None:
     # Attempt to escape history dir
     resp = client.post("/history/delete", json={"filename": "../../etc/passwd"})
     assert resp.status_code == 400
 
 
-def test_history_security_blocks_prefix_bypass_path(client):
+def test_history_security_blocks_prefix_bypass_path(client: FlaskClient) -> None:
     # Attempt sibling-directory prefix bypass like history/../history_evil/*
     resp = client.post(
         "/history/delete", json={"filename": "../history_evil/should_not_delete.png"}
@@ -133,7 +146,9 @@ def test_history_security_blocks_prefix_bypass_path(client):
     assert resp.status_code == 400
 
 
-def test_history_storage_endpoint_values(client, monkeypatch):
+def test_history_storage_endpoint_values(
+    client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
     # Monkeypatch shutil.disk_usage to return known numbers for precise assertions
     class Usage:
         total = 4 * (1024**3)  # 4 GB
@@ -154,7 +169,9 @@ def test_history_storage_endpoint_values(client, monkeypatch):
     assert data["pct_free"] == 25.0
 
 
-def test_history_clear_then_storage_endpoint_ok(client, device_config_dev):
+def test_history_clear_then_storage_endpoint_ok(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     d = device_config_dev.history_image_dir
     os.makedirs(d, exist_ok=True)
     from PIL import Image
@@ -176,7 +193,7 @@ def test_history_clear_then_storage_endpoint_ok(client, device_config_dev):
     )
 
 
-def test_history_redisplay_errors(client):
+def test_history_redisplay_errors(client: FlaskClient) -> None:
     # Missing filename
     resp = client.post("/history/redisplay", json={})
     assert resp.status_code == 400
@@ -190,7 +207,7 @@ def test_history_redisplay_errors(client):
     assert resp.status_code == 400
 
 
-def test_history_redisplay_invalid_json_returns_400(client):
+def test_history_redisplay_invalid_json_returns_400(client: FlaskClient) -> None:
     resp = client.post(
         "/history/redisplay",
         data="not json",
@@ -200,7 +217,7 @@ def test_history_redisplay_invalid_json_returns_400(client):
     assert resp.get_json()["error"] == "Invalid JSON payload"
 
 
-def test_history_redisplay_success(client, device_config_dev):
+def test_history_redisplay_success(client: FlaskClient, device_config_dev: Any) -> None:
     d = device_config_dev.history_image_dir
     os.makedirs(d, exist_ok=True)
     fname = "display_20250101_020000.png"
@@ -211,7 +228,7 @@ def test_history_redisplay_success(client, device_config_dev):
     assert resp.get_json().get("success") is True
 
 
-def test_history_delete_errors(client):
+def test_history_delete_errors(client: FlaskClient) -> None:
     # Missing filename
     resp = client.post("/history/delete", json={})
     assert resp.status_code == 400
@@ -226,7 +243,7 @@ def test_history_delete_errors(client):
     assert resp.status_code == 400
 
 
-def test_history_delete_invalid_json_returns_400(client):
+def test_history_delete_invalid_json_returns_400(client: FlaskClient) -> None:
     resp = client.post(
         "/history/delete",
         data="not json",
@@ -236,7 +253,9 @@ def test_history_delete_invalid_json_returns_400(client):
     assert resp.get_json()["error"] == "Invalid JSON payload"
 
 
-def test_history_sorting_and_size_formatting(client, device_config_dev):
+def test_history_sorting_and_size_formatting(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     import time
 
     from PIL import Image
@@ -272,7 +291,9 @@ def test_history_sorting_and_size_formatting(client, device_config_dev):
     assert "100 B" in body or "0.1 KB" in body or "KB" in body
 
 
-def test_history_sorting_uses_embedded_timestamp_when_mtimes_match(device_config_dev):
+def test_history_sorting_uses_embedded_timestamp_when_mtimes_match(
+    device_config_dev: Any,
+) -> None:
     from blueprints import history as history_mod
 
     d = device_config_dev.history_image_dir
@@ -299,7 +320,9 @@ def test_history_sorting_uses_embedded_timestamp_when_mtimes_match(device_config
     ]
 
 
-def test_history_server_renders_storage_when_disk_usage_ok(client, monkeypatch):
+def test_history_server_renders_storage_when_disk_usage_ok(
+    client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
     class Usage:
         total = 4 * (1024**3)
         used = 3 * (1024**3)
@@ -316,7 +339,9 @@ def test_history_server_renders_storage_when_disk_usage_ok(client, monkeypatch):
     assert "GB remaining of" in body and "GB total" in body
 
 
-def test_history_server_handles_disk_usage_failure(client, monkeypatch):
+def test_history_server_handles_disk_usage_failure(
+    client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
     import shutil as _shutil
 
     monkeypatch.setattr(
@@ -329,7 +354,9 @@ def test_history_server_handles_disk_usage_failure(client, monkeypatch):
     assert "History" in body
 
 
-def test_history_handles_file_stat_race(client, device_config_dev, monkeypatch):
+def test_history_handles_file_stat_race(
+    client: FlaskClient, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> Any:
     d = device_config_dev.history_image_dir
     os.makedirs(d, exist_ok=True)
 
@@ -344,7 +371,7 @@ def test_history_handles_file_stat_race(client, device_config_dev, monkeypatch):
 
     real_getmtime = _os.path.getmtime
 
-    def flaky_getmtime(p):
+    def flaky_getmtime(p: Any) -> Any:
         if p == path:
             raise FileNotFoundError("race gone")
         return real_getmtime(p)
@@ -358,7 +385,7 @@ def test_history_handles_file_stat_race(client, device_config_dev, monkeypatch):
     assert "History" in body
 
 
-def test_history_template_scripts_closed_and_grid_renders(client):
+def test_history_template_scripts_closed_and_grid_renders(client: FlaskClient) -> None:
     resp = client.get("/history")
     assert resp.status_code == 200
     body = resp.data.decode("utf-8")
@@ -373,7 +400,7 @@ def test_history_template_scripts_closed_and_grid_renders(client):
         assert first_script_close < grid_idx
 
 
-def test_format_size_exception_handling(monkeypatch):
+def test_format_size_exception_handling(monkeypatch: pytest.MonkeyPatch) -> None:
     from blueprints.history import _format_size
 
     # Test exception handling in _format_size - negative numbers don't trigger exception
@@ -383,7 +410,9 @@ def test_format_size_exception_handling(monkeypatch):
     assert isinstance(result, str)
 
 
-def test_list_history_images_exception_handling(client, device_config_dev, monkeypatch):
+def test_list_history_images_exception_handling(
+    client: FlaskClient, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     import blueprints.history as history_mod
 
     # Mock os.listdir to raise exception
@@ -398,7 +427,9 @@ def test_list_history_images_exception_handling(client, device_config_dev, monke
     assert total == 0
 
 
-def test_history_delete_exception_handling(client, flask_app, monkeypatch):
+def test_history_delete_exception_handling(
+    client: FlaskClient, flask_app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
     import blueprints.history as history_mod
 
     monkeypatch.setattr(
@@ -412,7 +443,9 @@ def test_history_delete_exception_handling(client, flask_app, monkeypatch):
     assert "An internal error occurred" in resp.get_json().get("error", "")
 
 
-def test_history_clear_exception_handling(client, flask_app, monkeypatch):
+def test_history_clear_exception_handling(
+    client: FlaskClient, flask_app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
     import blueprints.history as history_mod
 
     monkeypatch.setattr(
@@ -424,7 +457,9 @@ def test_history_clear_exception_handling(client, flask_app, monkeypatch):
     assert "error" in resp.get_json().get("error", "").lower()
 
 
-def test_history_pagination_defaults(client, device_config_dev):
+def test_history_pagination_defaults(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     """Page 1 returns first 24 items; pagination nav hidden with few items."""
     d = device_config_dev.history_image_dir
     os.makedirs(d, exist_ok=True)
@@ -440,7 +475,9 @@ def test_history_pagination_defaults(client, device_config_dev):
     assert "Page " not in body
 
 
-def test_history_pagination_multi_page(client, device_config_dev):
+def test_history_pagination_multi_page(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     """With more items than per_page, pagination nav appears."""
     d = device_config_dev.history_image_dir
     os.makedirs(d, exist_ok=True)
@@ -470,7 +507,9 @@ def test_history_pagination_multi_page(client, device_config_dev):
     assert "Page 3 of 3" in body3
 
 
-def test_history_pagination_invalid_params(client, device_config_dev):
+def test_history_pagination_invalid_params(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     """Invalid page/per_page params default gracefully."""
     d = device_config_dev.history_image_dir
     os.makedirs(d, exist_ok=True)
@@ -488,7 +527,9 @@ def test_history_pagination_invalid_params(client, device_config_dev):
     assert "1 items" in body
 
 
-def test_history_pagination_clamps_upper_bound(client, device_config_dev):
+def test_history_pagination_clamps_upper_bound(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     """JTN-359: ?page=99999 should clamp to the last valid page, not render
     "Page 99999 of N" over an empty grid."""
     d = device_config_dev.history_image_dir
@@ -513,7 +554,9 @@ def test_history_pagination_clamps_upper_bound(client, device_config_dev):
     assert "display_clamp_" in body
 
 
-def test_history_pagination_clamps_upper_bound_empty_history(client, device_config_dev):
+def test_history_pagination_clamps_upper_bound_empty_history(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     """JTN-359: ?page=99999 on an empty history renders the empty-state
     cleanly (page clamps to 1 via total_pages floor, no crash, no bogus
     'Page 99999 of 1')."""
@@ -534,7 +577,9 @@ def test_history_pagination_clamps_upper_bound_empty_history(client, device_conf
     assert "Page 1 of 1" not in body
 
 
-def test_history_storage_exception_handling(client, flask_app, monkeypatch):
+def test_history_storage_exception_handling(
+    client: FlaskClient, flask_app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
     import shutil as _shutil
 
     monkeypatch.setattr(
@@ -546,7 +591,9 @@ def test_history_storage_exception_handling(client, flask_app, monkeypatch):
     assert "failed to get storage info" in resp.get_json().get("error", "")
 
 
-def test_history_manual_metadata_rendered(client, device_config_dev):
+def test_history_manual_metadata_rendered(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     """Manual Update entries show Source with refresh_type and plugin_id."""
     d = device_config_dev.history_image_dir
     os.makedirs(d, exist_ok=True)
@@ -566,7 +613,9 @@ def test_history_manual_metadata_rendered(client, device_config_dev):
     assert "weather" in text
 
 
-def test_history_no_sidecar_shows_unknown_source(client, device_config_dev):
+def test_history_no_sidecar_shows_unknown_source(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     """Entries without JSON sidecars show a consistent "Source: Unknown" line (JTN-631)."""
     d = device_config_dev.history_image_dir
     os.makedirs(d, exist_ok=True)
@@ -584,7 +633,9 @@ def test_history_no_sidecar_shows_unknown_source(client, device_config_dev):
     assert "history-source-unknown" in text
 
 
-def test_history_metadata_deduplicates_instance(client, device_config_dev):
+def test_history_metadata_deduplicates_instance(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     """When plugin_instance equals plugin_id, it should not be shown twice."""
     d = device_config_dev.history_image_dir
     os.makedirs(d, exist_ok=True)
@@ -613,7 +664,7 @@ def test_history_metadata_deduplicates_instance(client, device_config_dev):
 # ---------------------------------------------------------------------------
 
 
-def test_list_history_images_total_count_accurate(device_config_dev):
+def test_list_history_images_total_count_accurate(device_config_dev: Any) -> None:
     """Total count reflects all PNG files, not just the returned page."""
     import json
 
@@ -637,7 +688,7 @@ def test_list_history_images_total_count_accurate(device_config_dev):
     assert len(images) == 10
 
 
-def test_list_history_images_offset_limit_slicing(device_config_dev):
+def test_list_history_images_offset_limit_slicing(device_config_dev: Any) -> None:
     """offset/limit correctly slices: 10 items, offset=2, limit=3 -> items 2,3,4."""
     from blueprints import history as history_mod
 
@@ -659,7 +710,7 @@ def test_list_history_images_offset_limit_slicing(device_config_dev):
     assert page_names == all_names[2:5]
 
 
-def test_list_history_images_offset_beyond_total(device_config_dev):
+def test_list_history_images_offset_beyond_total(device_config_dev: Any) -> None:
     """Offset beyond total returns empty list but correct total count."""
     from blueprints import history as history_mod
 
@@ -675,7 +726,7 @@ def test_list_history_images_offset_beyond_total(device_config_dev):
     assert images == []
 
 
-def test_list_history_images_no_limit_returns_all(device_config_dev):
+def test_list_history_images_no_limit_returns_all(device_config_dev: Any) -> None:
     """When limit=None (default), all items are returned for backward compat."""
     from blueprints import history as history_mod
 
@@ -691,7 +742,9 @@ def test_list_history_images_no_limit_returns_all(device_config_dev):
     assert len(images) == 7
 
 
-def test_history_action_buttons_have_aria_labels(client, device_config_dev):
+def test_history_action_buttons_have_aria_labels(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     """JTN-642: action buttons include aria-label with human-readable timestamp for assistive tech."""
     d = device_config_dev.history_image_dir
     os.makedirs(d, exist_ok=True)
@@ -736,7 +789,9 @@ def test_history_action_buttons_have_aria_labels(client, device_config_dev):
 # ---------------------------------------------------------------------------
 
 
-def test_history_delete_rejects_non_history_extension(client, device_config_dev):
+def test_history_delete_rejects_non_history_extension(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     """history_delete must refuse to delete files with unsupported extensions."""
     d = device_config_dev.history_image_dir
     os.makedirs(d, exist_ok=True)
@@ -754,7 +809,7 @@ def test_history_delete_rejects_non_history_extension(client, device_config_dev)
     assert os.path.exists(txt_path)
 
 
-def test_history_delete_allows_png(client, device_config_dev):
+def test_history_delete_allows_png(client: FlaskClient, device_config_dev: Any) -> None:
     """history_delete must successfully delete .png files."""
     d = device_config_dev.history_image_dir
     os.makedirs(d, exist_ok=True)
@@ -769,7 +824,9 @@ def test_history_delete_allows_png(client, device_config_dev):
     assert not os.path.exists(os.path.join(d, fname))
 
 
-def test_history_delete_allows_json(client, device_config_dev):
+def test_history_delete_allows_json(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     """history_delete must successfully delete .json sidecar files."""
     d = device_config_dev.history_image_dir
     os.makedirs(d, exist_ok=True)
@@ -783,7 +840,9 @@ def test_history_delete_allows_json(client, device_config_dev):
     assert not os.path.exists(os.path.join(d, fname))
 
 
-def test_list_history_images_only_reads_limit_sidecars(device_config_dev, monkeypatch):
+def test_list_history_images_only_reads_limit_sidecars(
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> Any:
     """Only `limit` number of sidecar JSON files are read, not all."""
     import json as _json
 
@@ -803,7 +862,7 @@ def test_list_history_images_only_reads_limit_sidecars(device_config_dev, monkey
     load_count = {"n": 0}
     original_load = _json.load
 
-    def counting_load(fh):
+    def counting_load(fh: Any) -> Any:
         load_count["n"] += 1
         return original_load(fh)
 
@@ -822,7 +881,9 @@ def test_list_history_images_only_reads_limit_sidecars(device_config_dev, monkey
 # ---------------------------------------------------------------------------
 
 
-def test_htmx_pagination_returns_different_content_per_page(client, device_config_dev):
+def test_htmx_pagination_returns_different_content_per_page(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     """JTN-330: HTMX partial for page 1 and page 2 must contain different images."""
     d = device_config_dev.history_image_dir
     os.makedirs(d, exist_ok=True)
@@ -850,7 +911,9 @@ def test_htmx_pagination_returns_different_content_per_page(client, device_confi
     assert not imgs_p1 & imgs_p2, "HTMX partials for page 1 and 2 must not overlap"
 
 
-def test_pagination_links_include_scroll_show_modifier(client, device_config_dev):
+def test_pagination_links_include_scroll_show_modifier(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     """JTN-330: pagination links must include show: modifier so the grid
     scrolls into view after HTMX swap."""
     d = device_config_dev.history_image_dir
@@ -872,7 +935,9 @@ def test_pagination_links_include_scroll_show_modifier(client, device_config_dev
     )
 
 
-def test_htmx_partial_is_not_full_page(client, device_config_dev):
+def test_htmx_partial_is_not_full_page(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     """JTN-330: HTMX partial must not include the full page shell."""
     d = device_config_dev.history_image_dir
     os.makedirs(d, exist_ok=True)
@@ -891,7 +956,9 @@ def test_htmx_partial_is_not_full_page(client, device_config_dev):
     assert "history-grid-container" in body, "Partial must contain the grid container"
 
 
-def test_history_source_hides_auto_generated_instance_key(client, device_config_dev):
+def test_history_source_hides_auto_generated_instance_key(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     """JTN-619: History source row must not expose {plugin_id}_saved_settings."""
     d = device_config_dev.history_image_dir
     os.makedirs(d, exist_ok=True)
@@ -917,7 +984,9 @@ def test_history_source_hides_auto_generated_instance_key(client, device_config_
     assert "weather_saved_settings" not in text
 
 
-def test_history_source_preserves_user_instance_name(client, device_config_dev):
+def test_history_source_preserves_user_instance_name(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     """User-chosen instance names continue to appear in the Source row."""
     d = device_config_dev.history_image_dir
     os.makedirs(d, exist_ok=True)
@@ -941,8 +1010,8 @@ def test_history_source_preserves_user_instance_name(client, device_config_dev):
 
 
 def test_history_pagination_previous_disabled_has_disabled_class(
-    client, device_config_dev
-):
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     """JTN-636: On page 1, 'Previous' must render with .pagination-disabled
     styling so it is visually distinguishable from the active 'Next' link."""
     d = device_config_dev.history_image_dir
@@ -966,7 +1035,9 @@ def test_history_pagination_previous_disabled_has_disabled_class(
     assert 'style="opacity: 0.4; pointer-events: none;"' not in body
 
 
-def test_history_pagination_next_disabled_on_last_page(client, device_config_dev):
+def test_history_pagination_next_disabled_on_last_page(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     """JTN-636: On the last page, 'Next' must also use .pagination-disabled."""
     d = device_config_dev.history_image_dir
     os.makedirs(d, exist_ok=True)
@@ -988,7 +1059,9 @@ def test_history_pagination_next_disabled_on_last_page(client, device_config_dev
 # ---------------------------------------------------------------------------
 
 
-def test_history_metric_pills_have_context_tooltip(client, device_config_dev):
+def test_history_metric_pills_have_context_tooltip(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     """Metric chips (Generate, Request, etc.) must have a title and aria-label
     so users can tell what the "2622 ms" number actually measures."""
     # Force a refresh_info with a generate_ms value so the pill is rendered.
@@ -1016,7 +1089,9 @@ def test_history_metric_pills_have_context_tooltip(client, device_config_dev):
 # ---------------------------------------------------------------------------
 
 
-def test_history_danger_zone_has_visual_separation(client, device_config_dev):
+def test_history_danger_zone_has_visual_separation(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     """Reset-cache section should render as a distinct danger zone with a
     divider, a "Danger zone" label, and a region landmark (JTN-649)."""
     d = device_config_dev.history_image_dir
@@ -1039,7 +1114,7 @@ def test_history_danger_zone_has_visual_separation(client, device_config_dev):
 # ---------------------------------------------------------------------------
 
 
-def _sample_png_name(d):
+def _sample_png_name(d: Any) -> Any:
     """Create a sample PNG in *d* and return its basename."""
     os.makedirs(d, exist_ok=True)
     name = "display_20260101_120000.png"
@@ -1047,7 +1122,7 @@ def _sample_png_name(d):
     return name
 
 
-def test_resolve_history_path_rejects_dotdot_traversal(device_config_dev):
+def test_resolve_history_path_rejects_dotdot_traversal(device_config_dev: Any) -> None:
     from blueprints.history import _resolve_history_path
 
     d = device_config_dev.history_image_dir
@@ -1058,7 +1133,7 @@ def test_resolve_history_path_rejects_dotdot_traversal(device_config_dev):
         _resolve_history_path(d, "../../etc/passwd")
 
 
-def test_resolve_history_path_rejects_absolute_path(device_config_dev):
+def test_resolve_history_path_rejects_absolute_path(device_config_dev: Any) -> None:
     from blueprints.history import _resolve_history_path
 
     d = device_config_dev.history_image_dir
@@ -1069,7 +1144,7 @@ def test_resolve_history_path_rejects_absolute_path(device_config_dev):
         _resolve_history_path(d, "/etc/passwd")
 
 
-def test_resolve_history_path_rejects_null_byte(device_config_dev):
+def test_resolve_history_path_rejects_null_byte(device_config_dev: Any) -> None:
     from blueprints.history import _resolve_history_path
 
     d = device_config_dev.history_image_dir
@@ -1080,7 +1155,9 @@ def test_resolve_history_path_rejects_null_byte(device_config_dev):
         _resolve_history_path(d, "good.png\x00evil")
 
 
-def test_resolve_history_path_rejects_symlink_escape(device_config_dev, tmp_path):
+def test_resolve_history_path_rejects_symlink_escape(
+    device_config_dev: Any, tmp_path: Path
+) -> None:
     """A symlink inside the history directory pointing outside must be rejected."""
     from blueprints.history import _resolve_history_path
 
@@ -1102,7 +1179,7 @@ def test_resolve_history_path_rejects_symlink_escape(device_config_dev, tmp_path
         _resolve_history_path(d, link_name)
 
 
-def test_resolve_history_path_accepts_valid_basename(device_config_dev):
+def test_resolve_history_path_accepts_valid_basename(device_config_dev: Any) -> None:
     from blueprints.history import _resolve_history_path
 
     d = device_config_dev.history_image_dir
@@ -1112,7 +1189,9 @@ def test_resolve_history_path_accepts_valid_basename(device_config_dev):
     assert os.path.realpath(resolved).startswith(os.path.realpath(d))
 
 
-def test_history_delete_rejects_traversal(client, device_config_dev):
+def test_history_delete_rejects_traversal(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     d = device_config_dev.history_image_dir
     os.makedirs(d, exist_ok=True)
     resp = client.post("/history/delete", json={"filename": "../../etc/passwd"})
@@ -1120,19 +1199,25 @@ def test_history_delete_rejects_traversal(client, device_config_dev):
     assert "invalid filename" in resp.get_json().get("error", "").lower()
 
 
-def test_history_delete_rejects_absolute_path(client, device_config_dev):
+def test_history_delete_rejects_absolute_path(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     d = device_config_dev.history_image_dir
     os.makedirs(d, exist_ok=True)
     resp = client.post("/history/delete", json={"filename": "/etc/passwd"})
     assert resp.status_code == 400
 
 
-def test_history_redisplay_rejects_traversal(client, device_config_dev):
+def test_history_redisplay_rejects_traversal(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     resp = client.post("/history/redisplay", json={"filename": "../../etc/passwd"})
     assert resp.status_code == 400
 
 
-def test_history_delete_removes_sidecar(client, device_config_dev):
+def test_history_delete_removes_sidecar(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     """Deleting a .png also removes its .json sidecar via re-validated path."""
     d = device_config_dev.history_image_dir
     os.makedirs(d, exist_ok=True)

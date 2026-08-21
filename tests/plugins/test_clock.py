@@ -1,16 +1,17 @@
 # pyright: reportMissingImports=false
 import math
 from datetime import datetime
+from typing import Any
 
 import pytest
 from PIL import Image
 
 
-def _fixed_dt(h=3, m=15, s=0):
+def _fixed_dt(h: Any = 3, m: Any = 15, s: Any = 0) -> Any:
     return datetime(2024, 1, 1, h, m, s)
 
 
-def test_static_format_time():
+def test_static_format_time() -> None:
     from plugins.clock.clock import Clock
 
     assert Clock.format_time(9, 5, zero_pad=False) == "9:5"
@@ -18,14 +19,14 @@ def test_static_format_time():
     assert Clock.format_time(12, 0, zero_pad=True) == "12:00"
 
 
-def test_static_pad_color():
+def test_static_pad_color() -> None:
     from plugins.clock.clock import Clock
 
     assert Clock.pad_color((1, 2, 3)) == (1, 2, 3, 255)
     assert Clock.pad_color((10, 20, 30, 40)) == (10, 20, 30, 40)
 
 
-def test_static_calculate_rectangle_corners():
+def test_static_calculate_rectangle_corners() -> None:
     from plugins.clock.clock import Clock
 
     start = (0.0, 0.0)
@@ -39,7 +40,7 @@ def test_static_calculate_rectangle_corners():
     assert ys == {-2.0, 2.0}
 
 
-def test_static_calculate_clock_angles():
+def test_static_calculate_clock_angles() -> None:
     from plugins.clock.clock import Clock
 
     dt = _fixed_dt(3, 0, 0)
@@ -49,7 +50,7 @@ def test_static_calculate_clock_angles():
     # We assert relative positioning: minute at 12 (pi/2 rad), hour at 0 (0 rad)
 
 
-def test_generate_settings_template():
+def test_generate_settings_template() -> None:
     """Test generate_settings_template method."""
     from plugins.clock.clock import CLOCK_FACES, Clock
 
@@ -81,7 +82,7 @@ def test_clock_color_schema_labels_explain_face_colors() -> None:
     assert labels == ["Face accent color", "Face background color"]
 
 
-def test_generate_image_exception_handling():
+def test_generate_image_exception_handling() -> None:
     """Test exception handling in generate_image method."""
     from unittest.mock import MagicMock
 
@@ -102,7 +103,7 @@ def test_generate_image_exception_handling():
     assert img is not None
 
 
-def test_draw_divided_clock():
+def test_draw_divided_clock() -> None:
     """Test draw_divided_clock method."""
     from plugins.clock.clock import Clock
 
@@ -115,7 +116,7 @@ def test_draw_divided_clock():
     assert img.size == dimensions
 
 
-def test_draw_word_clock():
+def test_draw_word_clock() -> None:
     """Test draw_word_clock method."""
     from plugins.clock.clock import Clock
 
@@ -128,7 +129,7 @@ def test_draw_word_clock():
     assert img.size == dimensions
 
 
-def test_draw_word_clock_minute_logic():
+def test_draw_word_clock_minute_logic() -> None:
     """Test word clock minute logic for different times."""
     from plugins.clock.clock import Clock
 
@@ -149,7 +150,7 @@ def test_draw_word_clock_minute_logic():
         assert img is not None
 
 
-def test_conic_clock_full_circle():
+def test_conic_clock_full_circle() -> None:
     """Test conic clock full circle gradient case."""
     from plugins.clock.clock import Clock
 
@@ -163,7 +164,7 @@ def test_conic_clock_full_circle():
     assert img.size == dimensions
 
 
-def test_timezone_handling():
+def test_timezone_handling() -> None:
     """Test timezone handling in generate_image."""
     from unittest.mock import MagicMock
 
@@ -209,7 +210,7 @@ def test_invalid_timezone_falls_back_in_generate_image() -> None:
     assert img is not None
 
 
-def test_invalid_clock_face_fallback():
+def test_invalid_clock_face_fallback() -> None:
     """Test fallback to default clock face for invalid selection."""
     from unittest.mock import MagicMock
 
@@ -230,7 +231,7 @@ def test_invalid_clock_face_fallback():
     # Should fall back to DEFAULT_CLOCK_FACE
 
 
-def test_static_translate_word_grid_positions_edges():
+def test_static_translate_word_grid_positions_edges() -> None:
     from plugins.clock.clock import Clock
 
     # Edge near o'clock
@@ -240,7 +241,7 @@ def test_static_translate_word_grid_positions_edges():
     assert [9, 5] in letters_59
 
 
-def test_translate_word_grid_positions_minute_33_uses_next_hour():
+def test_translate_word_grid_positions_minute_33_uses_next_hour() -> None:
     """At minute 33 the display should say TO [next hour], not TO [current hour].
 
     3:33 -> "TO FOUR" (hour index 3 in the hours list = FOUR)
@@ -266,7 +267,7 @@ def test_translate_word_grid_positions_minute_33_uses_next_hour():
     assert [5, 6] not in letters
 
 
-def test_draw_gradient_image_mode_and_size():
+def test_draw_gradient_image_mode_and_size() -> None:
     from plugins.clock.clock import Clock
 
     img = Clock.draw_gradient_image(
@@ -277,7 +278,7 @@ def test_draw_gradient_image_mode_and_size():
     assert img.size == (120, 80)
 
 
-def test_draw_hour_marks_image_unchanged_size_and_mode():
+def test_draw_hour_marks_image_unchanged_size_and_mode() -> None:
     from plugins.clock.clock import Clock
 
     base = Image.new("RGBA", (200, 200), (0, 0, 0, 0))
@@ -286,7 +287,7 @@ def test_draw_hour_marks_image_unchanged_size_and_mode():
     assert out.mode == "RGBA"
 
 
-def test_draw_clock_hand_image_unchanged_size_and_mode():
+def test_draw_clock_hand_image_unchanged_size_and_mode() -> None:
     from plugins.clock.clock import Clock
 
     base = Image.new("RGBA", (300, 200), (0, 0, 0, 0))
@@ -301,7 +302,9 @@ def test_draw_clock_hand_image_unchanged_size_and_mode():
     assert out.mode == "RGBA"
 
 
-def test_generate_image_face_selection_and_orientation(device_config_dev, monkeypatch):
+def test_generate_image_face_selection_and_orientation(
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     from plugins.clock.clock import Clock
 
     # Horizontal
@@ -335,7 +338,7 @@ def test_generate_image_face_selection_and_orientation(device_config_dev, monkey
     assert img_v.size == (h, w)
 
 
-def test_generate_image_default_face_when_invalid(device_config_dev):
+def test_generate_image_default_face_when_invalid(device_config_dev: Any) -> None:
     from plugins.clock.clock import Clock
 
     cfg = device_config_dev
@@ -354,14 +357,16 @@ def test_generate_image_default_face_when_invalid(device_config_dev):
     assert img.size[0] > 0
 
 
-def test_generate_image_error_path(device_config_dev, monkeypatch):
+def test_generate_image_error_path(
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     from plugins.clock.clock import Clock
 
     # Force a failure inside one of the draw methods (e.g., digital)
     class Boom(Exception):
         pass
 
-    def boom(*args, **kwargs):
+    def boom(*args: Any, **kwargs: Any) -> None:
         raise Boom("boom")
 
     import plugins.clock.clock as clock_mod

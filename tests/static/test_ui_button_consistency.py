@@ -32,7 +32,7 @@ def _css_block(css: str, selector: str) -> str:
     raise AssertionError(f"{selector} rule missing")
 
 
-def test_settings_demotes_non_primary_actions_to_secondary_styles():
+def test_settings_demotes_non_primary_actions_to_secondary_styles() -> None:
     html = SETTINGS_HTML.read_text(encoding="utf-8")
 
     assert (
@@ -49,7 +49,7 @@ def test_settings_demotes_non_primary_actions_to_secondary_styles():
     assert 'class="action-button is-secondary settings-logs-toggle"' in html
 
 
-def test_playlist_card_actions_use_visible_labels_for_edit_and_delete():
+def test_playlist_card_actions_use_visible_labels_for_edit_and_delete() -> None:
     html = PLAYLIST_HTML.read_text(encoding="utf-8")
 
     assert '<span class="action-button-label">Edit</span>' in html
@@ -58,7 +58,7 @@ def test_playlist_card_actions_use_visible_labels_for_edit_and_delete():
     assert 'class="pl-add-row"' in html
 
 
-def test_secondary_button_styles_share_surface_treatment_and_compact_scale():
+def test_secondary_button_styles_share_surface_treatment_and_compact_scale() -> None:
     button_css = BUTTON_CSS.read_text(encoding="utf-8")
     nav_css = NAVIGATION_CSS.read_text(encoding="utf-8")
     compact = _css_block(button_css, ".action-button.compact")
@@ -76,7 +76,7 @@ def test_secondary_button_styles_share_surface_treatment_and_compact_scale():
     assert "border: 1px solid var(--surface-border)" in header_secondary
 
 
-def test_disabled_buttons_do_not_keep_primary_fill():
+def test_disabled_buttons_do_not_keep_primary_fill() -> None:
     button_css = BUTTON_CSS.read_text(encoding="utf-8")
     disabled_block = _css_block(button_css, ".action-button:disabled")
 
@@ -85,7 +85,7 @@ def test_disabled_buttons_do_not_keep_primary_fill():
     assert "transform: none" in disabled_block
 
 
-def test_playlist_add_row_reads_as_clickable_recovery_action():
+def test_playlist_add_row_reads_as_clickable_recovery_action() -> None:
     css = PLAYLIST_ITEM_CSS.read_text(encoding="utf-8")
     add_row = _css_block(css, ".pl-add-row")
 

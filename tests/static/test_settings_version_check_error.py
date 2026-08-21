@@ -6,7 +6,7 @@ from pathlib import Path
 JS_PATH = Path("src/static/scripts/settings/actions.js")
 
 
-def test_version_check_aborts_without_warning():
+def test_version_check_aborts_without_warning() -> None:
     """AbortError from the version-check fetch should be treated as expected."""
     js = JS_PATH.read_text()
 

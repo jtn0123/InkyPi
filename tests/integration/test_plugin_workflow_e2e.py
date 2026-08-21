@@ -2,8 +2,10 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 
 import pytest
+from playwright.sync_api import Page
 
 pytestmark = pytest.mark.skipif(
     os.getenv("SKIP_UI", "").lower() in ("1", "true"),
@@ -13,7 +15,9 @@ pytestmark = pytest.mark.skipif(
 from tests.integration.browser_helpers import navigate_and_wait  # noqa: E402
 
 
-def test_plugin_settings_form_has_fields(live_server, browser_page, tmp_path):
+def test_plugin_settings_form_has_fields(
+    live_server: str, browser_page: Page, tmp_path: Path
+) -> None:
     page = browser_page
     rc = navigate_and_wait(page, live_server, "/plugin/clock")
 
@@ -27,7 +31,9 @@ def test_plugin_settings_form_has_fields(live_server, browser_page, tmp_path):
     rc.assert_no_errors(str(tmp_path), "plugin_form_fields")
 
 
-def test_plugin_settings_form_fields_editable(live_server, browser_page, tmp_path):
+def test_plugin_settings_form_fields_editable(
+    live_server: str, browser_page: Page, tmp_path: Path
+) -> None:
     page = browser_page
     # Use todo_list which has a text field ("title"); the clock plugin has
     # only color pickers and a custom clock-face radio widget, no text inputs.
@@ -46,8 +52,10 @@ def test_plugin_settings_form_fields_editable(live_server, browser_page, tmp_pat
     rc.assert_no_errors(str(tmp_path), "plugin_form_editable")
 
 
-def test_plugin_page_renders_both_workflow_panels(live_server, mobile_page, tmp_path):
-    # Design refresh (post-JTN-89): the Configure/Preview mode toggle was
+def test_plugin_page_renders_both_workflow_panels(
+    live_server: str, mobile_page: Page, tmp_path: Path
+):
+    # Design refresh (post-JTN-89) -> None -> None: the Configure/Preview mode toggle was
     # retired in favor of always showing both panels stacked on mobile and
     # side-by-side on desktop. Confirm both panels render and neither is
     # hidden behind an aria-hidden / inert gate.
@@ -72,7 +80,9 @@ def test_plugin_page_renders_both_workflow_panels(live_server, mobile_page, tmp_
     rc.assert_no_errors(str(tmp_path), "plugin_workflow_panels_always_visible")
 
 
-def test_last_progress_card_persistent_in_aside(live_server, browser_page, tmp_path):
+def test_last_progress_card_persistent_in_aside(
+    live_server: str, browser_page: Page, tmp_path: Path
+) -> None:
     """Design refresh: the Progress card is now a persistent aside card, not a
     fixed overlay. Confirm it renders on load with an empty state (no snapshot
     in localStorage) and that clicking ``#showLastProgressBtn`` reloads the

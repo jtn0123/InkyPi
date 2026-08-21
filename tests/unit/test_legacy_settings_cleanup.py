@@ -7,6 +7,7 @@ that all plugins use the schema-driven form system.
 import os
 import pathlib
 import sys
+from typing import Any
 
 import pytest
 
@@ -17,7 +18,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "src"))
 _SCHEMA_EXEMPT = {"base_plugin", "year_progress"}
 
 
-def _discover_active_plugins():
+def _discover_active_plugins() -> Any:
     """Dynamically discover plugin directories, excluding exempt and internal."""
     plugins_dir = pathlib.Path(__file__).parents[2] / "src" / "plugins"
     exclude = _SCHEMA_EXEMPT | {"__pycache__", "__fake__"}
@@ -31,7 +32,7 @@ def _discover_active_plugins():
 _ACTIVE_PLUGINS = _discover_active_plugins()
 
 
-def _get_plugin_class(plugin_id):
+def _get_plugin_class(plugin_id: Any) -> Any:
     """Import plugin module and return the first BasePlugin subclass."""
     from plugins.base_plugin.base_plugin import BasePlugin
 
@@ -48,7 +49,7 @@ def _get_plugin_class(plugin_id):
 
 
 @pytest.mark.parametrize("plugin_id", _ACTIVE_PLUGINS)
-def test_all_active_plugins_have_settings_schema(plugin_id):
+def test_all_active_plugins_have_settings_schema(plugin_id: Any) -> None:
     """Every active plugin must return a non-None settings schema."""
     from plugins.base_plugin.base_plugin import BasePlugin
 
@@ -65,7 +66,7 @@ def test_all_active_plugins_have_settings_schema(plugin_id):
     )
 
 
-def test_no_orphaned_settings_html():
+def test_no_orphaned_settings_html() -> None:
     """No plugin directory (other than base_plugin) should contain a settings.html."""
     repo_root = pathlib.Path(__file__).parents[2]
     matches = sorted((repo_root / "src" / "plugins").glob("*/settings.html"))
@@ -82,7 +83,7 @@ def test_no_orphaned_settings_html():
 
 
 @pytest.mark.parametrize("plugin_id", ["image_folder", "image_album", "image_upload"])
-def test_image_plugins_have_background_fields_in_schema(plugin_id):
+def test_image_plugins_have_background_fields_in_schema(plugin_id: Any) -> None:
     """Image plugins must define backgroundOption and backgroundColor in their schema."""
     plugin_cls = _get_plugin_class(plugin_id)
     assert plugin_cls is not None, f"No BasePlugin subclass found in {plugin_id}"
@@ -92,7 +93,7 @@ def test_image_plugins_have_background_fields_in_schema(plugin_id):
     # Recursively collect all field names from the schema
     field_names = set()
 
-    def _collect_fields(obj) -> None:
+    def _collect_fields(obj: Any) -> None:
         if isinstance(obj, dict):
             if "name" in obj:
                 field_names.add(obj["name"])

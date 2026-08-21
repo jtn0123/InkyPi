@@ -2,14 +2,18 @@
 """Tests exercising specific exception paths changed in JTN-41 batch 1."""
 
 import os
+from pathlib import Path
+from typing import Any
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 # ---------------------------------------------------------------------------
 # http_utils: RuntimeError on Flask context access outside request
 # ---------------------------------------------------------------------------
 
 
-def test_get_request_id_outside_context():
+def test_get_request_id_outside_context() -> None:
     """_get_or_set_request_id returns None outside Flask request context."""
     from utils.http_utils import _get_or_set_request_id
 
@@ -17,7 +21,7 @@ def test_get_request_id_outside_context():
     assert result is None
 
 
-def test_env_float_invalid(monkeypatch):
+def test_env_float_invalid(monkeypatch: pytest.MonkeyPatch) -> None:
     """_env_float returns default when env var is not a valid float."""
     monkeypatch.setenv("TEST_BAD_FLOAT", "not_a_number")
     from utils.http_utils import _env_float
@@ -26,7 +30,7 @@ def test_env_float_invalid(monkeypatch):
     assert result == 42.0
 
 
-def test_env_int_invalid(monkeypatch):
+def test_env_int_invalid(monkeypatch: pytest.MonkeyPatch) -> None:
     """_env_int returns default when env var is not a valid int."""
     monkeypatch.setenv("TEST_BAD_INT", "xyz")
     from utils.http_utils import _env_int
@@ -40,7 +44,7 @@ def test_env_int_invalid(monkeypatch):
 # ---------------------------------------------------------------------------
 
 
-def test_cache_control_malformed_max_age():
+def test_cache_control_malformed_max_age() -> None:
     """_parse_cache_control handles malformed max-age gracefully."""
     from utils.http_cache import HTTPCache
 
@@ -57,7 +61,9 @@ def test_cache_control_malformed_max_age():
 # ---------------------------------------------------------------------------
 
 
-def test_config_chmod_failure_logged(monkeypatch, tmp_path, caplog):
+def test_config_chmod_failure_logged(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
     """Config._write_env gracefully handles chmod failure."""
     import logging
 
@@ -66,7 +72,7 @@ def test_config_chmod_failure_logged(monkeypatch, tmp_path, caplog):
     env_path = tmp_path / ".env"
     env_path.write_text("KEY=val\n")
 
-    def _raise_chmod(*args, **kwargs):
+    def _raise_chmod(*args: Any, **kwargs: Any) -> None:
         raise OSError("permission denied")
 
     monkeypatch.setattr(os, "chmod", _raise_chmod)
@@ -87,7 +93,7 @@ def test_config_chmod_failure_logged(monkeypatch, tmp_path, caplog):
 # ---------------------------------------------------------------------------
 
 
-def test_playwright_import_error(monkeypatch):
+def test_playwright_import_error(monkeypatch: pytest.MonkeyPatch) -> Any:
     """_playwright_screenshot_html returns None when playwright not installed."""
     import utils.image_utils as iu
 
@@ -96,7 +102,7 @@ def test_playwright_import_error(monkeypatch):
         __builtins__.__import__ if hasattr(__builtins__, "__import__") else __import__
     )
 
-    def fake_import(name, *args, **kwargs):
+    def fake_import(name: Any, *args: Any, **kwargs: Any) -> Any:
         if "playwright" in name:
             raise ImportError("no playwright")
         return original_import(name, *args, **kwargs)
@@ -112,7 +118,9 @@ def test_playwright_import_error(monkeypatch):
 # ---------------------------------------------------------------------------
 
 
-def test_is_low_resource_device_returns_true_on_error(monkeypatch):
+def test_is_low_resource_device_returns_true_on_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """_is_low_resource_device defaults to True when psutil fails."""
     from utils.image_loader import _is_low_resource_device
 
@@ -128,7 +136,7 @@ def test_is_low_resource_device_returns_true_on_error(monkeypatch):
 # ---------------------------------------------------------------------------
 
 
-def test_snooze_until_invalid_datetime():
+def test_snooze_until_invalid_datetime() -> None:
     """PluginInstance with invalid snooze_until should still be show-eligible."""
     from datetime import UTC, datetime
 
@@ -152,7 +160,9 @@ def test_snooze_until_invalid_datetime():
 # ---------------------------------------------------------------------------
 
 
-def test_handle_request_files_seek_attribute_error(monkeypatch, tmp_path):
+def test_handle_request_files_seek_attribute_error(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> Any:
     """handle_request_files handles AttributeError on seek gracefully."""
     monkeypatch.setenv("SRC_DIR", str(tmp_path))
     (tmp_path / "static" / "images" / "saved").mkdir(parents=True, exist_ok=True)
@@ -176,20 +186,20 @@ def test_handle_request_files_seek_attribute_error(monkeypatch, tmp_path):
             lambda self: (_ for _ in ()).throw(AttributeError("no stream"))
         )
 
-        def read(self):
+        def read(self) -> Any:
             return content
 
-        def seek(self, pos):
+        def seek(self, pos: Any) -> None:
             raise AttributeError("no seek")
 
-        def tell(self):
+        def tell(self) -> Any:
             return len(content)
 
     class FakeFiles:
-        def keys(self):
+        def keys(self) -> Any:
             return {"file"}
 
-        def items(self, multi=False):
+        def items(self, multi: Any = False) -> Any:
             return iter([("file", BadStreamFile())])
 
     result = handle_request_files(FakeFiles())
@@ -201,7 +211,7 @@ def test_handle_request_files_seek_attribute_error(monkeypatch, tmp_path):
 # ---------------------------------------------------------------------------
 
 
-def test_unsplash_request_timeout_bad_env(monkeypatch):
+def test_unsplash_request_timeout_bad_env(monkeypatch: pytest.MonkeyPatch) -> None:
     """Unsplash._request_timeout falls back to 20.0 on invalid env var."""
     monkeypatch.setenv("INKYPI_HTTP_TIMEOUT_DEFAULT_S", "not_a_number")
     from plugins.unsplash.unsplash import Unsplash
@@ -215,7 +225,9 @@ def test_unsplash_request_timeout_bad_env(monkeypatch):
 # ---------------------------------------------------------------------------
 
 
-def test_image_upload_cleanup_oserror(monkeypatch, tmp_path, caplog):
+def test_image_upload_cleanup_oserror(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
     """ImageUpload.cleanup gracefully handles OSError on file deletion."""
     import logging
 
@@ -225,7 +237,7 @@ def test_image_upload_cleanup_oserror(monkeypatch, tmp_path, caplog):
     target = tmp_path / "fake.png"
     target.write_bytes(b"data")
 
-    def _raise_remove(path):
+    def _raise_remove(path: Any) -> None:
         raise OSError("permission denied")
 
     monkeypatch.setattr(os, "remove", _raise_remove)
@@ -244,7 +256,7 @@ def test_image_upload_cleanup_oserror(monkeypatch, tmp_path, caplog):
 # ---------------------------------------------------------------------------
 
 
-def test_apod_request_timeout_bad_env(monkeypatch):
+def test_apod_request_timeout_bad_env(monkeypatch: pytest.MonkeyPatch) -> None:
     """Apod._request_timeout falls back to 20.0 on invalid env var."""
     monkeypatch.setenv("INKYPI_HTTP_TIMEOUT_DEFAULT_S", "bad")
     from plugins.apod.apod import Apod
@@ -258,7 +270,9 @@ def test_apod_request_timeout_bad_env(monkeypatch):
 # ---------------------------------------------------------------------------
 
 
-def test_base_plugin_screenshot_timeout_bad_env(monkeypatch):
+def test_base_plugin_screenshot_timeout_bad_env(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Inline screenshot timeout parsing falls back on invalid env var."""
     monkeypatch.setenv("INKYPI_SCREENSHOT_TIMEOUT_MS", "not_int")
     # Exercise the same inline pattern from base_plugin.py:238-243
@@ -277,7 +291,7 @@ def test_base_plugin_screenshot_timeout_bad_env(monkeypatch):
 # ---------------------------------------------------------------------------
 
 
-def test_weather_request_timeout_bad_env(monkeypatch):
+def test_weather_request_timeout_bad_env(monkeypatch: pytest.MonkeyPatch) -> None:
     """Weather._request_timeout falls back to 20.0 on invalid env var."""
     monkeypatch.setenv("INKYPI_HTTP_TIMEOUT_DEFAULT_S", "xyz")
     from plugins.weather.weather import Weather
@@ -291,7 +305,9 @@ def test_weather_request_timeout_bad_env(monkeypatch):
 # ---------------------------------------------------------------------------
 
 
-def test_adaptive_loader_from_file_oserror(monkeypatch, tmp_path):
+def test_adaptive_loader_from_file_oserror(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     """AdaptiveImageLoader.from_file returns None on OSError."""
     from utils.image_loader import AdaptiveImageLoader
 
@@ -301,7 +317,7 @@ def test_adaptive_loader_from_file_oserror(monkeypatch, tmp_path):
 
     loader = AdaptiveImageLoader()
 
-    def _raise(*args, **kwargs):
+    def _raise(*args: Any, **kwargs: Any) -> None:
         raise OSError("corrupt")
 
     monkeypatch.setattr(loader, "_load_from_file_fast", _raise)
@@ -315,7 +331,9 @@ def test_adaptive_loader_from_file_oserror(monkeypatch, tmp_path):
 # ---------------------------------------------------------------------------
 
 
-def test_config_set_env_key_chmod_failure(monkeypatch, tmp_path, caplog):
+def test_config_set_env_key_chmod_failure(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> Any:
     """set_env_key handles chmod OSError gracefully."""
     import logging
 
@@ -330,7 +348,7 @@ def test_config_set_env_key_chmod_failure(monkeypatch, tmp_path, caplog):
 
     original_chmod = os.chmod
 
-    def _fail_chmod(path, mode):
+    def _fail_chmod(path: Any, mode: Any) -> Any:
         if ".env" in str(path):
             raise OSError("permission denied")
         return original_chmod(path, mode)

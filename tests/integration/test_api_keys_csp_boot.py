@@ -10,10 +10,12 @@ from __future__ import annotations
 
 import re  # noqa: I001 — re is used below; import order is intentional
 
+from flask.testing import FlaskClient
+
 # -- JTN-323: + Add API Key button must work ----------------------------------
 
 
-def test_no_inline_script_in_api_keys_page(client):
+def test_no_inline_script_in_api_keys_page(client: FlaskClient) -> None:
     """The api_keys page must not contain an inline <script> boot block.
 
     CSP ``script-src 'self'`` blocks inline scripts, which silently
@@ -29,7 +31,7 @@ def test_no_inline_script_in_api_keys_page(client):
     ), "Inline boot config must be removed; use data-* attributes instead"
 
 
-def test_api_keys_frame_has_data_attributes(client):
+def test_api_keys_frame_has_data_attributes(client: FlaskClient) -> None:
     """The .api-keys-frame container must carry data-* boot config attributes."""
     resp = client.get("/api-keys")
     assert resp.status_code == 200
@@ -41,7 +43,7 @@ def test_api_keys_frame_has_data_attributes(client):
     assert "data-save-managed-url=" in html
 
 
-def test_js_self_initialises_from_data_attributes(client):
+def test_js_self_initialises_from_data_attributes(client: FlaskClient) -> None:
     """The external JS must read data-* attributes and self-initialise."""
     resp = client.get("/static/scripts/api_keys_page.js")
     assert resp.status_code == 200
@@ -55,7 +57,7 @@ def test_js_self_initialises_from_data_attributes(client):
 # -- JTN-324: Suggested key chips must trigger row creation --------------------
 
 
-def test_preset_buttons_use_delegation(client):
+def test_preset_buttons_use_delegation(client: FlaskClient) -> None:
     """JTN-324: preset chip buttons must use data-api-action='add-preset'."""
     resp = client.get("/api-keys")
     assert resp.status_code == 200
@@ -67,7 +69,7 @@ def test_preset_buttons_use_delegation(client):
     ), f"Expected at least 6 preset chip buttons, found {preset_count}"
 
 
-def test_js_handles_add_preset_action(client):
+def test_js_handles_add_preset_action(client: FlaskClient) -> None:
     """JTN-324: the delegated click handler must handle the 'add-preset' action."""
     resp = client.get("/static/scripts/api_keys_page.js")
     assert resp.status_code == 200
@@ -80,7 +82,7 @@ def test_js_handles_add_preset_action(client):
 # -- JTN-325: Delete button must confirm and remove entries --------------------
 
 
-def test_delete_button_uses_delegation(client):
+def test_delete_button_uses_delegation(client: FlaskClient) -> None:
     """JTN-325: delete buttons in generic mode use data-api-action='delete-row'."""
     # Verify the JS handler supports both delete actions
     js_resp = client.get("/static/scripts/api_keys_page.js")
@@ -90,7 +92,7 @@ def test_delete_button_uses_delegation(client):
     assert '"delete-key"' in js, "JS must handle 'delete-key' action for managed mode"
 
 
-def test_external_js_loaded_with_defer(client):
+def test_external_js_loaded_with_defer(client: FlaskClient) -> None:
     """The api_keys_page.js script tag must use defer (not inline) for CSP compat."""
     resp = client.get("/api-keys")
     assert resp.status_code == 200
@@ -102,7 +104,7 @@ def test_external_js_loaded_with_defer(client):
     ), "api_keys_page.js must be loaded via a <script defer> tag"
 
 
-def test_data_mode_attribute_matches_generic(client):
+def test_data_mode_attribute_matches_generic(client: FlaskClient) -> None:
     """The generic API keys page must set data-mode='generic'."""
     resp = client.get("/api-keys")
     assert resp.status_code == 200

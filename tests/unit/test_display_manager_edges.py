@@ -2,6 +2,9 @@
 """Edge-case tests for display_manager.py: init errors, prune, save history, hash skip."""
 
 import os
+from collections.abc import Iterator
+from pathlib import Path
+from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
@@ -9,7 +12,9 @@ from PIL import Image
 
 
 class TestDisplayManagerInit:
-    def test_inky_unavailable_raises(self, device_config_dev, monkeypatch):
+    def test_inky_unavailable_raises(
+        self, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """display_type='inky' with InkyDisplay=None raises RuntimeError."""
         import display.display_manager as dm_mod
 
@@ -25,7 +30,9 @@ class TestDisplayManagerInit:
         with pytest.raises(RuntimeError, match="Inky hardware driver"):
             dm_mod.DisplayManager(cfg)
 
-    def test_waveshare_unavailable_raises(self, device_config_dev, monkeypatch):
+    def test_waveshare_unavailable_raises(
+        self, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """display_type matching epd pattern with WaveshareDisplay=None raises RuntimeError."""
         import display.display_manager as dm_mod
 
@@ -39,7 +46,9 @@ class TestDisplayManagerInit:
         with pytest.raises(RuntimeError, match="Waveshare driver"):
             dm_mod.DisplayManager(cfg)
 
-    def test_unsupported_display_raises(self, device_config_dev, monkeypatch):
+    def test_unsupported_display_raises(
+        self, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Unknown display_type raises ValueError."""
         import config as config_mod
         import display.display_manager as dm_mod
@@ -53,7 +62,7 @@ class TestDisplayManagerInit:
 
 class TestPruneHistory:
     @pytest.fixture(autouse=True)
-    def reset_class_state(self):
+    def reset_class_state(self) -> Iterator[Any]:
         """Reset class-level state to avoid leaks between tests."""
         from display.display_manager import DisplayManager
 
@@ -63,7 +72,9 @@ class TestPruneHistory:
         DisplayManager._history_count_estimate = None
         DisplayManager._history_increment_count = 0
 
-    def test_skips_when_estimate_under_limit(self, device_config_dev, tmp_path):
+    def test_skips_when_estimate_under_limit(
+        self, device_config_dev: Any, tmp_path: Path
+    ) -> None:
         """Estimate below max → no directory scan."""
         from display.display_manager import DisplayManager
 
@@ -84,7 +95,9 @@ class TestPruneHistory:
         assert os.path.exists(tmp_path / "history_prune" / "test.png")
         assert dm._history_count_estimate == 11  # incremented
 
-    def test_removes_oldest_over_limit(self, device_config_dev, tmp_path):
+    def test_removes_oldest_over_limit(
+        self, device_config_dev: Any, tmp_path: Path
+    ) -> None:
         """Files over limit are removed (oldest first), including sidecars."""
         from display.display_manager import DisplayManager
 
@@ -117,7 +130,7 @@ class TestPruneHistory:
         assert not os.path.exists(tmp_path / "history_prune2" / "display_0000.json")
         assert not os.path.exists(tmp_path / "history_prune2" / "display_0001.json")
 
-    def test_recount_forces_scan(self, device_config_dev, tmp_path):
+    def test_recount_forces_scan(self, device_config_dev: Any, tmp_path: Path) -> None:
         """After _RECOUNT_INTERVAL increments, a full scan occurs."""
         from display.display_manager import DisplayManager
 
@@ -137,7 +150,9 @@ class TestPruneHistory:
         # After recount, estimate should match actual count
         assert dm._history_count_estimate == 2
 
-    def test_os_error_handled(self, device_config_dev, tmp_path, monkeypatch):
+    def test_os_error_handled(
+        self, device_config_dev: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """os.listdir raising OSError → no crash."""
         from display.display_manager import DisplayManager
 
@@ -151,7 +166,7 @@ class TestPruneHistory:
 
 
 class TestSaveHistoryEntry:
-    def test_timestamp_collision(self, device_config_dev, tmp_path):
+    def test_timestamp_collision(self, device_config_dev: Any, tmp_path: Path) -> None:
         """Pre-existing file causes microsecond suffix to be added."""
         from display.display_manager import DisplayManager
 
@@ -175,7 +190,7 @@ class TestSaveHistoryEntry:
         files_after = {f for f in os.listdir(history_dir) if f.endswith(".png")}
         assert len(files_after) == 2  # both saved, no clobber
 
-    def test_no_history_dir(self, device_config_dev):
+    def test_no_history_dir(self, device_config_dev: Any) -> None:
         """history_image_dir=None → no-op, no crash."""
         from display.display_manager import DisplayManager
 
@@ -186,7 +201,9 @@ class TestSaveHistoryEntry:
         # Should not raise
         dm._save_history_entry(img)
 
-    def test_image_save_failure(self, device_config_dev, tmp_path, monkeypatch):
+    def test_image_save_failure(
+        self, device_config_dev: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """image.save raises OSError → returns early, no sidecar written."""
         from display.display_manager import DisplayManager
 
@@ -204,7 +221,9 @@ class TestSaveHistoryEntry:
         json_files = [f for f in os.listdir(history_dir) if f.endswith(".json")]
         assert len(json_files) == 0
 
-    def test_meta_write_failure(self, device_config_dev, tmp_path, monkeypatch):
+    def test_meta_write_failure(
+        self, device_config_dev: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """JSON sidecar write failure → PNG still saved."""
         from display.display_manager import DisplayManager
 
@@ -230,7 +249,9 @@ class TestSaveHistoryEntry:
 
 
 class TestDisplayImageHashSkip:
-    def test_same_image_skips_second_display(self, device_config_dev, tmp_path):
+    def test_same_image_skips_second_display(
+        self, device_config_dev: Any, tmp_path: Path
+    ) -> None:
         """Displaying same image twice → second call returns early."""
         from display.display_manager import DisplayManager
 

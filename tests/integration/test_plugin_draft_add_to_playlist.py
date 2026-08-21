@@ -6,8 +6,10 @@ never fail silently.
 """
 
 import os
+from typing import Any
 
 import pytest
+from flask.testing import FlaskClient
 
 pytestmark = pytest.mark.skipif(
     os.getenv("SKIP_UI", "").lower() in ("1", "true"),
@@ -15,14 +17,16 @@ pytestmark = pytest.mark.skipif(
 )
 
 
-def _render_clock_draft(client):
+def _render_clock_draft(client: FlaskClient) -> Any:
     """Return the raw HTML for `/plugin/clock` in DRAFT state."""
     resp = client.get("/plugin/clock")
     assert resp.status_code == 200
     return resp.get_data(as_text=True)
 
 
-def test_draft_add_to_playlist_button_renders_with_schedule_target(client):
+def test_draft_add_to_playlist_button_renders_with_schedule_target(
+    client: FlaskClient,
+) -> None:
     """DRAFT page must render an Add-to-Playlist trigger that targets Schedule."""
     html = _render_clock_draft(client)
     # DRAFT chip present
@@ -38,7 +42,9 @@ def test_draft_add_to_playlist_button_renders_with_schedule_target(client):
     assert "current settings" in html
 
 
-def test_draft_add_to_playlist_button_reveals_schedule_tab_with_real_handlers(client):
+def test_draft_add_to_playlist_button_reveals_schedule_tab_with_real_handlers(
+    client: FlaskClient,
+) -> None:
     """Real plugin_page.js handlers must reveal Schedule when the button is clicked.
 
     The previous test harness injected its own listeners. This test instead
@@ -127,7 +133,9 @@ def test_draft_add_to_playlist_button_reveals_schedule_tab_with_real_handlers(cl
         browser.close()
 
 
-def test_draft_add_to_playlist_click_surfaces_failure_if_schedule_panel_missing(client):
+def test_draft_add_to_playlist_click_surfaces_failure_if_schedule_panel_missing(
+    client: FlaskClient,
+) -> None:
     """If the inline scheduling panel is ever removed, the click must surface a
     visible error — never silently no-op. JTN-633 defensive path."""
     pytest.importorskip("playwright.sync_api", reason="playwright not available")

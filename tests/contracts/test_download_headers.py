@@ -15,7 +15,11 @@ from __future__ import annotations
 import os
 import re
 import sys
+from pathlib import Path
+from typing import Any
 
+import pytest
+from flask.testing import FlaskClient
 from PIL import Image
 
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
@@ -48,7 +52,9 @@ def _assert_attachment(cd: str) -> None:
 
 
 class TestDownloadLogsHeaders:
-    def test_attachment_disposition(self, client, monkeypatch):
+    def test_attachment_disposition(
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """download_logs must return attachment with a properly quoted filename."""
         import blueprints.settings as mod
 
@@ -58,7 +64,9 @@ class TestDownloadLogsHeaders:
         cd = resp.headers.get("Content-Disposition", "")
         _assert_attachment(cd)
 
-    def test_filename_matches_pattern(self, client, monkeypatch):
+    def test_filename_matches_pattern(
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """download_logs filename must match inkypi_YYYYMMDD-HHMMSS.log."""
         import blueprints.settings as mod
 
@@ -70,7 +78,9 @@ class TestDownloadLogsHeaders:
             r'filename="inkypi_\d{8}-\d{6}\.log"', cd
         ), f"Unexpected filename in: {cd!r}"
 
-    def test_filename_has_safe_chars_only(self, client, monkeypatch):
+    def test_filename_has_safe_chars_only(
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Filename in Content-Disposition must contain only safe characters."""
         import blueprints.settings as mod
 
@@ -85,7 +95,9 @@ class TestDownloadLogsHeaders:
             r"[a-zA-Z0-9._-]+", fname
         ), f"Filename contains unsafe characters: {fname!r}"
 
-    def test_nosniff_header_present(self, client, monkeypatch):
+    def test_nosniff_header_present(
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """download_logs response must include X-Content-Type-Options: nosniff."""
         import blueprints.settings as mod
 
@@ -100,7 +112,7 @@ class TestDownloadLogsHeaders:
 # ---------------------------------------------------------------------------
 
 
-def _make_png(tmp_path, name="test.png"):
+def _make_png(tmp_path: Path, name: Any = "test.png") -> Any:
     p = tmp_path / name
     img = Image.new("RGB", (4, 4), color=(10, 20, 30))
     img.save(str(p), format="PNG")
@@ -108,7 +120,7 @@ def _make_png(tmp_path, name="test.png"):
 
 
 class TestMaybeServeWebpHeaders:
-    def test_png_path_sets_inline_disposition(self, tmp_path):
+    def test_png_path_sets_inline_disposition(self, tmp_path: Path) -> None:
         """maybe_serve_webp PNG branch must set inline Content-Disposition."""
         from flask import Flask
 
@@ -123,7 +135,7 @@ class TestMaybeServeWebpHeaders:
         _assert_inline(cd)
         assert "test.png" in cd, f"Filename missing from: {cd!r}"
 
-    def test_webp_path_sets_inline_disposition(self, tmp_path):
+    def test_webp_path_sets_inline_disposition(self, tmp_path: Path) -> None:
         """maybe_serve_webp WebP branch must set inline Content-Disposition."""
         from flask import Flask
 
@@ -140,7 +152,7 @@ class TestMaybeServeWebpHeaders:
         _assert_inline(cd)
         assert "test.png" in cd, f"Filename missing from: {cd!r}"
 
-    def test_png_filename_quoted(self, tmp_path):
+    def test_png_filename_quoted(self, tmp_path: Path) -> None:
         """PNG branch filename must be double-quoted per RFC 6266."""
         from flask import Flask
 
@@ -154,7 +166,7 @@ class TestMaybeServeWebpHeaders:
         cd = resp.headers.get("Content-Disposition", "")
         assert 'filename="my-image.png"' in cd, f"Expected quoted filename in: {cd!r}"
 
-    def test_webp_filename_quoted(self, tmp_path):
+    def test_webp_filename_quoted(self, tmp_path: Path) -> None:
         """WebP branch filename must be double-quoted per RFC 6266."""
         from flask import Flask
 

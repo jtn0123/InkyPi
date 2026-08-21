@@ -12,8 +12,10 @@ hiccups continue to be papered over as before.
 
 import os
 from datetime import UTC, datetime
+from typing import Any
 from unittest.mock import MagicMock, patch
 
+import pytest
 from PIL import Image
 
 from refresh_task import RefreshTask
@@ -24,12 +26,12 @@ from utils.plugin_errors import PermanentPluginError
 # ---------------------------------------------------------------------------
 
 
-def _make_task(device_config_dev):
+def _make_task(device_config_dev: Any) -> Any:
     dm = MagicMock()
     return RefreshTask(device_config_dev, dm)
 
 
-def _fake_action(plugin_id: str = "image_url"):
+def _fake_action(plugin_id: str = "image_url") -> Any:
     action = MagicMock()
     action.get_plugin_id.return_value = plugin_id
     return action
@@ -40,11 +42,11 @@ class _CountingPlugin:
 
     config = {"image_settings": []}
 
-    def __init__(self, exc: BaseException):
+    def __init__(self, exc: BaseException) -> None:
         self.exc = exc
         self.calls = 0
 
-    def generate_image(self, settings, cfg):
+    def generate_image(self, settings: Any, cfg: Any) -> None:
         self.calls += 1
         raise self.exc
 
@@ -54,11 +56,11 @@ class _EventuallySucceedingPlugin:
 
     config = {"image_settings": []}
 
-    def __init__(self, transient_exc: BaseException):
+    def __init__(self, transient_exc: BaseException) -> None:
         self.transient_exc = transient_exc
         self.calls = 0
 
-    def generate_image(self, settings, cfg):
+    def generate_image(self, settings: Any, cfg: Any) -> Any:
         self.calls += 1
         if self.calls == 1:
             raise self.transient_exc
@@ -73,7 +75,9 @@ class _EventuallySucceedingPlugin:
 class TestPermanentPluginErrorInProcess:
     """``_execute_inprocess`` must not retry ``PermanentPluginError``."""
 
-    def test_permanent_error_runs_exactly_one_attempt(self, device_config_dev, caplog):
+    def test_permanent_error_runs_exactly_one_attempt(
+        self, device_config_dev: Any, caplog: pytest.LogCaptureFixture
+    ) -> None:
         """An ``Invalid URL`` failure must not trigger any retries."""
         task = _make_task(device_config_dev)
         action = _fake_action()
@@ -115,7 +119,9 @@ class TestPermanentPluginErrorInProcess:
         ]
         assert terminal_logs, "expected an attempt_terminal log record"
 
-    def test_transient_runtime_error_still_retries(self, device_config_dev):
+    def test_transient_runtime_error_still_retries(
+        self, device_config_dev: Any
+    ) -> None:
         """A generic ``RuntimeError`` must honour ``INKYPI_PLUGIN_RETRY_MAX``."""
         task = _make_task(device_config_dev)
         action = _fake_action()
@@ -142,7 +148,9 @@ class TestPermanentPluginErrorInProcess:
             f"second attempt — observed {plugin.calls} call(s)"
         )
 
-    def test_transient_connection_error_still_retries(self, device_config_dev):
+    def test_transient_connection_error_still_retries(
+        self, device_config_dev: Any
+    ) -> None:
         """``ConnectionError`` is the canonical transient failure — must retry."""
         task = _make_task(device_config_dev)
         action = _fake_action()
@@ -183,15 +191,20 @@ class TestPermanentPluginErrorPolicy:
     mocking ``_run_subprocess_attempt`` so no real child process is spawned.
     """
 
-    def test_policy_skips_retry_on_permanent_error(self, device_config_dev):
+    def test_policy_skips_retry_on_permanent_error(self, device_config_dev: Any) -> Any:
         task = _make_task(device_config_dev)
         action = _fake_action()
 
         call_counter = {"n": 0}
 
         def _fake_attempt(
-            refresh_action, plugin_config, current_dt, plugin_id, timeout_s, attempt
-        ):
+            refresh_action: Any,
+            plugin_config: Any,
+            current_dt: Any,
+            plugin_id: Any,
+            timeout_s: Any,
+            attempt: Any,
+        ) -> Any:
             call_counter["n"] += 1
             return None, PermanentPluginError(
                 "Invalid URL: scheme must be http or https"
@@ -222,7 +235,7 @@ class TestPermanentPluginErrorPolicy:
             f"single attempt — got {call_counter['n']}"
         )
 
-    def test_policy_retries_transient_errors(self, device_config_dev):
+    def test_policy_retries_transient_errors(self, device_config_dev: Any) -> Any:
         task = _make_task(device_config_dev)
         action = _fake_action()
 
@@ -230,8 +243,13 @@ class TestPermanentPluginErrorPolicy:
         success_image = Image.new("RGB", (10, 10), "blue")
 
         def _fake_attempt(
-            refresh_action, plugin_config, current_dt, plugin_id, timeout_s, attempt
-        ):
+            refresh_action: Any,
+            plugin_config: Any,
+            current_dt: Any,
+            plugin_id: Any,
+            timeout_s: Any,
+            attempt: Any,
+        ) -> Any:
             call_counter["n"] += 1
             if call_counter["n"] == 1:
                 return None, ConnectionError("temporary DNS failure")
@@ -262,7 +280,7 @@ class TestPermanentPluginErrorPolicy:
 
 
 class TestRemoteExceptionPreservesPermanentType:
-    def test_remote_exception_reconstructs_permanent_plugin_error(self):
+    def test_remote_exception_reconstructs_permanent_plugin_error(self) -> None:
         """Worker must round-trip ``PermanentPluginError`` by class name."""
         from refresh_task.worker import _remote_exception
 
@@ -271,13 +289,13 @@ class TestRemoteExceptionPreservesPermanentType:
         assert isinstance(exc, RuntimeError)  # subclass contract
         assert "Invalid URL" in str(exc)
 
-    def test_remote_exception_unknown_type_falls_back_to_runtime(self):
+    def test_remote_exception_unknown_type_falls_back_to_runtime(self) -> None:
         from refresh_task.worker import _remote_exception
 
         exc = _remote_exception("SomeUnknownError", "boom")
         assert type(exc) is RuntimeError
 
-    def test_remote_exception_reconstructs_url_validation_error(self):
+    def test_remote_exception_reconstructs_url_validation_error(self) -> None:
         """JTN-776: Worker must round-trip ``URLValidationError`` by class name.
 
         The blueprint's URLValidationError handler relies on the type to map

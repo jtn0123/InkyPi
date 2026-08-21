@@ -3,6 +3,7 @@ import socket
 import subprocess
 from io import BytesIO
 from pathlib import Path
+from typing import Any
 
 import pytest
 from PIL import Image
@@ -12,67 +13,69 @@ import utils.app_utils as app_utils
 
 
 class FakeForm:
-    def __init__(self, data):
+    def __init__(self, data: Any) -> None:
         self._data = data
 
-    def to_dict(self):
+    def to_dict(self) -> Any:
         return dict(self._data)
 
-    def __iter__(self):
+    def __iter__(self) -> Any:
         return iter(self._data)
 
-    def keys(self):
+    def keys(self) -> Any:
         return list(self._data.keys())
 
-    def getlist(self, key):
+    def getlist(self, key: Any) -> Any:
         val = self._data.get(key)
         if isinstance(val, list):
             return val
         return [val] if val is not None else []
 
-    def get(self, key, default=None):
+    def get(self, key: Any, default: Any = None) -> Any:
         return self._data.get(key, default)
 
 
 class FakeFile:
-    def __init__(self, filename, content_bytes):
+    def __init__(self, filename: Any, content_bytes: Any) -> None:
         self.filename = filename
         self.stream = BytesIO(content_bytes)
 
-    def read(self):
+    def read(self) -> Any:
         # simulate reading entire file
         self.stream.seek(0)
         return self.stream.read()
 
-    def seek(self, pos):
+    def seek(self, pos: Any) -> None:
         self.stream.seek(pos)
 
-    def tell(self):
+    def tell(self) -> Any:
         return self.stream.tell()
 
 
 class FakeFiles:
     """Mimic the subset of a Werkzeug MultiDict used by handle_request_files."""
 
-    def __init__(self, pairs):
-        # pairs: list of (key, file)
+    def __init__(self, pairs: Any):
+        # pairs: list of (key, file) -> None -> None
         self._pairs = list(pairs)
 
-    def keys(self):
+    def keys(self) -> Any:
         return {k for (k, _v) in self._pairs}
 
-    def items(self, multi=False):
+    def items(self, multi: Any = False) -> Any:
         # when called with multi=True, return iterator of pairs
         return iter(self._pairs)
 
 
-def test_resolve_path_with_env(tmp_path, monkeypatch):
+def test_resolve_path_with_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("SRC_DIR", str(tmp_path))
     p = app_utils.resolve_path("static/images")
     assert str(tmp_path).replace("\\", "/") in p.replace("\\", "/")
 
 
-def test_resolve_path_with_relative_src_dir_ignores_cwd(tmp_path, monkeypatch):
+def test_resolve_path_with_relative_src_dir_ignores_cwd(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     repo_root = Path(__file__).resolve().parents[2]
     monkeypatch.setenv("SRC_DIR", "src")
     monkeypatch.chdir(tmp_path)
@@ -82,48 +85,50 @@ def test_resolve_path_with_relative_src_dir_ignores_cwd(tmp_path, monkeypatch):
     assert p == str((repo_root / "src" / "plugins").resolve())
 
 
-def test_parse_form_list_handling():
+def test_parse_form_list_handling() -> None:
     form = FakeForm({"a": "1", "b[]": ["x", "y"]})
     parsed = app_utils.parse_form(form)
     assert parsed["a"] == "1"
     assert parsed["b[]"] == ["x", "y"]
 
 
-def test_get_wifi_name_success(monkeypatch):
+def test_get_wifi_name_success(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         subprocess, "check_output", lambda *_args, **_kwargs: b"my-network\n"
     )
     assert app_utils.get_wifi_name() == "my-network"
 
 
-def test_get_wifi_name_failure(monkeypatch):
-    def _raise(*_a, **_k):
+def test_get_wifi_name_failure(monkeypatch: pytest.MonkeyPatch) -> None:
+    def _raise(*_a: Any, **_k: Any) -> None:
         raise subprocess.CalledProcessError(1, ["iwgetid"])
 
     monkeypatch.setattr(subprocess, "check_output", _raise)
     assert app_utils.get_wifi_name() is None
 
 
-def test_is_connected_true_false(monkeypatch):
+def test_is_connected_true_false(monkeypatch: pytest.MonkeyPatch) -> None:
     # True case: create_connection does not raise
     monkeypatch.setattr(socket, "create_connection", lambda *_a, **_k: True)
     assert app_utils.is_connected() is True
 
     # False case: create_connection raises OSError
-    def _raise(*_a, **_k):
+    def _raise(*_a: Any, **_k: Any) -> None:
         raise OSError
 
     monkeypatch.setattr(socket, "create_connection", _raise)
     assert app_utils.is_connected() is False
 
 
-def make_png_bytes():
+def make_png_bytes() -> Any:
     bio = BytesIO()
     Image.new("RGB", (10, 10), color=(255, 0, 0)).save(bio, format="PNG")
     return bio.getvalue()
 
 
-def test_handle_request_files_valid_image(tmp_path, monkeypatch):
+def test_handle_request_files_valid_image(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     # Ensure uploads are saved under a temporary SRC_DIR
     monkeypatch.setenv("SRC_DIR", str(tmp_path))
 
@@ -137,7 +142,9 @@ def test_handle_request_files_valid_image(tmp_path, monkeypatch):
     assert os.path.exists(saved_path)
 
 
-def test_handle_request_files_large_file(tmp_path, monkeypatch):
+def test_handle_request_files_large_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     monkeypatch.setenv("SRC_DIR", str(tmp_path))
     monkeypatch.setenv("MAX_UPLOAD_BYTES", "10")
 
@@ -152,7 +159,9 @@ def test_handle_request_files_large_file(tmp_path, monkeypatch):
         app_utils.handle_request_files(files)
 
 
-def test_handle_request_files_invalid_image(tmp_path, monkeypatch):
+def test_handle_request_files_invalid_image(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     monkeypatch.setenv("SRC_DIR", str(tmp_path))
     f = FakeFile("notimg.png", b"notanimage")
     files = FakeFiles([("file", f)])
@@ -164,14 +173,16 @@ def test_handle_request_files_invalid_image(tmp_path, monkeypatch):
 # pyright: reportMissingImports=false
 
 
-def test_parse_form_with_list_fields():
+def test_parse_form_with_list_fields() -> None:
     form = ImmutableMultiDict([("a", "1"), ("b[]", "x"), ("b[]", "y")])
     out = app_utils.parse_form(form)
     assert out["a"] == "1"
     assert out["b[]"] == ["x", "y"]
 
 
-def test_handle_request_files_saves_images(tmp_path, monkeypatch):
+def test_handle_request_files_saves_images(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     # Prepare a simple PNG in memory
     buf = BytesIO()
     Image.new("RGB", (10, 10), "white").save(buf, format="PNG")
@@ -191,7 +202,7 @@ def test_handle_request_files_saves_images(tmp_path, monkeypatch):
     assert out["file"].endswith("test.png")
 
 
-def test_get_ip_address(monkeypatch):
+def test_get_ip_address(monkeypatch: pytest.MonkeyPatch) -> Any:
     """Test get_ip_address function."""
     import socket
 
@@ -208,7 +219,7 @@ def test_get_ip_address(monkeypatch):
         },
     )()
 
-    def mock_socket_constructor(*args, **kwargs):
+    def mock_socket_constructor(*args: Any, **kwargs: Any) -> Any:
         return mock_socket
 
     monkeypatch.setattr(socket, "socket", mock_socket_constructor)
@@ -216,7 +227,7 @@ def test_get_ip_address(monkeypatch):
     assert result == "192.168.1.100"
 
 
-def test_get_ip_address_failure(monkeypatch):
+def test_get_ip_address_failure(monkeypatch: pytest.MonkeyPatch) -> Any:
     """get_ip_address returns None when socket operations fail."""
     import socket
 
@@ -224,13 +235,13 @@ def test_get_ip_address_failure(monkeypatch):
         AF_INET = socket.AF_INET
         SOCK_DGRAM = socket.SOCK_DGRAM
 
-        def __enter__(self):
+        def __enter__(self) -> Any:
             return self
 
-        def __exit__(self, *args):
+        def __exit__(self, *args: Any) -> None:
             pass
 
-        def connect(self, *args, **kwargs):
+        def connect(self, *args: Any, **kwargs: Any) -> None:
             raise OSError("boom")
 
     monkeypatch.setattr(socket, "socket", lambda *a, **kw: MockSocket())
@@ -238,7 +249,7 @@ def test_get_ip_address_failure(monkeypatch):
     assert result is None
 
 
-def test_get_font_valid(monkeypatch, tmp_path):
+def test_get_font_valid(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """Test get_font with valid font family."""
     from PIL import ImageFont
 
@@ -257,19 +268,21 @@ def test_get_font_valid(monkeypatch, tmp_path):
     assert result is mock_font
 
 
-def test_get_font_invalid_family():
+def test_get_font_invalid_family() -> None:
     """Test get_font with invalid font family."""
     result = app_utils.get_font("InvalidFont", 24, "normal")
     assert result is None
 
 
-def test_get_font_strict_raises():
+def test_get_font_strict_raises() -> None:
     """get_font should raise when strict mode is enabled."""
     with pytest.raises(ValueError):
         app_utils.get_font("InvalidFont", 24, strict=True)
 
 
-def test_get_font_invalid_weight(monkeypatch, tmp_path):
+def test_get_font_invalid_weight(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     """Test get_font with invalid weight for valid family."""
     from PIL import ImageFont
 
@@ -288,7 +301,7 @@ def test_get_font_invalid_weight(monkeypatch, tmp_path):
     assert result is mock_font
 
 
-def test_get_fonts(monkeypatch, tmp_path):
+def test_get_fonts(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """Test get_fonts function."""
     monkeypatch.setenv("SRC_DIR", str(tmp_path))
     fonts_dir = tmp_path / "static" / "fonts"
@@ -315,7 +328,7 @@ def test_get_fonts(monkeypatch, tmp_path):
     assert "font_style" in item
 
 
-def test_get_font_path(monkeypatch, tmp_path):
+def test_get_font_path(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """Test get_font_path function."""
     monkeypatch.setenv("SRC_DIR", str(tmp_path))
     result = app_utils.get_font_path("jost")
@@ -327,16 +340,18 @@ def test_get_font_path(monkeypatch, tmp_path):
 # The function is tested indirectly through other tests and the core functionality works
 
 
-def test_handle_request_files_form_data_fallback(monkeypatch, tmp_path):
+def test_handle_request_files_form_data_fallback(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> Any:
     """Test handle_request_files with form data fallback."""
     monkeypatch.setenv("SRC_DIR", str(tmp_path))
 
     # Create a mock files object that doesn't support .keys()
     class MockFiles:
-        def __init__(self, items):
+        def __init__(self, items: Any) -> None:
             self._items = items
 
-        def items(self, multi=True):
+        def items(self, multi: Any = True) -> Any:
             return iter(self._items)
 
     # Test the fallback code path
@@ -347,30 +362,32 @@ def test_handle_request_files_form_data_fallback(monkeypatch, tmp_path):
     assert isinstance(result, dict)
 
 
-def test_handle_request_files_getlist_fallback(monkeypatch, tmp_path):
+def test_handle_request_files_getlist_fallback(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> Any:
     """Test handle_request_files with getlist fallback."""
     monkeypatch.setenv("SRC_DIR", str(tmp_path))
     (tmp_path / "static" / "images" / "saved").mkdir(parents=True, exist_ok=True)
 
     # Mock form_data without getlist method
     class MockFormData(dict):
-        def __init__(self, *args, **kwargs):
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
             super().__init__(*args, **kwargs)
 
-        def get(self, key, default=None):
+        def get(self, key: Any, default: Any = None) -> Any:
             return super().get(key, default)
 
     form_data = MockFormData({"file[]": ["existing_path1", "existing_path2"]})
 
     # Create a mock files object with keys that match form_data
     class MockFilesWithKeys:
-        def __init__(self, keys):
+        def __init__(self, keys: Any) -> None:
             self._keys = keys
 
-        def keys(self):
+        def keys(self) -> Any:
             return self._keys
 
-        def items(self, multi=True):
+        def items(self, multi: Any = True) -> Any:
             return []
 
     files = MockFilesWithKeys(["file[]"])
@@ -380,7 +397,9 @@ def test_handle_request_files_getlist_fallback(monkeypatch, tmp_path):
     assert result["file[]"] == ["existing_path1", "existing_path2"]
 
 
-def test_handle_request_files_max_upload_env(monkeypatch, tmp_path):
+def test_handle_request_files_max_upload_env(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     """Test handle_request_files with MAX_UPLOAD_BYTES environment variable."""
     monkeypatch.setenv("SRC_DIR", str(tmp_path))
     monkeypatch.setenv("MAX_UPLOAD_BYTES", "100")
@@ -394,7 +413,9 @@ def test_handle_request_files_max_upload_env(monkeypatch, tmp_path):
     assert "file" in result
 
 
-def test_handle_request_files_empty_content(monkeypatch, tmp_path):
+def test_handle_request_files_empty_content(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     """Test handle_request_files with empty file content."""
     monkeypatch.setenv("SRC_DIR", str(tmp_path))
 
@@ -406,7 +427,9 @@ def test_handle_request_files_empty_content(monkeypatch, tmp_path):
         app_utils.handle_request_files(files)
 
 
-def test_handle_request_files_list_mode(monkeypatch, tmp_path):
+def test_handle_request_files_list_mode(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     """Test handle_request_files with list mode (key ending with [])."""
     monkeypatch.setenv("SRC_DIR", str(tmp_path))
     (tmp_path / "static" / "images" / "saved").mkdir(parents=True, exist_ok=True)
@@ -421,7 +444,9 @@ def test_handle_request_files_list_mode(monkeypatch, tmp_path):
     assert len(result["files[]"]) == 1
 
 
-def test_handle_request_files_empty_filename_skipped(monkeypatch, tmp_path):
+def test_handle_request_files_empty_filename_skipped(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     """Files with empty filenames should be silently skipped."""
     monkeypatch.setenv("SRC_DIR", str(tmp_path))
     f = FakeFile("", make_png_bytes())
@@ -430,7 +455,9 @@ def test_handle_request_files_empty_filename_skipped(monkeypatch, tmp_path):
     assert "file" not in result
 
 
-def test_handle_request_files_disallowed_extension_skipped(monkeypatch, tmp_path):
+def test_handle_request_files_disallowed_extension_skipped(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     """Files with disallowed extensions (e.g. .exe) should be skipped."""
     monkeypatch.setenv("SRC_DIR", str(tmp_path))
     f = FakeFile("malware.exe", b"\x00" * 100)
@@ -439,7 +466,9 @@ def test_handle_request_files_disallowed_extension_skipped(monkeypatch, tmp_path
     assert "file" not in result
 
 
-def test_handle_request_files_no_extension_skipped(monkeypatch, tmp_path):
+def test_handle_request_files_no_extension_skipped(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     """Files without an extension should be skipped."""
     monkeypatch.setenv("SRC_DIR", str(tmp_path))
     f = FakeFile("noextension", b"\x00" * 100)
@@ -448,7 +477,9 @@ def test_handle_request_files_no_extension_skipped(monkeypatch, tmp_path):
     assert "file" not in result
 
 
-def test_handle_request_files_jpeg_exif_rotation(monkeypatch, tmp_path):
+def test_handle_request_files_jpeg_exif_rotation(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     """JPEG uploads should have EXIF rotation applied via exif_transpose."""
     monkeypatch.setenv("SRC_DIR", str(tmp_path))
     # Create a valid JPEG image
@@ -468,7 +499,9 @@ def test_handle_request_files_jpeg_exif_rotation(monkeypatch, tmp_path):
         assert img.size[0] > 0
 
 
-def test_handle_request_files_pdf_saved_as_is(monkeypatch, tmp_path):
+def test_handle_request_files_pdf_saved_as_is(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     """PDF uploads should be saved as raw bytes (no image processing)."""
     monkeypatch.setenv("SRC_DIR", str(tmp_path))
     pdf_bytes = b"%PDF-1.4 fake pdf content"
@@ -482,7 +515,9 @@ def test_handle_request_files_pdf_saved_as_is(monkeypatch, tmp_path):
         assert fh.read() == pdf_bytes
 
 
-def test_handle_request_files_invalid_jpeg_raises(monkeypatch, tmp_path):
+def test_handle_request_files_invalid_jpeg_raises(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     """Invalid JPEG content should raise RuntimeError."""
     monkeypatch.setenv("SRC_DIR", str(tmp_path))
     f = FakeFile("bad.jpg", b"not a real jpeg")

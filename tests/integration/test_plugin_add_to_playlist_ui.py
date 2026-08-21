@@ -1,6 +1,7 @@
 import os
 
 import pytest
+from flask.testing import FlaskClient
 
 pytestmark = pytest.mark.skipif(
     os.getenv("SKIP_UI", "").lower() in ("1", "true"),
@@ -8,7 +9,7 @@ pytestmark = pytest.mark.skipif(
 )
 
 
-def test_plugin_add_to_playlist_flow(client):
+def test_plugin_add_to_playlist_flow(client: FlaskClient) -> None:
     pytest.importorskip("playwright.sync_api", reason="playwright not available")
 
     # Choose a simple plugin page that renders without external deps

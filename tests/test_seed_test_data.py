@@ -5,6 +5,7 @@ from __future__ import annotations
 import importlib.util
 import json
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -13,7 +14,7 @@ import pytest
 # ---------------------------------------------------------------------------
 
 
-def _load_script():
+def _load_script() -> Any:
     scripts_dir = Path(__file__).parent.parent / "scripts"
     spec = importlib.util.spec_from_file_location(
         "seed_test_data", scripts_dir / "seed_test_data.py"
@@ -24,7 +25,7 @@ def _load_script():
 
 
 @pytest.fixture(scope="module")
-def seed_mod():
+def seed_mod() -> Any:
     return _load_script()
 
 
@@ -47,31 +48,31 @@ def _make_mock_device_json(directory: Path) -> None:
 
 
 class TestBasicSeed:
-    def test_creates_history_pngs(self, seed_mod, tmp_path):
+    def test_creates_history_pngs(self, seed_mod: Any, tmp_path: Path) -> None:
         seed_mod.run(["--target-dir", str(tmp_path), "--count", "5"])
         history_dir = tmp_path / "history"
         pngs = list(history_dir.glob("display_*.png"))
         assert len(pngs) == 5
 
-    def test_creates_history_sidecars(self, seed_mod, tmp_path):
+    def test_creates_history_sidecars(self, seed_mod: Any, tmp_path: Path) -> None:
         seed_mod.run(["--target-dir", str(tmp_path), "--count", "5"])
         history_dir = tmp_path / "history"
         jsons = list(history_dir.glob("display_*.json"))
         assert len(jsons) == 5
 
-    def test_creates_device_json(self, seed_mod, tmp_path):
+    def test_creates_device_json(self, seed_mod: Any, tmp_path: Path) -> None:
         seed_mod.run(["--target-dir", str(tmp_path), "--count", "3"])
         device_json = tmp_path / "device.json"
         assert device_json.exists()
 
-    def test_device_json_has_playlist(self, seed_mod, tmp_path):
+    def test_device_json_has_playlist(self, seed_mod: Any, tmp_path: Path) -> None:
         seed_mod.run(["--target-dir", str(tmp_path), "--count", "3"])
         data = json.loads((tmp_path / "device.json").read_text())
         playlists = data["playlist_config"]["playlists"]
         assert len(playlists) >= 1
         assert playlists[0]["name"] == "Seed Playlist"
 
-    def test_device_json_has_plugins(self, seed_mod, tmp_path):
+    def test_device_json_has_plugins(self, seed_mod: Any, tmp_path: Path) -> None:
         seed_mod.run(["--target-dir", str(tmp_path), "--count", "3"])
         data = json.loads((tmp_path / "device.json").read_text())
         plugins = data["playlist_config"]["playlists"][0]["plugins"]
@@ -80,14 +81,14 @@ class TestBasicSeed:
         assert "weather" in plugin_ids
         assert "calendar" in plugin_ids
 
-    def test_no_real_api_keys(self, seed_mod, tmp_path):
+    def test_no_real_api_keys(self, seed_mod: Any, tmp_path: Path) -> None:
         seed_mod.run(["--target-dir", str(tmp_path), "--count", "3"])
         raw = (tmp_path / "device.json").read_text()
         # Any real-looking credential would be a long alphanumeric string;
         # the placeholder must be clearly labelled.
         assert "PLACEHOLDER" in raw
 
-    def test_default_count_is_20(self, seed_mod, tmp_path):
+    def test_default_count_is_20(self, seed_mod: Any, tmp_path: Path) -> None:
         seed_mod.run(["--target-dir", str(tmp_path)])
         history_dir = tmp_path / "history"
         pngs = list(history_dir.glob("display_*.png"))
@@ -100,14 +101,14 @@ class TestBasicSeed:
 
 
 class TestSidecarJson:
-    def test_sidecar_is_valid_json(self, seed_mod, tmp_path):
+    def test_sidecar_is_valid_json(self, seed_mod: Any, tmp_path: Path) -> None:
         seed_mod.run(["--target-dir", str(tmp_path), "--count", "5"])
         history_dir = tmp_path / "history"
         for sidecar in history_dir.glob("display_*.json"):
             data = json.loads(sidecar.read_text())
             assert isinstance(data, dict)
 
-    def test_sidecar_has_required_fields(self, seed_mod, tmp_path):
+    def test_sidecar_has_required_fields(self, seed_mod: Any, tmp_path: Path) -> None:
         seed_mod.run(["--target-dir", str(tmp_path), "--count", "5"])
         history_dir = tmp_path / "history"
         for sidecar in history_dir.glob("display_*.json"):
@@ -116,7 +117,7 @@ class TestSidecarJson:
             assert "status" in data
             assert "timestamp" in data
 
-    def test_sidecar_status_values(self, seed_mod, tmp_path):
+    def test_sidecar_status_values(self, seed_mod: Any, tmp_path: Path) -> None:
         seed_mod.run(["--target-dir", str(tmp_path), "--count", "8"])
         history_dir = tmp_path / "history"
         statuses = set()
@@ -128,7 +129,7 @@ class TestSidecarJson:
         assert "success" in statuses
         assert "failure" in statuses
 
-    def test_png_and_sidecar_stems_match(self, seed_mod, tmp_path):
+    def test_png_and_sidecar_stems_match(self, seed_mod: Any, tmp_path: Path) -> None:
         seed_mod.run(["--target-dir", str(tmp_path), "--count", "5"])
         history_dir = tmp_path / "history"
         png_stems = {p.stem for p in history_dir.glob("display_*.png")}
@@ -142,19 +143,19 @@ class TestSidecarJson:
 
 
 class TestSafety:
-    def test_refuses_src_config(self, seed_mod):
+    def test_refuses_src_config(self, seed_mod: Any) -> None:
         src_config = str(Path(__file__).parent.parent / "src" / "config")
         with pytest.raises(SystemExit) as exc_info:
             seed_mod.run(["--target-dir", src_config, "--count", "1"])
         assert exc_info.value.code != 0
 
-    def test_refuses_nested_under_src_config(self, seed_mod):
+    def test_refuses_nested_under_src_config(self, seed_mod: Any) -> None:
         nested = str(Path(__file__).parent.parent / "src" / "config" / "subdir")
         with pytest.raises(SystemExit) as exc_info:
             seed_mod.run(["--target-dir", nested, "--count", "1"])
         assert exc_info.value.code != 0
 
-    def test_refuses_non_mock_device_json(self, seed_mod, tmp_path):
+    def test_refuses_non_mock_device_json(self, seed_mod: Any, tmp_path: Path) -> None:
         (tmp_path / "device.json").write_text(
             json.dumps({"display_type": "inky", "name": "Prod"}), encoding="utf-8"
         )
@@ -162,7 +163,7 @@ class TestSafety:
             seed_mod.run(["--target-dir", str(tmp_path), "--count", "1"])
         assert exc_info.value.code != 0
 
-    def test_refuses_dev_false(self, seed_mod, tmp_path):
+    def test_refuses_dev_false(self, seed_mod: Any, tmp_path: Path) -> None:
         (tmp_path / "device.json").write_text(
             json.dumps({"display_type": "mock", "dev": False}), encoding="utf-8"
         )
@@ -170,12 +171,12 @@ class TestSafety:
             seed_mod.run(["--target-dir", str(tmp_path), "--count", "1"])
         assert exc_info.value.code != 0
 
-    def test_allows_empty_target_dir(self, seed_mod, tmp_path):
+    def test_allows_empty_target_dir(self, seed_mod: Any, tmp_path: Path) -> None:
         # No device.json at all — should be safe
         seed_mod.run(["--target-dir", str(tmp_path), "--count", "2"])
         assert (tmp_path / "history").exists()
 
-    def test_allows_mock_device_json(self, seed_mod, tmp_path):
+    def test_allows_mock_device_json(self, seed_mod: Any, tmp_path: Path) -> None:
         _make_mock_device_json(tmp_path)
         seed_mod.run(["--target-dir", str(tmp_path), "--count", "2"])
         assert (tmp_path / "history").exists()
@@ -187,14 +188,14 @@ class TestSafety:
 
 
 class TestIdempotency:
-    def test_second_run_no_extra_pngs(self, seed_mod, tmp_path):
+    def test_second_run_no_extra_pngs(self, seed_mod: Any, tmp_path: Path) -> None:
         seed_mod.run(["--target-dir", str(tmp_path), "--count", "5"])
         seed_mod.run(["--target-dir", str(tmp_path), "--count", "5"])
         history_dir = tmp_path / "history"
         pngs = list(history_dir.glob("display_*.png"))
         assert len(pngs) == 5
 
-    def test_second_run_no_extra_playlists(self, seed_mod, tmp_path):
+    def test_second_run_no_extra_playlists(self, seed_mod: Any, tmp_path: Path) -> None:
         seed_mod.run(["--target-dir", str(tmp_path), "--count", "3"])
         seed_mod.run(["--target-dir", str(tmp_path), "--count", "3"])
         data = json.loads((tmp_path / "device.json").read_text())
@@ -209,7 +210,7 @@ class TestIdempotency:
 
 
 class TestReset:
-    def test_reset_wipes_history(self, seed_mod, tmp_path):
+    def test_reset_wipes_history(self, seed_mod: Any, tmp_path: Path) -> None:
         seed_mod.run(["--target-dir", str(tmp_path), "--count", "5"])
         # Add a stray file that --reset should remove
         (tmp_path / "history" / "stray_file.png").write_bytes(b"")
@@ -219,14 +220,14 @@ class TestReset:
         assert len(pngs) == 3
         assert not (history_dir / "stray_file.png").exists()
 
-    def test_reset_reseeds_different_count(self, seed_mod, tmp_path):
+    def test_reset_reseeds_different_count(self, seed_mod: Any, tmp_path: Path) -> None:
         seed_mod.run(["--target-dir", str(tmp_path), "--count", "10"])
         seed_mod.run(["--target-dir", str(tmp_path), "--count", "4", "--reset"])
         history_dir = tmp_path / "history"
         pngs = list(history_dir.glob("display_*.png"))
         assert len(pngs) == 4
 
-    def test_reset_reseeds_playlist(self, seed_mod, tmp_path):
+    def test_reset_reseeds_playlist(self, seed_mod: Any, tmp_path: Path) -> None:
         seed_mod.run(["--target-dir", str(tmp_path), "--count", "3"])
         seed_mod.run(["--target-dir", str(tmp_path), "--count", "3", "--reset"])
         data = json.loads((tmp_path / "device.json").read_text())

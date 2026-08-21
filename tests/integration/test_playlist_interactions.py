@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import os
 from datetime import UTC, datetime
+from typing import Any
 
 import pytest
 from tests.integration.browser_helpers import stub_leaflet
@@ -22,11 +23,11 @@ pytestmark = pytest.mark.skipif(
 from model import RefreshInfo  # noqa: E402
 
 
-def _fixed_now(_device_config):
+def _fixed_now(_device_config: Any) -> Any:
     return datetime(2025, 1, 1, 8, 0, 0, tzinfo=UTC)
 
 
-def _prepare_playlist(device_config_dev):
+def _prepare_playlist(device_config_dev: Any) -> None:
     pm = device_config_dev.get_playlist_manager()
     if not pm.get_playlist("Default"):
         pm.add_playlist("Default", "00:00", "24:00")
@@ -58,7 +59,9 @@ def _prepare_playlist(device_config_dev):
     device_config_dev.write_config()
 
 
-def test_playlist_keyboard_reorder(live_server, device_config_dev, monkeypatch):
+def test_playlist_keyboard_reorder(
+    live_server: str, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Keyboard ArrowDown reorders plugin items and fires a reorder request."""
     pytest.importorskip("playwright.sync_api", reason="playwright not available")
     monkeypatch.setattr("utils.time_utils.now_device_tz", _fixed_now, raising=True)
@@ -112,7 +115,9 @@ def test_playlist_keyboard_reorder(live_server, device_config_dev, monkeypatch):
             browser.close()
 
 
-def test_playlist_delete_modal(live_server, device_config_dev, monkeypatch):
+def test_playlist_delete_modal(
+    live_server: str, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Delete playlist button opens confirmation modal and fires DELETE request."""
     pytest.importorskip("playwright.sync_api", reason="playwright not available")
     monkeypatch.setattr("utils.time_utils.now_device_tz", _fixed_now, raising=True)
@@ -167,7 +172,9 @@ def test_playlist_delete_modal(live_server, device_config_dev, monkeypatch):
             browser.close()
 
 
-def test_playlist_delete_instance_modal(live_server, device_config_dev, monkeypatch):
+def test_playlist_delete_instance_modal(
+    live_server: str, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Delete instance button opens confirmation modal and fires POST request."""
     pytest.importorskip("playwright.sync_api", reason="playwright not available")
     monkeypatch.setattr("utils.time_utils.now_device_tz", _fixed_now, raising=True)

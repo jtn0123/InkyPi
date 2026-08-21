@@ -1,5 +1,6 @@
 # pyright: reportMissingImports=false
 from datetime import UTC, datetime, timedelta
+from typing import Any
 
 from hypothesis import HealthCheck, given, settings, strategies as st
 
@@ -12,7 +13,9 @@ from model import Playlist, PlaylistManager, RefreshInfo
     interval_s=st.integers(min_value=0, max_value=86_400),
 )
 @settings(max_examples=100, suppress_health_check=[HealthCheck.function_scoped_fixture])
-def test_should_refresh_matches_elapsed_time(latest_epoch, elapsed_s, interval_s):
+def test_should_refresh_matches_elapsed_time(
+    latest_epoch: Any, elapsed_s: Any, interval_s: Any
+) -> None:
     latest = datetime.fromtimestamp(latest_epoch, tz=UTC)
     current = latest + timedelta(seconds=elapsed_s)
     assert PlaylistManager.should_refresh(latest, interval_s, current) is (
@@ -36,7 +39,7 @@ def test_should_refresh_matches_elapsed_time(latest_epoch, elapsed_s, interval_s
     )
 )
 @settings(max_examples=50, suppress_health_check=[HealthCheck.function_scoped_fixture])
-def test_playlist_reorder_accepts_valid_permutations(plugin_ids):
+def test_playlist_reorder_accepts_valid_permutations(plugin_ids: Any) -> None:
     playlist = Playlist(
         "P",
         "00:00",
@@ -70,12 +73,12 @@ def test_playlist_reorder_accepts_valid_permutations(plugin_ids):
 )
 @settings(max_examples=75, suppress_health_check=[HealthCheck.function_scoped_fixture])
 def test_refresh_info_roundtrip_preserves_optional_metrics(
-    request_ms,
-    display_ms,
-    generate_ms,
-    preprocess_ms,
-    used_cached,
-):
+    request_ms: Any,
+    display_ms: Any,
+    generate_ms: Any,
+    preprocess_ms: Any,
+    used_cached: Any,
+) -> None:
     payload = {
         "refresh_type": "Manual Update",
         "plugin_id": "clock",

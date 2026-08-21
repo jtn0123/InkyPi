@@ -1,12 +1,14 @@
 # pyright: reportMissingImports=false
 """Input validation tests (location, units, API key, provider)."""
 
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
+from flask.testing import FlaskClient
 
 
-def test_weather_provider_validation():
+def test_weather_provider_validation() -> None:
     """Test weather provider validation."""
     from plugins.weather.weather import Weather
 
@@ -30,7 +32,7 @@ def test_weather_provider_validation():
         assert "Unknown weather provider" in str(e)
 
 
-def test_weather_units_invalid_falls_back_to_imperial():
+def test_weather_units_invalid_falls_back_to_imperial() -> None:
     """JTN-784: invalid `units` fall back to imperial at render time so a bare
     /update_now produces a render. Form-level validation (validate_settings)
     enforces the allowed set on save."""
@@ -69,7 +71,7 @@ def test_weather_units_invalid_falls_back_to_imperial():
     assert args[2] == "imperial"
 
 
-def test_weather_missing_latitude_falls_back_to_default():
+def test_weather_missing_latitude_falls_back_to_default() -> None:
     """JTN-784: missing lat/lon default to NYC coords at render time."""
     from plugins.weather.weather import Weather
 
@@ -103,7 +105,7 @@ def test_weather_missing_latitude_falls_back_to_default():
     assert args[0] == pytest.approx(40.7128)  # default latitude (NYC)
 
 
-def test_weather_api_key_validation():
+def test_weather_api_key_validation() -> None:
     """Test weather API key validation."""
     from plugins.weather.weather import Weather
 
@@ -127,7 +129,9 @@ def test_weather_api_key_validation():
         assert "OpenWeatherMap API Key not configured" in str(e)
 
 
-def test_weather_missing_api_key(device_config_dev, monkeypatch):
+def test_weather_missing_api_key(
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Test weather plugin with missing API key."""
     from plugins.weather.weather import Weather
 
@@ -146,7 +150,9 @@ def test_weather_missing_api_key(device_config_dev, monkeypatch):
         p.generate_image(settings, device_config_dev)
 
 
-def test_weather_missing_coordinates_falls_back_to_default(device_config_dev):
+def test_weather_missing_coordinates_falls_back_to_default(
+    device_config_dev: Any,
+) -> None:
     """JTN-784: missing lat/long no longer raise — defaults (NYC) are applied.
     Bug 9 regression (TypeError from ``float(None)``) is still covered by
     ``test_weather_invalid_coordinates_raises`` below, which exercises the
@@ -174,7 +180,7 @@ def test_weather_missing_coordinates_falls_back_to_default(device_config_dev):
     assert args[1] == pytest.approx(-74.0060)
 
 
-def test_weather_invalid_coordinates_raises(device_config_dev):
+def test_weather_invalid_coordinates_raises(device_config_dev: Any) -> None:
     """Bug 9: Non-numeric lat/long should raise RuntimeError."""
     from plugins.weather.weather import Weather
 
@@ -190,7 +196,7 @@ def test_weather_invalid_coordinates_raises(device_config_dev):
         p.generate_image(settings, device_config_dev)
 
 
-def test_weather_validate_settings_rejects_out_of_range_latitude():
+def test_weather_validate_settings_rejects_out_of_range_latitude() -> None:
     """JTN-354: validate_settings must reject latitudes outside [-90, 90]."""
     from plugins.weather.weather import Weather
 
@@ -202,7 +208,7 @@ def test_weather_validate_settings_rejects_out_of_range_latitude():
         assert "Latitude" in err
 
 
-def test_weather_validate_settings_rejects_out_of_range_longitude():
+def test_weather_validate_settings_rejects_out_of_range_longitude() -> None:
     """JTN-354: validate_settings must reject longitudes outside [-180, 180]."""
     from plugins.weather.weather import Weather
 
@@ -214,7 +220,7 @@ def test_weather_validate_settings_rejects_out_of_range_longitude():
         assert "Longitude" in err
 
 
-def test_weather_validate_settings_rejects_non_numeric():
+def test_weather_validate_settings_rejects_non_numeric() -> None:
     """JTN-354: validate_settings must reject non-numeric lat/lon."""
     from plugins.weather.weather import Weather
 
@@ -224,7 +230,7 @@ def test_weather_validate_settings_rejects_non_numeric():
     assert p.validate_settings({"latitude": "40.0", "longitude": "xyz"}) is not None
 
 
-def test_weather_validate_settings_rejects_missing_coordinates():
+def test_weather_validate_settings_rejects_missing_coordinates() -> None:
     """JTN-354: validate_settings must reject missing/empty lat/lon."""
     from plugins.weather.weather import Weather
 
@@ -235,7 +241,7 @@ def test_weather_validate_settings_rejects_missing_coordinates():
     assert p.validate_settings({"latitude": "", "longitude": ""}) is not None
 
 
-def test_weather_validate_settings_accepts_valid_coordinates():
+def test_weather_validate_settings_accepts_valid_coordinates() -> None:
     """JTN-354: valid lat/lon at and inside bounds must pass validation."""
     from plugins.weather.weather import Weather
 
@@ -252,7 +258,9 @@ def test_weather_validate_settings_accepts_valid_coordinates():
         assert p.validate_settings({"latitude": lat, "longitude": lon}) is None
 
 
-def test_weather_save_plugin_settings_rejects_out_of_range_latitude(client):
+def test_weather_save_plugin_settings_rejects_out_of_range_latitude(
+    client: FlaskClient,
+) -> None:
     """JTN-354: POST to /save_plugin_settings with bad lat must return 400."""
     data = {
         "plugin_id": "weather",
@@ -268,7 +276,9 @@ def test_weather_save_plugin_settings_rejects_out_of_range_latitude(client):
     assert "Latitude" in (body.get("error") or body.get("message") or "")
 
 
-def test_weather_save_plugin_settings_rejects_out_of_range_longitude(client):
+def test_weather_save_plugin_settings_rejects_out_of_range_longitude(
+    client: FlaskClient,
+) -> None:
     """JTN-354: POST to /save_plugin_settings with bad lon must return 400."""
     data = {
         "plugin_id": "weather",
@@ -284,7 +294,9 @@ def test_weather_save_plugin_settings_rejects_out_of_range_longitude(client):
     assert "Longitude" in (body.get("error") or body.get("message") or "")
 
 
-def test_weather_save_plugin_settings_rejects_negative_out_of_range(client):
+def test_weather_save_plugin_settings_rejects_negative_out_of_range(
+    client: FlaskClient,
+) -> None:
     """JTN-354: lat=-91 must be rejected with 400."""
     data = {
         "plugin_id": "weather",
@@ -297,7 +309,9 @@ def test_weather_save_plugin_settings_rejects_negative_out_of_range(client):
     assert resp.status_code == 400
 
 
-def test_weather_plugin_settings_template_has_numeric_inputs(client):
+def test_weather_plugin_settings_template_has_numeric_inputs(
+    client: FlaskClient,
+) -> None:
     """JTN-354: lat/lon inputs must be type=number with min/max constraints."""
     resp = client.get("/plugin/weather")
     assert resp.status_code == 200
@@ -313,7 +327,7 @@ def test_weather_plugin_settings_template_has_numeric_inputs(client):
     assert 'max="180"' in html
 
 
-def test_weather_invalid_units_falls_back_to_imperial(device_config_dev):
+def test_weather_invalid_units_falls_back_to_imperial(device_config_dev: Any) -> None:
     """JTN-784: invalid `units` fall back to imperial at render time; form
     validation still rejects the bad value on save."""
     from plugins.weather.weather import Weather
@@ -343,7 +357,9 @@ def test_weather_invalid_units_falls_back_to_imperial(device_config_dev):
     assert args[2] == "imperial"
 
 
-def test_weather_unknown_provider(device_config_dev, monkeypatch):
+def test_weather_unknown_provider(
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Test weather plugin with unknown provider."""
     from plugins.weather.weather import Weather
 

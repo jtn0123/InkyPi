@@ -42,8 +42,13 @@ Journey (maps 1:1 onto the assertions below)
 from __future__ import annotations
 
 import time
+from collections.abc import Iterator
+from typing import Any
 
 import pytest
+from flask import Flask
+from flask.testing import FlaskClient
+from playwright.sync_api import Page
 from tests.integration.browser_helpers import RuntimeCollector, stub_leaflet
 
 pytestmark = [pytest.mark.integration, pytest.mark.journey]
@@ -59,7 +64,9 @@ _STUBBED_LATEST_TAG = "99.0.0"
 _RUNNING_TIMEOUT_S = 20.0
 
 
-def _poll_update_status(client, *, timeout_s: float, want_running: bool) -> dict:
+def _poll_update_status(
+    client: FlaskClient, *, timeout_s: float, want_running: bool
+) -> dict:
     """Poll /settings/update_status until ``running`` matches ``want_running``.
 
     Returns the final JSON payload. Raises AssertionError on timeout so the
@@ -83,7 +90,7 @@ def _poll_update_status(client, *, timeout_s: float, want_running: bool) -> dict
 
 
 @pytest.fixture
-def stub_update_seam(monkeypatch):
+def stub_update_seam(monkeypatch: pytest.MonkeyPatch) -> Iterator[Any]:
     """Replace the update-execution seam with an in-process fast simulation.
 
     ``_start_update_via_systemd`` and ``_start_update_fallback_thread`` both
@@ -101,8 +108,8 @@ def stub_update_seam(monkeypatch):
     started = threading.Event()
     finished = threading.Event()
 
-    def _fake_runner(*args, **kwargs):
-        def _run():
+    def _fake_runner(*args: Any, **kwargs: Any) -> None:
+        def _run() -> None:
             # Hold "running" briefly so /settings/update_status observably
             # transitions through running=True. 0.3s is more than enough
             # given the test polls every 100ms.
@@ -132,7 +139,7 @@ def stub_update_seam(monkeypatch):
 
 
 @pytest.fixture
-def stub_latest_version(monkeypatch):
+def stub_latest_version(monkeypatch: pytest.MonkeyPatch) -> Iterator[Any]:
     """Force /api/version to report a fixed "latest" tag.
 
     This both bypasses the real GitHub API call AND resets the module-level
@@ -156,20 +163,20 @@ def stub_latest_version(monkeypatch):
 
 
 @pytest.fixture
-def pinned_app_version(flask_app):
+def pinned_app_version(flask_app: Flask) -> Iterator[Any]:
     """Set APP_VERSION on the Flask app so /api/version can compare against it."""
     flask_app.config["APP_VERSION"] = "1.0.0"
     yield "1.0.0"
 
 
 def test_update_flow_happy_path(
-    live_server,
-    flask_app,
-    browser_page,
-    stub_update_seam,
-    stub_latest_version,
-    pinned_app_version,
-):
+    live_server: str,
+    flask_app: Flask,
+    browser_page: Page,
+    stub_update_seam: Any,
+    stub_latest_version: Any,
+    pinned_app_version: Any,
+) -> None:
     """End-to-end happy path: check → click update → observe success."""
     page = browser_page
     stub_leaflet(page)

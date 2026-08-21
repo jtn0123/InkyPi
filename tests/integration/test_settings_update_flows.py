@@ -1,4 +1,12 @@
-def test_settings_update_systemd_and_fallback(client, monkeypatch):
+from typing import Any
+
+import pytest
+from flask.testing import FlaskClient
+
+
+def test_settings_update_systemd_and_fallback(
+    client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
     from blueprints import settings as settings_mod
 
     # Ensure clean state
@@ -9,11 +17,11 @@ def test_settings_update_systemd_and_fallback(client, monkeypatch):
 
     called = {"systemd": False, "thread": False}
 
-    def fake_systemd(target_tag=None):
+    def fake_systemd(target_tag: Any = None) -> None:
         called["systemd"] = True
         raise RuntimeError("systemd-run failed")
 
-    def fake_thread(script_path, target_tag=None):
+    def fake_thread(script_path: Any, target_tag: Any = None) -> None:
         called["thread"] = True
         # Do not actually sleep inside the worker; immediately clear running state
         settings_mod._set_update_state(False, None)
@@ -41,7 +49,9 @@ def test_settings_update_systemd_and_fallback(client, monkeypatch):
     assert st["running"] is False
 
 
-def test_settings_update_duplicate_returns_409(client, monkeypatch):
+def test_settings_update_duplicate_returns_409(
+    client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
     from blueprints import settings as settings_mod
 
     # Ensure clean state
@@ -51,7 +61,7 @@ def test_settings_update_duplicate_returns_409(client, monkeypatch):
     monkeypatch.setattr(settings_mod, "_systemd_available", lambda: False, raising=True)
 
     # Make fallback thread just mark running and keep it until we check 409
-    def fake_thread(script_path, target_tag=None):
+    def fake_thread(script_path: Any, target_tag: Any = None) -> None:
         # Mark running and do not clear
         settings_mod._set_update_state(True, None)
 

@@ -1,11 +1,19 @@
+from typing import Any
+
+import pytest
+from flask import Flask
+from flask.testing import FlaskClient
+
 # pyright: reportMissingImports=false
 
 
-def test_update_now_surfaces_plugin_error_json(client, monkeypatch):
+def test_update_now_surfaces_plugin_error_json(
+    client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
     # Make plugin raise
     import plugins.ai_text.ai_text as ai_text_mod
 
-    def boom(self, settings, device_config):
+    def boom(self, settings: Any, device_config: Any) -> None:
         raise RuntimeError("boom")
 
     monkeypatch.setattr(ai_text_mod.AIText, "generate_image", boom, raising=True)
@@ -29,11 +37,13 @@ def test_update_now_surfaces_plugin_error_json(client, monkeypatch):
     assert data.get("code") == "plugin_error"
 
 
-def test_save_plugin_settings_error_json(client, flask_app, monkeypatch):
+def test_save_plugin_settings_error_json(
+    client: FlaskClient, flask_app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
     # Simulate a config write failure so endpoint returns JSON error
     dc = flask_app.config["DEVICE_CONFIG"]
 
-    def boom_update_atomic(*args, **kwargs):
+    def boom_update_atomic(*args: Any, **kwargs: Any) -> None:
         raise RuntimeError("boom")
 
     monkeypatch.setattr(dc, "update_atomic", boom_update_atomic, raising=True)

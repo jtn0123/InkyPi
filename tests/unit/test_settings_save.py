@@ -1,7 +1,11 @@
 # pyright: reportMissingImports=false
 """Tests for save settings, validation, plugin isolation, safe reset, and API keys."""
 
+from typing import Any
 from unittest.mock import patch
+
+import pytest
+from flask.testing import FlaskClient
 
 # ---------------------------------------------------------------------------
 # /settings/isolation (GET, POST, DELETE) - plugin isolation
@@ -9,21 +13,21 @@ from unittest.mock import patch
 
 
 class TestPluginIsolation:
-    def test_get_isolation_empty(self, client):
+    def test_get_isolation_empty(self, client: FlaskClient) -> None:
         resp = client.get("/settings/isolation")
         assert resp.status_code == 200
         data = resp.get_json()
         assert data["success"] is True
         assert data["isolated_plugins"] == []
 
-    def test_post_isolation_add_plugin(self, client):
+    def test_post_isolation_add_plugin(self, client: FlaskClient) -> None:
         resp = client.post("/settings/isolation", json={"plugin_id": "weather"})
         assert resp.status_code == 200
         data = resp.get_json()
         assert data["success"] is True
         assert "weather" in data["isolated_plugins"]
 
-    def test_post_isolation_duplicate(self, client):
+    def test_post_isolation_duplicate(self, client: FlaskClient) -> None:
         """Adding the same plugin twice should not create duplicates."""
         client.post("/settings/isolation", json={"plugin_id": "weather"})
         resp = client.post("/settings/isolation", json={"plugin_id": "weather"})
@@ -31,43 +35,43 @@ class TestPluginIsolation:
         data = resp.get_json()
         assert data["isolated_plugins"].count("weather") == 1
 
-    def test_post_isolation_trims_plugin_id(self, client):
+    def test_post_isolation_trims_plugin_id(self, client: FlaskClient) -> None:
         resp = client.post("/settings/isolation", json={"plugin_id": " weather "})
         assert resp.status_code == 200
         data = resp.get_json()
         assert "weather" in data["isolated_plugins"]
         assert " weather " not in data["isolated_plugins"]
 
-    def test_delete_isolation_remove_plugin(self, client):
+    def test_delete_isolation_remove_plugin(self, client: FlaskClient) -> None:
         client.post("/settings/isolation", json={"plugin_id": "weather"})
         resp = client.delete("/settings/isolation", json={"plugin_id": "weather"})
         assert resp.status_code == 200
         data = resp.get_json()
         assert "weather" not in data["isolated_plugins"]
 
-    def test_isolation_invalid_body(self, client):
+    def test_isolation_invalid_body(self, client: FlaskClient) -> None:
         resp = client.post(
             "/settings/isolation", data="not json", content_type="application/json"
         )
         assert resp.status_code == 400
 
-    def test_isolation_missing_plugin_id(self, client):
+    def test_isolation_missing_plugin_id(self, client: FlaskClient) -> None:
         resp = client.post("/settings/isolation", json={})
         assert resp.status_code == 422
 
-    def test_isolation_empty_plugin_id(self, client):
+    def test_isolation_empty_plugin_id(self, client: FlaskClient) -> None:
         resp = client.post("/settings/isolation", json={"plugin_id": "  "})
         assert resp.status_code == 422
 
-    def test_isolation_non_string_plugin_id(self, client):
+    def test_isolation_non_string_plugin_id(self, client: FlaskClient) -> None:
         resp = client.post("/settings/isolation", json={"plugin_id": 123})
         assert resp.status_code == 422
 
-    def test_isolation_unknown_plugin_id(self, client):
+    def test_isolation_unknown_plugin_id(self, client: FlaskClient) -> None:
         resp = client.post("/settings/isolation", json={"plugin_id": "nonexistent"})
         assert resp.status_code == 422
 
-    def test_delete_unknown_plugin_id(self, client):
+    def test_delete_unknown_plugin_id(self, client: FlaskClient) -> None:
         resp = client.delete("/settings/isolation", json={"plugin_id": "nonexistent"})
         assert resp.status_code == 422
 
@@ -78,7 +82,9 @@ class TestPluginIsolation:
 
 
 class TestSafeReset:
-    def test_safe_reset_success(self, client, device_config_dev):
+    def test_safe_reset_success(
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
         resp = client.post("/settings/safe_reset")
         assert resp.status_code == 200
         data = resp.get_json()
@@ -91,18 +97,24 @@ class TestSafeReset:
         assert cfg["log_system_stats"] is False
         assert cfg["isolated_plugins"] == []
 
-    def test_safe_reset_preserves_name(self, client, device_config_dev):
+    def test_safe_reset_preserves_name(
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
         """Safe reset should preserve the device name."""
         original_name = device_config_dev.get_config("name")
         client.post("/settings/safe_reset")
         assert device_config_dev.get_config("name") == original_name
 
-    def test_safe_reset_preserves_timezone(self, client, device_config_dev):
+    def test_safe_reset_preserves_timezone(
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
         original_tz = device_config_dev.get_config("timezone")
         client.post("/settings/safe_reset")
         assert device_config_dev.get_config("timezone") == original_tz
 
-    def test_safe_reset_error(self, client, device_config_dev):
+    def test_safe_reset_error(
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
         with patch.object(
             device_config_dev, "get_config", side_effect=RuntimeError("boom")
         ):
@@ -116,7 +128,9 @@ class TestSafeReset:
 
 
 class TestSaveApiKeys:
-    def test_save_api_keys_success(self, client, device_config_dev):
+    def test_save_api_keys_success(
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
         resp = client.post(
             "/settings/save_api_keys",
             data={
@@ -130,7 +144,9 @@ class TestSaveApiKeys:
         assert "OPEN_AI_SECRET" in data["updated"]
         assert "NASA_SECRET" in data["updated"]
 
-    def test_save_api_keys_empty_values_ignored(self, client, device_config_dev):
+    def test_save_api_keys_empty_values_ignored(
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
         resp = client.post(
             "/settings/save_api_keys",
             data={
@@ -141,14 +157,16 @@ class TestSaveApiKeys:
         data = resp.get_json()
         assert "OPEN_AI_SECRET" not in data["updated"]
 
-    def test_save_api_keys_no_data(self, client):
+    def test_save_api_keys_no_data(self, client: FlaskClient) -> None:
         resp = client.post("/settings/save_api_keys", data={})
         assert resp.status_code == 200
         data = resp.get_json()
         assert data["success"] is True
         assert data["updated"] == []
 
-    def test_save_api_keys_error(self, client, device_config_dev):
+    def test_save_api_keys_error(
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
         with patch.object(
             device_config_dev, "set_env_key", side_effect=RuntimeError("write fail")
         ):
@@ -167,21 +185,25 @@ class TestSaveApiKeys:
 
 
 class TestDeleteApiKey:
-    def test_delete_api_key_success(self, client, device_config_dev):
+    def test_delete_api_key_success(
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
         resp = client.post("/settings/delete_api_key", data={"key": "OPEN_AI_SECRET"})
         assert resp.status_code == 200
         data = resp.get_json()
         assert data["success"] is True
 
-    def test_delete_api_key_invalid_name(self, client):
+    def test_delete_api_key_invalid_name(self, client: FlaskClient) -> None:
         resp = client.post("/settings/delete_api_key", data={"key": "EVIL_KEY"})
         assert resp.status_code == 400
 
-    def test_delete_api_key_missing_key(self, client):
+    def test_delete_api_key_missing_key(self, client: FlaskClient) -> None:
         resp = client.post("/settings/delete_api_key", data={})
         assert resp.status_code == 400
 
-    def test_delete_api_key_each_valid_key(self, client, device_config_dev):
+    def test_delete_api_key_each_valid_key(
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
         """Each valid key name should be accepted."""
         for key in (
             "OPEN_AI_SECRET",
@@ -192,7 +214,9 @@ class TestDeleteApiKey:
             resp = client.post("/settings/delete_api_key", data={"key": key})
             assert resp.status_code == 200, f"Failed for key={key}"
 
-    def test_delete_api_key_error(self, client, device_config_dev):
+    def test_delete_api_key_error(
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
         with patch.object(
             device_config_dev, "unset_env_key", side_effect=OSError("fail")
         ):
@@ -221,14 +245,18 @@ class TestSaveSettings:
         "contrast": "1.0",
     }
 
-    def test_save_settings_success(self, client, device_config_dev):
+    def test_save_settings_success(
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
         resp = client.post("/save_settings", data=self.VALID_FORM)
         assert resp.status_code == 200
         data = resp.get_json()
         assert data["success"] is True
         assert device_config_dev.get_config("name") == "TestDevice"
 
-    def test_save_settings_reconfigures_log_timezone(self, client, monkeypatch):
+    def test_save_settings_reconfigures_log_timezone(
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         import blueprints.settings._config as settings_config
 
         configured: list[str | None] = []
@@ -246,58 +274,62 @@ class TestSaveSettings:
         assert resp.status_code == 200
         assert configured == ["America/Los_Angeles"]
 
-    def test_save_settings_missing_unit(self, client):
+    def test_save_settings_missing_unit(self, client: FlaskClient) -> None:
         form = {**self.VALID_FORM}
         del form["unit"]
         resp = client.post("/save_settings", data=form)
         assert resp.status_code == 422
 
-    def test_save_settings_invalid_unit(self, client):
+    def test_save_settings_invalid_unit(self, client: FlaskClient) -> None:
         form = {**self.VALID_FORM, "unit": "nanosecond"}
         resp = client.post("/save_settings", data=form)
         assert resp.status_code == 422
 
-    def test_save_settings_missing_interval(self, client):
+    def test_save_settings_missing_interval(self, client: FlaskClient) -> None:
         form = {**self.VALID_FORM}
         del form["interval"]
         resp = client.post("/save_settings", data=form)
         assert resp.status_code == 422
 
-    def test_save_settings_non_numeric_interval(self, client):
+    def test_save_settings_non_numeric_interval(self, client: FlaskClient) -> None:
         form = {**self.VALID_FORM, "interval": "abc"}
         resp = client.post("/save_settings", data=form)
         assert resp.status_code == 422
 
-    def test_save_settings_missing_timezone(self, client):
+    def test_save_settings_missing_timezone(self, client: FlaskClient) -> None:
         form = {**self.VALID_FORM, "timezoneName": ""}
         resp = client.post("/save_settings", data=form)
         assert resp.status_code == 422
 
-    def test_save_settings_missing_time_format(self, client):
+    def test_save_settings_missing_time_format(self, client: FlaskClient) -> None:
         form = {**self.VALID_FORM}
         del form["timeFormat"]
         resp = client.post("/save_settings", data=form)
         assert resp.status_code == 422
 
-    def test_save_settings_invalid_time_format(self, client):
+    def test_save_settings_invalid_time_format(self, client: FlaskClient) -> None:
         form = {**self.VALID_FORM, "timeFormat": "48h"}
         resp = client.post("/save_settings", data=form)
         assert resp.status_code == 422
 
-    def test_save_settings_interval_too_large(self, client):
+    def test_save_settings_interval_too_large(self, client: FlaskClient) -> None:
         """Interval > 24 hours should be rejected."""
         form = {**self.VALID_FORM, "unit": "hour", "interval": "25"}
         resp = client.post("/save_settings", data=form)
         assert resp.status_code == 422
 
-    def test_save_settings_with_inky_saturation(self, client, device_config_dev):
+    def test_save_settings_with_inky_saturation(
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
         form = {**self.VALID_FORM, "inky_saturation": "0.7"}
         resp = client.post("/save_settings", data=form)
         assert resp.status_code == 200
         img_settings = device_config_dev.get_config("image_settings")
         assert img_settings["inky_saturation"] == 0.7
 
-    def test_save_settings_triggers_config_change(self, client, device_config_dev):
+    def test_save_settings_triggers_config_change(
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
         """Changing interval should signal config change on refresh task."""
         # Set initial interval different from what we'll submit
         device_config_dev.update_value("plugin_cycle_interval_seconds", 600, write=True)
@@ -305,37 +337,45 @@ class TestSaveSettings:
         resp = client.post("/save_settings", data=form)
         assert resp.status_code == 200
 
-    def test_save_settings_hour_unit(self, client, device_config_dev):
+    def test_save_settings_hour_unit(
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
         form = {**self.VALID_FORM, "unit": "hour", "interval": "2"}
         resp = client.post("/save_settings", data=form)
         assert resp.status_code == 200
 
-    def test_save_settings_preview_size_mode(self, client, device_config_dev):
+    def test_save_settings_preview_size_mode(
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
         form = {**self.VALID_FORM, "previewSizeMode": "fit"}
         resp = client.post("/save_settings", data=form)
         assert resp.status_code == 200
         assert device_config_dev.get_config("preview_size_mode") == "fit"
 
-    def test_save_settings_legacy_device_post(self, client, device_config_dev):
+    def test_save_settings_legacy_device_post(
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
         """POST /settings/device should forward to save_settings."""
         resp = client.post("/settings/device", data=self.VALID_FORM)
         assert resp.status_code == 200
         assert resp.get_json()["success"] is True
 
-    def test_save_settings_legacy_device_get(self, client):
+    def test_save_settings_legacy_device_get(self, client: FlaskClient) -> None:
         """GET /settings/device should render settings page."""
         resp = client.get("/settings/device")
         assert resp.status_code == 200
 
-    def test_save_settings_legacy_display_post(self, client, device_config_dev):
+    def test_save_settings_legacy_display_post(
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
         resp = client.post("/settings/display", data=self.VALID_FORM)
         assert resp.status_code == 200
 
-    def test_save_settings_legacy_network_get(self, client):
+    def test_save_settings_legacy_network_get(self, client: FlaskClient) -> None:
         resp = client.get("/settings/network")
         assert resp.status_code == 200
 
-    def test_save_settings_missing_device_name(self, client):
+    def test_save_settings_missing_device_name(self, client: FlaskClient) -> None:
         form = {**self.VALID_FORM}
         del form["deviceName"]
         resp = client.post("/save_settings", data=form)
@@ -343,28 +383,30 @@ class TestSaveSettings:
         data = resp.get_json()
         assert data["details"]["field"] == "deviceName"
 
-    def test_save_settings_empty_device_name(self, client):
+    def test_save_settings_empty_device_name(self, client: FlaskClient) -> None:
         form = {**self.VALID_FORM, "deviceName": ""}
         resp = client.post("/save_settings", data=form)
         assert resp.status_code == 422
         data = resp.get_json()
         assert data["details"]["field"] == "deviceName"
 
-    def test_save_settings_whitespace_device_name(self, client):
+    def test_save_settings_whitespace_device_name(self, client: FlaskClient) -> None:
         form = {**self.VALID_FORM, "deviceName": "   "}
         resp = client.post("/save_settings", data=form)
         assert resp.status_code == 422
         data = resp.get_json()
         assert data["details"]["field"] == "deviceName"
 
-    def test_save_settings_zero_interval(self, client):
+    def test_save_settings_zero_interval(self, client: FlaskClient) -> None:
         form = {**self.VALID_FORM, "interval": "0"}
         resp = client.post("/save_settings", data=form)
         assert resp.status_code == 422
         data = resp.get_json()
         assert data["details"]["field"] == "interval"
 
-    def test_save_settings_checkbox_on_stores_true(self, client, device_config_dev):
+    def test_save_settings_checkbox_on_stores_true(
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
         """Checkbox fields submitted as 'on' should be stored as boolean True."""
         form = {**self.VALID_FORM, "invertImage": "on", "logSystemStats": "on"}
         resp = client.post("/save_settings", data=form)
@@ -373,8 +415,8 @@ class TestSaveSettings:
         assert device_config_dev.get_config("log_system_stats") is True
 
     def test_save_settings_checkbox_absent_stores_false(
-        self, client, device_config_dev
-    ):
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
         """Checkboxes not present in form (unchecked) should be stored as boolean False."""
         form = {**self.VALID_FORM}
         resp = client.post("/save_settings", data=form)
@@ -382,7 +424,9 @@ class TestSaveSettings:
         assert device_config_dev.get_config("inverted_image") is False
         assert device_config_dev.get_config("log_system_stats") is False
 
-    def test_save_settings_checkbox_not_string_on(self, client, device_config_dev):
+    def test_save_settings_checkbox_not_string_on(
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
         """Checkbox value other than 'on' should be stored as boolean False."""
         form = {**self.VALID_FORM, "invertImage": "yes", "logSystemStats": "true"}
         resp = client.post("/save_settings", data=form)
@@ -390,7 +434,9 @@ class TestSaveSettings:
         assert device_config_dev.get_config("inverted_image") is False
         assert device_config_dev.get_config("log_system_stats") is False
 
-    def test_save_settings_negative_interval_accurate_error(self, client):
+    def test_save_settings_negative_interval_accurate_error(
+        self, client: FlaskClient
+    ) -> None:
         """Negative interval should say 'must be at least 1', not 'is required'."""
         form = {**self.VALID_FORM, "interval": "-5"}
         resp = client.post("/save_settings", data=form)
@@ -400,7 +446,9 @@ class TestSaveSettings:
         assert "at least 1" in data["error"]
         assert "required" not in data["error"].lower()
 
-    def test_save_settings_non_integer_interval_error(self, client):
+    def test_save_settings_non_integer_interval_error(
+        self, client: FlaskClient
+    ) -> None:
         """Non-numeric interval should say 'must be a number'."""
         form = {**self.VALID_FORM, "interval": "abc"}
         resp = client.post("/save_settings", data=form)

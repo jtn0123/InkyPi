@@ -1,9 +1,14 @@
 import os
+from typing import Any
 
+import pytest
+from flask.testing import FlaskClient
 from PIL import Image
 
 
-def test_history_page_ignores_truncated_sidecar_json(client, device_config_dev):
+def test_history_page_ignores_truncated_sidecar_json(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     history_dir = device_config_dev.history_image_dir
     image_path = os.path.join(history_dir, "display_20250101_000000.png")
     sidecar_path = os.path.join(history_dir, "display_20250101_000000.json")
@@ -17,8 +22,8 @@ def test_history_page_ignores_truncated_sidecar_json(client, device_config_dev):
 
 
 def test_preview_falls_back_to_current_image_when_processed_missing(
-    client, device_config_dev
-):
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     current_path = device_config_dev.current_image_file
     processed_path = device_config_dev.processed_image_file
 
@@ -31,9 +36,11 @@ def test_preview_falls_back_to_current_image_when_processed_missing(
     assert response.mimetype == "image/png"
 
 
-def test_refresh_info_endpoint_handles_broken_refresh_info(client, device_config_dev):
+def test_refresh_info_endpoint_handles_broken_refresh_info(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     class BrokenRefreshInfo:
-        def to_dict(self):
+        def to_dict(self) -> None:
             raise RuntimeError("bad metadata")
 
     device_config_dev.refresh_info = BrokenRefreshInfo()
@@ -42,7 +49,9 @@ def test_refresh_info_endpoint_handles_broken_refresh_info(client, device_config
     assert response.get_json() == {}
 
 
-def test_history_storage_returns_actionable_error_when_stat_fails(client, monkeypatch):
+def test_history_storage_returns_actionable_error_when_stat_fails(
+    client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
     monkeypatch.setattr(
         "shutil.disk_usage",
         lambda path: (_ for _ in ()).throw(OSError("no stat")),

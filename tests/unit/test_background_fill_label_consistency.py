@@ -1,8 +1,10 @@
 # pyright: reportMissingImports=false
 """Tests that image plugins use a consistent 'Background Fill' label (JTN-349 Theme 4)."""
 
+from typing import Any
 
-def _get_background_label(plugin_class):
+
+def _get_background_label(plugin_class: Any) -> Any:
     """Extract the backgroundOption field label from a plugin's schema."""
     plugin = plugin_class({"id": "test", "name": "Test"})
     schema = plugin.build_settings_schema()
@@ -15,25 +17,25 @@ def _get_background_label(plugin_class):
     return None
 
 
-def test_image_folder_background_fill_label():
+def test_image_folder_background_fill_label() -> None:
     from plugins.image_folder.image_folder import ImageFolder
 
     assert _get_background_label(ImageFolder) == "Background Fill"
 
 
-def test_image_upload_background_fill_label():
+def test_image_upload_background_fill_label() -> None:
     from plugins.image_upload.image_upload import ImageUpload
 
     assert _get_background_label(ImageUpload) == "Background Fill"
 
 
-def test_image_album_background_fill_label():
+def test_image_album_background_fill_label() -> None:
     from plugins.image_album.image_album import ImageAlbum
 
     assert _get_background_label(ImageAlbum) == "Background Fill"
 
 
-def test_all_image_plugins_same_label():
+def test_all_image_plugins_same_label() -> None:
     """All image plugins with backgroundOption should use the same label."""
     from plugins.image_album.image_album import ImageAlbum
     from plugins.image_folder.image_folder import ImageFolder

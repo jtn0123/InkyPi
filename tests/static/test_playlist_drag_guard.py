@@ -28,26 +28,26 @@ def _handle_drop_block() -> str:
 class TestCrossPlaylistDragGuard:
     """Verify playlist/cards.js rejects drops whose source is in a different playlist."""
 
-    def test_handle_drop_reads_src_playlist(self):
+    def test_handle_drop_reads_src_playlist(self) -> None:
         block = _handle_drop_block()
         assert (
             "srcPlaylist" in block
         ), "handleDrop must derive srcPlaylist from the dragged element"
 
-    def test_handle_drop_reads_dst_playlist(self):
+    def test_handle_drop_reads_dst_playlist(self) -> None:
         block = _handle_drop_block()
         assert (
             "dstPlaylist" in block
         ), "handleDrop must derive dstPlaylist from the drop target"
 
-    def test_handle_drop_guards_cross_playlist(self):
+    def test_handle_drop_guards_cross_playlist(self) -> None:
         block = _handle_drop_block()
         # Guard: if srcPlaylist !== dstPlaylist, bail out
         assert re.search(
             r"srcPlaylist\s*!==\s*dstPlaylist", block
         ), "handleDrop must return early when srcPlaylist !== dstPlaylist"
 
-    def test_guard_returns_before_dom_mutation(self):
+    def test_guard_returns_before_dom_mutation(self) -> None:
         """The guard must appear before the DOM mutation so the DOM is never mutated."""
         block = _handle_drop_block()
         guard_pos = block.find("srcPlaylist !== dstPlaylist")
@@ -61,7 +61,7 @@ class TestCrossPlaylistDragGuard:
             guard_pos < mutation_match.start()
         ), "Cross-playlist guard must appear before the DOM mutation"
 
-    def test_reorder_feedback_is_immediate(self):
+    def test_reorder_feedback_is_immediate(self) -> None:
         js_text = PLAYLIST_CARDS_JS.read_text()
         assert (
             'showResponseModal("success"' in js_text
@@ -71,7 +71,7 @@ class TestCrossPlaylistDragGuard:
             'sessionStorage.setItem("storedMessage"' not in js_text
         ), "playlist/cards.js must not defer reorder success feedback via storedMessage"
 
-    def test_guard_uses_closest_playlist_item(self):
+    def test_guard_uses_closest_playlist_item(self) -> None:
         block = _handle_drop_block()
         assert (
             "closest('.playlist-item')" in block or 'closest(".playlist-item")' in block

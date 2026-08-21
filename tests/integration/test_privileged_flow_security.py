@@ -10,10 +10,14 @@ verifies that privileged routes require the right combination of auth + CSRF.
 from __future__ import annotations
 
 import json
+from collections.abc import Iterator
 from copy import deepcopy
 from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
 
 import pytest
+from flask.testing import FlaskClient
 
 PIN = "246810"
 READONLY_TOKEN = "readonly-monitor-token"
@@ -83,7 +87,9 @@ def _bearer_headers() -> dict[str, str]:
     return {"Authorization": f"Bearer {READONLY_TOKEN}"}
 
 
-def _request(case: FlowCase, client, *, headers: dict[str, str] | None = None):
+def _request(
+    case: FlowCase, client: FlaskClient, *, headers: dict[str, str] | None = None
+) -> Any:
     kwargs = deepcopy(case.kwargs)
     if headers:
         merged_headers = dict(kwargs.get("headers", {}))
@@ -93,7 +99,9 @@ def _request(case: FlowCase, client, *, headers: dict[str, str] | None = None):
     return method(case.path, **kwargs)
 
 
-def _seed_authed_session(client, *, csrf_token: str | None = VALID_CSRF) -> None:
+def _seed_authed_session(
+    client: FlaskClient, *, csrf_token: str | None = VALID_CSRF
+) -> None:
     with client.session_transaction() as sess:
         sess["authed"] = True
         if csrf_token is not None:
@@ -104,7 +112,7 @@ def _csrf_headers(token: str = VALID_CSRF) -> dict[str, str]:
     return {"X-CSRFToken": token}
 
 
-def _write_failure_record(tmp_path) -> None:
+def _write_failure_record(tmp_path: Path) -> None:
     payload = {
         "timestamp": "2026-04-14T23:00:00Z",
         "exit_code": 97,
@@ -116,11 +124,13 @@ def _write_failure_record(tmp_path) -> None:
     )
 
 
-def _write_prev_version(tmp_path, value: str = "v0.52.0") -> None:
+def _write_prev_version(tmp_path: Path, value: str = "v0.52.0") -> None:
     (tmp_path / "prev_version").write_text(value, encoding="utf-8")
 
 
-def _add_plugin_instance(device_config, plugin_id="clock", name="My Clock") -> None:
+def _add_plugin_instance(
+    device_config: Any, plugin_id: Any = "clock", name: Any = "My Clock"
+) -> None:
     pm = device_config.get_playlist_manager()
     playlist = pm.get_playlist("Default")
     if not playlist:
@@ -138,7 +148,7 @@ def _add_plugin_instance(device_config, plugin_id="clock", name="My Clock") -> N
 
 
 @pytest.fixture()
-def privileged_client(client, monkeypatch):
+def privileged_client(client: FlaskClient, monkeypatch: pytest.MonkeyPatch) -> Any:
     """Enable real PIN auth + real CSRF middleware on the production test app."""
     monkeypatch.setenv("INKYPI_AUTH_PIN", PIN)
     monkeypatch.setenv("INKYPI_READONLY_TOKEN", READONLY_TOKEN)
@@ -153,7 +163,7 @@ def privileged_client(client, monkeypatch):
 
 
 @pytest.fixture(autouse=True)
-def reset_privileged_flow_state():
+def reset_privileged_flow_state() -> Iterator[Any]:
     import blueprints.settings as settings_mod
 
     settings_mod._set_update_state(False, None)
@@ -164,21 +174,27 @@ def reset_privileged_flow_state():
 
 
 @pytest.mark.parametrize("case", ALL_CASES, ids=lambda case: case.name)
-def test_unauthenticated_privileged_flows_redirect_to_login(privileged_client, case):
+def test_unauthenticated_privileged_flows_redirect_to_login(
+    privileged_client: Any, case: Any
+) -> None:
     resp = _request(case, privileged_client)
     assert resp.status_code == 302
     assert "/login" in resp.headers["Location"]
 
 
 @pytest.mark.parametrize("case", ALL_CASES, ids=lambda case: case.name)
-def test_readonly_token_cannot_access_privileged_flows(privileged_client, case):
+def test_readonly_token_cannot_access_privileged_flows(
+    privileged_client: Any, case: Any
+) -> None:
     resp = _request(case, privileged_client, headers=_bearer_headers())
     assert resp.status_code == 302
     assert "/login" in resp.headers["Location"]
 
 
 @pytest.mark.parametrize("case", PRIVILEGED_POST_CASES, ids=lambda case: case.name)
-def test_authenticated_privileged_posts_still_require_csrf(privileged_client, case):
+def test_authenticated_privileged_posts_still_require_csrf(
+    privileged_client: Any, case: Any
+) -> None:
     _seed_authed_session(privileged_client, csrf_token=VALID_CSRF)
 
     resp = _request(case, privileged_client)
@@ -189,7 +205,7 @@ def test_authenticated_privileged_posts_still_require_csrf(privileged_client, ca
     assert "CSRF token missing or invalid" in data["error"]
 
 
-def test_authenticated_session_can_export_settings(privileged_client):
+def test_authenticated_session_can_export_settings(privileged_client: Any) -> None:
     _seed_authed_session(privileged_client)
 
     resp = privileged_client.get("/settings/export")
@@ -201,8 +217,8 @@ def test_authenticated_session_can_export_settings(privileged_client):
 
 
 def test_authenticated_session_can_export_settings_with_keys_when_csrf_present(
-    privileged_client, device_config_dev
-):
+    privileged_client: Any, device_config_dev: Any
+) -> None:
     _seed_authed_session(privileged_client)
     device_config_dev.set_env_key("OPEN_AI_SECRET", "sk-exportable")
 
@@ -219,8 +235,8 @@ def test_authenticated_session_can_export_settings_with_keys_when_csrf_present(
 
 
 def test_authenticated_session_can_import_settings_with_csrf(
-    privileged_client, device_config_dev
-):
+    privileged_client: Any, device_config_dev: Any
+) -> None:
     _seed_authed_session(privileged_client)
 
     resp = privileged_client.post(
@@ -235,8 +251,8 @@ def test_authenticated_session_can_import_settings_with_csrf(
 
 
 def test_authenticated_session_can_save_and_delete_api_keys_with_csrf(
-    privileged_client, device_config_dev
-):
+    privileged_client: Any, device_config_dev: Any
+) -> None:
     _seed_authed_session(privileged_client)
 
     save_resp = privileged_client.post(
@@ -258,14 +274,16 @@ def test_authenticated_session_can_save_and_delete_api_keys_with_csrf(
     assert device_config_dev.load_env_key("OPEN_AI_SECRET") in (None, "")
 
 
-def test_authenticated_session_can_shutdown_with_csrf(privileged_client, monkeypatch):
+def test_authenticated_session_can_shutdown_with_csrf(
+    privileged_client: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     import blueprints.settings as settings_mod
 
     _seed_authed_session(privileged_client)
 
     calls: list[list[str]] = []
 
-    def _fake_run(argv, check):
+    def _fake_run(argv: Any, check: Any) -> None:
         calls.append(list(argv))
 
     monkeypatch.setattr(settings_mod.subprocess, "run", _fake_run)
@@ -282,8 +300,8 @@ def test_authenticated_session_can_shutdown_with_csrf(privileged_client, monkeyp
 
 
 def test_authenticated_session_can_start_update_with_csrf(
-    privileged_client, monkeypatch
-):
+    privileged_client: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     import blueprints.settings as settings_mod
 
     _seed_authed_session(privileged_client)
@@ -308,8 +326,8 @@ def test_authenticated_session_can_start_update_with_csrf(
 
 
 def test_authenticated_session_can_start_rollback_with_csrf(
-    privileged_client, monkeypatch, tmp_path
-):
+    privileged_client: Any, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     import blueprints.settings as settings_mod
 
     _seed_authed_session(privileged_client)
@@ -335,7 +353,9 @@ def test_authenticated_session_can_start_rollback_with_csrf(
     assert data["target_version"] == "v0.52.0"
 
 
-def test_authenticated_session_can_export_plugins(privileged_client, device_config_dev):
+def test_authenticated_session_can_export_plugins(
+    privileged_client: Any, device_config_dev: Any
+) -> None:
     _seed_authed_session(privileged_client)
     _add_plugin_instance(device_config_dev, name="Secure Export Clock")
 
@@ -348,8 +368,8 @@ def test_authenticated_session_can_export_plugins(privileged_client, device_conf
 
 
 def test_authenticated_session_can_import_plugins_with_csrf(
-    privileged_client, device_config_dev
-):
+    privileged_client: Any, device_config_dev: Any
+) -> None:
     _seed_authed_session(privileged_client)
 
     resp = privileged_client.post(

@@ -10,7 +10,7 @@ def _read_script(name: str) -> str:
     return (_SCRIPTS_DIR / name).read_text(encoding="utf-8")
 
 
-def test_history_page_script_handles_escape_for_open_modals():
+def test_history_page_script_handles_escape_for_open_modals() -> None:
     content = _read_script("history_page.js")
 
     assert 'event.key !== "Escape"' in content
@@ -18,7 +18,7 @@ def test_history_page_script_handles_escape_for_open_modals():
     assert "clearHistoryModal" in content
 
 
-def test_playlist_script_handles_escape_for_playlist_modals():
+def test_playlist_script_handles_escape_for_playlist_modals() -> None:
     content = _read_script("playlist/modals.js")
 
     assert "getOpenModalId" in content
@@ -28,14 +28,14 @@ def test_playlist_script_handles_escape_for_playlist_modals():
     assert 'event.key !== "Escape"' in content or "event.key !== 'Escape'" in content
 
 
-def test_image_modal_script_handles_escape_and_null_container():
+def test_image_modal_script_handles_escape_and_null_container() -> None:
     content = _read_script("image_modal.js")
 
     assert "if (!imageContainer) return;" in content
     assert "e.key === 'Escape'" in content
 
 
-def test_plugin_page_schedule_modal_handles_escape():
+def test_plugin_page_schedule_modal_handles_escape() -> None:
     """JTN-461: #scheduleModal closes on Escape key."""
     content = _read_script("plugin_page.js")
 
@@ -43,7 +43,7 @@ def test_plugin_page_schedule_modal_handles_escape():
     assert "scheduleModal" in content
 
 
-def test_plugin_page_open_modal_focuses_first_focusable():
+def test_plugin_page_open_modal_focuses_first_focusable() -> None:
     """JTN-463: openModal moves focus to first focusable element on open."""
     content = _read_script("plugin_page.js")
 
@@ -51,7 +51,7 @@ def test_plugin_page_open_modal_focuses_first_focusable():
     assert "_lastModalTrigger" in content
 
 
-def test_settings_page_reboot_shutdown_modals_handle_escape():
+def test_settings_page_reboot_shutdown_modals_handle_escape() -> None:
     """JTN-652: /settings reboot + shutdown confirm modals close on Escape."""
     content = _read_script("settings/modals.js")
 
@@ -60,7 +60,7 @@ def test_settings_page_reboot_shutdown_modals_handle_escape():
     assert "shutdownConfirmModal" in content
 
 
-def test_settings_page_device_action_modals_manage_focus():
+def test_settings_page_device_action_modals_manage_focus() -> None:
     """JTN-652: /settings confirm modals move focus in on open and restore
     focus to the trigger on close."""
     content = _read_script("settings/modals.js")
@@ -69,7 +69,7 @@ def test_settings_page_device_action_modals_manage_focus():
     assert "DeviceActionTrigger" in content
 
 
-def test_response_modal_restores_focus_to_trigger():
+def test_response_modal_restores_focus_to_trigger() -> None:
     """The shared response modal should restore focus after dismissal."""
     content = _read_script("response_modal.js")
 
@@ -79,7 +79,7 @@ def test_response_modal_restores_focus_to_trigger():
     assert "is-visible" in content
 
 
-def test_plugin_workflow_panels_do_not_hide_content_from_assistive_tech():
+def test_plugin_workflow_panels_do_not_hide_content_from_assistive_tech() -> None:
     """Design refresh: both Configure and Preview panels render together on every
     viewport (the old Configure/Preview mode bar was removed). Neither panel
     should be force-hidden via inert or aria-hidden='true' by setWorkflowMode —

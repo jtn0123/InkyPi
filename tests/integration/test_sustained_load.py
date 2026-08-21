@@ -44,6 +44,7 @@ import time
 from dataclasses import dataclass
 
 import pytest
+from playwright.sync_api import Page
 from tests.integration.browser_helpers import RuntimeCollector, stub_leaflet
 
 # Repo convention: env gates are "set=1 to skip". This test inverts the
@@ -164,7 +165,7 @@ _ENUMERATE_JS = """
 """
 
 
-def _collect_candidates(page, live_server: str, sweep: LoadPage) -> list[dict]:
+def _collect_candidates(page: Page, live_server: str, sweep: LoadPage) -> list[dict]:
     """Navigate to ``sweep`` and return visible clickable descriptors."""
     page.goto(
         f"{live_server}{sweep.path}",
@@ -185,7 +186,7 @@ def _percentile(values: list[float], pct: float) -> float:
     return ordered[rank]
 
 
-def test_sustained_handler_load(live_server, browser_page):
+def test_sustained_handler_load(live_server: str, browser_page: Page) -> None:
     """Click for ~2 minutes across three pages; assert no degradation.
 
     Uses a seeded ``random.Random`` so the click pattern is reproducible

@@ -1,26 +1,30 @@
+from typing import Any
+
 # pyright: reportMissingImports=false
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 
-def test_unsplash_search_success(monkeypatch, device_config_dev):
+def test_unsplash_search_success(
+    monkeypatch: pytest.MonkeyPatch, device_config_dev: Any
+) -> Any:
     from plugins.unsplash.unsplash import Unsplash
 
     # Mock key
     monkeypatch.setenv("UNSPLASH_ACCESS_KEY", "k")
 
     class RespApi:
-        def __init__(self, data):
+        def __init__(self, data: Any) -> None:
             self._data = data
 
-        def raise_for_status(self):
+        def raise_for_status(self) -> None:
             pass
 
-        def json(self):
+        def json(self) -> Any:
             return self._data
 
-    def fake_get(url, params=None, **kwargs):
+    def fake_get(url: Any, params: Any = None, **kwargs: Any) -> Any:
         if "search" in url:
             return RespApi({"results": [{"urls": {"full": "http://img"}}]})
         return RespApi({"urls": {"full": "http://img"}})
@@ -42,7 +46,9 @@ def test_unsplash_search_success(monkeypatch, device_config_dev):
     assert img is not None
 
 
-def test_unsplash_requires_key(monkeypatch, device_config_dev):
+def test_unsplash_requires_key(
+    monkeypatch: pytest.MonkeyPatch, device_config_dev: Any
+) -> None:
     from plugins.unsplash.unsplash import Unsplash
 
     monkeypatch.delenv("UNSPLASH_ACCESS_KEY", raising=False)
@@ -50,7 +56,9 @@ def test_unsplash_requires_key(monkeypatch, device_config_dev):
         Unsplash({"id": "unsplash"}).generate_image({}, device_config_dev)
 
 
-def test_unsplash_random_photo_success(device_config_dev, monkeypatch):
+def test_unsplash_random_photo_success(
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Test Unsplash plugin with random photo (no search query)."""
     from plugins.unsplash.unsplash import Unsplash
 
@@ -89,7 +97,9 @@ def test_unsplash_random_photo_success(device_config_dev, monkeypatch):
             assert result is not None
 
 
-def test_unsplash_with_collections(device_config_dev, monkeypatch):
+def test_unsplash_with_collections(
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Test Unsplash plugin with collections parameter."""
     from plugins.unsplash.unsplash import Unsplash
 
@@ -129,7 +139,9 @@ def test_unsplash_with_collections(device_config_dev, monkeypatch):
             assert result is not None
 
 
-def test_unsplash_with_color_filter(device_config_dev, monkeypatch):
+def test_unsplash_with_color_filter(
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Test Unsplash plugin with color filter."""
     from plugins.unsplash.unsplash import Unsplash
 
@@ -169,7 +181,9 @@ def test_unsplash_with_color_filter(device_config_dev, monkeypatch):
             assert result is not None
 
 
-def test_unsplash_with_orientation(device_config_dev, monkeypatch):
+def test_unsplash_with_orientation(
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Test Unsplash plugin with orientation filter."""
     from plugins.unsplash.unsplash import Unsplash
 
@@ -209,7 +223,9 @@ def test_unsplash_with_orientation(device_config_dev, monkeypatch):
             assert result is not None
 
 
-def test_unsplash_search_no_results(device_config_dev, monkeypatch):
+def test_unsplash_search_no_results(
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Test Unsplash plugin search with no results."""
     from plugins.unsplash.unsplash import Unsplash
 
@@ -233,7 +249,9 @@ def test_unsplash_search_no_results(device_config_dev, monkeypatch):
             p.generate_image(settings, device_config_dev)
 
 
-def test_unsplash_api_error_handling(device_config_dev, monkeypatch):
+def test_unsplash_api_error_handling(
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Test Unsplash plugin with API error."""
     from plugins.unsplash.unsplash import Unsplash
 
@@ -254,7 +272,9 @@ def test_unsplash_api_error_handling(device_config_dev, monkeypatch):
             p.generate_image({}, device_config_dev)
 
 
-def test_unsplash_api_response_parsing_error(device_config_dev, monkeypatch):
+def test_unsplash_api_response_parsing_error(
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Test Unsplash plugin with malformed API response."""
     from plugins.unsplash.unsplash import Unsplash
 
@@ -275,7 +295,9 @@ def test_unsplash_api_response_parsing_error(device_config_dev, monkeypatch):
             p.generate_image({}, device_config_dev)
 
 
-def test_unsplash_image_download_failure(device_config_dev, monkeypatch):
+def test_unsplash_image_download_failure(
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Test Unsplash plugin with image download failure."""
     from plugins.unsplash.unsplash import Unsplash
 
@@ -303,7 +325,9 @@ def test_unsplash_image_download_failure(device_config_dev, monkeypatch):
                 p.generate_image({}, device_config_dev)
 
 
-def test_unsplash_vertical_orientation(device_config_dev, monkeypatch):
+def test_unsplash_vertical_orientation(
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Test Unsplash plugin with vertical device orientation."""
     from plugins.unsplash.unsplash import Unsplash
 
@@ -354,7 +378,7 @@ def test_unsplash_vertical_orientation(device_config_dev, monkeypatch):
             assert result is not None
 
 
-def test_grab_image_success():
+def test_grab_image_success() -> None:
     """Test grab_image function with successful image download."""
     from plugins.unsplash.unsplash import grab_image
 
@@ -369,7 +393,7 @@ def test_grab_image_success():
         )
 
 
-def test_grab_image_download_failure():
+def test_grab_image_download_failure() -> None:
     """Test grab_image function with download failure."""
     from plugins.unsplash.unsplash import grab_image
 
@@ -381,7 +405,7 @@ def test_grab_image_download_failure():
         assert result is None
 
 
-def test_grab_image_invalid_image_data():
+def test_grab_image_invalid_image_data() -> None:
     """Test grab_image function with invalid image data."""
     from plugins.unsplash.unsplash import grab_image
 
@@ -393,7 +417,7 @@ def test_grab_image_invalid_image_data():
         assert result is None
 
 
-def test_unsplash_settings_template_declares_api_key():
+def test_unsplash_settings_template_declares_api_key() -> None:
     from plugins.unsplash.unsplash import Unsplash
 
     plugin = Unsplash({"id": "unsplash"})
@@ -404,7 +428,9 @@ def test_unsplash_settings_template_declares_api_key():
     assert params["api_key"]["service"] == "Unsplash"
 
 
-def test_unsplash_content_filter_settings(device_config_dev, monkeypatch):
+def test_unsplash_content_filter_settings(
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Test Unsplash plugin with different content filter settings."""
     from plugins.unsplash.unsplash import Unsplash
 

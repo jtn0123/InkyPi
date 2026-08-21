@@ -2,13 +2,19 @@
 """Tests for settings health and progress SSE endpoints (_health.py)."""
 
 from datetime import UTC, datetime, timedelta
+from typing import Any
 from unittest.mock import MagicMock
+
+import pytest
+from flask.testing import FlaskClient
 
 from blueprints.settings import _health
 
 
 class TestHealthPlugins:
-    def test_filters_stale_entries(self, client, monkeypatch):
+    def test_filters_stale_entries(
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Entries with last_seen older than the window are filtered out."""
         monkeypatch.setenv("INKYPI_HEALTH_WINDOW_MIN", "1440")
 
@@ -27,7 +33,9 @@ class TestHealthPlugins:
         assert data["success"] is True
         assert "old_plugin" not in data["items"]
 
-    def test_keeps_recent_entries(self, client, monkeypatch):
+    def test_keeps_recent_entries(
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Entries with recent last_seen are preserved."""
         monkeypatch.setenv("INKYPI_HEALTH_WINDOW_MIN", "1440")
         recent_time = datetime.now(UTC).isoformat()
@@ -43,7 +51,9 @@ class TestHealthPlugins:
         data = resp.get_json()
         assert "fresh_plugin" in data["items"]
 
-    def test_keeps_entries_without_last_seen(self, client, monkeypatch):
+    def test_keeps_entries_without_last_seen(
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Entries missing last_seen key are preserved."""
         snapshot = {"no_ts_plugin": {"status": "ok"}}
 
@@ -57,7 +67,9 @@ class TestHealthPlugins:
         data = resp.get_json()
         assert "no_ts_plugin" in data["items"]
 
-    def test_invalid_datetime_preserved(self, client, monkeypatch):
+    def test_invalid_datetime_preserved(
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Entries with unparseable last_seen are preserved (except path)."""
         snapshot = {"bad_ts": {"last_seen": "not-a-date", "status": "ok"}}
 
@@ -71,7 +83,9 @@ class TestHealthPlugins:
         data = resp.get_json()
         assert "bad_ts" in data["items"]
 
-    def test_window_env_non_numeric(self, client, monkeypatch):
+    def test_window_env_non_numeric(
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Non-numeric INKYPI_HEALTH_WINDOW_MIN falls back to 1440."""
         monkeypatch.setenv("INKYPI_HEALTH_WINDOW_MIN", "abc")
 
@@ -89,7 +103,9 @@ class TestHealthPlugins:
         assert data["success"] is True
         assert "plugin" in data["items"]
 
-    def test_no_snapshot_method(self, client, monkeypatch):
+    def test_no_snapshot_method(
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """RefreshTask without get_health_snapshot returns empty dict."""
         rt = MagicMock(spec=[])  # no methods at all
 
@@ -101,7 +117,9 @@ class TestHealthPlugins:
         assert data["success"] is True
         assert data["items"] == {}
 
-    def test_exception_returns_500(self, client, monkeypatch):
+    def test_exception_returns_500(
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Outer exception triggers json_internal_error."""
         # Remove REFRESH_TASK entirely to cause KeyError
         with client.application.app_context():
@@ -112,7 +130,7 @@ class TestHealthPlugins:
 
 
 class TestHealthSystem:
-    def test_with_psutil(self, client):
+    def test_with_psutil(self, client: FlaskClient) -> None:
         """Returns numeric system metrics when psutil is available."""
         resp = client.get("/api/health/system")
         assert resp.status_code == 200
@@ -126,7 +144,7 @@ class TestHealthSystem:
         assert isinstance(data["disk_total_gb"], int | float)
         assert isinstance(data["uptime_seconds"], int)
 
-    def test_disk_free_gb_is_plausible(self, client):
+    def test_disk_free_gb_is_plausible(self, client: FlaskClient) -> None:
         """disk_free_gb must be non-negative and less than or equal to disk_total_gb."""
         resp = client.get("/api/health/system")
         data = resp.get_json()
@@ -134,13 +152,15 @@ class TestHealthSystem:
         assert data["disk_total_gb"] > 0
         assert data["disk_free_gb"] <= data["disk_total_gb"]
 
-    def test_psutil_unavailable(self, client, monkeypatch):
+    def test_psutil_unavailable(
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+    ) -> Any:
         """All metrics are None when psutil import fails."""
         import builtins
 
         real_import = builtins.__import__
 
-        def _block_psutil(name, *args, **kwargs):
+        def _block_psutil(name: Any, *args: Any, **kwargs: Any) -> Any:
             if name == "psutil":
                 raise ImportError("blocked")
             return real_import(name, *args, **kwargs)
@@ -159,14 +179,18 @@ class TestHealthSystem:
 
 
 class TestProgressStream:
-    def test_disabled(self, client, monkeypatch):
+    def test_disabled(
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """SSE endpoint returns 404 when disabled."""
         monkeypatch.setenv("INKYPI_PROGRESS_SSE_ENABLED", "false")
 
         resp = client.get("/api/progress/stream")
         assert resp.status_code == 404
 
-    def test_enabled_mimetype(self, client, monkeypatch):
+    def test_enabled_mimetype(
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """SSE endpoint returns text/event-stream content type."""
         monkeypatch.setenv("INKYPI_PROGRESS_SSE_ENABLED", "true")
 
@@ -177,7 +201,9 @@ class TestProgressStream:
         finally:
             resp.close()
 
-    def test_last_seq_non_numeric(self, client, monkeypatch):
+    def test_last_seq_non_numeric(
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Non-numeric last_seq defaults to 0 without error."""
         monkeypatch.setenv("INKYPI_PROGRESS_SSE_ENABLED", "true")
 
@@ -188,7 +214,9 @@ class TestProgressStream:
         finally:
             resp.close()
 
-    def test_connection_cap_returns_503(self, client, monkeypatch):
+    def test_connection_cap_returns_503(
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """SSE endpoint refuses excess subscribers instead of tying up workers."""
         monkeypatch.setenv("INKYPI_PROGRESS_SSE_ENABLED", "true")
         monkeypatch.setenv("INKYPI_PROGRESS_SSE_MAX_CONNECTIONS", "0")
@@ -198,17 +226,21 @@ class TestProgressStream:
         assert resp.status_code == 503
         assert resp.get_data(as_text=True) == "Too many progress SSE connections"
 
-    def test_enabled_helper_accepts_truthy_values(self, monkeypatch):
+    def test_enabled_helper_accepts_truthy_values(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         monkeypatch.setenv("INKYPI_PROGRESS_SSE_ENABLED", "yes")
 
         assert _health._progress_stream_enabled() is True
 
-    def test_enabled_helper_rejects_disabled_values(self, monkeypatch):
+    def test_enabled_helper_rejects_disabled_values(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         monkeypatch.setenv("INKYPI_PROGRESS_SSE_ENABLED", "off")
 
         assert _health._progress_stream_enabled() is False
 
-    def test_iter_progress_events_backfills_and_follows_new_events(self):
+    def test_iter_progress_events_backfills_and_follows_new_events(self) -> None:
         bus = MagicMock()
         bus.recent.return_value = [
             {"seq": 1, "state": "old"},
@@ -225,7 +257,7 @@ class TestProgressStream:
         assert next(stream).startswith("event: next\n")
         bus.wait_for.assert_called_once_with(2, timeout_s=15.0)
 
-    def test_iter_progress_events_emits_keepalive_when_idle(self):
+    def test_iter_progress_events_emits_keepalive_when_idle(self) -> None:
         bus = MagicMock()
         bus.recent.return_value = []
         bus.wait_for.return_value = []

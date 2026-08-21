@@ -16,16 +16,20 @@ from __future__ import annotations
 import importlib
 import json
 import logging
+from typing import Any
 
 import pytest
 from flask import Flask  # noqa: E402
+from flask.testing import FlaskClient
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
 
-def _fresh_module(monkeypatch=None, *, capture: bool | None = None):
+def _fresh_module(
+    monkeypatch: pytest.MonkeyPatch = None, *, capture: bool | None = None
+) -> Any:
     """Reload ``blueprints.client_log`` and return (module, Flask app)."""
     import blueprints.client_log as cl_mod
 
@@ -48,13 +52,15 @@ def _make_app() -> Flask:
 
 
 @pytest.fixture()
-def cl_client():
+def cl_client() -> Any:
     """Flask test client for the client_log blueprint."""
     app = _make_app()
     return app.test_client()
 
 
-def _post(client, payload: dict | None = None, *, body: bytes | None = None):
+def _post(
+    client: FlaskClient, payload: dict | None = None, *, body: bytes | None = None
+) -> Any:
     """POST to /api/client-log with JSON payload or raw body."""
     if body is not None:
         return client.post(
@@ -75,19 +81,21 @@ def _post(client, payload: dict | None = None, *, body: bytes | None = None):
 
 
 class TestPostValidJson:
-    def test_warn_returns_204(self, cl_client):
+    def test_warn_returns_204(self, cl_client: Any) -> None:
         resp = _post(cl_client, {"level": "warn", "message": "something may be wrong"})
         assert resp.status_code == 204
 
-    def test_error_returns_204(self, cl_client):
+    def test_error_returns_204(self, cl_client: Any) -> None:
         resp = _post(cl_client, {"level": "error", "message": "something broke"})
         assert resp.status_code == 204
 
-    def test_empty_response_body(self, cl_client):
+    def test_empty_response_body(self, cl_client: Any) -> None:
         resp = _post(cl_client, {"level": "warn", "message": "test"})
         assert resp.data == b""
 
-    def test_all_accepted_fields_logged(self, cl_client, caplog):
+    def test_all_accepted_fields_logged(
+        self, cl_client: Any, caplog: pytest.LogCaptureFixture
+    ) -> None:
         payload = {
             "level": "error",
             "message": "TypeError: x is undefined",
@@ -110,19 +118,19 @@ class TestPostValidJson:
 
 
 class TestInvalidLevel:
-    def test_info_level_returns_400(self, cl_client):
+    def test_info_level_returns_400(self, cl_client: Any) -> None:
         resp = _post(cl_client, {"level": "info", "message": "just info"})
         assert resp.status_code == 400
 
-    def test_debug_level_returns_400(self, cl_client):
+    def test_debug_level_returns_400(self, cl_client: Any) -> None:
         resp = _post(cl_client, {"level": "debug", "message": "debug message"})
         assert resp.status_code == 400
 
-    def test_unknown_level_returns_400(self, cl_client):
+    def test_unknown_level_returns_400(self, cl_client: Any) -> None:
         resp = _post(cl_client, {"level": "verbose", "message": "verbose"})
         assert resp.status_code == 400
 
-    def test_missing_level_returns_400(self, cl_client):
+    def test_missing_level_returns_400(self, cl_client: Any) -> None:
         resp = _post(cl_client, {"message": "no level"})
         assert resp.status_code == 400
 
@@ -133,7 +141,7 @@ class TestInvalidLevel:
 
 
 class TestGetReturns405:
-    def test_get_returns_405(self, cl_client):
+    def test_get_returns_405(self, cl_client: Any) -> None:
         resp = cl_client.get("/api/client-log")
         assert resp.status_code == 405
 
@@ -144,7 +152,7 @@ class TestGetReturns405:
 
 
 class TestOversizedBody:
-    def test_body_over_limit_returns_413(self, cl_client):
+    def test_body_over_limit_returns_413(self, cl_client: Any) -> None:
         """Bodies over the 256 KB cap (JTN-711 raised to fit batches) → 413."""
         giant_message = "x" * (300 * 1024)
         body = json.dumps({"level": "warn", "message": giant_message}).encode()
@@ -152,7 +160,7 @@ class TestOversizedBody:
         resp = _post(cl_client, body=body)
         assert resp.status_code == 413
 
-    def test_body_under_limit_accepted(self, cl_client):
+    def test_body_under_limit_accepted(self, cl_client: Any) -> None:
         resp = _post(cl_client, {"level": "warn", "message": "normal log"})
         assert resp.status_code == 204
 
@@ -163,7 +171,9 @@ class TestOversizedBody:
 
 
 class TestRateLimit:
-    def test_rate_limit_kicks_in_after_capacity(self, monkeypatch):
+    def test_rate_limit_kicks_in_after_capacity(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> Any:
         """After exhausting 60-token burst capacity the next request returns 429 (JTN-711).
 
         Freezes ``time.monotonic`` so the token bucket cannot refill mid-test:
@@ -188,7 +198,7 @@ class TestRateLimit:
         frozen = _time_mod.monotonic()
 
         class _FrozenTime:
-            def __getattr__(self, name: str):
+            def __getattr__(self, name: str) -> Any:
                 return getattr(_time_mod, name)
 
             def monotonic(self) -> float:
@@ -219,7 +229,9 @@ class TestRateLimit:
 
 
 class TestBatchAccepted:
-    def test_batch_endpoint_accepts_array_payload(self, monkeypatch):
+    def test_batch_endpoint_accepts_array_payload(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         cl_mod, app = _fresh_module(monkeypatch, capture=True)
 
         batch = [
@@ -234,7 +246,9 @@ class TestBatchAccepted:
         assert [r["message"] for r in reports] == ["w1", "e1", "w2"]
         assert [r["level"] for r in reports] == ["warn", "error", "warn"]
 
-    def test_existing_single_entry_payload_still_works(self, monkeypatch):
+    def test_existing_single_entry_payload_still_works(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Backwards-compat: legacy single-object POSTs still return 204."""
         cl_mod, app = _fresh_module(monkeypatch, capture=True)
 
@@ -244,7 +258,7 @@ class TestBatchAccepted:
         assert len(reports) == 1
         assert reports[0]["message"] == "solo"
 
-    def test_batch_at_cap_is_accepted(self, monkeypatch):
+    def test_batch_at_cap_is_accepted(self, monkeypatch: pytest.MonkeyPatch) -> None:
         cl_mod, app = _fresh_module(monkeypatch, capture=True)
 
         batch = [{"level": "warn", "message": f"m{i}"} for i in range(50)]
@@ -254,7 +268,9 @@ class TestBatchAccepted:
 
 
 class TestBatchRejected:
-    def test_batch_endpoint_rejects_oversized_batch(self, monkeypatch):
+    def test_batch_endpoint_rejects_oversized_batch(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """> 50 entries → 400."""
         cl_mod, app = _fresh_module(monkeypatch, capture=True)
 
@@ -266,12 +282,14 @@ class TestBatchRejected:
         assert "max" in body["error"].lower() or "50" in body["error"]
         assert cl_mod.get_captured_reports() == []
 
-    def test_empty_batch_rejected(self, monkeypatch):
+    def test_empty_batch_rejected(self, monkeypatch: pytest.MonkeyPatch) -> None:
         _, app = _fresh_module(monkeypatch)
         resp = _post(app.test_client(), [])
         assert resp.status_code == 400
 
-    def test_batch_entries_individually_validated(self, monkeypatch):
+    def test_batch_entries_individually_validated(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """One bad entry returns 400 with per-entry errors and captures nothing."""
         cl_mod, app = _fresh_module(monkeypatch, capture=True)
 
@@ -286,7 +304,9 @@ class TestBatchRejected:
         assert body["details"]["entry_errors"][0]["index"] == 1
         assert cl_mod.get_captured_reports() == []
 
-    def test_non_object_entry_in_batch_rejected(self, monkeypatch):
+    def test_non_object_entry_in_batch_rejected(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         _, app = _fresh_module(monkeypatch)
         batch = [{"level": "warn", "message": "ok"}, "bad-entry", 42]
         resp = _post(app.test_client(), batch)
@@ -295,14 +315,18 @@ class TestBatchRejected:
         indexes = [e["index"] for e in body["details"]["entry_errors"]]
         assert indexes == [1, 2]
 
-    def test_non_object_non_array_body_rejected(self, monkeypatch):
+    def test_non_object_non_array_body_rejected(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         _, app = _fresh_module(monkeypatch)
         resp = _post(app.test_client(), "just-a-string")
         assert resp.status_code == 400
 
 
 class TestBatchRateLimit:
-    def test_rate_limit_capacity_raised_to_60(self, monkeypatch):
+    def test_rate_limit_capacity_raised_to_60(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """JTN-711: the bucket now holds 60 tokens (up from 10)."""
         cl_mod, app = _fresh_module(monkeypatch)
 
@@ -316,7 +340,9 @@ class TestBatchRateLimit:
         resp = _post(client, {"level": "warn", "message": "over"})
         assert resp.status_code == 429
 
-    def test_each_batch_post_consumes_one_token(self, monkeypatch):
+    def test_each_batch_post_consumes_one_token(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Request-based limiting should allow 60 ten-entry batches."""
         cl_mod, app = _fresh_module(monkeypatch, capture=True)
 
@@ -337,7 +363,9 @@ class TestBatchRateLimit:
 
 
 class TestBatchFieldHandling:
-    def test_secret_redaction_applied_to_every_batch_entry(self, monkeypatch, caplog):
+    def test_secret_redaction_applied_to_every_batch_entry(
+        self, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+    ) -> None:
         _, app = _fresh_module(monkeypatch)
 
         batch = [{"level": "warn", "message": f"entry-{i}"} for i in range(5)]
@@ -353,7 +381,9 @@ class TestBatchFieldHandling:
                 f"entry-{i}" in m for m in warning_msgs
             ), f"entry-{i} missing from logs"
 
-    def test_cr_lf_stripped_on_every_batch_entry(self, monkeypatch, caplog):
+    def test_cr_lf_stripped_on_every_batch_entry(
+        self, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+    ) -> None:
         _, app = _fresh_module(monkeypatch)
 
         batch = [
@@ -371,7 +401,9 @@ class TestBatchFieldHandling:
         assert "bad1" in warning_msgs
         assert "bad2" in warning_msgs
 
-    def test_message_field_capped_per_entry(self, monkeypatch):
+    def test_message_field_capped_per_entry(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         cl_mod, app = _fresh_module(monkeypatch, capture=True)
 
         huge = "x" * 5000
@@ -384,7 +416,9 @@ class TestBatchFieldHandling:
 class TestBurstAllLands:
     """Acceptance test from JTN-711: 30 errors in a burst all land in one POST."""
 
-    def test_30_errors_in_a_burst_all_land(self, monkeypatch):
+    def test_30_errors_in_a_burst_all_land(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         cl_mod, app = _fresh_module(monkeypatch, capture=True)
 
         batch = [{"level": "error", "message": f"burst-{i}"} for i in range(30)]
@@ -401,7 +435,9 @@ class TestBurstAllLands:
 
 
 class TestNewlineStripping:
-    def test_cr_lf_in_message_is_stripped(self, cl_client, caplog):
+    def test_cr_lf_in_message_is_stripped(
+        self, cl_client: Any, caplog: pytest.LogCaptureFixture
+    ) -> None:
         """CR and LF characters in message must be replaced to prevent log injection."""
         payload = {
             "level": "warn",
@@ -416,7 +452,9 @@ class TestNewlineStripping:
         assert "\r" not in warning_msgs
         assert "\n" not in warning_msgs
 
-    def test_cr_lf_in_args_is_stripped(self, cl_client, caplog):
+    def test_cr_lf_in_args_is_stripped(
+        self, cl_client: Any, caplog: pytest.LogCaptureFixture
+    ) -> None:
         payload = {
             "level": "error",
             "message": "test",
@@ -438,7 +476,9 @@ class TestNewlineStripping:
 
 
 class TestLogLevelPrefix:
-    def test_warn_logged_with_warn_prefix(self, cl_client, caplog):
+    def test_warn_logged_with_warn_prefix(
+        self, cl_client: Any, caplog: pytest.LogCaptureFixture
+    ) -> None:
         with caplog.at_level(logging.WARNING, logger="blueprints.client_log"):
             resp = _post(cl_client, {"level": "warn", "message": "test warn"})
         assert resp.status_code == 204
@@ -447,7 +487,9 @@ class TestLogLevelPrefix:
         ]
         assert any("client log [warn]" in m for m in warning_msgs)
 
-    def test_error_logged_with_error_prefix(self, cl_client, caplog):
+    def test_error_logged_with_error_prefix(
+        self, cl_client: Any, caplog: pytest.LogCaptureFixture
+    ) -> None:
         with caplog.at_level(logging.WARNING, logger="blueprints.client_log"):
             resp = _post(cl_client, {"level": "error", "message": "test error"})
         assert resp.status_code == 204

@@ -1,20 +1,23 @@
 import builtins
 import io
 import re
+from typing import Any
+
+import pytest
 
 from utils import icon_utils
 
 
-def _setup_svg(monkeypatch, svg_content):
+def _setup_svg(monkeypatch: pytest.MonkeyPatch, svg_content: Any) -> Any:
     monkeypatch.setattr(icon_utils.os.path, "isfile", lambda path: True)
 
-    def fake_open(*args, **kwargs):
+    def fake_open(*args: Any, **kwargs: Any) -> Any:
         return io.StringIO(svg_content)
 
     monkeypatch.setattr(builtins, "open", fake_open)
 
 
-def test_title_injected_with_xml_declaration(monkeypatch):
+def test_title_injected_with_xml_declaration(monkeypatch: pytest.MonkeyPatch) -> None:
     svg_content = (
         "<?xml version='1.0' encoding='UTF-8'?>\n"
         "<svg xmlns='http://www.w3.org/2000/svg'></svg>"
@@ -25,7 +28,7 @@ def test_title_injected_with_xml_declaration(monkeypatch):
     assert re.search(r"<svg[^>]*><title>MyIcon</title>", str(result))
 
 
-def test_title_xss_is_escaped(monkeypatch):
+def test_title_xss_is_escaped(monkeypatch: pytest.MonkeyPatch) -> None:
     svg_content = "<svg xmlns='http://www.w3.org/2000/svg'></svg>"
     _setup_svg(monkeypatch, svg_content)
     result = icon_utils.render_icon("test", title='<script>alert("xss")</script>')
@@ -33,7 +36,7 @@ def test_title_xss_is_escaped(monkeypatch):
     assert "&lt;script&gt;" in str(result)
 
 
-def test_title_xss_escaped_in_fallback():
+def test_title_xss_escaped_in_fallback() -> None:
     # When SVG file doesn't exist, fallback uses title attr
     result = icon_utils.render_icon(
         "nonexistent_icon_xyz", title='"onmouseover="alert(1)'
@@ -44,7 +47,9 @@ def test_title_xss_escaped_in_fallback():
     assert "&#34;" in result_str or "&quot;" in result_str
 
 
-def test_svg_with_existing_class_not_duplicated(monkeypatch):
+def test_svg_with_existing_class_not_duplicated(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """SVG that already has a class attribute should not get a second one."""
     svg_content = '<svg class="existing" xmlns="http://www.w3.org/2000/svg"></svg>'
     _setup_svg(monkeypatch, svg_content)
@@ -54,7 +59,7 @@ def test_svg_with_existing_class_not_duplicated(monkeypatch):
     assert 'class="existing"' in result
 
 
-def test_svg_without_title_no_title_injected(monkeypatch):
+def test_svg_without_title_no_title_injected(monkeypatch: pytest.MonkeyPatch) -> None:
     """When no title is provided, no <title> tag should be injected."""
     svg_content = '<svg xmlns="http://www.w3.org/2000/svg"><rect/></svg>'
     _setup_svg(monkeypatch, svg_content)
@@ -62,7 +67,9 @@ def test_svg_without_title_no_title_injected(monkeypatch):
     assert "<title>" not in result
 
 
-def test_svg_with_existing_title_not_duplicated(monkeypatch):
+def test_svg_with_existing_title_not_duplicated(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """SVG that already has a <title> should not get a second one."""
     svg_content = (
         '<svg xmlns="http://www.w3.org/2000/svg"><title>Original</title></svg>'
@@ -73,11 +80,11 @@ def test_svg_with_existing_title_not_duplicated(monkeypatch):
     assert "Original" in result
 
 
-def test_exception_falls_back_to_class_icon(monkeypatch):
+def test_exception_falls_back_to_class_icon(monkeypatch: pytest.MonkeyPatch) -> None:
     """Any exception in SVG loading should produce the Phosphor fallback."""
     monkeypatch.setattr(icon_utils.os.path, "isfile", lambda path: True)
 
-    def raise_on_open(*args, **kwargs):
+    def raise_on_open(*args: Any, **kwargs: Any) -> None:
         raise OSError("disk error")
 
     monkeypatch.setattr(builtins, "open", raise_on_open)
@@ -86,14 +93,14 @@ def test_exception_falls_back_to_class_icon(monkeypatch):
     assert "<svg" not in result
 
 
-def test_fallback_without_title():
+def test_fallback_without_title() -> None:
     """Fallback icon without title should have no title attribute."""
     result = str(icon_utils.render_icon("nonexistent_xyz"))
     assert "ph ph-nonexistent_xyz" in result
     assert "title=" not in result
 
 
-def test_invalid_icon_name_and_class_are_sanitized():
+def test_invalid_icon_name_and_class_are_sanitized() -> None:
     result = str(
         icon_utils.render_icon(
             '../bad" onmouseover="alert(1)',
@@ -108,7 +115,7 @@ def test_invalid_icon_name_and_class_are_sanitized():
     assert " ok" in result
 
 
-def test_title_injected_with_doctype(monkeypatch):
+def test_title_injected_with_doctype(monkeypatch: pytest.MonkeyPatch) -> None:
     svg_content = (
         "<!DOCTYPE svg PUBLIC '-//W3C//DTD SVG 1.1//EN' "
         "'http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd'>\n"

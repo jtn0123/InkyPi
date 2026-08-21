@@ -1,20 +1,22 @@
 # pyright: reportMissingImports=false
 """Tests for the service worker route (JTN-303)."""
 
+from flask.testing import FlaskClient
 
-def test_sw_js_returns_200(client):
+
+def test_sw_js_returns_200(client: FlaskClient) -> None:
     """GET /sw.js returns HTTP 200."""
     response = client.get("/sw.js")
     assert response.status_code == 200
 
 
-def test_sw_js_content_type_javascript(client):
+def test_sw_js_content_type_javascript(client: FlaskClient) -> None:
     """GET /sw.js returns application/javascript content type."""
     response = client.get("/sw.js")
     assert "application/javascript" in response.content_type
 
 
-def test_sw_js_contains_cache_name(client):
+def test_sw_js_contains_cache_name(client: FlaskClient) -> None:
     """GET /sw.js body contains the versioned CACHE_NAME constant.
 
     The cache version is bumped whenever the shell asset list changes; we
@@ -30,7 +32,7 @@ def test_sw_js_contains_cache_name(client):
     ), "sw.js must declare a versioned CACHE_NAME (inkypi-shell-v<n>)"
 
 
-def test_sw_js_service_worker_allowed_header(client):
+def test_sw_js_service_worker_allowed_header(client: FlaskClient) -> None:
     """GET /sw.js includes Service-Worker-Allowed header set to '/'."""
     response = client.get("/sw.js")
     assert response.headers.get("Service-Worker-Allowed") == "/"

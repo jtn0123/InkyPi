@@ -10,6 +10,7 @@ Covers:
 """
 
 from datetime import UTC, datetime
+from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
@@ -25,14 +26,14 @@ from utils.fallback_image import render_error_image
 # ---------------------------------------------------------------------------
 
 
-def _make_task(device_config_dev):
+def _make_task(device_config_dev: Any) -> Any:
     dm = MagicMock()
     dm.display_image.return_value = {"display_ms": 10, "preprocess_ms": 5}
     task = RefreshTask(device_config_dev, dm)
     return task, dm
 
 
-def _make_plugin_instance(plugin_id="dummy", name="my_dummy"):
+def _make_plugin_instance(plugin_id: Any = "dummy", name: Any = "my_dummy") -> Any:
     return PluginInstance(
         plugin_id=plugin_id,
         name=name,
@@ -41,7 +42,7 @@ def _make_plugin_instance(plugin_id="dummy", name="my_dummy"):
     )
 
 
-def _add_plugin_to_pm(device_config_dev, plugin_instance):
+def _add_plugin_to_pm(device_config_dev: Any, plugin_instance: Any) -> Any:
     pm = device_config_dev.get_playlist_manager()
     playlist = pm.get_playlist("Default")
     if playlist is None:
@@ -57,7 +58,7 @@ def _add_plugin_to_pm(device_config_dev, plugin_instance):
 
 
 class TestRenderErrorImage:
-    def test_returns_pil_image(self):
+    def test_returns_pil_image(self) -> None:
         img = render_error_image(
             width=800,
             height=480,
@@ -68,7 +69,7 @@ class TestRenderErrorImage:
         )
         assert isinstance(img, Image.Image)
 
-    def test_correct_dimensions(self):
+    def test_correct_dimensions(self) -> None:
         img = render_error_image(
             width=800,
             height=480,
@@ -79,7 +80,7 @@ class TestRenderErrorImage:
         )
         assert img.size == (800, 480)
 
-    def test_never_returns_none_on_long_message(self):
+    def test_never_returns_none_on_long_message(self) -> None:
         msg = "x" * 500
         img = render_error_image(
             width=400,
@@ -92,7 +93,7 @@ class TestRenderErrorImage:
         assert img is not None
         assert isinstance(img, Image.Image)
 
-    def test_custom_timestamp(self):
+    def test_custom_timestamp(self) -> None:
         img = render_error_image(
             width=400,
             height=300,
@@ -104,7 +105,7 @@ class TestRenderErrorImage:
         )
         assert isinstance(img, Image.Image)
 
-    def test_small_dimensions(self):
+    def test_small_dimensions(self) -> None:
         """Even tiny dimensions should not raise."""
         img = render_error_image(
             width=50,
@@ -124,8 +125,8 @@ class TestRenderErrorImage:
 
 class TestFallbackImageOnFailure:
     def test_fallback_displayed_when_generate_raises(
-        self, device_config_dev, monkeypatch
-    ):
+        self, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> Any:
         """When generate_image raises, _push_fallback_image is called."""
         monkeypatch.setenv("INKYPI_PLUGIN_ISOLATION", "none")
         monkeypatch.setenv("INKYPI_PLUGIN_RETRY_MAX", "0")
@@ -140,10 +141,10 @@ class TestFallbackImageOnFailure:
         monkeypatch.setattr(device_config_dev, "get_plugin", lambda pid: dummy_cfg)
 
         class AlwaysRaisesPlugin:
-            def generate_image(self, settings, cfg):
+            def generate_image(self, settings: Any, cfg: Any) -> None:
                 raise RuntimeError("API is down")
 
-            def get_latest_metadata(self):
+            def get_latest_metadata(self) -> Any:
                 return None
 
         monkeypatch.setattr(
@@ -161,7 +162,7 @@ class TestFallbackImageOnFailure:
         fallback_calls = []
         original_push = task._push_fallback_image
 
-        def _tracking_push(*args, **kwargs):
+        def _tracking_push(*args: Any, **kwargs: Any) -> Any:
             fallback_calls.append(True)
             return original_push(*args, **kwargs)
 
@@ -172,7 +173,9 @@ class TestFallbackImageOnFailure:
 
         assert len(fallback_calls) == 1, "Fallback push should have been called once"
 
-    def test_fallback_image_pushed_to_display(self, device_config_dev, monkeypatch):
+    def test_fallback_image_pushed_to_display(
+        self, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> Any:
         """display_manager.display_image is called with a PIL Image on failure."""
         monkeypatch.setenv("INKYPI_PLUGIN_ISOLATION", "none")
         monkeypatch.setenv("INKYPI_PLUGIN_RETRY_MAX", "0")
@@ -187,10 +190,10 @@ class TestFallbackImageOnFailure:
         monkeypatch.setattr(device_config_dev, "get_plugin", lambda pid: dummy_cfg)
 
         class AlwaysRaisesPlugin:
-            def generate_image(self, settings, cfg):
+            def generate_image(self, settings: Any, cfg: Any) -> None:
                 raise ValueError("config missing")
 
-            def get_latest_metadata(self):
+            def get_latest_metadata(self) -> Any:
                 return None
 
         monkeypatch.setattr(
@@ -224,7 +227,9 @@ class TestFallbackImageOnFailure:
 
 
 class TestCircuitBreakerPersistence:
-    def test_failure_counter_persisted_to_config(self, device_config_dev, monkeypatch):
+    def test_failure_counter_persisted_to_config(
+        self, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> Any:
         """Consecutive failures increment counter and write_config is called."""
         monkeypatch.setenv("PLUGIN_FAILURE_THRESHOLD", "5")
         task, _dm = _make_task(device_config_dev)
@@ -234,7 +239,7 @@ class TestCircuitBreakerPersistence:
         write_calls = []
         orig_write = device_config_dev.write_config
 
-        def _tracking_write():
+        def _tracking_write() -> Any:
             write_calls.append(True)
             return orig_write()
 
@@ -252,7 +257,9 @@ class TestCircuitBreakerPersistence:
         assert pi.consecutive_failure_count == 3
         assert len(write_calls) == 3, "write_config should be called per failure"
 
-    def test_paused_after_five_failures_persists(self, device_config_dev, monkeypatch):
+    def test_paused_after_five_failures_persists(
+        self, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """After 5 failures the instance is paused and state is written to disk."""
         monkeypatch.setenv("PLUGIN_FAILURE_THRESHOLD", "5")
         task, _dm = _make_task(device_config_dev)
@@ -291,7 +298,9 @@ class TestCircuitBreakerPersistence:
         assert found_plugin["paused"] is True
         assert found_plugin["consecutive_failure_count"] == 5
 
-    def test_success_resets_counter_and_persists(self, device_config_dev, monkeypatch):
+    def test_success_resets_counter_and_persists(
+        self, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> Any:
         """Success after failures resets counter to 0 and writes config once."""
         monkeypatch.setenv("PLUGIN_FAILURE_THRESHOLD", "5")
         task, _dm = _make_task(device_config_dev)
@@ -312,7 +321,7 @@ class TestCircuitBreakerPersistence:
         write_calls = []
         orig_write = device_config_dev.write_config
 
-        def _tracking_write():
+        def _tracking_write() -> Any:
             write_calls.append(True)
             return orig_write()
 
@@ -334,7 +343,9 @@ class TestCircuitBreakerPersistence:
             len(write_calls) == 1
         ), "write_config should be called exactly once on recovery"
 
-    def test_disabled_reason_cleared_on_success(self, device_config_dev, monkeypatch):
+    def test_disabled_reason_cleared_on_success(
+        self, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """disabled_reason is removed after successful refresh."""
         monkeypatch.setenv("PLUGIN_FAILURE_THRESHOLD", "2")
         task, _dm = _make_task(device_config_dev)
@@ -361,14 +372,14 @@ class TestCircuitBreakerPersistence:
         )
         assert pi.disabled_reason is None
 
-    def test_disabled_reason_in_to_dict(self):
+    def test_disabled_reason_in_to_dict(self) -> None:
         pi = PluginInstance("p", "n", {}, {"interval": 3600})
         pi.paused = True
         pi.disabled_reason = "Paused after 5 consecutive failures"
         d = pi.to_dict()
         assert d["disabled_reason"] == "Paused after 5 consecutive failures"
 
-    def test_disabled_reason_round_trips_from_dict(self):
+    def test_disabled_reason_round_trips_from_dict(self) -> None:
         data = {
             "plugin_id": "weather",
             "name": "inst",
@@ -381,7 +392,7 @@ class TestCircuitBreakerPersistence:
         pi = PluginInstance.from_dict(data)
         assert pi.disabled_reason == "too many errors"
 
-    def test_disabled_reason_absent_from_dict_defaults_none(self):
+    def test_disabled_reason_absent_from_dict_defaults_none(self) -> None:
         data = {
             "plugin_id": "weather",
             "name": "inst",
@@ -391,7 +402,7 @@ class TestCircuitBreakerPersistence:
         pi = PluginInstance.from_dict(data)
         assert pi.disabled_reason is None
 
-    def test_disabled_reason_not_in_to_dict_when_none(self):
+    def test_disabled_reason_not_in_to_dict_when_none(self) -> None:
         pi = PluginInstance("p", "n", {}, {"interval": 3600})
         d = pi.to_dict()
         assert "disabled_reason" not in d

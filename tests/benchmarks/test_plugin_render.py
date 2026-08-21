@@ -11,6 +11,7 @@ See also: docs/benchmarking.md for the production benchmarking workflow.
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -22,8 +23,8 @@ from PIL import Image
 
 
 def _make_device_config(
-    dimensions=(800, 480), orientation="horizontal", timezone="UTC"
-):
+    dimensions: Any = (800, 480), orientation: Any = "horizontal", timezone: Any = "UTC"
+) -> Any:
     """Return a minimal MagicMock that satisfies BasePlugin / generate_image contracts."""
     cfg = MagicMock()
     cfg.get_resolution.return_value = list(dimensions)
@@ -36,7 +37,7 @@ def _make_device_config(
     return cfg
 
 
-def _fake_screenshot(html, dimensions, timeout_ms=None):
+def _fake_screenshot(html: Any, dimensions: Any, timeout_ms: Any = None) -> Any:
     """Stub that returns a plain white image instead of spawning Chromium."""
     w, h = dimensions
     return Image.new("RGB", (w, h), "white")
@@ -91,7 +92,7 @@ _OPEN_METEO_AQI = {
 
 
 @pytest.fixture()
-def device_cfg():
+def device_cfg() -> Any:
     return _make_device_config()
 
 
@@ -101,7 +102,7 @@ def device_cfg():
 
 
 @pytest.mark.benchmark(group="plugin_render")
-def test_bench_clock_render(benchmark, device_cfg):
+def test_bench_clock_render(benchmark: Any, device_cfg: Any) -> None:
     """Measure the full Clock.generate_image() render pipeline.
 
     Uses a fixed datetime so results are deterministic across runs.
@@ -138,7 +139,7 @@ def test_bench_clock_render(benchmark, device_cfg):
 
 
 @pytest.mark.benchmark(group="plugin_render")
-def test_bench_weather_render(benchmark, device_cfg):
+def test_bench_weather_render(benchmark: Any, device_cfg: Any) -> Any:
     """Measure the full Weather.generate_image() pipeline with a mocked Open-Meteo response.
 
     No real network calls are made.  The screenshot step is stubbed so only
@@ -159,7 +160,7 @@ def test_bench_weather_render(benchmark, device_cfg):
 
     mock_session = MagicMock()
 
-    def _open_meteo_get(url, timeout=20):
+    def _open_meteo_get(url: Any, timeout: Any = 20) -> Any:
         resp = MagicMock()
         resp.status_code = 200
         if "air-quality" in url:
@@ -189,7 +190,7 @@ def test_bench_weather_render(benchmark, device_cfg):
 
 
 @pytest.mark.benchmark(group="plugin_render")
-def test_bench_html_render(benchmark, device_cfg):
+def test_bench_html_render(benchmark: Any, device_cfg: Any) -> None:
     """Measure the BasePlugin.render_image() HTML→PIL pipeline directly.
 
     Uses the base plugin's own plugin.html template (the fallback template

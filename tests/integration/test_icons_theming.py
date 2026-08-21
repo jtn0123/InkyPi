@@ -1,8 +1,11 @@
+from typing import Any
+
 import pytest
+from flask.testing import FlaskClient
 
 
 @pytest.fixture()
-def icons_csp_env(monkeypatch):
+def icons_csp_env(monkeypatch: pytest.MonkeyPatch) -> Any:
     # Allow remote fonts in CSP during tests.
     monkeypatch.setenv(
         "INKYPI_CSP",
@@ -11,7 +14,7 @@ def icons_csp_env(monkeypatch):
     return True
 
 
-def _html(client, path: str) -> str:
+def _html(client: FlaskClient, path: str) -> str:
     resp = client.get(path)
     assert resp.status_code == 200
     data = getattr(resp, "data", b"")
@@ -30,7 +33,9 @@ def _has_icon(html: str, class_marker: str, svg_class: str) -> bool:
     return has_class_marker or has_svg_with_class or has_img_with_class
 
 
-def test_home_includes_phosphor_and_icons(icons_csp_env, client):
+def test_home_includes_phosphor_and_icons(
+    icons_csp_env: Any, client: FlaskClient
+) -> None:
     html = _html(client, "/")
     # We allow either CDN or pure inline SVGs, so CSS may be omitted if all icons are local
     # If CDN is present, this will be true; otherwise, skip this check
@@ -43,7 +48,7 @@ def test_home_includes_phosphor_and_icons(icons_csp_env, client):
     assert 'id="themeToggle"' in html
 
 
-def test_playlist_icons_present(icons_csp_env, client):
+def test_playlist_icons_present(icons_csp_env: Any, client: FlaskClient) -> None:
     # Ensure there is at least one playlist and plugin so action icons render
     app = client.application
     device_config = app.config["DEVICE_CONFIG"]
@@ -72,7 +77,7 @@ def test_playlist_icons_present(icons_csp_env, client):
     assert _has_icon(html, "ph-trash", "action-icon")
 
 
-def test_settings_icons_and_toggle(icons_csp_env, client):
+def test_settings_icons_and_toggle(icons_csp_env: Any, client: FlaskClient) -> None:
     html = _html(client, "/settings")
     # CDN may not be present if all icons inline; accept either
     # assert "@phosphor-icons/web" in html
@@ -81,32 +86,36 @@ def test_settings_icons_and_toggle(icons_csp_env, client):
     assert 'id="themeToggle"' in html
 
 
-def test_plugin_page_icon_is_not_escaped(icons_csp_env, client):
+def test_plugin_page_icon_is_not_escaped(
+    icons_csp_env: Any, client: FlaskClient
+) -> None:
     html = _html(client, "/plugin/clock")
 
     assert _has_icon(html, "ph-clock", "app-icon")
     assert "&lt;svg" not in html
 
 
-def test_history_icon_present(icons_csp_env, client):
+def test_history_icon_present(icons_csp_env: Any, client: FlaskClient) -> None:
     html = _html(client, "/history")
     assert _has_icon(html, "ph-clock-counter-clockwise", "app-icon")
 
 
-def test_api_keys_icon_present(icons_csp_env, client):
+def test_api_keys_icon_present(icons_csp_env: Any, client: FlaskClient) -> None:
     html = _html(client, "/settings/api-keys")
     assert _has_icon(html, "ph-gear-six", "app-icon")
     assert _has_icon(html, "ph-info", "icon-image")
 
 
-def test_settings_logs_icon_uses_themeable_strokes(icons_csp_env, client):
+def test_settings_logs_icon_uses_themeable_strokes(
+    icons_csp_env: Any, client: FlaskClient
+) -> None:
     html = _html(client, "/settings")
     assert 'class="app-icon logs-icon"' in html
     assert 'stroke="#333"' not in html
     assert 'fill="#fff"' not in html
 
 
-def test_csp_header_present(icons_csp_env, client):
+def test_csp_header_present(icons_csp_env: Any, client: FlaskClient) -> None:
     resp = client.get("/")
     csp = resp.headers.get("Content-Security-Policy-Report-Only") or resp.headers.get(
         "Content-Security-Policy"

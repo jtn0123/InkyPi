@@ -1,8 +1,12 @@
 """Tests adding coverage for under-tested Flask routes."""
 
 from datetime import UTC
+from pathlib import Path
+from typing import Any
 
 import pytest
+from flask import Flask
+from flask.testing import FlaskClient
 from PIL import Image
 
 # ---------------------------------------------------------------------------
@@ -11,8 +15,11 @@ from PIL import Image
 
 
 def test_display_next_cooldown_blocks_rapid_calls(
-    client, device_config_dev, monkeypatch, flask_app
-):
+    client: FlaskClient,
+    device_config_dev: Any,
+    monkeypatch: pytest.MonkeyPatch,
+    flask_app: Flask,
+) -> None:
     """Second successful POST within the cooldown window must return 429."""
     from blueprints.main import _reset_display_next_cooldown
 
@@ -48,8 +55,11 @@ def test_display_next_cooldown_blocks_rapid_calls(
 
 
 def test_display_next_cooldown_reset_allows_retry(
-    client, device_config_dev, monkeypatch, flask_app
-):
+    client: FlaskClient,
+    device_config_dev: Any,
+    monkeypatch: pytest.MonkeyPatch,
+    flask_app: Flask,
+) -> None:
     """After resetting the cooldown the endpoint is available again."""
     from blueprints.main import _reset_display_next_cooldown
 
@@ -83,7 +93,7 @@ def test_display_next_cooldown_reset_allows_retry(
 # ---------------------------------------------------------------------------
 
 
-def test_plugin_order_unknown_id_returns_400(client):
+def test_plugin_order_unknown_id_returns_400(client: FlaskClient) -> None:
     resp = client.post(
         "/api/plugin_order",
         json={"order": ["nonexistent_plugin_id_xyz"]},
@@ -95,7 +105,7 @@ def test_plugin_order_unknown_id_returns_400(client):
     assert "nonexistent_plugin_id_xyz" not in body["error"]
 
 
-def test_plugin_order_non_string_entries_returns_400(client):
+def test_plugin_order_non_string_entries_returns_400(client: FlaskClient) -> None:
     resp = client.post(
         "/api/plugin_order",
         json={"order": [123]},
@@ -105,7 +115,7 @@ def test_plugin_order_non_string_entries_returns_400(client):
     assert "strings" in body["error"].lower()
 
 
-def test_plugin_order_empty_list_returns_400(client):
+def test_plugin_order_empty_list_returns_400(client: FlaskClient) -> None:
     resp = client.post(
         "/api/plugin_order",
         json={"order": []},
@@ -114,7 +124,7 @@ def test_plugin_order_empty_list_returns_400(client):
     assert "include every plugin id exactly once" in resp.get_json()["error"].lower()
 
 
-def test_plugin_order_non_dict_payload_returns_400(client):
+def test_plugin_order_non_dict_payload_returns_400(client: FlaskClient) -> None:
     resp = client.post(
         "/api/plugin_order",
         json=["clock", "weather"],
@@ -124,7 +134,9 @@ def test_plugin_order_non_dict_payload_returns_400(client):
     assert "Invalid" in body["error"]
 
 
-def test_plugin_order_valid_ids_returns_200(client, device_config_dev):
+def test_plugin_order_valid_ids_returns_200(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     plugins = device_config_dev.get_plugins()
     valid_ids = [p["id"] for p in plugins]
     if not valid_ids:
@@ -140,8 +152,8 @@ def test_plugin_order_valid_ids_returns_200(client, device_config_dev):
 
 
 def test_next_up_no_playlists_returns_empty_dict(
-    client, device_config_dev, monkeypatch
-):
+    client: FlaskClient, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """With no active playlist /next-up returns {}."""
     pm = device_config_dev.get_playlist_manager()
     monkeypatch.setattr(pm, "determine_active_playlist", lambda dt: None, raising=True)
@@ -152,8 +164,11 @@ def test_next_up_no_playlists_returns_empty_dict(
 
 
 def test_next_up_with_active_playlist_and_plugin(
-    client, device_config_dev, monkeypatch, flask_app
-):
+    client: FlaskClient,
+    device_config_dev: Any,
+    monkeypatch: pytest.MonkeyPatch,
+    flask_app: Flask,
+) -> None:
     """When a playlist has a next plugin, /next-up returns plugin info."""
     from datetime import datetime
 
@@ -193,7 +208,9 @@ def test_next_up_with_active_playlist_and_plugin(
 # ---------------------------------------------------------------------------
 
 
-def test_refresh_info_returns_json_with_expected_keys(client, device_config_dev):
+def test_refresh_info_returns_json_with_expected_keys(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     resp = client.get("/refresh-info")
     assert resp.status_code == 200
     data = resp.get_json()
@@ -204,8 +221,8 @@ def test_refresh_info_returns_json_with_expected_keys(client, device_config_dev)
 
 
 def test_refresh_info_handles_exception_gracefully(
-    client, device_config_dev, monkeypatch
-):
+    client: FlaskClient, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     monkeypatch.setattr(
         device_config_dev,
         "get_refresh_info",
@@ -222,19 +239,23 @@ def test_refresh_info_handles_exception_gracefully(
 # ---------------------------------------------------------------------------
 
 
-def test_healthz_returns_200_ok(client):
+def test_healthz_returns_200_ok(client: FlaskClient) -> None:
     resp = client.get("/healthz")
     assert resp.status_code == 200
     assert resp.data == b"OK"
 
 
-def test_readyz_with_task_not_running_returns_503(client, flask_app):
+def test_readyz_with_task_not_running_returns_503(
+    client: FlaskClient, flask_app: Flask
+) -> None:
     flask_app.config["REFRESH_TASK"].running = False
     resp = client.get("/readyz")
     assert resp.status_code == 503
 
 
-def test_readyz_with_web_only_mode_returns_200(client, flask_app):
+def test_readyz_with_web_only_mode_returns_200(
+    client: FlaskClient, flask_app: Flask
+) -> None:
     original = flask_app.config.get("WEB_ONLY")
     flask_app.config["WEB_ONLY"] = True
     try:
@@ -250,7 +271,7 @@ def test_readyz_with_web_only_mode_returns_200(client, flask_app):
 # ---------------------------------------------------------------------------
 
 
-def test_rate_limiter_prunes_expired_keys(monkeypatch):
+def test_rate_limiter_prunes_expired_keys(monkeypatch: pytest.MonkeyPatch) -> None:
     """SlidingWindowLimiter's amortised pruning removes keys with empty deques.
 
     We simulate stale IPs by injecting empty deques, then verify the pruning
@@ -296,7 +317,9 @@ def test_rate_limiter_prunes_expired_keys(monkeypatch):
 # ---------------------------------------------------------------------------
 
 
-def test_api_key_mask_shows_length_and_suffix(client, device_config_dev, monkeypatch):
+def test_api_key_mask_shows_length_and_suffix(
+    client: FlaskClient, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """The mask function renders '<suffix> (N chars)' for keys >= 4 chars."""
     key_value = "sk-abcdef1234567890"  # 19 chars; last 4 = "7890"
 
@@ -314,8 +337,8 @@ def test_api_key_mask_shows_length_and_suffix(client, device_config_dev, monkeyp
 
 
 def test_api_key_mask_none_value_not_in_masked_dict(
-    client, device_config_dev, monkeypatch
-):
+    client: FlaskClient, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """When load_env_key returns None the mask() function returns None, not a chars string."""
     # Import settings module and call mask logic directly via the route
     # mask(None) returns None, so the masked dict values will be None.
@@ -343,7 +366,7 @@ def test_api_key_mask_none_value_not_in_masked_dict(
 # ---------------------------------------------------------------------------
 
 
-def test_response_modal_close_is_button_not_span(client):
+def test_response_modal_close_is_button_not_span(client: FlaskClient) -> None:
     resp = client.get("/settings/api-keys")
     assert resp.status_code == 200
     html = resp.data.decode("utf-8")
@@ -361,7 +384,9 @@ def test_response_modal_close_is_button_not_span(client):
 # ---------------------------------------------------------------------------
 
 
-def test_preview_no_image_returns_404(client, device_config_dev, monkeypatch):
+def test_preview_no_image_returns_404(
+    client: FlaskClient, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> Any:
     # Config.__init__ copies a default image into both paths, so we must
     # tell os.path.exists that neither path is present.
     import os as _os
@@ -370,7 +395,7 @@ def test_preview_no_image_returns_404(client, device_config_dev, monkeypatch):
     _current = device_config_dev.current_image_file
     _real_exists = _os.path.exists
 
-    def _patched_exists(p):
+    def _patched_exists(p: Any) -> Any:
         if p in (_processed, _current):
             return False
         return _real_exists(p)
@@ -380,7 +405,9 @@ def test_preview_no_image_returns_404(client, device_config_dev, monkeypatch):
     assert resp.status_code == 404
 
 
-def test_preview_with_image_returns_200(client, device_config_dev, tmp_path):
+def test_preview_with_image_returns_200(
+    client: FlaskClient, device_config_dev: Any, tmp_path: Path
+) -> None:
     # Create a PNG at the processed image path
     img = Image.new("RGB", (100, 100), "blue")
     img.save(device_config_dev.processed_image_file)
@@ -395,14 +422,16 @@ def test_preview_with_image_returns_200(client, device_config_dev, tmp_path):
 # ---------------------------------------------------------------------------
 
 
-def test_current_image_no_file_returns_404(client, device_config_dev, monkeypatch):
+def test_current_image_no_file_returns_404(
+    client: FlaskClient, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> Any:
     # Config.__init__ copies a default image, so patch os.path.exists to hide it.
     import os as _os
 
     _current = device_config_dev.current_image_file
     _real_exists = _os.path.exists
 
-    def _patched_exists(p):
+    def _patched_exists(p: Any) -> Any:
         if p == _current:
             return False
         return _real_exists(p)
@@ -414,8 +443,8 @@ def test_current_image_no_file_returns_404(client, device_config_dev, monkeypatc
 
 
 def test_current_image_with_file_returns_200_and_last_modified(
-    client, device_config_dev
-):
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     img = Image.new("RGB", (100, 100), "green")
     img.save(device_config_dev.current_image_file)
 
@@ -425,7 +454,9 @@ def test_current_image_with_file_returns_200_and_last_modified(
     assert resp.content_type == "image/png"
 
 
-def test_current_image_if_modified_since_future_returns_304(client, device_config_dev):
+def test_current_image_if_modified_since_future_returns_304(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     img = Image.new("RGB", (100, 100), "green")
     img.save(device_config_dev.current_image_file)
 
@@ -443,7 +474,9 @@ def test_current_image_if_modified_since_future_returns_304(client, device_confi
 # ---------------------------------------------------------------------------
 
 
-def test_refresh_alias_behaves_like_display_next(client, device_config_dev, flask_app):
+def test_refresh_alias_behaves_like_display_next(
+    client: FlaskClient, device_config_dev: Any, flask_app: Flask
+) -> None:
     """POST /refresh should pass through the rate-limiter and return non-429."""
     from blueprints.main import _reset_display_next_cooldown
 
@@ -456,8 +489,8 @@ def test_refresh_alias_behaves_like_display_next(client, device_config_dev, flas
 
 
 def test_refresh_alias_is_rate_limited_after_first_success(
-    client, device_config_dev, flask_app
-):
+    client: FlaskClient, device_config_dev: Any, flask_app: Flask
+) -> None:
     """Two rapid successful POSTs to /refresh should trigger the cooldown on the second."""
     from blueprints.main import _reset_display_next_cooldown
 

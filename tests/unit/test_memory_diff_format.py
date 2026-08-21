@@ -3,7 +3,7 @@
 from scripts.format_memory_diff import format_comment
 
 
-def test_format_comment_groups_allocator_noise_by_package():
+def test_format_comment_groups_allocator_noise_by_package() -> None:
     base = {
         "backend": "memray",
         "total_rss_bytes": 10 * 1024 * 1024,
@@ -44,7 +44,7 @@ def test_format_comment_groups_allocator_noise_by_package():
     assert "Source-location detail" in comment
 
 
-def test_format_comment_does_not_invent_zero_for_sampled_shared_location():
+def test_format_comment_does_not_invent_zero_for_sampled_shared_location() -> None:
     base = {
         "backend": "memray",
         "total_rss_bytes": 0,
@@ -77,7 +77,7 @@ def test_format_comment_does_not_invent_zero_for_sampled_shared_location():
     assert "| `werkzeug/http.py:1` | 512.0 KB | 0 B |" not in comment
 
 
-def test_format_comment_hides_memray_command_string_allocator():
+def test_format_comment_hides_memray_command_string_allocator() -> None:
     base = {
         "backend": "memray",
         "total_rss_bytes": 0,

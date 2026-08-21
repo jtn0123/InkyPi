@@ -9,14 +9,16 @@ user has positive feedback.
 
 from __future__ import annotations
 
+from flask.testing import FlaskClient
 
-def _read_playlist_html(client) -> str:
+
+def _read_playlist_html(client: FlaskClient) -> str:
     resp = client.get("/playlist")
     assert resp.status_code == 200
     return resp.get_data(as_text=True)
 
 
-def _read_script(client, path: str) -> str:
+def _read_script(client: FlaskClient, path: str) -> str:
     resp = client.get(path)
     assert resp.status_code == 200
     return resp.get_data(as_text=True)
@@ -27,7 +29,7 @@ def _read_script(client, path: str) -> str:
 # ---------------------------------------------------------------------------
 
 
-def test_display_next_confirm_modal_rendered(client):
+def test_display_next_confirm_modal_rendered(client: FlaskClient) -> None:
     """The display next confirmation modal must be present in playlist.html."""
     html = _read_playlist_html(client)
     assert (
@@ -37,7 +39,7 @@ def test_display_next_confirm_modal_rendered(client):
     assert 'id="cancelDisplayNextBtn"' in html
 
 
-def test_display_next_modal_uses_role_dialog(client):
+def test_display_next_modal_uses_role_dialog(client: FlaskClient) -> None:
     html = _read_playlist_html(client)
     idx = html.find('id="displayNextConfirmModal"')
     assert idx != -1
@@ -46,7 +48,7 @@ def test_display_next_modal_uses_role_dialog(client):
     assert 'aria-modal="true"' in opening
 
 
-def test_display_next_modal_has_labelledby(client):
+def test_display_next_modal_has_labelledby(client: FlaskClient) -> None:
     html = _read_playlist_html(client)
     idx = html.find('id="displayNextConfirmModal"')
     assert idx != -1
@@ -61,7 +63,9 @@ def test_display_next_modal_has_labelledby(client):
 # ---------------------------------------------------------------------------
 
 
-def test_run_next_btn_opens_confirm_modal_not_fire_directly(client):
+def test_run_next_btn_opens_confirm_modal_not_fire_directly(
+    client: FlaskClient,
+) -> None:
     """The delegated run-next action must open the confirmation modal,
     not invoke displayNextInPlaylist immediately."""
     js = _read_script(client, "/static/scripts/playlist/actions.js")
@@ -73,7 +77,7 @@ def test_run_next_btn_opens_confirm_modal_not_fire_directly(client):
     assert "actionButton" in js
 
 
-def test_display_next_helper_exists_and_is_async(client):
+def test_display_next_helper_exists_and_is_async(client: FlaskClient) -> None:
     """The helper that actually performs the fetch stays available for the
     confirm button and for the public window.* API (used by other callers
     and by tests)."""
@@ -84,7 +88,7 @@ def test_display_next_helper_exists_and_is_async(client):
     assert '"openDisplayNextConfirmModal"' in bootstrap
 
 
-def test_display_next_success_surfaces_toast(client):
+def test_display_next_success_surfaces_toast(client: FlaskClient) -> None:
     """On success, the user must see positive feedback (toast) — previously
     there was only a silent reload, per JTN-630."""
     js = _read_script(client, "/static/scripts/playlist/actions.js")
@@ -94,14 +98,16 @@ def test_display_next_success_surfaces_toast(client):
     )
 
 
-def test_display_next_cancel_button_wired(client):
+def test_display_next_cancel_button_wired(client: FlaskClient) -> None:
     """Cancel button on the confirm modal must close the modal."""
     js = _read_script(client, "/static/scripts/playlist/modals.js")
     assert "cancelDisplayNextBtn" in js
     assert "closeDisplayNextConfirmModal" in js
 
 
-def test_display_next_modal_registered_for_escape_and_backdrop(client):
+def test_display_next_modal_registered_for_escape_and_backdrop(
+    client: FlaskClient,
+) -> None:
     """The confirm modal must participate in the shared Escape/backdrop-close
     plumbing used by the other playlist modals."""
     js = _read_script(client, "/static/scripts/playlist/modals.js")

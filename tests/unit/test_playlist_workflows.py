@@ -8,6 +8,8 @@ from dataclasses import dataclass, field
 from types import ModuleType
 from typing import Any
 
+import pytest
+
 
 @dataclass
 class _PluginInstance:
@@ -22,7 +24,7 @@ class _Playlist:
     name: str
     plugins: list[_PluginInstance] = field(default_factory=list)
 
-    def find_plugin(self, plugin_id: str, instance_name: str):
+    def find_plugin(self, plugin_id: str, instance_name: str) -> Any:
         return next(
             (
                 inst
@@ -47,31 +49,33 @@ class _Playlist:
 
 
 class _PlaylistManager:
-    def __init__(self):
+    def __init__(self) -> None:
         self.playlists: list[_Playlist] = []
 
-    def find_plugin(self, plugin_id: str, instance: str):
+    def find_plugin(self, plugin_id: str, instance: str) -> Any:
         for playlist in self.playlists:
             plugin = playlist.find_plugin(plugin_id, instance)
             if plugin:
                 return plugin
         return None
 
-    def add_plugin_to_playlist(self, playlist_name: str, plugin_data: dict[str, Any]):
+    def add_plugin_to_playlist(
+        self, playlist_name: str, plugin_data: dict[str, Any]
+    ) -> Any:
         playlist = self.get_playlist(playlist_name)
         if not playlist:
             return False
         return playlist.add_plugin(plugin_data)
 
-    def get_playlist(self, playlist_name: str):
+    def get_playlist(self, playlist_name: str) -> Any:
         return next((pl for pl in self.playlists if pl.name == playlist_name), None)
 
-    def add_playlist(self, name: str):
+    def add_playlist(self, name: str) -> Any:
         playlist = _Playlist(name=name)
         self.playlists.append(playlist)
         return True
 
-    def to_dict(self):
+    def to_dict(self) -> Any:
         return {
             "playlists": [
                 {
@@ -92,29 +96,31 @@ class _PlaylistManager:
 
 
 class _DeviceConfig:
-    def __init__(self, plugin_config=None, env_keys: dict[str, str] | None = None):
+    def __init__(
+        self, plugin_config: Any = None, env_keys: dict[str, str] | None = None
+    ) -> None:
         self.plugin_config = plugin_config
         self.env_keys = env_keys or {}
         self.playlist_manager = _PlaylistManager()
         self.update_calls: list[dict[str, Any]] = []
 
-    def get_plugin(self, plugin_id: str):
+    def get_plugin(self, plugin_id: str) -> Any:
         return self.plugin_config
 
-    def load_env_key(self, key: str):
+    def load_env_key(self, key: str) -> Any:
         return self.env_keys.get(key)
 
-    def update_atomic(self, update_fn):
+    def update_atomic(self, update_fn: Any) -> None:
         payload: dict[str, Any] = {}
         update_fn(payload)
         self.update_calls.append(payload)
 
 
 class _Plugin:
-    def __init__(self, validation_error: str | None = None):
+    def __init__(self, validation_error: str | None = None) -> None:
         self.validation_error = validation_error
 
-    def validate_settings(self, settings: dict[str, Any]):
+    def validate_settings(self, settings: dict[str, Any]) -> Any:
         return self.validation_error
 
 
@@ -122,7 +128,7 @@ def _playlist_workflows_mod() -> ModuleType:
     return importlib.import_module("services.playlist_workflows")
 
 
-def test_normalize_instance_name_trims_and_validates():
+def test_normalize_instance_name_trims_and_validates() -> None:
     playlist_workflows_mod = _playlist_workflows_mod()
 
     name, err = playlist_workflows_mod.normalize_instance_name("  My Instance  ")
@@ -130,7 +136,7 @@ def test_normalize_instance_name_trims_and_validates():
     assert name == "My Instance"
 
 
-def test_normalize_instance_name_rejects_bad_value():
+def test_normalize_instance_name_rejects_bad_value() -> None:
     playlist_workflows_mod = _playlist_workflows_mod()
 
     name, err = playlist_workflows_mod.normalize_instance_name(" ")
@@ -140,7 +146,7 @@ def test_normalize_instance_name_rejects_bad_value():
     assert err.status == 422
 
 
-def test_validate_plugin_refresh_settings_interval():
+def test_validate_plugin_refresh_settings_interval() -> None:
     playlist_workflows_mod = _playlist_workflows_mod()
 
     refresh_config, err = playlist_workflows_mod.validate_plugin_refresh_settings(
@@ -154,7 +160,7 @@ def test_validate_plugin_refresh_settings_interval():
     assert refresh_config == {"interval": 600}
 
 
-def test_validate_plugin_refresh_settings_scheduled():
+def test_validate_plugin_refresh_settings_scheduled() -> None:
     playlist_workflows_mod = _playlist_workflows_mod()
 
     refresh_config, err = playlist_workflows_mod.validate_plugin_refresh_settings(
@@ -167,7 +173,7 @@ def test_validate_plugin_refresh_settings_scheduled():
     assert refresh_config == {"scheduled": "08:30"}
 
 
-def test_build_playlist_plugin_dict_copies_inputs():
+def test_build_playlist_plugin_dict_copies_inputs() -> None:
     playlist_workflows_mod = _playlist_workflows_mod()
     refresh = {"interval": 600}
     settings = {"city": "London"}
@@ -187,7 +193,7 @@ def test_build_playlist_plugin_dict_copies_inputs():
     assert result["plugin_settings"] == {"city": "London"}
 
 
-def test_prepare_add_plugin_workflow_happy_path():
+def test_prepare_add_plugin_workflow_happy_path() -> None:
     playlist_workflows_mod = _playlist_workflows_mod()
     device_config = _DeviceConfig(plugin_config={"id": "weather"})
     manager = device_config.playlist_manager
@@ -221,7 +227,7 @@ def test_prepare_add_plugin_workflow_happy_path():
     assert manager.find_plugin("weather", "Morning Weather") is not None
 
 
-def test_prepare_add_plugin_workflow_rejects_duplicate_instance():
+def test_prepare_add_plugin_workflow_rejects_duplicate_instance() -> None:
     playlist_workflows_mod = _playlist_workflows_mod()
     device_config = _DeviceConfig(plugin_config={"id": "weather"})
     manager = device_config.playlist_manager
@@ -256,7 +262,7 @@ def test_prepare_add_plugin_workflow_rejects_duplicate_instance():
     assert result.error.field == "instance_name"
 
 
-def test_prepare_add_plugin_workflow_rejects_missing_playlist():
+def test_prepare_add_plugin_workflow_rejects_missing_playlist() -> None:
     playlist_workflows_mod = _playlist_workflows_mod()
     device_config = _DeviceConfig(plugin_config={"id": "weather"})
     result = playlist_workflows_mod.prepare_add_plugin_workflow(
@@ -279,7 +285,9 @@ def test_prepare_add_plugin_workflow_rejects_missing_playlist():
     assert result.error.field == "playlist"
 
 
-def test_prepare_add_plugin_workflow_rejects_security_error(monkeypatch):
+def test_prepare_add_plugin_workflow_rejects_security_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     device_config = _DeviceConfig(plugin_config={"id": "weather"})
     manager = device_config.playlist_manager
     manager.add_playlist("Morning")
@@ -312,7 +320,7 @@ def test_prepare_add_plugin_workflow_rejects_security_error(monkeypatch):
     assert result.error.message == "bad input"
 
 
-def test_prepare_add_plugin_workflow_allows_ai_image_provider_with_key():
+def test_prepare_add_plugin_workflow_allows_ai_image_provider_with_key() -> None:
     playlist_workflows_mod = _playlist_workflows_mod()
     device_config = _DeviceConfig(
         plugin_config={"id": "ai_image"},
@@ -346,7 +354,7 @@ def test_prepare_add_plugin_workflow_allows_ai_image_provider_with_key():
     assert instance.settings["textPrompt"] == "a glass city"
 
 
-def test_prepare_add_plugin_workflow_rejects_ai_image_provider_without_key():
+def test_prepare_add_plugin_workflow_rejects_ai_image_provider_without_key() -> None:
     playlist_workflows_mod = _playlist_workflows_mod()
     device_config = _DeviceConfig(plugin_config={"id": "ai_image"})
     manager = device_config.playlist_manager

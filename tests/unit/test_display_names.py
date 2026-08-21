@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 
 from utils.display_names import (
@@ -29,7 +31,9 @@ class TestIsAutoInstanceName:
             ("saved_settings", "weather", False),
         ],
     )
-    def test_detects_auto_generated_keys(self, instance_name, plugin_id, expected):
+    def test_detects_auto_generated_keys(
+        self, instance_name: Any, plugin_id: Any, expected: Any
+    ) -> None:
         assert is_auto_instance_name(instance_name, plugin_id) is expected
 
 
@@ -45,7 +49,7 @@ class TestHumanizePluginId:
             (None, ""),
         ],
     )
-    def test_humanize(self, plugin_id, expected):
+    def test_humanize(self, plugin_id: Any, expected: Any) -> None:
         assert humanize_plugin_id(plugin_id) == expected
 
     @pytest.mark.parametrize(
@@ -63,35 +67,37 @@ class TestHumanizePluginId:
             ("   ", ""),
         ],
     )
-    def test_humanize_strips_surrounding_whitespace(self, plugin_id, expected):
+    def test_humanize_strips_surrounding_whitespace(
+        self, plugin_id: Any, expected: Any
+    ) -> None:
         assert humanize_plugin_id(plugin_id) == expected
 
 
 class TestFriendlyInstanceLabel:
-    def test_user_renamed_instance_is_preserved(self):
+    def test_user_renamed_instance_is_preserved(self) -> None:
         assert (
             friendly_instance_label("My Weather", "weather", "Weather") == "My Weather"
         )
 
-    def test_auto_generated_falls_back_to_display_name(self):
+    def test_auto_generated_falls_back_to_display_name(self) -> None:
         assert (
             friendly_instance_label("weather_saved_settings", "weather", "Weather")
             == "Weather"
         )
 
-    def test_auto_generated_without_display_falls_back_to_humanized_id(self):
+    def test_auto_generated_without_display_falls_back_to_humanized_id(self) -> None:
         assert (
             friendly_instance_label("image_folder_saved_settings", "image_folder", None)
             == "Image Folder"
         )
 
-    def test_missing_everything_returns_empty_string(self):
+    def test_missing_everything_returns_empty_string(self) -> None:
         assert friendly_instance_label(None, None, None) == ""
 
-    def test_only_plugin_id_yields_humanized(self):
+    def test_only_plugin_id_yields_humanized(self) -> None:
         assert friendly_instance_label(None, "rss", None) == "Rss"
 
-    def test_internal_key_never_leaks(self):
+    def test_internal_key_never_leaks(self) -> None:
         # Regression guard: no user-facing path should ever echo the raw
         # "_saved_settings" suffix.
         result = friendly_instance_label("weather_saved_settings", "weather", "Weather")
@@ -99,12 +105,12 @@ class TestFriendlyInstanceLabel:
 
 
 class TestInstanceSuffixLabel:
-    def test_auto_name_returns_none(self):
+    def test_auto_name_returns_none(self) -> None:
         assert instance_suffix_label("weather_saved_settings", "weather") is None
 
-    def test_user_name_returns_name(self):
+    def test_user_name_returns_name(self) -> None:
         assert instance_suffix_label("Morning Weather", "weather") == "Morning Weather"
 
-    def test_empty_inputs_return_none(self):
+    def test_empty_inputs_return_none(self) -> None:
         assert instance_suffix_label(None, "weather") is None
         assert instance_suffix_label("", "weather") is None

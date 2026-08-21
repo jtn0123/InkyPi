@@ -5,13 +5,15 @@ row to be italicised when no date/label row was present (title was at index 0
 but caption at index 1 received the <em> treatment instead).
 """
 
+from flask.testing import FlaskClient
 
-def test_dashboard_page_script_exists(client):
+
+def test_dashboard_page_script_exists(client: FlaskClient) -> None:
     resp = client.get("/static/scripts/dashboard_page.js")
     assert resp.status_code == 200
 
 
-def test_rendermeta_tracks_title_index_dynamically(client):
+def test_rendermeta_tracks_title_index_dynamically(client: FlaskClient) -> None:
     """JTN-248: title italics must use a tracked index, not the hardcoded value 1.
 
     The buggy code used ``index === 1 && meta.title``.  The fix introduces a

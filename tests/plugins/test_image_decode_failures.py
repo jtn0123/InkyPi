@@ -1,7 +1,11 @@
+from typing import Any
+
 import pytest
 
 
-def test_apod_decode_failure(device_config_dev, monkeypatch):
+def test_apod_decode_failure(
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> Any:
     from plugins.apod.apod import Apod
 
     p = Apod({"id": "apod"})
@@ -11,7 +15,7 @@ def test_apod_decode_failure(device_config_dev, monkeypatch):
     class R:
         status_code = 200
 
-        def json(self):
+        def json(self) -> Any:
             return {"media_type": "image", "url": "https://example.com/x.png"}
 
     # Mock image response with invalid bytes
@@ -22,7 +26,7 @@ def test_apod_decode_failure(device_config_dev, monkeypatch):
     # Track call count to return different responses
     call_count = [0]
 
-    def mock_http_get(*args, **kwargs):
+    def mock_http_get(*args: Any, **kwargs: Any) -> Any:
         call_count[0] += 1
         if call_count[0] == 1:
             return R()  # First call returns JSON
@@ -34,7 +38,9 @@ def test_apod_decode_failure(device_config_dev, monkeypatch):
         p.generate_image({}, device_config_dev)
 
 
-def test_unsplash_decode_failure(device_config_dev, monkeypatch):
+def test_unsplash_decode_failure(
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> Any:
     from plugins.unsplash.unsplash import Unsplash
 
     u = Unsplash({"id": "unsplash"})
@@ -44,10 +50,10 @@ def test_unsplash_decode_failure(device_config_dev, monkeypatch):
     class R:
         status_code = 200
 
-        def json(self):
+        def json(self) -> Any:
             return {"urls": {"full": "https://example.com/x.jpg"}}
 
-        def raise_for_status(self):
+        def raise_for_status(self) -> None:
             pass  # No error
 
     monkeypatch.setattr("requests.get", lambda *a, **k: R(), raising=True)
@@ -61,7 +67,9 @@ def test_unsplash_decode_failure(device_config_dev, monkeypatch):
         u.generate_image({}, device_config_dev)
 
 
-def test_image_url_decode_failure(device_config_dev, monkeypatch):
+def test_image_url_decode_failure(
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     from plugins.image_url.image_url import ImageURL
 
     p = ImageURL({"id": "image_url"})

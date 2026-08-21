@@ -12,6 +12,7 @@ in clear text.
 from __future__ import annotations
 
 import logging
+from typing import Any
 
 import pytest
 
@@ -33,7 +34,7 @@ class _FailingResponse:
         return {}
 
 
-def _install_failing_session(monkeypatch, body: bytes) -> None:
+def _install_failing_session(monkeypatch: pytest.MonkeyPatch, body: bytes) -> None:
     resp = _FailingResponse(body)
     session = type("S", (), {"get": staticmethod(lambda *a, **kw: resp)})()
     monkeypatch.setattr(weather_api, "get_http_session", lambda: session)
@@ -56,7 +57,12 @@ def _install_failing_session(monkeypatch, body: bytes) -> None:
         ),
     ],
 )
-def test_weather_api_redacts_response_body_on_error(func, kwargs, monkeypatch, caplog):
+def test_weather_api_redacts_response_body_on_error(
+    func: Any,
+    kwargs: Any,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
     """Response body containing an API-key-shaped token must be redacted."""
     leaky_body = (
         b'{"cod":401,"message":"Invalid api_key=' + _FAKE_API_KEY.encode() + b'"}'
@@ -72,7 +78,7 @@ def test_weather_api_redacts_response_body_on_error(func, kwargs, monkeypatch, c
     assert _REDACTED in combined
 
 
-def test_parse_timezone_redacts_tainted_value(caplog):
+def test_parse_timezone_redacts_tainted_value(caplog: pytest.LogCaptureFixture) -> None:
     """Timezone field reaching the log site is passed through redact_secrets."""
     leaky = f"UTC api_key={_FAKE_API_KEY}"
 

@@ -4,7 +4,7 @@ import re
 from pathlib import Path
 
 
-def test_todo_remove_last_item_guarded():
+def test_todo_remove_last_item_guarded() -> None:
     """bindRemoveButtons must prevent removing the last dynamic-list-item."""
     js = Path("src/static/scripts/plugin_schema.js").read_text()
     # Check for the guard condition
@@ -12,31 +12,31 @@ def test_todo_remove_last_item_guarded():
     assert "length <= 1" in js or "length < 2" in js
 
 
-def test_calendar_repeater_has_descriptive_placeholder():
+def test_calendar_repeater_has_descriptive_placeholder() -> None:
     """Calendar URL input should have a descriptive placeholder."""
     html = Path("src/templates/widgets/calendar_repeater.html").read_text()
     assert re.search(r'placeholder="https://calendar\.google\.com/…/basic\.ics"', html)
 
 
-def test_calendar_repeater_has_help_text():
+def test_calendar_repeater_has_help_text() -> None:
     """Calendar repeater should have help text."""
     html = Path("src/templates/widgets/calendar_repeater.html").read_text()
     assert "field-note" in html
 
 
-def test_settings_schema_has_option_group():
+def test_settings_schema_has_option_group() -> None:
     """settings_schema.py must have option_group helper."""
     py = Path("src/plugins/base_plugin/settings_schema.py").read_text()
     assert "def option_group" in py
 
 
-def test_settings_schema_template_has_optgroup():
+def test_settings_schema_template_has_optgroup() -> None:
     """settings_schema.html must support optgroup rendering."""
     tpl = Path("src/templates/settings_schema.html").read_text()
     assert "optgroup" in tpl
 
 
-def test_locale_groups_covers_locale_map():
+def test_locale_groups_covers_locale_map() -> None:
     """Every locale in LOCALE_MAP must appear in LOCALE_GROUPS."""
     import os
     import sys

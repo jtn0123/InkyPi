@@ -21,9 +21,12 @@ from __future__ import annotations
 
 import importlib
 import sys
+from typing import Any
+
+import pytest
 
 
-def _reload_inkypi(monkeypatch, env):
+def _reload_inkypi(monkeypatch: pytest.MonkeyPatch, env: Any) -> Any:
     """Reload the inkypi module with a clean environment.
 
     Mirrors the helper in ``tests/unit/test_inkypi.py`` but local to
@@ -59,7 +62,9 @@ def _reload_inkypi(monkeypatch, env):
 # ---------------------------------------------------------------------------
 
 
-def test_spoofed_host_is_rejected_not_redirected(monkeypatch):
+def test_spoofed_host_is_rejected_not_redirected(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """A spoofed Host header must NOT produce a Location: https://evil.com/.
 
     This is the core regression test for the CodeQL
@@ -85,7 +90,7 @@ def test_spoofed_host_is_rejected_not_redirected(monkeypatch):
     assert resp.status_code == 400
 
 
-def test_spoofed_host_with_port_is_rejected(monkeypatch):
+def test_spoofed_host_with_port_is_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
     """Host header including a port is still rejected when not allow-listed."""
     mod = _reload_inkypi(
         monkeypatch,
@@ -101,7 +106,7 @@ def test_spoofed_host_with_port_is_rejected(monkeypatch):
         assert "attacker.example" not in resp.location
 
 
-def test_allowed_host_still_redirects(monkeypatch):
+def test_allowed_host_still_redirects(monkeypatch: pytest.MonkeyPatch) -> None:
     """A request with an allow-listed host is still upgraded to HTTPS."""
     mod = _reload_inkypi(
         monkeypatch,
@@ -118,7 +123,9 @@ def test_allowed_host_still_redirects(monkeypatch):
     assert resp.location == "https://localhost/settings"
 
 
-def test_default_allowed_hosts_include_inkypi_local(monkeypatch):
+def test_default_allowed_hosts_include_inkypi_local(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """``inkypi.local`` is in the default allow-list."""
     mod = _reload_inkypi(
         monkeypatch,
@@ -133,7 +140,9 @@ def test_default_allowed_hosts_include_inkypi_local(monkeypatch):
     assert resp.location == "https://inkypi.local/settings"
 
 
-def test_x_forwarded_proto_https_bypass_still_works(monkeypatch):
+def test_x_forwarded_proto_https_bypass_still_works(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """TLS-terminating proxies using X-Forwarded-Proto: https are unaffected.
 
     The allow-list check must only apply when we are actually going
@@ -154,7 +163,7 @@ def test_x_forwarded_proto_https_bypass_still_works(monkeypatch):
     assert resp.status_code == 200
 
 
-def test_custom_allowed_hosts_env_var(monkeypatch):
+def test_custom_allowed_hosts_env_var(monkeypatch: pytest.MonkeyPatch) -> None:
     """INKYPI_ALLOWED_HOSTS lets operators add their own hostnames."""
     mod = _reload_inkypi(
         monkeypatch,
@@ -176,7 +185,9 @@ def test_custom_allowed_hosts_env_var(monkeypatch):
     assert resp2.status_code == 400
 
 
-def test_redirect_preserves_path_and_query_string(monkeypatch):
+def test_redirect_preserves_path_and_query_string(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """The upgrade redirect must preserve the original path and query string."""
     mod = _reload_inkypi(
         monkeypatch,
@@ -190,7 +201,9 @@ def test_redirect_preserves_path_and_query_string(monkeypatch):
     assert resp.location == "https://localhost/settings?foo=bar&baz=1"
 
 
-def test_redirect_omits_trailing_question_mark_when_no_query(monkeypatch):
+def test_redirect_omits_trailing_question_mark_when_no_query(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """A request with no query string must not end the Location in ``?``."""
     mod = _reload_inkypi(
         monkeypatch,
@@ -204,7 +217,7 @@ def test_redirect_omits_trailing_question_mark_when_no_query(monkeypatch):
     assert resp.location == "https://localhost/"
 
 
-def test_redirect_reencodes_path_and_query(monkeypatch):
+def test_redirect_reencodes_path_and_query(monkeypatch: pytest.MonkeyPatch) -> None:
     """The redirect URL must be rebuilt via ``urlunsplit`` from validated
     components — not by string-concatenating ``request.full_path``.
 
@@ -227,7 +240,9 @@ def test_redirect_reencodes_path_and_query(monkeypatch):
     assert resp.location == "https://localhost/hello%20world"
 
 
-def test_redirect_drops_fragment_and_normalises_query(monkeypatch):
+def test_redirect_drops_fragment_and_normalises_query(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Fragments never travel over HTTP so the rebuilt URL must have none,
     and multi-value query strings must round-trip deterministically."""
     mod = _reload_inkypi(
@@ -242,7 +257,9 @@ def test_redirect_drops_fragment_and_normalises_query(monkeypatch):
     assert resp.location == "https://localhost/x?a=1&a=2&b=3"
 
 
-def test_redirect_never_uses_spoofed_host_even_in_path(monkeypatch):
+def test_redirect_never_uses_spoofed_host_even_in_path(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Even if an attacker embeds a hostname-like string in the path, the
     Location header still points at the allow-listed host."""
     mod = _reload_inkypi(
@@ -260,7 +277,7 @@ def test_redirect_never_uses_spoofed_host_even_in_path(monkeypatch):
     assert "evil.com" not in resp.location.split("/", 3)[2]
 
 
-def test_allowed_host_ignores_port_suffix(monkeypatch):
+def test_allowed_host_ignores_port_suffix(monkeypatch: pytest.MonkeyPatch) -> None:
     """``localhost:5000`` should count as the allow-listed ``localhost``."""
     mod = _reload_inkypi(
         monkeypatch,

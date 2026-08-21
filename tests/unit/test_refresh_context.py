@@ -11,7 +11,7 @@ from refresh_task.context import RefreshContext
 class TestRefreshContext:
     """Unit tests for the RefreshContext dataclass."""
 
-    def test_from_config_captures_all_fields(self):
+    def test_from_config_captures_all_fields(self) -> None:
         """RefreshContext.from_config should snapshot all relevant Config fields."""
         mock_config = MagicMock()
         mock_config.config_file = "/tmp/device.json"
@@ -32,7 +32,7 @@ class TestRefreshContext:
         assert ctx.resolution == (800, 480)
         assert ctx.timezone == "America/New_York"
 
-    def test_from_config_defaults_timezone_to_utc(self):
+    def test_from_config_defaults_timezone_to_utc(self) -> None:
         """When timezone config is missing or None, default to UTC."""
         mock_config = MagicMock()
         mock_config.config_file = "/tmp/device.json"
@@ -47,7 +47,7 @@ class TestRefreshContext:
 
         assert ctx.timezone == "UTC"
 
-    def test_from_config_handles_get_config_exception(self):
+    def test_from_config_handles_get_config_exception(self) -> None:
         """When get_config raises, timezone should fall back to UTC."""
         mock_config = MagicMock()
         mock_config.config_file = "/tmp/device.json"
@@ -62,7 +62,7 @@ class TestRefreshContext:
 
         assert ctx.timezone == "UTC"
 
-    def test_pickle_roundtrip(self):
+    def test_pickle_roundtrip(self) -> None:
         """RefreshContext must survive pickle serialisation (subprocess boundary)."""
         ctx = RefreshContext(
             config_file="/tmp/device.json",
@@ -81,7 +81,7 @@ class TestRefreshContext:
         assert restored.resolution == (800, 480)
         assert restored.timezone == "Europe/London"
 
-    def test_frozen_immutability(self):
+    def test_frozen_immutability(self) -> None:
         """RefreshContext fields should not be mutable after creation."""
         ctx = RefreshContext(
             config_file="/tmp/device.json",
@@ -95,7 +95,7 @@ class TestRefreshContext:
         with pytest.raises(AttributeError):
             ctx.timezone = "US/Eastern"
 
-    def test_restore_child_config(self):
+    def test_restore_child_config(self) -> None:
         """restore_child_config should set Config class attrs and return an instance."""
         ctx = RefreshContext(
             config_file="/tmp/device.json",
@@ -124,7 +124,7 @@ class TestRefreshContext:
 class TestWorkerRefreshContextIntegration:
     """Tests that worker.py correctly handles RefreshContext."""
 
-    def test_restore_child_config_with_refresh_context(self):
+    def test_restore_child_config_with_refresh_context(self) -> None:
         """_restore_child_config should delegate to RefreshContext.restore_child_config."""
         from refresh_task.worker import _restore_child_config
 
@@ -149,7 +149,7 @@ class TestWorkerRefreshContextIntegration:
             assert MockConfig.config_file == "/tmp/device.json"
             assert MockConfig.plugin_image_dir == "/tmp/plugins"
 
-    def test_restore_child_config_legacy_fallback(self):
+    def test_restore_child_config_legacy_fallback(self) -> None:
         """_restore_child_config should still work with a legacy Config-like object."""
         from refresh_task.worker import _restore_child_config
 
@@ -174,7 +174,7 @@ class TestWorkerRefreshContextIntegration:
 class TestRefreshTaskContextIntegration:
     """Tests that RefreshTask builds and uses RefreshContext."""
 
-    def test_refresh_task_creates_context(self):
+    def test_refresh_task_creates_context(self) -> None:
         """RefreshTask.__init__ should build a RefreshContext from device_config."""
         from refresh_task.task import RefreshTask
 
@@ -195,7 +195,7 @@ class TestRefreshTaskContextIntegration:
         assert task.refresh_context.config_file == "/tmp/device.json"
         assert task.refresh_context.resolution == (800, 480)
 
-    def test_signal_config_change_rebuilds_context(self):
+    def test_signal_config_change_rebuilds_context(self) -> None:
         """signal_config_change should rebuild the RefreshContext snapshot."""
         from refresh_task.task import RefreshTask
 

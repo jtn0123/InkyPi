@@ -12,8 +12,12 @@ from __future__ import annotations
 import json
 import os
 import uuid
+from pathlib import Path
+from typing import Any
 
 import pytest
+from flask import Flask
+from playwright.sync_api import Page
 
 pytestmark = [
     pytest.mark.journey,
@@ -36,7 +40,7 @@ _PLUGINS = [
 ]
 
 
-def _seed_plugins(device_config, playlist_name, instances):
+def _seed_plugins(device_config: Any, playlist_name: Any, instances: Any) -> None:
     """Add plugin instances to a playlist via the manager (skips UI/CSRF)."""
     pm = device_config.get_playlist_manager()
     playlist = pm.get_playlist(playlist_name)
@@ -53,7 +57,7 @@ def _seed_plugins(device_config, playlist_name, instances):
     device_config.write_config()
 
 
-def _dom_instance_names(page, playlist_name):
+def _dom_instance_names(page: Page, playlist_name: Any) -> Any:
     """Return the list of instance names for a playlist, in DOM order."""
     return page.evaluate(
         """(pn) => {
@@ -67,7 +71,7 @@ def _dom_instance_names(page, playlist_name):
     )
 
 
-def _backend_instance_names(device_config, playlist_name):
+def _backend_instance_names(device_config: Any, playlist_name: Any) -> Any:
     """Re-read the on-disk config and return instance names for the playlist.
 
     Re-loading via ``Config()`` guarantees we observe the persisted state
@@ -84,8 +88,12 @@ def _backend_instance_names(device_config, playlist_name):
 
 
 def test_playlist_roundtrip_create_reorder_delete_persist(
-    live_server, device_config_dev, flask_app, browser_page, tmp_path
-):
+    live_server: str,
+    device_config_dev: Any,
+    flask_app: Flask,
+    browser_page: Page,
+    tmp_path: Path,
+) -> None:
     """Create playlist, add 3 plugins, reorder, delete, reload, assert persistence."""
     client = flask_app.test_client()
     playlist_name = f"journey-{uuid.uuid4().hex[:8]}"

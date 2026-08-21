@@ -8,7 +8,7 @@ DIAGNOSTICS_JS = ROOT / "src" / "static" / "scripts" / "settings" / "diagnostics
 NAVIGATION_JS = ROOT / "src" / "static" / "scripts" / "settings" / "navigation.js"
 
 
-def test_progress_sse_is_lazy_and_closed_off_maintenance_tab():
+def test_progress_sse_is_lazy_and_closed_off_maintenance_tab() -> None:
     """Settings should not keep a progress stream open for unrelated tabs."""
     settings_js = SETTINGS_PAGE_JS.read_text(encoding="utf-8")
     diagnostics_js = DIAGNOSTICS_JS.read_text(encoding="utf-8")

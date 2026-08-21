@@ -27,11 +27,13 @@ class DummyDeviceConfig:
         return (800, 480)
 
 
-def _plugin(cls, plugin_id: str):
+def _plugin(cls, plugin_id: str) -> Any:
     return cls({"id": plugin_id})
 
 
-def test_comic_defaults_to_xkcd_when_settings_empty(monkeypatch):
+def test_comic_defaults_to_xkcd_when_settings_empty(
+    monkeypatch: pytest.MonkeyPatch,
+) -> Any:
     from src.plugins.comic import comic_parser as cp
     from src.plugins.comic.comic import Comic
 
@@ -51,7 +53,7 @@ def test_comic_defaults_to_xkcd_when_settings_empty(monkeypatch):
 
     monkeypatch.setattr(comic_mod, "get_panel", fake_get_panel)
 
-    def fake_compose(*_args, **_kwargs):
+    def fake_compose(*_args: Any, **_kwargs: Any) -> Any:
         return object()
 
     inst = _plugin(Comic, "comic")
@@ -62,12 +64,14 @@ def test_comic_defaults_to_xkcd_when_settings_empty(monkeypatch):
     assert captured["comic"] == "XKCD"
 
 
-def test_countdown_defaults_title_and_date_when_empty(monkeypatch):
+def test_countdown_defaults_title_and_date_when_empty(
+    monkeypatch: pytest.MonkeyPatch,
+) -> Any:
     from src.plugins.countdown.countdown import Countdown
 
     captured: dict[str, Any] = {}
 
-    def fake_render(_dims, _html, _css, params):
+    def fake_render(_dims: Any, _html: Any, _css: Any, params: Any) -> Any:
         captured["title"] = params["title"]
         captured["day_count"] = params["day_count"]
         captured["label"] = params["label"]
@@ -83,7 +87,7 @@ def test_countdown_defaults_title_and_date_when_empty(monkeypatch):
     assert captured["label"] == "Days Left"
 
 
-def test_newspaper_defaults_slug_when_empty(monkeypatch):
+def test_newspaper_defaults_slug_when_empty(monkeypatch: pytest.MonkeyPatch) -> Any:
     from src.plugins.newspaper import newspaper as np_mod
     from src.plugins.newspaper.newspaper import Newspaper
 
@@ -92,10 +96,10 @@ def test_newspaper_defaults_slug_when_empty(monkeypatch):
     class _FakeImage:
         size = (800, 480)
 
-        def resize(self, *_a, **_kw):
+        def resize(self, *_a: Any, **_kw: Any) -> Any:
             return self
 
-    def fake_get_image(url: str):
+    def fake_get_image(url: str) -> Any:
         captured["url"] = url
         return _FakeImage()
 
@@ -107,16 +111,16 @@ def test_newspaper_defaults_slug_when_empty(monkeypatch):
     assert "NY_NYT" in captured["url"]
 
 
-def test_rss_defaults_feed_url_when_empty(monkeypatch):
+def test_rss_defaults_feed_url_when_empty(monkeypatch: pytest.MonkeyPatch) -> Any:
     from src.plugins.rss.rss import Rss
 
     captured: dict[str, Any] = {}
 
-    def fake_parse(self, url: str, timeout: int = 10):  # noqa: ANN001
+    def fake_parse(self, url: str, timeout: int = 10) -> Any:  # noqa: ANN001
         captured["url"] = url
         return []
 
-    def fake_render(_dims, _html, _css, params):
+    def fake_render(_dims: Any, _html: Any, _css: Any, params: Any) -> Any:
         captured["title"] = params["title"]
         return object()
 
@@ -129,24 +133,30 @@ def test_rss_defaults_feed_url_when_empty(monkeypatch):
     assert captured["title"] == "Top Stories"
 
 
-def test_weather_defaults_use_openmeteo_when_empty(monkeypatch):
+def test_weather_defaults_use_openmeteo_when_empty(
+    monkeypatch: pytest.MonkeyPatch,
+) -> Any:
     from src.plugins.weather.weather import Weather
 
     captured: dict[str, Any] = {}
 
-    def fake_get_open_meteo_data(self, lat, long, units, days):  # noqa: ANN001
+    def fake_get_open_meteo_data(
+        self, lat: Any, long: Any, units: Any, days: Any
+    ) -> Any:  # noqa: ANN001
         captured["lat"] = lat
         captured["long"] = long
         captured["units"] = units
         return {}
 
-    def fake_get_open_meteo_air_quality(self, lat, long):  # noqa: ANN001
+    def fake_get_open_meteo_air_quality(
+        self, lat: Any, long: Any
+    ) -> Any:  # noqa: ANN001
         return {}
 
-    def fake_parse_open_meteo_data(self, *_a, **_kw):
+    def fake_parse_open_meteo_data(self, *_a: Any, **_kw: Any) -> Any:
         return {"title": "-", "dt": datetime.now(UTC).timestamp()}
 
-    def fake_render(_dims, _html, _css, params):
+    def fake_render(_dims: Any, _html: Any, _css: Any, params: Any) -> Any:
         captured["title"] = params.get("title")
         return object()
 

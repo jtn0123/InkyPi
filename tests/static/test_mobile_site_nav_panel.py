@@ -40,7 +40,7 @@ def _block_for_selector(css: str, selector: str) -> str:
     raise AssertionError(f"selector {selector!r} not found in CSS")
 
 
-def test_mobile_site_nav_panel_does_not_clip_to_grid_column():
+def test_mobile_site_nav_panel_does_not_clip_to_grid_column() -> None:
     """The panel must NOT use `left: 0` paired with `right: 0` — that pins
     its width to the narrow middle column of the sidebar grid and clips
     items. It should anchor to one edge with a `min-width`/`max-width`
@@ -63,7 +63,7 @@ def test_mobile_site_nav_panel_does_not_clip_to_grid_column():
     ), "Panel needs a viewport-bounded max-width so it doesn't spill off-screen"
 
 
-def test_mobile_site_nav_panel_anchors_to_right_edge():
+def test_mobile_site_nav_panel_anchors_to_right_edge() -> None:
     """We anchor to the right edge so the panel grows leftward (into the
     brand column) on narrow viewports — an explicit choice worth pinning."""
     css = SIDEBAR_CSS.read_text(encoding="utf-8")

@@ -1,9 +1,15 @@
 import json
 import logging
 import os
+from pathlib import Path
+from typing import Any
+
+import pytest
 
 
-def test_update_config_writes_atomically(device_config_dev, tmp_path):
+def test_update_config_writes_atomically(
+    device_config_dev: Any, tmp_path: Path
+) -> None:
     """Bug 10: update_config should write inside the lock to prevent races."""
     device_config_dev.update_config({"name": "Atomic"})
     assert device_config_dev.get_config("name") == "Atomic"
@@ -13,7 +19,7 @@ def test_update_config_writes_atomically(device_config_dev, tmp_path):
     assert on_disk["name"] == "Atomic"
 
 
-def test_update_value_writes_atomically(device_config_dev, tmp_path):
+def test_update_value_writes_atomically(device_config_dev: Any, tmp_path: Path) -> None:
     """Bug 10: update_value with write=True should write inside the lock."""
     device_config_dev.update_value("name", "AtomicVal", write=True)
     assert device_config_dev.get_config("name") == "AtomicVal"
@@ -22,7 +28,9 @@ def test_update_value_writes_atomically(device_config_dev, tmp_path):
     assert on_disk["name"] == "AtomicVal"
 
 
-def test_config_logging_is_sanitized(monkeypatch, tmp_path, caplog):
+def test_config_logging_is_sanitized(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
     import config as config_mod
 
     # Build a minimal config that includes sensitive-looking fields

@@ -2,25 +2,29 @@
 """Provider-specific tests (OpenWeatherMap, OpenMeteo API mocking)."""
 
 from datetime import UTC
-from typing import cast
+from typing import Any, cast
 from unittest.mock import MagicMock, patch
 from zoneinfo import ZoneInfo
 
+import pytest
 import requests
+from flask.testing import FlaskClient
 
 
 @patch("plugins.weather.weather_api.get_http_session")
-def test_weather_openweathermap_success(mock_get_session, client):
+def test_weather_openweathermap_success(
+    mock_get_session: Any, client: FlaskClient
+) -> Any:
     import os
 
     os.environ["OPEN_WEATHER_MAP_SECRET"] = "key"
 
     # Mock OWM endpoints
-    def fake_get(url, params=None, **kwargs):
+    def fake_get(url: Any, params: Any = None, **kwargs: Any) -> Any:
         class R:
             status_code = 200
 
-            def json(self_inner):
+            def json(self_inner: Any) -> Any:
                 if "air_pollution" in url:
                     return {"list": [{"main": {"aqi": 3}}]}
                 if "geo/1.0/reverse" in url:
@@ -71,12 +75,14 @@ def test_weather_openweathermap_success(mock_get_session, client):
     assert resp.status_code == 200
 
 
-def test_weather_openmeteo_success(client, monkeypatch):
-    def fake_get(url, *args, **kwargs):
+def test_weather_openmeteo_success(
+    client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> Any:
+    def fake_get(url: Any, *args: Any, **kwargs: Any) -> Any:
         class R:
             status_code = 200
 
-            def json(self_inner):
+            def json(self_inner: Any) -> Any:
                 if "air-quality" in url:
                     return {"hourly": {"time": ["2025-01-01T12:00"], "uv_index": [3.5]}}
                 # forecast
@@ -124,7 +130,7 @@ def test_weather_openmeteo_success(client, monkeypatch):
     assert resp.status_code == 200
 
 
-def test_weather_code_mapping_openmeteo():
+def test_weather_code_mapping_openmeteo() -> None:
     """Test weather code mapping for OpenMeteo."""
     from plugins.weather.weather import Weather
 
@@ -164,7 +170,7 @@ def test_weather_code_mapping_openmeteo():
         assert isinstance(icon, str)
 
 
-def test_openmeteo_forecast_parsing():
+def test_openmeteo_forecast_parsing() -> None:
     """Test OpenMeteo forecast parsing."""
     from plugins.weather.weather import Weather
 
@@ -193,7 +199,7 @@ def test_openmeteo_forecast_parsing():
         pass  # Expected to fail without full data, but covers the parsing attempt
 
 
-def test_openmeteo_hourly_parsing():
+def test_openmeteo_hourly_parsing() -> None:
     """Test OpenMeteo hourly data parsing."""
 
     # Mock hourly data
@@ -226,7 +232,9 @@ def test_openmeteo_hourly_parsing():
             continue
 
 
-def test_weather_openweathermap_api_failure(device_config_dev, monkeypatch):
+def test_weather_openweathermap_api_failure(
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Test weather plugin with OpenWeatherMap API failure."""
     from plugins.weather.weather import Weather
 
@@ -235,7 +243,7 @@ def test_weather_openweathermap_api_failure(device_config_dev, monkeypatch):
     # Mock API key and API failure
     monkeypatch.setattr(device_config_dev, "load_env_key", lambda key: "fake_key")
 
-    def raise_timeout(*args, **kwargs):
+    def raise_timeout(*args: Any, **kwargs: Any) -> None:
         raise requests.exceptions.Timeout("Connection timeout")
 
     mock_session = type("S", (), {"get": staticmethod(raise_timeout)})()
@@ -256,13 +264,15 @@ def test_weather_openweathermap_api_failure(device_config_dev, monkeypatch):
         p.generate_image(settings, device_config_dev)
 
 
-def test_weather_openmeteo_api_failure(device_config_dev, monkeypatch):
+def test_weather_openmeteo_api_failure(
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Test weather plugin with OpenMeteo API failure."""
     from plugins.weather.weather import Weather
 
     p = Weather({"id": "weather"})
 
-    def raise_connection_error(*args, **kwargs):
+    def raise_connection_error(*args: Any, **kwargs: Any) -> None:
         raise requests.exceptions.ConnectionError("Connection failed")
 
     mock_session = type("S", (), {"get": staticmethod(raise_connection_error)})()
@@ -283,7 +293,9 @@ def test_weather_openmeteo_api_failure(device_config_dev, monkeypatch):
         p.generate_image(settings, device_config_dev)
 
 
-def test_weather_vertical_orientation_openmeteo(device_config_dev, monkeypatch):
+def test_weather_vertical_orientation_openmeteo(
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Test weather plugin with vertical orientation using OpenMeteo."""
     from plugins.weather.weather import Weather
 
@@ -349,7 +361,9 @@ def test_weather_vertical_orientation_openmeteo(device_config_dev, monkeypatch):
             assert "orientation" not in str(e)
 
 
-def test_weather_24h_time_format(device_config_dev, monkeypatch):
+def test_weather_24h_time_format(
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Test weather plugin with 24h time format."""
     from plugins.weather.weather import Weather
 
@@ -411,7 +425,7 @@ def test_weather_24h_time_format(device_config_dev, monkeypatch):
         assert result is not None
 
 
-def test_weather_parse_open_meteo_data_missing_current():
+def test_weather_parse_open_meteo_data_missing_current() -> None:
     """Test parsing OpenMeteo data with missing current weather info handles gracefully."""
     from plugins.weather.weather import Weather
 
@@ -429,7 +443,7 @@ def test_weather_parse_open_meteo_data_missing_current():
     assert result["current_temperature"] == "0"  # Default temperature
 
 
-def test_weather_parse_data_points_openweathermap():
+def test_weather_parse_data_points_openweathermap() -> None:
     """Test parsing data points for OpenWeatherMap."""
     from plugins.weather.weather import Weather
 
@@ -452,7 +466,7 @@ def test_weather_parse_data_points_openweathermap():
     assert any("humidity" in item["label"].lower() for item in result)
 
 
-def test_weather_parse_data_points_openmeteo():
+def test_weather_parse_data_points_openmeteo() -> None:
     """Test parsing data points for OpenMeteo."""
     from plugins.weather.weather import Weather
 
@@ -472,7 +486,7 @@ def test_weather_parse_data_points_openmeteo():
     assert len(result) > 0
 
 
-def test_open_meteo_forecast_dates_not_shifted_for_western_tz():
+def test_open_meteo_forecast_dates_not_shifted_for_western_tz() -> None:
     """JTN-251: Open-Meteo returns local dates; parsing them as UTC shifts day labels
     back by one for western timezones.  The fix treats naive datetimes as local."""
     import os

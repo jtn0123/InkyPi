@@ -11,6 +11,7 @@ import importlib
 import sys
 import types
 from pathlib import Path
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -63,23 +64,23 @@ def _imports_name(tree: ast.Module, module: str, name: str) -> bool:
 class TestInkypiStructural:
     """Verify inkypi.py imports and uses the Notification enum for sd_notify."""
 
-    def setup_method(self):
+    def setup_method(self) -> None:
         self.tree = _ast_tree("src/inkypi.py")
 
-    def test_imports_notification_enum(self):
+    def test_imports_notification_enum(self) -> None:
         """inkypi.py must import Notification from cysystemd.daemon."""
         assert _imports_name(self.tree, "cysystemd.daemon", "Notification"), (
             "inkypi.py does not import Notification from cysystemd.daemon — "
             "the string-based notify() bug (JTN-594) may have been reintroduced."
         )
 
-    def test_imports_notify(self):
+    def test_imports_notify(self) -> None:
         """inkypi.py must import notify from cysystemd.daemon."""
         assert _imports_name(
             self.tree, "cysystemd.daemon", "notify"
         ), "inkypi.py does not import notify from cysystemd.daemon."
 
-    def test_no_string_ready_arg_to_notify(self):
+    def test_no_string_ready_arg_to_notify(self) -> None:
         """notify() must never be called with a bare string literal 'READY=1'."""
         tree = self.tree
         for node in ast.walk(tree):
@@ -95,17 +96,17 @@ class TestInkypiStructural:
 class TestTaskStructural:
     """Verify task.py imports Notification and uses the enum-based adapter."""
 
-    def setup_method(self):
+    def setup_method(self) -> None:
         self.tree = _ast_tree("src/refresh_task/task.py")
 
-    def test_imports_notification_enum(self):
+    def test_imports_notification_enum(self) -> None:
         """task.py must import Notification (as _sd_Notification) from cysystemd.daemon."""
         assert _imports_name(self.tree, "cysystemd.daemon", "Notification"), (
             "task.py does not import Notification from cysystemd.daemon — "
             "the string-based notify() bug (JTN-594) may have been reintroduced."
         )
 
-    def test_no_raw_string_watchdog_call(self):
+    def test_no_raw_string_watchdog_call(self) -> None:
         """_sd_notify_raw must never be called directly with a string literal."""
         for node in ast.walk(self.tree):
             if isinstance(node, ast.Call):
@@ -122,7 +123,7 @@ class TestTaskStructural:
                                 "Use _sd_Notification.<VARIANT> instead (JTN-594)."
                             )
 
-    def test_except_blocks_do_not_bare_pass(self):
+    def test_except_blocks_do_not_bare_pass(self) -> None:
         """No except block in the cysystemd import try/except should be a bare pass."""
         for node in ast.walk(self.tree):
             if isinstance(node, ast.Try):
@@ -150,7 +151,7 @@ class TestTaskStructural:
 class TestSdNotifyAdapter:
     """Test the _sd_notify adapter function in task.py calls the enum API."""
 
-    def _load_task_module_with_mock_cysystemd(self):
+    def _load_task_module_with_mock_cysystemd(self) -> Any:
         """Import task.py with cysystemd mocked so the adapter is defined."""
         # Build a fake cysystemd.daemon module with a real-looking Notification enum
         import enum
@@ -207,7 +208,7 @@ class TestSdNotifyAdapter:
 
         return module, fake_notify, FakeNotification
 
-    def test_watchdog_calls_notification_watchdog(self):
+    def test_watchdog_calls_notification_watchdog(self) -> None:
         """_sd_notify('WATCHDOG=1') must call notify(Notification.WATCHDOG)."""
         module, fake_notify, FakeNotification = (
             self._load_task_module_with_mock_cysystemd()
@@ -218,7 +219,7 @@ class TestSdNotifyAdapter:
         module._sd_notify("WATCHDOG=1")
         fake_notify.assert_called_once_with(FakeNotification.WATCHDOG)
 
-    def test_ready_calls_notification_ready(self):
+    def test_ready_calls_notification_ready(self) -> None:
         """_sd_notify('READY=1') must call notify(Notification.READY)."""
         module, fake_notify, FakeNotification = (
             self._load_task_module_with_mock_cysystemd()
@@ -229,7 +230,7 @@ class TestSdNotifyAdapter:
         module._sd_notify("READY=1")
         fake_notify.assert_called_once_with(FakeNotification.READY)
 
-    def test_unknown_kind_does_not_call_raw(self):
+    def test_unknown_kind_does_not_call_raw(self) -> None:
         """Unknown _kind strings must not trigger any notify call."""
         module, fake_notify, FakeNotification = (
             self._load_task_module_with_mock_cysystemd()
@@ -237,7 +238,7 @@ class TestSdNotifyAdapter:
         module._sd_notify("UNKNOWN=1")
         fake_notify.assert_not_called()
 
-    def test_sd_notify_is_none_when_cysystemd_unavailable(self):
+    def test_sd_notify_is_none_when_cysystemd_unavailable(self) -> None:
         """When cysystemd is not importable, _sd_notify must be None (graceful degradation)."""
         task_module_name = "refresh_task_jtn594_none_test"
 

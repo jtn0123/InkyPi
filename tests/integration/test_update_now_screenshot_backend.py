@@ -12,19 +12,27 @@ actionable error — not the generic 500 ``internal_error`` that a bare
 
 from __future__ import annotations
 
+from typing import Any
+
+import pytest
+from flask import Flask
+from flask.testing import FlaskClient
+
 
 class TestUpdateNowScreenshotBackend:
     """/update_now must map ``ScreenshotBackendError`` to HTTP 503."""
 
-    def test_screenshot_backend_error_returns_503(self, client, monkeypatch):
+    def test_screenshot_backend_error_returns_503(
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+    ) -> Any:
         """Plugin raising ``ScreenshotBackendError`` -> 503 backend_unavailable."""
         from plugins.plugin_registry import get_plugin_instance as _real_get
         from utils.plugin_errors import ScreenshotBackendError
 
-        def _boom(plugin_config):
+        def _boom(plugin_config: Any) -> Any:
             inst = _real_get(plugin_config)
 
-            def _raise(*a, **kw):
+            def _raise(*a: Any, **kw: Any) -> None:
                 raise ScreenshotBackendError(
                     "Screenshot backend failed after retry: chromium subprocess "
                     "did not produce an image."
@@ -71,8 +79,8 @@ class TestUpdateNowScreenshotBackendViaRefreshTask:
     """
 
     def test_screenshot_backend_error_from_refresh_task_returns_503(
-        self, client, flask_app, monkeypatch
-    ):
+        self, client: FlaskClient, flask_app: Flask, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         from utils.plugin_errors import (
             SCREENSHOT_BACKEND_UNAVAILABLE_MSG,
             ScreenshotBackendError,
@@ -82,7 +90,7 @@ class TestUpdateNowScreenshotBackendViaRefreshTask:
         refresh_task = flask_app.config["REFRESH_TASK"]
         monkeypatch.setattr(refresh_task, "running", True)
 
-        def _raise(_refresh_action):
+        def _raise(_refresh_action: Any) -> None:
             raise ScreenshotBackendError(
                 "Screenshot backend failed after retry: chromium subprocess "
                 "did not produce an image."

@@ -1,10 +1,12 @@
 import importlib
 import sys
+from pathlib import Path
 
+import pytest
 from tests.unit.test_secret_key import _write_min_device_config
 
 
-def test_import_does_not_parse(monkeypatch):
+def test_import_does_not_parse(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(sys, "argv", ["inkypi.py", "--dev"])
     sys.modules.pop("inkypi", None)
     import inkypi
@@ -13,7 +15,7 @@ def test_import_does_not_parse(monkeypatch):
     assert inkypi.app is None
 
 
-def test_main_invocation(tmp_path, monkeypatch):
+def test_main_invocation(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     cfg_path = tmp_path / "device.json"
     _write_min_device_config(cfg_path)
     monkeypatch.setenv("INKYPI_CONFIG_FILE", str(cfg_path))

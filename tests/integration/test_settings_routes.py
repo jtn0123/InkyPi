@@ -1,9 +1,14 @@
 # pyright: reportMissingImports=false
 import json
 import os
+from pathlib import Path
+
+import pytest
+from flask import Flask
+from flask.testing import FlaskClient
 
 
-def test_get_settings_page(client):
+def test_get_settings_page(client: FlaskClient) -> None:
     resp = client.get("/settings")
     assert resp.status_code == 200
     # Basic UI markers
@@ -12,16 +17,18 @@ def test_get_settings_page(client):
     assert b'data-settings-tab="device"' in resp.data
 
 
-def test_save_settings_validation_errors(client):
+def test_save_settings_validation_errors(client: FlaskClient) -> None:
     # Missing required fields
     resp = client.post("/save_settings", data={})
     assert resp.status_code == 422
 
 
-def test_save_settings_success_triggers_interval_update(client, flask_app, monkeypatch):
+def test_save_settings_success_triggers_interval_update(
+    client: FlaskClient, flask_app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
     called = {"signaled": False}
 
-    def fake_signal():
+    def fake_signal() -> None:
         called["signaled"] = True
 
     refresh_task = flask_app.config["REFRESH_TASK"]
@@ -48,7 +55,9 @@ def test_save_settings_success_triggers_interval_update(client, flask_app, monke
     assert called["signaled"] is True
 
 
-def test_start_update_endpoint(client, monkeypatch):
+def test_start_update_endpoint(
+    client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
     # Ensure start_update returns JSON and doesn't crash in dev
     resp = client.post("/settings/update")
     assert resp.status_code in (200, 409)
@@ -57,7 +66,7 @@ def test_start_update_endpoint(client, monkeypatch):
     assert "running" in data
 
 
-def test_update_status_endpoint(client):
+def test_update_status_endpoint(client: FlaskClient) -> None:
     resp = client.get("/settings/update_status")
     assert resp.status_code == 200
     data = resp.get_json()
@@ -65,8 +74,8 @@ def test_update_status_endpoint(client):
 
 
 def test_settings_page_timezone_defaults_to_utc_when_missing(
-    tmp_path, monkeypatch, flask_app
-):
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, flask_app: Flask
+) -> None:
     """Settings page renders value='UTC' when config has no timezone key (JTN-216)."""
     import config as config_mod
 
@@ -123,7 +132,7 @@ def test_settings_page_timezone_defaults_to_utc_when_missing(
     assert b'value="UTC"' in resp.data
 
 
-def test_settings_page_timezone_renders_configured_value(client):
+def test_settings_page_timezone_renders_configured_value(client: FlaskClient) -> None:
     """Settings page renders the configured timezone value (JTN-216)."""
     # The default fixture sets timezone="UTC"; verify it appears in the rendered HTML
     resp = client.get("/settings")
@@ -131,14 +140,14 @@ def test_settings_page_timezone_renders_configured_value(client):
     assert b'value="UTC"' in resp.data
 
 
-def test_settings_page_save_button_present(client):
+def test_settings_page_save_button_present(client: FlaskClient) -> None:
     """Save button must be present; dirty-checking disables it client-side via JS."""
     resp = client.get("/settings")
     assert resp.status_code == 200
     assert b'id="saveSettingsBtn"' in resp.data
 
 
-def test_settings_page_image_sliders_present(client):
+def test_settings_page_image_sliders_present(client: FlaskClient) -> None:
     """Image Processing sliders (saturation, contrast, sharpness, brightness) must render."""
     resp = client.get("/settings")
     assert resp.status_code == 200
@@ -148,7 +157,7 @@ def test_settings_page_image_sliders_present(client):
         ), f"Slider '{slider_name}' missing from settings page"
 
 
-def test_settings_responsive_css_sticky_save_selector_matches_real_dom():
+def test_settings_responsive_css_sticky_save_selector_matches_real_dom() -> None:
     """JTN-572: the Save button must actually become sticky on /settings.
 
     The earlier JTN-599 rule used ``.settings-panel > .buttons-container`` (child
@@ -179,7 +188,9 @@ def test_settings_responsive_css_sticky_save_selector_matches_real_dom():
     )
 
 
-def test_settings_image_processing_labels_have_no_trailing_colon(client):
+def test_settings_image_processing_labels_have_no_trailing_colon(
+    client: FlaskClient,
+) -> None:
     """JTN-645: Image Processing slider labels should not end in a colon —
     the rest of the settings form uses colon-free labels."""
     resp = client.get("/settings")

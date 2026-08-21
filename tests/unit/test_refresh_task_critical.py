@@ -14,8 +14,11 @@ import queue
 import threading
 import time
 from datetime import UTC, datetime
+from pathlib import Path
+from typing import Any
 from unittest.mock import MagicMock, patch
 
+import pytest
 from PIL import Image
 
 from refresh_task import (
@@ -36,7 +39,7 @@ class _SpawnableAction:
     Used only by `test_worker_reloads_plugin_registry_in_real_spawned_child`.
     """
 
-    def execute(self, plugin, cfg, dt):
+    def execute(self, plugin: Any, cfg: Any, dt: Any) -> Any:
         return Image.new("RGB", (10, 10), "green")
 
 
@@ -50,13 +53,13 @@ class _LargeImageAction:
     the old ``result_queue.put(image_bytes)`` path deadlocked.
     """
 
-    def execute(self, plugin, cfg, dt):
+    def execute(self, plugin: Any, cfg: Any, dt: Any) -> Any:
         data = os.urandom(800 * 480 * 3)
         return Image.frombytes("RGB", (800, 480), data)
 
 
 class TestRemoteException:
-    def test_known_types(self):
+    def test_known_types(self) -> None:
         for name, cls in [
             ("RuntimeError", RuntimeError),
             ("ValueError", ValueError),
@@ -68,12 +71,12 @@ class TestRemoteException:
             assert isinstance(exc, cls)
             assert str(exc) == "msg"
 
-    def test_key_error(self):
+    def test_key_error(self) -> None:
         exc = _remote_exception("KeyError", "missing_key")
         assert isinstance(exc, KeyError)
         assert "missing_key" in str(exc)
 
-    def test_unknown_type_defaults_to_runtime_error(self):
+    def test_unknown_type_defaults_to_runtime_error(self) -> None:
         exc = _remote_exception("SomeWeirdError", "oops")
         assert isinstance(exc, RuntimeError)
         assert "oops" in str(exc)
@@ -85,7 +88,7 @@ class TestRemoteException:
 
 
 class TestGetMpContext:
-    def test_returns_context(self):
+    def test_returns_context(self) -> None:
         ctx = _get_mp_context()
         assert ctx is not None
         assert hasattr(ctx, "Process")
@@ -98,20 +101,20 @@ class TestGetMpContext:
 
 
 class TestExecuteRefreshAttemptWorker:
-    def test_success_puts_ok_payload(self, device_config_dev):
+    def test_success_puts_ok_payload(self, device_config_dev: Any) -> Any:
         from refresh_task import _execute_refresh_attempt_worker
 
         result_queue = queue.Queue()
 
         class FakePlugin:
-            def generate_image(self, settings, cfg):
+            def generate_image(self, settings: Any, cfg: Any) -> Any:
                 return Image.new("RGB", (10, 10), "red")
 
-            def get_latest_metadata(self):
+            def get_latest_metadata(self) -> Any:
                 return {"key": "val"}
 
         class FakeAction:
-            def execute(self, plugin, cfg, dt):
+            def execute(self, plugin: Any, cfg: Any, dt: Any) -> Any:
                 return plugin.generate_image(None, cfg)
 
         # Mock get_plugin_instance and _restore_child_config
@@ -139,17 +142,17 @@ class TestExecuteRefreshAttemptWorker:
         img.close()
         os.unlink(payload["image_path"])
 
-    def test_none_image_puts_error(self, device_config_dev):
+    def test_none_image_puts_error(self, device_config_dev: Any) -> Any:
         from refresh_task import _execute_refresh_attempt_worker
 
         result_queue = queue.Queue()
 
         class NullPlugin:
-            def generate_image(self, settings, cfg):
+            def generate_image(self, settings: Any, cfg: Any) -> Any:
                 return None
 
         class FakeAction:
-            def execute(self, plugin, cfg, dt):
+            def execute(self, plugin: Any, cfg: Any, dt: Any) -> Any:
                 return None
 
         with (
@@ -172,13 +175,13 @@ class TestExecuteRefreshAttemptWorker:
         assert payload["error_type"] == "RuntimeError"
         assert "None" in payload["error_message"]
 
-    def test_exception_puts_error_payload(self, device_config_dev):
+    def test_exception_puts_error_payload(self, device_config_dev: Any) -> None:
         from refresh_task import _execute_refresh_attempt_worker
 
         result_queue = queue.Queue()
 
         class BrokenAction:
-            def execute(self, plugin, cfg, dt):
+            def execute(self, plugin: Any, cfg: Any, dt: Any) -> None:
                 raise ValueError("bad config")
 
         with (
@@ -212,7 +215,9 @@ class TestExecuteRefreshAttemptWorker:
             "a tempfile the parent's _handle_process_result never reads"
         )
 
-    def test_worker_reloads_plugin_registry_in_child(self, device_config_dev):
+    def test_worker_reloads_plugin_registry_in_child(
+        self, device_config_dev: Any
+    ) -> Any:
         """JTN-783: spawned subprocess starts with empty plugin registry.
 
         Simulates the real bug: when multiprocessing spawn/forkserver starts a
@@ -243,7 +248,7 @@ class TestExecuteRefreshAttemptWorker:
         refresh_context = RefreshContext.from_config(device_config_dev)
 
         class FakeAction:
-            def execute(self, plugin, cfg, dt):
+            def execute(self, plugin: Any, cfg: Any, dt: Any) -> Any:
                 return Image.new("RGB", (10, 10), "blue")
 
         result_queue = queue.Queue()
@@ -274,8 +279,8 @@ class TestExecuteRefreshAttemptWorker:
             plugin_registry._PLUGIN_CONFIGS.update(saved_configs)
 
     def test_worker_reloads_plugin_registry_in_real_spawned_child(
-        self, device_config_dev
-    ):
+        self, device_config_dev: Any
+    ) -> None:
         """JTN-783: end-to-end variant that spawns a real subprocess.
 
         The inline variant above simulates a cold registry by clearing the
@@ -354,7 +359,9 @@ class TestSubprocessPipeBufferDeadlockRegression:
     short timeout fires — and fails loudly instead of silently.
     """
 
-    def test_large_image_round_trips_under_deadlock_threshold(self, device_config_dev):
+    def test_large_image_round_trips_under_deadlock_threshold(
+        self, device_config_dev: Any
+    ) -> None:
         """Real spawned subprocess + 800x480 random-pixel image.
 
         Must complete well under 10 s.  With the pipe-buffer deadlock
@@ -438,7 +445,9 @@ class TestWorkerSessionLeaderCleanup:
     PID 1 and leak.
     """
 
-    def test_worker_calls_setsid_to_become_session_leader(self, monkeypatch):
+    def test_worker_calls_setsid_to_become_session_leader(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> Any:
         """The worker must call ``os.setsid()`` before doing any plugin
         work so chromium spawned later inherits the worker's pgid.
         """
@@ -448,7 +457,7 @@ class TestWorkerSessionLeaderCleanup:
 
         called: list[bool] = []
 
-        def fake_setsid():
+        def fake_setsid() -> None:
             called.append(True)
 
         # Patch the worker module's ``os`` reference.
@@ -466,11 +475,11 @@ class TestWorkerSessionLeaderCleanup:
         from PIL import Image as _Image
 
         class _FakePlugin:
-            def generate_image(self, settings, cfg):
+            def generate_image(self, settings: Any, cfg: Any) -> Any:
                 return _Image.new("RGB", (10, 10), "red")
 
         class _FakeAction:
-            def execute(self, plugin, cfg, dt):
+            def execute(self, plugin: Any, cfg: Any, dt: Any) -> Any:
                 return plugin.generate_image(None, cfg)
 
         from unittest.mock import MagicMock
@@ -511,7 +520,9 @@ class TestWorkerSessionLeaderCleanup:
             except OSError:
                 pass
 
-    def test_worker_setsid_eperm_is_swallowed(self, monkeypatch):
+    def test_worker_setsid_eperm_is_swallowed(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> Any:
         """If setsid fails (already a session leader, e.g. under some test
         mocks), the worker must still complete its render — the signal
         propagation path is best-effort, not load-bearing."""
@@ -519,7 +530,7 @@ class TestWorkerSessionLeaderCleanup:
 
         from refresh_task import _execute_refresh_attempt_worker
 
-        def setsid_eperm():
+        def setsid_eperm() -> None:
             raise OSError(1, "Operation not permitted")
 
         monkeypatch.setattr("refresh_task.worker.os.setsid", setsid_eperm)
@@ -533,11 +544,11 @@ class TestWorkerSessionLeaderCleanup:
         from PIL import Image as _Image
 
         class _FakePlugin:
-            def generate_image(self, settings, cfg):
+            def generate_image(self, settings: Any, cfg: Any) -> Any:
                 return _Image.new("RGB", (10, 10), "blue")
 
         class _FakeAction:
-            def execute(self, plugin, cfg, dt):
+            def execute(self, plugin: Any, cfg: Any, dt: Any) -> Any:
                 return plugin.generate_image(None, cfg)
 
         q = _queue.Queue()
@@ -565,8 +576,8 @@ class TestWorkerSessionLeaderCleanup:
         os.unlink(payload["image_path"])
 
     def test_cleanup_subprocess_killpgs_unconditionally_before_terminate(
-        self, monkeypatch
-    ):
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> Any:
         """JTN-S2 regression: cleanup must call ``killpg(SIGKILL)`` BEFORE
         the terminate/alive dance, not gated behind ``proc.is_alive()``.
 
@@ -582,12 +593,12 @@ class TestWorkerSessionLeaderCleanup:
         killpg_calls: list[tuple[int, int]] = []
         events: list[str] = []
 
-        def fake_getpgid(pid):
+        def fake_getpgid(pid: Any):
             # Returning a non-zero pgid distinct from getpgid(0) so the
-            # production code's ``pgid != os.getpgid(0)`` guard passes.
+            # production code's ``pgid != os.getpgid(0) -> Any -> Any`` guard passes.
             return 99999 if pid != 0 else 1
 
-        def fake_killpg(pgid, sig):
+        def fake_killpg(pgid: Any, sig: Any) -> None:
             killpg_calls.append((pgid, sig))
             events.append("killpg")
 
@@ -599,16 +610,16 @@ class TestWorkerSessionLeaderCleanup:
         class GracefulProc:
             pid = 12345
 
-            def terminate(self):
+            def terminate(self) -> None:
                 events.append("terminate")
 
-            def join(self, timeout=None):
+            def join(self, timeout: Any = None) -> None:
                 events.append("join")
 
-            def is_alive(self):
+            def is_alive(self) -> Any:
                 return False  # dies cleanly on SIGTERM
 
-            def kill(self):  # pragma: no cover  should not be reached
+            def kill(self) -> None:  # pragma: no cover  should not be reached
                 events.append("kill")
 
         proc = GracefulProc()
@@ -646,12 +657,14 @@ class TestSweepOrphanRenderTempfiles:
     sweep prevents indefinite accumulation on disk-backed ``/tmp`` setups.
     """
 
-    def _patch_tmpdir(self, monkeypatch, path):
+    def _patch_tmpdir(self, monkeypatch: pytest.MonkeyPatch, path: Any) -> None:
         # ``tempfile.gettempdir`` caches; clear that cache so each test
         # picks up the patched env-var ``TMPDIR``.
         monkeypatch.setattr("tempfile.tempdir", str(path))
 
-    def test_deletes_old_files_only(self, tmp_path, monkeypatch):
+    def test_deletes_old_files_only(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         from refresh_task.worker import sweep_orphan_render_tempfiles
 
         self._patch_tmpdir(monkeypatch, tmp_path)
@@ -675,14 +688,18 @@ class TestSweepOrphanRenderTempfiles:
         assert new.exists(), "in-flight render must not be touched"
         assert unrelated.exists(), "non-inkypi files must not be touched"
 
-    def test_returns_zero_when_directory_empty(self, tmp_path, monkeypatch):
+    def test_returns_zero_when_directory_empty(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         from refresh_task.worker import sweep_orphan_render_tempfiles
 
         self._patch_tmpdir(monkeypatch, tmp_path)
         deleted, freed = sweep_orphan_render_tempfiles()
         assert (deleted, freed) == (0, 0)
 
-    def test_unlink_failure_continues_sweep(self, tmp_path, monkeypatch):
+    def test_unlink_failure_continues_sweep(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> Any:
         from refresh_task.worker import sweep_orphan_render_tempfiles
 
         self._patch_tmpdir(monkeypatch, tmp_path)
@@ -696,7 +713,7 @@ class TestSweepOrphanRenderTempfiles:
         # still process `b`.
         real_unlink = os.unlink
 
-        def flaky_unlink(path, *args, **kwargs):
+        def flaky_unlink(path: Any, *args: Any, **kwargs: Any) -> Any:
             if path == str(a):
                 raise PermissionError("simulated")
             return real_unlink(path, *args, **kwargs)
@@ -714,11 +731,11 @@ class TestSweepOrphanRenderTempfiles:
 
 
 class TestRefreshTaskStop:
-    def _make_task(self, device_config_dev):
+    def _make_task(self, device_config_dev: Any) -> Any:
         dm = MagicMock()
         return RefreshTask(device_config_dev, dm)
 
-    def test_stop_rejects_pending_requests(self, device_config_dev):
+    def test_stop_rejects_pending_requests(self, device_config_dev: Any) -> None:
         task = self._make_task(device_config_dev)
         task.running = True
 
@@ -735,20 +752,20 @@ class TestRefreshTaskStop:
         assert isinstance(req1.exception, RuntimeError)
         assert isinstance(req2.exception, RuntimeError)
 
-    def test_stop_when_not_running(self, device_config_dev):
+    def test_stop_when_not_running(self, device_config_dev: Any) -> None:
         """stop() on an already-stopped task should not raise."""
         task = self._make_task(device_config_dev)
         task.running = False
         task.stop()  # should not raise
 
-    def test_stop_joins_thread(self, device_config_dev):
+    def test_stop_joins_thread(self, device_config_dev: Any) -> None:
         task = self._make_task(device_config_dev)
         task.running = True
 
         # Create a thread that exits immediately
         done_event = threading.Event()
 
-        def _quick():
+        def _quick() -> None:
             done_event.wait(timeout=5)
 
         task.thread = threading.Thread(target=_quick, daemon=True)
@@ -765,19 +782,19 @@ class TestRefreshTaskStop:
 
 
 class TestExecuteWithPolicyErrors:
-    def _make_task(self, device_config_dev):
+    def _make_task(self, device_config_dev: Any) -> Any:
         dm = MagicMock()
         task = RefreshTask(device_config_dev, dm)
         task.running = True
         return task
 
     @staticmethod
-    def _mock_action():
+    def _mock_action() -> Any:
         action = MagicMock()
         action.get_plugin_id.return_value = "test_plugin"
         return action
 
-    def test_empty_queue_zero_exit_raises(self, device_config_dev):
+    def test_empty_queue_zero_exit_raises(self, device_config_dev: Any) -> None:
         """Process exits cleanly but puts nothing in queue."""
         task = self._make_task(device_config_dev)
 
@@ -806,7 +823,7 @@ class TestExecuteWithPolicyErrors:
             except RuntimeError as e:
                 assert "without returning a result" in str(e)
 
-    def test_empty_queue_nonzero_exit_raises(self, device_config_dev):
+    def test_empty_queue_nonzero_exit_raises(self, device_config_dev: Any) -> None:
         """Process crashes (exit code != 0) and puts nothing in queue."""
         task = self._make_task(device_config_dev)
 
@@ -835,7 +852,9 @@ class TestExecuteWithPolicyErrors:
             except RuntimeError as e:
                 assert "exited with code -9" in str(e)
 
-    def test_error_payload_raises_remote_exception(self, device_config_dev):
+    def test_error_payload_raises_remote_exception(
+        self, device_config_dev: Any
+    ) -> None:
         """Process returns an error payload — should reconstruct the exception."""
         task = self._make_task(device_config_dev)
 
@@ -868,7 +887,7 @@ class TestExecuteWithPolicyErrors:
             except ValueError as e:
                 assert "bad input" in str(e)
 
-    def test_timeout_terminates_process(self, device_config_dev):
+    def test_timeout_terminates_process(self, device_config_dev: Any) -> None:
         """Process hangs past timeout — should terminate and raise TimeoutError."""
         task = self._make_task(device_config_dev)
 

@@ -1,8 +1,14 @@
 import io
 import json
+from typing import Any
+
+import pytest
+from flask.testing import FlaskClient
 
 
-def test_export_excludes_api_keys_by_default(client, device_config_dev, monkeypatch):
+def test_export_excludes_api_keys_by_default(
+    client: FlaskClient, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Bug 1: Export should NOT include API keys unless explicitly requested."""
     device_config_dev.set_env_key("OPEN_AI_SECRET", "sk-test")
     resp = client.get("/settings/export")
@@ -13,7 +19,9 @@ def test_export_excludes_api_keys_by_default(client, device_config_dev, monkeypa
     assert "env_keys" not in payload or not payload.get("env_keys")
 
 
-def test_export_includes_api_keys_when_opted_in(client, device_config_dev, monkeypatch):
+def test_export_includes_api_keys_when_opted_in(
+    client: FlaskClient, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     # Arrange env keys
     device_config_dev.set_env_key("OPEN_AI_SECRET", "sk-test")
     device_config_dev.set_env_key("OPEN_WEATHER_MAP_SECRET", "owm")
@@ -30,7 +38,7 @@ def test_export_includes_api_keys_when_opted_in(client, device_config_dev, monke
     assert env_keys.get("OPEN_WEATHER_MAP_SECRET") == "owm"
 
 
-def test_export_excludes_api_keys_when_opted_out(client):
+def test_export_excludes_api_keys_when_opted_out(client: FlaskClient) -> None:
     resp = client.get("/settings/export?include_keys=0")
     assert resp.status_code == 200
     data = resp.get_json()
@@ -39,7 +47,9 @@ def test_export_excludes_api_keys_when_opted_out(client):
     assert "env_keys" not in payload or not payload["env_keys"]
 
 
-def test_export_get_ignores_include_keys_query(client, device_config_dev):
+def test_export_get_ignores_include_keys_query(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     device_config_dev.set_env_key("OPEN_AI_SECRET", "sk-test")
     resp = client.get("/settings/export?include_keys=1")
     assert resp.status_code == 200
@@ -49,7 +59,9 @@ def test_export_get_ignores_include_keys_query(client, device_config_dev):
     assert "env_keys" not in payload or not payload["env_keys"]
 
 
-def test_import_round_trip_updates_config_and_keys(client, device_config_dev):
+def test_import_round_trip_updates_config_and_keys(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     # Build an export-like payload
     cfg = device_config_dev.get_config().copy()
     cfg["name"] = "RoundTrip"
@@ -73,7 +85,9 @@ def test_import_round_trip_updates_config_and_keys(client, device_config_dev):
     assert device_config_dev.load_env_key("UNSPLASH_ACCESS_KEY") == "u"
 
 
-def test_import_ignores_unknown_config_and_env_keys(client, device_config_dev):
+def test_import_ignores_unknown_config_and_env_keys(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     """Bug 6: import_settings should filter unknown config and env keys."""
     payload = {
         "config": {

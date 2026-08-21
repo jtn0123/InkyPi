@@ -27,6 +27,7 @@ one-liner that matches the CI environment).
 import os
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 from unittest.mock import patch
 
 import pytest
@@ -50,7 +51,7 @@ _FIXTURES_DIR = Path(__file__).parent / "fixtures"
 
 
 @pytest.fixture()
-def fixture_png(tmp_path):
+def fixture_png(tmp_path: Path) -> Any:
     """Create a deterministic 200x200 red/blue test PNG and return its path."""
     img = Image.new("RGB", (200, 200), (255, 0, 0))
     # Add a blue quadrant so the image has visible structure
@@ -68,14 +69,14 @@ def fixture_png(tmp_path):
 
 
 @pytest.fixture()
-def year_progress_plugin_config():
+def year_progress_plugin_config() -> Any:
     return {"id": "year_progress", "class": "YearProgress", "name": "Year Progress"}
 
 
 @_requires_browser
 def test_snapshot_year_progress_mid_year(
-    year_progress_plugin_config, device_config_dev
-):
+    year_progress_plugin_config: Any, device_config_dev: Any
+) -> None:
     """Snapshot: year_progress at 2025-07-01 12:00 UTC (horizontal)."""
     from plugins.year_progress.year_progress import YearProgress
 
@@ -93,8 +94,8 @@ def test_snapshot_year_progress_mid_year(
 
 @_requires_browser
 def test_snapshot_year_progress_start_of_year(
-    year_progress_plugin_config, device_config_dev
-):
+    year_progress_plugin_config: Any, device_config_dev: Any
+) -> None:
     """Snapshot: year_progress at 2025-01-02 12:00 UTC (horizontal)."""
     from plugins.year_progress.year_progress import YearProgress
 
@@ -116,12 +117,14 @@ def test_snapshot_year_progress_start_of_year(
 
 
 @pytest.fixture()
-def countdown_plugin_config():
+def countdown_plugin_config() -> Any:
     return {"id": "countdown", "class": "Countdown", "name": "Countdown"}
 
 
 @_requires_browser
-def test_snapshot_countdown_future(countdown_plugin_config, device_config_dev):
+def test_snapshot_countdown_future(
+    countdown_plugin_config: Any, device_config_dev: Any
+) -> None:
     """Snapshot: countdown to 2025-12-25 from 2025-06-01 (horizontal)."""
     from plugins.countdown.countdown import Countdown
 
@@ -144,11 +147,13 @@ def test_snapshot_countdown_future(countdown_plugin_config, device_config_dev):
 
 
 @pytest.fixture()
-def clock_plugin_config():
+def clock_plugin_config() -> Any:
     return {"id": "clock", "class": "Clock", "name": "Clock"}
 
 
-def test_snapshot_clock_digital(clock_plugin_config, device_config_dev):
+def test_snapshot_clock_digital(
+    clock_plugin_config: Any, device_config_dev: Any
+) -> None:
     """Snapshot: clock Digital face at 14:30 UTC."""
     from plugins.clock.clock import Clock
 
@@ -169,7 +174,7 @@ def test_snapshot_clock_digital(clock_plugin_config, device_config_dev):
     assert_image_snapshot(result, "clock", "digital_1430")
 
 
-def test_snapshot_clock_word(clock_plugin_config, device_config_dev):
+def test_snapshot_clock_word(clock_plugin_config: Any, device_config_dev: Any) -> None:
     """Snapshot: clock Word face at 10:15 UTC."""
     from plugins.clock.clock import Clock
 
@@ -196,12 +201,14 @@ def test_snapshot_clock_word(clock_plugin_config, device_config_dev):
 
 
 @pytest.fixture()
-def todo_list_plugin_config():
+def todo_list_plugin_config() -> Any:
     return {"id": "todo_list", "class": "TodoList", "name": "Todo List"}
 
 
 @_requires_browser
-def test_snapshot_todo_list(todo_list_plugin_config, device_config_dev):
+def test_snapshot_todo_list(
+    todo_list_plugin_config: Any, device_config_dev: Any
+) -> None:
     """Snapshot: todo_list with two lists, disc style."""
     from plugins.todo_list.todo_list import TodoList
 
@@ -227,13 +234,13 @@ def test_snapshot_todo_list(todo_list_plugin_config, device_config_dev):
 
 
 @pytest.fixture()
-def image_upload_plugin_config():
+def image_upload_plugin_config() -> Any:
     return {"id": "image_upload", "class": "ImageUpload", "name": "Image Upload"}
 
 
 def test_snapshot_image_upload_pad_color(
-    image_upload_plugin_config, device_config_dev, fixture_png
-):
+    image_upload_plugin_config: Any, device_config_dev: Any, fixture_png: Any
+) -> None:
     """Snapshot: image_upload with color padding on a fixture PNG."""
     from plugins.image_upload.image_upload import ImageUpload
 
@@ -264,13 +271,16 @@ def test_snapshot_image_upload_pad_color(
 
 
 @pytest.fixture()
-def image_folder_plugin_config():
+def image_folder_plugin_config() -> Any:
     return {"id": "image_folder", "class": "ImageFolder", "name": "Image Folder"}
 
 
 def test_snapshot_image_folder_fit(
-    image_folder_plugin_config, device_config_dev, fixture_png, tmp_path
-):
+    image_folder_plugin_config: Any,
+    device_config_dev: Any,
+    fixture_png: Any,
+    tmp_path: Path,
+) -> None:
     """Snapshot: image_folder with crop-to-fit on a fixture PNG."""
     from plugins.image_folder.image_folder import ImageFolder
 

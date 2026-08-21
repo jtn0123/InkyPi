@@ -3,7 +3,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -32,7 +34,7 @@ _RERUNS = 1
 _RERUNS_DELAY_SECONDS = 1
 
 
-def pytest_collection_modifyitems(items):
+def pytest_collection_modifyitems(items: Any) -> None:
     """Apply ``@pytest.mark.flaky(reruns=1, ...)`` to integration tests only.
 
     Gating on the resolved file path (not the pytest ``nodeid``) guarantees
@@ -97,7 +99,7 @@ _CLIENT_LOG_META_INIT_SCRIPT = """
 
 
 @pytest.fixture(autouse=True)
-def client_log_capture(monkeypatch):
+def client_log_capture(monkeypatch: pytest.MonkeyPatch) -> Iterator[Any]:
     """Enable /api/client-log capture for the duration of the test.
 
     On teardown, assert the captured list is empty — any POST during the
@@ -133,7 +135,7 @@ def client_log_capture(monkeypatch):
 
 
 @pytest.fixture()
-def browser_page():
+def browser_page() -> Iterator[Any]:
     """Desktop-sized Playwright page (1280x900). Closes browser on teardown."""
     from playwright.sync_api import sync_playwright
 
@@ -146,7 +148,7 @@ def browser_page():
 
 
 @pytest.fixture()
-def mobile_page():
+def mobile_page() -> Iterator[Any]:
     """Mobile-sized Playwright page (360x800). Closes browser on teardown."""
     from playwright.sync_api import sync_playwright
 

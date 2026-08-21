@@ -1,17 +1,20 @@
 # pyright: reportMissingImports=false
 """Tests for plugins/comic/comic.py — additional coverage for error paths."""
 
+from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
 
 
 @pytest.fixture()
-def plugin_config():
+def plugin_config() -> Any:
     return {"id": "comic", "class": "Comic", "name": "Comic"}
 
 
-def test_comic_http_error(monkeypatch, plugin_config, device_config_dev):
+def test_comic_http_error(
+    monkeypatch: pytest.MonkeyPatch, plugin_config: Any, device_config_dev: Any
+) -> None:
     from plugins.comic.comic import Comic
 
     monkeypatch.setattr(
@@ -28,7 +31,9 @@ def test_comic_http_error(monkeypatch, plugin_config, device_config_dev):
         p.generate_image({"comic": "XKCD"}, device_config_dev)
 
 
-def test_comic_invalid_image(monkeypatch, plugin_config, device_config_dev):
+def test_comic_invalid_image(
+    monkeypatch: pytest.MonkeyPatch, plugin_config: Any, device_config_dev: Any
+) -> None:
     from plugins.comic.comic import Comic
 
     monkeypatch.setattr(

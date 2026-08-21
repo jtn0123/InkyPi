@@ -5,6 +5,8 @@ Tests for image utilities and display manager.
 import io
 import os
 import threading
+from pathlib import Path
+from typing import Any
 
 import pytest
 from PIL import Image
@@ -26,12 +28,12 @@ from utils.image_utils import (
 # ---------------------------------------------------------------------------
 
 
-def make_image(width=800, height=480, color="red"):
+def make_image(width: Any = 800, height: Any = 480, color: Any = "red") -> Any:
     """Return a simple RGB PIL Image."""
     return Image.new("RGB", (width, height), color)
 
 
-def image_to_png_bytes(img):
+def image_to_png_bytes(img: Any) -> Any:
     """Serialize a PIL Image to PNG bytes."""
     buf = io.BytesIO()
     img.save(buf, format="PNG")
@@ -44,29 +46,29 @@ def image_to_png_bytes(img):
 
 
 class TestChangeOrientation:
-    def test_horizontal_keeps_landscape_size(self):
+    def test_horizontal_keeps_landscape_size(self) -> None:
         img = make_image(800, 480)
         result = change_orientation(img, "horizontal")
         assert result.size == (800, 480)
 
-    def test_vertical_rotates_90(self):
+    def test_vertical_rotates_90(self) -> None:
         img = make_image(800, 480)
         result = change_orientation(img, "vertical")
         assert result.size == (480, 800)
 
-    def test_horizontal_inverted_stays_same_size(self):
+    def test_horizontal_inverted_stays_same_size(self) -> None:
         img = make_image(800, 480)
         result = change_orientation(img, "horizontal", inverted=True)
         # 180-degree rotation preserves dimensions
         assert result.size == (800, 480)
 
-    def test_vertical_inverted_is_270_degrees(self):
+    def test_vertical_inverted_is_270_degrees(self) -> None:
         img = make_image(800, 480)
         result = change_orientation(img, "vertical", inverted=True)
         # 270 degrees still swaps width/height
         assert result.size == (480, 800)
 
-    def test_invalid_orientation_raises_value_error(self):
+    def test_invalid_orientation_raises_value_error(self) -> None:
         img = make_image(800, 480)
         with pytest.raises(ValueError):
             change_orientation(img, "diagonal")
@@ -78,27 +80,27 @@ class TestChangeOrientation:
 
 
 class TestResizeImage:
-    def test_wider_image_resized_to_target(self):
+    def test_wider_image_resized_to_target(self) -> None:
         img = make_image(1600, 800)
         result = resize_image(img, (800, 480))
         assert result.size == (800, 480)
 
-    def test_taller_image_resized_to_target(self):
+    def test_taller_image_resized_to_target(self) -> None:
         img = make_image(400, 800)
         result = resize_image(img, (800, 480))
         assert result.size == (800, 480)
 
-    def test_exact_size_no_change(self):
+    def test_exact_size_no_change(self) -> None:
         img = make_image(800, 480)
         result = resize_image(img, (800, 480))
         assert result.size == (800, 480)
 
-    def test_keep_width_setting(self):
+    def test_keep_width_setting(self) -> None:
         img = make_image(800, 480)
         result = resize_image(img, (800, 480), image_settings=["keep-width"])
         assert result.size == (800, 480)
 
-    def test_zero_height_raises_value_error(self):
+    def test_zero_height_raises_value_error(self) -> None:
         img = make_image(800, 480)
         with pytest.raises(ValueError):
             resize_image(img, (800, 0))
@@ -110,17 +112,17 @@ class TestResizeImage:
 
 
 class TestApplyImageEnhancement:
-    def test_no_settings_returns_image(self):
+    def test_no_settings_returns_image(self) -> None:
         img = make_image()
         result = apply_image_enhancement(img)
         assert isinstance(result, Image.Image)
 
-    def test_empty_dict_returns_image(self):
+    def test_empty_dict_returns_image(self) -> None:
         img = make_image()
         result = apply_image_enhancement(img, image_settings={})
         assert isinstance(result, Image.Image)
 
-    def test_custom_settings_returns_image(self):
+    def test_custom_settings_returns_image(self) -> None:
         img = make_image()
         settings = {
             "brightness": 1.5,
@@ -131,7 +133,7 @@ class TestApplyImageEnhancement:
         result = apply_image_enhancement(img, image_settings=settings)
         assert isinstance(result, Image.Image)
 
-    def test_none_settings_uses_defaults(self):
+    def test_none_settings_uses_defaults(self) -> None:
         img = make_image()
         result = apply_image_enhancement(img, image_settings=None)
         assert isinstance(result, Image.Image)
@@ -143,17 +145,17 @@ class TestApplyImageEnhancement:
 
 
 class TestComputeImageHash:
-    def test_same_image_same_hash(self):
+    def test_same_image_same_hash(self) -> None:
         img1 = make_image(800, 480, "red")
         img2 = make_image(800, 480, "red")
         assert compute_image_hash(img1) == compute_image_hash(img2)
 
-    def test_different_images_different_hash(self):
+    def test_different_images_different_hash(self) -> None:
         img1 = make_image(800, 480, "red")
         img2 = make_image(800, 480, "blue")
         assert compute_image_hash(img1) != compute_image_hash(img2)
 
-    def test_none_raises_value_error(self):
+    def test_none_raises_value_error(self) -> None:
         with pytest.raises(ValueError):
             compute_image_hash(None)
 
@@ -164,12 +166,12 @@ class TestComputeImageHash:
 
 
 class TestLoadImageFromBytes:
-    def test_valid_bytes_returns_image(self):
+    def test_valid_bytes_returns_image(self) -> None:
         png_bytes = image_to_png_bytes(make_image())
         result = load_image_from_bytes(png_bytes)
         assert isinstance(result, Image.Image)
 
-    def test_invalid_bytes_returns_none(self):
+    def test_invalid_bytes_returns_none(self) -> None:
         result = load_image_from_bytes(b"not an image")
         assert result is None
 
@@ -180,14 +182,14 @@ class TestLoadImageFromBytes:
 
 
 class TestLoadImageFromPath:
-    def test_valid_path_returns_image(self, tmp_path):
+    def test_valid_path_returns_image(self, tmp_path: Path) -> None:
         img = make_image()
         path = str(tmp_path / "test.png")
         img.save(path)
         result = load_image_from_path(path)
         assert isinstance(result, Image.Image)
 
-    def test_nonexistent_path_returns_none(self):
+    def test_nonexistent_path_returns_none(self) -> None:
         result = load_image_from_path("/nonexistent/path/image.png")
         assert result is None
 
@@ -198,11 +200,11 @@ class TestLoadImageFromPath:
 
 
 class TestProcessImageFromBytes:
-    def test_processor_receives_image_and_result_returned(self):
+    def test_processor_receives_image_and_result_returned(self) -> Any:
         png_bytes = image_to_png_bytes(make_image())
         received = []
 
-        def processor(img):
+        def processor(img: Any) -> Any:
             received.append(img)
             return "processed"
 
@@ -211,8 +213,8 @@ class TestProcessImageFromBytes:
         assert len(received) == 1
         assert isinstance(received[0], Image.Image)
 
-    def test_bad_bytes_returns_none(self):
-        def processor(img):
+    def test_bad_bytes_returns_none(self) -> Any:
+        def processor(img: Any) -> Any:
             return "should not be called"
 
         result = process_image_from_bytes(b"garbage", processor)
@@ -225,7 +227,7 @@ class TestProcessImageFromBytes:
 
 
 class TestPadImageBlur:
-    def test_small_image_padded_to_target_dimensions(self):
+    def test_small_image_padded_to_target_dimensions(self) -> None:
         small = make_image(400, 240, "green")
         dimensions = (800, 480)
         result = pad_image_blur(small, dimensions)
@@ -238,14 +240,16 @@ class TestPadImageBlur:
 
 
 class TestDisplayManager:
-    def test_hash_lock_exists_and_is_lock(self, device_config_dev, tmp_path):
+    def test_hash_lock_exists_and_is_lock(
+        self, device_config_dev: Any, tmp_path: Path
+    ) -> None:
         dm = DisplayManager(device_config_dev)
         assert hasattr(dm, "_hash_lock")
         assert isinstance(dm._hash_lock, type(threading.Lock()))
 
     def test_history_count_estimate_resets_after_recount_interval(
-        self, device_config_dev, tmp_path
-    ):
+        self, device_config_dev: Any, tmp_path: Path
+    ) -> None:
         dm = DisplayManager(device_config_dev)
         recount_interval = dm._RECOUNT_INTERVAL
         # Seed the estimate so the fast-path is taken
@@ -258,7 +262,9 @@ class TestDisplayManager:
                 dm._history_increment_count = 0
         assert dm._history_increment_count == 0
 
-    def test_display_image_skip_duplicate(self, device_config_dev, tmp_path):
+    def test_display_image_skip_duplicate(
+        self, device_config_dev: Any, tmp_path: Path
+    ) -> None:
         dm = DisplayManager(device_config_dev)
         img = make_image(800, 480, "red")
 
@@ -268,7 +274,9 @@ class TestDisplayManager:
         # Second call with the same image should skip display
         assert result2.get("display_ms") == 0
 
-    def test_prune_history_removes_excess(self, device_config_dev, tmp_path):
+    def test_prune_history_removes_excess(
+        self, device_config_dev: Any, tmp_path: Path
+    ) -> None:
         dm = DisplayManager(device_config_dev)
         history_dir = device_config_dev.history_image_dir
 

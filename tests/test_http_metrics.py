@@ -8,6 +8,10 @@ excluded, and that status codes (including 4xx/5xx) are labelled correctly.
 
 from __future__ import annotations
 
+from typing import Any
+
+from flask.testing import FlaskClient
+
 import utils.metrics as m
 
 # ---------------------------------------------------------------------------
@@ -16,7 +20,7 @@ import utils.metrics as m
 
 
 def _histogram_count(
-    histogram_metric, method: str, endpoint: str, status_code: str
+    histogram_metric: Any, method: str, endpoint: str, status_code: str
 ) -> float:
     """Return the observation count (_count sample) for a histogram label-set."""
     child = histogram_metric.labels(
@@ -29,7 +33,7 @@ def _histogram_count(
 
 
 def _counter_value(
-    counter_metric, method: str, endpoint: str, status_code: str
+    counter_metric: Any, method: str, endpoint: str, status_code: str
 ) -> float:
     """Return the current value of a labelled counter."""
     return counter_metric.labels(
@@ -42,7 +46,7 @@ def _counter_value(
 # ---------------------------------------------------------------------------
 
 
-def test_histogram_count_increments_on_request(client):
+def test_histogram_count_increments_on_request(client: FlaskClient) -> None:
     """A normal GET request must increment the histogram observation count."""
     before = _histogram_count(m.http_request_duration_seconds, "GET", "/healthz", "200")
     client.get("/healthz")
@@ -50,7 +54,7 @@ def test_histogram_count_increments_on_request(client):
     assert after == before + 1
 
 
-def test_total_counter_increments_on_request(client):
+def test_total_counter_increments_on_request(client: FlaskClient) -> None:
     """A normal GET request must increment the requests total counter."""
     before = _counter_value(m.http_requests_total, "GET", "/healthz", "200")
     client.get("/healthz")
@@ -58,7 +62,7 @@ def test_total_counter_increments_on_request(client):
     assert after == before + 1
 
 
-def test_metrics_reflected_in_prometheus_output(client):
+def test_metrics_reflected_in_prometheus_output(client: FlaskClient) -> None:
     """After a /healthz hit the /metrics output must contain the histogram family."""
     client.get("/healthz")
     resp = client.get("/metrics")
@@ -73,7 +77,7 @@ def test_metrics_reflected_in_prometheus_output(client):
 # ---------------------------------------------------------------------------
 
 
-def test_scraping_metrics_endpoint_is_not_recorded(client):
+def test_scraping_metrics_endpoint_is_not_recorded(client: FlaskClient) -> None:
     """/metrics requests must not appear in the histogram."""
     before = _histogram_count(m.http_request_duration_seconds, "GET", "/metrics", "200")
     client.get("/metrics")
@@ -81,7 +85,7 @@ def test_scraping_metrics_endpoint_is_not_recorded(client):
     assert after == before, "/metrics itself must not be measured"
 
 
-def test_scraping_metrics_counter_not_recorded(client):
+def test_scraping_metrics_counter_not_recorded(client: FlaskClient) -> None:
     """/metrics requests must not appear in the total counter."""
     before = _counter_value(m.http_requests_total, "GET", "/metrics", "200")
     client.get("/metrics")
@@ -94,7 +98,7 @@ def test_scraping_metrics_counter_not_recorded(client):
 # ---------------------------------------------------------------------------
 
 
-def test_404_is_recorded_with_correct_status(client):
+def test_404_is_recorded_with_correct_status(client: FlaskClient) -> None:
     """A 404 response must be recorded with status_code='404'."""
     before = _histogram_count(
         m.http_request_duration_seconds, "GET", "<unknown>", "404"
@@ -104,7 +108,7 @@ def test_404_is_recorded_with_correct_status(client):
     assert after == before + 1
 
 
-def test_404_counter_is_recorded(client):
+def test_404_counter_is_recorded(client: FlaskClient) -> None:
     """The total counter must also capture 404s."""
     before = _counter_value(m.http_requests_total, "GET", "<unknown>", "404")
     client.get("/this-path-does-not-exist-xyz")
@@ -117,7 +121,7 @@ def test_404_counter_is_recorded(client):
 # ---------------------------------------------------------------------------
 
 
-def test_endpoint_label_uses_url_rule_not_raw_path(client):
+def test_endpoint_label_uses_url_rule_not_raw_path(client: FlaskClient) -> None:
     """The endpoint label must be the Flask url_rule, not the raw path."""
     # /healthz is registered as a route rule — the label must be '/healthz',
     # not a raw path that might include dynamic segments.
@@ -131,7 +135,7 @@ def test_endpoint_label_uses_url_rule_not_raw_path(client):
     assert after_rule == before_rule + 1
 
 
-def test_multiple_requests_accumulate_count(client):
+def test_multiple_requests_accumulate_count(client: FlaskClient) -> None:
     """Multiple requests to the same endpoint must accumulate in the histogram."""
     before = _histogram_count(m.http_request_duration_seconds, "GET", "/healthz", "200")
     for _ in range(5):

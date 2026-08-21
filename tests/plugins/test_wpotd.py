@@ -1,27 +1,32 @@
 from io import BytesIO
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
 from PIL import Image
 
 
-def _png_bytes(size=(10, 6), color="white"):
+def _png_bytes(size: Any = (10, 6), color: Any = "white") -> Any:
     buf = BytesIO()
     Image.new("RGB", size, color).save(buf, format="PNG")
     return buf.getvalue()
 
 
-def test_wpotd_happy_path(monkeypatch, device_config_dev):
+def test_wpotd_happy_path(
+    monkeypatch: pytest.MonkeyPatch, device_config_dev: Any
+) -> Any:
     from plugins.wpotd.wpotd import Wpotd
 
-    def fake_session_get(url, params=None, headers=None, timeout=None):
+    def fake_session_get(
+        url: Any, params: Any = None, headers: Any = None, timeout: Any = None
+    ) -> Any:
         class R:
             status_code = 200
 
-            def raise_for_status(self):
+            def raise_for_status(self) -> Any:
                 return None
 
-            def json(self_inner):
+            def json(self_inner: Any) -> Any:
                 if params and params.get("prop") == "images":
                     return {
                         "query": {
@@ -62,19 +67,23 @@ def test_wpotd_happy_path(monkeypatch, device_config_dev):
     assert img.size[0] > 0
 
 
-def test_wpotd_bad_status_raises(monkeypatch, device_config_dev):
+def test_wpotd_bad_status_raises(
+    monkeypatch: pytest.MonkeyPatch, device_config_dev: Any
+) -> Any:
     from plugins.wpotd.wpotd import Wpotd
 
     class BadResp:
         status_code = 500
 
-        def raise_for_status(self):
+        def raise_for_status(self) -> None:
             raise RuntimeError("boom")
 
-        def json(self):
+        def json(self) -> Any:
             return {}
 
-    def fake_session_get(url, params=None, headers=None, timeout=None):
+    def fake_session_get(
+        url: Any, params: Any = None, headers: Any = None, timeout: Any = None
+    ) -> Any:
         return BadResp()
 
     mock_session = type("S", (), {"get": staticmethod(fake_session_get)})()
@@ -87,17 +96,21 @@ def test_wpotd_bad_status_raises(monkeypatch, device_config_dev):
         pass
 
 
-def test_wpotd_missing_fields_raises(monkeypatch, device_config_dev):
+def test_wpotd_missing_fields_raises(
+    monkeypatch: pytest.MonkeyPatch, device_config_dev: Any
+) -> Any:
     from plugins.wpotd.wpotd import Wpotd
 
-    def fake_session_get(url, params=None, headers=None, timeout=None):
+    def fake_session_get(
+        url: Any, params: Any = None, headers: Any = None, timeout: Any = None
+    ) -> Any:
         class R:
             status_code = 200
 
-            def raise_for_status(self):
+            def raise_for_status(self) -> Any:
                 return None
 
-            def json(self_inner):
+            def json(self_inner: Any) -> Any:
                 # Missing images array content
                 return {"query": {"pages": [{"images": []}]}}
 
@@ -113,7 +126,9 @@ def test_wpotd_missing_fields_raises(monkeypatch, device_config_dev):
         pass
 
 
-def test_wpotd_randomize_date(monkeypatch, device_config_dev):
+def test_wpotd_randomize_date(
+    monkeypatch: pytest.MonkeyPatch, device_config_dev: Any
+) -> None:
     """Test WPOTD plugin with random date generation."""
     from plugins.wpotd.wpotd import Wpotd
 
@@ -138,7 +153,9 @@ def test_wpotd_randomize_date(monkeypatch, device_config_dev):
         assert result is not None
 
 
-def test_wpotd_custom_date(monkeypatch, device_config_dev):
+def test_wpotd_custom_date(
+    monkeypatch: pytest.MonkeyPatch, device_config_dev: Any
+) -> None:
     """Test WPOTD plugin with custom date."""
     from plugins.wpotd.wpotd import Wpotd
 
@@ -164,7 +181,9 @@ def test_wpotd_custom_date(monkeypatch, device_config_dev):
         assert result is not None
 
 
-def test_wpotd_svg_format_detection(device_config_dev, monkeypatch):
+def test_wpotd_svg_format_detection(
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Test WPOTD plugin SVG format handling."""
     from plugins.wpotd.wpotd import Wpotd
 
@@ -175,7 +194,9 @@ def test_wpotd_svg_format_detection(device_config_dev, monkeypatch):
         p._download_image("http://example.com/image.svg")
 
 
-def test_wpotd_shrink_to_fit_enabled(device_config_dev, monkeypatch):
+def test_wpotd_shrink_to_fit_enabled(
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Test WPOTD plugin with shrink to fit enabled."""
     from plugins.wpotd.wpotd import Wpotd
 
@@ -209,7 +230,9 @@ def test_wpotd_shrink_to_fit_enabled(device_config_dev, monkeypatch):
         assert result is not None
 
 
-def test_wpotd_shrink_to_fit_disabled(device_config_dev, monkeypatch):
+def test_wpotd_shrink_to_fit_disabled(
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Test WPOTD plugin with shrink to fit disabled."""
     from plugins.wpotd.wpotd import Wpotd
 
@@ -236,7 +259,7 @@ def test_wpotd_shrink_to_fit_disabled(device_config_dev, monkeypatch):
         assert result is original_image
 
 
-def test_determine_date_today():
+def test_determine_date_today() -> None:
     """Test _determine_date with no special settings (uses today).
 
     The plugin resolves "today" via ``datetime.now(tz=UTC).date()``; the test
@@ -253,7 +276,7 @@ def test_determine_date_today():
     assert result == datetime.now(tz=UTC).date()
 
 
-def test_determine_date_random(monkeypatch):
+def test_determine_date_random(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test _determine_date with random date enabled."""
     from datetime import datetime, timedelta
 
@@ -271,7 +294,7 @@ def test_determine_date_random(monkeypatch):
         assert result == expected_date
 
 
-def test_determine_date_custom():
+def test_determine_date_custom() -> None:
     """Test _determine_date with custom date."""
     from plugins.wpotd.wpotd import Wpotd
 
@@ -281,7 +304,7 @@ def test_determine_date_custom():
     assert str(result) == "2023-12-25"
 
 
-def test_download_image_success():
+def test_download_image_success() -> None:
     """Test _download_image with successful download."""
     from plugins.wpotd.wpotd import Wpotd
 
@@ -303,7 +326,7 @@ def test_download_image_success():
     )
 
 
-def test_download_image_network_error():
+def test_download_image_network_error() -> None:
     """Test _download_image with network error."""
     from plugins.wpotd.wpotd import Wpotd
 
@@ -314,7 +337,7 @@ def test_download_image_network_error():
             p._download_image("http://example.com/image.png")
 
 
-def test_download_image_invalid_format():
+def test_download_image_invalid_format() -> None:
     """Test _download_image with invalid image format."""
     from plugins.wpotd.wpotd import Wpotd
 
@@ -325,7 +348,7 @@ def test_download_image_invalid_format():
             p._download_image("http://example.com/image.png")
 
 
-def test_fetch_image_src_success():
+def test_fetch_image_src_success() -> None:
     """Test _fetch_image_src with successful response."""
     from plugins.wpotd.wpotd import Wpotd
 
@@ -347,7 +370,7 @@ def test_fetch_image_src_success():
         mock_make_request.assert_called_once()
 
 
-def test_fetch_image_src_missing_url():
+def test_fetch_image_src_missing_url() -> None:
     """Test _fetch_image_src with missing URL in response."""
     from plugins.wpotd.wpotd import Wpotd
 
@@ -364,7 +387,7 @@ def test_fetch_image_src_missing_url():
             p._fetch_image_src("File:Example.png")
 
 
-def test_fetch_image_src_api_error():
+def test_fetch_image_src_api_error() -> None:
     """Test _fetch_image_src with API error."""
     from plugins.wpotd.wpotd import Wpotd
 
@@ -378,7 +401,7 @@ def test_fetch_image_src_api_error():
             p._fetch_image_src("File:Example.png")
 
 
-def test_shrink_to_fit_no_resize_needed():
+def test_shrink_to_fit_no_resize_needed() -> None:
     """Test _shrink_to_fit when image is already within bounds."""
     from plugins.wpotd.wpotd import Wpotd
 
@@ -393,7 +416,7 @@ def test_shrink_to_fit_no_resize_needed():
     assert result is small_image
 
 
-def test_shrink_to_fit_landscape_resize():
+def test_shrink_to_fit_landscape_resize() -> None:
     """Test _shrink_to_fit with landscape image that needs resizing."""
     from plugins.wpotd.wpotd import Wpotd
 
@@ -409,7 +432,7 @@ def test_shrink_to_fit_landscape_resize():
     assert result.size[1] == 600  # Target height
 
 
-def test_shrink_to_fit_portrait_resize():
+def test_shrink_to_fit_portrait_resize() -> None:
     """Test _shrink_to_fit with portrait image that needs resizing."""
     from plugins.wpotd.wpotd import Wpotd
 
@@ -425,7 +448,7 @@ def test_shrink_to_fit_portrait_resize():
     assert result.size[1] == 600  # Target height
 
 
-def test_wpotd_generate_settings_template():
+def test_wpotd_generate_settings_template() -> None:
     """Test WPOTD plugin settings template generation."""
     from plugins.wpotd.wpotd import Wpotd
 
@@ -436,7 +459,7 @@ def test_wpotd_generate_settings_template():
     assert template["style_settings"] is False
 
 
-def test_make_request_success():
+def test_make_request_success() -> None:
     """Test _make_request with successful API call."""
     from plugins.wpotd.wpotd import Wpotd
 
@@ -458,7 +481,7 @@ def test_make_request_success():
         mock_get.assert_called_once()
 
 
-def test_make_request_api_error():
+def test_make_request_api_error() -> None:
     """Test _make_request with API error."""
     from plugins.wpotd.wpotd import Wpotd
 
@@ -473,7 +496,7 @@ def test_make_request_api_error():
             p._make_request({"action": "query"})
 
 
-def test_fetch_potd_api_error():
+def test_fetch_potd_api_error() -> None:
     """Test _fetch_potd with API error."""
     from datetime import UTC, datetime
 
@@ -489,7 +512,7 @@ def test_fetch_potd_api_error():
             p._fetch_potd(datetime.now(UTC).date())
 
 
-def test_fetch_potd_missing_images():
+def test_fetch_potd_missing_images() -> None:
     """Test _fetch_potd with missing images in response."""
     from datetime import UTC, datetime
 

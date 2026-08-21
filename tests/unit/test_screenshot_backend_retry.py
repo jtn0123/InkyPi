@@ -15,6 +15,7 @@ bare ``None`` return would bubble up as.
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -48,8 +49,8 @@ class _AttemptRecorder:
     exercise. It is covered directly in the screenshot render-wait tests.
     """
 
-    def __init__(self, outcomes):
-        # outcomes is a list of (image, transient) tuples returned in order.
+    def __init__(self, outcomes: Any):
+        # outcomes is a list of (image, transient) -> None -> None tuples returned in order.
         self._outcomes = list(outcomes)
         self.calls: list[tuple] = []
 
@@ -60,7 +61,7 @@ class _AttemptRecorder:
         timeout_ms: Any,
         attempt: Any,
         render_wait_ms: Any = None,
-    ):
+    ) -> Any:
         self.calls.append((target, dimensions, timeout_ms, attempt))
         try:
             return self._outcomes.pop(0)
@@ -71,7 +72,7 @@ class _AttemptRecorder:
 
 
 @pytest.fixture(autouse=True)
-def _restore_real_take_screenshot(monkeypatch):
+def _restore_real_take_screenshot(monkeypatch: pytest.MonkeyPatch) -> None:
     """Undo the global ``mock_screenshot`` conftest patch for these tests.
 
     The top-level conftest autouse ``mock_screenshot`` fixture replaces
@@ -97,7 +98,9 @@ def _restore_real_take_screenshot(monkeypatch):
 class TestTakeScreenshotRetry:
     """``take_screenshot`` must retry exactly once on transient failure."""
 
-    def test_success_first_attempt_no_retry(self, monkeypatch):
+    def test_success_first_attempt_no_retry(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Image returned on the first call -> exactly one attempt, no sleep."""
         img = _make_img()
         rec = _AttemptRecorder([(img, False)])
@@ -114,7 +117,9 @@ class TestTakeScreenshotRetry:
         assert rec.calls[0][3] == 1
         assert slept == [], "no backoff should run when first attempt succeeds"
 
-    def test_transient_none_then_image_returns_image(self, monkeypatch):
+    def test_transient_none_then_image_returns_image(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """None+transient on attempt 1, image on attempt 2 -> image, exactly 2 calls."""
         img = _make_img()
         rec = _AttemptRecorder(
@@ -133,7 +138,9 @@ class TestTakeScreenshotRetry:
         assert len(rec.calls) == 2
         assert [c[3] for c in rec.calls] == [1, 2]
 
-    def test_transient_none_both_attempts_raises(self, monkeypatch):
+    def test_transient_none_both_attempts_raises(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Transient None twice -> ScreenshotBackendError, exactly 2 calls."""
         rec = _AttemptRecorder([(None, True), (None, True)])
         monkeypatch.setattr(image_utils, "_take_screenshot_once", rec)
@@ -146,7 +153,9 @@ class TestTakeScreenshotRetry:
         # a stringified traceback or env-dependent text.
         assert "retry" in str(excinfo.value).lower()
 
-    def test_deterministic_failure_does_not_retry(self, monkeypatch):
+    def test_deterministic_failure_does_not_retry(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """``transient=False`` short-circuits the retry loop after one attempt."""
         rec = _AttemptRecorder([(None, False)])  # e.g. no browser installed
         monkeypatch.setattr(image_utils, "_take_screenshot_once", rec)
@@ -162,7 +171,9 @@ class TestTakeScreenshotRetry:
             "won't magically appear 500ms later."
         )
 
-    def test_retry_uses_short_bounded_backoff(self, monkeypatch):
+    def test_retry_uses_short_bounded_backoff(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Exactly one sleep, and its duration is the documented constant."""
         rec = _AttemptRecorder([(None, True), (_make_img(), False)])
         monkeypatch.setattr(image_utils, "_take_screenshot_once", rec)
@@ -190,7 +201,7 @@ class TestWorkerRemoteExceptionAllowlist:
     as HTTP 500, defeating the whole purpose of the new typed error.
     """
 
-    def test_remote_exception_reconstructs_screenshot_backend_error(self):
+    def test_remote_exception_reconstructs_screenshot_backend_error(self) -> None:
         from refresh_task.worker import _remote_exception
 
         exc = _remote_exception(
@@ -204,7 +215,7 @@ class TestWorkerRemoteExceptionAllowlist:
         assert isinstance(exc, RuntimeError)
         assert "Screenshot backend" in str(exc)
 
-    def test_remote_exception_unknown_type_still_falls_back_to_runtime(self):
+    def test_remote_exception_unknown_type_still_falls_back_to_runtime(self) -> None:
         """Regression guard: the new allow-list entry must not change the default."""
         from refresh_task.worker import _remote_exception
 
@@ -224,7 +235,9 @@ class TestRunSingleAttemptTransientDetection:
     """
 
     @staticmethod
-    def _run_once_with_fake_subprocess(monkeypatch, returncode, write_bytes):
+    def _run_once_with_fake_subprocess(
+        monkeypatch: pytest.MonkeyPatch, returncode: Any, write_bytes: Any
+    ) -> Any:
         """Invoke ``_take_screenshot_once`` with a patched subprocess.run
         whose side effect writes *write_bytes* to the output tempfile and
         returns *returncode*. Returns the ``(image, transient)`` tuple."""
@@ -244,7 +257,7 @@ class TestRunSingleAttemptTransientDetection:
             ],
         )
 
-        def fake_run(command, **kwargs):
+        def fake_run(command: Any, **kwargs: Any) -> Any:
             out = command[-1]
             with open(out, "wb") as f:
                 f.write(write_bytes)
@@ -258,7 +271,9 @@ class TestRunSingleAttemptTransientDetection:
             attempt=1,
         )
 
-    def test_nonzero_exit_empty_file_is_transient(self, monkeypatch):
+    def test_nonzero_exit_empty_file_is_transient(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Chromium OOM-exit with no PNG bytes should retry."""
         image, transient = self._run_once_with_fake_subprocess(
             monkeypatch, returncode=1, write_bytes=b""
@@ -266,7 +281,9 @@ class TestRunSingleAttemptTransientDetection:
         assert image is None
         assert transient is True
 
-    def test_nonzero_exit_nonempty_file_is_deterministic(self, monkeypatch):
+    def test_nonzero_exit_nonempty_file_is_deterministic(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Chromium exit with some bytes on disk is NOT a memory-pressure flake."""
         image, transient = self._run_once_with_fake_subprocess(
             monkeypatch, returncode=2, write_bytes=b"<not a valid png>"
@@ -282,7 +299,7 @@ class TestTakeScreenshotOnceBranchCoverage:
     injected outcomes; this suite drives the real helper.
     """
 
-    def _base_patches(self, monkeypatch):
+    def _base_patches(self, monkeypatch: pytest.MonkeyPatch) -> Any:
         """Install the minimal monkeypatches to call ``_take_screenshot_once``
         without invoking a real browser. Returns the module under test."""
         import sys
@@ -301,7 +318,9 @@ class TestTakeScreenshotOnceBranchCoverage:
         )
         return iu
 
-    def test_missing_browser_returns_deterministic(self, monkeypatch):
+    def test_missing_browser_returns_deterministic(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """No browser on the system is deterministic — don't retry."""
         from utils import image_utils as iu
 
@@ -312,13 +331,15 @@ class TestTakeScreenshotOnceBranchCoverage:
         assert image is None
         assert transient is False
 
-    def test_timeout_expired_is_transient(self, monkeypatch):
+    def test_timeout_expired_is_transient(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """subprocess.TimeoutExpired should retry."""
         import subprocess
 
         iu = self._base_patches(monkeypatch)
 
-        def fake_run(*args, **kwargs):
+        def fake_run(*args: Any, **kwargs: Any) -> None:
             raise subprocess.TimeoutExpired(cmd="chromium", timeout=1)
 
         monkeypatch.setattr(iu.subprocess, "run", fake_run)
@@ -328,12 +349,14 @@ class TestTakeScreenshotOnceBranchCoverage:
         assert image is None
         assert transient is True
 
-    def test_file_not_found_is_deterministic(self, monkeypatch):
+    def test_file_not_found_is_deterministic(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """FileNotFoundError on subprocess.run = binary vanished between
         probe and invocation, deterministic (don't retry)."""
         iu = self._base_patches(monkeypatch)
 
-        def fake_run(*args, **kwargs):
+        def fake_run(*args: Any, **kwargs: Any) -> None:
             raise FileNotFoundError("browser")
 
         monkeypatch.setattr(iu.subprocess, "run", fake_run)
@@ -343,13 +366,15 @@ class TestTakeScreenshotOnceBranchCoverage:
         assert image is None
         assert transient is False
 
-    def test_zero_exit_empty_file_is_transient(self, monkeypatch):
+    def test_zero_exit_empty_file_is_transient(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> Any:
         """Clean exit but no PNG bytes — retry."""
         from types import SimpleNamespace
 
         iu = self._base_patches(monkeypatch)
 
-        def fake_run(command, **kwargs):
+        def fake_run(command: Any, **kwargs: Any) -> Any:
             return SimpleNamespace(returncode=0, stderr=b"", stdout=b"")
 
         monkeypatch.setattr(iu.subprocess, "run", fake_run)
@@ -359,13 +384,15 @@ class TestTakeScreenshotOnceBranchCoverage:
         assert image is None
         assert transient is True
 
-    def test_loader_returns_none_is_transient(self, monkeypatch):
+    def test_loader_returns_none_is_transient(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> Any:
         """Chromium succeeded, wrote bytes, but PIL can't decode — retry."""
         from types import SimpleNamespace
 
         iu = self._base_patches(monkeypatch)
 
-        def fake_run(command, **kwargs):
+        def fake_run(command: Any, **kwargs: Any) -> Any:
             out = command[-1]
             with open(out, "wb") as f:
                 f.write(b"some bytes")
@@ -379,20 +406,22 @@ class TestTakeScreenshotOnceBranchCoverage:
         assert image is None
         assert transient is True
 
-    def test_unexpected_exception_is_transient(self, monkeypatch):
+    def test_unexpected_exception_is_transient(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> Any:
         """Any unexpected exception inside the happy path is treated as
         transient so we at least retry once before surfacing."""
         from types import SimpleNamespace
 
         iu = self._base_patches(monkeypatch)
 
-        def fake_run(command, **kwargs):
+        def fake_run(command: Any, **kwargs: Any) -> Any:
             out = command[-1]
             with open(out, "wb") as f:
                 f.write(b"some bytes")
             return SimpleNamespace(returncode=0, stderr=b"", stdout=b"")
 
-        def boom(_path):
+        def boom(_path: Any) -> None:
             raise RuntimeError("decoder exploded")
 
         monkeypatch.setattr(iu.subprocess, "run", fake_run)
@@ -407,35 +436,37 @@ class TestTakeScreenshotOnceBranchCoverage:
 class TestTempfileIsEmpty:
     """Direct unit tests for the tempfile-empty helper."""
 
-    def test_none_path_is_empty(self):
+    def test_none_path_is_empty(self) -> None:
         from utils.image_utils import _tempfile_is_empty
 
         assert _tempfile_is_empty(None) is True
 
-    def test_missing_file_is_empty(self, tmp_path):
+    def test_missing_file_is_empty(self, tmp_path: Path) -> None:
         from utils.image_utils import _tempfile_is_empty
 
         assert _tempfile_is_empty(str(tmp_path / "nonexistent.png")) is True
 
-    def test_zero_byte_file_is_empty(self, tmp_path):
+    def test_zero_byte_file_is_empty(self, tmp_path: Path) -> None:
         from utils.image_utils import _tempfile_is_empty
 
         p = tmp_path / "empty.png"
         p.write_bytes(b"")
         assert _tempfile_is_empty(str(p)) is True
 
-    def test_nonempty_file_is_not_empty(self, tmp_path):
+    def test_nonempty_file_is_not_empty(self, tmp_path: Path) -> None:
         from utils.image_utils import _tempfile_is_empty
 
         p = tmp_path / "content.png"
         p.write_bytes(b"chromium-output")
         assert _tempfile_is_empty(str(p)) is False
 
-    def test_oserror_treated_as_empty(self, monkeypatch, tmp_path):
+    def test_oserror_treated_as_empty(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
         """If getsize raises (e.g. permissions), err on the side of transient."""
         from utils import image_utils as iu
 
-        def raise_os(_path):
+        def raise_os(_path: Any) -> None:
             raise OSError("fake permission error")
 
         monkeypatch.setattr(iu.os.path, "getsize", raise_os)

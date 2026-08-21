@@ -1,6 +1,7 @@
 """Edge case tests for model.py — Playlist, PluginInstance, PlaylistManager."""
 
 from datetime import UTC, datetime, timedelta
+from typing import Any
 
 from model import Playlist, PluginInstance
 
@@ -9,7 +10,9 @@ from model import Playlist, PluginInstance
 # ---------------------------------------------------------------------------
 
 
-def _plugin_dict(pid="test", name="Test", refresh=None, **kwargs):
+def _plugin_dict(
+    pid: Any = "test", name: Any = "Test", refresh: Any = None, **kwargs: Any
+) -> Any:
     return {
         "plugin_id": pid,
         "name": name,
@@ -19,7 +22,7 @@ def _plugin_dict(pid="test", name="Test", refresh=None, **kwargs):
     }
 
 
-def _make_playlist(start, end, plugins=None, index=None):
+def _make_playlist(start: Any, end: Any, plugins: Any = None, index: Any = None) -> Any:
     return Playlist(
         name="Test",
         start_time=start,
@@ -29,11 +32,11 @@ def _make_playlist(start, end, plugins=None, index=None):
     )
 
 
-def _future_snooze():
+def _future_snooze() -> Any:
     return (datetime.now(UTC) + timedelta(hours=24)).isoformat()
 
 
-def _past_snooze():
+def _past_snooze() -> Any:
     return (datetime.now(UTC) - timedelta(hours=1)).isoformat()
 
 
@@ -43,37 +46,37 @@ def _past_snooze():
 
 
 class TestIsActiveOvernight:
-    def setup_method(self):
+    def setup_method(self) -> None:
         self.pl = _make_playlist("22:00", "06:00")
 
-    def test_active_before_midnight(self):
+    def test_active_before_midnight(self) -> None:
         assert self.pl.is_active("23:00") is True
 
-    def test_active_after_midnight(self):
+    def test_active_after_midnight(self) -> None:
         assert self.pl.is_active("02:00") is True
 
-    def test_inactive_mid_morning(self):
+    def test_inactive_mid_morning(self) -> None:
         assert self.pl.is_active("07:00") is False
 
-    def test_inactive_midday(self):
+    def test_inactive_midday(self) -> None:
         assert self.pl.is_active("12:00") is False
 
 
 class TestIsActiveBoundary:
-    def test_exactly_at_start_is_active(self):
+    def test_exactly_at_start_is_active(self) -> None:
         pl = _make_playlist("09:00", "17:00")
         assert pl.is_active("09:00") is True
 
-    def test_exactly_at_end_is_not_active(self):
+    def test_exactly_at_end_is_not_active(self) -> None:
         # is_active uses strict less-than for end
         pl = _make_playlist("09:00", "17:00")
         assert pl.is_active("17:00") is False
 
-    def test_overnight_exactly_at_start_is_active(self):
+    def test_overnight_exactly_at_start_is_active(self) -> None:
         pl = _make_playlist("22:00", "06:00")
         assert pl.is_active("22:00") is True
 
-    def test_overnight_exactly_at_end_is_not_active(self):
+    def test_overnight_exactly_at_end_is_not_active(self) -> None:
         pl = _make_playlist("22:00", "06:00")
         assert pl.is_active("06:00") is False
 
@@ -84,15 +87,15 @@ class TestIsActiveBoundary:
 
 
 class TestGetTimeRangeMinutes:
-    def test_overnight_range(self):
+    def test_overnight_range(self) -> None:
         pl = _make_playlist("22:00", "06:00")
         assert pl.get_time_range_minutes() == 480
 
-    def test_normal_daytime_range(self):
+    def test_normal_daytime_range(self) -> None:
         pl = _make_playlist("09:00", "17:00")
         assert pl.get_time_range_minutes() == 480
 
-    def test_short_range(self):
+    def test_short_range(self) -> None:
         pl = _make_playlist("10:00", "10:30")
         assert pl.get_time_range_minutes() == 30
 
@@ -103,20 +106,20 @@ class TestGetTimeRangeMinutes:
 
 
 class TestGetNextPlugin:
-    def test_corrupted_index_resets_to_zero(self):
+    def test_corrupted_index_resets_to_zero(self) -> None:
         plugins = [_plugin_dict("a"), _plugin_dict("b")]
         pl = _make_playlist("00:00", "24:00", plugins=plugins, index=999)
         plugin = pl.get_next_plugin()
         assert plugin is not None
         assert pl.current_plugin_index == 0
 
-    def test_advances_index(self):
+    def test_advances_index(self) -> None:
         plugins = [_plugin_dict("a"), _plugin_dict("b"), _plugin_dict("c")]
         pl = _make_playlist("00:00", "24:00", plugins=plugins, index=0)
         pl.get_next_plugin()
         assert pl.current_plugin_index == 1
 
-    def test_wraps_around(self):
+    def test_wraps_around(self) -> None:
         plugins = [_plugin_dict("a"), _plugin_dict("b")]
         pl = _make_playlist("00:00", "24:00", plugins=plugins, index=1)
         pl.get_next_plugin()
@@ -129,7 +132,7 @@ class TestGetNextPlugin:
 
 
 class TestGetNextEligiblePlugin:
-    def test_all_snoozed_returns_none(self):
+    def test_all_snoozed_returns_none(self) -> None:
         plugins = [
             _plugin_dict("a", snooze_until=_future_snooze()),
             _plugin_dict("b", snooze_until=_future_snooze()),
@@ -140,7 +143,7 @@ class TestGetNextEligiblePlugin:
         assert result is None
         assert pl.current_plugin_index == original_index
 
-    def test_skips_snoozed_returns_next_eligible(self):
+    def test_skips_snoozed_returns_next_eligible(self) -> None:
         plugins = [
             _plugin_dict("a"),
             _plugin_dict("b", snooze_until=_future_snooze()),
@@ -151,7 +154,7 @@ class TestGetNextEligiblePlugin:
         assert result is not None
         assert result.plugin_id != "b"
 
-    def test_index_advances_to_eligible(self):
+    def test_index_advances_to_eligible(self) -> None:
         plugins = [
             _plugin_dict("a"),
             _plugin_dict("b", snooze_until=_future_snooze()),
@@ -169,20 +172,20 @@ class TestGetNextEligiblePlugin:
 
 
 class TestPeekNextEligiblePlugin:
-    def test_does_not_mutate_index(self):
+    def test_does_not_mutate_index(self) -> None:
         plugins = [_plugin_dict("a"), _plugin_dict("b"), _plugin_dict("c")]
         pl = _make_playlist("00:00", "24:00", plugins=plugins, index=1)
         original_index = pl.current_plugin_index
         pl.peek_next_eligible_plugin(datetime.now(UTC))
         assert pl.current_plugin_index == original_index
 
-    def test_returns_eligible_plugin(self):
+    def test_returns_eligible_plugin(self) -> None:
         plugins = [_plugin_dict("a"), _plugin_dict("b")]
         pl = _make_playlist("00:00", "24:00", plugins=plugins, index=0)
         result = pl.peek_next_eligible_plugin(datetime.now(UTC))
         assert result is not None
 
-    def test_all_snoozed_does_not_mutate_index(self):
+    def test_all_snoozed_does_not_mutate_index(self) -> None:
         plugins = [
             _plugin_dict("a", snooze_until=_future_snooze()),
             _plugin_dict("b", snooze_until=_future_snooze()),
@@ -200,7 +203,7 @@ class TestPeekNextEligiblePlugin:
 
 
 class TestReorderPlugins:
-    def _pl_with_abc(self):
+    def _pl_with_abc(self) -> Any:
         plugins = [
             _plugin_dict("a", "Alpha"),
             _plugin_dict("b", "Beta"),
@@ -208,7 +211,7 @@ class TestReorderPlugins:
         ]
         return _make_playlist("00:00", "24:00", plugins=plugins)
 
-    def test_reorder_with_dicts(self):
+    def test_reorder_with_dicts(self) -> None:
         pl = self._pl_with_abc()
         result = pl.reorder_plugins(
             [
@@ -221,19 +224,19 @@ class TestReorderPlugins:
         ids = [p.plugin_id for p in pl.plugins]
         assert ids == ["c", "a", "b"]
 
-    def test_reorder_with_tuples(self):
+    def test_reorder_with_tuples(self) -> None:
         pl = self._pl_with_abc()
         result = pl.reorder_plugins([("c", "Gamma"), ("a", "Alpha"), ("b", "Beta")])
         assert result is not False
         ids = [p.plugin_id for p in pl.plugins]
         assert ids == ["c", "a", "b"]
 
-    def test_too_few_items_returns_false(self):
+    def test_too_few_items_returns_false(self) -> None:
         pl = self._pl_with_abc()
         result = pl.reorder_plugins([{"plugin_id": "a", "name": "Alpha"}])
         assert result is False
 
-    def test_too_many_items_returns_false(self):
+    def test_too_many_items_returns_false(self) -> None:
         pl = self._pl_with_abc()
         result = pl.reorder_plugins(
             [
@@ -245,7 +248,7 @@ class TestReorderPlugins:
         )
         assert result is False
 
-    def test_unknown_plugin_id_returns_false(self):
+    def test_unknown_plugin_id_returns_false(self) -> None:
         pl = self._pl_with_abc()
         result = pl.reorder_plugins(
             [
@@ -263,26 +266,26 @@ class TestReorderPlugins:
 
 
 class TestShouldRefreshInterval:
-    def test_refreshed_two_hours_ago_interval_one_hour(self):
+    def test_refreshed_two_hours_ago_interval_one_hour(self) -> None:
         two_hours_ago = (datetime.now(UTC) - timedelta(hours=2)).isoformat()
         d = _plugin_dict(refresh={"interval": 3600}, latest_refresh_time=two_hours_ago)
         plugin = PluginInstance.from_dict(d)
         assert plugin.should_refresh(datetime.now(UTC)) is True
 
-    def test_refreshed_thirty_min_ago_interval_one_hour(self):
+    def test_refreshed_thirty_min_ago_interval_one_hour(self) -> None:
         thirty_min_ago = (datetime.now(UTC) - timedelta(minutes=30)).isoformat()
         d = _plugin_dict(refresh={"interval": 3600}, latest_refresh_time=thirty_min_ago)
         plugin = PluginInstance.from_dict(d)
         assert plugin.should_refresh(datetime.now(UTC)) is False
 
-    def test_never_refreshed_always_needs_refresh(self):
+    def test_never_refreshed_always_needs_refresh(self) -> None:
         d = _plugin_dict(refresh={"interval": 3600})
         plugin = PluginInstance.from_dict(d)
         assert plugin.should_refresh(datetime.now(UTC)) is True
 
 
 class TestShouldRefreshScheduled:
-    def test_scheduled_time_passed_last_refresh_yesterday(self):
+    def test_scheduled_time_passed_last_refresh_yesterday(self) -> None:
         yesterday_early = (
             datetime.now(UTC).replace(hour=6, minute=0, second=0, microsecond=0)
             - timedelta(days=1)
@@ -296,7 +299,7 @@ class TestShouldRefreshScheduled:
         )
         assert plugin.should_refresh(current_time) is True
 
-    def test_scheduled_already_refreshed_today(self):
+    def test_scheduled_already_refreshed_today(self) -> None:
         today_8_30 = (
             datetime.now(UTC)
             .replace(hour=8, minute=30, second=0, microsecond=0)
@@ -316,17 +319,17 @@ class TestShouldRefreshScheduled:
 
 
 class TestIsShowEligible:
-    def test_active_snooze_returns_false(self):
+    def test_active_snooze_returns_false(self) -> None:
         d = _plugin_dict(snooze_until=_future_snooze())
         plugin = PluginInstance.from_dict(d)
         assert plugin.is_show_eligible(datetime.now(UTC)) is False
 
-    def test_expired_snooze_returns_true(self):
+    def test_expired_snooze_returns_true(self) -> None:
         d = _plugin_dict(snooze_until=_past_snooze())
         plugin = PluginInstance.from_dict(d)
         assert plugin.is_show_eligible(datetime.now(UTC)) is True
 
-    def test_only_show_when_fresh_not_due_returns_false(self):
+    def test_only_show_when_fresh_not_due_returns_false(self) -> None:
         # Refreshed 30 min ago with 1 hour interval — not due for refresh → ineligible
         thirty_min_ago = (datetime.now(UTC) - timedelta(minutes=30)).isoformat()
         d = _plugin_dict(
@@ -337,7 +340,7 @@ class TestIsShowEligible:
         plugin = PluginInstance.from_dict(d)
         assert plugin.is_show_eligible(datetime.now(UTC)) is False
 
-    def test_only_show_when_fresh_due_returns_true(self):
+    def test_only_show_when_fresh_due_returns_true(self) -> None:
         # Refreshed 2 hours ago with 1 hour interval — due for refresh → eligible
         two_hours_ago = (datetime.now(UTC) - timedelta(hours=2)).isoformat()
         d = _plugin_dict(
@@ -348,7 +351,7 @@ class TestIsShowEligible:
         plugin = PluginInstance.from_dict(d)
         assert plugin.is_show_eligible(datetime.now(UTC)) is True
 
-    def test_no_snooze_no_only_fresh_returns_true(self):
+    def test_no_snooze_no_only_fresh_returns_true(self) -> None:
         d = _plugin_dict()
         plugin = PluginInstance.from_dict(d)
         assert plugin.is_show_eligible(datetime.now(UTC)) is True
@@ -360,7 +363,7 @@ class TestIsShowEligible:
 
 
 class TestFromDictRoundTrip:
-    def test_round_trip_preserves_fields(self):
+    def test_round_trip_preserves_fields(self) -> None:
         snooze = _future_snooze()
         original_dict = _plugin_dict(
             pid="rt_test",
@@ -378,7 +381,7 @@ class TestFromDictRoundTrip:
         assert plugin2.only_show_when_fresh is True
         assert plugin2.snooze_until == plugin.snooze_until
 
-    def test_from_dict_defaults(self):
+    def test_from_dict_defaults(self) -> None:
         d = _plugin_dict()
         plugin = PluginInstance.from_dict(d)
         assert plugin.only_show_when_fresh is False
@@ -387,7 +390,7 @@ class TestFromDictRoundTrip:
 
 
 class TestLegacyFromDictCompatibility:
-    def test_playlist_from_dict_migrates_string_cycle_minutes(self):
+    def test_playlist_from_dict_migrates_string_cycle_minutes(self) -> None:
         playlist = Playlist.from_dict({"cycle_minutes": " 15 ", "plugins": "invalid"})
 
         assert playlist.cycle_interval_seconds == 900
@@ -396,12 +399,12 @@ class TestLegacyFromDictCompatibility:
         assert playlist.start_time == "00:00"
         assert playlist.end_time == "24:00"
 
-    def test_playlist_from_dict_ignores_invalid_cycle_minutes_string(self):
+    def test_playlist_from_dict_ignores_invalid_cycle_minutes_string(self) -> None:
         playlist = Playlist.from_dict({"cycle_minutes": "fifteen", "plugins": []})
 
         assert playlist.cycle_interval_seconds is None
 
-    def test_plugin_instance_from_dict_migrates_legacy_aliases(self):
+    def test_plugin_instance_from_dict_migrates_legacy_aliases(self) -> None:
         refreshed_at = "2025-12-01T09:00:00+00:00"
         plugin = PluginInstance.from_dict(
             {
@@ -419,7 +422,7 @@ class TestLegacyFromDictCompatibility:
         assert plugin.refresh["scheduled"] == "09:00"
         assert plugin.latest_refresh_time == refreshed_at
 
-    def test_plugin_instance_from_dict_sanitizes_invalid_legacy_shapes(self):
+    def test_plugin_instance_from_dict_sanitizes_invalid_legacy_shapes(self) -> None:
         plugin = PluginInstance.from_dict(
             {
                 "plugin_id": "weather",
@@ -433,7 +436,7 @@ class TestLegacyFromDictCompatibility:
 
 
 class TestLegacyMigrationFromDict:
-    def test_playlist_from_dict_parses_cycle_minutes_string(self):
+    def test_playlist_from_dict_parses_cycle_minutes_string(self) -> None:
         playlist = Playlist.from_dict(
             {
                 "name": "Legacy",
@@ -445,7 +448,7 @@ class TestLegacyMigrationFromDict:
         )
         assert playlist.cycle_interval_seconds == 900
 
-    def test_playlist_from_dict_defaults_when_values_are_invalid(self):
+    def test_playlist_from_dict_defaults_when_values_are_invalid(self) -> None:
         playlist = Playlist.from_dict({"cycle_minutes": "not-a-number", "plugins": {}})
         assert playlist.name == "Default"
         assert playlist.start_time == "00:00"
@@ -453,7 +456,7 @@ class TestLegacyMigrationFromDict:
         assert playlist.plugins == []
         assert playlist.cycle_interval_seconds is None
 
-    def test_plugin_from_dict_supports_legacy_alias_fields(self):
+    def test_plugin_from_dict_supports_legacy_alias_fields(self) -> None:
         plugin = PluginInstance.from_dict(
             {
                 "id": "legacy_clock",
@@ -469,7 +472,7 @@ class TestLegacyMigrationFromDict:
         assert plugin.refresh.get("scheduled") == "07:15"
         assert plugin.latest_refresh_time == "2025-01-01T07:15:00"
 
-    def test_plugin_from_dict_defaults_non_mapping_inputs(self):
+    def test_plugin_from_dict_defaults_non_mapping_inputs(self) -> None:
         plugin = PluginInstance.from_dict(
             {
                 "plugin_id": "clock",
@@ -481,7 +484,7 @@ class TestLegacyMigrationFromDict:
         assert plugin.settings == {}
         assert plugin.refresh == {}
 
-    def test_plugin_from_dict_name_fallback_order(self):
+    def test_plugin_from_dict_name_fallback_order(self) -> None:
         from_plugin_id = PluginInstance.from_dict(
             {"plugin_id": "weather", "plugin_settings": {}, "refresh": {}}
         )

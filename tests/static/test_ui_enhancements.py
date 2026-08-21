@@ -4,6 +4,8 @@
 import re
 from pathlib import Path
 
+from flask.testing import FlaskClient
+
 # CSS is now split into @import partials; read all partials from disk
 _STYLES_DIR = Path(__file__).resolve().parents[2] / "src" / "static" / "styles"
 TOGGLE_CSS = _STYLES_DIR / "partials" / "_toggle.css"
@@ -25,7 +27,7 @@ def _css_block(css: str, selector: str) -> str:
     return match.group("body")
 
 
-def test_main_css_contains_progressive_disclosure_styles(client):
+def test_main_css_contains_progressive_disclosure_styles(client: FlaskClient) -> None:
     """Test that main.css contains progressive disclosure styling."""
     css_content = _read_all_css()
 
@@ -37,7 +39,7 @@ def test_main_css_contains_progressive_disclosure_styles(client):
     assert ".settings-section.advanced-only" in css_content
 
 
-def test_main_css_contains_form_enhancement_styles(client):
+def test_main_css_contains_form_enhancement_styles(client: FlaskClient) -> None:
     """Test that main.css contains form enhancement styling."""
     css_content = _read_all_css()
 
@@ -53,7 +55,7 @@ def test_main_css_contains_form_enhancement_styles(client):
     assert ".form-input[readonly]" in css_content
 
 
-def test_main_css_contains_validation_styles(client):
+def test_main_css_contains_validation_styles(client: FlaskClient) -> None:
     """Test that main.css contains validation styling."""
     css_content = _read_all_css()
 
@@ -68,7 +70,7 @@ def test_main_css_contains_validation_styles(client):
     assert ".form-input.valid" in css_content
 
 
-def test_main_css_contains_tooltip_styles(client):
+def test_main_css_contains_tooltip_styles(client: FlaskClient) -> None:
     """Test that main.css contains tooltip styling."""
     css_content = _read_all_css()
 
@@ -80,7 +82,7 @@ def test_main_css_contains_tooltip_styles(client):
     assert "visibility: visible" in css_content
 
 
-def test_main_css_contains_wizard_styles(client):
+def test_main_css_contains_wizard_styles(client: FlaskClient) -> None:
     """Test that main.css contains wizard styling."""
     css_content = _read_all_css()
 
@@ -93,7 +95,7 @@ def test_main_css_contains_wizard_styles(client):
     assert ".wizard-step-dot" in css_content
 
 
-def test_main_css_contains_live_preview_styles(client):
+def test_main_css_contains_live_preview_styles(client: FlaskClient) -> None:
     """Test that main.css contains live preview styling."""
     css_content = _read_all_css()
 
@@ -106,7 +108,7 @@ def test_main_css_contains_live_preview_styles(client):
     assert ".preview-modified" in css_content
 
 
-def test_main_css_contains_workflow_and_management_shells(client):
+def test_main_css_contains_workflow_and_management_shells(client: FlaskClient) -> None:
     css_content = _read_all_css()
 
     assert ".workflow-layout" in css_content
@@ -128,7 +130,7 @@ def test_main_css_contains_workflow_and_management_shells(client):
     assert ".compact-repeater" in css_content
 
 
-def test_primary_templates_reduce_inline_handlers():
+def test_primary_templates_reduce_inline_handlers() -> None:
     from pathlib import Path
 
     root = Path(__file__).resolve().parents[2] / "src" / "templates"
@@ -148,7 +150,7 @@ def test_primary_templates_reduce_inline_handlers():
         assert "Skip to settings content" not in content
 
 
-def test_main_css_contains_enhanced_button_styles(client):
+def test_main_css_contains_enhanced_button_styles(client: FlaskClient) -> None:
     """Test that main.css contains enhanced button styling."""
     css_content = _read_all_css()
 
@@ -159,7 +161,7 @@ def test_main_css_contains_enhanced_button_styles(client):
     assert ".button-group" in css_content
 
 
-def test_main_css_contains_toggle_styles(client):
+def test_main_css_contains_toggle_styles(client: FlaskClient) -> None:
     """Test that main.css contains enhanced toggle styling."""
     css_content = _read_all_css()
     toggle_css = TOGGLE_CSS.read_text(encoding="utf-8")
@@ -179,7 +181,7 @@ def test_main_css_contains_toggle_styles(client):
     assert ".form-group.nowrap:not(.toggle-row) > *" in form_css
 
 
-def test_main_css_contains_responsive_design(client):
+def test_main_css_contains_responsive_design(client: FlaskClient) -> None:
     """Test that main.css contains responsive design improvements."""
     css_content = _read_all_css()
 
@@ -192,7 +194,7 @@ def test_main_css_contains_responsive_design(client):
     assert ".form-group.nowrap" in css_content
 
 
-def test_main_css_contains_animation_styles(client):
+def test_main_css_contains_animation_styles(client: FlaskClient) -> None:
     """Test that main.css contains animation and transition styling."""
     css_content = _read_all_css()
 
@@ -203,7 +205,7 @@ def test_main_css_contains_animation_styles(client):
     assert "transition:" in css_content
 
 
-def test_main_css_contains_theme_variables(client):
+def test_main_css_contains_theme_variables(client: FlaskClient) -> None:
     """Test that main.css properly uses theme variables."""
     css_content = _read_all_css()
 
@@ -228,7 +230,7 @@ def test_main_css_contains_theme_variables(client):
     assert "--close-btn-hover:" in css_content
 
 
-def test_main_css_contains_spacing_improvements(client):
+def test_main_css_contains_spacing_improvements(client: FlaskClient) -> None:
     """Test that main.css contains improved spacing system."""
     css_content = _read_all_css()
 
@@ -243,7 +245,7 @@ def test_main_css_contains_spacing_improvements(client):
     assert "margin-bottom: 0" in css_content
 
 
-def test_main_css_contains_accessibility_improvements(client):
+def test_main_css_contains_accessibility_improvements(client: FlaskClient) -> None:
     """Test that main.css contains accessibility improvements."""
     css_content = _read_all_css()
 
@@ -257,7 +259,7 @@ def test_main_css_contains_accessibility_improvements(client):
     assert "background: var(--surface)" in css_content
 
 
-def test_main_css_contains_status_badges(client):
+def test_main_css_contains_status_badges(client: FlaskClient) -> None:
     """Test that main.css contains status badge styling."""
     css_content = _read_all_css()
 
@@ -268,7 +270,7 @@ def test_main_css_contains_status_badges(client):
     assert ".status-badge.error" in css_content
 
 
-def test_main_css_contains_color_picker_improvements(client):
+def test_main_css_contains_color_picker_improvements(client: FlaskClient) -> None:
     """Test that main.css contains color picker improvements."""
     css_content = _read_all_css()
 
@@ -278,7 +280,7 @@ def test_main_css_contains_color_picker_improvements(client):
     assert "border-radius: 8px" in css_content
 
 
-def test_main_css_contains_select_improvements(client):
+def test_main_css_contains_select_improvements(client: FlaskClient) -> None:
     """Test that main.css contains select element improvements."""
     css_content = _read_all_css()
 
@@ -289,7 +291,7 @@ def test_main_css_contains_select_improvements(client):
     assert "background-position: right" in css_content
 
 
-def test_main_css_contains_grid_improvements(client):
+def test_main_css_contains_grid_improvements(client: FlaskClient) -> None:
     """Test that main.css contains grid layout improvements."""
     css_content = _read_all_css()
 
@@ -300,7 +302,7 @@ def test_main_css_contains_grid_improvements(client):
     assert "@media (max-width: 900px)" in css_content
 
 
-def test_main_css_contains_preview_overlay_theming(client):
+def test_main_css_contains_preview_overlay_theming(client: FlaskClient) -> None:
     """Test that main.css contains proper theming for preview overlay."""
     css_content = _read_all_css()
 
@@ -314,7 +316,7 @@ def test_main_css_contains_preview_overlay_theming(client):
     assert ".preview-close:hover" in css_content
 
 
-def test_main_css_contains_mobile_preview_adjustments(client):
+def test_main_css_contains_mobile_preview_adjustments(client: FlaskClient) -> None:
     """Test that main.css contains mobile adjustments for preview."""
     css_content = _read_all_css()
 
@@ -330,7 +332,7 @@ def test_main_css_contains_mobile_preview_adjustments(client):
         assert "flex-direction: row" in mobile_section
 
 
-def test_main_css_typography_hierarchy(client):
+def test_main_css_typography_hierarchy(client: FlaskClient) -> None:
     """Test that main.css contains proper typography hierarchy."""
     css_content = _read_all_css()
 
@@ -342,7 +344,7 @@ def test_main_css_typography_hierarchy(client):
     assert "line-height:" in css_content
 
 
-def test_main_css_contains_enhanced_skeleton_styles(client):
+def test_main_css_contains_enhanced_skeleton_styles(client: FlaskClient) -> None:
     """Test that main.css contains enhanced skeleton loading styles."""
     css_content = _read_all_css()
 
@@ -365,7 +367,7 @@ def test_main_css_contains_enhanced_skeleton_styles(client):
     assert ".skeleton-step-indicator" in css_content
 
 
-def test_main_css_contains_enhanced_progress_styles(client):
+def test_main_css_contains_enhanced_progress_styles(client: FlaskClient) -> None:
     """Test that main.css contains enhanced progress display styles."""
     css_content = _read_all_css()
 
@@ -391,7 +393,7 @@ def test_main_css_contains_enhanced_progress_styles(client):
     assert "var(--text-muted)" in css_content
 
 
-def test_main_css_contains_api_validation_styles(client):
+def test_main_css_contains_api_validation_styles(client: FlaskClient) -> None:
     """Test that main.css contains API validation indicator styles."""
     css_content = _read_all_css()
 
@@ -419,7 +421,9 @@ def test_main_css_contains_api_validation_styles(client):
     assert "var(--text-muted)" in css_content
 
 
-def test_main_css_contains_top_level_theme_normalization_helpers(client):
+def test_main_css_contains_top_level_theme_normalization_helpers(
+    client: FlaskClient,
+) -> None:
     css_content = _read_all_css()
 
     assert ".storage-meter" in css_content
@@ -430,7 +434,7 @@ def test_main_css_contains_top_level_theme_normalization_helpers(client):
     assert ".playlist-thumbnail-info" in css_content
 
 
-def test_main_css_contains_operation_status_styles(client):
+def test_main_css_contains_operation_status_styles(client: FlaskClient) -> None:
     """Test that main.css contains operation status indicator styles."""
     css_content = _read_all_css()
 
@@ -463,7 +467,7 @@ def test_main_css_contains_operation_status_styles(client):
     assert "@media (max-width: 640px)" in css_content
 
 
-def test_main_css_contains_status_color_variables(client):
+def test_main_css_contains_status_color_variables(client: FlaskClient) -> None:
     """Test that main.css contains status color variables."""
     css_content = _read_all_css()
 
@@ -478,7 +482,7 @@ def test_main_css_contains_status_color_variables(client):
     assert '[data-theme="dark"]' in css_content and "--primary-bg:" in css_content
 
 
-def test_main_css_contains_shimmer_animation(client):
+def test_main_css_contains_shimmer_animation(client: FlaskClient) -> None:
     """Test that main.css contains shimmer animation for skeletons."""
     css_content = _read_all_css()
 

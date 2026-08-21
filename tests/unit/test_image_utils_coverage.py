@@ -11,7 +11,7 @@ from utils.image_utils import (
 )
 
 
-def test_load_image_from_bytes_error_handling():
+def test_load_image_from_bytes_error_handling() -> None:
     """Test load_image_from_bytes handles invalid image data gracefully."""
     from utils.image_utils import load_image_from_bytes
 
@@ -21,7 +21,7 @@ def test_load_image_from_bytes_error_handling():
     assert result is None
 
 
-def test_load_image_from_bytes_success():
+def test_load_image_from_bytes_success() -> None:
     """Test load_image_from_bytes loads valid image bytes."""
     from utils.image_utils import load_image_from_bytes
 
@@ -36,7 +36,7 @@ def test_load_image_from_bytes_success():
     assert isinstance(result, Image.Image)
 
 
-def test_load_image_from_path_error_handling():
+def test_load_image_from_path_error_handling() -> None:
     """Test load_image_from_path handles missing/invalid files gracefully."""
     from utils.image_utils import load_image_from_path
 
@@ -60,7 +60,7 @@ def test_load_image_from_path_error_handling():
         os.unlink(temp_path)
 
 
-def test_get_image_with_bad_url():
+def test_get_image_with_bad_url() -> None:
     """Test get_image handles network errors gracefully."""
     from utils.image_utils import get_image
 
@@ -71,7 +71,7 @@ def test_get_image_with_bad_url():
     assert result is None
 
 
-def test_get_image_with_non_200_status():
+def test_get_image_with_non_200_status() -> None:
     """Test get_image handles non-200 HTTP status codes."""
     from utils.image_utils import get_image
 
@@ -85,7 +85,7 @@ def test_get_image_with_non_200_status():
         assert result is None
 
 
-def test_get_image_with_invalid_image_data():
+def test_get_image_with_invalid_image_data() -> None:
     """Test get_image handles invalid image data in response."""
     from utils.image_utils import get_image
 
@@ -99,7 +99,7 @@ def test_get_image_with_invalid_image_data():
         assert result is None
 
 
-def test_change_orientation_horizontal():
+def test_change_orientation_horizontal() -> None:
     """Test change_orientation with horizontal orientation."""
     from utils.image_utils import change_orientation
 
@@ -108,7 +108,7 @@ def test_change_orientation_horizontal():
     assert result.size == (200, 100)
 
 
-def test_change_orientation_vertical():
+def test_change_orientation_vertical() -> None:
     """Test change_orientation with vertical orientation."""
     from utils.image_utils import change_orientation
 
@@ -118,7 +118,7 @@ def test_change_orientation_vertical():
     assert result.size == (100, 200)
 
 
-def test_change_orientation_inverted():
+def test_change_orientation_inverted() -> None:
     """Test change_orientation with inverted flag."""
     from utils.image_utils import change_orientation
 
@@ -128,7 +128,7 @@ def test_change_orientation_inverted():
     assert result.size == (200, 100)
 
 
-def test_resize_image_with_zero_dimension():
+def test_resize_image_with_zero_dimension() -> None:
     """Test resize_image handles zero dimensions gracefully."""
     from utils.image_utils import resize_image
 
@@ -148,7 +148,7 @@ def test_resize_image_with_zero_dimension():
 # ---------------------------------------------------------------------------
 
 
-def test_screenshot_timeout_default_when_none():
+def test_screenshot_timeout_default_when_none() -> None:
     """When timeout_ms is None, the computed timeout should use the default."""
     timeout_ms = None
     timeout_seconds = min(
@@ -158,7 +158,7 @@ def test_screenshot_timeout_default_when_none():
     assert timeout_seconds == _DEFAULT_SCREENSHOT_TIMEOUT_S
 
 
-def test_screenshot_timeout_caps_excessive():
+def test_screenshot_timeout_caps_excessive() -> None:
     """Even if caller passes a huge timeout_ms, it should be capped at max."""
     timeout_ms = 120_000
     timeout_seconds = min(
@@ -168,7 +168,7 @@ def test_screenshot_timeout_caps_excessive():
     assert timeout_seconds == _MAX_SCREENSHOT_TIMEOUT_S
 
 
-def test_screenshot_timeout_passes_normal():
+def test_screenshot_timeout_passes_normal() -> None:
     """A normal timeout_ms (e.g. 40000) should pass through as seconds."""
     timeout_ms = 40_000
     timeout_seconds = min(
@@ -178,7 +178,7 @@ def test_screenshot_timeout_passes_normal():
     assert timeout_seconds == 40.0
 
 
-def test_screenshot_timeout_constants_sane():
+def test_screenshot_timeout_constants_sane() -> None:
     """Default and max timeout constants should be positive and correctly ordered."""
     assert _DEFAULT_SCREENSHOT_TIMEOUT_S > 0
     assert _MAX_SCREENSHOT_TIMEOUT_S >= _DEFAULT_SCREENSHOT_TIMEOUT_S
@@ -189,7 +189,7 @@ def test_screenshot_timeout_constants_sane():
 # ---------------------------------------------------------------------------
 
 
-def test_fetch_and_resize_remote_image_success():
+def test_fetch_and_resize_remote_image_success() -> None:
     """Test successful fetch and resize of a remote image."""
     from utils.image_utils import fetch_and_resize_remote_image
 
@@ -213,7 +213,7 @@ def test_fetch_and_resize_remote_image_success():
     assert result.size == (100, 50)
 
 
-def test_fetch_and_resize_remote_image_http_failure():
+def test_fetch_and_resize_remote_image_http_failure() -> None:
     """Test fetch_and_resize_remote_image when HTTP request fails."""
     from utils.image_utils import fetch_and_resize_remote_image
 
@@ -227,7 +227,7 @@ def test_fetch_and_resize_remote_image_http_failure():
     assert result is None
 
 
-def test_fetch_and_resize_remote_image_invalid_bytes():
+def test_fetch_and_resize_remote_image_invalid_bytes() -> None:
     """Test fetch_and_resize_remote_image with non-image response body."""
     from utils.image_utils import fetch_and_resize_remote_image
 
@@ -244,7 +244,7 @@ def test_fetch_and_resize_remote_image_invalid_bytes():
     assert result is None
 
 
-def test_fetch_and_resize_remote_image_raise_for_status():
+def test_fetch_and_resize_remote_image_raise_for_status() -> None:
     """Test fetch_and_resize_remote_image when raise_for_status raises."""
     from requests.exceptions import HTTPError
 
@@ -266,7 +266,7 @@ def test_fetch_and_resize_remote_image_raise_for_status():
 # ---------------------------------------------------------------------------
 
 
-def test_stream_to_disk_writes_chunks_and_returns_path():
+def test_stream_to_disk_writes_chunks_and_returns_path() -> None:
     """_stream_to_disk should write streamed chunks to a temp file."""
     import os
 
@@ -292,7 +292,7 @@ def test_stream_to_disk_writes_chunks_and_returns_path():
         os.unlink(path)
 
 
-def test_stream_to_disk_raises_on_http_error():
+def test_stream_to_disk_raises_on_http_error() -> None:
     """_stream_to_disk should propagate HTTP errors."""
     from requests.exceptions import HTTPError
 
@@ -318,7 +318,7 @@ def test_stream_to_disk_raises_on_http_error():
 # ---------------------------------------------------------------------------
 
 
-def test_fetch_and_resize_low_memory_success():
+def test_fetch_and_resize_low_memory_success() -> None:
     """Test the low-memory streaming path through fetch_and_resize_remote_image."""
     from utils.image_utils import fetch_and_resize_remote_image
 
@@ -344,7 +344,7 @@ def test_fetch_and_resize_low_memory_success():
     )
 
 
-def test_fetch_and_resize_low_memory_cleans_up_on_failure():
+def test_fetch_and_resize_low_memory_cleans_up_on_failure() -> None:
     """The low-memory path should delete the temp file even on error."""
     from utils.image_utils import fetch_and_resize_remote_image
 
@@ -368,7 +368,7 @@ def test_fetch_and_resize_low_memory_cleans_up_on_failure():
     mock_unlink.assert_not_called()
 
 
-def test_fetch_and_resize_low_memory_swallows_unlink_oserror():
+def test_fetch_and_resize_low_memory_swallows_unlink_oserror() -> None:
     """If unlink fails during cleanup, the error is logged but not propagated."""
     from utils.image_utils import fetch_and_resize_remote_image
 
@@ -392,7 +392,7 @@ def test_fetch_and_resize_low_memory_swallows_unlink_oserror():
     assert result is fake_image
 
 
-def test_fetch_and_resize_low_memory_loader_returns_none():
+def test_fetch_and_resize_low_memory_loader_returns_none() -> None:
     """When loader.from_file returns None (decode failure), we get None back."""
     from utils.image_utils import fetch_and_resize_remote_image
 
@@ -413,7 +413,7 @@ def test_fetch_and_resize_low_memory_loader_returns_none():
     assert result is None
 
 
-def test_fetch_and_resize_non_low_memory_decode_failure_returns_none():
+def test_fetch_and_resize_non_low_memory_decode_failure_returns_none() -> None:
     """Non-low-memory path: from_bytesio returning None logs and returns None."""
     from utils.image_utils import fetch_and_resize_remote_image
 

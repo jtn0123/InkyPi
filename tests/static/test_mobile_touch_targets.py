@@ -4,6 +4,8 @@
 import re
 from pathlib import Path
 
+from flask.testing import FlaskClient
+
 _STYLES_DIR = Path(__file__).resolve().parents[2] / "src" / "static" / "styles"
 
 
@@ -41,7 +43,7 @@ def _extract_mobile_768_blocks(css: str) -> str:
     return "\n".join(blocks)
 
 
-def test_mobile_768_enforces_min_height_on_buttons(client):
+def test_mobile_768_enforces_min_height_on_buttons(client: FlaskClient) -> None:
     """@media (max-width: 768px) block sets min-height: 36px on buttons."""
     mobile = _extract_mobile_768_blocks(_read_all_css())
     assert mobile, "No @media (max-width: 768px) block found"
@@ -51,7 +53,7 @@ def test_mobile_768_enforces_min_height_on_buttons(client):
     )
 
 
-def test_mobile_768_enforces_min_width_on_buttons(client):
+def test_mobile_768_enforces_min_width_on_buttons(client: FlaskClient) -> None:
     """@media (max-width: 768px) block sets min-width: 36px on buttons."""
     mobile = _extract_mobile_768_blocks(_read_all_css())
     assert "min-width: 36px" in mobile, (
@@ -60,7 +62,7 @@ def test_mobile_768_enforces_min_width_on_buttons(client):
     )
 
 
-def test_mobile_768_covers_core_interactive_selectors(client):
+def test_mobile_768_covers_core_interactive_selectors(client: FlaskClient) -> None:
     """Touch-target block covers button, .btn, select and input[type='checkbox']."""
     mobile = _extract_mobile_768_blocks(_read_all_css())
     for selector in ("button", ".btn", "select", 'input[type="checkbox"]'):
@@ -70,7 +72,7 @@ def test_mobile_768_covers_core_interactive_selectors(client):
         )
 
 
-def test_mobile_768_enlarges_checkbox_radio(client):
+def test_mobile_768_enlarges_checkbox_radio(client: FlaskClient) -> None:
     """Checkboxes and radios get explicit width/height inside mobile block."""
     mobile = _extract_mobile_768_blocks(_read_all_css())
     # The block should size checkboxes/radios to 20px so they're tappable
@@ -82,7 +84,7 @@ def test_mobile_768_enlarges_checkbox_radio(client):
     ), "input[type='radio'] missing from @media (max-width: 768px) (JTN-223)."
 
 
-def test_touch_target_rules_not_in_desktop_styles(client):
+def test_touch_target_rules_not_in_desktop_styles(client: FlaskClient) -> None:
     """The 36px touch-target rules must live inside a mobile media query, not globally."""
     css = _read_all_css()
 

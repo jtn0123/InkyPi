@@ -1,6 +1,8 @@
 import os
 import sys
 import types
+from pathlib import Path
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -9,7 +11,9 @@ from PIL import Image
 # --- Abstract Display ---
 
 
-def test_abstract_display_initialize_display_not_implemented(device_config_dev):
+def test_abstract_display_initialize_display_not_implemented(
+    device_config_dev: Any,
+) -> None:
     """Test that AbstractDisplay raises NotImplementedError for initialize_display."""
     from display.abstract_display import AbstractDisplay
 
@@ -21,7 +25,7 @@ def test_abstract_display_initialize_display_not_implemented(device_config_dev):
         display.initialize_display()
 
 
-def test_abstract_display_display_image_not_implemented(device_config_dev):
+def test_abstract_display_display_image_not_implemented(device_config_dev: Any) -> None:
     """Test that AbstractDisplay raises NotImplementedError for display_image."""
     from display.abstract_display import AbstractDisplay
 
@@ -34,7 +38,9 @@ def test_abstract_display_display_image_not_implemented(device_config_dev):
         display.display_image(test_image)
 
 
-def test_abstract_display_initialization_sets_device_config(device_config_dev):
+def test_abstract_display_initialization_sets_device_config(
+    device_config_dev: Any,
+) -> None:
     """Test that AbstractDisplay properly initializes device_config."""
     from display.abstract_display import AbstractDisplay
 
@@ -44,7 +50,7 @@ def test_abstract_display_initialization_sets_device_config(device_config_dev):
     assert display.device_config == device_config_dev
 
 
-def test_mutable_default_not_shared(device_config_dev, tmp_path):
+def test_mutable_default_not_shared(device_config_dev: Any, tmp_path: Path) -> None:
     """Verify display_image default image_settings is not shared across calls."""
     from display.mock_display import MockDisplay
 
@@ -74,7 +80,7 @@ def test_mutable_default_not_shared(device_config_dev, tmp_path):
 
 
 class FakeAutoDisplay:
-    def __init__(self, width=250, height=122):
+    def __init__(self, width: Any = 250, height: Any = 122) -> None:
         self.width = width
         self.height = height
         self.border = None
@@ -84,17 +90,17 @@ class FakeAutoDisplay:
     # Inky API used by driver
     BLACK = 0
 
-    def set_border(self, color):
+    def set_border(self, color: Any) -> None:
         self.border = color
 
-    def set_image(self, image):
+    def set_image(self, image: Any) -> None:
         self._image = image
 
-    def show(self):
+    def show(self) -> None:
         self.shown = True
 
 
-def _install_fake_inky(monkeypatch, fake_disp):
+def _install_fake_inky(monkeypatch: pytest.MonkeyPatch, fake_disp: Any) -> None:
     # Provide a stub package/module tree for 'inky.auto'
     inky_pkg = types.ModuleType("inky")
     inky_auto_mod = types.ModuleType("inky.auto")
@@ -103,13 +109,15 @@ def _install_fake_inky(monkeypatch, fake_disp):
     monkeypatch.setitem(sys.modules, "inky.auto", inky_auto_mod)
 
 
-def test_inky_initialize_sets_resolution_and_border(monkeypatch, device_config_dev):
+def test_inky_initialize_sets_resolution_and_border(
+    monkeypatch: pytest.MonkeyPatch, device_config_dev: Any
+) -> Any:
     # Ensure no resolution preset to assert writing
     device_config_dev.update_value("resolution", None)
 
     fake_disp = FakeAutoDisplay(width=296, height=128)
 
-    def fake_auto():
+    def fake_auto() -> Any:
         return fake_disp
 
     # Install fake 'inky.auto'
@@ -125,7 +133,9 @@ def test_inky_initialize_sets_resolution_and_border(monkeypatch, device_config_d
     assert fake_disp.border == fake_disp.BLACK
 
 
-def test_inky_display_image_calls_set_image_and_show(monkeypatch, device_config_dev):
+def test_inky_display_image_calls_set_image_and_show(
+    monkeypatch: pytest.MonkeyPatch, device_config_dev: Any
+) -> None:
     fake_disp = FakeAutoDisplay(width=212, height=104)
     _install_fake_inky(monkeypatch, fake_disp)
 
@@ -140,7 +150,9 @@ def test_inky_display_image_calls_set_image_and_show(monkeypatch, device_config_
     assert driver.inky_display.shown is True
 
 
-def test_inky_display_image_raises_on_none(monkeypatch, device_config_dev):
+def test_inky_display_image_raises_on_none(
+    monkeypatch: pytest.MonkeyPatch, device_config_dev: Any
+) -> None:
     fake_disp = FakeAutoDisplay(width=212, height=104)
     _install_fake_inky(monkeypatch, fake_disp)
 
@@ -156,8 +168,8 @@ def test_inky_display_image_raises_on_none(monkeypatch, device_config_dev):
 
 
 def test_mock_display_writes_latest_and_timestamp(
-    monkeypatch, device_config_dev, tmp_path
-):
+    monkeypatch: pytest.MonkeyPatch, device_config_dev: Any, tmp_path: Path
+) -> None:
     device_config_dev.update_value("display_type", "mock")
     device_config_dev.update_value("output_dir", str(tmp_path / "mock_output"))
     os.makedirs(str(tmp_path / "mock_output"), exist_ok=True)
@@ -178,7 +190,7 @@ def test_mock_display_writes_latest_and_timestamp(
     assert len(files) >= 1
 
 
-def test_mock_display_initialize_display_logging(device_config_dev):
+def test_mock_display_initialize_display_logging(device_config_dev: Any) -> None:
     """Test that mock display logs initialization message."""
     device_config_dev.update_value("display_type", "mock")
     device_config_dev.update_value("resolution", [200, 100])
@@ -199,8 +211,8 @@ def test_mock_display_initialize_display_logging(device_config_dev):
 
 
 def test_mock_display_display_image_with_none_image_settings(
-    device_config_dev, tmp_path
-):
+    device_config_dev: Any, tmp_path: Path
+) -> None:
     """Test that mock display handles None image_settings parameter."""
     device_config_dev.update_value("display_type", "mock")
     device_config_dev.update_value("output_dir", str(tmp_path / "mock_output"))
@@ -220,7 +232,9 @@ def test_mock_display_display_image_with_none_image_settings(
     assert latest.exists()
 
 
-def test_mock_display_default_output_dir_under_runtime(monkeypatch, device_config_dev):
+def test_mock_display_default_output_dir_under_runtime(
+    monkeypatch: pytest.MonkeyPatch, device_config_dev: Any
+) -> None:
     """Without INKYPI_RUNTIME_DIR or output_dir config, default goes to runtime/."""
     monkeypatch.delenv("INKYPI_RUNTIME_DIR", raising=False)
     # Remove output_dir from config so get_config returns the computed default
@@ -235,7 +249,9 @@ def test_mock_display_default_output_dir_under_runtime(monkeypatch, device_confi
     assert display.mock_frame_path == os.path.join(display.output_dir, "mock_frame.png")
 
 
-def test_mock_display_writes_simulated_frame(monkeypatch, device_config_dev, tmp_path):
+def test_mock_display_writes_simulated_frame(
+    monkeypatch: pytest.MonkeyPatch, device_config_dev: Any, tmp_path: Path
+) -> None:
     device_config_dev.update_value("display_type", "mock")
     device_config_dev.update_value("output_dir", str(tmp_path / "mock_output"))
     frame_path = tmp_path / "mock_frame.png"

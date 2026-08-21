@@ -1,8 +1,13 @@
 import json
 from datetime import datetime, timedelta
+from typing import Any
+
+import pytest
+from flask import Flask
+from flask.testing import FlaskClient
 
 
-def test_add_plugin_success_and_duplicate(client):
+def test_add_plugin_success_and_duplicate(client: FlaskClient) -> None:
     payload = {
         "plugin_id": "clock",
         "refresh_settings": json.dumps(
@@ -25,7 +30,7 @@ def test_add_plugin_success_and_duplicate(client):
     assert "already exists" in resp2.get_json().get("error", "")
 
 
-def test_add_plugin_validation_errors(client):
+def test_add_plugin_validation_errors(client: FlaskClient) -> None:
     bad_name = {
         "plugin_id": "clock",
         "refresh_settings": json.dumps(
@@ -59,7 +64,7 @@ def test_add_plugin_validation_errors(client):
     assert "Refresh type is required" in r2.get_json().get("error", "")
 
 
-def _add_plugin_with_instance(client, instance_name):
+def _add_plugin_with_instance(client: FlaskClient, instance_name: Any) -> Any:
     """Helper: attempt to add a clock plugin with the given instance name."""
     payload = {
         "plugin_id": "clock",
@@ -76,28 +81,28 @@ def _add_plugin_with_instance(client, instance_name):
     return client.post("/add_plugin", data=payload)
 
 
-def test_instance_name_allows_underscore(client):
+def test_instance_name_allows_underscore(client: FlaskClient) -> None:
     """JTN-471: underscore should be accepted in instance names."""
     resp = _add_plugin_with_instance(client, "weather_home")
     assert resp.status_code == 200
     assert resp.get_json().get("success") is True
 
 
-def test_instance_name_allows_hyphen(client):
+def test_instance_name_allows_hyphen(client: FlaskClient) -> None:
     """JTN-471: hyphen should be accepted in instance names."""
     resp = _add_plugin_with_instance(client, "my-plugin")
     assert resp.status_code == 200
     assert resp.get_json().get("success") is True
 
 
-def test_instance_name_allows_plain(client):
+def test_instance_name_allows_plain(client: FlaskClient) -> None:
     """JTN-471: plain alphanumeric name should be accepted."""
     resp = _add_plugin_with_instance(client, "plain")
     assert resp.status_code == 200
     assert resp.get_json().get("success") is True
 
 
-def test_instance_name_rejects_slash(client):
+def test_instance_name_rejects_slash(client: FlaskClient) -> None:
     """JTN-471: slash must be rejected to prevent path traversal."""
     resp = _add_plugin_with_instance(client, "foo/bar")
     assert resp.status_code == 422
@@ -106,7 +111,7 @@ def test_instance_name_rejects_slash(client):
     )
 
 
-def test_instance_name_rejects_dotdot(client):
+def test_instance_name_rejects_dotdot(client: FlaskClient) -> None:
     """JTN-471: ../etc traversal attempt must be rejected."""
     resp = _add_plugin_with_instance(client, "../etc")
     assert resp.status_code == 422
@@ -115,14 +120,14 @@ def test_instance_name_rejects_dotdot(client):
     )
 
 
-def test_instance_name_rejects_empty(client):
+def test_instance_name_rejects_empty(client: FlaskClient) -> None:
     """JTN-471: empty instance name must be rejected."""
     resp = _add_plugin_with_instance(client, "")
     assert resp.status_code == 422
     assert "required" in resp.get_json().get("error", "").lower()
 
 
-def test_create_playlist_error_paths(client):
+def test_create_playlist_error_paths(client: FlaskClient) -> None:
     # Equal times should be rejected
     resp = client.post(
         "/create_playlist",
@@ -147,7 +152,9 @@ def test_create_playlist_error_paths(client):
     assert dupe.status_code == 400
 
 
-def test_update_playlist_errors_and_failure_branch(client, flask_app, monkeypatch):
+def test_update_playlist_errors_and_failure_branch(
+    client: FlaskClient, flask_app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
     # Missing required fields
     r = client.put("/update_playlist/Nope", json={})
     assert r.status_code == 400
@@ -175,8 +182,8 @@ def test_update_playlist_errors_and_failure_branch(client, flask_app, monkeypatc
     assert r3.status_code == 500
 
 
-def test_delete_playlist_not_exist(client):
-    # JTN-782: missing playlist returns 404 (not_found), not 400.
+def test_delete_playlist_not_exist(client: FlaskClient):
+    # JTN-782: missing playlist returns 404 (not_found) -> None -> None, not 400.
     resp = client.delete("/delete_playlist/NoSuch")
     assert resp.status_code == 404
     data = resp.get_json()
@@ -184,7 +191,9 @@ def test_delete_playlist_not_exist(client):
     assert data.get("code") == "not_found"
 
 
-def test_eta_endpoint_and_request_ids(client, device_config_dev):
+def test_eta_endpoint_and_request_ids(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     # Build a playlist with 2 plugins
     pm = device_config_dev.get_playlist_manager()
     pm.add_playlist("Default", "00:00", "24:00")
@@ -226,7 +235,7 @@ def test_eta_endpoint_and_request_ids(client, device_config_dev):
     assert isinstance(j2.get("request_id"), str) and len(j2["request_id"]) > 0
 
 
-def test_format_relative_time_filter_cases():
+def test_format_relative_time_filter_cases() -> None:
     from blueprints.playlist import format_relative_time
 
     now = datetime.now().astimezone()
@@ -255,7 +264,7 @@ def test_format_relative_time_filter_cases():
     assert " at " in out4
 
 
-def test_add_plugin_missing_playlist_name(client):
+def test_add_plugin_missing_playlist_name(client: FlaskClient) -> None:
     payload = {
         "plugin_id": "clock",
         "refresh_settings": json.dumps(
@@ -272,7 +281,7 @@ def test_add_plugin_missing_playlist_name(client):
     assert "Playlist name is required" in resp.get_json().get("error", "")
 
 
-def test_add_plugin_missing_instance_name(client):
+def test_add_plugin_missing_instance_name(client: FlaskClient) -> None:
     payload = {
         "plugin_id": "clock",
         "refresh_settings": json.dumps(
@@ -289,7 +298,7 @@ def test_add_plugin_missing_instance_name(client):
     assert "Instance name is required" in resp.get_json().get("error", "")
 
 
-def test_add_plugin_missing_refresh_unit(client):
+def test_add_plugin_missing_refresh_unit(client: FlaskClient) -> None:
     payload = {
         "plugin_id": "clock",
         "refresh_settings": json.dumps(
@@ -306,7 +315,7 @@ def test_add_plugin_missing_refresh_unit(client):
     assert "Refresh interval unit is required" in resp.get_json().get("error", "")
 
 
-def test_add_plugin_missing_refresh_interval(client):
+def test_add_plugin_missing_refresh_interval(client: FlaskClient) -> None:
     payload = {
         "plugin_id": "clock",
         "refresh_settings": json.dumps(
@@ -323,7 +332,7 @@ def test_add_plugin_missing_refresh_interval(client):
     assert "Refresh interval is required" in resp.get_json().get("error", "")
 
 
-def test_add_plugin_missing_refresh_time_scheduled(client):
+def test_add_plugin_missing_refresh_time_scheduled(client: FlaskClient) -> None:
     payload = {
         "plugin_id": "clock",
         "refresh_settings": json.dumps(
@@ -339,7 +348,9 @@ def test_add_plugin_missing_refresh_time_scheduled(client):
     assert "Refresh time is required" in resp.get_json().get("error", "")
 
 
-def test_add_plugin_playlist_manager_failure(client, flask_app, monkeypatch):
+def test_add_plugin_playlist_manager_failure(
+    client: FlaskClient, flask_app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
     payload = {
         "plugin_id": "clock",
         "refresh_settings": json.dumps(
@@ -361,13 +372,13 @@ def test_add_plugin_playlist_manager_failure(client, flask_app, monkeypatch):
     assert "Failed to add to playlist" in resp.get_json().get("error", "")
 
 
-def test_create_playlist_invalid_json(client):
+def test_create_playlist_invalid_json(client: FlaskClient) -> None:
     resp = client.post("/create_playlist", data="not json")
     assert resp.status_code == 415  # Flask returns 415 for unsupported media type
     # The actual validation happens later, so we test that the endpoint handles it
 
 
-def test_create_playlist_missing_name(client):
+def test_create_playlist_missing_name(client: FlaskClient) -> None:
     resp = client.post(
         "/create_playlist", json={"start_time": "06:00", "end_time": "09:00"}
     )
@@ -380,13 +391,15 @@ def test_create_playlist_missing_name(client):
     assert data["details"]["field"] == "playlist_name"
 
 
-def test_create_playlist_missing_times(client):
+def test_create_playlist_missing_times(client: FlaskClient) -> None:
     resp = client.post("/create_playlist", json={"playlist_name": "Test"})
     assert resp.status_code == 400
     assert "Start time and End time are required" in resp.get_json().get("error", "")
 
 
-def test_create_playlist_playlist_manager_failure(client, flask_app, monkeypatch):
+def test_create_playlist_playlist_manager_failure(
+    client: FlaskClient, flask_app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
     pm = flask_app.config["DEVICE_CONFIG"].get_playlist_manager()
     monkeypatch.setattr(pm, "add_playlist", lambda *args, **kwargs: False)
 
@@ -398,7 +411,9 @@ def test_create_playlist_playlist_manager_failure(client, flask_app, monkeypatch
     assert "Failed to create playlist" in resp.get_json().get("error", "")
 
 
-def test_create_playlist_exception_handling(client, flask_app, monkeypatch):
+def test_create_playlist_exception_handling(
+    client: FlaskClient, flask_app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
     pm = flask_app.config["DEVICE_CONFIG"].get_playlist_manager()
     monkeypatch.setattr(
         pm,
@@ -417,7 +432,7 @@ def test_create_playlist_exception_handling(client, flask_app, monkeypatch):
     assert body.get("details", {}).get("context") == "create playlist"
 
 
-def test_update_playlist_rejects_equal_start_end(client):
+def test_update_playlist_rejects_equal_start_end(client: FlaskClient) -> None:
     # First create a playlist
     client.post(
         "/create_playlist",
@@ -432,7 +447,7 @@ def test_update_playlist_rejects_equal_start_end(client):
     assert "cannot be the same" in resp.get_json().get("error", "")
 
 
-def test_update_playlist_allows_overnight_window(client):
+def test_update_playlist_allows_overnight_window(client: FlaskClient) -> None:
     client.post(
         "/create_playlist",
         json={"playlist_name": "Overnight", "start_time": "06:00", "end_time": "09:00"},
@@ -444,7 +459,7 @@ def test_update_playlist_allows_overnight_window(client):
     assert resp.status_code == 200
 
 
-def test_delete_playlist_missing_name(client):
+def test_delete_playlist_missing_name(client: FlaskClient) -> None:
     resp = client.delete("/delete_playlist/")
     assert resp.status_code == 404  # Flask routing gives 404 for missing path parameter
     # The validation happens at the route level

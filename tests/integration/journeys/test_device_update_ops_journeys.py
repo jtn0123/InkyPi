@@ -14,8 +14,11 @@ import json
 import threading
 import time
 from pathlib import Path
+from typing import Any
 
 import pytest
+from flask import Flask
+from playwright.sync_api import Page
 from tests.integration.browser_helpers import RuntimeCollector, stub_leaflet
 
 pytestmark = [pytest.mark.integration, pytest.mark.journey]
@@ -24,7 +27,7 @@ _STUBBED_LATEST_TAG = "99.0.0"
 
 
 @pytest.fixture
-def stable_version_check(monkeypatch):
+def stable_version_check(monkeypatch: pytest.MonkeyPatch) -> None:
     """Force /api/version to stay local/deterministic during settings journeys."""
     import blueprints.settings as settings_mod
 
@@ -42,7 +45,7 @@ def stable_version_check(monkeypatch):
     )
 
 
-def _open_settings_page(page, live_server: str) -> RuntimeCollector:
+def _open_settings_page(page: Page, live_server: str) -> RuntimeCollector:
     stub_leaflet(page)
     collector = RuntimeCollector(page, live_server)
     page.goto(f"{live_server}/settings", wait_until="domcontentloaded", timeout=30000)
@@ -51,23 +54,23 @@ def _open_settings_page(page, live_server: str) -> RuntimeCollector:
     return collector
 
 
-def _open_updates_tab(page) -> None:
+def _open_updates_tab(page: Page) -> None:
     page.locator('[data-settings-tab="maintenance"]').first.click()
     page.wait_for_selector("#checkUpdatesBtn:visible", timeout=10000)
 
 
-def _open_power_tab(page) -> None:
+def _open_power_tab(page: Page) -> None:
     # Reboot/shutdown moved to a dedicated "Power" tab (handoff design parity).
     page.locator('[data-settings-tab="power"]').first.click()
     page.wait_for_selector("#rebootBtn:visible", timeout=10000)
 
 
-def _viewer_lines(page) -> list[str]:
+def _viewer_lines(page: Page) -> list[str]:
     raw = page.locator("#logsViewer").inner_text()
     return [line for line in raw.splitlines() if line.strip()]
 
 
-def _ensure_logs_panel_open(page) -> None:
+def _ensure_logs_panel_open(page: Page) -> None:
     viewer = page.locator("#logsViewer")
     if viewer.is_visible():
         return
@@ -77,7 +80,7 @@ def _ensure_logs_panel_open(page) -> None:
     page.wait_for_selector("#logsViewer:visible", timeout=5000)
 
 
-def _wait_for_toast_message(page, text: str, timeout: int = 10000) -> None:
+def _wait_for_toast_message(page: Page, text: str, timeout: int = 10000) -> None:
     page.wait_for_function(
         "(needle) => Array.from(document.querySelectorAll('.toast .toast-content'))"
         ".some((el) => (el.textContent || '').includes(needle))",
@@ -87,11 +90,11 @@ def _wait_for_toast_message(page, text: str, timeout: int = 10000) -> None:
 
 
 def test_jtn_728_reboot_shutdown_journey(
-    live_server,
-    browser_page,
-    monkeypatch,
-    stable_version_check,
-):
+    live_server: str,
+    browser_page: Page,
+    monkeypatch: pytest.MonkeyPatch,
+    stable_version_check: Any,
+) -> Any:
     """JTN-728: Reboot/shutdown controls open confirms and hit /shutdown."""
     import blueprints.settings as settings_mod
     from blueprints.settings import _system as system_mod
@@ -109,7 +112,9 @@ def test_jtn_728_reboot_shutdown_journey(
 
     calls: list[list[str]] = []
 
-    def _fake_run(cmd, check=True):  # noqa: FBT002 - signature mirrors subprocess.run
+    def _fake_run(
+        cmd: Any, check: Any = True
+    ) -> Any:  # noqa: FBT002 - signature mirrors subprocess.run
         calls.append(list(cmd))
 
         class _Result:
@@ -153,11 +158,11 @@ def test_jtn_728_reboot_shutdown_journey(
 
 
 def test_jtn_727_logs_journey(
-    live_server,
-    browser_page,
-    monkeypatch,
-    stable_version_check,
-):
+    live_server: str,
+    browser_page: Page,
+    monkeypatch: pytest.MonkeyPatch,
+    stable_version_check: Any,
+) -> Any:
     """JTN-727: Logs refresh/filter controls keep rendering expected output."""
     import blueprints.settings as settings_mod
 
@@ -229,17 +234,17 @@ def test_jtn_727_logs_journey(
 
 
 def test_jtn_726_refresh_cadence_journey(
-    live_server,
-    flask_app,
-    device_config_dev,
-    browser_page,
-    monkeypatch,
-    stable_version_check,
-):
+    live_server: str,
+    flask_app: Flask,
+    device_config_dev: Any,
+    browser_page: Page,
+    monkeypatch: pytest.MonkeyPatch,
+    stable_version_check: Any,
+) -> None:
     """JTN-726: Changing cadence in Settings persists + signals refresh task."""
     signal_calls = {"count": 0}
 
-    def _signal_config_change():
+    def _signal_config_change() -> None:
         signal_calls["count"] += 1
 
     monkeypatch.setattr(
@@ -279,13 +284,13 @@ def test_jtn_726_refresh_cadence_journey(
 
 
 def test_jtn_725_update_failure_recovery_journey(
-    live_server,
-    flask_app,
-    browser_page,
-    monkeypatch,
+    live_server: str,
+    flask_app: Flask,
+    browser_page: Page,
+    monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
-    stable_version_check,
-):
+    stable_version_check: Any,
+) -> None:
     """JTN-725: Failed-update banner renders and rollback recovery can be started."""
     import blueprints.settings as settings_mod
 
@@ -308,7 +313,7 @@ def test_jtn_725_update_failure_recovery_journey(
     started = threading.Event()
     rollback_targets: list[str | None] = []
 
-    def _fake_runner(script_path, target_tag=None):
+    def _fake_runner(script_path: Any, target_tag: Any = None) -> None:
         rollback_targets.append(target_tag)
         started.set()
         settings_mod._set_update_state(False, None)

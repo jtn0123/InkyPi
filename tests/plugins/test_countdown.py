@@ -1,5 +1,6 @@
 # pyright: reportMissingImports=false
 from datetime import UTC, datetime
+from typing import Any
 from unittest.mock import patch
 
 import pytest
@@ -7,15 +8,15 @@ from PIL import Image
 
 
 @pytest.fixture()
-def plugin_config():
+def plugin_config() -> Any:
     return {"id": "countdown", "class": "Countdown", "name": "Countdown"}
 
 
-def _frozen_now(year, month, day):
+def _frozen_now(year: Any, month: Any, day: Any) -> Any:
     return datetime(year, month, day, 12, 0, 0, tzinfo=UTC)
 
 
-def test_countdown_future_date(plugin_config, device_config_dev):
+def test_countdown_future_date(plugin_config: Any, device_config_dev: Any) -> None:
     from plugins.countdown.countdown import Countdown
 
     with patch("plugins.countdown.countdown.datetime", wraps=datetime) as mock_dt:
@@ -28,7 +29,7 @@ def test_countdown_future_date(plugin_config, device_config_dev):
     assert isinstance(result, Image.Image)
 
 
-def test_countdown_past_date(plugin_config, device_config_dev):
+def test_countdown_past_date(plugin_config: Any, device_config_dev: Any) -> None:
     from plugins.countdown.countdown import Countdown
 
     with patch("plugins.countdown.countdown.datetime", wraps=datetime) as mock_dt:
@@ -41,7 +42,7 @@ def test_countdown_past_date(plugin_config, device_config_dev):
     assert isinstance(result, Image.Image)
 
 
-def test_countdown_today(plugin_config, device_config_dev):
+def test_countdown_today(plugin_config: Any, device_config_dev: Any) -> None:
     from plugins.countdown.countdown import Countdown
 
     with patch("plugins.countdown.countdown.datetime", wraps=datetime) as mock_dt:
@@ -54,7 +55,9 @@ def test_countdown_today(plugin_config, device_config_dev):
     assert isinstance(result, Image.Image)
 
 
-def test_countdown_missing_date_falls_back_to_default(plugin_config, device_config_dev):
+def test_countdown_missing_date_falls_back_to_default(
+    plugin_config: Any, device_config_dev: Any
+) -> None:
     """JTN-784: missing/empty date renders with a ~30-day default rather than
     raising, so a bare /update_now call produces a visible render. Form-time
     validation (validate_settings) still rejects the empty date; see
@@ -66,14 +69,14 @@ def test_countdown_missing_date_falls_back_to_default(plugin_config, device_conf
     assert isinstance(result, Image.Image)
 
 
-def test_countdown_validate_settings_rejects_missing_date(plugin_config):
+def test_countdown_validate_settings_rejects_missing_date(plugin_config: Any) -> None:
     from plugins.countdown.countdown import Countdown
 
     p = Countdown(plugin_config)
     assert p.validate_settings({"title": "No Date", "date": ""}) == "Date is required."
 
 
-def test_countdown_vertical(plugin_config, device_config_dev):
+def test_countdown_vertical(plugin_config: Any, device_config_dev: Any) -> None:
     from plugins.countdown.countdown import Countdown
 
     device_config_dev.update_value("orientation", "vertical")
@@ -88,7 +91,9 @@ def test_countdown_vertical(plugin_config, device_config_dev):
     assert isinstance(result, Image.Image)
 
 
-def test_countdown_invalid_timezone_falls_back_to_utc(plugin_config, device_config_dev):
+def test_countdown_invalid_timezone_falls_back_to_utc(
+    plugin_config: Any, device_config_dev: Any
+) -> None:
     """Invalid timezone must not crash countdown; get_timezone() falls back to UTC."""
     from plugins.countdown.countdown import Countdown
 

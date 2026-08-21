@@ -2,12 +2,14 @@
 """Core weather rendering/integration tests."""
 
 from datetime import UTC
+from typing import Any
 from zoneinfo import ZoneInfoNotFoundError
 
 import pytest
+from flask.testing import FlaskClient
 
 
-def test_weather_timezone_parsing():
+def test_weather_timezone_parsing() -> None:
     """Test weather timezone parsing logic."""
     from plugins.weather.weather import Weather
 
@@ -19,7 +21,7 @@ def test_weather_timezone_parsing():
     assert tz is not None
 
 
-def test_weather_vertical_orientation():
+def test_weather_vertical_orientation() -> None:
     """Test vertical orientation handling."""
     from unittest.mock import MagicMock
 
@@ -37,7 +39,7 @@ def test_weather_vertical_orientation():
     assert dimensions == (300, 400)
 
 
-def test_weather_error_handling():
+def test_weather_error_handling() -> None:
     """Test weather error handling."""
     from unittest.mock import MagicMock, patch
 
@@ -64,7 +66,7 @@ def test_weather_error_handling():
             assert "OpenWeatherMap request failure" in str(e)
 
 
-def test_moon_phase_parsing():
+def test_moon_phase_parsing() -> None:
     """Test moon phase parsing logic."""
 
     # Test moon phase parsing with different phases
@@ -89,7 +91,7 @@ def test_moon_phase_parsing():
         ]
 
 
-def test_moon_phase_name_handling():
+def test_moon_phase_name_handling() -> None:
     """Test moon phase name handling edge cases."""
     from plugins.weather.weather import Weather
 
@@ -116,7 +118,7 @@ def test_moon_phase_name_handling():
         assert phase_name in ["newmoon", "lastquarter", "firstquarter"]
 
 
-def test_visibility_parsing():
+def test_visibility_parsing() -> None:
     """Test visibility parsing logic."""
 
     # Test visibility parsing with different values
@@ -142,15 +144,17 @@ def test_visibility_parsing():
         assert visibility_str is not None or visibility_raw is None
 
 
-def test_weather_save_settings(client, monkeypatch):
+def test_weather_save_settings(
+    client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> Any:
     """Test saving weather settings to default playlist from main plugin page."""
 
     # Mock the weather API calls
-    def fake_get(url, *args, **kwargs):
+    def fake_get(url: Any, *args: Any, **kwargs: Any) -> Any:
         class R:
             status_code = 200
 
-            def json(self_inner):
+            def json(self_inner: Any) -> Any:
                 if "air_pollution" in url:
                     return {"list": [{"main": {"aqi": 3}}]}
                 if "geo/1.0/reverse" in url:
@@ -207,15 +211,17 @@ def test_weather_save_settings(client, monkeypatch):
     assert "Add to Playlist" in result.get("message", "")
 
 
-def test_weather_settings_persistence(client, monkeypatch):
+def test_weather_settings_persistence(
+    client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> Any:
     """Test that saved weather settings persist when navigating back to plugin page."""
 
     # Mock the weather API calls
-    def fake_get(url, *args, **kwargs):
+    def fake_get(url: Any, *args: Any, **kwargs: Any) -> Any:
         class R:
             status_code = 200
 
-            def json(self_inner):
+            def json(self_inner: Any) -> Any:
                 if "air_pollution" in url:
                     return {"list": [{"main": {"aqi": 3}}]}
                 if "geo/1.0/reverse" in url:
@@ -279,7 +285,7 @@ def test_weather_settings_persistence(client, monkeypatch):
     assert "-122.4194" in response_text  # longitude
 
 
-def test_weather_parse_weather_data_missing_current():
+def test_weather_parse_weather_data_missing_current() -> None:
     """Test parsing weather data with missing current weather info."""
     from plugins.weather.weather import Weather
 
@@ -294,7 +300,7 @@ def test_weather_parse_weather_data_missing_current():
         p.parse_weather_data(weather_data, aqi_data, tz, "metric", "12h", 40.7)
 
 
-def test_weather_map_weather_code_to_icon():
+def test_weather_map_weather_code_to_icon() -> None:
     """Test weather code to icon mapping."""
     from plugins.weather.weather import Weather
 
@@ -310,7 +316,7 @@ def test_weather_map_weather_code_to_icon():
     assert result2.endswith("d")  # Daytime
 
 
-def test_weather_parse_forecast_empty_data():
+def test_weather_parse_forecast_empty_data() -> None:
     """Test parsing forecast with empty data."""
     from plugins.weather.weather import Weather
 
@@ -321,7 +327,7 @@ def test_weather_parse_forecast_empty_data():
     assert result == []
 
 
-def test_weather_parse_hourly_empty_data():
+def test_weather_parse_hourly_empty_data() -> None:
     """Test parsing hourly data with empty data."""
     from plugins.weather.weather import Weather
 
@@ -332,7 +338,7 @@ def test_weather_parse_hourly_empty_data():
     assert result == []
 
 
-def test_weather_parse_timezone():
+def test_weather_parse_timezone() -> None:
     """Test timezone parsing from weather data."""
     from plugins.weather.weather import Weather
 
@@ -343,7 +349,7 @@ def test_weather_parse_timezone():
     assert str(tz) == "America/New_York"
 
 
-def test_weather_parse_timezone_invalid():
+def test_weather_parse_timezone_invalid() -> None:
     """Test timezone parsing with invalid timezone."""
     from plugins.weather.weather import Weather
 
@@ -355,7 +361,7 @@ def test_weather_parse_timezone_invalid():
         p.parse_timezone(weather_data)
 
 
-def test_weather_generate_settings_template():
+def test_weather_generate_settings_template() -> None:
     """Test settings template generation."""
     from plugins.weather.weather import Weather
 
@@ -367,7 +373,9 @@ def test_weather_generate_settings_template():
     assert template["style_settings"] is True
 
 
-def test_weather_invalid_timezone_falls_back_to_utc(device_config_dev, monkeypatch):
+def test_weather_invalid_timezone_falls_back_to_utc(
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Invalid device timezone must not crash weather; get_timezone() falls back to UTC."""
     from unittest.mock import patch
 

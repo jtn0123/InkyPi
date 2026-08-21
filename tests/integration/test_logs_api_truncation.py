@@ -1,8 +1,16 @@
-def test_logs_api_truncation_and_level_filter(client, monkeypatch):
+from typing import Any
+
+import pytest
+from flask.testing import FlaskClient
+
+
+def test_logs_api_truncation_and_level_filter(
+    client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> Any:
     from blueprints import settings as settings_mod
 
     # Monkeypatch readers to return controlled lines
-    def fake_read_log_lines(hours):
+    def fake_read_log_lines(hours: Any) -> Any:
         # Include errors and warnings and info lines
         return [
             "INFO normal line",

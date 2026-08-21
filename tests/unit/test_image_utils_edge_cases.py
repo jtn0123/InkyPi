@@ -1,10 +1,12 @@
 """Simple edge case tests for image_utils to improve coverage."""
 
+from typing import Any
+
 import pytest
 from PIL import Image
 
 
-def test_resize_image_with_extreme_aspect_ratio(device_config_dev):
+def test_resize_image_with_extreme_aspect_ratio(device_config_dev: Any) -> None:
     """Test resizing image with extreme aspect ratio (very wide)."""
     from utils.image_utils import resize_image
 
@@ -21,7 +23,7 @@ def test_resize_image_with_extreme_aspect_ratio(device_config_dev):
     assert 400 in result.size
 
 
-def test_resize_image_very_small(device_config_dev):
+def test_resize_image_very_small(device_config_dev: Any) -> None:
     """Test resizing very small image."""
     from utils.image_utils import resize_image
 
@@ -36,7 +38,7 @@ def test_resize_image_very_small(device_config_dev):
     assert result.height <= 600
 
 
-def test_apply_image_enhancement_with_extreme_values():
+def test_apply_image_enhancement_with_extreme_values() -> None:
     """Test image enhancement with extreme values."""
     from utils.image_utils import apply_image_enhancement
 
@@ -52,7 +54,7 @@ def test_apply_image_enhancement_with_extreme_values():
     assert isinstance(result, Image.Image)
 
 
-def test_apply_image_enhancement_with_zero_values():
+def test_apply_image_enhancement_with_zero_values() -> None:
     """Test image enhancement with zero/minimum values."""
     from utils.image_utils import apply_image_enhancement
 
@@ -65,7 +67,7 @@ def test_apply_image_enhancement_with_zero_values():
     assert result is not None
 
 
-def test_change_orientation_with_invalid_value():
+def test_change_orientation_with_invalid_value() -> None:
     """Test orientation change with invalid orientation value."""
     from utils.image_utils import change_orientation
 
@@ -83,7 +85,7 @@ def test_change_orientation_with_invalid_value():
             change_orientation(img, invalid_orientation)
 
 
-def test_resize_image_with_pad_settings():
+def test_resize_image_with_pad_settings() -> None:
     """Test resize with pad image setting."""
     from utils.image_utils import resize_image
 
@@ -98,7 +100,7 @@ def test_resize_image_with_pad_settings():
     assert result.height <= 400
 
 
-def test_get_image_from_url_with_timeout():
+def test_get_image_from_url_with_timeout() -> None:
     """Test get_image with network timeout."""
     from utils.image_utils import get_image
 
@@ -108,7 +110,7 @@ def test_get_image_from_url_with_timeout():
         get_image("http://invalid.url.that.does.not.exist.test/image.png", timeout=1)
 
 
-def test_resize_to_exact_dimensions():
+def test_resize_to_exact_dimensions() -> None:
     """Test that resize handles exact dimension requests."""
     from utils.image_utils import resize_image
 
@@ -123,7 +125,7 @@ def test_resize_to_exact_dimensions():
     assert result.height <= 300
 
 
-def test_image_conversion_rgba_to_rgb():
+def test_image_conversion_rgba_to_rgb() -> None:
     """Test RGBA to RGB conversion."""
     from utils.image_utils import resize_image
 
@@ -137,7 +139,7 @@ def test_image_conversion_rgba_to_rgb():
     # Should work with RGBA
 
 
-def test_apply_enhancement_preserves_image_mode():
+def test_apply_enhancement_preserves_image_mode() -> None:
     """Test that enhancement preserves image mode."""
     from utils.image_utils import apply_image_enhancement
 

@@ -1,4 +1,7 @@
-def test_plugin_add_config_render_remove_flow(client):
+from flask.testing import FlaskClient
+
+
+def test_plugin_add_config_render_remove_flow(client: FlaskClient) -> None:
     app = client.application
     device_config = app.config["DEVICE_CONFIG"]
     pm = device_config.get_playlist_manager()

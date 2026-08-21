@@ -6,8 +6,10 @@ invalid input. The fix lives in form_validator.js (shared helper) and
 plugin_page.js (the Save Settings / Add to Playlist caller).
 """
 
+from flask.testing import FlaskClient
 
-def test_form_validator_exposes_detailed_api(client):
+
+def test_form_validator_exposes_detailed_api(client: FlaskClient) -> None:
     resp = client.get("/static/scripts/form_validator.js")
     assert resp.status_code == 200
     js = resp.get_data(as_text=True)
@@ -28,7 +30,7 @@ def test_form_validator_exposes_detailed_api(client):
         assert name in js, f"window.FormValidator must export {name.rstrip(':')}"
 
 
-def test_form_validator_message_shapes(client):
+def test_form_validator_message_shapes(client: FlaskClient) -> None:
     resp = client.get("/static/scripts/form_validator.js")
     js = resp.get_data(as_text=True)
 
@@ -39,7 +41,7 @@ def test_form_validator_message_shapes(client):
     assert '" (and "' in js and '" more)"' in js
 
 
-def test_form_validator_label_lookup_order(client):
+def test_form_validator_label_lookup_order(client: FlaskClient) -> None:
     """Label lookup must prefer data-label, then aria-label, then <label for>,
     then a wrapping label, then the titlecased name, then 'This field'."""
     resp = client.get("/static/scripts/form_validator.js")
@@ -57,7 +59,7 @@ def test_form_validator_label_lookup_order(client):
     assert '"This field"' in js
 
 
-def test_form_validator_includes_required_textareas(client):
+def test_form_validator_includes_required_textareas(client: FlaskClient) -> None:
     """textarea[required] was missing from the selector — JTN-378 also closes
     that gap so required textareas (e.g. AI Text prompt) are validated too."""
     resp = client.get("/static/scripts/form_validator.js")
@@ -66,7 +68,7 @@ def test_form_validator_includes_required_textareas(client):
     assert "textarea[required]" in js
 
 
-def test_plugin_page_uses_detailed_validator(client):
+def test_plugin_page_uses_detailed_validator(client: FlaskClient) -> None:
     resp = client.get("/static/scripts/plugin_page.js")
     assert resp.status_code == 200
     js = resp.get_data(as_text=True)
@@ -85,7 +87,7 @@ def test_plugin_page_uses_detailed_validator(client):
     assert "fields need' : ' field needs'" not in js
 
 
-def test_ai_image_prompt_field_has_label_for_textprompt(client):
+def test_ai_image_prompt_field_has_label_for_textprompt(client: FlaskClient) -> None:
     """JTN-378: the AI Image Prompt field must render a <label for="textPrompt">
     so getInputLabel() can name it in validation toasts."""
     resp = client.get("/plugin/ai_image")
@@ -102,7 +104,7 @@ def test_ai_image_prompt_field_has_label_for_textprompt(client):
 # ---------------------------------------------------------------------------
 
 
-def test_form_validator_has_classify_invalid_reasons(client):
+def test_form_validator_has_classify_invalid_reasons(client: FlaskClient) -> None:
     """classifyInvalid should distinguish required/invalid_url/number reasons."""
     resp = client.get("/static/scripts/form_validator.js")
     js = resp.get_data(as_text=True)
@@ -119,7 +121,7 @@ def test_form_validator_has_classify_invalid_reasons(client):
         assert reason in js, f"classifyInvalid should emit reason {reason}"
 
 
-def test_form_validator_describe_reason_exposed(client):
+def test_form_validator_describe_reason_exposed(client: FlaskClient) -> None:
     """describeReason must be exposed on window.FormValidator for other scripts."""
     resp = client.get("/static/scripts/form_validator.js")
     js = resp.get_data(as_text=True)
@@ -128,7 +130,7 @@ def test_form_validator_describe_reason_exposed(client):
     assert "function describeReason(input, reason)" in js
 
 
-def test_form_validator_describe_reason_messages(client):
+def test_form_validator_describe_reason_messages(client: FlaskClient) -> None:
     """Each reason code should produce a distinct human-readable suffix."""
     resp = client.get("/static/scripts/form_validator.js")
     js = resp.get_data(as_text=True)
@@ -142,7 +144,7 @@ def test_form_validator_describe_reason_messages(client):
     assert '" is invalid"' in js
 
 
-def test_calendar_repeater_has_unique_url_label(client):
+def test_calendar_repeater_has_unique_url_label(client: FlaskClient) -> None:
     """Each calendar URL input in the template must have a unique label id."""
     resp = client.get("/plugin/calendar")
     assert resp.status_code == 200

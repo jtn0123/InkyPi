@@ -5,6 +5,7 @@ import importlib
 import json
 import sys
 from pathlib import Path
+from typing import Any
 from unittest.mock import patch
 
 import pytest
@@ -13,7 +14,7 @@ from PIL import Image
 # ── helpers ─────────────────────────────────────────────────────────────────
 
 
-def _import_dry_run():
+def _import_dry_run() -> Any:
     """Import the dry_run_plugin script as a module (adds src/ to sys.path)."""
     repo_root = Path(__file__).parent.parent
     script_path = repo_root / "scripts" / "dry_run_plugin.py"
@@ -25,7 +26,7 @@ def _import_dry_run():
 
 
 @pytest.fixture(scope="session")
-def dry_run_mod():
+def dry_run_mod() -> Any:
     """Session-scoped import of dry_run_plugin to share across tests."""
     return _import_dry_run()
 
@@ -33,28 +34,30 @@ def dry_run_mod():
 # ── unit: _MockDeviceConfig ──────────────────────────────────────────────────
 
 
-def test_mock_device_config_get_resolution(dry_run_mod):
+def test_mock_device_config_get_resolution(dry_run_mod: Any) -> None:
     cfg = dry_run_mod._MockDeviceConfig(1200, 600, "horizontal", "UTC")
     assert cfg.get_resolution() == (1200, 600)
 
 
-def test_mock_device_config_orientation(dry_run_mod):
+def test_mock_device_config_orientation(dry_run_mod: Any) -> None:
     cfg = dry_run_mod._MockDeviceConfig(800, 480, "vertical", "UTC")
     assert cfg.get_config("orientation") == "vertical"
 
 
-def test_mock_device_config_timezone(dry_run_mod):
+def test_mock_device_config_timezone(dry_run_mod: Any) -> None:
     cfg = dry_run_mod._MockDeviceConfig(800, 480, "horizontal", "Europe/London")
     assert cfg.get_config("timezone") == "Europe/London"
 
 
-def test_mock_device_config_missing_key_returns_default(dry_run_mod):
+def test_mock_device_config_missing_key_returns_default(dry_run_mod: Any) -> None:
     cfg = dry_run_mod._MockDeviceConfig(800, 480, "horizontal", "UTC")
     assert cfg.get_config("does_not_exist", default="fallback") == "fallback"
     assert cfg.get_config("does_not_exist") is None
 
 
-def test_mock_device_config_load_env_key(dry_run_mod, monkeypatch):
+def test_mock_device_config_load_env_key(
+    dry_run_mod: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     monkeypatch.setenv("MY_TEST_KEY", "secret_value")
     cfg = dry_run_mod._MockDeviceConfig(800, 480, "horizontal", "UTC")
     assert cfg.load_env_key("MY_TEST_KEY") == "secret_value"
@@ -63,13 +66,13 @@ def test_mock_device_config_load_env_key(dry_run_mod, monkeypatch):
 # ── unit: _discover_plugin_config ────────────────────────────────────────────
 
 
-def test_discover_plugin_config_year_progress(dry_run_mod):
+def test_discover_plugin_config_year_progress(dry_run_mod: Any) -> None:
     cfg = dry_run_mod._discover_plugin_config("year_progress")
     assert cfg["id"] == "year_progress"
     assert cfg["class"] == "YearProgress"
 
 
-def test_discover_plugin_config_missing_plugin_exits(dry_run_mod):
+def test_discover_plugin_config_missing_plugin_exits(dry_run_mod: Any) -> None:
     with pytest.raises(SystemExit):
         dry_run_mod._discover_plugin_config("plugin_does_not_exist_xyz")
 
@@ -77,23 +80,23 @@ def test_discover_plugin_config_missing_plugin_exits(dry_run_mod):
 # ── unit: _load_settings ─────────────────────────────────────────────────────
 
 
-def test_load_settings_no_config(dry_run_mod):
+def test_load_settings_no_config(dry_run_mod: Any) -> None:
     assert dry_run_mod._load_settings(None) == {}
 
 
-def test_load_settings_valid_json(dry_run_mod, tmp_path):
+def test_load_settings_valid_json(dry_run_mod: Any, tmp_path: Path) -> None:
     cfg_file = tmp_path / "settings.json"
     cfg_file.write_text(json.dumps({"selectedFrame": "None", "style": "dark"}))
     result = dry_run_mod._load_settings(str(cfg_file))
     assert result == {"selectedFrame": "None", "style": "dark"}
 
 
-def test_load_settings_missing_file_exits(dry_run_mod, tmp_path):
+def test_load_settings_missing_file_exits(dry_run_mod: Any, tmp_path: Path) -> None:
     with pytest.raises(SystemExit):
         dry_run_mod._load_settings(str(tmp_path / "nonexistent.json"))
 
 
-def test_load_settings_non_object_exits(dry_run_mod, tmp_path):
+def test_load_settings_non_object_exits(dry_run_mod: Any, tmp_path: Path) -> None:
     cfg_file = tmp_path / "bad.json"
     cfg_file.write_text(json.dumps(["a", "b", "c"]))
     with pytest.raises(SystemExit):
@@ -103,7 +106,7 @@ def test_load_settings_non_object_exits(dry_run_mod, tmp_path):
 # ── integration: year_progress generates a PNG ───────────────────────────────
 
 
-def test_year_progress_produces_png(dry_run_mod, tmp_path):
+def test_year_progress_produces_png(dry_run_mod: Any, tmp_path: Path) -> None:
     """Run generate_image() via the dry-run helpers and verify a PNG is created."""
     from plugins.plugin_registry import get_plugin_instance, load_plugins
 
@@ -123,7 +126,7 @@ def test_year_progress_produces_png(dry_run_mod, tmp_path):
     assert loaded.height == 480
 
 
-def test_year_progress_custom_dimensions(dry_run_mod, tmp_path):
+def test_year_progress_custom_dimensions(dry_run_mod: Any, tmp_path: Path) -> None:
     """Verify that the mock device config's resolution flows through to the image."""
     from plugins.plugin_registry import get_plugin_instance, load_plugins
 
@@ -143,7 +146,7 @@ def test_year_progress_custom_dimensions(dry_run_mod, tmp_path):
     assert loaded.height == 400
 
 
-def test_year_progress_config_override(dry_run_mod, tmp_path):
+def test_year_progress_config_override(dry_run_mod: Any, tmp_path: Path) -> None:
     """--config JSON override is loaded and passed as settings to generate_image()."""
     from plugins.plugin_registry import get_plugin_instance, load_plugins
 
@@ -169,7 +172,9 @@ def test_year_progress_config_override(dry_run_mod, tmp_path):
 # ── integration: main() end-to-end via argv patching ─────────────────────────
 
 
-def test_main_writes_png_for_year_progress(tmp_path, monkeypatch):
+def test_main_writes_png_for_year_progress(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Call main() directly with year_progress and verify the PNG is created."""
     output = tmp_path / "result.png"
     test_argv = [
@@ -195,7 +200,9 @@ def test_main_writes_png_for_year_progress(tmp_path, monkeypatch):
     assert img.height == 480
 
 
-def test_main_respects_config_override(tmp_path, monkeypatch):
+def test_main_respects_config_override(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """main() passes the --config JSON into generate_image settings."""
     output = tmp_path / "result_cfg.png"
     settings_file = tmp_path / "settings.json"
@@ -217,7 +224,9 @@ def test_main_respects_config_override(tmp_path, monkeypatch):
     assert output.exists()
 
 
-def test_main_default_output_path(tmp_path, monkeypatch):
+def test_main_default_output_path(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """When --output is omitted the file is created in the cwd."""
     # Change working directory to tmp_path so the default path lands there
     monkeypatch.chdir(tmp_path)

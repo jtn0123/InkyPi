@@ -15,6 +15,9 @@ from __future__ import annotations
 
 import json
 import logging
+from pathlib import Path
+
+import pytest
 
 from utils.logging_utils import JsonFormatter, SecretRedactionFilter, _redact
 
@@ -54,51 +57,51 @@ def _apply(record: logging.LogRecord) -> logging.LogRecord:
 
 
 class TestRedactHelper:
-    def test_api_key_equals(self):
+    def test_api_key_equals(self) -> None:
         result = _redact("api_key=abc123def456")  # gitleaks:allow
         assert "abc123def456" not in result
         assert "***REDACTED***" in result
         assert "api_key" in result
 
-    def test_token_colon(self):
+    def test_token_colon(self) -> None:
         result = _redact('token: "mysecrettoken"')
         assert "mysecrettoken" not in result
         assert "***REDACTED***" in result
 
-    def test_password_equals(self):
+    def test_password_equals(self) -> None:
         result = _redact("password=hunter2")
         assert "hunter2" not in result
         assert "***REDACTED***" in result
 
-    def test_pin_equals(self):
+    def test_pin_equals(self) -> None:
         result = _redact("pin=1234")
         assert "1234" not in result
         assert "***REDACTED***" in result
 
-    def test_bearer_token(self):
+    def test_bearer_token(self) -> None:
         result = _redact("Authorization: Bearer eyJhbGciOiJSUzI1NiJ9.payload.sig")
         assert "eyJhbGciOiJSUzI1NiJ9" not in result
         assert "***REDACTED***" in result
         # The word "Bearer" itself (or "Bearer ***REDACTED***") should remain
         assert "Bearer" in result
 
-    def test_hex_32_chars_redacted(self):
+    def test_hex_32_chars_redacted(self) -> None:
         hex_key = "a" * 32
         result = _redact(f"here is a key: {hex_key}")
         assert hex_key not in result
         assert "***REDACTED***" in result
 
-    def test_hex_31_chars_not_redacted(self):
+    def test_hex_31_chars_not_redacted(self) -> None:
         short_hex = "a" * 31
         result = _redact(f"value: {short_hex}")
         # 31-char hex should NOT be treated as a secret
         assert short_hex in result
 
-    def test_normal_text_unchanged(self):
+    def test_normal_text_unchanged(self) -> None:
         clean = "Starting server on port 8080"
         assert _redact(clean) == clean
 
-    def test_mixed_sentence_only_secret_redacted(self):
+    def test_mixed_sentence_only_secret_redacted(self) -> None:
         text = "User logged in successfully; api_key=TOPSECRETKEY123 from 192.168.1.1"  # gitleaks:allow
         result = _redact(text)
         assert "User logged in successfully" in result
@@ -112,53 +115,53 @@ class TestRedactHelper:
 
 
 class TestSecretRedactionFilter:
-    def test_msg_redacted(self):
+    def test_msg_redacted(self) -> None:
         record = _apply(_make_record("api_key=abc123def456"))  # gitleaks:allow
         assert "abc123def456" not in record.msg
         assert "***REDACTED***" in record.msg
 
-    def test_clean_msg_unchanged(self):
+    def test_clean_msg_unchanged(self) -> None:
         record = _apply(_make_record("No secrets here, just info"))
         assert record.msg == "No secrets here, just info"
 
-    def test_args_tuple_redacted(self):
+    def test_args_tuple_redacted(self) -> None:
         # The arg itself contains a key=value pattern that should be redacted.
         record = _apply(_make_record("config: %s", args=("password=hunter2",)))
         assert all("hunter2" not in str(a) for a in record.args)
 
-    def test_args_tuple_non_string_untouched(self):
+    def test_args_tuple_non_string_untouched(self) -> None:
         record = _apply(_make_record("count=%d", args=(42,)))
         assert record.args == (42,)
 
-    def test_args_tuple_bearer_redacted(self):
+    def test_args_tuple_bearer_redacted(self) -> None:
         record = _apply(
             _make_record("header: %s", args=("Bearer eyJhbGciOiJSUzI1NiJ9.abc.def",))
         )
         assert all("eyJhbGciOiJSUzI1NiJ9" not in str(a) for a in record.args)
 
-    def test_extra_string_attribute_with_secret_redacted(self):
+    def test_extra_string_attribute_with_secret_redacted(self) -> None:
         # Extra attribute contains a key=value pair — the value is redacted.
         auth = "api_key=SECRETKEYVALUE"  # gitleaks:allow
         record = _apply(_make_record("check extras", auth_info=auth))
         assert record.auth_info == "api_key=***REDACTED***"  # type: ignore[attr-defined]
 
-    def test_extra_non_string_attribute_untouched(self):
+    def test_extra_non_string_attribute_untouched(self) -> None:
         record = _apply(_make_record("check extras", request_id=999))
         assert record.request_id == 999  # type: ignore[attr-defined]
 
-    def test_filter_always_returns_true(self):
+    def test_filter_always_returns_true(self) -> None:
         """Filter must never drop records."""
         msg = "api_key=xyz"  # gitleaks:allow
         result = SecretRedactionFilter().filter(_make_record(msg))
         assert result is True
 
-    def test_authorization_header_redacted(self):
+    def test_authorization_header_redacted(self) -> None:
         record = _apply(
             _make_record("Authorization: Bearer eyJhbGciOiJSUzI1NiJ9.payload.sig")
         )
         assert "eyJhbGciOiJSUzI1NiJ9" not in record.msg
 
-    def test_password_in_record_redacted(self):
+    def test_password_in_record_redacted(self) -> None:
         record = _apply(_make_record("Password: hunter2"))
         assert "hunter2" not in record.msg
         assert "***REDACTED***" in record.msg
@@ -171,14 +174,14 @@ class TestSecretRedactionFilter:
 
 class TestPlainTextOutput:
     def test_formatted_message_redacted_via_msg(self):
-        # Secret is in the msg template itself (already fully interpolated).
+        # Secret is in the msg template itself (already fully interpolated) -> None -> None.
         record = _make_record("api_key=MYSECRETAPIKEY123")  # gitleaks:allow
         SecretRedactionFilter().filter(record)
         formatted = record.getMessage()
         assert "MYSECRETAPIKEY123" not in formatted
         assert "***REDACTED***" in formatted
 
-    def test_formatted_message_redacted_via_args(self):
+    def test_formatted_message_redacted_via_args(self) -> None:
         # Secret is in a %s arg that itself contains a key=value pattern.
         record = _make_record("config dump: %s", args=("password=hunter2",))
         SecretRedactionFilter().filter(record)
@@ -186,7 +189,7 @@ class TestPlainTextOutput:
         assert "hunter2" not in formatted
         assert "***REDACTED***" in formatted
 
-    def test_clean_formatted_message_unchanged(self):
+    def test_clean_formatted_message_unchanged(self) -> None:
         record = _make_record("Server started on %s", args=("localhost:8080",))
         SecretRedactionFilter().filter(record)
         assert record.getMessage() == "Server started on localhost:8080"
@@ -198,34 +201,34 @@ class TestPlainTextOutput:
 
 
 class TestJsonFormatterOutput:
-    def test_secret_in_msg_redacted_in_json(self):
+    def test_secret_in_msg_redacted_in_json(self) -> None:
         record = _make_record("api_key=SUPERSECRET")  # gitleaks:allow
         SecretRedactionFilter().filter(record)
         data = json.loads(JsonFormatter().format(record))
         assert "SUPERSECRET" not in data["msg"]
         assert "***REDACTED***" in data["msg"]
 
-    def test_clean_msg_in_json_unchanged(self):
+    def test_clean_msg_in_json_unchanged(self) -> None:
         record = _make_record("All systems nominal")
         SecretRedactionFilter().filter(record)
         data = json.loads(JsonFormatter().format(record))
         assert data["msg"] == "All systems nominal"
 
-    def test_secret_extra_redacted_in_json(self):
+    def test_secret_extra_redacted_in_json(self) -> None:
         # Extra attribute contains a key=value string — value gets redacted.
         record = _make_record("request", auth_header="token=BEARER_TOKEN_VALUE_HERE")
         SecretRedactionFilter().filter(record)
         data = json.loads(JsonFormatter().format(record))
         assert "BEARER_TOKEN_VALUE_HERE" not in json.dumps(data)
 
-    def test_bearer_in_json_redacted(self):
+    def test_bearer_in_json_redacted(self) -> None:
         record = _make_record("Authorization: Bearer eyJhbGciOiJSUzI1NiJ9.abc.def")
         SecretRedactionFilter().filter(record)
         data = json.loads(JsonFormatter().format(record))
         assert "eyJhbGciOiJSUzI1NiJ9" not in data["msg"]
         assert "***REDACTED***" in data["msg"]
 
-    def test_hex_key_in_json_redacted(self):
+    def test_hex_key_in_json_redacted(self) -> None:
         hex_key = "deadbeef" * 4  # 32 chars
         record = _make_record(f"loaded config key={hex_key}")
         SecretRedactionFilter().filter(record)
@@ -239,7 +242,9 @@ class TestJsonFormatterOutput:
 
 
 class TestSetupLoggingWiresFilter:
-    def test_root_logger_has_redaction_filter_after_setup(self, monkeypatch):
+    def test_root_logger_has_redaction_filter_after_setup(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         monkeypatch.setenv("INKYPI_LOG_FORMAT", "json")
         root = logging.getLogger()
         saved_handlers = root.handlers[:]
@@ -258,7 +263,7 @@ class TestSetupLoggingWiresFilter:
             root.filters = saved_filters
             root.level = saved_level
 
-    def test_expected_sse_disconnect_filter_drops_waitress_noise(self):
+    def test_expected_sse_disconnect_filter_drops_waitress_noise(self) -> None:
         from app_setup.logging_setup import ExpectedSSEDisconnectFilter
 
         flt = ExpectedSSEDisconnectFilter()
@@ -273,7 +278,9 @@ class TestSetupLoggingWiresFilter:
         assert flt.filter(events) is False
         assert flt.filter(other) is True
 
-    def test_root_logger_has_redaction_filter_plain_text(self, monkeypatch, tmp_path):
+    def test_root_logger_has_redaction_filter_plain_text(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
         """Filter is wired for plain-text mode too."""
         monkeypatch.delenv("INKYPI_LOG_FORMAT", raising=False)
         root = logging.getLogger()

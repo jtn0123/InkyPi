@@ -1,7 +1,9 @@
 """Tests for breadcrumb rendering across InkyPi pages."""
 
+from flask.testing import FlaskClient
 
-def test_settings_breadcrumb(client):
+
+def test_settings_breadcrumb(client: FlaskClient) -> None:
     """GET /settings contains breadcrumb nav with Home and Settings."""
     resp = client.get("/settings")
     html = resp.data.decode()
@@ -10,7 +12,7 @@ def test_settings_breadcrumb(client):
     assert "Settings" in html
 
 
-def test_playlist_breadcrumb(client):
+def test_playlist_breadcrumb(client: FlaskClient) -> None:
     """GET /playlist contains breadcrumb with Home and Playlists."""
     resp = client.get("/playlist")
     html = resp.data.decode()
@@ -18,7 +20,7 @@ def test_playlist_breadcrumb(client):
     assert "Playlists" in html
 
 
-def test_history_breadcrumb(client):
+def test_history_breadcrumb(client: FlaskClient) -> None:
     """GET /history contains breadcrumb with Home and History."""
     resp = client.get("/history")
     html = resp.data.decode()
@@ -26,7 +28,7 @@ def test_history_breadcrumb(client):
     assert "History" in html
 
 
-def test_api_keys_breadcrumb(client):
+def test_api_keys_breadcrumb(client: FlaskClient) -> None:
     """GET /settings/api-keys contains breadcrumb with Home, Settings, and API Keys with correct links."""
     resp = client.get("/settings/api-keys")
     html = resp.data.decode()
@@ -38,7 +40,7 @@ def test_api_keys_breadcrumb(client):
     assert 'href="/settings"' in html  # Settings link present
 
 
-def test_plugin_breadcrumb(client):
+def test_plugin_breadcrumb(client: FlaskClient) -> None:
     """GET /plugin/<id> contains breadcrumb with Home and the plugin display name."""
     # "clock" is a built-in plugin type whose plugin-info.json defines display_name="Clock"
     resp = client.get("/plugin/clock")
@@ -48,7 +50,7 @@ def test_plugin_breadcrumb(client):
     assert "Clock" in html
 
 
-def test_plugin_breadcrumb_includes_plugins_level(client):
+def test_plugin_breadcrumb_includes_plugins_level(client: FlaskClient) -> None:
     """Plugin breadcrumb has intermediate 'Plugins' level linking back to the list (JTN-637)."""
     resp = client.get("/plugin/clock")
     assert resp.status_code == 200
@@ -59,7 +61,7 @@ def test_plugin_breadcrumb_includes_plugins_level(client):
     assert 'href="/plugins"' in html
 
 
-def test_plugins_page_breadcrumb(client):
+def test_plugins_page_breadcrumb(client: FlaskClient) -> None:
     """GET /plugins contains breadcrumb with Home and Plugins."""
     resp = client.get("/plugins")
     assert resp.status_code == 200
@@ -69,7 +71,7 @@ def test_plugins_page_breadcrumb(client):
     assert "Plugins" in html
 
 
-def test_home_page_has_plugins_grid_anchor(client):
+def test_home_page_has_plugins_grid_anchor(client: FlaskClient) -> None:
     """Home page plugin grid section has id='plugins-grid' anchor target (JTN-637)."""
     resp = client.get("/")
     assert resp.status_code == 200
@@ -77,7 +79,7 @@ def test_home_page_has_plugins_grid_anchor(client):
     assert 'id="plugins-grid"' in html
 
 
-def test_home_page_showing_chip_has_label(client):
+def test_home_page_showing_chip_has_label(client: FlaskClient) -> None:
     """Home page 'now showing' chip has a 'Showing:' label prefix and a tooltip (JTN-638)."""
     resp = client.get("/")
     assert resp.status_code == 200
@@ -89,7 +91,7 @@ def test_home_page_showing_chip_has_label(client):
         assert "Showing:" in html
 
 
-def test_breadcrumb_last_item_not_linked(client):
+def test_breadcrumb_last_item_not_linked(client: FlaskClient) -> None:
     """The last breadcrumb item has aria-current="page" and is a <span>, not an <a>."""
     resp = client.get("/settings")
     html = resp.data.decode()

@@ -1,6 +1,8 @@
 """Tests for HTTP response caching functionality."""
 
 import os
+from collections.abc import Iterator
+from typing import Any
 from unittest.mock import Mock, patch
 
 import pytest
@@ -20,13 +22,13 @@ from utils.http_cache import (
 
 
 @pytest.fixture
-def cache():
+def cache() -> Any:
     """Create a fresh cache instance for testing."""
     return HTTPCache(default_ttl=1.0, max_size=5, enabled=True)
 
 
 @pytest.fixture
-def mock_response():
+def mock_response() -> Any:
     """Create a mock HTTP response."""
     resp = Mock(spec=requests.Response)
     resp.status_code = 200
@@ -36,14 +38,14 @@ def mock_response():
 
 
 @pytest.fixture(autouse=True)
-def reset_global_cache():
+def reset_global_cache() -> Iterator[Any]:
     """Reset global cache before each test."""
     _reset_cache_for_tests()
     yield
     _reset_cache_for_tests()
 
 
-def test_cache_entry_expiration():
+def test_cache_entry_expiration() -> None:
     """Test CacheEntry expiration logic."""
     cached_data = {"status_code": 200, "headers": {}, "content": b"body"}
 
@@ -64,7 +66,7 @@ def test_cache_entry_expiration():
         assert entry.is_expired()
 
 
-def test_cache_entry_age():
+def test_cache_entry_age() -> None:
     """Test CacheEntry age calculation."""
     cached_data = {"status_code": 200, "headers": {}, "content": b"body"}
 
@@ -85,7 +87,7 @@ def test_cache_entry_age():
         assert 0.05 < entry.age_seconds() < 0.2
 
 
-def test_cache_stats_hit_rate():
+def test_cache_stats_hit_rate() -> None:
     """Test cache statistics hit rate calculation."""
     stats = CacheStats()
 
@@ -103,7 +105,7 @@ def test_cache_stats_hit_rate():
     assert stats.hit_rate() == 100.0
 
 
-def test_cache_basic_put_and_get(cache, mock_response):
+def test_cache_basic_put_and_get(cache: Any, mock_response: Any) -> None:
     """Test basic cache put and get operations."""
     url = "https://api.example.com/data"
 
@@ -120,7 +122,7 @@ def test_cache_basic_put_and_get(cache, mock_response):
     assert cached.content == b"test response body"
 
 
-def test_cache_with_params(cache, mock_response):
+def test_cache_with_params(cache: Any, mock_response: Any) -> None:
     """Test that query parameters affect cache keys."""
     url = "https://api.example.com/data"
 
@@ -140,7 +142,7 @@ def test_cache_with_params(cache, mock_response):
     assert cached is None
 
 
-def test_cache_expiration(cache, mock_response):
+def test_cache_expiration(cache: Any, mock_response: Any) -> None:
     """Test that expired entries are not returned."""
     url = "https://api.example.com/data"
 
@@ -164,7 +166,7 @@ def test_cache_expiration(cache, mock_response):
         assert stats["expirations"] == 1
 
 
-def test_cache_control_headers(cache):
+def test_cache_control_headers(cache: Any) -> None:
     """Test that Cache-Control headers are respected."""
     url = "https://api.example.com/data"
 
@@ -192,7 +194,7 @@ def test_cache_control_headers(cache):
     assert cache_key not in cache._cache
 
 
-def test_cache_lru_eviction(cache, mock_response):
+def test_cache_lru_eviction(cache: Any, mock_response: Any) -> None:
     """Test LRU eviction when cache reaches max size."""
     # Cache max_size is 5
 
@@ -210,7 +212,7 @@ def test_cache_lru_eviction(cache, mock_response):
     assert cache.get_stats()["evictions"] == 1
 
 
-def test_cache_hit_count_affects_lru(cache, mock_response):
+def test_cache_hit_count_affects_lru(cache: Any, mock_response: Any) -> None:
     """Test that hit count affects LRU eviction."""
     # Add 5 items
     for i in range(5):
@@ -227,7 +229,7 @@ def test_cache_hit_count_affects_lru(cache, mock_response):
     assert cache.get("https://example.com/item0") is not None
 
 
-def test_cache_non_200_responses_not_cached(cache):
+def test_cache_non_200_responses_not_cached(cache: Any) -> None:
     """Test that non-2xx responses are not cached."""
     url = "https://api.example.com/error"
 
@@ -252,7 +254,7 @@ def test_cache_non_200_responses_not_cached(cache):
     assert cache.get(url) is None
 
 
-def test_cache_disabled(mock_response):
+def test_cache_disabled(mock_response: Any) -> None:
     """Test that caching can be disabled."""
     disabled_cache = HTTPCache(enabled=False)
 
@@ -263,7 +265,7 @@ def test_cache_disabled(mock_response):
     assert disabled_cache.get(url) is None
 
 
-def test_cache_clear(cache, mock_response):
+def test_cache_clear(cache: Any, mock_response: Any) -> None:
     """Test clearing the cache."""
     # Add some entries
     for i in range(3):
@@ -281,7 +283,7 @@ def test_cache_clear(cache, mock_response):
     assert cache.get("https://example.com/item0") is None
 
 
-def test_cache_remove_expired(cache, mock_response):
+def test_cache_remove_expired(cache: Any, mock_response: Any) -> None:
     """Test manual removal of expired entries."""
     with patch("utils.http_cache.time") as mock_time:
         mock_time.time.return_value = 1000.0
@@ -307,7 +309,7 @@ def test_cache_remove_expired(cache, mock_response):
         assert cache.get("https://example.com/long") is not None
 
 
-def test_global_cache_instance():
+def test_global_cache_instance() -> None:
     """Test global cache singleton."""
     # Get cache twice
     cache1 = get_cache()
@@ -317,7 +319,7 @@ def test_global_cache_instance():
     assert cache1 is cache2
 
 
-def test_global_cache_operations(mock_response):
+def test_global_cache_operations(mock_response: Any) -> None:
     """Test global cache operations."""
     # Clear first
     clear_cache()
@@ -340,7 +342,7 @@ def test_global_cache_operations(mock_response):
     assert stats["size"] == 0
 
 
-def test_cache_key_consistency(cache):
+def test_cache_key_consistency(cache: Any) -> None:
     """Test that cache keys are generated consistently."""
     url = "https://api.example.com/data"
     params = {"a": "1", "b": "2"}
@@ -357,7 +359,7 @@ def test_cache_key_consistency(cache):
     assert key1 == key3
 
 
-def test_cache_stats_tracking(cache, mock_response):
+def test_cache_stats_tracking(cache: Any, mock_response: Any) -> None:
     """Test that cache statistics are tracked correctly."""
     url = "https://example.com/stats"
 
@@ -378,14 +380,14 @@ def test_cache_stats_tracking(cache, mock_response):
     assert stats["hit_rate"] == 50.0
 
 
-def test_cache_thread_safety(cache, mock_response):
+def test_cache_thread_safety(cache: Any, mock_response: Any) -> None:
     """Test that cache is thread-safe."""
     import threading
 
     url = "https://example.com/concurrent"
     errors = []
 
-    def add_and_get():
+    def add_and_get() -> None:
         try:
             for i in range(10):
                 cache.put(f"{url}/{i}", mock_response)
@@ -404,7 +406,7 @@ def test_cache_thread_safety(cache, mock_response):
     assert len(errors) == 0
 
 
-def test_cache_custom_ttl_override(cache, mock_response):
+def test_cache_custom_ttl_override(cache: Any, mock_response: Any) -> None:
     """Test that custom TTL overrides default."""
     url = "https://example.com/custom_ttl"
 
@@ -416,7 +418,9 @@ def test_cache_custom_ttl_override(cache, mock_response):
     assert entry.ttl_seconds == 0.2
 
 
-def test_cached_response_holds_no_raw_connection(cache, mock_response):
+def test_cached_response_holds_no_raw_connection(
+    cache: Any, mock_response: Any
+) -> None:
     """Cached responses must not hold raw socket or urllib3 connection references.
 
     Storing full Response objects prevents connections from returning to the
@@ -452,12 +456,12 @@ def test_cached_response_holds_no_raw_connection(cache, mock_response):
 
 
 @pytest.fixture
-def small_cache(mock_response):
+def small_cache(mock_response: Any) -> Any:
     """Cache with max_entries=3 for eviction tests."""
     return HTTPCache(default_ttl=60.0, max_size=100, enabled=True, max_entries=3)
 
 
-def test_max_entries_evicts_oldest(small_cache, mock_response):
+def test_max_entries_evicts_oldest(small_cache: Any, mock_response: Any) -> None:
     """Cache evicts the oldest (LRU) entry when max_entries is exceeded."""
     small_cache.put("https://example.com/a", mock_response)
     small_cache.put("https://example.com/b", mock_response)
@@ -474,7 +478,9 @@ def test_max_entries_evicts_oldest(small_cache, mock_response):
     assert small_cache.get("https://example.com/d") is not None
 
 
-def test_lru_access_moves_entry_to_most_recent(small_cache, mock_response):
+def test_lru_access_moves_entry_to_most_recent(
+    small_cache: Any, mock_response: Any
+) -> None:
     """Accessing a cache entry promotes it so it is not evicted first."""
     small_cache.put("https://example.com/a", mock_response)
     small_cache.put("https://example.com/b", mock_response)
@@ -491,7 +497,7 @@ def test_lru_access_moves_entry_to_most_recent(small_cache, mock_response):
     assert small_cache.get("https://example.com/b") is None, "b should be evicted"
 
 
-def test_stats_method_returns_counters(small_cache, mock_response):
+def test_stats_method_returns_counters(small_cache: Any, mock_response: Any) -> None:
     """stats() returns hits, misses, and evictions counters."""
     url_a = "https://example.com/s1"
     url_b = "https://example.com/s2"
@@ -516,7 +522,7 @@ def test_stats_method_returns_counters(small_cache, mock_response):
     assert result["max_entries"] == 3
 
 
-def test_eviction_counter_increments(small_cache, mock_response):
+def test_eviction_counter_increments(small_cache: Any, mock_response: Any) -> None:
     """Eviction counter increments with each evicted entry."""
     for i in range(6):
         small_cache.put(f"https://example.com/ev{i}", mock_response)
@@ -525,7 +531,7 @@ def test_eviction_counter_increments(small_cache, mock_response):
     assert result["evictions"] == 3  # 6 inserts into cap-3 cache = 3 evictions
 
 
-def test_env_var_max_entries_override(mock_response):
+def test_env_var_max_entries_override(mock_response: Any) -> None:
     """HTTP_CACHE_MAX_ENTRIES env var is respected when constructing a cache."""
     with patch.dict(os.environ, {"HTTP_CACHE_MAX_ENTRIES": "2"}):
         env_cache = HTTPCache(default_ttl=60.0, max_size=100, enabled=True)
@@ -541,7 +547,7 @@ def test_env_var_max_entries_override(mock_response):
     assert env_cache.stats()["evictions"] == 1
 
 
-def test_under_limit_no_eviction(mock_response):
+def test_under_limit_no_eviction(mock_response: Any) -> None:
     """No evictions occur when cache stays under max_entries."""
     c = HTTPCache(default_ttl=60.0, max_size=100, enabled=True, max_entries=10)
     for i in range(5):
@@ -551,7 +557,7 @@ def test_under_limit_no_eviction(mock_response):
     assert len(c._cache) == 5
 
 
-def test_existing_ttl_behavior_preserved(mock_response):
+def test_existing_ttl_behavior_preserved(mock_response: Any) -> None:
     """Existing TTL expiry behavior is unaffected by the LRU cap."""
     c = HTTPCache(default_ttl=60.0, max_size=100, enabled=True, max_entries=256)
     url = "https://example.com/ttl_preserved"
@@ -565,18 +571,18 @@ def test_existing_ttl_behavior_preserved(mock_response):
         assert c.get(url) is None
 
 
-def test_get_http_cache_returns_http_cache_instance():
+def test_get_http_cache_returns_http_cache_instance() -> None:
     """get_http_cache() returns an HTTPCache singleton."""
     cache = get_http_cache()
     assert isinstance(cache, HTTPCache)
 
 
-def test_get_http_cache_is_same_as_get_cache():
+def test_get_http_cache_is_same_as_get_cache() -> None:
     """get_http_cache() returns the same object as get_cache()."""
     assert get_http_cache() is get_cache()
 
 
-def test_reset_for_tests_clears_singleton():
+def test_reset_for_tests_clears_singleton() -> None:
     """reset_for_tests() resets the global cache so the next call creates a fresh instance."""
     cache1 = get_http_cache()
     reset_for_tests()
@@ -584,7 +590,7 @@ def test_reset_for_tests_clears_singleton():
     assert cache2 is not cache1
 
 
-def test_reset_for_tests_when_none():
+def test_reset_for_tests_when_none() -> None:
     """reset_for_tests() is safe to call when the global cache is already None."""
     reset_for_tests()  # clear first
     reset_for_tests()  # must not raise

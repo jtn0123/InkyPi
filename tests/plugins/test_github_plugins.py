@@ -1,3 +1,5 @@
+from typing import Any
+
 # pyright: reportMissingImports=false
 from unittest.mock import MagicMock, patch
 
@@ -6,14 +8,16 @@ from PIL import Image
 
 
 @pytest.fixture()
-def plugin_config():
+def plugin_config() -> Any:
     return {"id": "github", "class": "GitHub", "name": "GitHub"}
 
 
 # ---- Router (github.py) ----
 
 
-def test_github_routes_to_contributions(monkeypatch, plugin_config, device_config_dev):
+def test_github_routes_to_contributions(
+    monkeypatch: pytest.MonkeyPatch, plugin_config: Any, device_config_dev: Any
+) -> None:
     from plugins.github.github import GitHub
 
     monkeypatch.setattr(device_config_dev, "load_env_key", lambda k: "ghp_fake")
@@ -29,7 +33,9 @@ def test_github_routes_to_contributions(monkeypatch, plugin_config, device_confi
     assert result is not None
 
 
-def test_github_routes_to_stars(monkeypatch, plugin_config, device_config_dev):
+def test_github_routes_to_stars(
+    monkeypatch: pytest.MonkeyPatch, plugin_config: Any, device_config_dev: Any
+) -> None:
     from plugins.github.github import GitHub
 
     with patch("plugins.github.github.stars_generate_image") as mock_fn:
@@ -47,7 +53,9 @@ def test_github_routes_to_stars(monkeypatch, plugin_config, device_config_dev):
     assert result is not None
 
 
-def test_github_routes_to_sponsors(monkeypatch, plugin_config, device_config_dev):
+def test_github_routes_to_sponsors(
+    monkeypatch: pytest.MonkeyPatch, plugin_config: Any, device_config_dev: Any
+) -> None:
     from plugins.github.github import GitHub
 
     with patch("plugins.github.github.sponsors_generate_image") as mock_fn:
@@ -61,7 +69,7 @@ def test_github_routes_to_sponsors(monkeypatch, plugin_config, device_config_dev
     assert result is not None
 
 
-def test_github_unknown_type(plugin_config, device_config_dev):
+def test_github_unknown_type(plugin_config: Any, device_config_dev: Any) -> None:
     from plugins.github.github import GitHub
 
     p = GitHub(plugin_config)
@@ -72,7 +80,7 @@ def test_github_unknown_type(plugin_config, device_config_dev):
 # ---- Contributions (github_contributions.py) ----
 
 
-def _graphql_contributions_response(count=5):
+def _graphql_contributions_response(count: Any = 5) -> Any:
     days = [
         {"contributionCount": count, "date": f"2025-01-{d:02d}"} for d in range(1, 8)
     ]
@@ -90,7 +98,9 @@ def _graphql_contributions_response(count=5):
     }
 
 
-def test_contributions_success(monkeypatch, plugin_config, device_config_dev):
+def test_contributions_success(
+    monkeypatch: pytest.MonkeyPatch, plugin_config: Any, device_config_dev: Any
+) -> None:
     from plugins.github.github import GitHub
 
     monkeypatch.setattr(device_config_dev, "load_env_key", lambda k: "ghp_fake")
@@ -122,8 +132,8 @@ def test_contributions_success(monkeypatch, plugin_config, device_config_dev):
 
 
 def test_contributions_missing_colors_uses_defaults(
-    monkeypatch, plugin_config, device_config_dev
-):
+    monkeypatch: pytest.MonkeyPatch, plugin_config: Any, device_config_dev: Any
+) -> None:
     """Bug 8: Missing contributionColor[] should use default palette, not crash."""
     from plugins.github.github import GitHub
 
@@ -149,7 +159,9 @@ def test_contributions_missing_colors_uses_defaults(
     assert isinstance(result, Image.Image)
 
 
-def test_contributions_missing_key(monkeypatch, plugin_config, device_config_dev):
+def test_contributions_missing_key(
+    monkeypatch: pytest.MonkeyPatch, plugin_config: Any, device_config_dev: Any
+) -> None:
     from plugins.github.github import GitHub
 
     monkeypatch.setattr(device_config_dev, "load_env_key", lambda k: None)
@@ -162,7 +174,9 @@ def test_contributions_missing_key(monkeypatch, plugin_config, device_config_dev
         )
 
 
-def test_contributions_missing_username(monkeypatch, plugin_config, device_config_dev):
+def test_contributions_missing_username(
+    monkeypatch: pytest.MonkeyPatch, plugin_config: Any, device_config_dev: Any
+) -> None:
     from plugins.github.github import GitHub
 
     monkeypatch.setattr(device_config_dev, "load_env_key", lambda k: "ghp_fake")
@@ -175,7 +189,9 @@ def test_contributions_missing_username(monkeypatch, plugin_config, device_confi
         )
 
 
-def test_contributions_api_error(monkeypatch, plugin_config, device_config_dev):
+def test_contributions_api_error(
+    monkeypatch: pytest.MonkeyPatch, plugin_config: Any, device_config_dev: Any
+) -> None:
     import requests as req_mod
 
     from plugins.github.github import GitHub
@@ -200,7 +216,9 @@ def test_contributions_api_error(monkeypatch, plugin_config, device_config_dev):
             )
 
 
-def test_contributions_empty_data(monkeypatch, plugin_config, device_config_dev):
+def test_contributions_empty_data(
+    monkeypatch: pytest.MonkeyPatch, plugin_config: Any, device_config_dev: Any
+) -> None:
     from plugins.github.github import GitHub
 
     monkeypatch.setattr(device_config_dev, "load_env_key", lambda k: "ghp_fake")
@@ -234,7 +252,9 @@ def test_contributions_empty_data(monkeypatch, plugin_config, device_config_dev)
 # ---- Stars (github_stars.py) ----
 
 
-def test_stars_success(monkeypatch, plugin_config, device_config_dev):
+def test_stars_success(
+    monkeypatch: pytest.MonkeyPatch, plugin_config: Any, device_config_dev: Any
+) -> None:
     from plugins.github.github import GitHub
 
     mock_resp = MagicMock()
@@ -255,7 +275,7 @@ def test_stars_success(monkeypatch, plugin_config, device_config_dev):
     assert isinstance(result, Image.Image)
 
 
-def test_stars_missing_username(plugin_config, device_config_dev):
+def test_stars_missing_username(plugin_config: Any, device_config_dev: Any) -> None:
     from plugins.github.github import GitHub
 
     p = GitHub(plugin_config)
@@ -266,7 +286,9 @@ def test_stars_missing_username(plugin_config, device_config_dev):
         )
 
 
-def test_stars_http_error(monkeypatch, plugin_config, device_config_dev):
+def test_stars_http_error(
+    monkeypatch: pytest.MonkeyPatch, plugin_config: Any, device_config_dev: Any
+) -> None:
     from plugins.github.github import GitHub
 
     mock_resp = MagicMock()
@@ -291,7 +313,7 @@ def test_stars_http_error(monkeypatch, plugin_config, device_config_dev):
 # ---- Sponsors (github_sponsors.py) ----
 
 
-def _graphql_sponsors_response():
+def _graphql_sponsors_response() -> Any:
     return {
         "data": {
             "user": {
@@ -316,7 +338,9 @@ def _graphql_sponsors_response():
     }
 
 
-def test_sponsors_success(monkeypatch, plugin_config, device_config_dev):
+def test_sponsors_success(
+    monkeypatch: pytest.MonkeyPatch, plugin_config: Any, device_config_dev: Any
+) -> None:
     from plugins.github.github import GitHub
 
     monkeypatch.setattr(device_config_dev, "load_env_key", lambda k: "ghp_fake")
@@ -335,7 +359,9 @@ def test_sponsors_success(monkeypatch, plugin_config, device_config_dev):
     assert isinstance(result, Image.Image)
 
 
-def test_sponsors_missing_key(monkeypatch, plugin_config, device_config_dev):
+def test_sponsors_missing_key(
+    monkeypatch: pytest.MonkeyPatch, plugin_config: Any, device_config_dev: Any
+) -> None:
     from plugins.github.github import GitHub
 
     monkeypatch.setattr(device_config_dev, "load_env_key", lambda k: None)
@@ -348,7 +374,9 @@ def test_sponsors_missing_key(monkeypatch, plugin_config, device_config_dev):
         )
 
 
-def test_sponsors_missing_username(monkeypatch, plugin_config, device_config_dev):
+def test_sponsors_missing_username(
+    monkeypatch: pytest.MonkeyPatch, plugin_config: Any, device_config_dev: Any
+) -> None:
     from plugins.github.github import GitHub
 
     monkeypatch.setattr(device_config_dev, "load_env_key", lambda k: "ghp_fake")
@@ -361,7 +389,9 @@ def test_sponsors_missing_username(monkeypatch, plugin_config, device_config_dev
         )
 
 
-def test_sponsors_api_error(monkeypatch, plugin_config, device_config_dev):
+def test_sponsors_api_error(
+    monkeypatch: pytest.MonkeyPatch, plugin_config: Any, device_config_dev: Any
+) -> None:
     from plugins.github.github import GitHub
 
     monkeypatch.setattr(device_config_dev, "load_env_key", lambda k: "ghp_fake")
@@ -381,8 +411,8 @@ def test_sponsors_api_error(monkeypatch, plugin_config, device_config_dev):
 
 
 def test_sponsors_null_tier_does_not_crash(
-    monkeypatch, plugin_config, device_config_dev
-):
+    monkeypatch: pytest.MonkeyPatch, plugin_config: Any, device_config_dev: Any
+) -> None:
     """JTN-254: null tier in sponsorship data should not raise TypeError."""
     from plugins.github.github import GitHub
 
@@ -425,7 +455,7 @@ def test_sponsors_null_tier_does_not_crash(
     assert isinstance(result, Image.Image)
 
 
-def test_calculate_monthly_total_null_tier():
+def test_calculate_monthly_total_null_tier() -> None:
     """JTN-254: null tier entries contribute 0 cents; rounding is correct."""
     from plugins.github.github_sponsors import calculate_monthly_total
 
@@ -446,7 +476,7 @@ def test_calculate_monthly_total_null_tier():
     assert calculate_monthly_total(data) == 10
 
 
-def test_calculate_monthly_total_rounding():
+def test_calculate_monthly_total_rounding() -> None:
     """JTN-254: round() is used instead of int() for correct rounding."""
     from plugins.github.github_sponsors import calculate_monthly_total
 

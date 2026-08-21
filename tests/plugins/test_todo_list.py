@@ -1,14 +1,16 @@
+from typing import Any
+
 # pyright: reportMissingImports=false
 import pytest
 from PIL import Image
 
 
 @pytest.fixture()
-def plugin_config():
+def plugin_config() -> Any:
     return {"id": "todo_list", "class": "TodoList", "name": "Todo List"}
 
 
-def test_todo_list_basic(plugin_config, device_config_dev):
+def test_todo_list_basic(plugin_config: Any, device_config_dev: Any) -> None:
     from plugins.todo_list.todo_list import TodoList
 
     p = TodoList(plugin_config)
@@ -25,7 +27,7 @@ def test_todo_list_basic(plugin_config, device_config_dev):
     assert isinstance(result, Image.Image)
 
 
-def test_todo_list_multiple_lists(plugin_config, device_config_dev):
+def test_todo_list_multiple_lists(plugin_config: Any, device_config_dev: Any) -> None:
     from plugins.todo_list.todo_list import TodoList
 
     p = TodoList(plugin_config)
@@ -42,7 +44,9 @@ def test_todo_list_multiple_lists(plugin_config, device_config_dev):
     assert isinstance(result, Image.Image)
 
 
-def test_todo_list_empty_items_filtered(plugin_config, device_config_dev):
+def test_todo_list_empty_items_filtered(
+    plugin_config: Any, device_config_dev: Any
+) -> None:
     from plugins.todo_list.todo_list import TodoList
 
     p = TodoList(plugin_config)
@@ -59,7 +63,7 @@ def test_todo_list_empty_items_filtered(plugin_config, device_config_dev):
     assert isinstance(result, Image.Image)
 
 
-def test_todo_list_font_sizes(plugin_config, device_config_dev):
+def test_todo_list_font_sizes(plugin_config: Any, device_config_dev: Any) -> None:
     from plugins.todo_list.todo_list import FONT_SIZES, TodoList
 
     for size_name in FONT_SIZES:
@@ -77,7 +81,7 @@ def test_todo_list_font_sizes(plugin_config, device_config_dev):
         assert isinstance(result, Image.Image)
 
 
-def test_todo_list_vertical(plugin_config, device_config_dev):
+def test_todo_list_vertical(plugin_config: Any, device_config_dev: Any) -> None:
     from plugins.todo_list.todo_list import TodoList
 
     device_config_dev.update_value("orientation", "vertical")

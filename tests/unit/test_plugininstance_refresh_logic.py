@@ -3,7 +3,7 @@ from datetime import UTC, datetime, timedelta, timezone
 from model import PluginInstance
 
 
-def test_should_refresh_interval_and_initial():
+def test_should_refresh_interval_and_initial() -> None:
     inst = PluginInstance("x", "A", {}, {"interval": 60}, latest_refresh_time=None)
     now = datetime.now(UTC)
     # No latest -> should refresh
@@ -18,7 +18,7 @@ def test_should_refresh_interval_and_initial():
     assert inst.should_refresh(now) is False
 
 
-def test_should_refresh_scheduled_with_tz_alignment():
+def test_should_refresh_scheduled_with_tz_alignment() -> None:
     # Schedule at current minute; last refresh earlier today should trigger
     now = datetime.now(UTC)
     hhmm = now.strftime("%H:%M")
@@ -55,7 +55,7 @@ def _tz(offset_hours: int) -> timezone:
 class TestDSTSpringForward:
     """Spring-forward: clocks jump from 02:00 → 03:00, so 02:30 never exists."""
 
-    def test_scheduled_time_in_gap_still_fires_after_gap(self):
+    def test_scheduled_time_in_gap_still_fires_after_gap(self) -> None:
         """A plugin scheduled at 02:30 should fire once the clock is past 03:00.
 
         Before the fix, current_time.replace(hour=2, minute=30) on a datetime
@@ -82,7 +82,7 @@ class TestDSTSpringForward:
         # current_time 03:05 > 02:30, last_refresh 01:00 < 02:30 → should fire
         assert inst.should_refresh(current_time) is True
 
-    def test_already_refreshed_at_gap_time_does_not_double_fire(self):
+    def test_already_refreshed_at_gap_time_does_not_double_fire(self) -> None:
         """If the last refresh is recorded at 02:30, a second call should not fire."""
         post_spring_tz = _tz(3)
         current_time = datetime(2024, 3, 31, 3, 5, 0, tzinfo=post_spring_tz)
@@ -109,7 +109,7 @@ class TestDSTFallBack:
     a single timezone offset the scheduler does not double-fire.
     """
 
-    def test_scheduled_time_fires_in_pre_fallback_hour(self):
+    def test_scheduled_time_fires_in_pre_fallback_hour(self) -> None:
         """Fires correctly during the first 01:30 (pre-fallback, UTC-4)."""
         pre_fallback_tz = _tz(-4)
         current_time = datetime(2024, 11, 3, 1, 45, 0, tzinfo=pre_fallback_tz)
@@ -125,7 +125,7 @@ class TestDSTFallBack:
         # 01:30-04:00 is between 00:00 and 01:45 → should fire
         assert inst.should_refresh(current_time) is True
 
-    def test_does_not_double_fire_in_same_offset_window(self):
+    def test_does_not_double_fire_in_same_offset_window(self) -> None:
         """After firing during the first 01:30 (UTC-4), does not fire again in that same window."""
         pre_fallback_tz = _tz(-4)
         # current is 01:45 EDT, refresh already happened at 01:30 EDT
@@ -142,7 +142,7 @@ class TestDSTFallBack:
         # last_refresh == scheduled_dt (01:30 EDT) → condition is <=, not <, so False
         assert inst.should_refresh(current_time) is False
 
-    def test_scheduled_time_fires_in_post_fallback_hour(self):
+    def test_scheduled_time_fires_in_post_fallback_hour(self) -> None:
         """Fires correctly during the second 01:30 (post-fallback, UTC-5).
 
         The last refresh was at 01:30 EDT (UTC-4) = 05:30 UTC.
@@ -167,7 +167,7 @@ class TestDSTFallBack:
         # last_refresh 05:30 UTC < scheduled_dt 06:30 UTC → should fire
         assert inst.should_refresh(current_time) is True
 
-    def test_before_fallback_scheduled_time_does_not_fire_early(self):
+    def test_before_fallback_scheduled_time_does_not_fire_early(self) -> None:
         """Before the scheduled time, should_refresh returns False."""
         pre_fallback_tz = _tz(-4)
         # It's 01:00 (before 01:30)

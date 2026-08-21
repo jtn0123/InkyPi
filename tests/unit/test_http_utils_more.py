@@ -1,14 +1,17 @@
+from typing import Any
+
+import pytest
 import requests
 
 
-def test_http_client_headers_and_ssl_verify(monkeypatch):
+def test_http_client_headers_and_ssl_verify(monkeypatch: pytest.MonkeyPatch) -> Any:
     import src.utils.http_utils as http_utils
 
     http_utils._reset_shared_session_for_tests()
 
     captured = {}
 
-    def fake_get(self, url, **kwargs):
+    def fake_get(self, url: Any, **kwargs: Any) -> Any:
         captured["headers"] = kwargs.get("headers")
         captured["verify"] = kwargs.get("verify")
 
@@ -16,7 +19,7 @@ def test_http_client_headers_and_ssl_verify(monkeypatch):
             status_code = 200
             content = b""
 
-            def json(self):
+            def json(self) -> Any:
                 return {}
 
         return R()

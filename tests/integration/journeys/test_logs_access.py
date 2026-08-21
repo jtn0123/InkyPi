@@ -16,9 +16,13 @@ from __future__ import annotations
 import logging
 import os
 import uuid
+from collections.abc import Iterator
 from datetime import UTC, datetime
+from typing import Any
 
 import pytest
+from flask.testing import FlaskClient
+from playwright.sync_api import Page
 
 pytestmark = [
     pytest.mark.integration,
@@ -34,7 +38,7 @@ from tests.integration.browser_helpers import navigate_and_wait  # noqa: E402
 
 
 @pytest.fixture
-def dev_log_handler(monkeypatch):
+def dev_log_handler(monkeypatch: pytest.MonkeyPatch) -> Iterator[Any]:
     """Force dev-mode log path and attach DevModeLogHandler to the root logger.
 
     The default test app does not install the dev log handler, so error logs
@@ -60,8 +64,8 @@ def dev_log_handler(monkeypatch):
 
 
 def test_logs_access_trigger_error_download_verify(
-    live_server, browser_page, client, dev_log_handler
-):
+    live_server: str, browser_page: Page, client: FlaskClient, dev_log_handler: Any
+) -> None:
     marker = f"JTN-727 deliberate error {uuid.uuid4().hex[:8]}"
     window_start = datetime.now(tz=UTC)
 

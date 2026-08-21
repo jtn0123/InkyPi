@@ -14,7 +14,7 @@ pytestmark = pytest.mark.skipif(
 )
 
 
-def test_weather_settings_has_location_fields(live_server):
+def test_weather_settings_has_location_fields(live_server: str) -> None:
     """Weather plugin page has latitude and longitude input fields."""
     pytest.importorskip("playwright.sync_api", reason="playwright not available")
 
@@ -35,7 +35,7 @@ def test_weather_settings_has_location_fields(live_server):
             browser.close()
 
 
-def test_weather_settings_has_map_button(live_server):
+def test_weather_settings_has_map_button(live_server: str) -> None:
     """Weather plugin page has an Open Map button for location selection."""
     pytest.importorskip("playwright.sync_api", reason="playwright not available")
 
@@ -56,7 +56,7 @@ def test_weather_settings_has_map_button(live_server):
             browser.close()
 
 
-def test_weather_settings_form_has_units_and_provider(live_server):
+def test_weather_settings_form_has_units_and_provider(live_server: str) -> None:
     """Weather plugin page has units and provider selection fields."""
     pytest.importorskip("playwright.sync_api", reason="playwright not available")
 

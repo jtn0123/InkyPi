@@ -29,7 +29,7 @@ def _settings_js() -> str:
 # ---------------------------------------------------------------------------
 
 
-def test_whats_new_modal_has_role_dialog():
+def test_whats_new_modal_has_role_dialog() -> None:
     """The What's New modal container must have role="dialog"."""
     content = _settings_html()
     assert 'id="whatsNewModal"' in content, "whatsNewModal element missing"
@@ -42,7 +42,7 @@ def test_whats_new_modal_has_role_dialog():
     ), 'whatsNewModal must have role="dialog" on its container element'
 
 
-def test_whats_new_modal_has_aria_modal():
+def test_whats_new_modal_has_aria_modal() -> None:
     """The What's New modal must have aria-modal="true"."""
     content = _settings_html()
     idx = content.index('id="whatsNewModal"')
@@ -52,7 +52,7 @@ def test_whats_new_modal_has_aria_modal():
     ), 'whatsNewModal must have aria-modal="true"'
 
 
-def test_whats_new_modal_has_aria_labelledby():
+def test_whats_new_modal_has_aria_labelledby() -> None:
     """The What's New modal must have aria-labelledby pointing to its heading."""
     content = _settings_html()
     idx = content.index('id="whatsNewModal"')
@@ -62,7 +62,7 @@ def test_whats_new_modal_has_aria_labelledby():
     ), 'whatsNewModal must have aria-labelledby="whatsNewModalTitle"'
 
 
-def test_whats_new_modal_heading_id_matches_labelledby():
+def test_whats_new_modal_heading_id_matches_labelledby() -> None:
     """The heading referenced by aria-labelledby must exist with the same id."""
     content = _settings_html()
     assert (
@@ -70,7 +70,7 @@ def test_whats_new_modal_heading_id_matches_labelledby():
     ), "Heading with id='whatsNewModalTitle' is required so aria-labelledby resolves"
 
 
-def test_whats_new_button_exists_in_update_panel():
+def test_whats_new_button_exists_in_update_panel() -> None:
     """The update panel must contain a trigger button for the What's New modal."""
     content = _settings_html()
     assert (
@@ -78,7 +78,7 @@ def test_whats_new_button_exists_in_update_panel():
     ), "whatsNewBtn trigger button must be present in the update panel"
 
 
-def test_whats_new_body_container_exists():
+def test_whats_new_body_container_exists() -> None:
     """The modal must contain a content container for release notes."""
     content = _settings_html()
     assert (
@@ -91,7 +91,7 @@ def test_whats_new_body_container_exists():
 # ---------------------------------------------------------------------------
 
 
-def test_settings_js_opens_whats_new_modal():
+def test_settings_js_opens_whats_new_modal() -> None:
     """settings_page.js must define openWhatsNew and wire whatsNewBtn."""
     content = _settings_js()
     assert (
@@ -100,7 +100,7 @@ def test_settings_js_opens_whats_new_modal():
     assert "whatsNewBtn" in content, "whatsNewBtn must be wired in bindButtons()"
 
 
-def test_settings_js_closes_whats_new_on_escape():
+def test_settings_js_closes_whats_new_on_escape() -> None:
     """settings_page.js must close the What's New modal on Escape."""
     content = _settings_js()
     assert (
@@ -109,7 +109,7 @@ def test_settings_js_closes_whats_new_on_escape():
     assert "whatsNewModal" in content, "Escape handler must reference whatsNewModal"
 
 
-def test_settings_js_whats_new_modal_hidden_attribute():
+def test_settings_js_whats_new_modal_hidden_attribute() -> None:
     """openWhatsNew must set modal.hidden = false; closeWhatsNew must hide it."""
     content = _settings_js()
     assert "whatsNewModal" in content

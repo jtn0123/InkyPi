@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -101,7 +102,7 @@ def _load_axe_js() -> str:
     reason="A11y checks skipped by env",
 )
 @pytest.mark.parametrize("route_name,route_path", _ROUTES, ids=[r[0] for r in _ROUTES])
-def test_axe_scan(live_server, route_name, route_path):
+def test_axe_scan(live_server: str, route_name: Any, route_path: Any) -> None:
     """Run axe-core against *route_path* and fail on unknown violations."""
     from playwright.sync_api import sync_playwright
 

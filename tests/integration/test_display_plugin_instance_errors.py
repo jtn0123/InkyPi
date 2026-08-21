@@ -1,4 +1,7 @@
-def test_display_plugin_instance_missing_playlist(client):
+from flask.testing import FlaskClient
+
+
+def test_display_plugin_instance_missing_playlist(client: FlaskClient) -> None:
     resp = client.post(
         "/display_plugin_instance",
         json={

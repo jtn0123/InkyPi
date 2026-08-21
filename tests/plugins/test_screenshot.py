@@ -1,9 +1,12 @@
 import socket
+from typing import Any
 
 import pytest
 
 
-def test_screenshot_success(monkeypatch, device_config_dev):
+def test_screenshot_success(
+    monkeypatch: pytest.MonkeyPatch, device_config_dev: Any
+) -> None:
     from plugins.screenshot.screenshot import Screenshot
 
     # Mock DNS resolution to return a public IP so validate_url passes
@@ -23,7 +26,9 @@ def test_screenshot_success(monkeypatch, device_config_dev):
     assert img.size == tuple(device_config_dev.get_resolution())
 
 
-def test_screenshot_failure(monkeypatch, device_config_dev):
+def test_screenshot_failure(
+    monkeypatch: pytest.MonkeyPatch, device_config_dev: Any
+) -> None:
     from plugins.screenshot.screenshot import Screenshot
 
     # Mock DNS resolution to return a public IP so validate_url passes
@@ -51,7 +56,7 @@ def test_screenshot_failure(monkeypatch, device_config_dev):
         pass
 
 
-def test_screenshot_rejects_file_url(device_config_dev):
+def test_screenshot_rejects_file_url(device_config_dev: Any) -> None:
     """Screenshot plugin must reject file:// URLs."""
     from plugins.screenshot.screenshot import Screenshot
 
@@ -60,7 +65,7 @@ def test_screenshot_rejects_file_url(device_config_dev):
         plugin.generate_image({"url": "file:///etc/passwd"}, device_config_dev)
 
 
-def test_screenshot_rejects_localhost(device_config_dev):
+def test_screenshot_rejects_localhost(device_config_dev: Any) -> None:
     """Screenshot plugin must reject localhost URLs."""
     from plugins.screenshot.screenshot import Screenshot
 
@@ -69,7 +74,9 @@ def test_screenshot_rejects_localhost(device_config_dev):
         plugin.generate_image({"url": "http://localhost:8080"}, device_config_dev)
 
 
-def test_screenshot_rejects_metadata_endpoint(monkeypatch, device_config_dev):
+def test_screenshot_rejects_metadata_endpoint(
+    monkeypatch: pytest.MonkeyPatch, device_config_dev: Any
+) -> None:
     """Screenshot plugin must reject cloud metadata endpoints."""
     from plugins.screenshot.screenshot import Screenshot
 

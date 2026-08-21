@@ -7,16 +7,18 @@ import threading
 import time
 from collections import deque
 from datetime import UTC, datetime
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
+from flask.testing import FlaskClient
 
 # ---------------------------------------------------------------------------
 # 1. Rate limiter memory cleanup
 # ---------------------------------------------------------------------------
 
 
-def test_sliding_window_limiter_prunes_stale_keys():
+def test_sliding_window_limiter_prunes_stale_keys() -> None:
     """SlidingWindowLimiter's amortised pruning removes empty keys."""
     from utils.rate_limiter import SlidingWindowLimiter
 
@@ -30,7 +32,7 @@ def test_sliding_window_limiter_prunes_stale_keys():
     assert "stale-ip" not in limiter._requests
 
 
-def test_rate_limit_ok_adds_timestamp():
+def test_rate_limit_ok_adds_timestamp() -> None:
     """_rate_limit_ok records a timestamp for the given address via SlidingWindowLimiter."""
     import blueprints.settings as settings_mod
 
@@ -50,7 +52,7 @@ def test_rate_limit_ok_adds_timestamp():
 # ---------------------------------------------------------------------------
 
 
-def test_manual_update_raises_when_queue_full():
+def test_manual_update_raises_when_queue_full() -> None:
     """manual_update raises RuntimeError when the deque is at capacity."""
     from refresh_task import ManualRefresh, RefreshTask
 
@@ -73,7 +75,7 @@ def test_manual_update_raises_when_queue_full():
         task.manual_update(ManualRefresh("test_plugin", {}))
 
 
-def test_manual_update_succeeds_when_queue_has_space():
+def test_manual_update_succeeds_when_queue_has_space() -> None:
     """manual_update enqueues without raising when there is room in the deque."""
     from refresh_task import ManualRefresh, RefreshTask
 
@@ -89,7 +91,7 @@ def test_manual_update_succeeds_when_queue_has_space():
     # manual_update blocks waiting for done event; we need to set it from another thread
     import threading
 
-    def set_done_after_enqueue():
+    def set_done_after_enqueue() -> None:
         # Wait until an item appears in the queue
         for _ in range(100):
             if task.manual_update_requests:
@@ -114,7 +116,7 @@ def test_manual_update_succeeds_when_queue_has_space():
 # ---------------------------------------------------------------------------
 
 
-def test_should_refresh_invalid_scheduled_time_returns_false():
+def test_should_refresh_invalid_scheduled_time_returns_false() -> None:
     """PluginInstance.should_refresh returns False for invalid scheduled time strings."""
     from model import PluginInstance
 
@@ -133,7 +135,7 @@ def test_should_refresh_invalid_scheduled_time_returns_false():
     ), "should_refresh should return False for invalid scheduled time"
 
 
-def test_should_refresh_none_scheduled_time_returns_false():
+def test_should_refresh_none_scheduled_time_returns_false() -> None:
     """PluginInstance.should_refresh returns False when scheduled time is None."""
     from model import PluginInstance
 
@@ -155,7 +157,7 @@ def test_should_refresh_none_scheduled_time_returns_false():
 # ---------------------------------------------------------------------------
 
 
-def test_update_plugin_health_resets_failure_count_on_recovery():
+def test_update_plugin_health_resets_failure_count_on_recovery() -> None:
     """_update_plugin_health resets failure_count to 0 when ok=True."""
     from refresh_task import RefreshTask
 
@@ -187,7 +189,7 @@ def test_update_plugin_health_resets_failure_count_on_recovery():
     ), "failure_count should reset to 0 after successful health update"
 
 
-def test_update_plugin_health_accumulates_failures():
+def test_update_plugin_health_accumulates_failures() -> None:
     """_update_plugin_health increments failure_count on repeated failures."""
     from refresh_task import RefreshTask
 
@@ -216,7 +218,7 @@ def test_update_plugin_health_accumulates_failures():
 # ---------------------------------------------------------------------------
 
 
-def test_prune_history_recount_after_interval():
+def test_prune_history_recount_after_interval() -> None:
     """_prune_history triggers a full recount every _RECOUNT_INTERVAL calls."""
     from display.display_manager import DisplayManager
 
@@ -251,7 +253,7 @@ def test_prune_history_recount_after_interval():
 # ---------------------------------------------------------------------------
 
 
-def test_display_manager_has_hash_lock():
+def test_display_manager_has_hash_lock() -> None:
     """DisplayManager has a _hash_lock that is a threading.Lock instance."""
     from display.display_manager import DisplayManager
 
@@ -290,7 +292,9 @@ def test_display_manager_has_hash_lock():
 # ---------------------------------------------------------------------------
 
 
-def test_display_next_cooldown_returns_429_on_second_request(client, monkeypatch):
+def test_display_next_cooldown_returns_429_on_second_request(
+    client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Second immediate POST to /display-next returns 429."""
     from blueprints.main import _reset_display_next_cooldown
 
@@ -322,7 +326,9 @@ def test_display_next_cooldown_returns_429_on_second_request(client, monkeypatch
     ), f"Second immediate request should be rate-limited (429), got {r2.status_code}"
 
 
-def test_display_next_cooldown_resets(client, monkeypatch):
+def test_display_next_cooldown_resets(
+    client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """After _reset_display_next_cooldown, /display-next is allowed again."""
     from blueprints.main import _reset_display_next_cooldown
 
@@ -351,7 +357,7 @@ def test_display_next_cooldown_resets(client, monkeypatch):
     ), "After cooldown reset, request should be allowed again"
 
 
-def test_display_next_cooldown_constant_exists():
+def test_display_next_cooldown_constant_exists() -> None:
     """_display_next_limiter has a positive cooldown configured."""
     from blueprints.main import _display_next_limiter
 
@@ -363,7 +369,7 @@ def test_display_next_cooldown_constant_exists():
 # ---------------------------------------------------------------------------
 
 
-def test_plugin_order_rejects_unknown_ids(client):
+def test_plugin_order_rejects_unknown_ids(client: FlaskClient) -> None:
     """POST /api/plugin_order with unknown IDs returns 400 with 'Unknown plugin IDs'."""
     response = client.post(
         "/api/plugin_order",
@@ -379,7 +385,7 @@ def test_plugin_order_rejects_unknown_ids(client):
     ), f"Response should mention unknown/invalid IDs, got: {data}"
 
 
-def test_plugin_order_rejects_duplicate_ids(client):
+def test_plugin_order_rejects_duplicate_ids(client: FlaskClient) -> None:
     plugins = client.application.config["DEVICE_CONFIG"].get_plugins()
     assert plugins, "No plugins registered in dev config"
     plugin_id = plugins[0]["id"]
@@ -393,7 +399,7 @@ def test_plugin_order_rejects_duplicate_ids(client):
 # ---------------------------------------------------------------------------
 
 
-def test_eta_cache_max_size_defined():
+def test_eta_cache_max_size_defined() -> None:
     """_ETA_CACHE_MAX_SIZE is defined and reasonable."""
     import blueprints.playlist as playlist_mod
 
@@ -407,7 +413,9 @@ def test_eta_cache_max_size_defined():
 # ---------------------------------------------------------------------------
 
 
-def test_is_show_eligible_bad_snooze_until_returns_true(caplog):
+def test_is_show_eligible_bad_snooze_until_returns_true(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
     """is_show_eligible returns True and logs a warning for malformed snooze_until."""
     import logging
 
@@ -435,7 +443,7 @@ def test_is_show_eligible_bad_snooze_until_returns_true(caplog):
 # ---------------------------------------------------------------------------
 
 
-def test_api_keys_page_close_button_is_button_element(client):
+def test_api_keys_page_close_button_is_button_element(client: FlaskClient) -> None:
     """GET /settings/api-keys has a <button class='close-button'>, not a <span>."""
     response = client.get("/settings/api-keys")
     assert response.status_code == 200
@@ -467,7 +475,9 @@ def test_api_keys_page_close_button_is_button_element(client):
 # ---------------------------------------------------------------------------
 
 
-def test_api_key_status_shows_chars(client, device_config_dev, monkeypatch):
+def test_api_key_status_shows_chars(
+    client: FlaskClient, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """API key status display includes length information ('chars')."""
     monkeypatch.setattr(
         device_config_dev,

@@ -1,15 +1,19 @@
 # pyright: reportMissingImports=false
 from datetime import UTC, datetime
+from typing import Any
+
+import pytest
+from flask.testing import FlaskClient
 
 from model import RefreshInfo
 
 
-def _fixed_now(_device_config):
+def _fixed_now(_device_config: Any) -> Any:
     # 2025-01-01 08:00:00 UTC for deterministic snapshots/ETA
     return datetime(2025, 1, 1, 8, 0, 0, tzinfo=UTC)
 
 
-def _prepare_playlist_state(device_config_dev):
+def _prepare_playlist_state(device_config_dev: Any) -> None:
     pm = device_config_dev.get_playlist_manager()
     if not pm.get_playlist("Default"):
         pm.add_playlist("Default", "00:00", "24:00")
@@ -52,7 +56,9 @@ def _prepare_playlist_state(device_config_dev):
     device_config_dev.write_config()
 
 
-def test_eta_math_renders_expected(client, device_config_dev, monkeypatch):
+def test_eta_math_renders_expected(
+    client: FlaskClient, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Test ETA calculation via backend API endpoint (UI rendering was removed in upstream)."""
     monkeypatch.setattr("utils.time_utils.now_device_tz", _fixed_now, raising=True)
     # Patch the imported alias used inside blueprints.playlist

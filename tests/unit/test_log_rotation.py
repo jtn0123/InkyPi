@@ -18,7 +18,9 @@ import configparser
 import logging
 import logging.handlers
 import os
+from collections.abc import Iterator
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -30,7 +32,7 @@ from app_setup.logging_setup import (
 
 
 @pytest.fixture
-def isolated_root_logger():
+def isolated_root_logger() -> Iterator[Any]:
     """Snapshot and restore root-logger handlers/level around each test."""
     root = logging.getLogger()
     original_handlers = root.handlers[:]
@@ -62,7 +64,7 @@ def _emit(logger: logging.Logger, message: str, count: int) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_logging_conf_has_rotating_file_section():
+def test_logging_conf_has_rotating_file_section() -> None:
     """logging.conf must declare a [rotating_file] section (JTN-712)."""
     parser = configparser.ConfigParser()
     parser.read(_LOGGING_CONF_PATH)
@@ -72,14 +74,14 @@ def test_logging_conf_has_rotating_file_section():
     )
 
 
-def test_rotation_config_has_nonzero_limits():
+def test_rotation_config_has_nonzero_limits() -> None:
     """maxBytes and backupCount must both be > 0 in logging.conf."""
     cfg = read_rotation_config()
     assert cfg.max_bytes > 0, "maxBytes must be > 0 to trigger rotation"
     assert cfg.backup_count > 0, "backupCount must be > 0 to retain history"
 
 
-def test_rotation_config_uses_rotating_file_handler_class():
+def test_rotation_config_uses_rotating_file_handler_class() -> None:
     """The handler class in [rotating_file] must be a RotatingFileHandler."""
     parser = configparser.ConfigParser()
     parser.read(_LOGGING_CONF_PATH)
@@ -87,7 +89,7 @@ def test_rotation_config_uses_rotating_file_handler_class():
     assert "RotatingFileHandler" in cls, f"Expected RotatingFileHandler, got {cls!r}"
 
 
-def test_read_rotation_config_rejects_zero_max_bytes(tmp_path: Path):
+def test_read_rotation_config_rejects_zero_max_bytes(tmp_path: Path) -> None:
     """maxBytes=0 must raise — otherwise rotation is effectively disabled."""
     conf = tmp_path / "logging.conf"
     conf.write_text(
@@ -102,7 +104,7 @@ def test_read_rotation_config_rejects_zero_max_bytes(tmp_path: Path):
         read_rotation_config(str(conf))
 
 
-def test_read_rotation_config_rejects_missing_section(tmp_path: Path):
+def test_read_rotation_config_rejects_missing_section(tmp_path: Path) -> None:
     """A conf without [rotating_file] must raise, not silently skip."""
     conf = tmp_path / "logging.conf"
     conf.write_text("[loggers]\nkeys=root\n")
@@ -110,7 +112,7 @@ def test_read_rotation_config_rejects_missing_section(tmp_path: Path):
         read_rotation_config(str(conf))
 
 
-def test_read_rotation_config_rejects_zero_backup_count(tmp_path: Path):
+def test_read_rotation_config_rejects_zero_backup_count(tmp_path: Path) -> None:
     """backupCount=0 drops all history on rotation — reject it."""
     conf = tmp_path / "logging.conf"
     conf.write_text(
@@ -150,8 +152,8 @@ def _write_test_conf(
 
 
 def test_rotation_creates_backup_when_size_exceeded(
-    tmp_path: Path, isolated_root_logger
-):
+    tmp_path: Path, isolated_root_logger: Any
+) -> None:
     """Emit > maxBytes and assert a .1 backup is created."""
     conf = _write_test_conf(tmp_path, max_bytes=1024, backup_count=3)
     log_path = tmp_path / "logs" / "app.log"
@@ -190,8 +192,8 @@ def test_rotation_creates_backup_when_size_exceeded(
 
 
 def test_rotation_respects_backup_count_over_many_rotations(
-    tmp_path: Path, isolated_root_logger
-):
+    tmp_path: Path, isolated_root_logger: Any
+) -> None:
     """Emit ~10x maxBytes and assert backupCount cap is enforced."""
     backup_count = 3
     conf = _write_test_conf(tmp_path, max_bytes=512, backup_count=backup_count)
@@ -219,8 +221,8 @@ def test_rotation_respects_backup_count_over_many_rotations(
 
 
 def test_newest_content_in_primary_oldest_in_backup(
-    tmp_path: Path, isolated_root_logger
-):
+    tmp_path: Path, isolated_root_logger: Any
+) -> None:
     """The primary file holds the newest messages; backups hold older ones."""
     conf = _write_test_conf(tmp_path, max_bytes=256, backup_count=3)
     log_path = tmp_path / "logs" / "app.log"
@@ -259,7 +261,9 @@ def test_newest_content_in_primary_oldest_in_backup(
         assert "FIRST-MARKER-alpha" not in primary
 
 
-def test_attach_handler_rejects_zero_max_bytes(tmp_path: Path, isolated_root_logger):
+def test_attach_handler_rejects_zero_max_bytes(
+    tmp_path: Path, isolated_root_logger: Any
+) -> None:
     """Acceptance: deliberately breaking rotation config fails the test.
 
     If a maintainer sets maxBytes=0 in logging.conf, attach_rotating_file_handler
@@ -280,8 +284,8 @@ def test_attach_handler_rejects_zero_max_bytes(tmp_path: Path, isolated_root_log
 
 
 def test_setup_logging_attaches_rotating_handler_when_env_set(
-    tmp_path: Path, isolated_root_logger, monkeypatch
-):
+    tmp_path: Path, isolated_root_logger: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """setup_logging() honors INKYPI_LOG_FILE and attaches rotation."""
     log_path = tmp_path / "logs" / "app.log"
     monkeypatch.setenv("INKYPI_LOG_FILE", str(log_path))
@@ -311,8 +315,8 @@ def test_setup_logging_attaches_rotating_handler_when_env_set(
 
 
 def test_setup_logging_no_file_handler_when_env_unset(
-    isolated_root_logger, monkeypatch
-):
+    isolated_root_logger: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Without INKYPI_LOG_FILE, no file handler should be attached."""
     monkeypatch.delenv("INKYPI_LOG_FILE", raising=False)
     monkeypatch.delenv("INKYPI_LOG_FORMAT", raising=False)

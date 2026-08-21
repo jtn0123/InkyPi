@@ -38,7 +38,7 @@ def _make_pattern_regex(pattern: str) -> re.Pattern[str]:
     return re.compile(decoded, re.S)
 
 
-def test_device_name_pattern_rejects_whitespace_only_and_lone_control_chars():
+def test_device_name_pattern_rejects_whitespace_only_and_lone_control_chars() -> None:
     """The HTML pattern must reject:
        - empty / whitespace-only input  (ISSUE-008)
        - a single control character     (CodeRabbit follow-up — closes a
@@ -65,7 +65,7 @@ def test_device_name_pattern_rejects_whitespace_only_and_lone_control_chars():
     assert rx.fullmatch("a") is not None, "single non-space char is fine"
 
 
-def test_device_name_title_documents_non_space_requirement():
+def test_device_name_title_documents_non_space_requirement() -> None:
     """The user-facing tooltip should explain the constraint we just added,
     so the rejection message is self-explanatory if the pattern fails."""
     tag = _device_name_input_tag()

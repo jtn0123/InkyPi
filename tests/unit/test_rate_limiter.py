@@ -12,27 +12,27 @@ from utils.rate_limiter import CooldownLimiter, SlidingWindowLimiter
 
 
 class TestCooldownLimiter:
-    def test_check_passes_initially(self):
+    def test_check_passes_initially(self) -> None:
         limiter = CooldownLimiter(10)
         allowed, retry_after = limiter.check()
         assert allowed is True
         assert retry_after == 0.0
 
-    def test_record_arms_cooldown(self):
+    def test_record_arms_cooldown(self) -> None:
         limiter = CooldownLimiter(10)
         limiter.record()
         allowed, retry_after = limiter.check()
         assert allowed is False
         assert retry_after > 0.0
 
-    def test_check_fails_within_window(self):
+    def test_check_fails_within_window(self) -> None:
         limiter = CooldownLimiter(10)
         limiter.record()
         allowed, retry_after = limiter.check()
         assert allowed is False
         assert 0.0 < retry_after <= 10.0
 
-    def test_check_passes_after_window(self):
+    def test_check_passes_after_window(self) -> None:
         limiter = CooldownLimiter(5)
         # Record at a fixed monotonic time
         with patch("utils.rate_limiter.time.monotonic", return_value=100.0):
@@ -43,7 +43,7 @@ class TestCooldownLimiter:
         assert allowed is True
         assert retry_after == 0.0
 
-    def test_reset_clears_cooldown(self):
+    def test_reset_clears_cooldown(self) -> None:
         limiter = CooldownLimiter(10)
         limiter.record()
         allowed, _ = limiter.check()
@@ -54,7 +54,7 @@ class TestCooldownLimiter:
         assert allowed is True
         assert retry_after == 0.0
 
-    def test_different_keys_are_independent(self):
+    def test_different_keys_are_independent(self) -> None:
         limiter = CooldownLimiter(10)
         limiter.record("key-a")
         allowed_a, _ = limiter.check("key-a")
@@ -62,7 +62,7 @@ class TestCooldownLimiter:
         assert allowed_a is False
         assert allowed_b is True
 
-    def test_reset_only_affects_specified_key(self):
+    def test_reset_only_affects_specified_key(self) -> None:
         limiter = CooldownLimiter(10)
         limiter.record("key-a")
         limiter.record("key-b")
@@ -79,14 +79,14 @@ class TestCooldownLimiter:
 
 
 class TestSlidingWindowLimiter:
-    def test_allows_up_to_max_requests(self):
+    def test_allows_up_to_max_requests(self) -> None:
         limiter = SlidingWindowLimiter(5, 60)
         for _ in range(5):
             allowed, retry_after = limiter.check("ip")
             assert allowed is True
             assert retry_after == 0.0
 
-    def test_blocks_at_max_plus_one(self):
+    def test_blocks_at_max_plus_one(self) -> None:
         limiter = SlidingWindowLimiter(5, 60)
         for _ in range(5):
             limiter.check("ip")
@@ -94,7 +94,7 @@ class TestSlidingWindowLimiter:
         assert allowed is False
         assert retry_after > 0.0
 
-    def test_allows_again_after_window(self):
+    def test_allows_again_after_window(self) -> None:
         limiter = SlidingWindowLimiter(2, 10)
         # Fill at time 100
         with patch("utils.rate_limiter.time.monotonic", return_value=100.0):
@@ -108,7 +108,7 @@ class TestSlidingWindowLimiter:
             assert allowed is True
             assert retry_after == 0.0
 
-    def test_different_keys_are_independent(self):
+    def test_different_keys_are_independent(self) -> None:
         limiter = SlidingWindowLimiter(2, 60)
         limiter.check("ip-a")
         limiter.check("ip-a")
@@ -119,7 +119,7 @@ class TestSlidingWindowLimiter:
         allowed_b, _ = limiter.check("ip-b")
         assert allowed_b is True
 
-    def test_pruning_removes_empty_keys(self):
+    def test_pruning_removes_empty_keys(self) -> None:
         limiter = SlidingWindowLimiter(10, 60)
         # Add an empty deque manually
         limiter._requests["stale"] = deque()
@@ -127,7 +127,7 @@ class TestSlidingWindowLimiter:
         limiter._prune_empty_keys()
         assert "stale" not in limiter._requests
 
-    def test_amortised_pruning_triggers(self):
+    def test_amortised_pruning_triggers(self) -> None:
         """After _PRUNE_INTERVAL calls, empty keys should be cleaned up."""
         limiter = SlidingWindowLimiter(1000, 60)
         limiter._requests["stale"] = deque()
@@ -144,11 +144,11 @@ class TestSlidingWindowLimiter:
 
 
 class TestThreadSafety:
-    def test_cooldown_limiter_concurrent_access(self):
+    def test_cooldown_limiter_concurrent_access(self) -> None:
         limiter = CooldownLimiter(0.1)
         errors = []
 
-        def worker():
+        def worker() -> None:
             try:
                 for _ in range(50):
                     limiter.check()
@@ -164,12 +164,12 @@ class TestThreadSafety:
             t.join()
         assert not errors, f"Thread errors: {errors}"
 
-    def test_sliding_window_concurrent_access(self):
+    def test_sliding_window_concurrent_access(self) -> None:
         limiter = SlidingWindowLimiter(1000, 60)
         results = {"allowed": 0, "denied": 0}
         lock = threading.Lock()
 
-        def worker():
+        def worker() -> None:
             local_allowed = 0
             local_denied = 0
             for _ in range(100):
@@ -193,13 +193,13 @@ class TestThreadSafety:
         # With max_requests=1000, all 1000 should be allowed
         assert results["allowed"] == 1000
 
-    def test_sliding_window_concurrent_with_limit(self):
+    def test_sliding_window_concurrent_with_limit(self) -> None:
         """With a low limit and many threads, total allowed should not exceed max."""
         limiter = SlidingWindowLimiter(50, 60)
         allowed_count = {"value": 0}
         lock = threading.Lock()
 
-        def worker():
+        def worker() -> None:
             local = 0
             for _ in range(20):
                 allowed, _ = limiter.check("shared-ip")

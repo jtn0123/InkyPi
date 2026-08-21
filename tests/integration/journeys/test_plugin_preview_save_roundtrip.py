@@ -38,8 +38,11 @@ Relation to sibling tests
 from __future__ import annotations
 
 import os
+from typing import Any
 
 import pytest
+from flask import Flask
+from playwright.sync_api import Page
 from tests.integration.browser_helpers import RuntimeCollector, stub_leaflet
 from tests.integration.fixtures.plugin_inputs import (
     PLUGIN_FORM_INPUTS,
@@ -72,14 +75,14 @@ _SAVE_TIMEOUT_MS = 10000
 _ROUNDTRIP_PLUGINS = sorted(PLUGIN_FORM_INPUTS.keys())
 
 
-def _preview_src(page) -> str | None:
+def _preview_src(page: Page) -> str | None:
     """Return current ``#previewImage`` src (or None if element/attr missing)."""
     return page.evaluate(
         "() => document.getElementById('previewImage')?.getAttribute('src') || null"
     )
 
 
-def _read_form_value(page, name: str):
+def _read_form_value(page: Page, name: str) -> Any:
     """Read back the current value of a named field inside ``#settingsForm``.
 
     Uses the same selector strategy as :func:`fill_form_inputs` so the
@@ -104,7 +107,7 @@ def _read_form_value(page, name: str):
     )
 
 
-def _click_update_preview(page, plugin_id: str) -> str:
+def _click_update_preview(page: Page, plugin_id: str) -> str:
     """Click Update Preview and wait for ``#previewImage`` src to flip.
 
     Returns the new (post-click) src so callers can compare across clicks.
@@ -145,7 +148,7 @@ def _click_update_preview(page, plugin_id: str) -> str:
     return after_src
 
 
-def _click_save_settings(page, plugin_id: str) -> None:
+def _click_save_settings(page: Page, plugin_id: str) -> None:
     """Click Save Settings and wait for the HX-Trigger success event.
 
     The save path is HTMX-driven (see ``plugin.html`` savePluginSettingsBtn
@@ -179,7 +182,7 @@ def _click_save_settings(page, plugin_id: str) -> None:
     )
 
 
-def _purge_saved_instance(flask_app, plugin_id: str) -> None:
+def _purge_saved_instance(flask_app: Flask, plugin_id: str) -> None:
     """Remove ``<plugin_id>_saved_settings`` from the Default playlist.
 
     The save path writes an instance named ``<plugin_id>_saved_settings``
@@ -216,8 +219,12 @@ def _purge_saved_instance(flask_app, plugin_id: str) -> None:
     ids=lambda pid: pid,
 )
 def test_plugin_preview_save_roundtrip(
-    live_server, browser_page, flask_app, monkeypatch, plugin_id: str
-):
+    live_server: str,
+    browser_page: Page,
+    flask_app: Flask,
+    monkeypatch: pytest.MonkeyPatch,
+    plugin_id: str,
+) -> None:
     """Configure -> preview -> save -> leave -> return -> values persist.
 
     Each assertion is its own failure site so the logs point at the exact

@@ -51,7 +51,7 @@ def _validate_apod_schema(payload: dict) -> None:
         assert "url" in payload, "image APODs must include a url"
 
 
-def test_apod_image_fixture_matches_schema():
+def test_apod_image_fixture_matches_schema() -> None:
     payload = _load_fixture("nasa_apod_image.json")
     _validate_apod_schema(payload)
     # An image APOD should have either hdurl or url that the parser can read.
@@ -59,13 +59,13 @@ def test_apod_image_fixture_matches_schema():
     assert payload.get("hdurl") or payload.get("url")
 
 
-def test_apod_video_fixture_matches_schema():
+def test_apod_video_fixture_matches_schema() -> None:
     payload = _load_fixture("nasa_apod_video.json")
     _validate_apod_schema(payload)
     assert payload["media_type"] == "video"
 
 
-def test_apod_parser_image_url_resolution():
+def test_apod_parser_image_url_resolution() -> None:
     """The APOD parser prefers hdurl over url when both are present."""
     payload = _load_fixture("nasa_apod_image.json")
     # Mirror the resolution logic in src/plugins/apod/apod.py
@@ -74,7 +74,7 @@ def test_apod_parser_image_url_resolution():
     assert image_url.startswith("https://")
 
 
-def test_apod_parser_rejects_video_media_type():
+def test_apod_parser_rejects_video_media_type() -> None:
     """The APOD parser raises when media_type != 'image'."""
     payload = _load_fixture("nasa_apod_video.json")
     # Mirror the check in src/plugins/apod/apod.py
@@ -96,12 +96,12 @@ def _validate_github_repo_schema(payload: dict) -> None:
     assert payload["stargazers_count"] >= 0
 
 
-def test_github_repo_fixture_matches_schema():
+def test_github_repo_fixture_matches_schema() -> None:
     payload = _load_fixture("github_repo_stars.json")
     _validate_github_repo_schema(payload)
 
 
-def test_github_stars_parser_extracts_count():
+def test_github_stars_parser_extracts_count() -> None:
     """github_stars.fetch_stars() returns the stargazers_count from the API response."""
     from plugins.github.github_stars import fetch_stars
 
@@ -116,7 +116,7 @@ def test_github_stars_parser_extracts_count():
     assert result == 1729
 
 
-def test_github_stars_parser_handles_zero_stars():
+def test_github_stars_parser_handles_zero_stars() -> None:
     """A repo with zero stars should return 0, not crash on a missing/None field."""
     from plugins.github.github_stars import fetch_stars
 
@@ -130,7 +130,7 @@ def test_github_stars_parser_handles_zero_stars():
     assert result == 0
 
 
-def test_github_stars_parser_handles_404():
+def test_github_stars_parser_handles_404() -> None:
     """A non-existent repo returns 0 (not raise) — see fetch_stars in github_stars.py."""
     from plugins.github.github_stars import fetch_stars
 
@@ -203,12 +203,12 @@ def _validate_open_meteo_schema(payload: dict) -> None:
     assert hourly_lens.pop() == len(hourly["time"])
 
 
-def test_open_meteo_fixture_matches_schema():
+def test_open_meteo_fixture_matches_schema() -> None:
     payload = _load_fixture("open_meteo_forecast.json")
     _validate_open_meteo_schema(payload)
 
 
-def test_open_meteo_parser_returns_full_payload():
+def test_open_meteo_parser_returns_full_payload() -> None:
     """get_open_meteo_data is a thin wrapper that returns the parsed JSON unchanged."""
     from plugins.weather.weather_api import get_open_meteo_data
 
@@ -227,7 +227,7 @@ def test_open_meteo_parser_returns_full_payload():
     assert result["daily"]["temperature_2m_max"][0] == 22.0
 
 
-def test_open_meteo_parser_raises_on_http_error():
+def test_open_meteo_parser_raises_on_http_error() -> None:
     """A non-2xx response raises a clear RuntimeError."""
     from plugins.weather.weather_api import get_open_meteo_data
 

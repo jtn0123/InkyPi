@@ -1,9 +1,12 @@
+import pytest
+from flask.testing import FlaskClient
+
 # ---------------------------------------------------------------------------
 # Health endpoints
 # ---------------------------------------------------------------------------
 
 
-def test_health_endpoints(client):
+def test_health_endpoints(client: FlaskClient) -> None:
     # Liveness is always OK
     r = client.get("/healthz")
     assert r.status_code == 200
@@ -17,7 +20,9 @@ def test_health_endpoints(client):
 # ---------------------------------------------------------------------------
 
 
-def test_csp_report_only_header(client, monkeypatch):
+def test_csp_report_only_header(
+    client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
     # Ensure default report-only is applied
     resp = client.get("/")
     assert resp.status_code == 200
@@ -27,7 +32,9 @@ def test_csp_report_only_header(client, monkeypatch):
     assert ro or csp
 
 
-def test_csp_header_enforced_when_report_only_disabled(client, monkeypatch):
+def test_csp_header_enforced_when_report_only_disabled(
+    client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
     # Disable report-only mode to enforce CSP header
     monkeypatch.setenv("INKYPI_CSP_REPORT_ONLY", "0")
     resp = client.get("/")

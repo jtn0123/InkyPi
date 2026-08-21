@@ -15,6 +15,8 @@ This regression test locks in the fix:
 
 from pathlib import Path
 
+from flask.testing import FlaskClient
+
 _PLUGIN_JS = (
     Path(__file__).resolve().parents[2]
     / "src"
@@ -24,7 +26,7 @@ _PLUGIN_JS = (
 )
 
 
-def _read_plugin_html(client, plugin_id: str = "ai_image") -> str:
+def _read_plugin_html(client: FlaskClient, plugin_id: str = "ai_image") -> str:
     resp = client.get(f"/plugin/{plugin_id}")
     assert resp.status_code == 200, f"/plugin/{plugin_id} returned {resp.status_code}"
     return resp.get_data(as_text=True)
@@ -35,7 +37,7 @@ def _read_plugin_html(client, plugin_id: str = "ai_image") -> str:
 # --------------------------------------------------------------------------
 
 
-def test_api_required_chip_has_data_hook(client):
+def test_api_required_chip_has_data_hook(client: FlaskClient) -> None:
     """The missing-key chip must expose data-api-keys-link so JS can intercept."""
     html = _read_plugin_html(client)
     assert "data-api-keys-link" in html, (
@@ -44,7 +46,7 @@ def test_api_required_chip_has_data_hook(client):
     )
 
 
-def test_api_keys_leave_confirm_modal_rendered(client):
+def test_api_keys_leave_confirm_modal_rendered(client: FlaskClient) -> None:
     """A confirmation modal must be present when the API key is required+missing."""
     html = _read_plugin_html(client)
     assert 'id="apiKeysLeaveConfirmModal"' in html, (
@@ -55,7 +57,7 @@ def test_api_keys_leave_confirm_modal_rendered(client):
     assert 'id="cancelApiKeysLeaveBtn"' in html
 
 
-def test_api_keys_leave_modal_has_accessibility_attrs(client):
+def test_api_keys_leave_modal_has_accessibility_attrs(client: FlaskClient) -> None:
     html = _read_plugin_html(client)
     idx = html.find('id="apiKeysLeaveConfirmModal"')
     assert idx != -1
@@ -64,7 +66,7 @@ def test_api_keys_leave_modal_has_accessibility_attrs(client):
     assert 'aria-modal="true"' in opening
 
 
-def test_confirm_leave_button_points_to_api_keys(client):
+def test_confirm_leave_button_points_to_api_keys(client: FlaskClient) -> None:
     """The "Leave and discard" button must still navigate to /settings/api-keys."""
     html = _read_plugin_html(client)
     idx = html.find('id="confirmApiKeysLeaveBtn"')
@@ -75,7 +77,7 @@ def test_confirm_leave_button_points_to_api_keys(client):
     assert "/settings/api-keys" in window or "api-keys" in window
 
 
-def test_modal_copy_mentions_unsaved_changes(client):
+def test_modal_copy_mentions_unsaved_changes(client: FlaskClient) -> None:
     html = _read_plugin_html(client)
     lower = html.lower()
     # Modal body copy must clearly warn about unsaved changes.
@@ -87,7 +89,7 @@ def test_modal_copy_mentions_unsaved_changes(client):
 # --------------------------------------------------------------------------
 
 
-def test_plugin_js_has_leave_guard_init():
+def test_plugin_js_has_leave_guard_init() -> None:
     js = _PLUGIN_JS.read_text(encoding="utf-8")
     assert "initApiKeysLeaveGuard" in js, (
         "plugin_page.js must define an init function that wires the API "
@@ -95,7 +97,7 @@ def test_plugin_js_has_leave_guard_init():
     )
 
 
-def test_plugin_js_hooks_data_api_keys_link():
+def test_plugin_js_hooks_data_api_keys_link() -> None:
     js = _PLUGIN_JS.read_text(encoding="utf-8")
     assert "data-api-keys-link" in js, (
         "plugin_page.js must locate the API chip via the data-api-keys-link "
@@ -103,7 +105,7 @@ def test_plugin_js_hooks_data_api_keys_link():
     )
 
 
-def test_plugin_js_tracks_form_snapshot_for_dirty_check():
+def test_plugin_js_tracks_form_snapshot_for_dirty_check() -> None:
     js = _PLUGIN_JS.read_text(encoding="utf-8")
     # Dirty detection is implemented by comparing a form snapshot to the
     # current state. Both pieces must exist.
@@ -111,7 +113,7 @@ def test_plugin_js_tracks_form_snapshot_for_dirty_check():
     assert "isSettingsFormDirty" in js
 
 
-def test_plugin_js_opens_modal_only_when_dirty():
+def test_plugin_js_opens_modal_only_when_dirty() -> None:
     js = _PLUGIN_JS.read_text(encoding="utf-8")
     # The guard must open the apiKeysLeaveConfirmModal via openModal.
     assert "apiKeysLeaveConfirmModal" in js
@@ -120,7 +122,7 @@ def test_plugin_js_opens_modal_only_when_dirty():
     assert "isSettingsFormDirty()" in js
 
 
-def test_plugin_js_guard_is_called_from_init():
+def test_plugin_js_guard_is_called_from_init() -> None:
     js = _PLUGIN_JS.read_text(encoding="utf-8")
     # Called from the main init() so it runs on every plugin page load.
     assert "initApiKeysLeaveGuard()" in js
@@ -131,7 +133,7 @@ def test_plugin_js_guard_is_called_from_init():
 # --------------------------------------------------------------------------
 
 
-def test_no_modal_when_plugin_has_no_api_requirement(client):
+def test_no_modal_when_plugin_has_no_api_requirement(client: FlaskClient) -> None:
     """The clock plugin has no api_key requirement; modal should not render."""
     html = _read_plugin_html(client, plugin_id="clock")
     assert "apiKeysLeaveConfirmModal" not in html, (

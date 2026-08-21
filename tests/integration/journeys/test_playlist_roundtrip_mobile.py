@@ -14,8 +14,12 @@ from __future__ import annotations
 import json
 import os
 import uuid
+from pathlib import Path
+from typing import Any
 
 import pytest
+from flask import Flask
+from playwright.sync_api import Page
 
 pytestmark = [
     pytest.mark.journey,
@@ -38,7 +42,7 @@ _PLUGINS = [
 _MOBILE_MIN_TOUCH = 44  # CSS px, per WCAG 2.5.5 / Apple HIG touch-target minimum.
 
 
-def _seed_plugins(device_config, playlist_name, instances):
+def _seed_plugins(device_config: Any, playlist_name: Any, instances: Any) -> None:
     pm = device_config.get_playlist_manager()
     playlist = pm.get_playlist(playlist_name)
     assert playlist is not None, f"Playlist {playlist_name!r} not found for seeding"
@@ -54,7 +58,7 @@ def _seed_plugins(device_config, playlist_name, instances):
     device_config.write_config()
 
 
-def _dom_instance_names(page, playlist_name):
+def _dom_instance_names(page: Page, playlist_name: Any) -> Any:
     return page.evaluate(
         """(pn) => {
             const card = Array.from(document.querySelectorAll('.playlist-item'))
@@ -67,7 +71,7 @@ def _dom_instance_names(page, playlist_name):
     )
 
 
-def _backend_instance_names(device_config, playlist_name):
+def _backend_instance_names(device_config: Any, playlist_name: Any) -> Any:
     import config as config_mod
 
     fresh = config_mod.Config()
@@ -78,7 +82,7 @@ def _backend_instance_names(device_config, playlist_name):
     return [p.name for p in pl.plugins]
 
 
-def _assert_touch_target(locator, label):
+def _assert_touch_target(locator: Any, label: Any) -> None:
     """Assert the locator's bounding rect meets 44x44 CSS px minimum."""
     box = locator.bounding_box()
     assert box is not None, f"{label}: could not resolve bounding box"
@@ -88,7 +92,7 @@ def _assert_touch_target(locator, label):
     )
 
 
-def _assert_no_horizontal_overflow(page, playlist_name, label):
+def _assert_no_horizontal_overflow(page: Page, playlist_name: Any, label: Any) -> None:
     """Assert the playlist card does not scroll horizontally past viewport."""
     overflow = page.evaluate(
         """(pn) => {
@@ -117,8 +121,12 @@ def _assert_no_horizontal_overflow(page, playlist_name, label):
 
 
 def test_playlist_roundtrip_mobile_create_reorder_delete_persist(
-    live_server, device_config_dev, flask_app, mobile_page, tmp_path
-):
+    live_server: str,
+    device_config_dev: Any,
+    flask_app: Flask,
+    mobile_page: Page,
+    tmp_path: Path,
+) -> None:
     """Mobile viewport: create, reorder, delete, reload; assert persistence +
     touch-target minimums + no horizontal overflow at each step."""
     client = flask_app.test_client()

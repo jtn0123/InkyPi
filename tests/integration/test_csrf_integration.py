@@ -8,12 +8,14 @@ dedicated app instance to verify it end-to-end.
 """
 
 import json
+from typing import Any
 
 import pytest
+from flask.testing import FlaskClient
 
 
 @pytest.fixture()
-def csrf_client(client):
+def csrf_client(client: FlaskClient) -> Any:
     """Client with the production CSRF middleware registered on the existing test app.
 
     The standard ``client`` fixture omits CSRF enforcement.  This fixture
@@ -26,7 +28,7 @@ def csrf_client(client):
     return client
 
 
-def test_new_session_post_rejected_by_production_middleware(csrf_client):
+def test_new_session_post_rejected_by_production_middleware(csrf_client: Any) -> None:
     """JTN-224: First POST in a new session must be rejected by production CSRF middleware."""
     resp = csrf_client.post(
         "/settings/client_log",
@@ -36,7 +38,7 @@ def test_new_session_post_rejected_by_production_middleware(csrf_client):
     assert resp.status_code == 403
 
 
-def test_post_with_valid_csrf_token_succeeds(csrf_client):
+def test_post_with_valid_csrf_token_succeeds(csrf_client: Any) -> None:
     """After establishing a session token, POST with valid token succeeds."""
     # GET the home page to establish a session with a CSRF token
     get_resp = csrf_client.get("/")
@@ -57,7 +59,7 @@ def test_post_with_valid_csrf_token_succeeds(csrf_client):
     assert resp.status_code == 200
 
 
-def test_post_with_wrong_csrf_token_rejected(csrf_client):
+def test_post_with_wrong_csrf_token_rejected(csrf_client: Any) -> None:
     """POST with an incorrect CSRF token must be rejected."""
     # Establish session
     csrf_client.get("/")
@@ -70,7 +72,9 @@ def test_post_with_wrong_csrf_token_rejected(csrf_client):
     assert resp.status_code == 403
 
 
-def test_json_body_csrf_token_accepted_by_production_middleware(csrf_client):
+def test_json_body_csrf_token_accepted_by_production_middleware(
+    csrf_client: Any,
+) -> None:
     """JTN-257: CSRF token in JSON body (_csrf_token) must be accepted by production middleware."""
     # Establish session
     csrf_client.get("/")
@@ -87,7 +91,7 @@ def test_json_body_csrf_token_accepted_by_production_middleware(csrf_client):
     assert resp.status_code == 200
 
 
-def test_form_csrf_token_accepted_by_production_middleware(csrf_client):
+def test_form_csrf_token_accepted_by_production_middleware(csrf_client: Any) -> None:
     """CSRF token in form data (csrf_token field) must be accepted."""
     csrf_client.get("/")
     with csrf_client.session_transaction() as sess:
@@ -103,7 +107,7 @@ def test_form_csrf_token_accepted_by_production_middleware(csrf_client):
     assert resp.status_code != 403
 
 
-def test_extract_csrf_token_prefers_header(csrf_client):
+def test_extract_csrf_token_prefers_header(csrf_client: Any) -> None:
     """When both header and JSON body have tokens, header takes precedence."""
     csrf_client.get("/")
     with csrf_client.session_transaction() as sess:

@@ -1,7 +1,15 @@
+from typing import Any
+
+import pytest
+from flask import Flask
+from flask.testing import FlaskClient
+
 # pyright: reportMissingImports=false
 
 
-def test_shutdown_route_logs_and_returns_json(client, monkeypatch):
+def test_shutdown_route_logs_and_returns_json(
+    client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
     calls = {"cmd": None}
     monkeypatch.setattr("subprocess.run", lambda cmd, check: calls.update(cmd=cmd))
 
@@ -11,7 +19,9 @@ def test_shutdown_route_logs_and_returns_json(client, monkeypatch):
     assert isinstance(calls["cmd"], list)
 
 
-def test_download_logs_dev_mode_message(client, monkeypatch):
+def test_download_logs_dev_mode_message(
+    client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
     # Force JOURNAL_AVAILABLE = False path by re-importing module symbol
     import blueprints.settings as settings_mod
 
@@ -22,7 +32,7 @@ def test_download_logs_dev_mode_message(client, monkeypatch):
     assert b"Development Mode Logs" in resp.data
 
 
-def test_api_logs_basic(client, monkeypatch):
+def test_api_logs_basic(client: FlaskClient, monkeypatch: pytest.MonkeyPatch) -> None:
     # Force JOURNAL_AVAILABLE False path so response is deterministic
     import blueprints.settings as settings_mod
 
@@ -36,11 +46,13 @@ def test_api_logs_basic(client, monkeypatch):
     assert "meta" in data and data["meta"]["hours"] >= 1
 
 
-def test_api_logs_filters_and_limits(client, monkeypatch):
+def test_api_logs_filters_and_limits(
+    client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> Any:
     # Stub _read_log_lines to a fixed corpus
     import blueprints.settings as settings_mod
 
-    def fake_read(hours: int):
+    def fake_read(hours: int) -> Any:
         return [
             "Jan 01 host app[1]: INFO started",
             "Jan 01 host app[1]: WARNING something odd",
@@ -65,7 +77,9 @@ def test_api_logs_filters_and_limits(client, monkeypatch):
     assert "started" in data2["lines"][0]
 
 
-def test_api_logs_guardrails(client, monkeypatch):
+def test_api_logs_guardrails(
+    client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
     import blueprints.settings as settings_mod
 
     # very large fake corpus to trigger size trimming
@@ -86,7 +100,9 @@ def test_api_logs_guardrails(client, monkeypatch):
     assert data["truncated"] is True
 
 
-def test_rate_limit_functions(client, monkeypatch):
+def test_rate_limit_functions(
+    client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
     import blueprints.settings as settings_mod
 
     # Test rate limiting
@@ -96,7 +112,7 @@ def test_rate_limit_functions(client, monkeypatch):
     assert "Too many requests" in resp.get_json().get("error", "")
 
 
-def test_clamp_int_exception_handling(monkeypatch):
+def test_clamp_int_exception_handling(monkeypatch: pytest.MonkeyPatch) -> None:
     import blueprints.settings as settings_mod
 
     # Test clamp_int with invalid input
@@ -104,7 +120,9 @@ def test_clamp_int_exception_handling(monkeypatch):
     assert result == 5
 
 
-def test_read_log_lines_journal_available_false(monkeypatch):
+def test_read_log_lines_journal_available_false(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     import blueprints.settings as settings_mod
 
     # Force JOURNAL_AVAILABLE = False
@@ -115,11 +133,11 @@ def test_read_log_lines_journal_available_false(monkeypatch):
     assert "Development Mode Logs" in lines[0]
 
 
-def test_read_log_lines_journal_available_true(monkeypatch):
+def test_read_log_lines_journal_available_true(monkeypatch: pytest.MonkeyPatch) -> Any:
     import blueprints.settings as settings_mod
 
     class FakeRecord:
-        def __init__(self):
+        def __init__(self) -> None:
             self.data = {
                 "_HOSTNAME": "host",
                 "SYSLOG_IDENTIFIER": "inkypi",
@@ -127,36 +145,36 @@ def test_read_log_lines_journal_available_true(monkeypatch):
                 "MESSAGE": "test message",
             }
 
-        def get_realtime_usec(self):
+        def get_realtime_usec(self) -> Any:
             return 0
 
     class FakeJournalReader:
         instance = None
 
-        def __init__(self):
+        def __init__(self) -> None:
             FakeJournalReader.instance = self
             self.closed = False
 
-        def open(self, mode):
+        def open(self, mode: Any) -> None:
             pass
 
-        def add_filter(self, rule):
+        def add_filter(self, rule: Any) -> None:
             pass
 
-        def seek_realtime_usec(self, ts):
+        def seek_realtime_usec(self, ts: Any) -> None:
             pass
 
-        def __iter__(self):
+        def __iter__(self) -> Any:
             return iter([FakeRecord()])
 
-        def close(self):
+        def close(self) -> None:
             self.closed = True
 
     class FakeJournalOpenMode:
         SYSTEM = object()
 
     class FakeRule:
-        def __init__(self, *args, **kwargs):
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
             pass
 
     monkeypatch.setattr(settings_mod, "JOURNAL_AVAILABLE", True)
@@ -170,13 +188,15 @@ def test_read_log_lines_journal_available_true(monkeypatch):
     assert FakeJournalReader.instance.closed
 
 
-def test_api_keys_masking_functions():
+def test_api_keys_masking_functions() -> None:
     # Test masking function - it's actually a nested function in the route
     # Let's test the actual behavior by calling the route
     pass
 
 
-def test_save_api_keys_exception_handling(client, flask_app, monkeypatch):
+def test_save_api_keys_exception_handling(
+    client: FlaskClient, flask_app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
     dc = flask_app.config["DEVICE_CONFIG"]
     monkeypatch.setattr(
         dc, "set_env_key", lambda *args: (_ for _ in ()).throw(Exception("test"))
@@ -187,7 +207,9 @@ def test_save_api_keys_exception_handling(client, flask_app, monkeypatch):
     assert "An internal error occurred" in resp.get_json().get("error", "")
 
 
-def test_delete_api_key_exception_handling(client, flask_app, monkeypatch):
+def test_delete_api_key_exception_handling(
+    client: FlaskClient, flask_app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
     dc = flask_app.config["DEVICE_CONFIG"]
     monkeypatch.setattr(
         dc, "unset_env_key", lambda *args: (_ for _ in ()).throw(Exception("test"))
@@ -198,7 +220,7 @@ def test_delete_api_key_exception_handling(client, flask_app, monkeypatch):
     assert "An internal error occurred" in resp.get_json().get("error", "")
 
 
-def test_save_settings_validation_missing_timezone(client):
+def test_save_settings_validation_missing_timezone(client: FlaskClient) -> None:
     resp = client.post(
         "/save_settings",
         data={
@@ -217,7 +239,7 @@ def test_save_settings_validation_missing_timezone(client):
     assert "Time Zone is required" in resp.get_json().get("error", "")
 
 
-def test_save_settings_validation_missing_time_format(client):
+def test_save_settings_validation_missing_time_format(client: FlaskClient) -> None:
     resp = client.post(
         "/save_settings",
         data={
@@ -236,7 +258,9 @@ def test_save_settings_validation_missing_time_format(client):
     assert "Time format is required" in resp.get_json().get("error", "")
 
 
-def test_save_settings_exception_handling(client, flask_app, monkeypatch):
+def test_save_settings_exception_handling(
+    client: FlaskClient, flask_app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
     dc = flask_app.config["DEVICE_CONFIG"]
     monkeypatch.setattr(
         dc, "update_config", lambda *args: (_ for _ in ()).throw(RuntimeError("test"))
@@ -264,7 +288,9 @@ def test_save_settings_exception_handling(client, flask_app, monkeypatch):
     assert body.get("details", {}).get("context") == "saving device settings"
 
 
-def test_shutdown_route_reboot(client, monkeypatch):
+def test_shutdown_route_reboot(
+    client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
     import blueprints.settings as settings_mod
 
     calls = {"cmd": None}
@@ -278,7 +304,9 @@ def test_shutdown_route_reboot(client, monkeypatch):
     assert "reboot" in calls["cmd"]
 
 
-def test_download_logs_with_parameters(client, monkeypatch):
+def test_download_logs_with_parameters(
+    client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
     import blueprints.settings as settings_mod
 
     monkeypatch.setattr(settings_mod, "JOURNAL_AVAILABLE", False)
@@ -289,10 +317,12 @@ def test_download_logs_with_parameters(client, monkeypatch):
     assert "inkypi_" in resp.headers.get("Content-Disposition", "")
 
 
-def test_download_logs_exception_handling(client, monkeypatch):
+def test_download_logs_exception_handling(
+    client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
     import blueprints.settings as settings_mod
 
-    def failing_read(hours):
+    def failing_read(hours: Any) -> None:
         raise Exception("test error")
 
     monkeypatch.setattr(settings_mod, "_read_log_lines", failing_read)
@@ -302,7 +332,7 @@ def test_download_logs_exception_handling(client, monkeypatch):
     assert "Error reading logs" in resp.data.decode()
 
 
-def test_api_logs_rate_limiting_disabled(monkeypatch):
+def test_api_logs_rate_limiting_disabled(monkeypatch: pytest.MonkeyPatch) -> None:
     import blueprints.settings as settings_mod
 
     # Test when rate limiting allows request
@@ -312,10 +342,12 @@ def test_api_logs_rate_limiting_disabled(monkeypatch):
     # The rate limit check happens before the main logic
 
 
-def test_api_logs_exception_handling(client, monkeypatch):
+def test_api_logs_exception_handling(
+    client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
     import blueprints.settings as settings_mod
 
-    def failing_read(hours):
+    def failing_read(hours: Any) -> None:
         raise Exception("test error")
 
     monkeypatch.setattr(settings_mod, "_read_log_lines", failing_read)
@@ -331,7 +363,7 @@ def test_api_logs_exception_handling(client, monkeypatch):
     assert "test error" not in body["error"]
 
 
-def test_settings_time_format_12h():
+def test_settings_time_format_12h() -> None:
     """Test 12-hour time format handling."""
     from datetime import UTC, datetime
 
@@ -355,7 +387,7 @@ def test_settings_time_format_12h():
         assert "AM" in time_str or "PM" in time_str
 
 
-def test_settings_journal_availability():
+def test_settings_journal_availability() -> None:
     """Test journal availability detection."""
     import blueprints.settings as settings_mod
 
@@ -365,7 +397,7 @@ def test_settings_journal_availability():
     assert isinstance(journal_available, bool)
 
 
-def test_settings_rate_limit_edge_cases():
+def test_settings_rate_limit_edge_cases() -> None:
     """Test rate limiting edge cases."""
 
     from blueprints.settings import _rate_limit_ok
@@ -380,7 +412,7 @@ def test_settings_rate_limit_edge_cases():
     assert result is True
 
 
-def test_settings_log_line_processing():
+def test_settings_log_line_processing() -> None:
     """Test log line processing functions."""
     from blueprints.settings import _clamp_int
 
@@ -392,7 +424,7 @@ def test_settings_log_line_processing():
     assert _clamp_int("invalid", 10, 1, 20) == 10  # Invalid input
 
 
-def test_settings_log_filtering():
+def test_settings_log_filtering() -> None:
     """Test log filtering functionality."""
     # Test that log filtering logic is covered
     test_lines = [
@@ -408,7 +440,7 @@ def test_settings_log_filtering():
     assert "ERROR" in error_lines[0]
 
 
-def test_settings_log_contains_filter():
+def test_settings_log_contains_filter() -> None:
     """Test log contains filtering."""
     test_lines = [
         "App started successfully",
@@ -423,7 +455,7 @@ def test_settings_log_contains_filter():
     assert "Database connection failed" in filtered[0]
 
 
-def test_rate_limit_ok_threshold(monkeypatch):
+def test_rate_limit_ok_threshold(monkeypatch: pytest.MonkeyPatch) -> None:
     import blueprints.settings as settings_mod
 
     addr = "1.2.3.4"
@@ -442,10 +474,12 @@ def test_rate_limit_ok_threshold(monkeypatch):
     assert settings_mod._rate_limit_ok(addr) is False
 
 
-def test_api_logs_warnings_alias_combines_warn_and_errors(client, monkeypatch):
+def test_api_logs_warnings_alias_combines_warn_and_errors(
+    client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> Any:
     import blueprints.settings as settings_mod
 
-    def fake_read(hours: int):
+    def fake_read(hours: int) -> Any:
         return [
             "Jan 01 host app[1]: INFO started",
             "Jan 01 host app[1]: WARNING something odd",

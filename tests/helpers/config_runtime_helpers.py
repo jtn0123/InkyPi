@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
+import pytest
 from flask import Flask
 
 import config as config_mod
@@ -14,7 +16,9 @@ from refresh_task import ManualRefresh, RefreshTask
 from utils.config_schema import validate_device_config
 
 
-def load_runtime_config(config_path: Path, monkeypatch) -> config_mod.Config:
+def load_runtime_config(
+    config_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> config_mod.Config:
     """Load a Config instance from an explicit path for test scenarios."""
     monkeypatch.setattr(config_mod.Config, "config_file", str(config_path))
     return config_mod.Config()
@@ -25,7 +29,9 @@ def assert_valid_device_config(config_payload: dict) -> None:
     validate_device_config(config_payload)
 
 
-def run_upgrade_hop(config_path: Path, monkeypatch) -> tuple[dict, dict]:
+def run_upgrade_hop(
+    config_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> tuple[dict, dict]:
     """Load a migrated config and exercise diagnostics/refresh health checks."""
     cfg = load_runtime_config(config_path, monkeypatch)
 
@@ -44,7 +50,7 @@ def run_upgrade_hop(config_path: Path, monkeypatch) -> tuple[dict, dict]:
     app.config["AUTH_ENABLED"] = False
 
     @app.route("/healthz")
-    def _healthz():
+    def _healthz() -> Any:
         return ("OK", 200)
 
     app.register_blueprint(diagnostics_bp)

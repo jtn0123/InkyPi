@@ -29,8 +29,8 @@ def _load_json(path: Path) -> dict:
 
 
 def test_upgrade_chain_preserves_user_state_and_diagnostics_clean(
-    monkeypatch, tmp_path
-):
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     monkeypatch.setenv("INKYPI_ENV", "dev")
 
     spec = _load_chain_spec()
@@ -58,7 +58,9 @@ def test_upgrade_chain_preserves_user_state_and_diagnostics_clean(
         assert diagnostics["plugin_health"].get("clock") in {"ok", "unknown"}
 
 
-def test_upgrade_chain_detects_key_drop_at_specific_hop(monkeypatch, tmp_path):
+def test_upgrade_chain_detects_key_drop_at_specific_hop(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     monkeypatch.setenv("INKYPI_ENV", "dev")
 
     spec = _load_chain_spec()

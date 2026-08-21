@@ -7,11 +7,15 @@ Specifically targeting previously uncovered lines:
 
 import json
 import os
+from pathlib import Path
+from typing import Any
 
 import pytest
 
 
-def test_inkypi_env_dev_selects_dev_config(tmp_path, monkeypatch):
+def test_inkypi_env_dev_selects_dev_config(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Test that INKYPI_ENV=dev causes dev config selection (lines 107-112)."""
     # Create a dev config file
     config_dir = tmp_path / "config"
@@ -68,7 +72,9 @@ def test_inkypi_env_dev_selects_dev_config(tmp_path, monkeypatch):
     assert "dev" in cfg.config_file.lower()
 
 
-def test_flask_env_development_fallback(tmp_path, monkeypatch):
+def test_flask_env_development_fallback(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Test that FLASK_ENV=development also triggers dev config (lines 108-113)."""
     # Create a dev config file
     config_dir = tmp_path / "config"
@@ -122,7 +128,9 @@ def test_flask_env_development_fallback(tmp_path, monkeypatch):
     assert cfg.get_config("name") == "InkyPi Dev Flask"
 
 
-def test_validate_device_config_called_on_read(tmp_path, monkeypatch):
+def test_validate_device_config_called_on_read(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> Any:
     """Test that validate_device_config is invoked when reading config."""
     # Create a valid config
     config_dir = tmp_path / "config"
@@ -172,7 +180,7 @@ def test_validate_device_config_called_on_read(tmp_path, monkeypatch):
     validate_called = {"count": 0}
     original_validate = schema_mod.validate_device_config
 
-    def track_validate(config_dict):
+    def track_validate(config_dict: Any) -> Any:
         validate_called["count"] += 1
         return original_validate(config_dict)
 
@@ -185,7 +193,9 @@ def test_validate_device_config_called_on_read(tmp_path, monkeypatch):
     assert validate_called["count"] > 0, "validate_device_config should be called"
 
 
-def test_validation_with_jsonschema_available(tmp_path, monkeypatch):
+def test_validation_with_jsonschema_available(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Test validation path when jsonschema is available (covers validation logic)."""
     import shutil
 
@@ -254,7 +264,9 @@ def test_validation_with_jsonschema_available(tmp_path, monkeypatch):
         assert cfg is not None
 
 
-def test_validation_without_jsonschema(tmp_path, monkeypatch):
+def test_validation_without_jsonschema(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Test that config loads when jsonschema is not available."""
     config_dir = tmp_path / "config"
     config_dir.mkdir()
@@ -307,7 +319,9 @@ def test_validation_without_jsonschema(tmp_path, monkeypatch):
     assert cfg.get_config("name") == "InkyPi No Schema"
 
 
-def test_env_mode_with_whitespace(tmp_path, monkeypatch):
+def test_env_mode_with_whitespace(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Test that INKYPI_ENV with whitespace is handled correctly (strip())."""
     config_dir = tmp_path / "config"
     config_dir.mkdir()

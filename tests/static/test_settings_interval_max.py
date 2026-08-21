@@ -18,7 +18,7 @@ def _read() -> str:
     return FORM_JS.read_text(encoding="utf-8")
 
 
-def test_form_js_caps_interval_max_per_unit():
+def test_form_js_caps_interval_max_per_unit() -> None:
     """The form module must compute a unit-specific max and apply it on
     page load + on unit change. Otherwise the field has no max and the
     server has to backstop typos."""
@@ -48,7 +48,7 @@ def test_form_js_caps_interval_max_per_unit():
     ), "minute branch must `return 1439` (server cap is < 24h = 1440 min)"
 
 
-def test_unit_change_listener_refreshes_max():
+def test_unit_change_listener_refreshes_max() -> None:
     """The unit <select> must trigger refreshIntervalMax on change so the
     cap reflects whichever unit the user just picked."""
     js = _read()
@@ -63,7 +63,7 @@ def test_unit_change_listener_refreshes_max():
     ), "unit <select> must listen for change and call refreshIntervalMax"
 
 
-def test_populate_interval_fields_sets_initial_max():
+def test_populate_interval_fields_sets_initial_max() -> None:
     """First paint must already have the max set so the user sees the cap
     immediately, not only after they wiggle the unit."""
     js = _read()

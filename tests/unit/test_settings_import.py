@@ -3,6 +3,9 @@
 
 import io
 import json
+from typing import Any
+
+from flask.testing import FlaskClient
 
 # ---------------------------------------------------------------------------
 # /settings/import (POST) - import settings
@@ -10,7 +13,9 @@ import json
 
 
 class TestImportSettings:
-    def test_import_json_config(self, client, device_config_dev):
+    def test_import_json_config(
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
         payload = {
             "config": {
                 "name": "Imported Device",
@@ -23,7 +28,9 @@ class TestImportSettings:
         assert data["success"] is True
         assert device_config_dev.get_config("name") == "Imported Device"
 
-    def test_import_filters_disallowed_keys(self, client, device_config_dev):
+    def test_import_filters_disallowed_keys(
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
         payload = {
             "config": {
                 "name": "Good Key",
@@ -35,7 +42,9 @@ class TestImportSettings:
         assert device_config_dev.get_config("name") == "Good Key"
         assert device_config_dev.get_config("dangerous_key") is None
 
-    def test_import_with_env_keys(self, client, device_config_dev):
+    def test_import_with_env_keys(
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
         payload = {
             "config": {"name": "Test"},
             "env_keys": {"OPEN_AI_SECRET": "sk-test-123"},
@@ -45,10 +54,12 @@ class TestImportSettings:
         data = resp.get_json()
         assert data["success"] is True
 
-    def test_import_filters_disallowed_env_keys(self, client, device_config_dev):
+    def test_import_filters_disallowed_env_keys(
+        self, client: FlaskClient, device_config_dev: Any
+    ):
         # Pair a disallowed env key with at least one allowed config key so
         # the request still has *something* to apply; otherwise it would 400
-        # (see test_import_rejects_payload_with_no_recognized_keys below).
+        # (see test_import_rejects_payload_with_no_recognized_keys below) -> None -> None.
         payload = {
             "config": {"name": "Filters Test"},
             "env_keys": {"EVIL_KEY": "hacked"},
@@ -57,17 +68,19 @@ class TestImportSettings:
         assert resp.status_code == 200
         # EVIL_KEY should not have been set
 
-    def test_import_invalid_payload(self, client):
+    def test_import_invalid_payload(self, client: FlaskClient) -> None:
         resp = client.post(
             "/settings/import", data="not json", content_type="application/json"
         )
         assert resp.status_code == 400
 
-    def test_import_empty_body(self, client):
+    def test_import_empty_body(self, client: FlaskClient) -> None:
         resp = client.post("/settings/import", data="", content_type="application/json")
         assert resp.status_code == 400
 
-    def test_import_via_file_upload(self, client, device_config_dev):
+    def test_import_via_file_upload(
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
         payload = json.dumps({"config": {"name": "File Import"}})
         data = {
             "file": (io.BytesIO(payload.encode("utf-8")), "settings.json"),
@@ -79,12 +92,14 @@ class TestImportSettings:
         assert resp.get_json()["success"] is True
         assert device_config_dev.get_config("name") == "File Import"
 
-    def test_import_no_config_key(self, client):
+    def test_import_no_config_key(self, client: FlaskClient) -> None:
         """Import with empty dict is treated as invalid payload (400)."""
         resp = client.post("/settings/import", json={})
         assert resp.status_code == 400
 
-    def test_import_config_only(self, client, device_config_dev):
+    def test_import_config_only(
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
         """Import with only a config key and no env_keys should succeed."""
         resp = client.post(
             "/settings/import", json={"config": {"name": "MinimalImport"}}
@@ -93,8 +108,8 @@ class TestImportSettings:
         assert resp.get_json()["success"] is True
 
     def test_import_rejects_payload_with_no_recognized_keys(
-        self, client, device_config_dev
-    ):
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
         """A payload that survives JSON parse but contains no whitelisted
         config keys and no whitelisted env_keys must fail loudly (400),
         not silently return 'Import completed'. Otherwise users uploading
@@ -114,7 +129,9 @@ class TestImportSettings:
         # Device config must be untouched.
         assert device_config_dev.get_config("name") == original_name
 
-    def test_import_success_message_reports_counts(self, client, device_config_dev):
+    def test_import_success_message_reports_counts(
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
         """Success message should reflect what was applied so the user
         knows the restore actually did something."""
         resp = client.post(
@@ -136,7 +153,7 @@ class TestImportSettings:
 
 
 class TestExportSettings:
-    def test_export_without_keys(self, client):
+    def test_export_without_keys(self, client: FlaskClient) -> None:
         resp = client.get("/settings/export")
         assert resp.status_code == 200
         data = resp.get_json()
@@ -144,14 +161,18 @@ class TestExportSettings:
         assert "config" in data["data"]
         assert "env_keys" not in data["data"]
 
-    def test_export_with_keys(self, client, device_config_dev):
+    def test_export_with_keys(
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
         resp = client.post("/settings/export", json={"include_keys": True})
         assert resp.status_code == 200
         data = resp.get_json()
         assert data["success"] is True
         assert "env_keys" in data["data"]
 
-    def test_export_get_never_includes_keys(self, client, device_config_dev):
+    def test_export_get_never_includes_keys(
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
         device_config_dev.set_env_key("OPEN_AI_SECRET", "sk-test")
         resp = client.get("/settings/export?include_keys=1")
         assert resp.status_code == 200

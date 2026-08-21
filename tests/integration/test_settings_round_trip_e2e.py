@@ -4,6 +4,7 @@ from __future__ import annotations
 import os
 
 import pytest
+from playwright.sync_api import Page
 
 pytestmark = pytest.mark.skipif(
     os.getenv("SKIP_UI", "").lower() in ("1", "true"),
@@ -13,7 +14,7 @@ pytestmark = pytest.mark.skipif(
 from tests.integration.browser_helpers import navigate_and_wait  # noqa: E402
 
 
-def test_change_device_name_persists(live_server, browser_page):
+def test_change_device_name_persists(live_server: str, browser_page: Page) -> None:
     page = browser_page
     navigate_and_wait(page, live_server, "/settings")
 
@@ -36,7 +37,7 @@ def test_change_device_name_persists(live_server, browser_page):
     assert value == "TestInkyDevice", f"Device name should persist, got '{value}'"
 
 
-def test_change_timezone_persists(live_server, browser_page):
+def test_change_timezone_persists(live_server: str, browser_page: Page) -> None:
     page = browser_page
     navigate_and_wait(page, live_server, "/settings")
 
@@ -60,7 +61,7 @@ def test_change_timezone_persists(live_server, browser_page):
     assert value == "US/Eastern", f"Timezone should persist, got '{value}'"
 
 
-def test_image_slider_values_persist(live_server, browser_page):
+def test_image_slider_values_persist(live_server: str, browser_page: Page) -> None:
     page = browser_page
     navigate_and_wait(page, live_server, "/settings")
 
@@ -83,7 +84,7 @@ def test_image_slider_values_persist(live_server, browser_page):
     assert value == "1.5", f"Saturation slider should persist at 1.5, got '{value}'"
 
 
-def test_orientation_persists(live_server, browser_page):
+def test_orientation_persists(live_server: str, browser_page: Page) -> None:
     """Orientation is now a segmented-radio control — check() the vertical
     option instead of select_option(). FormData still serializes the chosen
     radio as `orientation=vertical` so the round-trip contract is preserved.

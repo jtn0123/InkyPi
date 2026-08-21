@@ -5,8 +5,11 @@ from __future__ import annotations
 import json
 import os
 import urllib.parse
+from pathlib import Path
+from typing import Any
 
 import pytest
+from flask import Flask
 
 # ---------------------------------------------------------------------------
 # Unit tests for utils/plugin_history.py
@@ -14,19 +17,19 @@ import pytest
 
 
 @pytest.fixture()
-def config_dir(tmp_path):
+def config_dir(tmp_path: Path) -> Any:
     """Return a temp directory to use as config_dir."""
     return str(tmp_path)
 
 
-def _hist_file_for(config_dir, instance_name):
+def _hist_file_for(config_dir: Any, instance_name: Any) -> Any:
     """Helper that mirrors plugin_history._history_file for test assertions."""
     from utils.plugin_history import _history_file
 
     return _history_file(config_dir, instance_name)
 
 
-def test_record_change_creates_file(config_dir):
+def test_record_change_creates_file(config_dir: Any) -> None:
     from utils.plugin_history import record_change
 
     record_change(config_dir, "my_plugin", {"key": "old"}, {"key": "new"})
@@ -43,7 +46,7 @@ def test_record_change_creates_file(config_dir):
     assert "ts" in entry
 
 
-def test_record_change_appends(config_dir):
+def test_record_change_appends(config_dir: Any) -> None:
     from utils.plugin_history import record_change
 
     record_change(config_dir, "inst", {"a": 1}, {"a": 2})
@@ -55,7 +58,7 @@ def test_record_change_appends(config_dir):
     assert len(lines) == 2
 
 
-def test_get_history_returns_newest_first(config_dir):
+def test_get_history_returns_newest_first(config_dir: Any) -> None:
     from utils.plugin_history import get_history, record_change
 
     for i in range(5):
@@ -68,7 +71,7 @@ def test_get_history_returns_newest_first(config_dir):
     assert history[-1]["after"] == {"v": 1}
 
 
-def test_get_history_respects_limit(config_dir):
+def test_get_history_respects_limit(config_dir: Any) -> None:
     from utils.plugin_history import get_history, record_change
 
     for i in range(10):
@@ -80,14 +83,14 @@ def test_get_history_respects_limit(config_dir):
     assert history[0]["after"] == {"v": 10}
 
 
-def test_get_history_returns_empty_for_missing_instance(config_dir):
+def test_get_history_returns_empty_for_missing_instance(config_dir: Any) -> None:
     from utils.plugin_history import get_history
 
     result = get_history(config_dir, "no_such_instance")
     assert result == []
 
 
-def test_truncation_at_max_entries(config_dir):
+def test_truncation_at_max_entries(config_dir: Any) -> None:
     """Writing more than MAX_ENTRIES records should drop the oldest."""
     from utils.plugin_history import MAX_ENTRIES, get_history, record_change
 
@@ -112,7 +115,7 @@ def test_truncation_at_max_entries(config_dir):
     assert all_history[-1]["after"] == {"v": total - MAX_ENTRIES + 1}
 
 
-def test_compute_diff_added(config_dir):
+def test_compute_diff_added(config_dir: Any) -> None:
     from utils.plugin_history import compute_diff
 
     diff = compute_diff({}, {"new_key": "value"})
@@ -121,7 +124,7 @@ def test_compute_diff_added(config_dir):
     assert diff["changed"] == {}
 
 
-def test_compute_diff_removed():
+def test_compute_diff_removed() -> None:
     from utils.plugin_history import compute_diff
 
     diff = compute_diff({"old_key": "value"}, {})
@@ -130,7 +133,7 @@ def test_compute_diff_removed():
     assert diff["changed"] == {}
 
 
-def test_compute_diff_changed():
+def test_compute_diff_changed() -> None:
     from utils.plugin_history import compute_diff
 
     diff = compute_diff({"k": "before"}, {"k": "after"})
@@ -139,14 +142,14 @@ def test_compute_diff_changed():
     assert diff["changed"] == {"k": {"before": "before", "after": "after"}}
 
 
-def test_compute_diff_no_change():
+def test_compute_diff_no_change() -> None:
     from utils.plugin_history import compute_diff
 
     diff = compute_diff({"k": "same"}, {"k": "same"})
     assert diff == {"added": {}, "removed": {}, "changed": {}}
 
 
-def test_compute_diff_mixed():
+def test_compute_diff_mixed() -> None:
     from utils.plugin_history import compute_diff
 
     before = {"a": 1, "b": 2, "c": 3}
@@ -162,7 +165,7 @@ def test_compute_diff_mixed():
 # ---------------------------------------------------------------------------
 
 
-def _add_plugin_instance(flask_app, instance_name: str):
+def _add_plugin_instance(flask_app: Flask, instance_name: str) -> None:
     """Helper: add a plugin instance to the Default playlist via the app config."""
     device_config = flask_app.config["DEVICE_CONFIG"]
     pm = device_config.get_playlist_manager()
@@ -181,7 +184,7 @@ def _add_plugin_instance(flask_app, instance_name: str):
     device_config.write_config()
 
 
-def _write_history(flask_app, instance_name: str, entries: int = 3):
+def _write_history(flask_app: Flask, instance_name: str, entries: int = 3) -> None:
     """Write *entries* history records for *instance_name* via the utility."""
     import os
 
@@ -198,7 +201,7 @@ def _write_history(flask_app, instance_name: str, entries: int = 3):
         )
 
 
-def test_history_endpoint_returns_json(flask_app):
+def test_history_endpoint_returns_json(flask_app: Flask) -> None:
     client = flask_app.test_client()
     instance_name = "clock_test"
     _add_plugin_instance(flask_app, instance_name)
@@ -212,7 +215,7 @@ def test_history_endpoint_returns_json(flask_app):
     assert len(data["history"]) == 3
 
 
-def test_history_endpoint_limit_param(flask_app):
+def test_history_endpoint_limit_param(flask_app: Flask) -> None:
     client = flask_app.test_client()
     instance_name = "clock_limited"
     _add_plugin_instance(flask_app, instance_name)
@@ -224,13 +227,13 @@ def test_history_endpoint_limit_param(flask_app):
     assert len(data["history"]) == 2
 
 
-def test_history_endpoint_404_for_unknown_instance(flask_app):
+def test_history_endpoint_404_for_unknown_instance(flask_app: Flask) -> None:
     client = flask_app.test_client()
     resp = client.get("/api/plugins/instance/no_such_plugin/history")
     assert resp.status_code == 404
 
 
-def test_diff_endpoint_returns_correct_diff(flask_app):
+def test_diff_endpoint_returns_correct_diff(flask_app: Flask) -> None:
     client = flask_app.test_client()
     instance_name = "clock_diff"
     _add_plugin_instance(flask_app, instance_name)
@@ -246,7 +249,7 @@ def test_diff_endpoint_returns_correct_diff(flask_app):
     assert "to_ts" in data
 
 
-def test_diff_endpoint_404_not_enough_history(flask_app):
+def test_diff_endpoint_404_not_enough_history(flask_app: Flask) -> None:
     client = flask_app.test_client()
     instance_name = "clock_onehist"
     _add_plugin_instance(flask_app, instance_name)
@@ -256,7 +259,7 @@ def test_diff_endpoint_404_not_enough_history(flask_app):
     assert resp.status_code == 404
 
 
-def test_diff_endpoint_404_for_unknown_instance(flask_app):
+def test_diff_endpoint_404_for_unknown_instance(flask_app: Flask) -> None:
     client = flask_app.test_client()
     resp = client.get("/api/plugins/instance/ghost_instance/diff")
     assert resp.status_code == 404
@@ -273,7 +276,7 @@ def test_diff_endpoint_404_for_unknown_instance(flask_app):
         ".hidden",
     ],
 )
-def test_path_traversal_returns_400(flask_app, bad_name):
+def test_path_traversal_returns_400(flask_app: Flask, bad_name: Any) -> None:
     client = flask_app.test_client()
     # URL-encode slashes so Flask doesn't route them as path separators
     encoded = urllib.parse.quote(bad_name, safe="")
@@ -285,7 +288,7 @@ def test_path_traversal_returns_400(flask_app, bad_name):
         ), f"Expected 400/404 for name={bad_name!r} endpoint={endpoint}, got {resp.status_code}"
 
 
-def test_safe_name_with_slashes_gives_400(flask_app):
+def test_safe_name_with_slashes_gives_400(flask_app: Flask) -> None:
     """Instance names containing slashes must be rejected."""
     client = flask_app.test_client()
     resp = client.get("/api/plugins/instance/foo%2Fbar/history")

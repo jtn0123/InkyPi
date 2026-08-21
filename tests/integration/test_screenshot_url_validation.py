@@ -6,6 +6,11 @@ not just when generate_image is called.  This prevents unsafe values (e.g.
 file:// or javascript:) from being persisted to device.json.
 """
 
+from typing import Any
+
+import pytest
+from flask.testing import FlaskClient
+
 # ---------------------------------------------------------------------------
 # /save_plugin_settings  (POST)
 # ---------------------------------------------------------------------------
@@ -14,7 +19,7 @@ file:// or javascript:) from being persisted to device.json.
 class TestSavePluginSettingsUrlValidation:
     """Verify that /save_plugin_settings enforces URL scheme for screenshot."""
 
-    def test_javascript_url_rejected_on_save(self, client):
+    def test_javascript_url_rejected_on_save(self, client: FlaskClient) -> None:
         """javascript: URLs must be rejected at save time with HTTP 400."""
         resp = client.post(
             "/save_plugin_settings",
@@ -24,7 +29,7 @@ class TestSavePluginSettingsUrlValidation:
         data = resp.get_json()
         assert "Invalid URL" in data.get("error", "")
 
-    def test_file_url_rejected_on_save(self, client):
+    def test_file_url_rejected_on_save(self, client: FlaskClient) -> None:
         """file:// URLs must be rejected at save time with HTTP 400."""
         resp = client.post(
             "/save_plugin_settings",
@@ -34,7 +39,7 @@ class TestSavePluginSettingsUrlValidation:
         data = resp.get_json()
         assert "Invalid URL" in data.get("error", "")
 
-    def test_data_url_rejected_on_save(self, client):
+    def test_data_url_rejected_on_save(self, client: FlaskClient) -> None:
         """data: URLs must be rejected at save time with HTTP 400."""
         resp = client.post(
             "/save_plugin_settings",
@@ -44,7 +49,7 @@ class TestSavePluginSettingsUrlValidation:
         data = resp.get_json()
         assert "Invalid URL" in data.get("error", "")
 
-    def test_ftp_url_rejected_on_save(self, client):
+    def test_ftp_url_rejected_on_save(self, client: FlaskClient) -> None:
         """ftp:// URLs must be rejected at save time with HTTP 400."""
         resp = client.post(
             "/save_plugin_settings",
@@ -54,7 +59,9 @@ class TestSavePluginSettingsUrlValidation:
         data = resp.get_json()
         assert "Invalid URL" in data.get("error", "")
 
-    def test_http_url_accepted_on_save(self, client, monkeypatch):
+    def test_http_url_accepted_on_save(
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """http:// URLs with a public hostname must be accepted (HTTP 200)."""
         import socket
 
@@ -73,7 +80,9 @@ class TestSavePluginSettingsUrlValidation:
         data = resp.get_json()
         assert data.get("success") is True
 
-    def test_https_url_accepted_on_save(self, client, monkeypatch):
+    def test_https_url_accepted_on_save(
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """https:// URLs with a public hostname must be accepted (HTTP 200)."""
         import socket
 
@@ -101,7 +110,7 @@ class TestSavePluginSettingsUrlValidation:
 class TestSaveAliasUrlValidation:
     """Verify the alias route /plugin/screenshot/save also enforces URL scheme."""
 
-    def test_javascript_url_rejected_via_alias(self, client):
+    def test_javascript_url_rejected_via_alias(self, client: FlaskClient) -> None:
         """javascript: URL is rejected through the alias save route."""
         resp = client.post(
             "/plugin/screenshot/save",
@@ -111,7 +120,7 @@ class TestSaveAliasUrlValidation:
         data = resp.get_json()
         assert "Invalid URL" in data.get("error", "")
 
-    def test_file_url_rejected_via_alias(self, client):
+    def test_file_url_rejected_via_alias(self, client: FlaskClient) -> None:
         """file:// URL is rejected through the alias save route."""
         resp = client.post(
             "/plugin/screenshot/save",
@@ -121,7 +130,9 @@ class TestSaveAliasUrlValidation:
         data = resp.get_json()
         assert "Invalid URL" in data.get("error", "")
 
-    def test_https_url_accepted_via_alias(self, client, monkeypatch):
+    def test_https_url_accepted_via_alias(
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """https:// URL is accepted through the alias save route."""
         import socket
 
@@ -149,7 +160,9 @@ class TestSaveAliasUrlValidation:
 class TestUpdateInstanceUrlValidation:
     """Verify that updating an existing screenshot instance also validates URL."""
 
-    def _create_instance(self, device_config_dev, name="screenshot_test_instance"):
+    def _create_instance(
+        self, device_config_dev: Any, name: Any = "screenshot_test_instance"
+    ) -> Any:
         """Helper: create a screenshot plugin instance on the Default playlist."""
         pm = device_config_dev.get_playlist_manager()
         if not pm.get_playlist("Default"):
@@ -166,7 +179,9 @@ class TestUpdateInstanceUrlValidation:
         device_config_dev.write_config()
         return name
 
-    def test_update_rejects_javascript_url(self, client, device_config_dev):
+    def test_update_rejects_javascript_url(
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
         """javascript: URL is rejected when updating an existing screenshot instance."""
         name = self._create_instance(device_config_dev)
         resp = client.put(
@@ -177,7 +192,9 @@ class TestUpdateInstanceUrlValidation:
         data = resp.get_json()
         assert "Invalid URL" in data.get("error", "")
 
-    def test_update_rejects_file_url(self, client, device_config_dev):
+    def test_update_rejects_file_url(
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
         """file:// URL is rejected when updating an existing screenshot instance."""
         name = self._create_instance(device_config_dev, "screenshot_file_test")
         resp = client.put(
@@ -186,7 +203,12 @@ class TestUpdateInstanceUrlValidation:
         )
         assert resp.status_code == 400
 
-    def test_update_accepts_https_url(self, client, device_config_dev, monkeypatch):
+    def test_update_accepts_https_url(
+        self,
+        client: FlaskClient,
+        device_config_dev: Any,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
         """https:// URL is accepted when updating an existing screenshot instance."""
         import socket
 

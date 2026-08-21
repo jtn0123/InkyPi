@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+from pathlib import Path
+from typing import Any
+
 import pytest
 
 
 @pytest.fixture
-def chaos_diag_paths(tmp_path, monkeypatch):
+def chaos_diag_paths(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Any:
     """Isolate diagnostics filesystem paths per test and allow dev access."""
     import blueprints.diagnostics as diag
 

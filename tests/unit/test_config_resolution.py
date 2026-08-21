@@ -1,9 +1,13 @@
 # pyright: reportMissingImports=false
 import json
 import os
+from pathlib import Path
+from typing import Any
+
+import pytest
 
 
-def _write_min_config(path, name="TestCfg"):
+def _write_min_config(path: Any, name: Any = "TestCfg") -> None:
     cfg = {
         "name": name,
         "display_type": "mock",
@@ -22,7 +26,9 @@ def _write_min_config(path, name="TestCfg"):
         json.dump(cfg, f)
 
 
-def test_env_config_file_takes_precedence(monkeypatch, tmp_path):
+def test_env_config_file_takes_precedence(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     import config as config_mod
 
     # Arrange
@@ -42,7 +48,9 @@ def test_env_config_file_takes_precedence(monkeypatch, tmp_path):
     assert cfg.get_config("name") == "EnvSelected"
 
 
-def test_class_override_used_when_env_not_set(monkeypatch, tmp_path):
+def test_class_override_used_when_env_not_set(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     import config as config_mod
 
     # Arrange
@@ -58,7 +66,7 @@ def test_class_override_used_when_env_not_set(monkeypatch, tmp_path):
     assert cfg.get_config("name") == "ClassSelected"
 
 
-def test_env_mode_dev_uses_device_dev_json(monkeypatch):
+def test_env_mode_dev_uses_device_dev_json(monkeypatch: pytest.MonkeyPatch) -> None:
     import config as config_mod
 
     # Arrange – ensure no explicit file set
@@ -73,7 +81,9 @@ def test_env_mode_dev_uses_device_dev_json(monkeypatch):
     assert cfg.config.get("name") in {"InkyPi Development", "InkyPi Dev", "InkyPi"}
 
 
-def test_bootstrap_when_no_config_found(monkeypatch, tmp_path):
+def test_bootstrap_when_no_config_found(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     import config as config_mod
 
     # Build a temporary project-like structure
@@ -103,7 +113,9 @@ def test_bootstrap_when_no_config_found(monkeypatch, tmp_path):
     assert os.path.isfile(os.path.join(str(tmp_src), "config", "device.json"))
 
 
-def test_env_mode_dev_wins_over_prod_when_both_exist(monkeypatch, tmp_path):
+def test_env_mode_dev_wins_over_prod_when_both_exist(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     """Regression test for JTN-259: INKYPI_ENV=dev must select device_dev.json
     even when device.json also exists (the class default always points to device.json,
     which previously caused step 2 to always match and INKYPI_ENV to be unreachable).
@@ -132,7 +144,9 @@ def test_env_mode_dev_wins_over_prod_when_both_exist(monkeypatch, tmp_path):
     )
 
 
-def test_get_resolution_returns_default_when_key_missing(monkeypatch, tmp_path):
+def test_get_resolution_returns_default_when_key_missing(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     import config as config_mod
 
     # Arrange – config without a "resolution" key
@@ -165,7 +179,9 @@ def test_get_resolution_returns_default_when_key_missing(monkeypatch, tmp_path):
     assert height == 480
 
 
-def test_get_config_without_key_returns_copy(monkeypatch, tmp_path):
+def test_get_config_without_key_returns_copy(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     """get_config() with no key must return a copy, not the internal dict (JTN-241)."""
     import config as config_mod
 
@@ -195,7 +211,9 @@ def test_get_config_without_key_returns_copy(monkeypatch, tmp_path):
     )
 
 
-def test_runtime_dir_overrides_output_paths(monkeypatch, tmp_path):
+def test_runtime_dir_overrides_output_paths(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     import config as config_mod
 
     cfg_path = tmp_path / "device.json"

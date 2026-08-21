@@ -1,9 +1,16 @@
 """Tests for JTN-309 (internal secrets filtered) and JTN-310 (Add Key button)."""
 
+from pathlib import Path
+
+import pytest
+from flask.testing import FlaskClient
+
 # --- JTN-309: internal secrets must not appear in the API Keys UI ---
 
 
-def test_secret_key_not_shown_in_generic_api_keys_page(client, tmp_path, monkeypatch):
+def test_secret_key_not_shown_in_generic_api_keys_page(
+    client: FlaskClient, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """JTN-309: SECRET_KEY must not appear in the /api-keys response."""
     env_file = tmp_path / ".env"
     env_file.write_text("SECRET_KEY=super-secret\nNASA_SECRET=nasa123\n")
@@ -17,7 +24,9 @@ def test_secret_key_not_shown_in_generic_api_keys_page(client, tmp_path, monkeyp
     assert "super-secret" not in html, "The value of SECRET_KEY must never be shown"
 
 
-def test_test_key_not_shown_in_generic_api_keys_page(client, tmp_path, monkeypatch):
+def test_test_key_not_shown_in_generic_api_keys_page(
+    client: FlaskClient, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """JTN-309: TEST_KEY must not appear in the /api-keys response."""
     env_file = tmp_path / ".env"
     env_file.write_text("TEST_KEY=test-value\nGITHUB_SECRET=gh-token\n")
@@ -31,8 +40,8 @@ def test_test_key_not_shown_in_generic_api_keys_page(client, tmp_path, monkeypat
 
 
 def test_wtf_csrf_secret_key_not_shown_in_generic_api_keys_page(
-    client, tmp_path, monkeypatch
-):
+    client: FlaskClient, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """JTN-309: WTF_CSRF_SECRET_KEY must not appear in the /api-keys response."""
     env_file = tmp_path / ".env"
     env_file.write_text("WTF_CSRF_SECRET_KEY=csrf-secret\nOPEN_AI_SECRET=openai-key\n")
@@ -48,8 +57,8 @@ def test_wtf_csrf_secret_key_not_shown_in_generic_api_keys_page(
 
 
 def test_provider_keys_still_shown_after_internal_filtering(
-    client, tmp_path, monkeypatch
-):
+    client: FlaskClient, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """JTN-309: filtering internal keys must not hide provider API keys."""
     env_file = tmp_path / ".env"
     env_file.write_text(
@@ -66,7 +75,7 @@ def test_provider_keys_still_shown_after_internal_filtering(
     assert "UNSPLASH_ACCESS_KEY" in html
 
 
-def test_internal_keys_constant_contains_expected_names():
+def test_internal_keys_constant_contains_expected_names() -> None:
     """JTN-309: _INTERNAL_KEYS frozenset must contain all known internal secrets."""
     from blueprints.apikeys import _INTERNAL_KEYS
 
@@ -78,7 +87,7 @@ def test_internal_keys_constant_contains_expected_names():
 # --- JTN-310: Add API Key button and preset chips must be wired up ---
 
 
-def test_add_api_key_button_present_in_generic_page(client):
+def test_add_api_key_button_present_in_generic_page(client: FlaskClient) -> None:
     """JTN-310: the + Add API Key button must be rendered in generic mode."""
     resp = client.get("/api-keys")
     assert resp.status_code == 200
@@ -88,7 +97,7 @@ def test_add_api_key_button_present_in_generic_page(client):
     assert "Add API Key" in html
 
 
-def test_preset_chips_rendered_with_data_api_action(client):
+def test_preset_chips_rendered_with_data_api_action(client: FlaskClient) -> None:
     """JTN-310: preset suggestion chips must carry data-api-action=add-preset."""
     resp = client.get("/api-keys")
     assert resp.status_code == 200
@@ -99,7 +108,7 @@ def test_preset_chips_rendered_with_data_api_action(client):
     assert 'data-key="NASA_SECRET"' in html
 
 
-def test_add_row_guard_in_js(client):
+def test_add_row_guard_in_js(client: FlaskClient) -> None:
     """JTN-310: api_keys_page.js addRow must guard against missing #apikeys-list."""
     resp = client.get("/static/scripts/api_keys_page.js")
     assert resp.status_code == 200
@@ -109,7 +118,7 @@ def test_add_row_guard_in_js(client):
     assert "api_keys_page: #apikeys-list not found in DOM" in js
 
 
-def test_add_preset_guards_missing_key(client):
+def test_add_preset_guards_missing_key(client: FlaskClient) -> None:
     """JTN-310: addPreset must guard against buttons with no data-key attribute."""
     resp = client.get("/static/scripts/api_keys_page.js")
     assert resp.status_code == 200
@@ -121,7 +130,7 @@ def test_add_preset_guards_missing_key(client):
     assert "if (!key) return;" in fn_body
 
 
-def test_init_wires_add_button_click_handler(client):
+def test_init_wires_add_button_click_handler(client: FlaskClient) -> None:
     """JTN-310: init() must attach a click listener on #addApiKeyBtn."""
     resp = client.get("/static/scripts/api_keys_page.js")
     assert resp.status_code == 200
@@ -131,7 +140,7 @@ def test_init_wires_add_button_click_handler(client):
     assert "() => addRow()" in js
 
 
-def test_delegated_handler_covers_add_preset_action(client):
+def test_delegated_handler_covers_add_preset_action(client: FlaskClient) -> None:
     """JTN-310: the delegated click handler in init() must handle add-preset action."""
     resp = client.get("/static/scripts/api_keys_page.js")
     assert resp.status_code == 200

@@ -13,7 +13,9 @@ inline JS object literals.
 
 import json
 import os
+from typing import Any
 
+from flask.testing import FlaskClient
 from PIL import Image
 
 # ---------------------------------------------------------------------------
@@ -21,7 +23,9 @@ from PIL import Image
 # ---------------------------------------------------------------------------
 
 
-def _seed_history(device_config, count, prefix="display_regression"):
+def _seed_history(
+    device_config: Any, count: Any, prefix: Any = "display_regression"
+) -> Any:
     """Create *count* PNG files in the history directory and return filenames."""
     d = device_config.history_image_dir
     os.makedirs(d, exist_ok=True)
@@ -33,7 +37,9 @@ def _seed_history(device_config, count, prefix="display_regression"):
     return names
 
 
-def _seed_history_with_sidecar(device_config, count, prefix="display_sc"):
+def _seed_history_with_sidecar(
+    device_config: Any, count: Any, prefix: Any = "display_sc"
+) -> Any:
     """Create PNGs with matching JSON sidecar files."""
     d = device_config.history_image_dir
     os.makedirs(d, exist_ok=True)
@@ -58,7 +64,9 @@ def _seed_history_with_sidecar(device_config, count, prefix="display_sc"):
 class TestPaginationNext:
     """Verify the Next link renders as an <a> tag pointing to the correct page."""
 
-    def test_next_link_present_on_first_page(self, client, device_config_dev):
+    def test_next_link_present_on_first_page(
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
         _seed_history(device_config_dev, 30, prefix="display_pnext")
         resp = client.get("/history?per_page=10")
         assert resp.status_code == 200
@@ -66,7 +74,9 @@ class TestPaginationNext:
         assert "Page 1 of 3" in body
         assert "page=2" in body, "Next link must point to page=2"
 
-    def test_next_link_returns_different_items(self, client, device_config_dev):
+    def test_next_link_returns_different_items(
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
         names = _seed_history(device_config_dev, 20, prefix="display_pnextdiff")
         resp1 = client.get("/history?page=1&per_page=10")
         resp2 = client.get("/history?page=2&per_page=10")
@@ -79,7 +89,9 @@ class TestPaginationNext:
         assert page2_items, "Page 2 must show some items"
         assert not page1_items & page2_items, "Pages must show disjoint items"
 
-    def test_htmx_partial_returns_grid_fragment(self, client, device_config_dev):
+    def test_htmx_partial_returns_grid_fragment(
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
         """HTMX pagination must return only the grid partial, not the full page."""
         _seed_history(device_config_dev, 15, prefix="display_htmx")
         resp = client.get(
@@ -93,13 +105,17 @@ class TestPaginationNext:
         # But must include the grid container
         assert 'id="history-grid-container"' in body
 
-    def test_previous_link_on_page_two(self, client, device_config_dev):
+    def test_previous_link_on_page_two(
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
         _seed_history(device_config_dev, 20, prefix="display_pprev")
         resp = client.get("/history?page=2&per_page=10")
         body = resp.get_data(as_text=True)
         assert "page=1" in body, "Previous link must point to page=1"
 
-    def test_no_next_on_last_page(self, client, device_config_dev):
+    def test_no_next_on_last_page(
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
         _seed_history(device_config_dev, 15, prefix="display_plast")
         resp = client.get("/history?page=2&per_page=10")
         body = resp.get_data(as_text=True)
@@ -115,7 +131,9 @@ class TestPaginationNext:
 class TestClearAll:
     """Verify the Clear All endpoint removes all history images."""
 
-    def test_clear_all_removes_all_pngs(self, client, device_config_dev):
+    def test_clear_all_removes_all_pngs(
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
         _seed_history(device_config_dev, 5, prefix="display_clr")
         d = device_config_dev.history_image_dir
         assert len([f for f in os.listdir(d) if f.endswith(".png")]) == 5
@@ -128,7 +146,9 @@ class TestClearAll:
         remaining = [f for f in os.listdir(d) if f.endswith(".png")]
         assert remaining == []
 
-    def test_clear_all_removes_sidecars_too(self, client, device_config_dev):
+    def test_clear_all_removes_sidecars_too(
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
         _seed_history_with_sidecar(device_config_dev, 3, prefix="display_clrsc")
         d = device_config_dev.history_image_dir
         assert len([f for f in os.listdir(d) if f.endswith(".json")]) == 3
@@ -138,7 +158,9 @@ class TestClearAll:
         remaining_json = [f for f in os.listdir(d) if f.endswith(".json")]
         assert remaining_json == [], "Sidecar JSON files must also be cleared"
 
-    def test_clear_all_modal_markup_present(self, client, device_config_dev):
+    def test_clear_all_modal_markup_present(
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
         _seed_history(device_config_dev, 1, prefix="display_clrmod")
         resp = client.get("/history")
         body = resp.get_data(as_text=True)
@@ -147,7 +169,9 @@ class TestClearAll:
         assert 'id="cancelClearHistoryBtn"' in body
         assert 'id="historyClearBtn"' in body
 
-    def test_clear_on_empty_history_returns_success(self, client, device_config_dev):
+    def test_clear_on_empty_history_returns_success(
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
         d = device_config_dev.history_image_dir
         os.makedirs(d, exist_ok=True)
         for f in os.listdir(d):
@@ -167,7 +191,9 @@ class TestClearAll:
 class TestDeleteButton:
     """Verify the Delete endpoint removes specific files."""
 
-    def test_delete_removes_target_file(self, client, device_config_dev):
+    def test_delete_removes_target_file(
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
         names = _seed_history(device_config_dev, 3, prefix="display_del")
         d = device_config_dev.history_image_dir
         target = names[1]
@@ -180,7 +206,9 @@ class TestDeleteButton:
         assert os.path.exists(os.path.join(d, names[0]))
         assert os.path.exists(os.path.join(d, names[2]))
 
-    def test_delete_removes_matching_sidecar(self, client, device_config_dev):
+    def test_delete_removes_matching_sidecar(
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
         names = _seed_history_with_sidecar(device_config_dev, 2, prefix="display_delsc")
         d = device_config_dev.history_image_dir
         target = names[0]
@@ -194,7 +222,9 @@ class TestDeleteButton:
             os.path.join(d, sidecar)
         ), "Sidecar JSON must be deleted alongside the PNG"
 
-    def test_delete_modal_markup_present(self, client, device_config_dev):
+    def test_delete_modal_markup_present(
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
         _seed_history(device_config_dev, 1, prefix="display_delmod")
         resp = client.get("/history")
         body = resp.get_data(as_text=True)
@@ -202,22 +232,24 @@ class TestDeleteButton:
         assert 'id="confirmDeleteHistoryBtn"' in body
         assert 'id="cancelDeleteHistoryBtn"' in body
 
-    def test_delete_buttons_carry_data_attrs(self, client, device_config_dev):
+    def test_delete_buttons_carry_data_attrs(
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
         names = _seed_history(device_config_dev, 1, prefix="display_delattr")
         resp = client.get("/history")
         body = resp.get_data(as_text=True)
         assert 'data-history-action="delete"' in body
         assert f'data-filename="{names[0]}"' in body
 
-    def test_delete_nonexistent_returns_404(self, client):
+    def test_delete_nonexistent_returns_404(self, client: FlaskClient) -> None:
         resp = client.post("/history/delete", json={"filename": "nonexistent.png"})
         assert resp.status_code == 404
 
-    def test_delete_missing_filename_returns_400(self, client):
+    def test_delete_missing_filename_returns_400(self, client: FlaskClient) -> None:
         resp = client.post("/history/delete", json={})
         assert resp.status_code == 400
 
-    def test_delete_path_traversal_returns_400(self, client):
+    def test_delete_path_traversal_returns_400(self, client: FlaskClient) -> None:
         resp = client.post("/history/delete", json={"filename": "../../etc/passwd"})
         assert resp.status_code == 400
 
@@ -230,33 +262,37 @@ class TestDeleteButton:
 class TestDisplayButton:
     """Verify the Display (redisplay) endpoint works end-to-end."""
 
-    def test_redisplay_returns_success(self, client, device_config_dev):
+    def test_redisplay_returns_success(
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
         names = _seed_history(device_config_dev, 1, prefix="display_redisp")
         resp = client.post("/history/redisplay", json={"filename": names[0]})
         assert resp.status_code == 200
         data = resp.get_json()
         assert data.get("success") is True
 
-    def test_display_buttons_carry_data_attrs(self, client, device_config_dev):
+    def test_display_buttons_carry_data_attrs(
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
         names = _seed_history(device_config_dev, 1, prefix="display_dispattr")
         resp = client.get("/history")
         body = resp.get_data(as_text=True)
         assert 'data-history-action="display"' in body
         assert f'data-filename="{names[0]}"' in body
 
-    def test_redisplay_missing_filename_returns_400(self, client):
+    def test_redisplay_missing_filename_returns_400(self, client: FlaskClient) -> None:
         resp = client.post("/history/redisplay", json={})
         assert resp.status_code == 400
 
-    def test_redisplay_nonexistent_file_returns_404(self, client):
+    def test_redisplay_nonexistent_file_returns_404(self, client: FlaskClient) -> None:
         resp = client.post("/history/redisplay", json={"filename": "nonexistent.png"})
         assert resp.status_code in (400, 404)
 
-    def test_redisplay_path_traversal_returns_400(self, client):
+    def test_redisplay_path_traversal_returns_400(self, client: FlaskClient) -> None:
         resp = client.post("/history/redisplay", json={"filename": "../../etc/passwd"})
         assert resp.status_code == 400
 
-    def test_redisplay_invalid_json_returns_400(self, client):
+    def test_redisplay_invalid_json_returns_400(self, client: FlaskClient) -> None:
         resp = client.post(
             "/history/redisplay",
             data="not json",
@@ -273,32 +309,32 @@ class TestDisplayButton:
 class TestBootConfig:
     """Verify the boot data element carries all required endpoint URLs."""
 
-    def test_boot_data_element_present(self, client):
+    def test_boot_data_element_present(self, client: FlaskClient) -> None:
         resp = client.get("/history")
         body = resp.get_data(as_text=True)
         assert 'id="historyBootData"' in body
 
-    def test_boot_data_has_clear_url(self, client):
+    def test_boot_data_has_clear_url(self, client: FlaskClient) -> None:
         resp = client.get("/history")
         body = resp.get_data(as_text=True)
         assert 'data-clear-url="/history/clear"' in body
 
-    def test_boot_data_has_delete_url(self, client):
+    def test_boot_data_has_delete_url(self, client: FlaskClient) -> None:
         resp = client.get("/history")
         body = resp.get_data(as_text=True)
         assert 'data-delete-url="/history/delete"' in body
 
-    def test_boot_data_has_redisplay_url(self, client):
+    def test_boot_data_has_redisplay_url(self, client: FlaskClient) -> None:
         resp = client.get("/history")
         body = resp.get_data(as_text=True)
         assert 'data-redisplay-url="/history/redisplay"' in body
 
-    def test_boot_data_has_storage_url(self, client):
+    def test_boot_data_has_storage_url(self, client: FlaskClient) -> None:
         resp = client.get("/history")
         body = resp.get_data(as_text=True)
         assert 'data-storage-url="/history/storage"' in body
 
-    def test_page_controller_invoked_in_script(self, client):
+    def test_page_controller_invoked_in_script(self, client: FlaskClient) -> None:
         resp = client.get("/history")
         body = resp.get_data(as_text=True)
         assert "InkyPiHistoryPage" in body

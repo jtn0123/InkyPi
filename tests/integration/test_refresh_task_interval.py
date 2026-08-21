@@ -1,10 +1,15 @@
+from typing import Any
+
 # pyright: reportMissingImports=false
 from zoneinfo import ZoneInfo
 
+import pytest
 from PIL import Image
 
 
-def test_interval_refresh_logic_without_thread(device_config_dev, monkeypatch):
+def test_interval_refresh_logic_without_thread(
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> Any:
     # Create a playlist with one plugin instance
     pm = device_config_dev.get_playlist_manager()
     pm.add_playlist("P1", "12:00", "13:00")
@@ -28,7 +33,7 @@ def test_interval_refresh_logic_without_thread(device_config_dev, monkeypatch):
     # Mock plugin image generation
     import plugins.ai_text.ai_text as ai_text_mod
 
-    def fake_generate_image(self, settings, device_config):
+    def fake_generate_image(self, settings: Any, device_config: Any) -> Any:
         return Image.new("RGB", device_config.get_resolution(), "white")
 
     monkeypatch.setattr(
@@ -41,7 +46,9 @@ def test_interval_refresh_logic_without_thread(device_config_dev, monkeypatch):
     dm = DisplayManager(device_config_dev)
     calls = {"display": 0}
 
-    def fake_display_image(img, image_settings=None, history_meta=None):
+    def fake_display_image(
+        img: Any, image_settings: Any = None, history_meta: Any = None
+    ) -> None:
         calls["display"] += 1
 
     monkeypatch.setattr(dm, "display_image", fake_display_image, raising=True)

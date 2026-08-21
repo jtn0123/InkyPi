@@ -5,7 +5,7 @@ from pathlib import Path
 SETTINGS_TEMPLATE = Path("src/templates/settings.html")
 
 
-def test_settings_template_loads_feature_modules_before_bootstrap():
+def test_settings_template_loads_feature_modules_before_bootstrap() -> None:
     html = SETTINGS_TEMPLATE.read_text(encoding="utf-8")
     script_paths = [
         "scripts/settings/shared.js",

@@ -7,12 +7,21 @@ import importlib
 import sys
 from collections.abc import Callable
 from types import ModuleType
+from typing import Any
+
+import pytest
 
 
-def _block_prometheus_imports(monkeypatch) -> None:
+def _block_prometheus_imports(monkeypatch: pytest.MonkeyPatch) -> None:
     real_import = builtins.__import__
 
-    def guarded_import(name, globals=None, locals=None, fromlist=(), level=0):
+    def guarded_import(
+        name: Any,
+        globals: Any = None,
+        locals: Any = None,
+        fromlist: Any = (),
+        level: Any = 0,
+    ) -> Any:
         if name == "prometheus_client" or name.startswith("prometheus_client."):
             raise ModuleNotFoundError("No module named 'prometheus_client'")
         return real_import(name, globals, locals, fromlist, level)
@@ -26,7 +35,7 @@ def _block_prometheus_imports(monkeypatch) -> None:
 
 
 def _import_fallback_modules(
-    monkeypatch,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> tuple[ModuleType, ModuleType, Callable[[], None]]:
     original_metrics_module = sys.modules.get("utils.metrics")
     original_blueprints_metrics_module = sys.modules.get("blueprints.metrics")
@@ -51,7 +60,9 @@ def _import_fallback_modules(
     return metrics_module, blueprints_metrics_module, restore_modules
 
 
-def test_metrics_helpers_work_without_prometheus(monkeypatch):
+def test_metrics_helpers_work_without_prometheus(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     metrics_module, _, restore_modules = _import_fallback_modules(monkeypatch)
     try:
         assert metrics_module._PROMETHEUS_AVAILABLE is False
@@ -79,7 +90,9 @@ def test_metrics_helpers_work_without_prometheus(monkeypatch):
         restore_modules()
 
 
-def test_metrics_endpoint_fallback_response_when_prometheus_missing(monkeypatch):
+def test_metrics_endpoint_fallback_response_when_prometheus_missing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     _, blueprints_metrics_module, restore_modules = _import_fallback_modules(
         monkeypatch
     )

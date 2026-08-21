@@ -5,6 +5,7 @@ import re
 from pathlib import Path
 
 import pytest
+from flask.testing import FlaskClient
 
 _STYLES_DIR = Path(__file__).resolve().parents[2] / "src" / "static" / "styles"
 
@@ -24,7 +25,7 @@ def _read_partials_individually() -> dict[str, str]:
     return result
 
 
-def test_dark_mode_defines_core_color_variables(client):
+def test_dark_mode_defines_core_color_variables(client: FlaskClient) -> None:
     """Both :root and [data-theme='dark'] define all core color tokens."""
     css = _read_all_css()
 
@@ -57,7 +58,7 @@ def test_dark_mode_defines_core_color_variables(client):
         assert f"{var}:" in dark_content, f"{var} not defined in dark theme"
 
 
-def test_no_hardcoded_white_black_outside_root(client):
+def test_no_hardcoded_white_black_outside_root(client: FlaskClient) -> None:
     """No hardcoded #fff/#000 in selectors outside :root/[data-theme] blocks.
 
     Exceptions: _print.css (fallback values), data URIs, and rgba() values.
@@ -100,7 +101,7 @@ def test_no_hardcoded_white_black_outside_root(client):
             )
 
 
-def test_disabled_styles_exist(client):
+def test_disabled_styles_exist(client: FlaskClient) -> None:
     """Verify :disabled rules exist for buttons and inputs."""
     css = _read_all_css()
 
@@ -120,7 +121,7 @@ def test_disabled_styles_exist(client):
     ), "Disabled elements should have reduced opacity"
 
 
-def test_print_stylesheet_uses_variables(client):
+def test_print_stylesheet_uses_variables(client: FlaskClient) -> None:
     """Print stylesheet should use CSS variables with fallbacks, not hardcoded colors."""
     partials = _read_partials_individually()
     print_css = partials.get("_print.css", "")
@@ -132,7 +133,7 @@ def test_print_stylesheet_uses_variables(client):
     ), "Print stylesheet should use CSS variables"
 
 
-def test_hover_overlay_uses_variable(client):
+def test_hover_overlay_uses_variable(client: FlaskClient) -> None:
     """Plugin action button hover should use --hover-overlay variable."""
     css = _read_all_css()
     assert (

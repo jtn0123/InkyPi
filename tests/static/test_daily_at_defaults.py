@@ -16,7 +16,7 @@ MANAGER_JS = ROOT / "src" / "static" / "scripts" / "refresh_settings_manager.js"
 class TestDailyAtTemplateDefaults:
     """Verify the refresh_settings_form.html template has the required markup."""
 
-    def test_help_text_element_present(self):
+    def test_help_text_element_present(self) -> None:
         """The template must contain a help-text paragraph for the scheduled mode."""
         html = TEMPLATE.read_text()
         assert "scheduled-help" in html, (
@@ -24,7 +24,7 @@ class TestDailyAtTemplateDefaults:
             "'{{ prefix }}-scheduled-help' for inline guidance (Option B)"
         )
 
-    def test_help_text_initially_hidden(self):
+    def test_help_text_initially_hidden(self) -> None:
         """The help text must start hidden so it only appears when Daily at is active."""
         html = TEMPLATE.read_text()
         # The element should have display:none in its initial inline style
@@ -32,14 +32,14 @@ class TestDailyAtTemplateDefaults:
             "display:none" in html or "display: none" in html
         ), "The scheduled-help element must start with display:none"
 
-    def test_help_text_content(self):
+    def test_help_text_content(self) -> None:
         """The help text must include the expected guidance copy."""
         html = TEMPLATE.read_text()
         assert (
             "Pick a time of day for the refresh" in html
         ), "Help text must say 'Pick a time of day for the refresh.'"
 
-    def test_template_prefills_default_on_switch(self):
+    def test_template_prefills_default_on_switch(self) -> None:
         """The inline script must set inputScheduled.value to '09:00' when empty."""
         html = TEMPLATE.read_text()
         assert "09:00" in html, (
@@ -47,7 +47,7 @@ class TestDailyAtTemplateDefaults:
             "the default time for the Daily at option (Option A)"
         )
 
-    def test_help_text_toggled_by_mode(self):
+    def test_help_text_toggled_by_mode(self) -> None:
         """The inline script must toggle the help element visibility."""
         html = TEMPLATE.read_text()
         # The script must reference scheduled-help to show/hide it
@@ -60,7 +60,7 @@ class TestDailyAtTemplateDefaults:
 class TestDailyAtManagerDefaults:
     """Verify refresh_settings_manager.js applies defaults and shows help text."""
 
-    def test_manager_has_sync_method(self):
+    def test_manager_has_sync_method(self) -> None:
         """The manager must have a syncScheduledDefaults method."""
         js = MANAGER_JS.read_text()
         assert "syncScheduledDefaults" in js, (
@@ -68,14 +68,14 @@ class TestDailyAtManagerDefaults:
             "to handle Option A and Option B logic"
         )
 
-    def test_manager_prefills_default_time(self):
+    def test_manager_prefills_default_time(self) -> None:
         """syncScheduledDefaults must set '09:00' when no time is selected."""
         js = MANAGER_JS.read_text()
         assert (
             "09:00" in js
         ), "refresh_settings_manager.js must default the time input to '09:00'"
 
-    def test_manager_toggles_help_text(self):
+    def test_manager_toggles_help_text(self) -> None:
         """syncScheduledDefaults must show/hide the help element."""
         js = MANAGER_JS.read_text()
         assert "scheduled-help" in js, (
@@ -83,7 +83,7 @@ class TestDailyAtManagerDefaults:
             "toggle the inline guidance text"
         )
 
-    def test_manager_calls_sync_on_radio_click(self):
+    def test_manager_calls_sync_on_radio_click(self) -> None:
         """Clicking either radio must trigger syncScheduledDefaults."""
         js = MANAGER_JS.read_text()
         # syncScheduledDefaults is called from activateGroup which is called
@@ -93,7 +93,7 @@ class TestDailyAtManagerDefaults:
             "when the user clicks a radio button"
         )
 
-    def test_manager_does_not_overwrite_existing_value(self):
+    def test_manager_does_not_overwrite_existing_value(self) -> None:
         """The default must only apply when the time input is empty (!value check)."""
         js = MANAGER_JS.read_text()
         assert "!this.inputScheduled.value" in js, (

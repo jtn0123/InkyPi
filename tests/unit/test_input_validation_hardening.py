@@ -15,7 +15,13 @@ Covers:
 import io
 import json
 import subprocess
+from pathlib import Path
+from typing import Any
 from unittest.mock import MagicMock
+
+import pytest
+from flask import Flask
+from flask.testing import FlaskClient
 
 from blueprints.apikeys import API_KEY_VALIDATION_ERROR
 
@@ -27,7 +33,9 @@ from blueprints.apikeys import API_KEY_VALIDATION_ERROR
 class TestApiKeySaveValidation:
     """POST /api-keys/save should return 400 for malformed input, not 500."""
 
-    def test_non_string_value_returns_400(self, client, tmp_path, monkeypatch):
+    def test_non_string_value_returns_400(
+        self, client: FlaskClient, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         env_path = tmp_path / "test.env"
         env_path.write_text("")
         monkeypatch.setattr("blueprints.apikeys.get_env_path", lambda: str(env_path))
@@ -40,7 +48,9 @@ class TestApiKeySaveValidation:
         assert data["success"] is False
         assert data["error"] == API_KEY_VALIDATION_ERROR
 
-    def test_non_dict_entry_returns_400(self, client, tmp_path, monkeypatch):
+    def test_non_dict_entry_returns_400(
+        self, client: FlaskClient, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         env_path = tmp_path / "test.env"
         env_path.write_text("")
         monkeypatch.setattr("blueprints.apikeys.get_env_path", lambda: str(env_path))
@@ -52,7 +62,9 @@ class TestApiKeySaveValidation:
         data = resp.get_json()
         assert data["success"] is False
 
-    def test_non_string_key_returns_400(self, client, tmp_path, monkeypatch):
+    def test_non_string_key_returns_400(
+        self, client: FlaskClient, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         env_path = tmp_path / "test.env"
         env_path.write_text("")
         monkeypatch.setattr("blueprints.apikeys.get_env_path", lambda: str(env_path))
@@ -63,8 +75,8 @@ class TestApiKeySaveValidation:
         assert resp.status_code == 400
 
     def test_keep_existing_with_none_value_does_not_crash(
-        self, client, tmp_path, monkeypatch
-    ):
+        self, client: FlaskClient, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """When .env has a malformed line that parses as None, keepExisting should not 500."""
         env_path = tmp_path / ".env"
         # dotenv_values returns None for keys without values
@@ -86,7 +98,7 @@ class TestApiKeySaveValidation:
 class TestSettingsImportValidation:
     """POST /settings/import should return 400 for malformed JSON uploads."""
 
-    def test_malformed_json_file_returns_400(self, client):
+    def test_malformed_json_file_returns_400(self, client: FlaskClient) -> None:
         data = io.BytesIO(b"{not valid json")
         resp = client.post(
             "/settings/import",
@@ -98,7 +110,7 @@ class TestSettingsImportValidation:
         assert body["success"] is False
         assert "invalid" in body["error"].lower()
 
-    def test_binary_garbage_file_returns_400(self, client):
+    def test_binary_garbage_file_returns_400(self, client: FlaskClient) -> None:
         data = io.BytesIO(b"\x80\x81\x82\x83")
         resp = client.post(
             "/settings/import",
@@ -107,7 +119,7 @@ class TestSettingsImportValidation:
         )
         assert resp.status_code == 400
 
-    def test_valid_json_file_import_succeeds(self, client):
+    def test_valid_json_file_import_succeeds(self, client: FlaskClient) -> None:
         payload = json.dumps({"config": {"name": "TestDevice"}})
         data = io.BytesIO(payload.encode())
         resp = client.post(
@@ -126,7 +138,9 @@ class TestSettingsImportValidation:
 class TestPlaylistJsonValidation:
     """Playlist POST endpoints should return 400 for malformed JSON, not 500."""
 
-    def test_add_plugin_malformed_refresh_settings_returns_400(self, client):
+    def test_add_plugin_malformed_refresh_settings_returns_400(
+        self, client: FlaskClient
+    ) -> None:
         resp = client.post(
             "/add_plugin",
             data={
@@ -138,14 +152,18 @@ class TestPlaylistJsonValidation:
         body = resp.get_json()
         assert body["success"] is False
 
-    def test_add_plugin_missing_refresh_settings_returns_400(self, client):
+    def test_add_plugin_missing_refresh_settings_returns_400(
+        self, client: FlaskClient
+    ) -> None:
         resp = client.post(
             "/add_plugin",
             data={"plugin_id": "weather"},
         )
         assert resp.status_code == 400
 
-    def test_reorder_plugins_malformed_json_returns_400(self, client):
+    def test_reorder_plugins_malformed_json_returns_400(
+        self, client: FlaskClient
+    ) -> None:
         resp = client.post(
             "/reorder_plugins",
             data=b"not json at all",
@@ -155,7 +173,9 @@ class TestPlaylistJsonValidation:
         body = resp.get_json()
         assert body["success"] is False
 
-    def test_display_next_in_playlist_malformed_json_returns_400(self, client):
+    def test_display_next_in_playlist_malformed_json_returns_400(
+        self, client: FlaskClient
+    ) -> None:
         resp = client.post(
             "/display_next_in_playlist",
             data=b"{{invalid",
@@ -183,41 +203,41 @@ class TestSaveSettingsNumericValidation:
         "orientation": "horizontal",
     }
 
-    def test_invalid_saturation_returns_422(self, client):
+    def test_invalid_saturation_returns_422(self, client: FlaskClient) -> None:
         form = {**self.VALID_FORM, "saturation": "abc"}
         resp = client.post("/save_settings", data=form)
         assert resp.status_code == 422
         body = resp.get_json()
         assert body["details"]["field"] == "saturation"
 
-    def test_invalid_brightness_returns_422(self, client):
+    def test_invalid_brightness_returns_422(self, client: FlaskClient) -> None:
         form = {**self.VALID_FORM, "brightness": "not_a_number"}
         resp = client.post("/save_settings", data=form)
         assert resp.status_code == 422
         body = resp.get_json()
         assert body["details"]["field"] == "brightness"
 
-    def test_invalid_contrast_returns_422(self, client):
+    def test_invalid_contrast_returns_422(self, client: FlaskClient) -> None:
         form = {**self.VALID_FORM, "contrast": "???"}
         resp = client.post("/save_settings", data=form)
         assert resp.status_code == 422
 
-    def test_invalid_sharpness_returns_422(self, client):
+    def test_invalid_sharpness_returns_422(self, client: FlaskClient) -> None:
         form = {**self.VALID_FORM, "sharpness": "NaN-bad"}
         resp = client.post("/save_settings", data=form)
         assert resp.status_code == 422
 
-    def test_nan_rejected(self, client):
+    def test_nan_rejected(self, client: FlaskClient) -> None:
         form = {**self.VALID_FORM, "saturation": "NaN"}
         resp = client.post("/save_settings", data=form)
         assert resp.status_code == 422
 
-    def test_infinity_rejected(self, client):
+    def test_infinity_rejected(self, client: FlaskClient) -> None:
         form = {**self.VALID_FORM, "brightness": "Infinity"}
         resp = client.post("/save_settings", data=form)
         assert resp.status_code == 422
 
-    def test_valid_numeric_settings_pass_validation(self, client):
+    def test_valid_numeric_settings_pass_validation(self, client: FlaskClient) -> None:
         form = {
             **self.VALID_FORM,
             "saturation": "1.5",
@@ -237,28 +257,28 @@ class TestSaveSettingsNumericValidation:
 class TestClientLogSanitization:
     """POST /settings/client_log should strip newlines from client input."""
 
-    def test_newlines_stripped_from_message(self, client):
+    def test_newlines_stripped_from_message(self, client: FlaskClient) -> None:
         resp = client.post(
             "/settings/client_log",
             json={"level": "info", "message": "hello\nforged\rline", "extra": {}},
         )
         assert resp.status_code == 200
 
-    def test_newlines_stripped_from_level(self, client):
+    def test_newlines_stripped_from_level(self, client: FlaskClient) -> None:
         resp = client.post(
             "/settings/client_log",
             json={"level": "info\nevil", "message": "ok"},
         )
         assert resp.status_code == 200
 
-    def test_sanitize_log_value_strips_control_chars(self):
+    def test_sanitize_log_value_strips_control_chars(self) -> None:
         from blueprints.settings._system import _sanitize_log_value
 
         assert "\n" not in _sanitize_log_value("hello\nworld")
         assert "\r" not in _sanitize_log_value("hello\rworld")
         assert "\x00" not in _sanitize_log_value("hello\x00world")
 
-    def test_sanitize_log_value_truncates(self):
+    def test_sanitize_log_value_truncates(self) -> None:
         from blueprints.settings._system import _sanitize_log_value
 
         result = _sanitize_log_value("a" * 1000, max_len=50)
@@ -273,7 +293,9 @@ class TestClientLogSanitization:
 class TestShutdownCooldownOnFailure:
     """POST /shutdown should not consume the cooldown when the command fails."""
 
-    def test_failed_shutdown_does_not_block_retry(self, client, monkeypatch):
+    def test_failed_shutdown_does_not_block_retry(
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         import blueprints.settings as settings_mod
 
         # Reset cooldown
@@ -292,7 +314,9 @@ class TestShutdownCooldownOnFailure:
         resp2 = client.post("/shutdown", json={})
         assert resp2.status_code == 500
 
-    def test_successful_shutdown_does_consume_cooldown(self, client, monkeypatch):
+    def test_successful_shutdown_does_consume_cooldown(
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         import blueprints.settings as settings_mod
 
         settings_mod._shutdown_limiter.reset()
@@ -314,7 +338,9 @@ class TestShutdownCooldownOnFailure:
 class TestLogEndpointExceptionLeaks:
     """Log endpoints should return generic errors, not raw exception text."""
 
-    def test_download_logs_hides_exception_details(self, client, monkeypatch):
+    def test_download_logs_hides_exception_details(
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         monkeypatch.setattr(
             "blueprints.settings._read_log_lines",
             MagicMock(side_effect=Exception("secret-internal-detail")),
@@ -323,7 +349,9 @@ class TestLogEndpointExceptionLeaks:
         assert resp.status_code == 500
         assert b"secret-internal-detail" not in resp.data
 
-    def test_api_logs_hides_exception_details(self, client, monkeypatch):
+    def test_api_logs_hides_exception_details(
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         monkeypatch.setattr(
             "blueprints.settings._read_log_lines",
             MagicMock(side_effect=Exception("secret-db-password")),
@@ -344,8 +372,8 @@ class TestDeletePluginInstanceCleanup:
     """delete_plugin_instance should pass plugin config dict, not string ID."""
 
     def test_cleanup_receives_config_dict_not_string(
-        self, client, flask_app, monkeypatch
-    ):
+        self, client: FlaskClient, flask_app: Flask, monkeypatch: pytest.MonkeyPatch
+    ) -> Any:
         """Verify get_plugin_instance is called with a dict (plugin config), not a string."""
         device_config = flask_app.config["DEVICE_CONFIG"]
 
@@ -366,7 +394,7 @@ class TestDeletePluginInstanceCleanup:
         # Track what get_plugin_instance receives
         received_args = []
 
-        def tracking_get_plugin_instance(arg):
+        def tracking_get_plugin_instance(arg: Any) -> Any:
             received_args.append(arg)
             mock_plugin = MagicMock()
             mock_plugin.cleanup = MagicMock()

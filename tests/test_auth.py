@@ -15,9 +15,11 @@ from __future__ import annotations
 
 import os
 import time
+from typing import Any
 
 import pytest
 from flask import Flask
+from flask.testing import FlaskClient
 from jinja2 import ChoiceLoader, FileSystemLoader
 
 # ---------------------------------------------------------------------------
@@ -27,7 +29,9 @@ from jinja2 import ChoiceLoader, FileSystemLoader
 SRC_ABS = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src"))
 
 
-def _make_auth_app(pin: str | None = None, monkeypatch=None) -> Flask:
+def _make_auth_app(
+    pin: str | None = None, monkeypatch: pytest.MonkeyPatch = None
+) -> Flask:
     """Build a minimal Flask app with auth wired up.
 
     If *pin* is given it is set as INKYPI_AUTH_PIN.
@@ -65,29 +69,29 @@ def _make_auth_app(pin: str | None = None, monkeypatch=None) -> Flask:
 
     # A trivial protected route
     @app.route("/")
-    def index():
+    def index() -> Any:
         return ("home", 200)
 
     @app.route("/api/health")
-    def api_health():
+    def api_health() -> Any:
         return ("ok", 200)
 
     @app.route("/sw.js")
-    def sw():
+    def sw() -> Any:
         return ("sw", 200)
 
     @app.route("/static/test.css")
-    def static_css():
+    def static_css() -> Any:
         return ("css", 200)
 
     # Provide a CSRF token in the session for POST requests
     @app.context_processor
-    def _inject_csrf():
+    def _inject_csrf() -> Any:
         import secrets as _s
 
         from flask import session as _sess
 
-        def _csrf():
+        def _csrf() -> Any:
             if "_csrf_token" not in _sess:
                 _sess["_csrf_token"] = _s.token_hex(32)
             return _sess["_csrf_token"]
@@ -96,7 +100,7 @@ def _make_auth_app(pin: str | None = None, monkeypatch=None) -> Flask:
 
     # Wire auth (reads INKYPI_AUTH_PIN from env, which monkeypatch already set)
     class _FakeConfig:
-        def get_config(self, key, default=None):
+        def get_config(self, key: Any, default: Any = None) -> Any:
             return default
 
     auth_mod.init_auth(app, _FakeConfig())
@@ -104,7 +108,7 @@ def _make_auth_app(pin: str | None = None, monkeypatch=None) -> Flask:
     return app
 
 
-def _get_csrf(client) -> str:
+def _get_csrf(client: FlaskClient) -> str:
     """Return a fresh CSRF token by hitting /login and reading the session."""
     import secrets
 
@@ -121,22 +125,22 @@ def _get_csrf(client) -> str:
 
 class TestAuthDisabled:
     @pytest.fixture()
-    def app(self, monkeypatch):
+    def app(self, monkeypatch: pytest.MonkeyPatch) -> Any:
         return _make_auth_app(pin=None, monkeypatch=monkeypatch)
 
     @pytest.fixture()
-    def client(self, app):
+    def client(self, app: Flask) -> Any:
         return app.test_client()
 
-    def test_home_accessible_without_login(self, client):
+    def test_home_accessible_without_login(self, client: FlaskClient) -> None:
         resp = client.get("/")
         assert resp.status_code == 200
 
-    def test_login_route_still_works(self, client):
+    def test_login_route_still_works(self, client: FlaskClient) -> None:
         resp = client.get("/login")
         assert resp.status_code == 200
 
-    def test_static_accessible(self, client):
+    def test_static_accessible(self, client: FlaskClient) -> None:
         resp = client.get("/static/test.css")
         assert resp.status_code == 200
 
@@ -150,23 +154,23 @@ class TestAuthEnabled:
     PIN = "s3cr3t"
 
     @pytest.fixture()
-    def app(self, monkeypatch):
+    def app(self, monkeypatch: pytest.MonkeyPatch) -> Any:
         return _make_auth_app(pin=self.PIN, monkeypatch=monkeypatch)
 
     @pytest.fixture()
-    def client(self, app):
+    def client(self, app: Flask) -> Any:
         return app.test_client()
 
     # ------------------------------------------------------------------
     # Redirect enforcement
     # ------------------------------------------------------------------
 
-    def test_unauthenticated_home_redirects_to_login(self, client):
+    def test_unauthenticated_home_redirects_to_login(self, client: FlaskClient) -> None:
         resp = client.get("/")
         assert resp.status_code == 302
         assert "/login" in resp.headers["Location"]
 
-    def test_authenticated_home_accessible(self, client):
+    def test_authenticated_home_accessible(self, client: FlaskClient) -> None:
         with client.session_transaction() as sess:
             sess["authed"] = True
         resp = client.get("/")
@@ -176,24 +180,24 @@ class TestAuthEnabled:
     # Exempt paths
     # ------------------------------------------------------------------
 
-    def test_login_page_exempt(self, client):
+    def test_login_page_exempt(self, client: FlaskClient) -> None:
         resp = client.get("/login")
         assert resp.status_code == 200
 
-    def test_logout_exempt(self, client):
+    def test_logout_exempt(self, client: FlaskClient) -> None:
         # /logout redirects to /login — not blocked by auth guard
         resp = client.get("/logout")
         assert resp.status_code == 302
 
-    def test_sw_js_exempt(self, client):
+    def test_sw_js_exempt(self, client: FlaskClient) -> None:
         resp = client.get("/sw.js")
         assert resp.status_code == 200
 
-    def test_static_exempt(self, client):
+    def test_static_exempt(self, client: FlaskClient) -> None:
         resp = client.get("/static/test.css")
         assert resp.status_code == 200
 
-    def test_api_health_exempt(self, client):
+    def test_api_health_exempt(self, client: FlaskClient) -> None:
         resp = client.get("/api/health")
         assert resp.status_code == 200
 
@@ -201,7 +205,7 @@ class TestAuthEnabled:
     # Login flow
     # ------------------------------------------------------------------
 
-    def test_correct_pin_sets_session_and_redirects(self, client):
+    def test_correct_pin_sets_session_and_redirects(self, client: FlaskClient) -> None:
         csrf = _get_csrf(client)
         resp = client.post(
             "/login",
@@ -213,7 +217,7 @@ class TestAuthEnabled:
         with client.session_transaction() as sess:
             assert sess.get("authed") is True
 
-    def test_wrong_pin_renders_login_with_error(self, client):
+    def test_wrong_pin_renders_login_with_error(self, client: FlaskClient) -> None:
         csrf = _get_csrf(client)
         resp = client.post(
             "/login",
@@ -223,7 +227,7 @@ class TestAuthEnabled:
         data = resp.get_data(as_text=True)
         assert "Incorrect PIN" in data
 
-    def test_wrong_pin_does_not_set_authed(self, client):
+    def test_wrong_pin_does_not_set_authed(self, client: FlaskClient) -> None:
         csrf = _get_csrf(client)
         client.post("/login", data={"pin": "wrong", "next": "/", "csrf_token": csrf})
         with client.session_transaction() as sess:
@@ -233,7 +237,7 @@ class TestAuthEnabled:
     # Rate-limit / lockout
     # ------------------------------------------------------------------
 
-    def test_lockout_after_five_failures(self, client):
+    def test_lockout_after_five_failures(self, client: FlaskClient) -> None:
         for _ in range(5):
             csrf = _get_csrf(client)
             client.post("/login", data={"pin": "bad", "next": "/", "csrf_token": csrf})
@@ -250,7 +254,9 @@ class TestAuthEnabled:
         with client.session_transaction() as sess:
             assert sess.get("authed") is not True
 
-    def test_lockout_expires_after_60s(self, client, monkeypatch):
+    def test_lockout_expires_after_60s(
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """After lockout window elapses the user can log in again."""
         # Trigger lockout
         for _ in range(5):
@@ -274,7 +280,7 @@ class TestAuthEnabled:
     # Logout
     # ------------------------------------------------------------------
 
-    def test_logout_clears_session(self, client):
+    def test_logout_clears_session(self, client: FlaskClient) -> None:
         with client.session_transaction() as sess:
             sess["authed"] = True
 
@@ -295,7 +301,7 @@ class TestSafeNextUrl:
     """Regression tests for CodeQL py/url-redirection guard in blueprints.auth."""
 
     @pytest.fixture()
-    def safe_next_url(self, monkeypatch):
+    def safe_next_url(self, monkeypatch: pytest.MonkeyPatch) -> Any:
         _make_auth_app(pin=None, monkeypatch=monkeypatch)
         from blueprints.auth import _safe_next_url
 
@@ -317,7 +323,7 @@ class TestSafeNextUrl:
             "/<script>",
         ],
     )
-    def test_rejects_unsafe_inputs(self, safe_next_url, raw):
+    def test_rejects_unsafe_inputs(self, safe_next_url: Any, raw: Any) -> None:
         assert safe_next_url(raw) == "/"
 
     @pytest.mark.parametrize(
@@ -330,7 +336,7 @@ class TestSafeNextUrl:
             "/path/to-thing_with.chars~",
         ],
     )
-    def test_accepts_safe_paths(self, safe_next_url, raw):
+    def test_accepts_safe_paths(self, safe_next_url: Any, raw: Any) -> None:
         # Result must be a same-origin relative path starting with '/'.
         result = safe_next_url(raw)
         assert result.startswith("/")
@@ -338,7 +344,7 @@ class TestSafeNextUrl:
         # Re-quoted segments should preserve the meaningful path structure.
         assert result.rstrip("/") == raw.rstrip("/") or result == "/"
 
-    def test_preserves_safe_query_string(self, safe_next_url):
+    def test_preserves_safe_query_string(self, safe_next_url: Any) -> None:
         result = safe_next_url("/home?tab=latest&page=2")
         assert result.startswith("/home?")
         assert "tab=latest" in result

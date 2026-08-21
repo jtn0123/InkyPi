@@ -11,13 +11,15 @@ Fix: each submit handler now uses its own per-operation closure variables
 wrappedFetch on top of whatever window.fetch is current, forming a chain.
 """
 
+from flask.testing import FlaskClient
 
-def test_operation_status_script_exists(client):
+
+def test_operation_status_script_exists(client: FlaskClient) -> None:
     resp = client.get("/static/scripts/operation_status.js")
     assert resp.status_code == 200
 
 
-def test_no_shared_fetchWrapped_state(client):
+def test_no_shared_fetchWrapped_state(client: FlaskClient) -> None:
     """JTN-260: The module-level shared fetchWrapped flag must not exist.
 
     The bug was caused by a single let fetchWrapped = false declared outside
@@ -34,7 +36,7 @@ def test_no_shared_fetchWrapped_state(client):
     assert "if (!fetchWrapped)" not in js
 
 
-def test_no_shared_fetchTimeoutId_state(client):
+def test_no_shared_fetchTimeoutId_state(client: FlaskClient) -> None:
     """JTN-260: The module-level fetchTimeoutId must not exist.
 
     Previously a single fetchTimeoutId was shared across all concurrent
@@ -50,7 +52,7 @@ def test_no_shared_fetchTimeoutId_state(client):
     assert "fetchTimeoutId" not in js
 
 
-def test_per_operation_local_timeout_id(client):
+def test_per_operation_local_timeout_id(client: FlaskClient) -> None:
     """JTN-260: Each operation must declare its own localTimeoutId."""
     resp = client.get("/static/scripts/operation_status.js")
     assert resp.status_code == 200
@@ -61,7 +63,7 @@ def test_per_operation_local_timeout_id(client):
     assert "clearTimeout(localTimeoutId)" in js
 
 
-def test_per_operation_previous_fetch_captured(client):
+def test_per_operation_previous_fetch_captured(client: FlaskClient) -> None:
     """JTN-260: Each submit handler must capture the current window.fetch before
     installing its own wrapper, enabling safe stacking when multiple operations
     are in flight concurrently.
@@ -76,7 +78,7 @@ def test_per_operation_previous_fetch_captured(client):
     assert "return previousFetch(...args)" in js
 
 
-def test_wrapped_fetch_installed_unconditionally(client):
+def test_wrapped_fetch_installed_unconditionally(client: FlaskClient) -> None:
     """JTN-260: Every submit must install its own wrapper without a guard.
 
     The old guard `if (!fetchWrapped)` prevented the second concurrent
@@ -93,7 +95,7 @@ def test_wrapped_fetch_installed_unconditionally(client):
     assert "window.fetch = wrappedFetch;" in js
 
 
-def test_finish_operation_restores_previous_fetch(client):
+def test_finish_operation_restores_previous_fetch(client: FlaskClient) -> None:
     """JTN-260: finishOperation must restore previousFetch, not nativeFetch.
 
     Restoring nativeFetch (the original pre-page-load fetch) would silently

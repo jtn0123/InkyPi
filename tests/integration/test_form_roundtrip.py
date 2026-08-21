@@ -23,9 +23,12 @@ comes back through the real GET template render).
 from __future__ import annotations
 
 import os
+from collections.abc import Iterator
 from contextlib import contextmanager
+from typing import Any
 
 import pytest
+from playwright.sync_api import Page
 
 pytestmark = pytest.mark.skipif(
     os.getenv("SKIP_UI", "").lower() in ("1", "true"),
@@ -39,7 +42,7 @@ from tests.integration.browser_helpers import navigate_and_wait  # noqa: E402
 # ---------------------------------------------------------------------------
 
 
-def _expand_all_collapsibles(page) -> None:
+def _expand_all_collapsibles(page: Page) -> None:
     """Force every ``.collapsible-content`` visible so hidden inputs are reachable."""
     page.evaluate("""() => {
             document.querySelectorAll('.collapsible-content').forEach((el) => {
@@ -53,7 +56,7 @@ def _expand_all_collapsibles(page) -> None:
         }""")
 
 
-def _read_field(page, field_id: str, *, kind: str) -> str | bool:
+def _read_field(page: Page, field_id: str, *, kind: str) -> str | bool:
     """Return the current value for a field by id."""
     loc = page.locator(f"#{field_id}")
     loc.wait_for(state="attached", timeout=5000)
@@ -85,7 +88,7 @@ def _read_field(page, field_id: str, *, kind: str) -> str | bool:
     return loc.input_value()
 
 
-def _write_field(page, field_id: str, value, *, kind: str) -> None:
+def _write_field(page: Page, field_id: str, value: Any, *, kind: str) -> None:
     """Set ``field_id`` to ``value`` using the appropriate input primitive.
 
     Uses direct DOM manipulation + dispatched events rather than
@@ -153,7 +156,7 @@ def _write_field(page, field_id: str, value, *, kind: str) -> None:
         raise ValueError(f"Unknown field kind: {kind}")
 
 
-def _save_settings(page) -> None:
+def _save_settings(page: Page) -> None:
     _expand_all_collapsibles(page)
     save_btn = page.locator("#saveSettingsBtn")
     save_btn.wait_for(state="attached", timeout=5000)
@@ -184,7 +187,7 @@ SETTINGS_FIELDS = [
 
 
 @contextmanager
-def _restore_after(page, live_server, fields):
+def _restore_after(page: Page, live_server: str, fields: Any) -> Iterator[Any]:
     """Capture baseline for ``fields`` now, yield, then restore on exit."""
     navigate_and_wait(page, live_server, "/settings")
     baseline = {fid: _read_field(page, fid, kind=kind) for fid, kind, _ in fields}
@@ -208,7 +211,7 @@ def _restore_after(page, live_server, fields):
 # ---------------------------------------------------------------------------
 
 
-def test_settings_form_roundtrip(live_server, browser_page):
+def test_settings_form_roundtrip(live_server: str, browser_page: Page) -> None:
     """Submit /settings values, navigate away, return, confirm persistence."""
     page = browser_page
 
@@ -242,7 +245,9 @@ def test_settings_form_roundtrip(live_server, browser_page):
                 )
 
 
-def test_settings_form_roundtrip_uncheck_invert(live_server, browser_page):
+def test_settings_form_roundtrip_uncheck_invert(
+    live_server: str, browser_page: Page
+) -> None:
     """Checkbox round-trip specifically for the unchecked state.
 
     HTML form submissions omit unchecked checkboxes from the payload — a

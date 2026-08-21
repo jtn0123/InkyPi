@@ -7,7 +7,9 @@ header (progressive enhancement — no-JS users follow normal link navigation).
 """
 
 import os
+from typing import Any
 
+from flask.testing import FlaskClient
 from PIL import Image
 
 
@@ -18,7 +20,9 @@ def _make_history_images(history_dir: str, count: int = 2) -> None:
         Image.new("RGB", (10, 10), "white").save(os.path.join(history_dir, name))
 
 
-def test_htmx_partial_returned_when_hx_header_present(client, device_config_dev):
+def test_htmx_partial_returned_when_hx_header_present(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     """GET /history with HX-Request header returns the grid partial, not a full HTML page."""
     _make_history_images(device_config_dev.history_image_dir)
 
@@ -33,7 +37,9 @@ def test_htmx_partial_returned_when_hx_header_present(client, device_config_dev)
     assert "history-grid-container" in body
 
 
-def test_full_page_returned_without_hx_header(client, device_config_dev):
+def test_full_page_returned_without_hx_header(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     """GET /history without HX-Request header returns a full HTML page."""
     _make_history_images(device_config_dev.history_image_dir)
 
@@ -48,7 +54,7 @@ def test_full_page_returned_without_hx_header(client, device_config_dev):
     assert "history-grid-container" in body
 
 
-def test_htmx_script_loaded_in_base(client):
+def test_htmx_script_loaded_in_base(client: FlaskClient) -> None:
     """The base template includes htmx.min.js so HTMX is available on all pages."""
     resp = client.get("/")
     assert resp.status_code == 200
@@ -56,7 +62,9 @@ def test_htmx_script_loaded_in_base(client):
     assert "htmx.min.js" in body
 
 
-def test_htmx_partial_pagination_links_have_hx_attributes(client, device_config_dev):
+def test_htmx_partial_pagination_links_have_hx_attributes(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     """When multiple pages exist the partial pagination links include hx-get attributes."""
     d = device_config_dev.history_image_dir
     os.makedirs(d, exist_ok=True)
@@ -74,7 +82,9 @@ def test_htmx_partial_pagination_links_have_hx_attributes(client, device_config_
     assert "hx-swap" in body
 
 
-def test_history_partial_works_without_js_via_plain_links(client, device_config_dev):
+def test_history_partial_works_without_js_via_plain_links(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     """Full page response contains plain href links for no-JS progressive enhancement."""
     _make_history_images(device_config_dev.history_image_dir, count=30)
 

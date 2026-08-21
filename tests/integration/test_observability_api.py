@@ -1,4 +1,12 @@
-def test_benchmarks_summary_refreshes_and_plugins(client, device_config_dev, tmp_path):
+from pathlib import Path
+from typing import Any
+
+from flask.testing import FlaskClient
+
+
+def test_benchmarks_summary_refreshes_and_plugins(
+    client: FlaskClient, device_config_dev: Any, tmp_path: Path
+) -> None:
     db_path = tmp_path / "benchmarks.db"
     device_config_dev.update_value("benchmarks_db_path", str(db_path), write=True)
 
@@ -25,7 +33,7 @@ def test_benchmarks_summary_refreshes_and_plugins(client, device_config_dev, tmp
     assert isinstance(pj.get("items"), list)
 
 
-def test_benchmarks_stages_validation(client):
+def test_benchmarks_stages_validation(client: FlaskClient) -> None:
     r = client.get("/api/benchmarks/stages")
     assert r.status_code == 422
     j = r.get_json()
@@ -33,7 +41,7 @@ def test_benchmarks_stages_validation(client):
     assert j.get("code") == "validation_error"
 
 
-def test_health_endpoints(client):
+def test_health_endpoints(client: FlaskClient) -> None:
     hp = client.get("/api/health/plugins")
     hs = client.get("/api/health/system")
     assert hp.status_code == 200
@@ -42,7 +50,7 @@ def test_health_endpoints(client):
     assert hs.get_json().get("success") is True
 
 
-def test_isolation_endpoints(client):
+def test_isolation_endpoints(client: FlaskClient) -> None:
     g = client.get("/settings/isolation")
     assert g.status_code == 200
     assert g.get_json().get("success") is True
@@ -56,14 +64,14 @@ def test_isolation_endpoints(client):
     assert "clock" not in d.get_json().get("isolated_plugins", [])
 
 
-def test_safe_reset_endpoint(client):
+def test_safe_reset_endpoint(client: FlaskClient) -> None:
     r = client.post("/settings/safe_reset")
     assert r.status_code == 200
     j = r.get_json()
     assert j.get("success") is True
 
 
-def test_progress_stream_sse(client):
+def test_progress_stream_sse(client: FlaskClient) -> None:
     # Hit endpoint to ensure it is streamable and emits event syntax
     r = client.get("/api/progress/stream", buffered=False)
     assert r.status_code == 200

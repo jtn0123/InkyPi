@@ -3,7 +3,11 @@
 
 import threading
 import time
+from typing import Any
 from unittest.mock import MagicMock, patch
+
+import pytest
+from flask.testing import FlaskClient
 
 # ---------------------------------------------------------------------------
 # /settings/update (POST) - start update
@@ -11,7 +15,9 @@ from unittest.mock import MagicMock, patch
 
 
 class TestStartUpdate:
-    def test_start_update_success(self, client, monkeypatch):
+    def test_start_update_success(
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """POST /settings/update triggers update and returns success JSON."""
         import blueprints.settings as mod
 
@@ -31,7 +37,9 @@ class TestStartUpdate:
         # Clean up
         mod._set_update_state(False, None)
 
-    def test_start_update_already_running(self, client, monkeypatch):
+    def test_start_update_already_running(
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """POST /settings/update returns 409 when update is already running."""
         import blueprints.settings as mod
         from blueprints.settings import _updates as _updates_mod
@@ -58,7 +66,9 @@ class TestStartUpdate:
         finally:
             mod._set_update_state(False, None)
 
-    def test_start_update_systemd_path(self, client, monkeypatch):
+    def test_start_update_systemd_path(
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """POST /settings/update uses systemd path when available."""
         import blueprints.settings as mod
 
@@ -75,7 +85,9 @@ class TestStartUpdate:
         assert data["success"] is True
         mod._set_update_state(False, None)
 
-    def test_start_update_systemd_fails_falls_back(self, client, monkeypatch):
+    def test_start_update_systemd_fails_falls_back(
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """If systemd-run fails, falls back to thread runner."""
         import blueprints.settings as mod
 
@@ -95,7 +107,9 @@ class TestStartUpdate:
         assert data["success"] is True
         mod._set_update_state(False, None)
 
-    def test_start_update_toctou_race_prevented(self, client, monkeypatch):
+    def test_start_update_toctou_race_prevented(
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Concurrent requests to /settings/update must not both succeed.
 
         This verifies the TOCTOU fix: the running-flag check and the state
@@ -114,7 +128,7 @@ class TestStartUpdate:
         results: list[int] = []
         barrier = threading.Barrier(2)
 
-        def fire():
+        def fire() -> None:
             barrier.wait()  # both threads hit the endpoint simultaneously
             resp = client.post("/settings/update")
             results.append(resp.status_code)
@@ -135,7 +149,9 @@ class TestStartUpdate:
 
         mod._set_update_state(False, None)
 
-    def test_state_flip_inside_lock(self, client, monkeypatch):
+    def test_state_flip_inside_lock(
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+    ) -> Any:
         """The running flag is set to True while _update_lock is still held.
 
         We verify atomicity by intercepting the lock's __exit__ and checking
@@ -156,11 +172,11 @@ class TestStartUpdate:
         class _CapturingLock:
             """Thin wrapper that records _UPDATE_STATE["running"] on __exit__."""
 
-            def __enter__(self):
+            def __enter__(self) -> Any:
                 real_lock.acquire()
                 return self
 
-            def __exit__(self, *args):
+            def __exit__(self, *args: Any) -> None:
                 # Capture the state while still inside the critical section
                 state_at_exit.append(bool(mod._UPDATE_STATE.get("running")))
                 real_lock.release()
@@ -187,7 +203,9 @@ class TestStartUpdate:
 
 
 class TestUpdateStatus:
-    def test_update_status_idle(self, client, monkeypatch):
+    def test_update_status_idle(
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         import blueprints.settings as mod
 
         mod._set_update_state(False, None)
@@ -197,7 +215,9 @@ class TestUpdateStatus:
         assert data["running"] is False
         assert data["unit"] is None
 
-    def test_update_status_running(self, client, monkeypatch):
+    def test_update_status_running(
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         import blueprints.settings as mod
 
         mod._set_update_state(True, "inkypi-update-123.service")
@@ -213,7 +233,9 @@ class TestUpdateStatus:
         finally:
             mod._set_update_state(False, None)
 
-    def test_update_status_clears_when_systemd_inactive(self, client, monkeypatch):
+    def test_update_status_clears_when_systemd_inactive(
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """When the systemd unit is no longer active, running should auto-clear."""
         import blueprints.settings as mod
 
@@ -233,7 +255,9 @@ class TestUpdateStatus:
         finally:
             mod._set_update_state(False, None)
 
-    def test_update_status_timeout_clears(self, client, monkeypatch):
+    def test_update_status_timeout_clears(
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """If started_at is >30 min ago, update state should auto-clear."""
         import blueprints.settings as mod
 
@@ -248,7 +272,9 @@ class TestUpdateStatus:
         finally:
             mod._set_update_state(False, None)
 
-    def test_start_update_passes_target_tag(self, client, monkeypatch):
+    def test_start_update_passes_target_tag(
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """POST /settings/update with target_version should pass it to systemd cmd."""
         import blueprints.settings as mod
 
@@ -259,7 +285,7 @@ class TestUpdateStatus:
 
         captured_args = {}
 
-        def mock_systemd(target_tag=None):
+        def mock_systemd(target_tag: Any = None) -> None:
             captured_args["target_tag"] = target_tag
 
         monkeypatch.setattr(mod, "_start_update_via_systemd", mock_systemd)
@@ -273,7 +299,9 @@ class TestUpdateStatus:
         assert captured_args["target_tag"] == "v1.2.0"
         mod._set_update_state(False, None)
 
-    def test_start_update_rejects_invalid_target_tag(self, client, monkeypatch):
+    def test_start_update_rejects_invalid_target_tag(
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """POST /settings/update rejects shell injection in target_version."""
         import blueprints.settings as mod
 
@@ -287,7 +315,9 @@ class TestUpdateStatus:
         assert data["success"] is False
         assert "Invalid target version" in data["error"]
 
-    def test_start_update_rejects_flag_injection(self, client, monkeypatch):
+    def test_start_update_rejects_flag_injection(
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """POST /settings/update rejects flag-style injection."""
         import blueprints.settings as mod
 
@@ -298,7 +328,9 @@ class TestUpdateStatus:
         )
         assert resp.status_code == 400
 
-    def test_start_update_accepts_semver_with_prerelease(self, client, monkeypatch):
+    def test_start_update_accepts_semver_with_prerelease(
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """POST /settings/update accepts valid semver with pre-release suffix."""
         import blueprints.settings as mod
 
@@ -309,7 +341,7 @@ class TestUpdateStatus:
 
         captured_args = {}
 
-        def mock_systemd(target_tag=None):
+        def mock_systemd(target_tag: Any = None) -> None:
             captured_args["target_tag"] = target_tag
 
         monkeypatch.setattr(mod, "_start_update_via_systemd", mock_systemd)

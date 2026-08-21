@@ -12,6 +12,7 @@ import importlib
 import io
 import sys
 import types
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -19,10 +20,10 @@ import pytest
 _real_open = builtins.open
 
 
-def mock_cpuinfo(content):
+def mock_cpuinfo(content: Any) -> Any:
     """Return a context manager that patches builtins.open to fake /proc/cpuinfo."""
 
-    def _patched_open(path, *args, **kwargs):
+    def _patched_open(path: Any, *args: Any, **kwargs: Any) -> Any:
         if path == "/proc/cpuinfo":
             return io.StringIO(content)
         return _real_open(path, *args, **kwargs)
@@ -30,37 +31,37 @@ def mock_cpuinfo(content):
     return patch("builtins.open", side_effect=_patched_open)
 
 
-def make_fake_gpio_module():
+def make_fake_gpio_module() -> Any:
     m = types.ModuleType("gpiozero")
 
     class LED:
-        def __init__(self, pin):
+        def __init__(self, pin: Any) -> None:
             self.pin = pin
             self._value = False
 
-        def on(self):
+        def on(self) -> None:
             self._value = True
 
-        def off(self):
+        def off(self) -> None:
             self._value = False
 
         @property
-        def value(self):
+        def value(self) -> Any:
             return self._value
 
-        def close(self):
+        def close(self) -> None:
             pass
 
     class Button:
-        def __init__(self, pin, pull_up=False):
+        def __init__(self, pin: Any, pull_up: Any = False) -> None:
             self.pin = pin
             self._value = False
 
         @property
-        def value(self):
+        def value(self) -> Any:
             return self._value
 
-        def close(self):
+        def close(self) -> None:
             pass
 
     m.LED = LED  # type: ignore[attr-defined]
@@ -68,38 +69,40 @@ def make_fake_gpio_module():
     return m
 
 
-def make_fake_spidev_module():
+def make_fake_spidev_module() -> Any:
     m = types.ModuleType("spidev")
 
     class SpiDev:
-        def __init__(self):
+        def __init__(self) -> None:
             self.opened = False
             self.max_speed_hz = None
             self.mode = None
 
-        def open(self, bus, device):
+        def open(self, bus: Any, device: Any) -> None:
             self.opened = True
 
-        def writebytes(self, data):
+        def writebytes(self, data: Any) -> None:
             pass
 
-        def writebytes2(self, data):
+        def writebytes2(self, data: Any) -> None:
             pass
 
-        def close(self):
+        def close(self) -> None:
             self.opened = False
 
     m.SpiDev = SpiDev  # type: ignore[attr-defined]
     return m
 
 
-def install_fake_modules(monkeypatch):
+def install_fake_modules(monkeypatch: pytest.MonkeyPatch) -> None:
     """Install fake spidev and gpiozero modules so RaspberryPi class can load."""
     sys.modules["spidev"] = make_fake_spidev_module()
     sys.modules["gpiozero"] = make_fake_gpio_module()
 
 
-def _load_epdconfig_as_rpi(monkeypatch, install_mocks=True):
+def _load_epdconfig_as_rpi(
+    monkeypatch: pytest.MonkeyPatch, install_mocks: Any = True
+) -> Any:
     """Reload epdconfig with Raspberry Pi detected. Returns the module."""
     if install_mocks:
         install_fake_modules(monkeypatch)
@@ -114,7 +117,7 @@ def _load_epdconfig_as_rpi(monkeypatch, install_mocks=True):
 # ---------------------------------------------------------------------------
 
 
-def test_raspberry_selection_and_methods(monkeypatch):
+def test_raspberry_selection_and_methods(monkeypatch: pytest.MonkeyPatch) -> None:
     epdconfig = _load_epdconfig_as_rpi(monkeypatch)
 
     assert hasattr(epdconfig, "module_init")
@@ -123,7 +126,7 @@ def test_raspberry_selection_and_methods(monkeypatch):
     epdconfig.module_init(cleanup=False)
 
 
-def test_gpio_operations_raspberry_pi(monkeypatch):
+def test_gpio_operations_raspberry_pi(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test GPIO operations on Raspberry Pi platform."""
     epdconfig = _load_epdconfig_as_rpi(monkeypatch)
 
@@ -135,7 +138,7 @@ def test_gpio_operations_raspberry_pi(monkeypatch):
     assert isinstance(busy_value, int | bool)
 
 
-def test_gpio_operations_without_hardware(monkeypatch):
+def test_gpio_operations_without_hardware(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test GPIO operations when hardware libraries are not available."""
     # Don't install fake modules — simulate missing hardware
     epdconfig = _load_epdconfig_as_rpi(monkeypatch, install_mocks=False)
@@ -147,7 +150,7 @@ def test_gpio_operations_without_hardware(monkeypatch):
     assert busy_value == 0  # Default when GPIO not available
 
 
-def test_spi_operations_raspberry_pi(monkeypatch):
+def test_spi_operations_raspberry_pi(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test SPI operations on Raspberry Pi platform."""
     epdconfig = _load_epdconfig_as_rpi(monkeypatch)
 
@@ -160,7 +163,7 @@ def test_spi_operations_raspberry_pi(monkeypatch):
     epdconfig.module_exit(cleanup=False)
 
 
-def test_module_init_cleanup_mode(monkeypatch):
+def test_module_init_cleanup_mode(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test module initialization in cleanup mode."""
     install_fake_modules(monkeypatch)
 
@@ -179,7 +182,9 @@ def test_module_init_cleanup_mode(monkeypatch):
         mock_dev_spi.DEV_Module_Init.assert_called_once()
 
 
-def test_module_init_cleanup_mode_library_not_found(monkeypatch):
+def test_module_init_cleanup_mode_library_not_found(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Test module initialization when DEV_Config library is not found.
 
     The vendored code has ``RuntimeError(...)`` without ``raise``, so DEV_SPI
@@ -195,7 +200,7 @@ def test_module_init_cleanup_mode_library_not_found(monkeypatch):
         epdconfig.module_init(cleanup=True)
 
 
-def test_dev_spi_operations(monkeypatch):
+def test_dev_spi_operations(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test DEV_SPI operations when available."""
     epdconfig = _load_epdconfig_as_rpi(monkeypatch)
 
@@ -215,7 +220,7 @@ def test_dev_spi_operations(monkeypatch):
     assert result == 0x42
 
 
-def test_dev_spi_operations_no_library(monkeypatch):
+def test_dev_spi_operations_no_library(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test DEV_SPI operations when library is not initialized.
 
     DEV_SPI is not set on the implementation after a normal (non-cleanup)
@@ -233,7 +238,7 @@ def test_dev_spi_operations_no_library(monkeypatch):
         epdconfig.DEV_SPI_read()
 
 
-def test_delay_ms_functionality(monkeypatch):
+def test_delay_ms_functionality(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test delay_ms timing function."""
     install_fake_modules(monkeypatch)
 
@@ -243,7 +248,7 @@ def test_delay_ms_functionality(monkeypatch):
         mock_sleep.assert_called_once_with(0.1)
 
 
-def test_module_exit_cleanup_operations(monkeypatch):
+def test_module_exit_cleanup_operations(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test module exit with cleanup operations."""
     epdconfig = _load_epdconfig_as_rpi(monkeypatch)
 
@@ -251,7 +256,7 @@ def test_module_exit_cleanup_operations(monkeypatch):
     epdconfig.module_exit(cleanup=False)
 
 
-def test_gpio_pin_constants(monkeypatch):
+def test_gpio_pin_constants(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test that GPIO pin constants are correctly defined."""
     install_fake_modules(monkeypatch)
 
@@ -265,7 +270,7 @@ def test_gpio_pin_constants(monkeypatch):
     assert rpi.PWR_PIN == 18
 
 
-def test_hardware_import_error_handling(monkeypatch):
+def test_hardware_import_error_handling(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test graceful handling when hardware libraries fail to import."""
     epdconfig = _load_epdconfig_as_rpi(monkeypatch, install_mocks=False)
 
@@ -278,7 +283,7 @@ def test_hardware_import_error_handling(monkeypatch):
     assert value == 0  # Default when GPIO not available
 
 
-def test_pin_mapping_comprehensive(monkeypatch):
+def test_pin_mapping_comprehensive(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test comprehensive pin mapping for all GPIO operations."""
     epdconfig = _load_epdconfig_as_rpi(monkeypatch)
 
@@ -293,7 +298,9 @@ def test_pin_mapping_comprehensive(monkeypatch):
         assert isinstance(value, int | bool)
 
 
-def test_raspberry_pi_cleanup_mode_with_dev_config(monkeypatch):
+def test_raspberry_pi_cleanup_mode_with_dev_config(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Test Raspberry Pi cleanup mode with DEV_Config library."""
     install_fake_modules(monkeypatch)
 
@@ -312,7 +319,7 @@ def test_raspberry_pi_cleanup_mode_with_dev_config(monkeypatch):
         mock_dev_config.DEV_Module_Init.assert_called_once()
 
 
-def test_digital_read_all_pins(monkeypatch):
+def test_digital_read_all_pins(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test digital_read works for all pins (RST, DC, PWR, BUSY) after bug fix."""
     epdconfig = _load_epdconfig_as_rpi(monkeypatch)
 
@@ -322,7 +329,7 @@ def test_digital_read_all_pins(monkeypatch):
         assert isinstance(value, int | bool)
 
 
-def test_spi_configuration(monkeypatch):
+def test_spi_configuration(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test SPI configuration and parameter setting."""
     epdconfig = _load_epdconfig_as_rpi(monkeypatch)
 

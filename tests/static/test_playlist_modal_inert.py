@@ -20,28 +20,28 @@ PLAYLIST_HTML = ROOT / "src" / "templates" / "playlist.html"
 class TestInertAttributeManagement:
     """Verify that playlist/modals.js sets/removes inert on the page content wrapper."""
 
-    def test_js_sets_inert_on_page_content(self):
+    def test_js_sets_inert_on_page_content(self) -> None:
         """syncModalOpenState must set the inert attribute when a modal opens."""
         js = PLAYLIST_MODALS_JS.read_text()
         assert (
             "setAttribute('inert'" in js or 'setAttribute("inert"' in js
         ), "playlist/modals.js must call setAttribute('inert', '') to block background"
 
-    def test_js_removes_inert_on_modal_close(self):
+    def test_js_removes_inert_on_modal_close(self) -> None:
         """syncModalOpenState must remove the inert attribute when all modals close."""
         js = PLAYLIST_MODALS_JS.read_text()
         assert (
             "removeAttribute('inert'" in js or 'removeAttribute("inert"' in js
         ), "playlist/modals.js must call removeAttribute('inert') when modals close"
 
-    def test_js_targets_playlist_page_content(self):
+    def test_js_targets_playlist_page_content(self) -> None:
         """The inert toggle must target the #playlist-page-content wrapper."""
         js = PLAYLIST_MODALS_JS.read_text()
         assert (
             "playlist-page-content" in js
         ), "playlist/modals.js must reference #playlist-page-content as the inert target"
 
-    def test_inert_toggled_in_sync_function(self):
+    def test_inert_toggled_in_sync_function(self) -> None:
         """The inert toggle must live inside the syncModalOpenState function so it
         fires on every open/close path."""
         js = PLAYLIST_MODALS_JS.read_text()
@@ -58,7 +58,7 @@ class TestInertAttributeManagement:
         ), "inert toggling must be inside syncModalOpenState"
         assert "inert" in body, "syncModalOpenState must handle the inert attribute"
 
-    def test_sync_function_does_not_return_before_inert_toggle(self):
+    def test_sync_function_does_not_return_before_inert_toggle(self) -> None:
         js = PLAYLIST_MODALS_JS.read_text()
         assert (
             "return ui.syncModalOpenState()" not in js
@@ -68,14 +68,14 @@ class TestInertAttributeManagement:
 class TestPageContentWrapperInTemplate:
     """Verify playlist.html has the #playlist-page-content wrapper."""
 
-    def test_html_has_page_content_wrapper(self):
+    def test_html_has_page_content_wrapper(self) -> None:
         """The template must wrap the interactive page content in a dedicated div."""
         html = PLAYLIST_HTML.read_text()
         assert (
             'id="playlist-page-content"' in html
         ), "playlist.html must contain <div id='playlist-page-content'>"
 
-    def test_modals_are_outside_page_content_wrapper(self):
+    def test_modals_are_outside_page_content_wrapper(self) -> None:
         """Modal elements must come after (outside) #playlist-page-content so that
         the inert attribute does not block them."""
         html = PLAYLIST_HTML.read_text()
@@ -105,7 +105,7 @@ class TestPageContentWrapperInTemplate:
 class TestFocusManagement:
     """Verify that focus is moved into the modal when it opens and restored on close."""
 
-    def test_js_moves_focus_into_modal_on_open(self):
+    def test_js_moves_focus_into_modal_on_open(self) -> None:
         """setModalOpen / openRefreshModal must focus a child element when opening."""
         js = PLAYLIST_MODALS_JS.read_text()
         # Look for a focus() call inside an open path
@@ -113,7 +113,7 @@ class TestFocusManagement:
             "focusable.focus()" in js
         ), "playlist/modals.js must call focusable.focus() when opening a modal"
 
-    def test_js_restores_focus_on_close(self):
+    def test_js_restores_focus_on_close(self) -> None:
         """On close, focus must return to _lastModalTrigger."""
         js = PLAYLIST_MODALS_JS.read_text()
         assert (
@@ -123,7 +123,7 @@ class TestFocusManagement:
             "lastModalTrigger.focus()" in js
         ), "playlist/modals.js must call lastModalTrigger.focus() when closing a modal"
 
-    def test_refresh_btn_listener_passes_trigger(self):
+    def test_refresh_btn_listener_passes_trigger(self) -> None:
         """The delegated refresh action must pass the button element as the
         trigger so focus can be restored after close."""
         js = PLAYLIST_ACTIONS_JS.read_text()

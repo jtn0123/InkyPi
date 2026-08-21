@@ -14,8 +14,11 @@ import json
 import os
 import threading
 import time
+from pathlib import Path
 from typing import Any
 from unittest.mock import patch
+
+import pytest
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -49,7 +52,9 @@ def _write_config(path: str, data: dict | None = None) -> None:
         json.dump(data if data is not None else _MIN_CFG, fh)
 
 
-def _make_config(tmp_path, monkeypatch) -> config_mod.Config:  # noqa: F821
+def _make_config(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> config_mod.Config:  # noqa: F821
     """Build a Config pointing at a fresh tmp_path device.json."""
     import config as config_mod
 
@@ -80,14 +85,16 @@ def _make_config(tmp_path, monkeypatch) -> config_mod.Config:  # noqa: F821
 # ---------------------------------------------------------------------------
 
 
-def test_repeated_reads_use_cache(tmp_path, monkeypatch):
+def test_repeated_reads_use_cache(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> Any:
     """1 000 read_config() calls on an unchanged file produce only 1 json.load."""
     cfg = _make_config(tmp_path, monkeypatch)
 
     parse_count = {"n": 0}
     original_json_load = json.load
 
-    def counting_load(fp):
+    def counting_load(fp: Any) -> Any:
         parse_count["n"] += 1
         return original_json_load(fp)
 
@@ -104,7 +111,9 @@ def test_repeated_reads_use_cache(tmp_path, monkeypatch):
     assert result["name"] == "CacheTest"
 
 
-def test_first_read_after_construction_hits_cache(tmp_path, monkeypatch):
+def test_first_read_after_construction_hits_cache(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> Any:
     """After __init__, the cache is warm so read_config() returns cached data."""
     cfg = _make_config(tmp_path, monkeypatch)
 
@@ -119,7 +128,7 @@ def test_first_read_after_construction_hits_cache(tmp_path, monkeypatch):
 
     original_load = json.load
 
-    def counting_load(fp):
+    def counting_load(fp: Any) -> Any:
         parse_count["n"] += 1
         return original_load(fp)
 
@@ -130,7 +139,9 @@ def test_first_read_after_construction_hits_cache(tmp_path, monkeypatch):
     assert isinstance(result, dict)
 
 
-def test_cache_returns_copy_not_reference(tmp_path, monkeypatch):
+def test_cache_returns_copy_not_reference(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """read_config() must return a copy so callers cannot mutate the cached dict."""
     cfg = _make_config(tmp_path, monkeypatch)
 
@@ -149,7 +160,9 @@ def test_cache_returns_copy_not_reference(tmp_path, monkeypatch):
 # ---------------------------------------------------------------------------
 
 
-def test_cache_invalidates_after_file_rewrite(tmp_path, monkeypatch):
+def test_cache_invalidates_after_file_rewrite(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """After rewriting the file (advancing mtime), read_config() re-parses."""
     cfg = _make_config(tmp_path, monkeypatch)
 
@@ -169,7 +182,9 @@ def test_cache_invalidates_after_file_rewrite(tmp_path, monkeypatch):
     ), "read_config() returned stale cached data after the file was rewritten."
 
 
-def test_mtime_bump_invalidates_cache(tmp_path, monkeypatch):
+def test_mtime_bump_invalidates_cache(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> Any:
     """Manually touching (bumping) the mtime causes re-parse."""
     cfg = _make_config(tmp_path, monkeypatch)
 
@@ -185,7 +200,7 @@ def test_mtime_bump_invalidates_cache(tmp_path, monkeypatch):
 
     original_load = json.load
 
-    def counting_load(fp):
+    def counting_load(fp: Any) -> Any:
         parse_count["n"] += 1
         return original_load(fp)
 
@@ -204,7 +219,9 @@ def test_mtime_bump_invalidates_cache(tmp_path, monkeypatch):
 # ---------------------------------------------------------------------------
 
 
-def test_invalidate_config_cache_clears_cache(tmp_path, monkeypatch):
+def test_invalidate_config_cache_clears_cache(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> Any:
     """invalidate_config_cache() resets the cache so the next read re-parses."""
     cfg = _make_config(tmp_path, monkeypatch)
 
@@ -219,7 +236,7 @@ def test_invalidate_config_cache_clears_cache(tmp_path, monkeypatch):
 
     original_load = json.load
 
-    def counting_load(fp):
+    def counting_load(fp: Any) -> Any:
         parse_count["n"] += 1
         return original_load(fp)
 
@@ -237,7 +254,9 @@ def test_invalidate_config_cache_clears_cache(tmp_path, monkeypatch):
 # ---------------------------------------------------------------------------
 
 
-def test_write_config_refreshes_cache(tmp_path, monkeypatch):
+def test_write_config_refreshes_cache(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> Any:
     """After write_config(), the cache is warm so the next read_config() is a cache hit."""
     cfg = _make_config(tmp_path, monkeypatch)
 
@@ -255,7 +274,7 @@ def test_write_config_refreshes_cache(tmp_path, monkeypatch):
 
     original_load = json.load
 
-    def counting_load(fp):
+    def counting_load(fp: Any) -> Any:
         parse_count["n"] += 1
         return original_load(fp)
 
@@ -268,7 +287,9 @@ def test_write_config_refreshes_cache(tmp_path, monkeypatch):
     assert result["name"] == "PostWrite"
 
 
-def test_read_modify_write_cycle(tmp_path, monkeypatch):
+def test_read_modify_write_cycle(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """A complete read → modify → write_config() round-trip preserves correctness."""
     cfg = _make_config(tmp_path, monkeypatch)
 
@@ -288,7 +309,9 @@ def test_read_modify_write_cycle(tmp_path, monkeypatch):
 # ---------------------------------------------------------------------------
 
 
-def test_concurrent_reads_are_thread_safe(tmp_path, monkeypatch):
+def test_concurrent_reads_are_thread_safe(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Multiple threads calling read_config() concurrently must not corrupt state."""
     cfg = _make_config(tmp_path, monkeypatch)
 
@@ -296,7 +319,7 @@ def test_concurrent_reads_are_thread_safe(tmp_path, monkeypatch):
     results: list[dict] = []
     lock = threading.Lock()
 
-    def reader():
+    def reader() -> None:
         try:
             for _ in range(50):
                 r = cfg.read_config()
@@ -320,14 +343,16 @@ def test_concurrent_reads_are_thread_safe(tmp_path, monkeypatch):
         assert r["name"] == "CacheTest"
 
 
-def test_concurrent_read_and_write_are_thread_safe(tmp_path, monkeypatch):
+def test_concurrent_read_and_write_are_thread_safe(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Concurrent reads and writes must not produce torn or corrupt state."""
     cfg = _make_config(tmp_path, monkeypatch)
 
     errors: list[Exception] = []
     stop_event = threading.Event()
 
-    def reader():
+    def reader() -> None:
         while not stop_event.is_set():
             try:
                 r = cfg.read_config()
@@ -337,7 +362,7 @@ def test_concurrent_read_and_write_are_thread_safe(tmp_path, monkeypatch):
                     errors.append(exc)
                 return
 
-    def writer():
+    def writer() -> None:
         for i in range(5):
             try:
                 cfg.config["plugin_cycle_interval_seconds"] = 300 + i
@@ -367,7 +392,9 @@ def test_concurrent_read_and_write_are_thread_safe(tmp_path, monkeypatch):
 # ---------------------------------------------------------------------------
 
 
-def test_stat_failure_clears_cache_and_falls_back_to_full_read(tmp_path, monkeypatch):
+def test_stat_failure_clears_cache_and_falls_back_to_full_read(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> Any:
     """If os.stat() raises OSError the cache is cleared and a full parse still succeeds.
 
     When stat() fails (e.g. transient FS glitch but the file is still readable),
@@ -383,7 +410,7 @@ def test_stat_failure_clears_cache_and_falls_back_to_full_read(tmp_path, monkeyp
     parse_count = {"n": 0}
     original_load = json.load
 
-    def counting_load(fp):
+    def counting_load(fp: Any) -> Any:
         parse_count["n"] += 1
         return original_load(fp)
 

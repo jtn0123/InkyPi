@@ -1,12 +1,15 @@
 from datetime import UTC, datetime
+from typing import Any
+
+import pytest
 
 from blueprints.main import _current_dt
 
 
-def test_current_dt_returns_now_device_tz(monkeypatch):
+def test_current_dt_returns_now_device_tz(monkeypatch: pytest.MonkeyPatch) -> Any:
     sentinel = datetime(2020, 1, 1)
 
-    def fake(device_config):
+    def fake(device_config: Any) -> Any:
         return sentinel
 
     monkeypatch.setattr("utils.time_utils.now_device_tz", fake, raising=True)
@@ -14,8 +17,8 @@ def test_current_dt_returns_now_device_tz(monkeypatch):
     assert _current_dt(object()) is sentinel
 
 
-def test_current_dt_falls_back_to_utc(monkeypatch):
-    def boom(device_config):
+def test_current_dt_falls_back_to_utc(monkeypatch: pytest.MonkeyPatch) -> None:
+    def boom(device_config: Any) -> None:
         raise RuntimeError("fail")
 
     monkeypatch.setattr("utils.time_utils.now_device_tz", boom, raising=True)

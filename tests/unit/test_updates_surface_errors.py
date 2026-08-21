@@ -14,15 +14,20 @@ Covers two sides of the fix:
 from __future__ import annotations
 
 import json
+from pathlib import Path
+from typing import Any
 from unittest.mock import MagicMock
+
+import pytest
+from flask.testing import FlaskClient
 
 
 class TestUpdateStatusLastFailure:
     """GET /settings/update_status surfaces .last-update-failure contents."""
 
     def test_update_status_includes_last_failure_when_file_present(
-        self, client, monkeypatch, tmp_path
-    ):
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
         import blueprints.settings as mod
 
         mod._set_update_state(False, None)
@@ -43,8 +48,8 @@ class TestUpdateStatusLastFailure:
         assert data["last_failure"] == failure_payload
 
     def test_update_status_last_failure_null_when_missing(
-        self, client, monkeypatch, tmp_path
-    ):
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
         import blueprints.settings as mod
 
         mod._set_update_state(False, None)
@@ -58,8 +63,8 @@ class TestUpdateStatusLastFailure:
         assert data["last_failure"] is None
 
     def test_update_status_handles_malformed_failure_json(
-        self, client, monkeypatch, tmp_path
-    ):
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
         """Malformed JSON must not crash the endpoint."""
         import blueprints.settings as mod
 
@@ -77,8 +82,8 @@ class TestUpdateStatusLastFailure:
         assert data["last_failure"] == {"parse_error": True}
 
     def test_update_status_handles_non_object_failure_json(
-        self, client, monkeypatch, tmp_path
-    ):
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
         """A JSON array/scalar at the top level is still treated as parse_error."""
         import blueprints.settings as mod
 
@@ -100,8 +105,8 @@ class TestSynthesizeFailureFromJournal:
     before delegating to ``install/update.sh``."""
 
     def test_synthesizes_last_failure_when_unit_failed_and_no_file(
-        self, client, monkeypatch, tmp_path
-    ):
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> Any:
         import subprocess as real_subprocess
 
         import blueprints.settings as mod
@@ -126,7 +131,7 @@ class TestSynthesizeFailureFromJournal:
             "branches.\nAborting\n"
         )
 
-        def fake_run(cmd, *args, **kwargs):
+        def fake_run(cmd: Any, *args: Any, **kwargs: Any) -> Any:
             # systemctl is-active -> "failed"
             if cmd[:2] == ["systemctl", "is-active"]:
                 return real_subprocess.CompletedProcess(
@@ -161,8 +166,8 @@ class TestSynthesizeFailureFromJournal:
             mod._set_update_state(False, None)
 
     def test_does_not_synthesize_when_failure_file_already_exists(
-        self, client, monkeypatch, tmp_path
-    ):
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> Any:
         """If update.sh already wrote .last-update-failure, that record wins
         and we must not overwrite it with the journal-synthesized one."""
         import subprocess as real_subprocess
@@ -185,7 +190,7 @@ class TestSynthesizeFailureFromJournal:
         mod._UPDATE_STATE["started_at"] = 1_000_000.0
         monkeypatch.setattr(mod, "_systemd_available", lambda: True)
 
-        def fake_run(cmd, *args, **kwargs):
+        def fake_run(cmd: Any, *args: Any, **kwargs: Any) -> Any:
             if cmd[:2] == ["systemctl", "is-active"]:
                 return real_subprocess.CompletedProcess(
                     args=cmd, returncode=0, stdout="failed\n", stderr=""
@@ -215,7 +220,7 @@ class TestSynthesizeFailureFromJournal:
 class TestStartUpdateRejectsEmptyTargetVersion:
     """POST /settings/update validates ``target_version`` explicitly."""
 
-    def _install_mocks(self, monkeypatch):
+    def _install_mocks(self, monkeypatch: pytest.MonkeyPatch) -> Any:
         import blueprints.settings as mod
 
         monkeypatch.setattr(mod, "_systemd_available", lambda: False)
@@ -226,8 +231,8 @@ class TestStartUpdateRejectsEmptyTargetVersion:
         return mod, fallback_mock
 
     def test_update_endpoint_rejects_null_target_version_with_validation_error(
-        self, client, monkeypatch
-    ):
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         mod, fallback_mock = self._install_mocks(monkeypatch)
         try:
             resp = client.post("/settings/update", json={"target_version": None})
@@ -241,8 +246,8 @@ class TestStartUpdateRejectsEmptyTargetVersion:
             mod._set_update_state(False, None)
 
     def test_update_endpoint_rejects_empty_target_version_with_validation_error(
-        self, client, monkeypatch
-    ):
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         mod, fallback_mock = self._install_mocks(monkeypatch)
         try:
             resp = client.post("/settings/update", json={"target_version": ""})
@@ -256,8 +261,8 @@ class TestStartUpdateRejectsEmptyTargetVersion:
             mod._set_update_state(False, None)
 
     def test_update_endpoint_rejects_whitespace_only_target_version(
-        self, client, monkeypatch
-    ):
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         mod, fallback_mock = self._install_mocks(monkeypatch)
         try:
             resp = client.post("/settings/update", json={"target_version": "   "})
@@ -270,8 +275,8 @@ class TestStartUpdateRejectsEmptyTargetVersion:
             mod._set_update_state(False, None)
 
     def test_update_endpoint_rejects_non_string_target_version(
-        self, client, monkeypatch
-    ):
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         mod, fallback_mock = self._install_mocks(monkeypatch)
         try:
             resp = client.post("/settings/update", json={"target_version": 123})
@@ -284,8 +289,8 @@ class TestStartUpdateRejectsEmptyTargetVersion:
             mod._set_update_state(False, None)
 
     def test_update_endpoint_invalid_tag_format_returns_validation_envelope(
-        self, client, monkeypatch
-    ):
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Existing invalid-format rejection now also uses the envelope."""
         mod, fallback_mock = self._install_mocks(monkeypatch)
         try:
@@ -301,8 +306,8 @@ class TestStartUpdateRejectsEmptyTargetVersion:
             mod._set_update_state(False, None)
 
     def test_update_endpoint_missing_target_version_still_allowed(
-        self, client, monkeypatch
-    ):
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Omitting ``target_version`` entirely remains valid (latest-tag path)."""
         mod, fallback_mock = self._install_mocks(monkeypatch)
         try:
@@ -316,13 +321,17 @@ class TestStartUpdateRejectsEmptyTargetVersion:
 class TestReadLastUpdateFailureHelper:
     """Direct unit tests for the read_last_update_failure helper."""
 
-    def test_returns_none_when_file_missing(self, monkeypatch, tmp_path):
+    def test_returns_none_when_file_missing(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
         from blueprints.settings._update_status import read_last_update_failure
 
         monkeypatch.setenv("INKYPI_LOCKFILE_DIR", str(tmp_path))
         assert read_last_update_failure() is None
 
-    def test_returns_parsed_record_when_present(self, monkeypatch, tmp_path):
+    def test_returns_parsed_record_when_present(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
         from blueprints.settings._update_status import read_last_update_failure
 
         record = {
@@ -337,7 +346,9 @@ class TestReadLastUpdateFailureHelper:
         monkeypatch.setenv("INKYPI_LOCKFILE_DIR", str(tmp_path))
         assert read_last_update_failure() == record
 
-    def test_caps_oversized_file(self, monkeypatch, tmp_path):
+    def test_caps_oversized_file(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
         """A 1 MiB failure file must not blow up the response."""
         from blueprints.settings._update_status import read_last_update_failure
 
@@ -359,7 +370,7 @@ class TestStartUpdateReapsStaleRunningState:
     progress" referencing a unit that had been dead for hours.
     """
 
-    def _install_mocks(self, monkeypatch):
+    def _install_mocks(self, monkeypatch: pytest.MonkeyPatch) -> Any:
         import blueprints.settings as mod
 
         monkeypatch.setattr(mod, "_systemd_available", lambda: False)
@@ -369,7 +380,9 @@ class TestStartUpdateReapsStaleRunningState:
         mod._set_update_state(False, None)
         return mod, fallback_mock
 
-    def test_post_reaps_timed_out_running_state(self, client, monkeypatch):
+    def test_post_reaps_timed_out_running_state(
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Pre-populate a >30 min old running state; POST must succeed.
 
         Uses the timeout-fallback branch of ``_auto_clear_stale_update_state``
@@ -402,7 +415,9 @@ class TestStartUpdateReapsStaleRunningState:
         finally:
             mod._set_update_state(False, None)
 
-    def test_post_preserves_409_for_genuinely_active_update(self, client, monkeypatch):
+    def test_post_preserves_409_for_genuinely_active_update(
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """With a fresh running state (started just now), the reaper is a
         no-op and the "already running" 409 still fires.  Prevents the
         K3 fix from trampling a legitimate concurrent update.

@@ -2,14 +2,17 @@
 """Concurrent request tests to verify thread safety."""
 
 import threading
+from typing import Any
+
+from flask.testing import FlaskClient
 
 
-def test_concurrent_settings_saves(client):
+def test_concurrent_settings_saves(client: FlaskClient) -> None:
     """5 simultaneous settings POSTs should not corrupt state."""
     results = []
     errors = []
 
-    def save_settings(idx):
+    def save_settings(idx: Any) -> None:
         try:
             data = {
                 "unit": "minute",
@@ -34,12 +37,12 @@ def test_concurrent_settings_saves(client):
         assert status in (200, 302, 422), f"Unexpected status: {status}"
 
 
-def test_concurrent_playlist_creates(client):
+def test_concurrent_playlist_creates(client: FlaskClient) -> None:
     """5 simultaneous playlist creates should all succeed or conflict gracefully."""
     results = []
     errors = []
 
-    def create_playlist(idx):
+    def create_playlist(idx: Any) -> None:
         try:
             import json
 

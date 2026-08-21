@@ -10,6 +10,7 @@ import json
 import os
 import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -42,7 +43,7 @@ def _write_config_file(path: str, data: dict | None = None) -> None:
         json.dump(data if data is not None else _MIN_CFG, fh)
 
 
-def _make_config(tmp_path, monkeypatch):
+def _make_config(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Any:
     """Build a Config instance pointing at a fresh tmp_path device.json."""
     # Ensure src/ is importable
     src_dir = os.path.join(os.path.dirname(__file__), "..", "..", "src")
@@ -85,14 +86,18 @@ def _make_config(tmp_path, monkeypatch):
 # ---------------------------------------------------------------------------
 
 
-def test_update_atomic_applies_mutation(tmp_path, monkeypatch):
+def test_update_atomic_applies_mutation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """update_atomic calls update_fn and persists the result."""
     cfg = _make_config(tmp_path, monkeypatch)
     cfg.update_atomic(lambda c: c.update({"extra_key": "hello"}))
     assert cfg.config.get("extra_key") == "hello"
 
 
-def test_update_atomic_writes_to_disk(tmp_path, monkeypatch):
+def test_update_atomic_writes_to_disk(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """update_atomic writes the config to disk after the mutation."""
     cfg = _make_config(tmp_path, monkeypatch)
     cfg.update_atomic(lambda c: c.update({"disk_test": True}))
@@ -101,12 +106,14 @@ def test_update_atomic_writes_to_disk(tmp_path, monkeypatch):
     assert on_disk.get("disk_test") is True
 
 
-def test_update_atomic_exception_does_not_write(tmp_path, monkeypatch):
+def test_update_atomic_exception_does_not_write(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """If update_fn raises, write_config should not be reached."""
     cfg = _make_config(tmp_path, monkeypatch)
     original_hash = cfg._last_written_hash
 
-    def _bad_fn(c):
+    def _bad_fn(c: Any) -> None:
         c["should_not_persist"] = "bad"
         raise RuntimeError("intentional failure")
 
@@ -122,7 +129,9 @@ def test_update_atomic_exception_does_not_write(tmp_path, monkeypatch):
 # ---------------------------------------------------------------------------
 
 
-def test_concurrent_add_to_playlist_no_clobber(tmp_path, monkeypatch):
+def test_concurrent_add_to_playlist_no_clobber(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Fire N threads each adding a different plugin instance via update_atomic.
 
     All N instances must survive in the final config without any being silently
@@ -147,7 +156,7 @@ def test_concurrent_add_to_playlist_no_clobber(tmp_path, monkeypatch):
             "plugin_settings": {},
         }
 
-        def _do_add(c):
+        def _do_add(c: Any) -> None:
             result = playlist_manager.add_plugin_to_playlist("Default", plugin_dict)
             if not result:
                 raise RuntimeError(f"add_plugin_to_playlist failed for instance_{i}")

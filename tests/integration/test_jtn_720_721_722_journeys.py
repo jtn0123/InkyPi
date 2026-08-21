@@ -4,8 +4,12 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
+from typing import Any
 
 import pytest
+from flask import Flask
+from flask.testing import FlaskClient
+from playwright.sync_api import Page
 
 pytestmark = pytest.mark.skipif(
     os.getenv("SKIP_UI", "").lower() in ("1", "true"),
@@ -18,13 +22,13 @@ from tests.integration.browser_helpers import (  # noqa: E402
 )
 
 
-def _playlist_names(page) -> list[str]:
+def _playlist_names(page: Page) -> list[str]:
     return page.locator(".playlist-item").evaluate_all(
         "(nodes) => nodes.map((node) => node.dataset.playlistName || '')"
     )
 
 
-def _plugin_instance_names(page, playlist_name: str | None = None) -> list[str]:
+def _plugin_instance_names(page: Page, playlist_name: str | None = None) -> list[str]:
     selector = ".plugin-item"
     if playlist_name:
         selector = f'[data-playlist-name="{playlist_name}"] .plugin-item'
@@ -34,7 +38,7 @@ def _plugin_instance_names(page, playlist_name: str | None = None) -> list[str]:
 
 
 def _create_playlist_via_ui(
-    page,
+    page: Page,
     live_server: str,
     *,
     name: str,
@@ -53,14 +57,14 @@ def _create_playlist_via_ui(
 
 
 def _add_plugin_via_client(
-    client,
+    client: FlaskClient,
     *,
     plugin_id: str,
     playlist: str,
     instance_name: str,
     interval: int = 5,
     plugin_settings: dict | None = None,
-):
+) -> None:
     payload = {
         "plugin_id": plugin_id,
         "refresh_settings": json.dumps(
@@ -80,12 +84,12 @@ def _add_plugin_via_client(
 
 
 def test_jtn_720_first_run_setup_add_schedule_refresh_history(
-    live_server,
-    browser_page,
-    client,
-    flask_app,
-    monkeypatch,
-):
+    live_server: str,
+    browser_page: Page,
+    client: FlaskClient,
+    flask_app: Flask,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     install_direct_manual_update(monkeypatch, flask_app)
 
     page = browser_page
@@ -133,7 +137,9 @@ def test_jtn_720_first_run_setup_add_schedule_refresh_history(
     assert "First Clock" in body_text
 
 
-def _wait_for_plugin_order(device_config_dev, playlist_name, expected, timeout_s=5.0):
+def _wait_for_plugin_order(
+    device_config_dev: Any, playlist_name: Any, expected: Any, timeout_s: Any = 5.0
+) -> None:
     """Poll device_config until the playlist's plugin order matches expected.
 
     Avoids racing the client-side reorder POST against the reload that follows.
@@ -156,11 +162,11 @@ def _wait_for_plugin_order(device_config_dev, playlist_name, expected, timeout_s
 
 
 def test_jtn_721_playlist_roundtrip_create_add_reorder_delete_persist(
-    live_server,
-    browser_page,
-    client,
-    device_config_dev,
-):
+    live_server: str,
+    browser_page: Page,
+    client: FlaskClient,
+    device_config_dev: Any,
+) -> None:
     page = browser_page
 
     _create_playlist_via_ui(page, live_server, name="Journey List")
@@ -253,11 +259,11 @@ def test_jtn_721_playlist_roundtrip_create_add_reorder_delete_persist(
 
 
 def test_jtn_722_api_key_roundtrip_add_edit_delete(
-    live_server,
-    browser_page,
-    monkeypatch,
-    tmp_path,
-):
+    live_server: str,
+    browser_page: Page,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
     monkeypatch.setenv("PROJECT_DIR", str(tmp_path))
     env_path = Path(tmp_path) / ".env"
     env_path.write_text("", encoding="utf-8")

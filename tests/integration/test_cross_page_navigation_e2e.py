@@ -2,8 +2,10 @@
 from __future__ import annotations
 
 import os
+from typing import Any
 
 import pytest
+from playwright.sync_api import Page
 from tests.integration.browser_helpers import navigate_and_wait
 
 pytestmark = pytest.mark.skipif(
@@ -22,14 +24,16 @@ pytestmark = pytest.mark.skipif(
         ("/api-keys", "api_keys"),
     ],
 )
-def test_all_pages_load_without_js_errors(live_server, browser_page, path, label):
+def test_all_pages_load_without_js_errors(
+    live_server: str, browser_page: Page, path: Any, label: Any
+) -> None:
     page = browser_page
     rc = navigate_and_wait(page, live_server, path)
     page.wait_for_timeout(1000)
     rc.assert_no_errors(name=f"page_load_{label}")
 
 
-def test_nav_links_work(live_server, browser_page):
+def test_nav_links_work(live_server: str, browser_page: Page) -> None:
     page = browser_page
     navigate_and_wait(page, live_server, "/")
 
@@ -54,7 +58,7 @@ def test_nav_links_work(live_server, browser_page):
     assert "/history" in page.url
 
 
-def test_browser_back_forward(live_server, browser_page):
+def test_browser_back_forward(live_server: str, browser_page: Page) -> None:
     page = browser_page
     base_url = live_server
     navigate_and_wait(page, base_url, "/")
@@ -69,7 +73,7 @@ def test_browser_back_forward(live_server, browser_page):
     assert "/settings" in page.url
 
 
-def test_plugin_page_loads_without_errors(live_server, browser_page):
+def test_plugin_page_loads_without_errors(live_server: str, browser_page: Page) -> None:
     page = browser_page
     rc = navigate_and_wait(page, live_server, "/plugin/clock")
     page.wait_for_timeout(1000)

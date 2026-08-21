@@ -7,7 +7,9 @@ JTN-308: Pagination Next link must have a valid href to the next page.
 """
 
 import os
+from typing import Any
 
+from flask.testing import FlaskClient
 from PIL import Image
 
 # ---------------------------------------------------------------------------
@@ -15,7 +17,7 @@ from PIL import Image
 # ---------------------------------------------------------------------------
 
 
-def test_history_page_js_redisplay_function_exists(client):
+def test_history_page_js_redisplay_function_exists(client: FlaskClient) -> None:
     """JTN-305: history_page.js must define an async redisplay function."""
     resp = client.get("/static/scripts/history_page.js")
     assert resp.status_code == 200
@@ -26,7 +28,7 @@ def test_history_page_js_redisplay_function_exists(client):
     ), "history_page.js must define async function redisplay(filename, button)"
 
 
-def test_history_page_js_redisplay_posts_to_config_url(client):
+def test_history_page_js_redisplay_posts_to_config_url(client: FlaskClient) -> None:
     """JTN-305: redisplay must POST to config.redisplayUrl with filename in body."""
     resp = client.get("/static/scripts/history_page.js")
     assert resp.status_code == 200
@@ -41,7 +43,9 @@ def test_history_page_js_redisplay_posts_to_config_url(client):
     ), "redisplay must send {filename} as JSON body"
 
 
-def test_history_page_js_display_action_bound_via_delegation(client):
+def test_history_page_js_display_action_bound_via_delegation(
+    client: FlaskClient,
+) -> None:
     """JTN-305: click handler must delegate to [data-history-action='display'] buttons."""
     resp = client.get("/static/scripts/history_page.js")
     assert resp.status_code == 200
@@ -58,7 +62,9 @@ def test_history_page_js_display_action_bound_via_delegation(client):
     ), "must pass filename and button reference to redisplay()"
 
 
-def test_history_template_display_buttons_have_data_attrs(client, device_config_dev):
+def test_history_template_display_buttons_have_data_attrs(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     """JTN-305: rendered history page must include data-history-action=display buttons."""
     d = device_config_dev.history_image_dir
     os.makedirs(d, exist_ok=True)
@@ -77,7 +83,7 @@ def test_history_template_display_buttons_have_data_attrs(client, device_config_
     ), "Display buttons must carry the filename in data-filename"
 
 
-def test_history_template_boot_provides_redisplay_url(client):
+def test_history_template_boot_provides_redisplay_url(client: FlaskClient) -> None:
     """JTN-305: boot data must expose the redisplay URL for the JS controller."""
     resp = client.get("/history")
     assert resp.status_code == 200
@@ -91,7 +97,9 @@ def test_history_template_boot_provides_redisplay_url(client):
     ), "Boot script must reference redisplayUrl to pass to the page controller"
 
 
-def test_history_redisplay_endpoint_accepts_post(client, device_config_dev):
+def test_history_redisplay_endpoint_accepts_post(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     """JTN-305: /history/redisplay must accept POST with filename and succeed."""
     d = device_config_dev.history_image_dir
     os.makedirs(d, exist_ok=True)
@@ -111,7 +119,7 @@ def test_history_redisplay_endpoint_accepts_post(client, device_config_dev):
 # ---------------------------------------------------------------------------
 
 
-def test_history_page_js_open_delete_modal_function(client):
+def test_history_page_js_open_delete_modal_function(client: FlaskClient) -> None:
     """JTN-306: history_page.js must define openDeleteModal to show confirmation."""
     resp = client.get("/static/scripts/history_page.js")
     assert resp.status_code == 200
@@ -125,7 +133,9 @@ def test_history_page_js_open_delete_modal_function(client):
     ), "modal must reference the #deleteHistoryModal element"
 
 
-def test_history_page_js_confirm_delete_posts_to_config_url(client):
+def test_history_page_js_confirm_delete_posts_to_config_url(
+    client: FlaskClient,
+) -> None:
     """JTN-306: confirmDelete must POST filename to config.deleteUrl."""
     resp = client.get("/static/scripts/history_page.js")
     assert resp.status_code == 200
@@ -142,7 +152,9 @@ def test_history_page_js_confirm_delete_posts_to_config_url(client):
     ), "confirmDelete must read the filename from state.pendingDelete"
 
 
-def test_history_page_js_delete_action_bound_via_delegation(client):
+def test_history_page_js_delete_action_bound_via_delegation(
+    client: FlaskClient,
+) -> None:
     """JTN-306: delegated handler must wire delete action to openDeleteModal."""
     resp = client.get("/static/scripts/history_page.js")
     assert resp.status_code == 200
@@ -156,7 +168,9 @@ def test_history_page_js_delete_action_bound_via_delegation(client):
     ), "delete action must call openDeleteModal with the filename"
 
 
-def test_history_template_delete_buttons_have_data_attrs(client, device_config_dev):
+def test_history_template_delete_buttons_have_data_attrs(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     """JTN-306: rendered history page must include data-history-action=delete buttons."""
     d = device_config_dev.history_image_dir
     os.makedirs(d, exist_ok=True)
@@ -173,7 +187,7 @@ def test_history_template_delete_buttons_have_data_attrs(client, device_config_d
     assert f'data-filename="{fname}"' in body
 
 
-def test_history_template_boot_provides_delete_url(client):
+def test_history_template_boot_provides_delete_url(client: FlaskClient) -> None:
     """JTN-306: boot script must expose deleteUrl to the JS controller."""
     resp = client.get("/history")
     assert resp.status_code == 200
@@ -183,7 +197,9 @@ def test_history_template_boot_provides_delete_url(client):
     assert "/history/delete" in body, "deleteUrl must resolve to /history/delete"
 
 
-def test_history_template_includes_delete_modal(client, device_config_dev):
+def test_history_template_includes_delete_modal(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     """JTN-306: rendered page must include the delete confirmation modal markup."""
     d = device_config_dev.history_image_dir
     os.makedirs(d, exist_ok=True)
@@ -202,7 +218,9 @@ def test_history_template_includes_delete_modal(client, device_config_dev):
     assert 'id="cancelDeleteHistoryBtn"' in body, "Cancel delete button must exist"
 
 
-def test_history_delete_endpoint_removes_file(client, device_config_dev):
+def test_history_delete_endpoint_removes_file(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     """JTN-306: POST to /history/delete removes the target file."""
     d = device_config_dev.history_image_dir
     os.makedirs(d, exist_ok=True)
@@ -223,7 +241,7 @@ def test_history_delete_endpoint_removes_file(client, device_config_dev):
 # ---------------------------------------------------------------------------
 
 
-def test_history_page_js_open_clear_modal_function(client):
+def test_history_page_js_open_clear_modal_function(client: FlaskClient) -> None:
     """JTN-307: history_page.js must define openClearModal."""
     resp = client.get("/static/scripts/history_page.js")
     assert resp.status_code == 200
@@ -237,7 +255,7 @@ def test_history_page_js_open_clear_modal_function(client):
     ), "modal must reference the #clearHistoryModal element"
 
 
-def test_history_page_js_confirm_clear_posts_to_config_url(client):
+def test_history_page_js_confirm_clear_posts_to_config_url(client: FlaskClient) -> None:
     """JTN-307: confirmClear must POST to config.clearUrl."""
     resp = client.get("/static/scripts/history_page.js")
     assert resp.status_code == 200
@@ -250,7 +268,7 @@ def test_history_page_js_confirm_clear_posts_to_config_url(client):
     assert 'method: "POST"' in js, "confirmClear must use HTTP POST"
 
 
-def test_history_page_js_clear_btn_bound_to_open_modal(client):
+def test_history_page_js_clear_btn_bound_to_open_modal(client: FlaskClient) -> None:
     """JTN-307: #historyClearBtn click must open the clear confirmation modal."""
     resp = client.get("/static/scripts/history_page.js")
     assert resp.status_code == 200
@@ -264,7 +282,7 @@ def test_history_page_js_clear_btn_bound_to_open_modal(client):
     ), "historyClearBtn click handler must call openClearModal"
 
 
-def test_history_template_boot_provides_clear_url(client):
+def test_history_template_boot_provides_clear_url(client: FlaskClient) -> None:
     """JTN-307: boot script must expose clearUrl to the JS controller."""
     resp = client.get("/history")
     assert resp.status_code == 200
@@ -274,7 +292,9 @@ def test_history_template_boot_provides_clear_url(client):
     assert "/history/clear" in body, "clearUrl must resolve to /history/clear"
 
 
-def test_history_template_includes_clear_all_modal(client, device_config_dev):
+def test_history_template_includes_clear_all_modal(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     """JTN-307: rendered page must include the clear-all confirmation modal markup."""
     d = device_config_dev.history_image_dir
     os.makedirs(d, exist_ok=True)
@@ -292,7 +312,9 @@ def test_history_template_includes_clear_all_modal(client, device_config_dev):
     assert 'id="historyClearBtn"' in body, "Clear All trigger button must exist"
 
 
-def test_history_clear_endpoint_removes_all_files(client, device_config_dev):
+def test_history_clear_endpoint_removes_all_files(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     """JTN-307: POST to /history/clear removes all history images."""
     d = device_config_dev.history_image_dir
     os.makedirs(d, exist_ok=True)
@@ -313,7 +335,9 @@ def test_history_clear_endpoint_removes_all_files(client, device_config_dev):
 # ---------------------------------------------------------------------------
 
 
-def test_history_template_next_link_is_anchor_with_href(client, device_config_dev):
+def test_history_template_next_link_is_anchor_with_href(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     """JTN-308: Next pagination element must be an <a> tag with a valid href."""
     d = device_config_dev.history_image_dir
     os.makedirs(d, exist_ok=True)
@@ -345,7 +369,9 @@ def test_history_template_next_link_is_anchor_with_href(client, device_config_de
     ), f"Next <a> tag must include an href attribute, got: {opening_tag!r}"
 
 
-def test_history_template_next_href_advances_page(client, device_config_dev):
+def test_history_template_next_href_advances_page(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     """JTN-308: Next link href must point to page=N+1 with same per_page."""
     d = device_config_dev.history_image_dir
     os.makedirs(d, exist_ok=True)
@@ -361,7 +387,9 @@ def test_history_template_next_href_advances_page(client, device_config_dev):
     assert "page=2" in body, "On page 1 the Next link href must contain page=2"
 
 
-def test_history_template_next_href_on_middle_page(client, device_config_dev):
+def test_history_template_next_href_on_middle_page(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     """JTN-308: On page 2 of 3, Next href must point to page=3."""
     d = device_config_dev.history_image_dir
     os.makedirs(d, exist_ok=True)
@@ -377,7 +405,9 @@ def test_history_template_next_href_on_middle_page(client, device_config_dev):
     assert "page=3" in body, "On page 2 the Next link href must contain page=3"
 
 
-def test_history_template_next_not_rendered_on_last_page(client, device_config_dev):
+def test_history_template_next_not_rendered_on_last_page(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     """JTN-308: On the last page, Next must be a disabled span (no href)."""
     d = device_config_dev.history_image_dir
     os.makedirs(d, exist_ok=True)
@@ -399,7 +429,9 @@ def test_history_template_next_not_rendered_on_last_page(client, device_config_d
     ), "Next must not link to page=3 when page 2 is the last page"
 
 
-def test_history_next_page_loads_different_items(client, device_config_dev):
+def test_history_next_page_loads_different_items(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     """JTN-308: Following the Next link must serve a different set of items."""
     d = device_config_dev.history_image_dir
     os.makedirs(d, exist_ok=True)
@@ -433,7 +465,7 @@ def test_history_next_page_loads_different_items(client, device_config_dev):
 # ---------------------------------------------------------------------------
 
 
-def test_history_template_boot_config_has_all_four_urls(client):
+def test_history_template_boot_config_has_all_four_urls(client: FlaskClient) -> None:
     """JTN-305/306/307/308: all required URL keys must be in the boot config."""
     resp = client.get("/history")
     assert resp.status_code == 200
@@ -445,7 +477,7 @@ def test_history_template_boot_config_has_all_four_urls(client):
         ), f"Boot config must include '{key}' so JS actions can reach their endpoints"
 
 
-def test_history_template_boot_invokes_page_controller(client):
+def test_history_template_boot_invokes_page_controller(client: FlaskClient) -> None:
     """JTN-305/306/307: page must call InkyPiHistoryPage.create(...).init()."""
     resp = client.get("/history")
     assert resp.status_code == 200
@@ -456,7 +488,7 @@ def test_history_template_boot_invokes_page_controller(client):
     assert ".init()" in body, "Boot script must call .init() to wire up event handlers"
 
 
-def test_history_page_js_rebinds_images_after_htmx_swap(client):
+def test_history_page_js_rebinds_images_after_htmx_swap(client: FlaskClient) -> None:
     """JTN-330: history_page.js must listen for htmx:afterSettle to rebind
     image skeleton handlers after HTMX swaps the grid."""
     resp = client.get("/static/scripts/history_page.js")

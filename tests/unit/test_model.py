@@ -1,5 +1,7 @@
 from datetime import UTC, datetime, timedelta
 
+import pytest
+
 import model
 from model import Playlist, PlaylistManager, PluginInstance, _sanitize_log_value
 
@@ -7,33 +9,35 @@ from model import Playlist, PlaylistManager, PluginInstance, _sanitize_log_value
 class TestSanitizeLogValue:
     """Tests for _sanitize_log_value log-injection helper."""
 
-    def test_strips_newline(self):
+    def test_strips_newline(self) -> None:
         assert _sanitize_log_value("hello\nworld") == "helloworld"
 
-    def test_strips_carriage_return(self):
+    def test_strips_carriage_return(self) -> None:
         assert _sanitize_log_value("hello\rworld") == "helloworld"
 
-    def test_strips_tab(self):
+    def test_strips_tab(self) -> None:
         assert _sanitize_log_value("hello\tworld") == "helloworld"
 
-    def test_strips_null_byte(self):
+    def test_strips_null_byte(self) -> None:
         assert _sanitize_log_value("hello\x00world") == "helloworld"
 
-    def test_strips_mixed_control_chars(self):
+    def test_strips_mixed_control_chars(self) -> None:
         assert _sanitize_log_value("a\r\nb\tc\x00d") == "abcd"
 
-    def test_clean_string_unchanged(self):
+    def test_clean_string_unchanged(self) -> None:
         assert _sanitize_log_value("clean string") == "clean string"
 
-    def test_non_string_converted(self):
+    def test_non_string_converted(self) -> None:
         assert _sanitize_log_value(42) == "42"
         assert _sanitize_log_value(None) == "None"
 
-    def test_empty_string(self):
+    def test_empty_string(self) -> None:
         assert _sanitize_log_value("") == ""
 
 
-def test_add_plugin_to_nonexistent_playlist_warns(caplog):
+def test_add_plugin_to_nonexistent_playlist_warns(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
     """Cover the sanitized warning path when playlist doesn't exist."""
     pm = PlaylistManager()
     bad_name = "no_such\nplaylist\t\x00"
@@ -47,7 +51,7 @@ def test_add_plugin_to_nonexistent_playlist_warns(caplog):
     assert "\n" not in caplog.records[0].message
 
 
-def test_update_nonexistent_playlist_warns(caplog):
+def test_update_nonexistent_playlist_warns(caplog: pytest.LogCaptureFixture) -> None:
     """Cover the sanitized warning path in update_playlist."""
     pm = PlaylistManager()
     bad_name = "no_such\nplaylist"
@@ -59,7 +63,7 @@ def test_update_nonexistent_playlist_warns(caplog):
     assert "\n" not in caplog.records[0].message
 
 
-def test_refresh_info_to_from_dict_and_datetime():
+def test_refresh_info_to_from_dict_and_datetime() -> None:
     now_iso = datetime.utcnow().isoformat()
     ri = model.RefreshInfo(
         refresh_type="Manual Update",
@@ -76,7 +80,7 @@ def test_refresh_info_to_from_dict_and_datetime():
     assert ri2.get_refresh_datetime() == datetime.fromisoformat(now_iso)
 
 
-def test_playlist_and_plugininstance_basic_operations():
+def test_playlist_and_plugininstance_basic_operations() -> None:
     # Create plugin instances
     pdata = {
         "plugin_id": "weather",
@@ -106,7 +110,7 @@ def test_playlist_and_plugininstance_basic_operations():
     assert plugin.should_refresh(now) is True
 
 
-def test_playlist_cycle_and_priority():
+def test_playlist_cycle_and_priority() -> None:
     # Playlist with two plugins
     plugins = [
         {"plugin_id": "a", "name": "one", "plugin_settings": {}, "refresh": {}},
@@ -129,7 +133,7 @@ def test_playlist_cycle_and_priority():
     assert pl.get_priority() == 120
 
 
-def test_playlist_manager_operations():
+def test_playlist_manager_operations() -> None:
     pm = model.PlaylistManager()
     pm.add_playlist("day", "00:00", "24:00")
     assert pm.get_playlist("day") is not None
@@ -165,19 +169,19 @@ def test_playlist_manager_operations():
 # pyright: reportMissingImports=false
 
 
-def test_should_refresh_interval_true():
+def test_should_refresh_interval_true() -> None:
     now = datetime(2025, 1, 1, 12, 0, 0)
     last = now - timedelta(seconds=3601)
     assert PlaylistManager.should_refresh(last, 3600, now) is True
 
 
-def test_should_refresh_interval_false():
+def test_should_refresh_interval_false() -> None:
     now = datetime(2025, 1, 1, 12, 0, 0)
     last = now - timedelta(seconds=3599)
     assert PlaylistManager.should_refresh(last, 3600, now) is False
 
 
-def test_determine_active_playlist_priority():
+def test_determine_active_playlist_priority() -> None:
     tz = UTC
     now = datetime(2025, 1, 1, 12, 0, 0, tzinfo=tz)
     p1 = Playlist(
@@ -211,7 +215,7 @@ def test_determine_active_playlist_priority():
     assert active.name == "Lunch"
 
 
-def test_plugin_instance_should_refresh_interval_and_scheduled():
+def test_plugin_instance_should_refresh_interval_and_scheduled() -> None:
     tz = UTC
     now = datetime(2025, 1, 1, 13, 0, 0, tzinfo=tz)
     pi = PluginInstance(
@@ -234,7 +238,7 @@ def test_plugin_instance_should_refresh_interval_and_scheduled():
     assert pi.should_refresh(now) is True
 
 
-def test_plugin_instance_scheduled_across_day_boundary_once():
+def test_plugin_instance_scheduled_across_day_boundary_once() -> None:
     tz = UTC
     schedule = "12:00"
     yesterday = datetime(2025, 1, 1, 13, 0, 0, tzinfo=tz)  # after schedule yesterday
@@ -259,12 +263,12 @@ def test_plugin_instance_scheduled_across_day_boundary_once():
     assert pi.should_refresh(tomorrow_at) is True
 
 
-def test_get_time_range_minutes():
+def test_get_time_range_minutes() -> None:
     p = Playlist("Morning", "06:00", "09:30")
     assert p.get_time_range_minutes() == 210
 
 
-def test_playlist_wraparound_is_active():
+def test_playlist_wraparound_is_active() -> None:
     p = Playlist("Late Night", "23:00", "02:00")
     assert p.is_active("23:30") is True
     assert p.is_active("00:30") is True
@@ -273,12 +277,12 @@ def test_playlist_wraparound_is_active():
     assert p.is_active("02:00") is False
 
 
-def test_get_time_range_minutes_wraparound():
+def test_get_time_range_minutes_wraparound() -> None:
     p = Playlist("Late Night", "23:00", "02:00")
     assert p.get_time_range_minutes() == 180
 
 
-def test_plugin_instance_only_show_when_fresh_respected():
+def test_plugin_instance_only_show_when_fresh_respected() -> None:
     tz = UTC
     now = datetime(2025, 1, 1, 13, 0, 0, tzinfo=tz)
     pi = PluginInstance(

@@ -16,8 +16,12 @@ from __future__ import annotations
 
 import json
 
+import pytest
+from flask import Flask
+from flask.testing import FlaskClient
 
-def test_save_plugin_settings_htmx_returns_html_on_success(client):
+
+def test_save_plugin_settings_htmx_returns_html_on_success(client: FlaskClient) -> None:
     resp = client.post(
         "/save_plugin_settings",
         data={
@@ -42,7 +46,9 @@ def test_save_plugin_settings_htmx_returns_html_on_success(client):
     assert "pluginSettingsSaved" in trigger
 
 
-def test_save_plugin_settings_htmx_returns_error_partial_when_plugin_missing(client):
+def test_save_plugin_settings_htmx_returns_error_partial_when_plugin_missing(
+    client: FlaskClient,
+) -> None:
     resp = client.post(
         "/save_plugin_settings",
         data={"plugin_id": "not_real_plugin"},
@@ -59,7 +65,9 @@ def test_save_plugin_settings_htmx_returns_error_partial_when_plugin_missing(cli
     assert "Plugin not found" in body
 
 
-def test_save_plugin_settings_htmx_returns_error_partial_when_plugin_id_missing(client):
+def test_save_plugin_settings_htmx_returns_error_partial_when_plugin_id_missing(
+    client: FlaskClient,
+) -> None:
     resp = client.post(
         "/save_plugin_settings",
         data={"title": "no plugin id"},
@@ -73,7 +81,9 @@ def test_save_plugin_settings_htmx_returns_error_partial_when_plugin_id_missing(
     assert 'data-plugin-form-error-field="plugin_id"' in body
 
 
-def test_save_plugin_settings_without_htmx_header_still_returns_json(client):
+def test_save_plugin_settings_without_htmx_header_still_returns_json(
+    client: FlaskClient,
+) -> None:
     """Legacy contract: no HX-Request header => JSON response."""
     resp = client.post(
         "/save_plugin_settings",
@@ -92,8 +102,8 @@ def test_save_plugin_settings_without_htmx_header_still_returns_json(client):
 
 
 def test_save_plugin_settings_htmx_error_never_leaks_exception_text(
-    client, flask_app, monkeypatch
-):
+    client: FlaskClient, flask_app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """HTMX error partial should use the generic internal-error copy."""
     dc = flask_app.config["DEVICE_CONFIG"]
     monkeypatch.setattr(
@@ -117,7 +127,7 @@ def test_save_plugin_settings_htmx_error_never_leaks_exception_text(
     assert "internal error" in body.lower()
 
 
-def test_is_htmx_request_returns_false_outside_request_context():
+def test_is_htmx_request_returns_false_outside_request_context() -> None:
     """_is_htmx_request handles the no-request-context case (JTN-506)."""
     from blueprints.plugin import _is_htmx_request
 
@@ -127,8 +137,8 @@ def test_is_htmx_request_returns_false_outside_request_context():
 
 
 def test_save_plugin_settings_htmx_internal_error_has_fallback_content_type(
-    client, flask_app, monkeypatch
-):
+    client: FlaskClient, flask_app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Internal error response sets text/html content-type (JTN-506)."""
     dc = flask_app.config["DEVICE_CONFIG"]
     monkeypatch.setattr(
@@ -150,7 +160,7 @@ def test_save_plugin_settings_htmx_internal_error_has_fallback_content_type(
     assert "text/html" in resp.headers.get("Content-Type", "")
 
 
-def test_plugin_page_renders_htmx_save_button(client):
+def test_plugin_page_renders_htmx_save_button(client: FlaskClient) -> None:
     """The plugin page ships hx-* attributes on the Save Settings button."""
     resp = client.get("/plugin/ai_text")
     assert resp.status_code == 200

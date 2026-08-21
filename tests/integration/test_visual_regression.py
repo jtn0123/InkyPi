@@ -68,10 +68,12 @@ import os
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import pytest
 from PIL import Image
+from playwright.sync_api import Page
 
 _TRUTHY = {"1", "true", "yes"}
 
@@ -400,7 +402,7 @@ _DETERMINISM_CSS = """
 """
 
 
-def _stub_network(page) -> None:
+def _stub_network(page: Page) -> None:
     """Prevent CDN / external requests that could jitter the layout.
 
     Reuses the leaflet stub from browser_helpers for settings pages that
@@ -411,7 +413,7 @@ def _stub_network(page) -> None:
 
     stub_leaflet(page)
 
-    def _abort_external(route):
+    def _abort_external(route: Any) -> None:
         url = route.request.url
         if url.startswith(("http://127.0.0.1", "http://localhost")):
             route.continue_()
@@ -433,7 +435,9 @@ def _stub_network(page) -> None:
 
 @pytest.mark.parametrize("viewport", VIEWPORTS, ids=lambda v: v.label)
 @pytest.mark.parametrize("page_spec", PAGES, ids=lambda p: p.label)
-def test_visual_regression(live_server, page_spec: VisualPage, viewport: Viewport):
+def test_visual_regression(
+    live_server: str, page_spec: VisualPage, viewport: Viewport
+) -> None:
     """Diff a page screenshot against its stored layout baseline.
 
     One test per (page, viewport) pair — pytest parametrize ids produce

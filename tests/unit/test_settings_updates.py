@@ -3,11 +3,18 @@
 
 import threading
 import time
+from pathlib import Path
+from typing import Any
 from unittest.mock import MagicMock
+
+import pytest
+from flask.testing import FlaskClient
 
 
 class TestUpdateStatus:
-    def test_systemd_activating_stays_running(self, client, monkeypatch):
+    def test_systemd_activating_stays_running(
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """systemctl is-active returns 'activating' → running stays True."""
         import subprocess
 
@@ -26,7 +33,9 @@ class TestUpdateStatus:
         finally:
             mod._set_update_state(False, None)
 
-    def test_timeout_clears_stale(self, client, monkeypatch):
+    def test_timeout_clears_stale(
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Update started >30 min ago is force-cleared."""
         import blueprints.settings as mod
 
@@ -42,7 +51,9 @@ class TestUpdateStatus:
         finally:
             mod._set_update_state(False, None)
 
-    def test_systemd_check_exception_ignored(self, client, monkeypatch):
+    def test_systemd_check_exception_ignored(
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """subprocess.run raises during status check → state not cleared."""
         import subprocess
 
@@ -66,7 +77,9 @@ class TestUpdateStatus:
 
 
 class TestApiVersion:
-    def test_cache_ttl_respected(self, client, monkeypatch):
+    def test_cache_ttl_respected(
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Recent cache entry prevents API call."""
         import blueprints.settings as mod
 
@@ -87,7 +100,9 @@ class TestApiVersion:
             mod._VERSION_CACHE["checked_at"] = 0.0
             mod._VERSION_CACHE["release_notes"] = None
 
-    def test_current_greater_than_latest(self, client, monkeypatch):
+    def test_current_greater_than_latest(
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """current > latest → update_available is False."""
         import blueprints.settings as mod
 
@@ -109,7 +124,9 @@ class TestApiVersion:
             else:
                 client.application.config.pop("APP_VERSION", None)
 
-    def test_unknown_current(self, client, monkeypatch):
+    def test_unknown_current(
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """current='unknown' → update_available is False."""
         import blueprints.settings as mod
 
@@ -133,25 +150,25 @@ class TestApiVersion:
 
 
 class TestSemverGt:
-    def test_non_numeric_returns_false(self):
+    def test_non_numeric_returns_false(self) -> None:
         """Non-numeric version string returns False."""
         import blueprints.settings as mod
 
         assert mod._semver_gt("abc", "1.0.0") is False
 
-    def test_none_returns_false(self):
+    def test_none_returns_false(self) -> None:
         """None input returns False."""
         import blueprints.settings as mod
 
         assert mod._semver_gt(None, "1.0.0") is False
 
-    def test_equal_returns_false(self):
+    def test_equal_returns_false(self) -> None:
         """Equal versions return False."""
         import blueprints.settings as mod
 
         assert mod._semver_gt("1.0.0", "1.0.0") is False
 
-    def test_greater_returns_true(self):
+    def test_greater_returns_true(self) -> None:
         """Greater version returns True."""
         import blueprints.settings as mod
 
@@ -159,7 +176,9 @@ class TestSemverGt:
 
 
 class TestStartUpdateEdge:
-    def test_no_systemd_uses_thread(self, client, monkeypatch):
+    def test_no_systemd_uses_thread(
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """When systemd is unavailable, falls back to thread runner."""
         import blueprints.settings as mod
 
@@ -176,7 +195,9 @@ class TestStartUpdateEdge:
         finally:
             mod._set_update_state(False, None)
 
-    def test_no_systemd_preserves_target_tag_for_fallback(self, client, monkeypatch):
+    def test_no_systemd_preserves_target_tag_for_fallback(
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Fallback runner receives the requested target version."""
         import blueprints.settings as mod
 
@@ -193,7 +214,9 @@ class TestStartUpdateEdge:
         finally:
             mod._set_update_state(False, None)
 
-    def test_invalid_json_body_returns_400(self, client, monkeypatch):
+    def test_invalid_json_body_returns_400(
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Malformed JSON should be rejected instead of starting an update."""
         import blueprints.settings as mod
 
@@ -215,7 +238,9 @@ class TestStartUpdateEdge:
         finally:
             mod._set_update_state(False, None)
 
-    def test_systemd_run_exception_falls_back(self, client, monkeypatch):
+    def test_systemd_run_exception_falls_back(
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """If systemd-run raises, falls back to thread runner."""
         import blueprints.settings as mod
 
@@ -237,7 +262,9 @@ class TestStartUpdateEdge:
         finally:
             mod._set_update_state(False, None)
 
-    def test_systemd_run_exception_preserves_target_tag(self, client, monkeypatch):
+    def test_systemd_run_exception_preserves_target_tag(
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Systemd fallback still receives the requested target version."""
         import blueprints.settings as mod
 
@@ -261,7 +288,9 @@ class TestStartUpdateEdge:
 
 
 class TestUpdateRunnerHelpers:
-    def test_run_real_update_passes_target_tag(self, monkeypatch, tmp_path):
+    def test_run_real_update_passes_target_tag(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> Any:
         import blueprints.settings as mod
 
         popen_calls = {}
@@ -270,10 +299,10 @@ class TestUpdateRunnerHelpers:
             stdout = ["line one\n", "line two\n"]
             returncode = 0
 
-            def wait(self):
+            def wait(self) -> Any:
                 return None
 
-        def fake_popen(cmd, **kwargs):
+        def fake_popen(cmd: Any, **kwargs: Any) -> Any:
             popen_calls["cmd"] = cmd
             return FakeProc()
 
@@ -295,7 +324,9 @@ class TestUpdateRunnerHelpers:
             log_mock.call_args_list[-1].args[0] == "web_update: completed successfully"
         )
 
-    def test_run_simulated_update_logs_requested_target_version(self, monkeypatch):
+    def test_run_simulated_update_logs_requested_target_version(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         import blueprints.settings as mod
 
         log_mock = MagicMock()
@@ -311,7 +342,9 @@ class TestUpdateRunnerHelpers:
         assert messages[0] == "Simulated update starting..."
         assert messages[-1] == "Update completed."
 
-    def test_update_runner_without_script_logs_target_tag(self, monkeypatch):
+    def test_update_runner_without_script_logs_target_tag(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         import blueprints.settings as mod
 
         log_mock = MagicMock()
@@ -329,19 +362,21 @@ class TestUpdateRunnerHelpers:
         assert messages[-1] == "done (simulated)"
         state_mock.assert_called_once_with(False, None)
 
-    def test_start_update_fallback_thread_passes_target_tag(self, monkeypatch):
+    def test_start_update_fallback_thread_passes_target_tag(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         import blueprints.settings as mod
 
         thread_args = {}
 
         class FakeThread:
-            def __init__(self, target, args, name, daemon):
+            def __init__(self, target: Any, args: Any, name: Any, daemon: Any) -> None:
                 thread_args["target"] = target
                 thread_args["args"] = args
                 thread_args["name"] = name
                 thread_args["daemon"] = daemon
 
-            def start(self):
+            def start(self) -> None:
                 thread_args["started"] = True
 
         monkeypatch.setattr("blueprints.settings.threading.Thread", FakeThread)
@@ -363,7 +398,9 @@ class TestStartUpdateTOCTOURace:
     lock acquisition so two concurrent callers cannot both pass the guard.
     """
 
-    def test_running_state_set_atomically(self, client, monkeypatch):
+    def test_running_state_set_atomically(
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """_UPDATE_STATE['running'] is flipped to True while _update_lock is held.
 
         We intercept the dict __setitem__ to observe whether the lock is held
@@ -383,7 +420,7 @@ class TestStartUpdateTOCTOURace:
         real_dict = mod._UPDATE_STATE
 
         class _SpyDict(dict):
-            def __setitem__(self, key, value) -> None:
+            def __setitem__(self, key: Any, value: Any) -> None:
                 if key == "running" and value is True:
                     # Record whether the lock is already held (cannot acquire
                     # means this thread already owns it).
@@ -408,7 +445,9 @@ class TestStartUpdateTOCTOURace:
         finally:
             mod._set_update_state(False, None)
 
-    def test_concurrent_requests_one_409(self, client, monkeypatch):
+    def test_concurrent_requests_one_409(
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Two simultaneous start_update calls: exactly one succeeds, one gets 409."""
         import blueprints.settings as mod
 
@@ -422,7 +461,7 @@ class TestStartUpdateTOCTOURace:
         results: list[int] = []
         barrier = threading.Barrier(2)
 
-        def make_request():
+        def make_request() -> None:
             barrier.wait()  # both threads hit the endpoint simultaneously
             resp = client.post("/settings/update")
             results.append(resp.status_code)
@@ -454,7 +493,9 @@ class TestStartUpdateViaSystemdValidation:
     flag-style injection before subprocess.Popen is invoked.
     """
 
-    def _patch_popen_tracker(self, monkeypatch, script_path: str | None = None):
+    def _patch_popen_tracker(
+        self, monkeypatch: pytest.MonkeyPatch, script_path: str | None = None
+    ) -> Any:
         """Replace subprocess.Popen with a spy that records invocations.
 
         Also patches ``_validate_update_script_path`` so the test does not
@@ -465,7 +506,7 @@ class TestStartUpdateViaSystemdValidation:
 
         calls: list[list[str]] = []
 
-        def _fake_popen(cmd, *args, **kwargs):
+        def _fake_popen(cmd: Any, *args: Any, **kwargs: Any) -> Any:
             calls.append(list(cmd))
 
             class _FakeProc:
@@ -481,11 +522,15 @@ class TestStartUpdateViaSystemdValidation:
             monkeypatch.setattr(mod, "_get_update_script_path", lambda: script_path)
         return calls
 
-    def _redirect_target_version_file(self, monkeypatch, tmp_path):
+    def _redirect_target_version_file(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> Any:
         monkeypatch.setenv("INKYPI_LOCKFILE_DIR", str(tmp_path))
         return tmp_path / "update-target-version"
 
-    def test_rejects_target_tag_with_shell_injection(self, monkeypatch):
+    def test_rejects_target_tag_with_shell_injection(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         import pytest
 
         import blueprints.settings as mod
@@ -497,7 +542,9 @@ class TestStartUpdateViaSystemdValidation:
             mod._start_update_via_systemd(target_tag="v1.0.0; rm -rf /")
         assert calls == []
 
-    def test_rejects_target_tag_flag_style(self, monkeypatch):
+    def test_rejects_target_tag_flag_style(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         import pytest
 
         import blueprints.settings as mod
@@ -509,7 +556,9 @@ class TestStartUpdateViaSystemdValidation:
             mod._start_update_via_systemd(target_tag="--upload-pack=/tmp/evil")
         assert calls == []
 
-    def test_rejects_target_tag_with_underscores(self, monkeypatch):
+    def test_rejects_target_tag_with_underscores(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Underscores must be rejected — Python ``\\w`` would accept them but
         the bash regex in install/do_update.sh does not."""
         import pytest
@@ -523,7 +572,9 @@ class TestStartUpdateViaSystemdValidation:
             mod._start_update_via_systemd(target_tag="v1.2.3-rc_1")
         assert calls == []
 
-    def test_accepts_valid_invocation(self, monkeypatch, tmp_path):
+    def test_accepts_valid_invocation(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
         import blueprints.settings as mod
 
         target_file = self._redirect_target_version_file(monkeypatch, tmp_path)
@@ -542,7 +593,9 @@ class TestStartUpdateViaSystemdValidation:
         assert "v0.28.1" not in cmd
         assert target_file.read_text(encoding="utf-8") == "v0.28.1\n"
 
-    def test_accepts_valid_invocation_without_target_tag(self, monkeypatch, tmp_path):
+    def test_accepts_valid_invocation_without_target_tag(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
         import blueprints.settings as mod
 
         target_file = self._redirect_target_version_file(monkeypatch, tmp_path)
@@ -558,7 +611,9 @@ class TestStartUpdateViaSystemdValidation:
         assert cmd[-1] == "/usr/local/inkypi/install/update.sh"
         assert not target_file.exists()
 
-    def test_accepts_valid_semver_variants(self, monkeypatch, tmp_path):
+    def test_accepts_valid_semver_variants(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
         import blueprints.settings as mod
 
         target_file = self._redirect_target_version_file(monkeypatch, tmp_path)
@@ -575,7 +630,9 @@ class TestStartUpdateViaSystemdValidation:
             assert tag not in call
         assert target_file.read_text(encoding="utf-8") == "2.3.4-rc1\n"
 
-    def test_unit_name_uses_hardcoded_prefix(self, monkeypatch, tmp_path):
+    def test_unit_name_uses_hardcoded_prefix(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
         """The systemd unit prefix MUST be the hardcoded ``inkypi-update``
         literal — no caller-controlled value can influence it."""
         import blueprints.settings as mod
@@ -601,7 +658,9 @@ class TestValidateUpdateScriptPath:
     ``_start_update_via_systemd`` and ``_run_real_update`` both delegate to.
     """
 
-    def test_rejects_path_outside_trusted_root(self, monkeypatch, tmp_path):
+    def test_rejects_path_outside_trusted_root(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
         """A do_update.sh basename under /opt/attacker is rejected."""
         import pytest
 
@@ -610,7 +669,9 @@ class TestValidateUpdateScriptPath:
         with pytest.raises(ValueError, match="not under trusted root"):
             mod._validate_update_script_path("/opt/attacker/do_update.sh")
 
-    def test_rejects_bad_basename_inside_trusted_root(self, monkeypatch, tmp_path):
+    def test_rejects_bad_basename_inside_trusted_root(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
         """An evil.sh under a trusted root is still rejected by basename check."""
         import pytest
 
@@ -626,7 +687,7 @@ class TestValidateUpdateScriptPath:
         with pytest.raises(ValueError, match="Invalid update script basename"):
             mod._validate_update_script_path(str(evil))
 
-    def test_rejects_path_traversal(self, monkeypatch):
+    def test_rejects_path_traversal(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """``..`` segments are normalised by realpath, then checked against trusted roots."""
         import pytest
 
@@ -637,7 +698,7 @@ class TestValidateUpdateScriptPath:
                 "/usr/local/inkypi/install/../../etc/passwd"
             )
 
-    def test_rejects_non_string(self, monkeypatch):
+    def test_rejects_non_string(self, monkeypatch: pytest.MonkeyPatch) -> None:
         import pytest
 
         import blueprints.settings as mod
@@ -645,7 +706,7 @@ class TestValidateUpdateScriptPath:
         with pytest.raises(ValueError, match="Invalid update script path"):
             mod._validate_update_script_path(None)  # type: ignore[arg-type]
 
-    def test_rejects_empty_string(self, monkeypatch):
+    def test_rejects_empty_string(self, monkeypatch: pytest.MonkeyPatch) -> None:
         import pytest
 
         import blueprints.settings as mod
@@ -653,7 +714,9 @@ class TestValidateUpdateScriptPath:
         with pytest.raises(ValueError, match="Invalid update script path"):
             mod._validate_update_script_path("")
 
-    def test_accepts_path_inside_trusted_root(self, monkeypatch, tmp_path):
+    def test_accepts_path_inside_trusted_root(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
         """A do_update.sh inside a fixture-trusted root is returned as realpath."""
         import blueprints.settings as mod
 
@@ -664,7 +727,9 @@ class TestValidateUpdateScriptPath:
         result = mod._validate_update_script_path(str(script))
         assert result == str(script.resolve())
 
-    def test_resolves_symlink_to_real_target(self, monkeypatch, tmp_path):
+    def test_resolves_symlink_to_real_target(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
         """Symlinks are followed before the trusted-root check."""
         import blueprints.settings as mod
 
@@ -683,7 +748,9 @@ class TestValidateUpdateScriptPath:
         result = mod._validate_update_script_path(str(link_script))
         assert result == str(real_script.resolve())
 
-    def test_run_real_update_rejects_bad_script_path(self, monkeypatch):
+    def test_run_real_update_rejects_bad_script_path(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Defense-in-depth: _run_real_update must also validate its inputs.
 
         Uses a non-temp absolute path that is clearly outside any trusted
@@ -700,7 +767,9 @@ class TestValidateUpdateScriptPath:
             mod._run_real_update("/opt/attacker/evil.sh", target_tag="v1.0.0")
         popen_mock.assert_not_called()
 
-    def test_run_real_update_rejects_bad_target_tag(self, monkeypatch):
+    def test_run_real_update_rejects_bad_target_tag(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         import pytest
 
         import blueprints.settings as mod

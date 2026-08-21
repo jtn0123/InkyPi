@@ -1,6 +1,8 @@
 # pyright: reportMissingImports=false
 """Tests for the backend error taxonomy helpers."""
 
+from typing import Any
+
 import pytest
 from flask import Flask
 
@@ -12,11 +14,11 @@ from utils.backend_errors import (
 
 
 @pytest.fixture
-def app():
+def app() -> Any:
     return Flask(__name__)
 
 
-def test_client_input_error_adds_field_details():
+def test_client_input_error_adds_field_details() -> None:
     err = ClientInputError(
         "Bad input",
         status=422,
@@ -29,7 +31,7 @@ def test_client_input_error_adds_field_details():
     assert err.details == {"field": "plugin_id"}
 
 
-def test_internal_operation_error_uses_internal_error_envelope(app):
+def test_internal_operation_error_uses_internal_error_envelope(app: Flask) -> None:
     with app.app_context():
         err = InternalOperationError(
             "save widget",
@@ -44,7 +46,7 @@ def test_internal_operation_error_uses_internal_error_envelope(app):
         }
 
 
-def test_route_error_boundary_wraps_unexpected_errors():
+def test_route_error_boundary_wraps_unexpected_errors() -> None:
     with pytest.raises(InternalOperationError) as exc_info:
         with route_error_boundary("sync widgets"):
             raise RuntimeError("boom")
@@ -54,7 +56,7 @@ def test_route_error_boundary_wraps_unexpected_errors():
     assert err.details == {"context": "sync widgets"}
 
 
-def test_route_error_boundary_passthroughs_api_errors():
+def test_route_error_boundary_passthroughs_api_errors() -> None:
     with pytest.raises(ClientInputError):
         with route_error_boundary("sync widgets"):
             raise ClientInputError("Bad input", status=400)

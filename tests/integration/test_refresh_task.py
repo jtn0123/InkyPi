@@ -2,8 +2,10 @@
 import os
 from datetime import UTC
 from pathlib import Path
+from typing import Any
 from zoneinfo import ZoneInfo
 
+import pytest
 from PIL import Image
 
 from display.display_manager import DisplayManager
@@ -12,15 +14,15 @@ from refresh_task import ManualRefresh, RefreshTask, task as refresh_task_mod
 
 
 def test_manual_update_triggers_display_and_refresh_info(
-    device_config_dev, monkeypatch
-):
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> Any:
     # Ensure plugin registry is loaded
     load_plugins(device_config_dev.get_plugins())
 
     # Patch AI Text to avoid network calls
     import plugins.ai_text.ai_text as ai_text_mod
 
-    def fake_generate_image(self, settings, device_config):
+    def fake_generate_image(self, settings: Any, device_config: Any) -> Any:
         return Image.new("RGB", device_config.get_resolution(), "white")
 
     monkeypatch.setattr(
@@ -63,7 +65,9 @@ def test_manual_update_triggers_display_and_refresh_info(
         task.stop()
 
 
-def test_refresh_task_system_stats_logging(device_config_dev, monkeypatch):
+def test_refresh_task_system_stats_logging(
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> Any:
     """Test system stats logging functionality."""
     from display.display_manager import DisplayManager
     from refresh_task import RefreshTask
@@ -75,7 +79,7 @@ def test_refresh_task_system_stats_logging(device_config_dev, monkeypatch):
     mock_psutil = type("MockPsutil", (), {})()
     cpu_call = {}
 
-    def fake_cpu_percent(interval=None):
+    def fake_cpu_percent(interval: Any = None) -> Any:
         cpu_call["interval"] = interval
         return 50.0
 
@@ -95,7 +99,7 @@ def test_refresh_task_system_stats_logging(device_config_dev, monkeypatch):
 
     _orig_import = _builtins.__import__
 
-    def mock_import(name, *args, **kwargs):
+    def mock_import(name: Any, *args: Any, **kwargs: Any) -> Any:
         if name == "psutil":
             return mock_psutil
         return _orig_import(name, *args, **kwargs)
@@ -116,8 +120,8 @@ def test_refresh_task_system_stats_logging(device_config_dev, monkeypatch):
 
 
 def test_refresh_task_system_stats_logging_no_getloadavg(
-    device_config_dev, monkeypatch
-):
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> Any:
     """Ensure system stats logging handles missing getloadavg gracefully."""
     import refresh_task
     from display.display_manager import DisplayManager
@@ -140,7 +144,7 @@ def test_refresh_task_system_stats_logging_no_getloadavg(
 
     _orig_import = _builtins.__import__
 
-    def mock_import(name, *args, **kwargs):
+    def mock_import(name: Any, *args: Any, **kwargs: Any) -> Any:
         if name == "psutil":
             return mock_psutil
         return _orig_import(name, *args, **kwargs)
@@ -148,14 +152,14 @@ def test_refresh_task_system_stats_logging_no_getloadavg(
     monkeypatch.setattr("builtins.__import__", mock_import)
 
     # Simulate getloadavg missing/unsupported
-    def fake_getloadavg():
+    def fake_getloadavg() -> None:
         raise OSError("unsupported")
 
     monkeypatch.setattr("os.getloadavg", fake_getloadavg)
 
     logged = {}
 
-    def fake_logger(msg):
+    def fake_logger(msg: Any) -> None:
         logged["msg"] = msg
 
     monkeypatch.setattr(refresh_task_mod.logger, "info", fake_logger)
@@ -169,7 +173,9 @@ def test_refresh_task_system_stats_logging_no_getloadavg(
     monkeypatch.setattr("builtins.__import__", _orig_import, raising=True)
 
 
-def test_refresh_task_plugin_config_not_found(device_config_dev, monkeypatch):
+def test_refresh_task_plugin_config_not_found(
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Test handling when plugin config is not found."""
     from refresh_task import PlaylistRefresh
 
@@ -190,7 +196,9 @@ def test_refresh_task_plugin_config_not_found(device_config_dev, monkeypatch):
         pass
 
 
-def test_refresh_task_plugin_returns_none_image(device_config_dev, monkeypatch):
+def test_refresh_task_plugin_returns_none_image(
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Test handling when plugin returns None image."""
 
     # This should trigger the None image error check
@@ -199,7 +207,9 @@ def test_refresh_task_plugin_returns_none_image(device_config_dev, monkeypatch):
         pass  # This covers the missing line about plugin returning None image
 
 
-def test_refresh_task_image_already_displayed(device_config_dev, monkeypatch):
+def test_refresh_task_image_already_displayed(
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Test handling when image is already displayed."""
     from model import RefreshInfo
 
@@ -219,7 +229,9 @@ def test_refresh_task_image_already_displayed(device_config_dev, monkeypatch):
         pass  # This covers the "image already displayed" line
 
 
-def test_refresh_task_manual_update_exception_handling(device_config_dev, monkeypatch):
+def test_refresh_task_manual_update_exception_handling(
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Test exception handling in manual update."""
     from display.display_manager import DisplayManager
     from refresh_task import ManualRefresh, RefreshTask
@@ -244,7 +256,9 @@ def test_refresh_task_manual_update_exception_handling(device_config_dev, monkey
         task.stop()
 
 
-def test_refresh_task_signal_config_change(device_config_dev, monkeypatch):
+def test_refresh_task_signal_config_change(
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Test signal config change functionality."""
     from display.display_manager import DisplayManager
     from refresh_task import RefreshTask
@@ -261,7 +275,9 @@ def test_refresh_task_signal_config_change(device_config_dev, monkeypatch):
     task.signal_config_change()  # This should be a no-op
 
 
-def test_refresh_task_determine_next_plugin_no_playlist(device_config_dev, monkeypatch):
+def test_refresh_task_determine_next_plugin_no_playlist(
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Test determine next plugin when no playlist is active."""
     from display.display_manager import DisplayManager
     from model import RefreshInfo
@@ -293,8 +309,8 @@ def test_refresh_task_determine_next_plugin_no_playlist(device_config_dev, monke
 
 
 def test_refresh_task_determine_next_plugin_empty_playlist(
-    device_config_dev, monkeypatch
-):
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Test determine next plugin when playlist has no plugins."""
     from display.display_manager import DisplayManager
     from model import Playlist, RefreshInfo
@@ -328,7 +344,9 @@ def test_refresh_task_determine_next_plugin_empty_playlist(
     assert plugin_instance is None
 
 
-def test_refresh_task_not_time_to_update(device_config_dev, monkeypatch):
+def test_refresh_task_not_time_to_update(
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Test handling when it's not time to update."""
 
     # Mock should_refresh to return False
@@ -340,7 +358,7 @@ def test_refresh_task_not_time_to_update(device_config_dev, monkeypatch):
         pass  # This covers the "not time to update" logging
 
 
-def test_refresh_action_base_class():
+def test_refresh_action_base_class() -> None:
     """Test RefreshAction base class NotImplementedError methods."""
     from refresh_task import RefreshAction
 
@@ -366,7 +384,7 @@ def test_refresh_action_base_class():
         pass
 
 
-def test_playlist_refresh_info():
+def test_playlist_refresh_info() -> None:
     """Test PlaylistRefresh get_refresh_info method."""
     from refresh_task import PlaylistRefresh
 
@@ -386,7 +404,9 @@ def test_playlist_refresh_info():
     assert info["plugin_instance"] == "test_instance"
 
 
-def test_playlist_refresh_execute_force_refresh(device_config_dev, monkeypatch):
+def test_playlist_refresh_execute_force_refresh(
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Test PlaylistRefresh execute with force refresh."""
     from PIL import Image
 
@@ -425,7 +445,9 @@ def test_playlist_refresh_execute_force_refresh(device_config_dev, monkeypatch):
     assert image is not None
 
 
-def test_playlist_refresh_execute_use_cached_image(device_config_dev, monkeypatch):
+def test_playlist_refresh_execute_use_cached_image(
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Test PlaylistRefresh execute using cached image."""
     import os
 
@@ -469,7 +491,9 @@ def test_playlist_refresh_execute_use_cached_image(device_config_dev, monkeypatc
             os.unlink(plugin_image_path)
 
 
-def test_determine_next_plugin_not_time_to_update_path(device_config_dev, monkeypatch):
+def test_determine_next_plugin_not_time_to_update_path(
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     from display.display_manager import DisplayManager
     from refresh_task import RefreshTask
 
@@ -504,7 +528,9 @@ def test_determine_next_plugin_not_time_to_update_path(device_config_dev, monkey
     assert playlist is None and plugin_instance is None
 
 
-def test_same_image_hash_skips_display(device_config_dev, monkeypatch):
+def test_same_image_hash_skips_display(
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     from PIL import Image
 
     from display.display_manager import DisplayManager
@@ -595,7 +621,9 @@ def test_same_image_hash_skips_display(device_config_dev, monkeypatch):
     assert calls["display"] == 0
 
 
-def test_manual_update_propagates_exception(device_config_dev, monkeypatch):
+def test_manual_update_propagates_exception(
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     from display.display_manager import DisplayManager
     from refresh_task import ManualRefresh, RefreshTask
 

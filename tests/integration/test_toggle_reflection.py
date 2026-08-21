@@ -23,6 +23,7 @@ import os
 from dataclasses import dataclass
 
 import pytest
+from playwright.sync_api import Page
 from tests.integration.browser_helpers import RuntimeCollector, stub_leaflet
 
 pytestmark = pytest.mark.skipif(
@@ -138,11 +139,11 @@ _STATE_JS = """
 """
 
 
-def _enumerate(page) -> list[dict]:
+def _enumerate(page: Page) -> list[dict]:
     return page.evaluate(_ENUMERATE_JS)
 
 
-def _state(page, marker: str) -> dict | None:
+def _state(page: Page, marker: str) -> dict | None:
     return page.evaluate(_STATE_JS, f"[data-togglesweep-id='{marker}']")
 
 
@@ -161,7 +162,7 @@ def _state_changed(before: dict, after: dict) -> bool:
     return False
 
 
-def _click_toggle(page, descriptor: dict) -> tuple[dict | None, dict | None]:
+def _click_toggle(page: Page, descriptor: dict) -> tuple[dict | None, dict | None]:
     marker = descriptor["id"]
     selector = f"[data-togglesweep-id='{marker}']"
     before = _state(page, marker)
@@ -191,7 +192,9 @@ _XFAIL_PAGES: dict[str, str] = {}
 
 
 @pytest.mark.parametrize("sweep", PAGES_TO_SWEEP, ids=lambda sweep: sweep.label)
-def test_toggle_reflection(live_server, browser_page, sweep: SweepPage):
+def test_toggle_reflection(
+    live_server: str, browser_page: Page, sweep: SweepPage
+) -> None:
     """Every toggle on the page must change its reflected DOM state on click."""
     if sweep.label in _XFAIL_PAGES:
         pytest.xfail(_XFAIL_PAGES[sweep.label])

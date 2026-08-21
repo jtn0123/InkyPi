@@ -5,6 +5,7 @@ a wide range of inputs, catching edge cases that unit tests might miss.
 """
 
 from io import BytesIO
+from typing import Any
 
 import pytest
 from hypothesis import assume, given, settings, strategies as st
@@ -21,7 +22,7 @@ from utils.image_utils import (
 
 # Custom strategies for image testing
 @st.composite
-def image_dimensions(draw, min_size=1, max_size=2000):
+def image_dimensions(draw: Any, min_size: Any = 1, max_size: Any = 2000) -> Any:
     """Generate valid image dimensions."""
     width = draw(st.integers(min_value=min_size, max_value=max_size))
     height = draw(st.integers(min_value=min_size, max_value=max_size))
@@ -29,7 +30,7 @@ def image_dimensions(draw, min_size=1, max_size=2000):
 
 
 @st.composite
-def pil_image(draw, min_size=1, max_size=200):
+def pil_image(draw: Any, min_size: Any = 1, max_size: Any = 200) -> Any:
     """Generate a PIL Image with random dimensions and solid color.
 
     Note: Uses solid color instead of random pixels to avoid Hypothesis buffer limits.
@@ -56,7 +57,7 @@ def pil_image(draw, min_size=1, max_size=200):
 
 
 @st.composite
-def enhancement_settings(draw):
+def enhancement_settings(draw: Any) -> Any:
     """Generate valid image enhancement settings."""
     return {
         "brightness": draw(st.floats(min_value=0.1, max_value=3.0)),
@@ -71,7 +72,7 @@ def enhancement_settings(draw):
 
 @given(pil_image())
 @settings(max_examples=50, deadline=5000)
-def test_resize_preserves_aspect_ratio_with_crop(img):
+def test_resize_preserves_aspect_ratio_with_crop(img: Any) -> None:
     """Resizing maintains expected dimensions after crop."""
     original_width, original_height = img.size
     assume(original_width > 0 and original_height > 0)
@@ -88,7 +89,7 @@ def test_resize_preserves_aspect_ratio_with_crop(img):
 
 @given(pil_image(), image_dimensions(min_size=10, max_size=800))
 @settings(max_examples=50, deadline=5000)
-def test_resize_to_arbitrary_size(img, target_size):
+def test_resize_to_arbitrary_size(img: Any, target_size: Any) -> None:
     """Resize produces exact target dimensions for any valid size."""
     assume(img.size[0] > 0 and img.size[1] > 0)
     assume(target_size[0] > 0 and target_size[1] > 0)
@@ -99,7 +100,7 @@ def test_resize_to_arbitrary_size(img, target_size):
 
 @given(pil_image(), st.sampled_from(["horizontal", "vertical"]))
 @settings(max_examples=30, deadline=5000)
-def test_change_orientation_preserves_pixels(img, orientation):
+def test_change_orientation_preserves_pixels(img: Any, orientation: Any) -> None:
     """Orientation changes preserve pixel data (possibly rotated)."""
     original_size = img.size
     assume(original_size[0] > 0 and original_size[1] > 0)
@@ -117,7 +118,7 @@ def test_change_orientation_preserves_pixels(img, orientation):
 
 @given(pil_image())
 @settings(max_examples=50, deadline=5000)
-def test_image_hash_deterministic(img):
+def test_image_hash_deterministic(img: Any) -> None:
     """Same image produces same hash consistently."""
     # Convert to RGB for consistency (hash requires RGB)
     img_rgb = img.convert("RGB")
@@ -132,7 +133,7 @@ def test_image_hash_deterministic(img):
 
 @given(pil_image(), pil_image())
 @settings(max_examples=30, deadline=5000)
-def test_different_images_different_hashes(img1, img2):
+def test_different_images_different_hashes(img1: Any, img2: Any) -> None:
     """Different images should produce different hashes (with high probability)."""
     # Skip if images are identical
     assume(img1.tobytes() != img2.tobytes())
@@ -149,7 +150,7 @@ def test_different_images_different_hashes(img1, img2):
 
 @given(pil_image(), enhancement_settings())
 @settings(max_examples=50, deadline=5000)
-def test_apply_enhancement_preserves_size(img, settings_dict):
+def test_apply_enhancement_preserves_size(img: Any, settings_dict: Any) -> None:
     """Image enhancement preserves dimensions."""
     original_size = img.size
 
@@ -161,7 +162,7 @@ def test_apply_enhancement_preserves_size(img, settings_dict):
 
 @given(pil_image())
 @settings(max_examples=50, deadline=5000)
-def test_apply_enhancement_default_settings_unchanged(img):
+def test_apply_enhancement_default_settings_unchanged(img: Any) -> None:
     """Default enhancement settings (all 1.0) should not modify pixels."""
     default_settings = {
         "brightness": 1.0,
@@ -178,7 +179,7 @@ def test_apply_enhancement_default_settings_unchanged(img):
 
 @given(pil_image())
 @settings(max_examples=30, deadline=5000)
-def test_load_image_from_bytes_roundtrip(img):
+def test_load_image_from_bytes_roundtrip(img: Any) -> None:
     """Loading image from bytes preserves image data."""
     # Save to bytes
     bio = BytesIO()
@@ -200,7 +201,9 @@ def test_load_image_from_bytes_roundtrip(img):
     st.sampled_from(["keep-width", ""]),
 )
 @settings(max_examples=50, deadline=5000)
-def test_resize_keep_width_setting(width, height, keep_width_setting):
+def test_resize_keep_width_setting(
+    width: Any, height: Any, keep_width_setting: Any
+) -> None:
     """Test keep-width setting behavior in resize."""
     img = Image.new("RGB", (width * 2, height))  # Wide image
     target_size = (width, height)
@@ -213,7 +216,7 @@ def test_resize_keep_width_setting(width, height, keep_width_setting):
 
 @given(pil_image())
 @settings(max_examples=30, deadline=5000)
-def test_orientation_inverted_double_rotation(img):
+def test_orientation_inverted_double_rotation(img: Any) -> None:
     """Double inverted rotation returns to original orientation (360 degrees)."""
     # Horizontal + inverted twice should equal no change
     rotated_once = change_orientation(img, "horizontal", inverted=True)
@@ -222,14 +225,14 @@ def test_orientation_inverted_double_rotation(img):
     assert rotated_twice.size == img.size
 
 
-def test_resize_zero_height_raises():
+def test_resize_zero_height_raises() -> None:
     """Zero height in desired size should raise ValueError."""
     img = Image.new("RGB", (100, 100))
     with pytest.raises(ValueError, match="Desired height must be non-zero"):
         resize_image(img, (100, 0))
 
 
-def test_resize_zero_image_height_raises():
+def test_resize_zero_image_height_raises() -> None:
     """Zero height in source image should raise ValueError."""
     # Create a mock image object with zero height
     from unittest.mock import Mock
@@ -241,14 +244,14 @@ def test_resize_zero_image_height_raises():
         resize_image(mock_img, (50, 50))
 
 
-def test_change_orientation_invalid_raises():
+def test_change_orientation_invalid_raises() -> None:
     """Invalid orientation parameter raises ValueError."""
     img = Image.new("RGB", (100, 100))
     with pytest.raises(ValueError, match="Unsupported orientation"):
         change_orientation(img, "diagonal")
 
 
-def test_compute_image_hash_none_raises():
+def test_compute_image_hash_none_raises() -> None:
     """Hashing None image raises ValueError."""
     with pytest.raises(ValueError, match="compute_image_hash called with None"):
         compute_image_hash(None)
@@ -256,7 +259,7 @@ def test_compute_image_hash_none_raises():
 
 @given(st.binary(min_size=1, max_size=100))
 @settings(max_examples=30, deadline=2000)
-def test_load_image_from_bytes_invalid_data(invalid_bytes):
+def test_load_image_from_bytes_invalid_data(invalid_bytes: Any) -> None:
     """Loading invalid image data returns None."""
     # Assume data is not actually a valid image
     assume(not invalid_bytes.startswith(b"\x89PNG"))  # PNG magic

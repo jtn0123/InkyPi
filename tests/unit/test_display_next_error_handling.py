@@ -5,16 +5,19 @@ instead of a generic 500, and that missing plugin config returns 404.
 """
 
 from datetime import UTC, datetime
+from typing import Any
 
 import pytest
+from flask import Flask
+from flask.testing import FlaskClient
 from PIL import Image
 
 
-def _fixed_now(_device_config):
+def _fixed_now(_device_config: Any) -> Any:
     return datetime(2025, 1, 1, 8, 0, 0, tzinfo=UTC)
 
 
-def _add_playlist_with_plugin(device_config):
+def _add_playlist_with_plugin(device_config: Any) -> None:
     pm = device_config.get_playlist_manager()
     if not pm.get_playlist("Default"):
         pm.add_playlist("Default", "00:00", "24:00")
@@ -35,8 +38,12 @@ class TestGenerateImageRuntimeError:
 
     @pytest.mark.integration
     def test_generate_image_runtime_error_returns_400(
-        self, client, device_config_dev, monkeypatch, flask_app
-    ):
+        self,
+        client: FlaskClient,
+        device_config_dev: Any,
+        monkeypatch: pytest.MonkeyPatch,
+        flask_app: Flask,
+    ) -> None:
         flask_app.config["REFRESH_TASK"].running = False
         _add_playlist_with_plugin(device_config_dev)
         monkeypatch.setattr("utils.time_utils.now_device_tz", _fixed_now, raising=True)
@@ -44,7 +51,7 @@ class TestGenerateImageRuntimeError:
         from plugins import plugin_registry
 
         class _FailingPlugin:
-            def generate_image(self, settings, device_config):
+            def generate_image(self, settings: Any, device_config: Any) -> None:
                 raise RuntimeError("API key missing for clock plugin")
 
         monkeypatch.setattr(
@@ -65,8 +72,12 @@ class TestGenerateImageRuntimeError:
 
     @pytest.mark.integration
     def test_generate_image_runtime_error_does_not_trigger_cooldown(
-        self, client, device_config_dev, monkeypatch, flask_app
-    ):
+        self,
+        client: FlaskClient,
+        device_config_dev: Any,
+        monkeypatch: pytest.MonkeyPatch,
+        flask_app: Flask,
+    ) -> Any:
         """A failed generate_image should not consume the rate-limit window."""
         flask_app.config["REFRESH_TASK"].running = False
         _add_playlist_with_plugin(device_config_dev)
@@ -77,7 +88,7 @@ class TestGenerateImageRuntimeError:
         call_count = {"n": 0}
 
         class _FailOnceThenSucceed:
-            def generate_image(self, settings, device_config):
+            def generate_image(self, settings: Any, device_config: Any) -> Any:
                 call_count["n"] += 1
                 if call_count["n"] == 1:
                     raise RuntimeError("transient failure")
@@ -92,7 +103,9 @@ class TestGenerateImageRuntimeError:
 
         displayed = {"called": False}
 
-        def _display_image(image, image_settings=None, history_meta=None):
+        def _display_image(
+            image: Any, image_settings: Any = None, history_meta: Any = None
+        ) -> None:
             displayed["called"] = True
 
         flask_app.config["DISPLAY_MANAGER"].display_image = _display_image
@@ -112,8 +125,12 @@ class TestPluginConfigNotFound:
 
     @pytest.mark.integration
     def test_missing_plugin_config_returns_404(
-        self, client, device_config_dev, monkeypatch, flask_app
-    ):
+        self,
+        client: FlaskClient,
+        device_config_dev: Any,
+        monkeypatch: pytest.MonkeyPatch,
+        flask_app: Flask,
+    ) -> None:
         flask_app.config["REFRESH_TASK"].running = False
         _add_playlist_with_plugin(device_config_dev)
         monkeypatch.setattr("utils.time_utils.now_device_tz", _fixed_now, raising=True)
@@ -138,13 +155,17 @@ class TestManualUpdateFailure:
 
     @pytest.mark.integration
     def test_manual_update_exception_returns_400(
-        self, client, device_config_dev, monkeypatch, flask_app
-    ):
+        self,
+        client: FlaskClient,
+        device_config_dev: Any,
+        monkeypatch: pytest.MonkeyPatch,
+        flask_app: Flask,
+    ) -> None:
         flask_app.config["REFRESH_TASK"].running = True
         _add_playlist_with_plugin(device_config_dev)
         monkeypatch.setattr("utils.time_utils.now_device_tz", _fixed_now, raising=True)
 
-        def _failing_manual_update(playlist_refresh):
+        def _failing_manual_update(playlist_refresh: Any) -> None:
             raise RuntimeError("background task crashed")
 
         flask_app.config["REFRESH_TASK"].manual_update = _failing_manual_update

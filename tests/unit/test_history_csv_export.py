@@ -5,6 +5,9 @@ import csv
 import io
 import json
 import os
+from typing import Any
+
+from flask.testing import FlaskClient
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -37,19 +40,19 @@ def _parse_csv(body: str) -> tuple[list[str], list[list[str]]]:
 # ---------------------------------------------------------------------------
 
 
-def test_export_csv_returns_200(client):
+def test_export_csv_returns_200(client: FlaskClient) -> None:
     """GET /history/export.csv should return HTTP 200."""
     resp = client.get("/history/export.csv")
     assert resp.status_code == 200
 
 
-def test_export_csv_content_type(client):
+def test_export_csv_content_type(client: FlaskClient) -> None:
     """Response Content-Type must be text/csv."""
     resp = client.get("/history/export.csv")
     assert resp.content_type.startswith("text/csv")
 
 
-def test_export_csv_content_disposition(client):
+def test_export_csv_content_disposition(client: FlaskClient) -> None:
     """Response must carry an attachment Content-Disposition with .csv filename."""
     resp = client.get("/history/export.csv")
     cd = resp.headers.get("Content-Disposition", "")
@@ -57,7 +60,7 @@ def test_export_csv_content_disposition(client):
     assert ".csv" in cd
 
 
-def test_export_csv_correct_headers(client):
+def test_export_csv_correct_headers(client: FlaskClient) -> None:
     """CSV header row must exactly match the specified column names."""
     resp = client.get("/history/export.csv")
     body = resp.get_data(as_text=True)
@@ -72,7 +75,9 @@ def test_export_csv_correct_headers(client):
     ]
 
 
-def test_export_csv_empty_history_headers_only(client, device_config_dev):
+def test_export_csv_empty_history_headers_only(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     """When history is empty the response must contain only the header row."""
     # history_dir exists but is empty (conftest creates it)
     resp = client.get("/history/export.csv")
@@ -89,7 +94,9 @@ def test_export_csv_empty_history_headers_only(client, device_config_dev):
     assert rows == []
 
 
-def test_export_csv_one_entry_produces_one_row(client, device_config_dev):
+def test_export_csv_one_entry_produces_one_row(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     """Each history entry must produce exactly one data row."""
     history_dir = device_config_dev.history_image_dir
     _write_history_entry(
@@ -111,7 +118,9 @@ def test_export_csv_one_entry_produces_one_row(client, device_config_dev):
     assert len(rows) == 1
 
 
-def test_export_csv_row_values_match_sidecar(client, device_config_dev):
+def test_export_csv_row_values_match_sidecar(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     """Data rows must reflect the values stored in the sidecar JSON."""
     history_dir = device_config_dev.history_image_dir
     meta = {
@@ -137,7 +146,9 @@ def test_export_csv_row_values_match_sidecar(client, device_config_dev):
     assert row[5] == ""
 
 
-def test_export_csv_multiple_entries(client, device_config_dev):
+def test_export_csv_multiple_entries(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     """Multiple history entries produce multiple rows (one per entry)."""
     history_dir = device_config_dev.history_image_dir
     for i, stem in enumerate(
@@ -163,7 +174,9 @@ def test_export_csv_multiple_entries(client, device_config_dev):
     assert len(rows) == 3
 
 
-def test_export_csv_missing_sidecar_uses_mtime(client, device_config_dev):
+def test_export_csv_missing_sidecar_uses_mtime(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     """Entries without a sidecar JSON should still appear, using mtime for timestamp."""
     history_dir = device_config_dev.history_image_dir
     # Write only the PNG, no sidecar
@@ -182,7 +195,9 @@ def test_export_csv_missing_sidecar_uses_mtime(client, device_config_dev):
     assert rows[0][2] == ""  # instance_name
 
 
-def test_export_csv_escaping_commas_in_error_message(client, device_config_dev):
+def test_export_csv_escaping_commas_in_error_message(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     """error_message containing commas must be properly CSV-escaped."""
     history_dir = device_config_dev.history_image_dir
     tricky = "Connection refused, retry 1, retry 2"
@@ -204,7 +219,9 @@ def test_export_csv_escaping_commas_in_error_message(client, device_config_dev):
     assert rows[0][5] == tricky
 
 
-def test_export_csv_escaping_quotes_in_error_message(client, device_config_dev):
+def test_export_csv_escaping_quotes_in_error_message(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     """error_message containing double-quotes must be properly CSV-escaped."""
     history_dir = device_config_dev.history_image_dir
     tricky = 'API returned "bad request"'
@@ -226,7 +243,9 @@ def test_export_csv_escaping_quotes_in_error_message(client, device_config_dev):
     assert rows[0][5] == tricky
 
 
-def test_export_csv_escaping_newlines_in_error_message(client, device_config_dev):
+def test_export_csv_escaping_newlines_in_error_message(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     """error_message containing newlines must be properly CSV-escaped."""
     history_dir = device_config_dev.history_image_dir
     tricky = "Line one\nLine two"
@@ -248,7 +267,7 @@ def test_export_csv_escaping_newlines_in_error_message(client, device_config_dev
     assert rows[0][5] == tricky
 
 
-def test_history_page_has_export_csv_link(client):
+def test_history_page_has_export_csv_link(client: FlaskClient) -> None:
     """The history page must contain a link to /history/export.csv."""
     resp = client.get("/history")
     assert resp.status_code == 200

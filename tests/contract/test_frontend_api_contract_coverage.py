@@ -12,6 +12,9 @@ from __future__ import annotations
 import json
 import re
 
+from flask import Flask
+from flask.testing import FlaskClient
+
 from tests.helpers.endpoint_schema_helpers import get_endpoint_schema_names
 
 # Flask route syntax for lookup in ``url_map``.
@@ -111,7 +114,7 @@ def _normalize_route_pattern(route: str) -> str:
     return re.sub(r"<(?:[^:>]+:)?([^>]+)>", r"<\1>", route)
 
 
-def _find_endpoint_for_method(flask_app, route: str, method: str) -> str | None:
+def _find_endpoint_for_method(flask_app: Flask, route: str, method: str) -> str | None:
     normalized_route = _normalize_route_pattern(route)
     for rule in flask_app.url_map.iter_rules():
         if (
@@ -122,7 +125,7 @@ def _find_endpoint_for_method(flask_app, route: str, method: str) -> str | None:
     return None
 
 
-def test_frontend_json_routes_have_endpoint_schema(flask_app):
+def test_frontend_json_routes_have_endpoint_schema(flask_app: Flask) -> None:
     endpoint_schema_names = get_endpoint_schema_names()
     missing: list[str] = []
     for method, route in _FRONTEND_JSON_ROUTES:
@@ -141,7 +144,7 @@ def test_frontend_json_routes_have_endpoint_schema(flask_app):
     )
 
 
-def test_frontend_json_routes_are_documented_in_openapi(client):
+def test_frontend_json_routes_are_documented_in_openapi(client: FlaskClient) -> None:
     resp = client.get("/api/openapi.json")
     assert resp.status_code == 200
     spec = json.loads(resp.data)
@@ -162,7 +165,7 @@ def test_frontend_json_routes_are_documented_in_openapi(client):
     )
 
 
-def test_mutating_frontend_routes_document_request_bodies(client):
+def test_mutating_frontend_routes_document_request_bodies(client: FlaskClient) -> None:
     resp = client.get("/api/openapi.json")
     assert resp.status_code == 200
     spec = json.loads(resp.data)

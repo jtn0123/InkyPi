@@ -1,7 +1,9 @@
-# pyright: reportMissingImports=false
+from pathlib import Path
 
+# pyright: reportMissingImports=false
 from typing import Any
 
+import pytest
 from PIL import Image
 
 # ---------------------------------------------------------------------------
@@ -9,11 +11,11 @@ from PIL import Image
 # ---------------------------------------------------------------------------
 
 
-def _dummy_plugin(device_config):
+def _dummy_plugin(device_config: Any) -> Any:
     class DummyPlugin:
         config = {"image_settings": []}
 
-        def generate_image(self, settings, cfg):
+        def generate_image(self, settings: Any, cfg: Any) -> Any:
             return Image.new("RGB", cfg.get_resolution(), "white")
 
     return DummyPlugin()
@@ -24,7 +26,9 @@ def _dummy_plugin(device_config):
 # ---------------------------------------------------------------------------
 
 
-def test_signal_config_change_noop_when_not_running(device_config_dev, monkeypatch):
+def test_signal_config_change_noop_when_not_running(
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     from display.display_manager import DisplayManager
     from refresh_task import RefreshTask
 
@@ -34,7 +38,9 @@ def test_signal_config_change_noop_when_not_running(device_config_dev, monkeypat
     task.signal_config_change()
 
 
-def test_manual_update_raises_exception_from_thread(device_config_dev, monkeypatch):
+def test_manual_update_raises_exception_from_thread(
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     from display.display_manager import DisplayManager
     from refresh_task import ManualRefresh, RefreshTask
 
@@ -63,7 +69,9 @@ def test_manual_update_raises_exception_from_thread(device_config_dev, monkeypat
 # ---------------------------------------------------------------------------
 
 
-def test_manual_refresh_uses_execute(device_config_dev, monkeypatch, tmp_path):
+def test_manual_refresh_uses_execute(
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> Any:
     """Ensure ManualRefresh is executed via the unified execute method."""
     from display.display_manager import DisplayManager
     from refresh_task import ManualRefresh, RefreshTask
@@ -83,7 +91,7 @@ def test_manual_refresh_uses_execute(device_config_dev, monkeypatch, tmp_path):
     refresh = ManualRefresh("dummy", {})
     marker = tmp_path / "manual-execute.txt"
 
-    def fake_execute(self, plugin, device_config, current_dt):
+    def fake_execute(self, plugin: Any, device_config: Any, current_dt: Any) -> Any:
         marker.write_text("called", encoding="utf-8")
         return Image.new("RGB", device_config.get_resolution(), "white")
 
@@ -100,7 +108,9 @@ def test_manual_refresh_uses_execute(device_config_dev, monkeypatch, tmp_path):
         task.stop()
 
 
-def test_perform_refresh_calls_execute_with_policy(device_config_dev, monkeypatch):
+def test_perform_refresh_calls_execute_with_policy(
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> Any:
     """Ensure _perform_refresh delegates to _execute_with_policy."""
     from display.display_manager import DisplayManager
     from refresh_task import ManualRefresh, RefreshTask
@@ -113,7 +123,9 @@ def test_perform_refresh_calls_execute_with_policy(device_config_dev, monkeypatc
 
     called = {}
 
-    def fake_execute_with_policy(self, action, cfg, dt, request_id=None):
+    def fake_execute_with_policy(
+        self, action: Any, cfg: Any, dt: Any, request_id: Any = None
+    ) -> Any:
         called["action"] = action
         img = Image.new("RGB", device_config_dev.get_resolution(), "white")
         return img, {}
@@ -137,14 +149,14 @@ def test_perform_refresh_calls_execute_with_policy(device_config_dev, monkeypatc
 # ---------------------------------------------------------------------------
 
 
-def test_timeout_msg():
+def test_timeout_msg() -> None:
     from refresh_task import RefreshTask
 
     msg = RefreshTask._timeout_msg("weather", 30.0)
     assert msg == "Plugin 'weather' timed out after 30s"
 
 
-def test_timeout_msg_truncates_float():
+def test_timeout_msg_truncates_float() -> None:
     from refresh_task import RefreshTask
 
     msg = RefreshTask._timeout_msg("clock", 10.7)
@@ -191,7 +203,7 @@ def test_global_timeout_env_overrides_plugin_default(monkeypatch: Any) -> None:
     assert RefreshTask._manual_update_wait_seconds("ai_image") == 75.0
 
 
-def test_cleanup_subprocess_terminates(monkeypatch):
+def test_cleanup_subprocess_terminates(monkeypatch: pytest.MonkeyPatch) -> Any:
     from refresh_task import RefreshTask
 
     calls = []
@@ -200,17 +212,17 @@ def test_cleanup_subprocess_terminates(monkeypatch):
         pid = 999
         _alive = True
 
-        def terminate(self):
+        def terminate(self) -> None:
             calls.append("terminate")
             self._alive = False
 
-        def join(self, timeout=None):
+        def join(self, timeout: Any = None) -> None:
             calls.append(("join", timeout))
 
-        def is_alive(self):
+        def is_alive(self) -> Any:
             return self._alive
 
-        def kill(self):
+        def kill(self) -> None:
             calls.append("kill")
 
     proc = FakeProc()
@@ -219,23 +231,23 @@ def test_cleanup_subprocess_terminates(monkeypatch):
     assert not proc.is_alive()
 
 
-def test_cleanup_subprocess_escalates_to_kill(monkeypatch):
+def test_cleanup_subprocess_escalates_to_kill(monkeypatch: pytest.MonkeyPatch) -> Any:
     from refresh_task import RefreshTask
 
     class StubbornProc:
         pid = 123
         _kill_count = 0
 
-        def terminate(self):
+        def terminate(self) -> None:
             pass
 
-        def join(self, timeout=None):
+        def join(self, timeout: Any = None) -> None:
             pass
 
-        def is_alive(self):
+        def is_alive(self) -> Any:
             return self._kill_count < 1
 
-        def kill(self):
+        def kill(self) -> None:
             self._kill_count += 1
 
     proc = StubbornProc()
@@ -243,7 +255,7 @@ def test_cleanup_subprocess_escalates_to_kill(monkeypatch):
     assert proc._kill_count >= 1
 
 
-def test_handle_process_result_success(tmp_path):
+def test_handle_process_result_success(tmp_path: Path) -> None:
     import queue
 
     from refresh_task import RefreshTask
@@ -265,7 +277,7 @@ def test_handle_process_result_success(tmp_path):
     assert not png_path.exists(), "handler should delete the tempfile after read"
 
 
-def test_handle_process_result_error():
+def test_handle_process_result_error() -> None:
     import queue
 
     from refresh_task import RefreshTask
@@ -287,8 +299,8 @@ def test_handle_process_result_error():
 
 
 def test_manual_update_returns_after_image_saved_not_display(
-    device_config_dev, monkeypatch
-):
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> Any:
     """JTN-786 regression test.
 
     On slow hardware (Inky 7.3" Impression / Pi Zero 2 W), the e-paper SPI
@@ -305,7 +317,7 @@ def test_manual_update_returns_after_image_saved_not_display(
     dm = DisplayManager(device_config_dev)
     task = RefreshTask(device_config_dev, dm)
 
-    def slow_display(image_arg, **kwargs):
+    def slow_display(image_arg: Any, **kwargs: Any) -> Any:
         # Simulate: image gets saved quickly, display push drags on for 90s.
         on_image_saved = kwargs.get("on_image_saved")
         if on_image_saved is not None:
@@ -323,7 +335,9 @@ def test_manual_update_returns_after_image_saved_not_display(
         raising=True,
     )
 
-    def fake_execute_with_policy(self, action, cfg, dt, request_id=None):
+    def fake_execute_with_policy(
+        self, action: Any, cfg: Any, dt: Any, request_id: Any = None
+    ) -> Any:
         img = Image.new("RGB", device_config_dev.get_resolution(), "white")
         return img, {}
 
@@ -347,7 +361,9 @@ def test_manual_update_returns_after_image_saved_not_display(
         task.stop()
 
 
-def test_manual_update_still_surfaces_generate_errors(device_config_dev, monkeypatch):
+def test_manual_update_still_surfaces_generate_errors(
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """JTN-786: errors raised before image-save must still reach the caller.
 
     If ``_execute_with_policy`` raises (e.g. ``Plugin 'X' is not registered``
@@ -366,7 +382,7 @@ def test_manual_update_still_surfaces_generate_errors(device_config_dev, monkeyp
     dummy_cfg = {"id": "dummy", "class": "Dummy"}
     monkeypatch.setattr(device_config_dev, "get_plugin", lambda pid: dummy_cfg)
 
-    def boom(self, action, cfg, dt, request_id=None):
+    def boom(self, action: Any, cfg: Any, dt: Any, request_id: Any = None) -> None:
         raise RuntimeError("generate failed")
 
     monkeypatch.setattr(RefreshTask, "_execute_with_policy", boom)
@@ -379,7 +395,7 @@ def test_manual_update_still_surfaces_generate_errors(device_config_dev, monkeyp
         task.stop()
 
 
-def test_handle_process_result_empty_queue_raises():
+def test_handle_process_result_empty_queue_raises() -> None:
     import queue
 
     import pytest

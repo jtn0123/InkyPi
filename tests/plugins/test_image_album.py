@@ -1,7 +1,9 @@
 # pyright: reportMissingImports=false
 import socket
+from collections.abc import Iterator
 from contextlib import ExitStack, contextmanager
 from io import BytesIO
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -11,23 +13,23 @@ from PIL import Image
 _PUBLIC_DNS = [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("93.184.216.34", 0))]
 
 
-def _png_bytes(size=(100, 80), color="blue"):
+def _png_bytes(size: Any = (100, 80), color: Any = "blue") -> Any:
     buf = BytesIO()
     Image.new("RGB", size, color).save(buf, format="PNG")
     return buf.getvalue()
 
 
 @pytest.fixture()
-def plugin_config():
+def plugin_config() -> Any:
     return {"id": "image_album", "class": "ImageAlbum", "name": "Image Album"}
 
 
-def _make_mock_session(albums, assets, image_bytes):
+def _make_mock_session(albums: Any, assets: Any, image_bytes: Any) -> Any:
     """Build a mock session whose .get/.post return appropriate data."""
     session = MagicMock()
     search_calls = {"count": 0}
 
-    def fake_get(url, **kw):
+    def fake_get(url: Any, **kw: Any) -> Any:
         resp = MagicMock()
         resp.raise_for_status = MagicMock()
         if "/api/albums" in url:
@@ -37,7 +39,7 @@ def _make_mock_session(albums, assets, image_bytes):
             resp.iter_content = MagicMock(return_value=[image_bytes])
         return resp
 
-    def fake_post(url, **kw):
+    def fake_post(url: Any, **kw: Any) -> Any:
         resp = MagicMock()
         resp.raise_for_status = MagicMock()
         items = assets if search_calls["count"] == 0 else []
@@ -51,7 +53,7 @@ def _make_mock_session(albums, assets, image_bytes):
 
 
 @contextmanager
-def _patched_album_sessions(session):
+def _patched_album_sessions(session: Any) -> Iterator[Any]:
     with ExitStack() as stack:
         stack.enter_context(
             patch(
@@ -65,7 +67,9 @@ def _patched_album_sessions(session):
         yield
 
 
-def test_image_album_generate_success(monkeypatch, plugin_config, device_config_dev):
+def test_image_album_generate_success(
+    monkeypatch: pytest.MonkeyPatch, plugin_config: Any, device_config_dev: Any
+) -> None:
     from plugins.image_album.image_album import ImageAlbum
 
     monkeypatch.setenv("IMMICH_KEY", "test-key")
@@ -90,7 +94,9 @@ def test_image_album_generate_success(monkeypatch, plugin_config, device_config_
     assert isinstance(result, Image.Image)
 
 
-def test_image_album_missing_key(monkeypatch, plugin_config, device_config_dev):
+def test_image_album_missing_key(
+    monkeypatch: pytest.MonkeyPatch, plugin_config: Any, device_config_dev: Any
+) -> None:
     from plugins.image_album.image_album import ImageAlbum
 
     monkeypatch.delenv("IMMICH_KEY", raising=False)
@@ -108,7 +114,9 @@ def test_image_album_missing_key(monkeypatch, plugin_config, device_config_dev):
         )
 
 
-def test_image_album_missing_url(monkeypatch, plugin_config, device_config_dev):
+def test_image_album_missing_url(
+    monkeypatch: pytest.MonkeyPatch, plugin_config: Any, device_config_dev: Any
+) -> None:
     from plugins.image_album.image_album import ImageAlbum
 
     monkeypatch.setattr(device_config_dev, "load_env_key", lambda k: "test-key")
@@ -121,7 +129,9 @@ def test_image_album_missing_url(monkeypatch, plugin_config, device_config_dev):
         )
 
 
-def test_image_album_missing_album(monkeypatch, plugin_config, device_config_dev):
+def test_image_album_missing_album(
+    monkeypatch: pytest.MonkeyPatch, plugin_config: Any, device_config_dev: Any
+) -> None:
     from plugins.image_album.image_album import ImageAlbum
 
     monkeypatch.setattr(device_config_dev, "load_env_key", lambda k: "test-key")
@@ -140,8 +150,8 @@ def test_image_album_missing_album(monkeypatch, plugin_config, device_config_dev
 
 
 def test_image_album_unsupported_provider(
-    monkeypatch, plugin_config, device_config_dev
-):
+    monkeypatch: pytest.MonkeyPatch, plugin_config: Any, device_config_dev: Any
+) -> None:
     from plugins.image_album.image_album import ImageAlbum
 
     p = ImageAlbum(plugin_config)
@@ -152,7 +162,9 @@ def test_image_album_unsupported_provider(
         )
 
 
-def test_image_album_empty_assets(monkeypatch, plugin_config, device_config_dev):
+def test_image_album_empty_assets(
+    monkeypatch: pytest.MonkeyPatch, plugin_config: Any, device_config_dev: Any
+) -> None:
     from plugins.image_album.image_album import ImageAlbum
 
     monkeypatch.setattr(device_config_dev, "load_env_key", lambda k: "test-key")
@@ -173,7 +185,9 @@ def test_image_album_empty_assets(monkeypatch, plugin_config, device_config_dev)
             )
 
 
-def test_image_album_padding_blur(monkeypatch, plugin_config, device_config_dev):
+def test_image_album_padding_blur(
+    monkeypatch: pytest.MonkeyPatch, plugin_config: Any, device_config_dev: Any
+) -> None:
     from plugins.image_album.image_album import ImageAlbum
 
     monkeypatch.setattr(device_config_dev, "load_env_key", lambda k: "test-key")
@@ -199,7 +213,9 @@ def test_image_album_padding_blur(monkeypatch, plugin_config, device_config_dev)
     assert isinstance(result, Image.Image)
 
 
-def test_image_album_padding_color(monkeypatch, plugin_config, device_config_dev):
+def test_image_album_padding_color(
+    monkeypatch: pytest.MonkeyPatch, plugin_config: Any, device_config_dev: Any
+) -> None:
     from plugins.image_album.image_album import ImageAlbum
 
     monkeypatch.setattr(device_config_dev, "load_env_key", lambda k: "test-key")
@@ -227,8 +243,8 @@ def test_image_album_padding_color(monkeypatch, plugin_config, device_config_dev
 
 
 def test_image_album_rejects_localhost_url(
-    monkeypatch, plugin_config, device_config_dev
-):
+    monkeypatch: pytest.MonkeyPatch, plugin_config: Any, device_config_dev: Any
+) -> None:
     """ImageAlbum plugin must reject localhost Immich base URLs."""
     from plugins.image_album.image_album import ImageAlbum
 
@@ -247,8 +263,8 @@ def test_image_album_rejects_localhost_url(
 
 
 def test_image_album_rejects_private_ip_url(
-    monkeypatch, plugin_config, device_config_dev
-):
+    monkeypatch: pytest.MonkeyPatch, plugin_config: Any, device_config_dev: Any
+) -> None:
     """ImageAlbum plugin must reject private IP Immich base URLs."""
     from plugins.image_album.image_album import ImageAlbum
 
@@ -274,8 +290,8 @@ def test_image_album_rejects_private_ip_url(
 
 
 def test_image_album_rejects_metadata_endpoint_url(
-    monkeypatch, plugin_config, device_config_dev
-):
+    monkeypatch: pytest.MonkeyPatch, plugin_config: Any, device_config_dev: Any
+) -> None:
     """ImageAlbum plugin must reject cloud metadata endpoint Immich base URLs."""
     from plugins.image_album.image_album import ImageAlbum
 
@@ -300,7 +316,9 @@ def test_image_album_rejects_metadata_endpoint_url(
         )
 
 
-def test_image_album_vertical(monkeypatch, plugin_config, device_config_dev):
+def test_image_album_vertical(
+    monkeypatch: pytest.MonkeyPatch, plugin_config: Any, device_config_dev: Any
+) -> None:
     from plugins.image_album.image_album import ImageAlbum
 
     monkeypatch.setattr(device_config_dev, "load_env_key", lambda k: "test-key")

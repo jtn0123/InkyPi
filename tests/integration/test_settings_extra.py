@@ -1,9 +1,15 @@
-def test_delete_api_key_invalid(client):
+from typing import Any
+
+import pytest
+from flask.testing import FlaskClient
+
+
+def test_delete_api_key_invalid(client: FlaskClient) -> None:
     resp = client.post("/settings/delete_api_key", data={"key": "NOT_A_REAL_KEY"})
     assert resp.status_code == 400
 
 
-def test_save_settings_zero_interval_rejected(client):
+def test_save_settings_zero_interval_rejected(client: FlaskClient) -> None:
     data = {
         "deviceName": "D",
         "orientation": "horizontal",
@@ -22,7 +28,9 @@ def test_save_settings_zero_interval_rejected(client):
     assert resp.status_code == 422
 
 
-def test_shutdown_reboot_path(client, monkeypatch):
+def test_shutdown_reboot_path(
+    client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
     calls = {"cmd": None}
     monkeypatch.setattr("subprocess.run", lambda cmd, check: calls.update(cmd=cmd))
 
@@ -31,7 +39,9 @@ def test_shutdown_reboot_path(client, monkeypatch):
     assert "reboot" in (calls["cmd"] or [])
 
 
-def test_download_logs_has_attachment_header(client, monkeypatch):
+def test_download_logs_has_attachment_header(
+    client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
     import blueprints.settings as settings_mod
 
     monkeypatch.setattr(settings_mod, "JOURNAL_AVAILABLE", False)
@@ -42,7 +52,9 @@ def test_download_logs_has_attachment_header(client, monkeypatch):
     assert "attachment;" in cd and "inkypi_" in cd and ".log" in cd
 
 
-def test_api_logs_rate_limited(client, monkeypatch):
+def test_api_logs_rate_limited(
+    client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
     import blueprints.settings as settings_mod
 
     monkeypatch.setattr(settings_mod, "_rate_limit_ok", lambda remote: False)
@@ -50,10 +62,12 @@ def test_api_logs_rate_limited(client, monkeypatch):
     assert resp.status_code == 429
 
 
-def test_api_logs_errors_level_filter(client, monkeypatch):
+def test_api_logs_errors_level_filter(
+    client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> Any:
     import blueprints.settings as settings_mod
 
-    def fake_read(hours: int):
+    def fake_read(hours: int) -> Any:
         return [
             "Jan 01 host app[1]: INFO started",
             "Jan 01 host app[1]: WARNING warn",

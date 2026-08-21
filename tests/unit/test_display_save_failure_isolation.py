@@ -1,7 +1,12 @@
+from typing import Any
+
+import pytest
 from PIL import Image
 
 
-def test_display_continue_on_save_failures(monkeypatch, device_config_dev):
+def test_display_continue_on_save_failures(
+    monkeypatch: pytest.MonkeyPatch, device_config_dev: Any
+) -> Any:
     # Prepare display manager and image
     device_config_dev.update_value("display_type", "mock")
     from display.display_manager import DisplayManager
@@ -11,7 +16,7 @@ def test_display_continue_on_save_failures(monkeypatch, device_config_dev):
     # Spy hardware display call
     called = {"render": 0}
 
-    def spy_render(img, image_settings=None):
+    def spy_render(img: Any, image_settings: Any = None) -> None:
         called["render"] += 1
 
     monkeypatch.setattr(dm.display, "display_image", spy_render, raising=True)
@@ -20,7 +25,7 @@ def test_display_continue_on_save_failures(monkeypatch, device_config_dev):
     # current_image save to succeed
     original_save = Image.Image.save
 
-    def conditional_fail_save(self, fp, *args, **kwargs):
+    def conditional_fail_save(self, fp: Any, *args: Any, **kwargs: Any) -> Any:
         # Allow saving the initial current image, fail others
         if str(fp) == device_config_dev.current_image_file:
             return original_save(self, fp, *args, **kwargs)

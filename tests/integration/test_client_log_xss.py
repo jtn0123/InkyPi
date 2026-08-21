@@ -13,9 +13,11 @@ from __future__ import annotations
 
 import importlib
 import json
+from typing import Any
 
 import pytest
 from flask import Flask
+from flask.testing import FlaskClient
 
 
 def _make_app() -> Flask:
@@ -31,7 +33,7 @@ def _make_app() -> Flask:
 
 
 @pytest.fixture()
-def client():
+def client() -> Any:
     return _make_app().test_client()
 
 
@@ -46,7 +48,7 @@ _XSS_PAYLOADS = [
 
 
 @pytest.mark.parametrize("payload", _XSS_PAYLOADS)
-def test_invalid_level_not_reflected(client, payload: str) -> None:
+def test_invalid_level_not_reflected(client: FlaskClient, payload: str) -> None:
     """An invalid ``level`` value must not appear verbatim in the response."""
     resp = client.post(
         "/api/client-log",
@@ -72,7 +74,7 @@ def test_invalid_level_not_reflected(client, payload: str) -> None:
     assert "invalid level" in combined or "validation" in combined
 
 
-def test_invalid_level_missing_still_rejected(client) -> None:
+def test_invalid_level_missing_still_rejected(client: FlaskClient) -> None:
     """Empty level (default) triggers the same branch without reflection."""
     resp = client.post(
         "/api/client-log",
@@ -83,7 +85,9 @@ def test_invalid_level_missing_still_rejected(client) -> None:
     assert resp.content_type.startswith("application/json")
 
 
-def test_invalid_level_logs_sanitized_value(client, caplog) -> None:
+def test_invalid_level_logs_sanitized_value(
+    client: FlaskClient, caplog: pytest.LogCaptureFixture
+) -> None:
     """The rejected value is logged (sanitized) for debugging."""
     import logging
 

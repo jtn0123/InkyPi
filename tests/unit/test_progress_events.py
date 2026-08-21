@@ -10,7 +10,7 @@ from utils.progress_events import ProgressEventBus, get_progress_bus, to_sse
 # ---- publish() ----
 
 
-def test_publish_returns_event_with_seq():
+def test_publish_returns_event_with_seq() -> None:
     bus = ProgressEventBus()
     evt = bus.publish({"msg": "hello"})
     assert evt["seq"] == 1
@@ -18,7 +18,7 @@ def test_publish_returns_event_with_seq():
     assert "ts" in evt
 
 
-def test_publish_increments_seq():
+def test_publish_increments_seq() -> None:
     bus = ProgressEventBus()
     e1 = bus.publish({"step": 1})
     e2 = bus.publish({"step": 2})
@@ -28,14 +28,14 @@ def test_publish_increments_seq():
     assert e3["seq"] == 3
 
 
-def test_publish_preserves_payload_keys():
+def test_publish_preserves_payload_keys() -> None:
     bus = ProgressEventBus()
     evt = bus.publish({"type": "progress", "pct": 50})
     assert evt["type"] == "progress"
     assert evt["pct"] == 50
 
 
-def test_publish_respects_max_events():
+def test_publish_respects_max_events() -> None:
     bus = ProgressEventBus(max_events=3)
     for i in range(5):
         bus.publish({"i": i})
@@ -49,7 +49,7 @@ def test_publish_respects_max_events():
 # ---- recent() ----
 
 
-def test_recent_returns_recent_events():
+def test_recent_returns_recent_events() -> None:
     bus = ProgressEventBus()
     for i in range(10):
         bus.publish({"i": i})
@@ -59,7 +59,7 @@ def test_recent_returns_recent_events():
     assert recent[2]["i"] == 9
 
 
-def test_recent_returns_all_when_limit_exceeds_count():
+def test_recent_returns_all_when_limit_exceeds_count() -> None:
     bus = ProgressEventBus()
     bus.publish({"a": 1})
     bus.publish({"a": 2})
@@ -67,19 +67,19 @@ def test_recent_returns_all_when_limit_exceeds_count():
     assert len(recent) == 2
 
 
-def test_recent_returns_empty_for_zero_limit():
+def test_recent_returns_empty_for_zero_limit() -> None:
     bus = ProgressEventBus()
     bus.publish({"a": 1})
     assert bus.recent(limit=0) == []
 
 
-def test_recent_returns_empty_for_negative_limit():
+def test_recent_returns_empty_for_negative_limit() -> None:
     bus = ProgressEventBus()
     bus.publish({"a": 1})
     assert bus.recent(limit=-5) == []
 
 
-def test_recent_returns_empty_when_no_events():
+def test_recent_returns_empty_when_no_events() -> None:
     bus = ProgressEventBus()
     assert bus.recent() == []
 
@@ -87,7 +87,7 @@ def test_recent_returns_empty_when_no_events():
 # ---- wait_for() ----
 
 
-def test_wait_for_returns_new_events_immediately():
+def test_wait_for_returns_new_events_immediately() -> None:
     bus = ProgressEventBus()
     bus.publish({"step": "first"})
     bus.publish({"step": "second"})
@@ -95,7 +95,7 @@ def test_wait_for_returns_new_events_immediately():
     assert len(result) == 2
 
 
-def test_wait_for_filters_by_seq():
+def test_wait_for_filters_by_seq() -> None:
     bus = ProgressEventBus()
     bus.publish({"step": 1})
     bus.publish({"step": 2})
@@ -105,11 +105,11 @@ def test_wait_for_filters_by_seq():
     assert result[0]["step"] == 3
 
 
-def test_wait_for_blocks_then_returns_on_publish():
+def test_wait_for_blocks_then_returns_on_publish() -> None:
     bus = ProgressEventBus()
     results = []
 
-    def waiter():
+    def waiter() -> None:
         results.extend(bus.wait_for(last_seq=0, timeout_s=5.0))
 
     t = threading.Thread(target=waiter)
@@ -121,7 +121,7 @@ def test_wait_for_blocks_then_returns_on_publish():
     assert results[0]["msg"] == "wakeup"
 
 
-def test_wait_for_times_out_returns_empty():
+def test_wait_for_times_out_returns_empty() -> None:
     bus = ProgressEventBus()
     start = time.monotonic()
     result = bus.wait_for(last_seq=0, timeout_s=0.1)
@@ -133,7 +133,7 @@ def test_wait_for_times_out_returns_empty():
 # ---- to_sse() ----
 
 
-def test_to_sse_formats_event_type_and_data():
+def test_to_sse_formats_event_type_and_data() -> None:
     payload = {"seq": 1, "msg": "hi"}
     output = to_sse("progress", payload)
     assert output.startswith("event: progress\n")
@@ -146,7 +146,7 @@ def test_to_sse_formats_event_type_and_data():
     assert data_json["msg"] == "hi"
 
 
-def test_to_sse_uses_compact_json():
+def test_to_sse_uses_compact_json() -> None:
     output = to_sse("test", {"a": 1, "b": 2})
     data_line = [line for line in output.split("\n") if line.startswith("data:")][0]
     # Compact separators: no spaces after , or :
@@ -157,13 +157,13 @@ def test_to_sse_uses_compact_json():
 # ---- get_progress_bus() ----
 
 
-def test_get_progress_bus_returns_singleton():
+def test_get_progress_bus_returns_singleton() -> None:
     bus1 = get_progress_bus()
     bus2 = get_progress_bus()
     assert bus1 is bus2
 
 
-def test_get_progress_bus_is_instance():
+def test_get_progress_bus_is_instance() -> None:
     bus = get_progress_bus()
     assert isinstance(bus, ProgressEventBus)
 
@@ -171,13 +171,13 @@ def test_get_progress_bus_is_instance():
 # ---- Thread safety ----
 
 
-def test_concurrent_publishes_no_lost_events():
+def test_concurrent_publishes_no_lost_events() -> None:
     bus = ProgressEventBus(max_events=2000)
     n_threads = 10
     n_per_thread = 100
     barrier = threading.Barrier(n_threads)
 
-    def publisher():
+    def publisher() -> None:
         barrier.wait()
         for _ in range(n_per_thread):
             bus.publish({"t": threading.current_thread().name})
@@ -195,12 +195,12 @@ def test_concurrent_publishes_no_lost_events():
     assert seqs == list(range(1, n_threads * n_per_thread + 1))
 
 
-def test_concurrent_publish_and_wait():
+def test_concurrent_publish_and_wait() -> None:
     """Ensure wait_for correctly wakes when a concurrent publish happens."""
     bus = ProgressEventBus()
     results = []
 
-    def waiter():
+    def waiter() -> None:
         r = bus.wait_for(last_seq=0, timeout_s=5.0)
         results.extend(r)
 

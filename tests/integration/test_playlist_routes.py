@@ -1,8 +1,10 @@
 # pyright: reportMissingImports=false
 from typing import Any
 
+from flask.testing import FlaskClient
 
-def test_playlist_page_renders(client):
+
+def test_playlist_page_renders(client: FlaskClient) -> None:
     resp = client.get("/playlist")
     assert resp.status_code == 200
     assert b'data-page-shell="dashboard"' in resp.data
@@ -10,7 +12,7 @@ def test_playlist_page_renders(client):
     assert b'data-collapsed-label="Open"' in resp.data
 
 
-def test_create_update_delete_playlist_flow(client):
+def test_create_update_delete_playlist_flow(client: FlaskClient) -> None:
     # Create
     payload = {"playlist_name": "Morning", "start_time": "06:00", "end_time": "09:00"}
     resp = client.post("/create_playlist", json=payload)
@@ -31,7 +33,9 @@ def test_create_update_delete_playlist_flow(client):
     assert resp.status_code == 200
 
 
-def test_update_playlist_accepts_form_payload(client, device_config_dev):
+def test_update_playlist_accepts_form_payload(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     pm = device_config_dev.get_playlist_manager()
     pm.add_playlist("FormUpdate", "06:00", "09:00")
     device_config_dev.write_config()
@@ -52,7 +56,9 @@ def test_update_playlist_accepts_form_payload(client, device_config_dev):
     assert playlist.cycle_interval_seconds == 12 * 60
 
 
-def test_update_playlist_malformed_json_returns_fielded_error(client):
+def test_update_playlist_malformed_json_returns_fielded_error(
+    client: FlaskClient,
+) -> None:
     resp = client.put(
         "/update_playlist/Default",
         data=b"{{invalid",
@@ -83,7 +89,9 @@ def test_create_playlist_persists_cycle_override(
     assert playlist.cycle_interval_seconds == 12 * 60
 
 
-def test_delete_default_playlist_is_refused(client, device_config_dev):
+def test_delete_default_playlist_is_refused(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     """JTN-781: DELETE /delete_playlist/Default must return 400 and keep the playlist."""
     pm = device_config_dev.get_playlist_manager()
     if not pm.get_playlist("Default"):
@@ -100,7 +108,9 @@ def test_delete_default_playlist_is_refused(client, device_config_dev):
     assert pm.get_playlist("Default") is not None
 
 
-def test_delete_non_default_playlist_still_succeeds(client, device_config_dev):
+def test_delete_non_default_playlist_still_succeeds(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     """JTN-781: guard must not regress deletion of regular user-created playlists."""
     pm = device_config_dev.get_playlist_manager()
     pm.add_playlist("Evening", "18:00", "22:00")
@@ -111,7 +121,9 @@ def test_delete_non_default_playlist_still_succeeds(client, device_config_dev):
     assert pm.get_playlist("Evening") is None
 
 
-def test_delete_lowercase_default_playlist_is_allowed(client, device_config_dev):
+def test_delete_lowercase_default_playlist_is_allowed(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     """JTN-781: the guard is case-sensitive — 'default' (lowercase) is a
     user-created playlist and remains deletable. Matches how create/update
     elsewhere key off the exact string 'Default'."""
@@ -125,13 +137,13 @@ def test_delete_lowercase_default_playlist_is_allowed(client, device_config_dev)
     assert pm.get_playlist("default") is None
 
 
-def test_add_plugin_to_playlist_validation(client):
+def test_add_plugin_to_playlist_validation(client: FlaskClient) -> None:
     # Missing fields
     resp = client.post("/add_plugin", data={})
     assert resp.status_code == 500 or resp.status_code == 400
 
 
-def test_reorder_plugins_endpoint(client, device_config_dev):
+def test_reorder_plugins_endpoint(client: FlaskClient, device_config_dev: Any) -> None:
     pm = device_config_dev.get_playlist_manager()
     pm.add_playlist("Default", "00:00", "24:00")
     pl = pm.get_playlist("Default")
@@ -172,7 +184,9 @@ def test_reorder_plugins_endpoint(client, device_config_dev):
     assert pl2.plugins[0].name == "B"
 
 
-def test_reorder_plugins_rejects_empty_plugin_id(client, device_config_dev):
+def test_reorder_plugins_rejects_empty_plugin_id(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     pm = device_config_dev.get_playlist_manager()
     pm.add_playlist("BadReorder", "00:00", "24:00")
     pl = pm.get_playlist("BadReorder")
@@ -200,7 +214,9 @@ def test_reorder_plugins_rejects_empty_plugin_id(client, device_config_dev):
     assert body["details"]["field"] == "ordered"
 
 
-def test_cycle_override_zero_rejected(client, device_config_dev):
+def test_cycle_override_zero_rejected(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     """JTN-232/JTN-469: cycle_minutes=0 must be rejected with 400 (range: 1-1440)."""
     pm = device_config_dev.get_playlist_manager()
     pm.add_playlist("CycleTest", "10:00", "11:00")
@@ -223,7 +239,9 @@ def test_cycle_override_zero_rejected(client, device_config_dev):
     assert pl.cycle_interval_seconds is None
 
 
-def test_update_playlist_rejects_special_char_name(client, device_config_dev):
+def test_update_playlist_rejects_special_char_name(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     """JTN-256: update_playlist must validate new_name and reject XSS-style names."""
     pm = device_config_dev.get_playlist_manager()
     pm.add_playlist("SafeName", "12:00", "13:00")
@@ -240,7 +258,9 @@ def test_update_playlist_rejects_special_char_name(client, device_config_dev):
     assert j.get("success") is False
 
 
-def test_update_playlist_rejects_name_over_64_chars(client, device_config_dev):
+def test_update_playlist_rejects_name_over_64_chars(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     """JTN-256: update_playlist must reject names longer than 64 characters."""
     pm = device_config_dev.get_playlist_manager()
     pm.add_playlist("LongNameTest", "14:00", "15:00")
@@ -258,7 +278,9 @@ def test_update_playlist_rejects_name_over_64_chars(client, device_config_dev):
     assert j.get("success") is False
 
 
-def test_toggle_only_fresh_and_snooze(client, device_config_dev):
+def test_toggle_only_fresh_and_snooze(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     pm = device_config_dev.get_playlist_manager()
     pm.add_playlist("Default", "00:00", "24:00")
     pl = pm.get_playlist("Default")
@@ -279,7 +301,7 @@ def test_toggle_only_fresh_and_snooze(client, device_config_dev):
 # JTN-217: Overlap-with-Default warning
 
 
-def _ensure_default_playlist(device_config_dev) -> None:
+def _ensure_default_playlist(device_config_dev: Any) -> None:
     """Ensure a Default (00:00-24:00) playlist exists in the config."""
     pm = device_config_dev.get_playlist_manager()
     if not pm.get_playlist("Default"):
@@ -287,14 +309,16 @@ def _ensure_default_playlist(device_config_dev) -> None:
         device_config_dev.write_config()
 
 
-def _assert_overlap_warning(data) -> None:
+def _assert_overlap_warning(data: Any) -> None:
     """Assert the response includes a Default-overlap warning."""
     assert "warning" in data
     assert "Default" in data["warning"]
     assert "priority" in data["warning"]
 
 
-def test_create_playlist_overlapping_default_returns_warning(client, device_config_dev):
+def test_create_playlist_overlapping_default_returns_warning(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     """Creating a playlist whose hours overlap Default should succeed and return a warning."""
     _ensure_default_playlist(device_config_dev)
 
@@ -306,7 +330,9 @@ def test_create_playlist_overlapping_default_returns_warning(client, device_conf
     _assert_overlap_warning(data)
 
 
-def test_create_default_playlist_does_not_warn_about_itself(client, device_config_dev):
+def test_create_default_playlist_does_not_warn_about_itself(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     """Creating a playlist named 'Default' should not emit a warning about overlapping Default."""
     pm = device_config_dev.get_playlist_manager()
     pm.delete_playlist("Default")
@@ -320,7 +346,9 @@ def test_create_default_playlist_does_not_warn_about_itself(client, device_confi
     assert "warning" not in data or data.get("warning") is None
 
 
-def test_update_playlist_overlapping_default_returns_warning(client, device_config_dev):
+def test_update_playlist_overlapping_default_returns_warning(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     """Updating a playlist so its hours overlap Default should succeed and return a warning."""
     _ensure_default_playlist(device_config_dev)
     pm = device_config_dev.get_playlist_manager()
@@ -340,7 +368,9 @@ def test_update_playlist_overlapping_default_returns_warning(client, device_conf
     _assert_overlap_warning(data)
 
 
-def test_update_default_playlist_does_not_warn_about_itself(client, device_config_dev):
+def test_update_default_playlist_does_not_warn_about_itself(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     """Updating the Default playlist itself should not emit a warning about overlapping Default."""
     _ensure_default_playlist(device_config_dev)
     upd = {
@@ -358,7 +388,9 @@ def test_update_default_playlist_does_not_warn_about_itself(client, device_confi
 # JTN-469: cycle_minutes range validation
 
 
-def test_update_playlist_rejects_cycle_minutes_above_max(client, device_config_dev):
+def test_update_playlist_rejects_cycle_minutes_above_max(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     """JTN-469: cycle_minutes > 1440 must be rejected with 400 and a clear error."""
     pm = device_config_dev.get_playlist_manager()
     pm.add_playlist("RangeTest", "06:00", "10:00")
@@ -381,7 +413,9 @@ def test_update_playlist_rejects_cycle_minutes_above_max(client, device_config_d
     assert pl.cycle_interval_seconds is None
 
 
-def test_update_playlist_valid_cycle_minutes_persisted(client, device_config_dev):
+def test_update_playlist_valid_cycle_minutes_persisted(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     """JTN-469: valid cycle_minutes (30) must be persisted and readable back."""
     pm = device_config_dev.get_playlist_manager()
     pm.add_playlist("PersistTest", "08:00", "12:00")
@@ -403,7 +437,9 @@ def test_update_playlist_valid_cycle_minutes_persisted(client, device_config_dev
     assert pl.cycle_interval_seconds == 30 * 60
 
 
-def test_update_playlist_absent_cycle_minutes_clears_nothing(client, device_config_dev):
+def test_update_playlist_absent_cycle_minutes_clears_nothing(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     """JTN-469: omitting cycle_minutes must not change existing cycle override."""
     pm = device_config_dev.get_playlist_manager()
     pm.add_playlist("OmitTest", "09:00", "11:00")
@@ -426,8 +462,8 @@ def test_update_playlist_absent_cycle_minutes_clears_nothing(client, device_conf
 
 
 def test_update_playlist_null_cycle_minutes_leaves_override_unchanged(
-    client, device_config_dev
-):
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     """JTN-469: cycle_minutes=null is treated the same as absent (no-op on cycle)."""
     pm = device_config_dev.get_playlist_manager()
     pm.add_playlist("NullTest", "10:00", "12:00")
@@ -448,7 +484,7 @@ def test_update_playlist_null_cycle_minutes_leaves_override_unchanged(
     assert pl2.cycle_interval_seconds == 20 * 60
 
 
-def test_playlist_to_dict_exposes_cycle_minutes(device_config_dev):
+def test_playlist_to_dict_exposes_cycle_minutes(device_config_dev: Any) -> None:
     """JTN-469: Playlist.to_dict() must include cycle_minutes when cycle_interval_seconds is set."""
     pm = device_config_dev.get_playlist_manager()
     pm.add_playlist("DictTest", "07:00", "08:00")
@@ -459,7 +495,7 @@ def test_playlist_to_dict_exposes_cycle_minutes(device_config_dev):
     assert d.get("cycle_minutes") == 15
 
 
-def test_playlist_to_dict_no_cycle_minutes_when_unset(device_config_dev):
+def test_playlist_to_dict_no_cycle_minutes_when_unset(device_config_dev: Any) -> None:
     """JTN-469: Playlist.to_dict() must not include cycle_minutes when no override is set."""
     pm = device_config_dev.get_playlist_manager()
     pm.add_playlist("NoCycleDict", "07:00", "08:00")
@@ -469,7 +505,7 @@ def test_playlist_to_dict_no_cycle_minutes_when_unset(device_config_dev):
     assert "cycle_minutes" not in d
 
 
-def test_create_playlist_accepts_wraparound_times(client):
+def test_create_playlist_accepts_wraparound_times(client: FlaskClient) -> None:
     """JTN-353: Playlists with start > end (wraps past midnight) should be accepted.
 
     The model already supports wraparound via Playlist.is_active(), so we accept
@@ -486,7 +522,7 @@ def test_create_playlist_accepts_wraparound_times(client):
     assert j.get("success") is True
 
 
-def test_playlist_page_labels_wraparound_next_day(client):
+def test_playlist_page_labels_wraparound_next_day(client: FlaskClient) -> None:
     """JTN-353: The playlist list summary must mark wrap-past-midnight ranges with '(next day)'.
 
     Without the label the UI renders '20:00 - 08:00' identically to a normal
@@ -510,7 +546,7 @@ def test_playlist_page_labels_wraparound_next_day(client):
     assert "playlist-wrap-label" in body
 
 
-def test_playlist_page_no_wrap_label_for_normal_range(client):
+def test_playlist_page_no_wrap_label_for_normal_range(client: FlaskClient) -> None:
     """JTN-353: Normal same-day ranges must NOT get the '(next day)' label."""
     payload = {
         "playlist_name": "Daytime",
@@ -533,7 +569,9 @@ def test_playlist_page_no_wrap_label_for_normal_range(client):
     assert "(next day)" not in body[idx : idx + 200]
 
 
-def test_playlist_page_hides_auto_generated_instance_keys(client, device_config_dev):
+def test_playlist_page_hides_auto_generated_instance_keys(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     """JTN-620: Playlists page must not display raw {plugin_id}_saved_settings keys.
 
     Internal ``data-*`` attributes and element ``id``s may still reference
@@ -580,7 +618,9 @@ def test_playlist_page_hides_auto_generated_instance_keys(client, device_config_
     assert "Weather" in body
 
 
-def test_playlist_header_chip_uses_plain_language_refresh_interval(client):
+def test_playlist_header_chip_uses_plain_language_refresh_interval(
+    client: FlaskClient,
+) -> None:
     """JTN-640: Playlists header chip must say 'Refresh interval', not jargon
     'Device cadence'."""
     resp = client.get("/playlist")
@@ -590,7 +630,9 @@ def test_playlist_header_chip_uses_plain_language_refresh_interval(client):
     assert "Refresh interval" in body
 
 
-def test_playlist_default_all_day_renders_as_all_day(client, device_config_dev):
+def test_playlist_default_all_day_renders_as_all_day(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     """JTN-639: A playlist spanning 00:00 - 24:00 should render 'All day'
     instead of the non-standard '24:00' end time."""
     pm = device_config_dev.get_playlist_manager()
@@ -614,7 +656,9 @@ def test_playlist_default_all_day_renders_as_all_day(client, device_config_dev):
     assert "00:00 - 24:00" not in chunk
 
 
-def test_playlist_page_preserves_user_instance_names(client, device_config_dev):
+def test_playlist_page_preserves_user_instance_names(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     """User-renamed instances are preserved as visible labels."""
     pm = device_config_dev.get_playlist_manager()
     if not pm.get_playlist("Default"):
@@ -636,7 +680,7 @@ def test_playlist_page_preserves_user_instance_names(client, device_config_dev):
     assert b"Kitchen Weather" in resp.data
 
 
-def test_playlist_form_uses_native_time_input(client):
+def test_playlist_form_uses_native_time_input(client: FlaskClient) -> None:
     """JTN-647: start/end time fields must be <input type="time"> (not a 15-min <select>).
 
     This lets users schedule arbitrary HH:MM values (e.g. 09:05) instead of the
@@ -655,7 +699,7 @@ def test_playlist_form_uses_native_time_input(client):
     assert '<select id="end_time"' not in body
 
 
-def test_create_playlist_accepts_non_quarter_hour_times(client):
+def test_create_playlist_accepts_non_quarter_hour_times(client: FlaskClient) -> None:
     """JTN-647: backend accepts arbitrary HH:MM values like 09:05 or 07:10."""
     payload = {
         "playlist_name": "OddHours",

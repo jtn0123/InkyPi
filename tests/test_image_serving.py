@@ -26,7 +26,7 @@ def _make_png(tmp_path: Path, name: str = "test.png") -> Path:
 # ---------------------------------------------------------------------------
 
 
-def test_webp_returned_when_header_present(tmp_path):
+def test_webp_returned_when_header_present(tmp_path: Path) -> None:
     """Client sending Accept: image/webp receives WebP bytes."""
     from flask import Flask
 
@@ -44,7 +44,7 @@ def test_webp_returned_when_header_present(tmp_path):
     assert data[8:12] == b"WEBP"
 
 
-def test_png_returned_when_header_absent(tmp_path):
+def test_png_returned_when_header_absent(tmp_path: Path) -> None:
     """Client without Accept: image/webp gets the original PNG."""
     from flask import Flask
 
@@ -58,7 +58,7 @@ def test_png_returned_when_header_absent(tmp_path):
     assert resp.mimetype == "image/png"
 
 
-def test_png_returned_when_header_no_webp(tmp_path):
+def test_png_returned_when_header_no_webp(tmp_path: Path) -> None:
     """Client sending only image/png in Accept header gets PNG."""
     from flask import Flask
 
@@ -72,7 +72,7 @@ def test_png_returned_when_header_no_webp(tmp_path):
     assert resp.mimetype == "image/png"
 
 
-def test_etag_present_for_webp_response(tmp_path):
+def test_etag_present_for_webp_response(tmp_path: Path) -> None:
     """WebP response includes an ETag header."""
     from flask import Flask
 
@@ -87,7 +87,7 @@ def test_etag_present_for_webp_response(tmp_path):
     assert resp.headers["ETag"]  # non-empty
 
 
-def test_etag_changes_when_mtime_changes(tmp_path):
+def test_etag_changes_when_mtime_changes(tmp_path: Path) -> None:
     """ETag must differ after the file is updated (mtime changes)."""
     from flask import Flask
 
@@ -119,7 +119,7 @@ def test_etag_changes_when_mtime_changes(tmp_path):
     assert etag1 != etag2
 
 
-def test_cache_returns_same_bytes_on_repeated_call(tmp_path):
+def test_cache_returns_same_bytes_on_repeated_call(tmp_path: Path) -> None:
     """Repeated calls with same mtime hit lru_cache (same object returned)."""
     from flask import Flask
 
@@ -142,7 +142,7 @@ def test_cache_returns_same_bytes_on_repeated_call(tmp_path):
     assert info.hits >= 1
 
 
-def test_path_traversal_rejected(tmp_path):
+def test_path_traversal_rejected(tmp_path: Path) -> None:
     """Filename containing '..' must not escape safe_root."""
     from flask import Flask
     from werkzeug.exceptions import NotFound

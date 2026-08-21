@@ -7,6 +7,7 @@ points directly so no sleep() or thread-timing hacks are needed.
 """
 
 from datetime import UTC, datetime
+from typing import Any
 
 import pytest
 from PIL import Image
@@ -20,7 +21,7 @@ from refresh_task import PlaylistRefresh, RefreshTask
 # ---------------------------------------------------------------------------
 
 
-def _make_plugin_instance(plugin_id, name, refresh_interval=0):
+def _make_plugin_instance(plugin_id: Any, name: Any, refresh_interval: Any = 0) -> Any:
     """Create a PluginInstance that is always due for a refresh."""
     return PluginInstance(
         plugin_id=plugin_id,
@@ -31,7 +32,7 @@ def _make_plugin_instance(plugin_id, name, refresh_interval=0):
     )
 
 
-def _make_playlist_with_plugins(*plugin_instances):
+def _make_playlist_with_plugins(*plugin_instances: Any) -> Any:
     """Create an always-active playlist containing the given plugin instances.
 
     Playlist.__init__ calls PluginInstance.from_dict on whatever is in the
@@ -48,7 +49,7 @@ def _make_playlist_with_plugins(*plugin_instances):
     return pl
 
 
-def _fake_image(width=800, height=480):
+def _fake_image(width: Any = 800, height: Any = 480) -> Any:
     """Return a small solid-colour PIL image for use as a plugin output stub."""
     return Image.new("RGB", (width, height), "white")
 
@@ -58,7 +59,9 @@ def _fake_image(width=800, height=480):
 # ---------------------------------------------------------------------------
 
 
-def test_refresh_cycle_runs_plugin_to_display(device_config_dev, monkeypatch):
+def test_refresh_cycle_runs_plugin_to_display(
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> Any:
     """Full cycle: playlist → year_progress plugin → mock display receives image.
 
     The display is real (MockDisplay backed by tmp_path) but the plugin's
@@ -91,7 +94,7 @@ def test_refresh_cycle_runs_plugin_to_display(device_config_dev, monkeypatch):
     received_images: list[Image.Image] = []
     real_display_image = dm.display.display_image
 
-    def _spy_display_image(image, image_settings=None):
+    def _spy_display_image(image: Any, image_settings: Any = None) -> Any:
         received_images.append(image.copy())
         return real_display_image(image, image_settings=image_settings)
 
@@ -137,7 +140,9 @@ def test_refresh_cycle_runs_plugin_to_display(device_config_dev, monkeypatch):
 # ---------------------------------------------------------------------------
 
 
-def test_refresh_cycle_handles_plugin_failure(device_config_dev, monkeypatch):
+def test_refresh_cycle_handles_plugin_failure(
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """When the plugin raises, a fallback error-card is pushed and health records the error."""
     failing_cfg = {"id": "bad_plugin", "class": "BadPlugin"}
     monkeypatch.setattr(
@@ -160,7 +165,7 @@ def test_refresh_cycle_handles_plugin_failure(device_config_dev, monkeypatch):
     )
 
     # Stub the plugin to raise unconditionally
-    def _boom(*args, **kwargs):
+    def _boom(*args: Any, **kwargs: Any) -> None:
         raise RuntimeError("Simulated plugin crash")
 
     monkeypatch.setattr(
@@ -211,15 +216,17 @@ def test_refresh_cycle_handles_plugin_failure(device_config_dev, monkeypatch):
 # ---------------------------------------------------------------------------
 
 
-def test_refresh_cycle_advances_playlist(device_config_dev, monkeypatch):
+def test_refresh_cycle_advances_playlist(
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> Any:
     """With two plugins in the playlist each refresh tick renders the next one."""
     call_log: list[str] = []
 
-    def _make_fake_plugin(plugin_id):
+    def _make_fake_plugin(plugin_id: Any) -> Any:
         """Return a plugin object whose generate_image records the plugin_id."""
 
         class FakePlugin:
-            def generate_image(self, settings, cfg):
+            def generate_image(self, settings: Any, cfg: Any) -> Any:
                 call_log.append(plugin_id)
                 return _fake_image(*cfg.get_resolution())
 
@@ -232,7 +239,7 @@ def test_refresh_cycle_advances_playlist(device_config_dev, monkeypatch):
     pm = PlaylistManager(playlists=[playlist], active_playlist="Test Playlist")
     monkeypatch.setattr(device_config_dev, "get_playlist_manager", lambda: pm)
 
-    def _fake_get_plugin(pid):
+    def _fake_get_plugin(pid: Any) -> Any:
         if pid in ("plugin_a", "plugin_b"):
             return {"id": pid, "class": pid.title().replace("_", "")}
         return None

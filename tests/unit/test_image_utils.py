@@ -1,4 +1,6 @@
 from io import BytesIO
+from pathlib import Path
+from typing import Any
 
 import pytest
 from PIL import Image
@@ -8,21 +10,21 @@ from utils.image_utils import change_orientation, compute_image_hash, resize_ima
 
 
 class FakeResp:
-    def __init__(self, content, status_code=200):
+    def __init__(self, content: Any, status_code: Any = 200) -> None:
         self.content = content
         self.status_code = status_code
 
 
-def make_png_bytes(size=(10, 10), color=(1, 2, 3)):
+def make_png_bytes(size: Any = (10, 10), color: Any = (1, 2, 3)) -> Any:
     bio = BytesIO()
     Image.new("RGB", size, color=color).save(bio, format="PNG")
     return bio.getvalue()
 
 
-def test_get_image_success(monkeypatch):
+def test_get_image_success(monkeypatch: pytest.MonkeyPatch) -> Any:
     content = make_png_bytes()
 
-    def fake_get(url, timeout=None, **kwargs):
+    def fake_get(url: Any, timeout: Any = None, **kwargs: Any) -> Any:
         return FakeResp(content, 200)
 
     monkeypatch.setattr("utils.image_utils.http_get", staticmethod(fake_get))
@@ -30,10 +32,10 @@ def test_get_image_success(monkeypatch):
     assert isinstance(img, Image.Image)
 
 
-def test_get_image_typeerror_fallback(monkeypatch):
+def test_get_image_typeerror_fallback(monkeypatch: pytest.MonkeyPatch) -> Any:
     content = make_png_bytes()
 
-    def fake_get(url, timeout=None, **kwargs):
+    def fake_get(url: Any, timeout: Any = None, **kwargs: Any) -> Any:
         if timeout is not None:
             raise TypeError("no timeout support")
         return FakeResp(content, 200)
@@ -43,15 +45,15 @@ def test_get_image_typeerror_fallback(monkeypatch):
     assert isinstance(img, Image.Image)
 
 
-def test_get_image_non200(monkeypatch):
-    def fake_get(url, timeout=None, **kwargs):
+def test_get_image_non200(monkeypatch: pytest.MonkeyPatch) -> Any:
+    def fake_get(url: Any, timeout: Any = None, **kwargs: Any) -> Any:
         return FakeResp(b"", 404)
 
     monkeypatch.setattr("utils.image_utils.http_get", staticmethod(fake_get))
     assert image_utils.get_image("http://example.com/notfound") is None
 
 
-def test_change_orientation():
+def test_change_orientation() -> None:
     img = Image.new("RGB", (30, 10), "white")
     out_h = image_utils.change_orientation(img, "horizontal")
     assert out_h.size != ()
@@ -60,7 +62,7 @@ def test_change_orientation():
     assert out_v.size[0] != img.size[0] or out_v.size[1] != img.size[1]
 
 
-def test_resize_image_and_keep_width():
+def test_resize_image_and_keep_width() -> None:
     img = Image.new("RGB", (200, 100), "white")
     out = image_utils.resize_image(img, (100, 100))
     assert out.size == (100, 100)
@@ -69,7 +71,7 @@ def test_resize_image_and_keep_width():
     assert out2.size == (100, 100)
 
 
-def test_apply_image_enhancement_and_compute_hash():
+def test_apply_image_enhancement_and_compute_hash() -> None:
     img = Image.new("RGB", (10, 10), "white")
     enhanced = image_utils.apply_image_enhancement(
         img, {"brightness": 1.2, "contrast": 0.9, "saturation": 1.0, "sharpness": 1.0}
@@ -82,7 +84,7 @@ def test_apply_image_enhancement_and_compute_hash():
         image_utils.compute_image_hash(None)
 
 
-def test_take_screenshot_html(tmp_path):
+def test_take_screenshot_html(tmp_path: Path) -> None:
     # conftest patches take_screenshot to a fake in-memory generator
     html = "<html><body>test</body></html>"
     dims = (80, 60)
@@ -94,28 +96,28 @@ def test_take_screenshot_html(tmp_path):
 # pyright: reportMissingImports=false
 
 
-def test_change_orientation_vertical():
+def test_change_orientation_vertical() -> None:
     img = Image.new("RGB", (100, 50), "white")
     out = change_orientation(img, "vertical")
     assert out.size == (50, 100)
 
 
-def test_resize_image_aspect_crop():
+def test_resize_image_aspect_crop() -> None:
     img = Image.new("RGB", (160, 100), "white")
     out = resize_image(img, (80, 80), [])
     assert out.size == (80, 80)
 
 
-def test_compute_image_hash_deterministic():
+def test_compute_image_hash_deterministic() -> None:
     img1 = Image.new("RGB", (10, 10), "white")
     img2 = Image.new("RGB", (10, 10), "white")
     assert compute_image_hash(img1) == compute_image_hash(img2)
 
 
-def test_get_image_exception_handling(monkeypatch):
+def test_get_image_exception_handling(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test get_image with exception handling."""
 
-    def fake_get(url, timeout=None, **kwargs):
+    def fake_get(url: Any, timeout: Any = None, **kwargs: Any) -> None:
         if timeout is not None:
             raise TypeError("timeout not supported")
         # This should trigger the exception handling path
@@ -126,14 +128,14 @@ def test_get_image_exception_handling(monkeypatch):
     assert result is None
 
 
-def test_resize_image_with_none_settings():
+def test_resize_image_with_none_settings() -> None:
     """Test resize_image with None image_settings."""
     img = Image.new("RGB", (200, 100), "white")
     result = image_utils.resize_image(img, (100, 100), None)
     assert result.size == (100, 100)
 
 
-def test_apply_image_enhancement_with_none_settings():
+def test_apply_image_enhancement_with_none_settings() -> None:
     """Test apply_image_enhancement with None image_settings."""
     img = Image.new("RGB", (10, 10), "white")
     result = image_utils.apply_image_enhancement(img, None)
@@ -143,7 +145,9 @@ def test_apply_image_enhancement_with_none_settings():
 # Test removed due to autouse fixture conflicts - exception handling is tested indirectly
 
 
-def test_take_screenshot_with_timeout(tmp_path, monkeypatch):
+def test_take_screenshot_with_timeout(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Test take_screenshot with timeout parameter."""
     # Since conftest.py mocks take_screenshot, we test the timeout logic indirectly
     # by checking that the function still works with timeout parameter
@@ -153,7 +157,7 @@ def test_take_screenshot_with_timeout(tmp_path, monkeypatch):
     assert isinstance(result, Image.Image)
 
 
-def test_take_screenshot_filenotfound_error(monkeypatch):
+def test_take_screenshot_filenotfound_error(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test take_screenshot with FileNotFoundError."""
     # Since conftest.py mocks take_screenshot, we can't test the actual subprocess errors
     # But we can test that the function returns an image when mocked
@@ -161,7 +165,7 @@ def test_take_screenshot_filenotfound_error(monkeypatch):
     assert isinstance(result, Image.Image)
 
 
-def test_take_screenshot_process_error(monkeypatch):
+def test_take_screenshot_process_error(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test take_screenshot with process error."""
     # Since conftest.py mocks take_screenshot, we can't test the actual subprocess errors
     # But we can test that the function returns an image when mocked
@@ -169,7 +173,7 @@ def test_take_screenshot_process_error(monkeypatch):
     assert isinstance(result, Image.Image)
 
 
-def test_take_screenshot_general_exception(monkeypatch):
+def test_take_screenshot_general_exception(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test take_screenshot with general exception."""
     # Since conftest.py mocks take_screenshot, we can't test the actual subprocess errors
     # But we can test that the function returns an image when mocked
@@ -177,14 +181,14 @@ def test_take_screenshot_general_exception(monkeypatch):
     assert isinstance(result, Image.Image)
 
 
-def test_resize_image_zero_img_height():
+def test_resize_image_zero_img_height() -> None:
     """resize_image should fail when source image height is zero."""
     img = Image.new("RGB", (10, 0), "white")
     with pytest.raises(ValueError):
         image_utils.resize_image(img, (5, 5))
 
 
-def test_resize_image_zero_desired_height():
+def test_resize_image_zero_desired_height() -> None:
     """resize_image should fail when desired height is zero."""
     img = Image.new("RGB", (10, 10), "white")
     with pytest.raises(ValueError):
@@ -196,7 +200,7 @@ def test_resize_image_zero_desired_height():
 # ---------------------------------------------------------------------------
 
 
-def test_get_image_returns_correct_size(monkeypatch):
+def test_get_image_returns_correct_size(monkeypatch: pytest.MonkeyPatch) -> None:
     """get_image returns an image with the correct dimensions."""
     import socket
 
@@ -221,7 +225,7 @@ def test_get_image_returns_correct_size(monkeypatch):
     assert img.size == (5, 5)
 
 
-def test_get_image_error_500(monkeypatch):
+def test_get_image_error_500(monkeypatch: pytest.MonkeyPatch) -> None:
     """get_image returns None for a 500 response."""
 
     class Resp:
@@ -233,7 +237,7 @@ def test_get_image_error_500(monkeypatch):
     assert img is None
 
 
-def test_get_image_304_not_modified(monkeypatch):
+def test_get_image_304_not_modified(monkeypatch: pytest.MonkeyPatch) -> None:
     """get_image handles a 304 response gracefully (returns None on decode failure)."""
 
     class Resp:
@@ -249,21 +253,21 @@ def test_get_image_304_not_modified(monkeypatch):
 # ---------------------------------------------------------------------------
 
 
-def test_apply_image_enhancement_noop_defaults():
+def test_apply_image_enhancement_noop_defaults() -> None:
     """apply_image_enhancement with empty dict is a no-op on image size."""
     img = Image.new("RGB", (10, 10), "gray")
     out = image_utils.apply_image_enhancement(img, {})
     assert out.size == img.size
 
 
-def test_change_orientation_inverted_flag():
+def test_change_orientation_inverted_flag() -> None:
     """change_orientation with inverted=True keeps size for horizontal."""
     img = Image.new("RGB", (20, 10), "white")
     out = image_utils.change_orientation(img, "horizontal", inverted=True)
     assert out.size == (20, 10)
 
 
-def test_change_orientation_unknown_orientation():
+def test_change_orientation_unknown_orientation() -> None:
     """change_orientation raises ValueError for unknown orientation string."""
     img = Image.new("RGB", (10, 10), "white")
     with pytest.raises(ValueError):
@@ -275,7 +279,7 @@ def test_change_orientation_unknown_orientation():
 # ---------------------------------------------------------------------------
 
 
-def test_compute_image_hash_consistency():
+def test_compute_image_hash_consistency() -> None:
     """compute_image_hash returns the same hash for the same image object."""
     img = Image.new("RGB", (100, 100), "red")
     h1 = image_utils.compute_image_hash(img)
@@ -283,14 +287,14 @@ def test_compute_image_hash_consistency():
     assert h1 == h2
 
 
-def test_compute_image_hash_different():
+def test_compute_image_hash_different() -> None:
     """compute_image_hash produces different hashes for different image content."""
     img1 = Image.new("RGB", (100, 100), "red")
     img2 = Image.new("RGB", (100, 100), "blue")
     assert image_utils.compute_image_hash(img1) != image_utils.compute_image_hash(img2)
 
 
-def test_pad_image_blur():
+def test_pad_image_blur() -> None:
     """pad_image_blur produces an image of the requested dimensions."""
     img = Image.new("RGB", (100, 200), "green")
     result = image_utils.pad_image_blur(img, (400, 300))

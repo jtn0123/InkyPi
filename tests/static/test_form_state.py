@@ -13,8 +13,10 @@ from __future__ import annotations
 
 import re
 
+from flask.testing import FlaskClient
 
-def test_form_state_script_is_served(client):
+
+def test_form_state_script_is_served(client: FlaskClient) -> None:
     resp = client.get("/static/scripts/form_state.js")
     assert resp.status_code == 200
     js = resp.get_data(as_text=True)
@@ -31,7 +33,7 @@ def test_form_state_script_is_served(client):
         assert symbol in js, f"form_state.js must expose {symbol}"
 
 
-def test_form_state_auto_attaches_on_dom_ready(client):
+def test_form_state_auto_attaches_on_dom_ready(client: FlaskClient) -> None:
     js = client.get("/static/scripts/form_state.js").get_data(as_text=True)
     # Auto-attach hook runs for any form carrying data-form-state.
     assert "DOMContentLoaded" in js
@@ -40,7 +42,7 @@ def test_form_state_auto_attaches_on_dom_ready(client):
     assert "aria-busy" in js
 
 
-def test_form_state_focuses_first_invalid_field(client):
+def test_form_state_focuses_first_invalid_field(client: FlaskClient) -> None:
     js = client.get("/static/scripts/form_state.js").get_data(as_text=True)
     # setFieldError must toggle aria-invalid and focus the field when first
     # error is rendered (required for proper screen-reader flow).
@@ -48,7 +50,7 @@ def test_form_state_focuses_first_invalid_field(client):
     assert "field.focus" in js
 
 
-def test_form_state_loaded_in_base_template(client):
+def test_form_state_loaded_in_base_template(client: FlaskClient) -> None:
     html = client.get("/static/scripts/../../").status_code  # sanity noop
     _ = html
     # Load any page to capture base.html rendering.
@@ -59,7 +61,7 @@ def test_form_state_loaded_in_base_template(client):
         assert "scripts/form_state.js" in body or "dist/" in body
 
 
-def test_settings_form_has_data_form_state(client):
+def test_settings_form_has_data_form_state(client: FlaskClient) -> None:
     resp = client.get("/settings")
     # Auth may redirect — rely on template content via test client either way.
     if resp.status_code != 200:
@@ -74,7 +76,7 @@ def test_settings_form_has_data_form_state(client):
     assert "data-form-state-submit" in body
 
 
-def test_playlist_schedule_form_has_data_form_state(client):
+def test_playlist_schedule_form_has_data_form_state(client: FlaskClient) -> None:
     resp = client.get("/playlist")
     if resp.status_code != 200:
         return
@@ -87,7 +89,7 @@ def test_playlist_schedule_form_has_data_form_state(client):
     assert "data-form-state-submit" in body
 
 
-def test_settings_page_script_invokes_form_state(client):
+def test_settings_page_script_invokes_form_state(client: FlaskClient) -> None:
     js = client.get("/static/scripts/settings/form.js").get_data(as_text=True)
     # handleAction must route through FormState so the submit button is
     # disabled and aria-busy set for the duration of the save request.
@@ -97,7 +99,7 @@ def test_settings_page_script_invokes_form_state(client):
     assert "field_errors" in js
 
 
-def test_playlist_script_invokes_form_state(client):
+def test_playlist_script_invokes_form_state(client: FlaskClient) -> None:
     js = client.get("/static/scripts/playlist/form.js").get_data(as_text=True)
     # Both create and update flows must wrap submission in FormState.run.
     assert "FormState.attach" in js
@@ -106,12 +108,14 @@ def test_playlist_script_invokes_form_state(client):
     assert "field_errors" in js
 
 
-def test_playlist_create_includes_cycle_minutes(client):
+def test_playlist_create_includes_cycle_minutes(client: FlaskClient) -> None:
     js = client.get("/static/scripts/playlist/form.js").get_data(as_text=True)
     assert "cycle_minutes: cycleMinutes || null" in js
 
 
-def test_playlist_device_cycle_rejects_partial_numeric_values(client):
+def test_playlist_device_cycle_rejects_partial_numeric_values(
+    client: FlaskClient,
+) -> None:
     js = client.get("/static/scripts/playlist/form.js").get_data(as_text=True)
     assert 'const raw = (input?.value || "").trim();' in js
     assert "!/^\\d+$/.test(raw)" in js

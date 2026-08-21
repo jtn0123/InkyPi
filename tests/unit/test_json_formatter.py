@@ -3,18 +3,22 @@
 import json
 import logging
 import sys
+from pathlib import Path
+from typing import Any
+
+import pytest
 
 from utils.logging_utils import JsonFormatter
 
 
 def _make_record(
-    name="test.logger",
-    level=logging.INFO,
-    msg="Hello %s",
-    args=("world",),
-    lineno=42,
-    exc_info=None,
-):
+    name: Any = "test.logger",
+    level: Any = logging.INFO,
+    msg: Any = "Hello %s",
+    args: Any = ("world",),
+    lineno: Any = 42,
+    exc_info: Any = None,
+) -> Any:
     return logging.LogRecord(
         name=name,
         level=level,
@@ -31,14 +35,14 @@ def _make_record(
 # ---------------------------------------------------------------------------
 
 
-def test_basic_fields_present():
+def test_basic_fields_present() -> None:
     record = _make_record()
     data = json.loads(JsonFormatter().format(record))
     for key in ("ts", "level", "logger", "msg", "module", "func", "line", "pid"):
         assert key in data, f"Expected key '{key}' missing from output"
 
 
-def test_basic_field_values():
+def test_basic_field_values() -> None:
     record = _make_record(
         name="myapp.module",
         level=logging.DEBUG,
@@ -53,13 +57,13 @@ def test_basic_field_values():
     assert data["line"] == 99
 
 
-def test_msg_arg_interpolation():
+def test_msg_arg_interpolation() -> None:
     record = _make_record(msg="Hello %s", args=("world",))
     data = json.loads(JsonFormatter().format(record))
     assert data["msg"] == "Hello world"
 
 
-def test_ts_is_iso8601_utc():
+def test_ts_is_iso8601_utc() -> None:
     record = _make_record()
     data = json.loads(JsonFormatter().format(record))
     ts = data["ts"]
@@ -67,7 +71,7 @@ def test_ts_is_iso8601_utc():
     assert ts.endswith(("+00:00", "Z")), f"Expected UTC ts, got: {ts}"
 
 
-def test_pid_is_integer():
+def test_pid_is_integer() -> None:
     record = _make_record()
     data = json.loads(JsonFormatter().format(record))
     assert isinstance(data["pid"], int)
@@ -78,7 +82,7 @@ def test_pid_is_integer():
 # ---------------------------------------------------------------------------
 
 
-def test_exception_fields_present():
+def test_exception_fields_present() -> None:
     try:
         raise ValueError("boom")
     except ValueError:
@@ -91,7 +95,7 @@ def test_exception_fields_present():
     assert "ValueError" in data["exc_traceback"]
 
 
-def test_exception_no_exc_type_key_when_no_exception():
+def test_exception_no_exc_type_key_when_no_exception() -> None:
     record = _make_record()
     data = json.loads(JsonFormatter().format(record))
     assert "exc_type" not in data
@@ -104,7 +108,7 @@ def test_exception_no_exc_type_key_when_no_exception():
 # ---------------------------------------------------------------------------
 
 
-def test_extras_passed_through():
+def test_extras_passed_through() -> None:
     record = _make_record()
     record.request_id = "abc123"
     record.user_id = 42
@@ -113,7 +117,7 @@ def test_extras_passed_through():
     assert data["extra"]["user_id"] == 42
 
 
-def test_no_extra_key_when_no_extras():
+def test_no_extra_key_when_no_extras() -> None:
     record = _make_record()
     data = json.loads(JsonFormatter().format(record))
     assert "extra" not in data
@@ -124,9 +128,9 @@ def test_no_extra_key_when_no_extras():
 # ---------------------------------------------------------------------------
 
 
-def test_non_serialisable_extra_does_not_crash():
+def test_non_serialisable_extra_does_not_crash() -> Any:
     class Unserializable:
-        def __repr__(self):
+        def __repr__(self) -> Any:
             return "<Unserializable>"
 
     record = _make_record()
@@ -141,7 +145,7 @@ def test_non_serialisable_extra_does_not_crash():
 # ---------------------------------------------------------------------------
 
 
-def test_default_fields_merged():
+def test_default_fields_merged() -> None:
     formatter = JsonFormatter(default_fields={"app": "inkypi", "env": "test"})
     record = _make_record()
     data = json.loads(formatter.format(record))
@@ -154,7 +158,9 @@ def test_default_fields_merged():
 # ---------------------------------------------------------------------------
 
 
-def test_setup_logging_uses_json_formatter_when_env_set(monkeypatch, tmp_path):
+def test_setup_logging_uses_json_formatter_when_env_set(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     """setup_logging() must attach JsonFormatter to root when env var is json."""
     monkeypatch.setenv("INKYPI_LOG_FORMAT", "json")
 

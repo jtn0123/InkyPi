@@ -1,19 +1,20 @@
 # pyright: reportMissingImports=false
 """Error scenario tests for the RSS plugin."""
 
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
 import requests
 
 
-def _make_rss_plugin():
+def _make_rss_plugin() -> Any:
     from plugins.rss.rss import Rss
 
     return Rss({"id": "rss"})
 
 
-def _make_device_config():
+def _make_device_config() -> Any:
     cfg = MagicMock()
     cfg.get_resolution.return_value = (800, 480)
     cfg.get_config.side_effect = lambda key, default=None: {
@@ -23,7 +24,7 @@ def _make_device_config():
     return cfg
 
 
-def _base_settings(feed_url="http://example.com/feed.xml"):
+def _base_settings(feed_url: Any = "http://example.com/feed.xml") -> Any:
     return {
         "title": "Test Feed",
         "feedUrl": feed_url,
@@ -32,7 +33,7 @@ def _base_settings(feed_url="http://example.com/feed.xml"):
     }
 
 
-def test_rss_malformed_xml():
+def test_rss_malformed_xml() -> None:
     """feedparser gets garbage XML -> RuntimeError."""
     p = _make_rss_plugin()
 
@@ -55,7 +56,7 @@ def test_rss_malformed_xml():
                 p.parse_rss_feed("http://example.com/feed.xml")
 
 
-def test_rss_empty_feed():
+def test_rss_empty_feed() -> None:
     """Valid XML with zero entries returns empty list gracefully."""
     p = _make_rss_plugin()
 
@@ -76,7 +77,7 @@ def test_rss_empty_feed():
             assert items == []
 
 
-def test_rss_network_timeout():
+def test_rss_network_timeout() -> None:
     """requests.get raises Timeout."""
     p = _make_rss_plugin()
 
@@ -88,7 +89,7 @@ def test_rss_network_timeout():
             p.parse_rss_feed("http://example.com/feed.xml")
 
 
-def test_rss_http_500():
+def test_rss_http_500() -> None:
     """Server returns 500 -> raise_for_status raises."""
     p = _make_rss_plugin()
 
@@ -104,7 +105,7 @@ def test_rss_http_500():
             p.parse_rss_feed("http://example.com/feed.xml")
 
 
-def test_rss_missing_feed_url_falls_back_to_default():
+def test_rss_missing_feed_url_falls_back_to_default() -> None:
     """JTN-784: missing feedUrl at render time falls back to the BBC World News
     default so a bare /update_now renders. validate_settings still rejects an
     empty feedUrl on save — see tests/plugins/test_rss.py for that contract."""
@@ -117,7 +118,7 @@ def test_rss_missing_feed_url_falls_back_to_default():
     assert args[0] == "https://feeds.bbci.co.uk/news/rss.xml"
 
 
-def test_rss_connection_error():
+def test_rss_connection_error() -> None:
     """requests.get raises ConnectionError."""
     p = _make_rss_plugin()
 

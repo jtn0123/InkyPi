@@ -14,6 +14,8 @@ from __future__ import annotations
 
 from html.parser import HTMLParser
 
+from flask.testing import FlaskClient
+
 
 class _FormLabelAuditor(HTMLParser):
     """Lightweight HTML parser that identifies form controls and their labels."""
@@ -73,7 +75,7 @@ def _find_unlabeled(html: str) -> list[dict]:
 # ---------------------------------------------------------------------------
 
 
-def test_playlist_page_all_controls_labeled(client):
+def test_playlist_page_all_controls_labeled(client: FlaskClient) -> None:
     """/playlist — every named input/select/textarea must have an accessible label."""
     resp = client.get("/playlist")
     assert resp.status_code == 200
@@ -92,7 +94,7 @@ def test_playlist_page_all_controls_labeled(client):
 # ---------------------------------------------------------------------------
 
 
-def test_calendar_plugin_page_all_controls_labeled(client):
+def test_calendar_plugin_page_all_controls_labeled(client: FlaskClient) -> None:
     """/plugin/calendar — every named input/select/textarea must have an accessible label."""
     resp = client.get("/plugin/calendar")
     assert resp.status_code == 200

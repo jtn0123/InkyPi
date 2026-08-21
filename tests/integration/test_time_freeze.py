@@ -2,15 +2,20 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta
+from typing import Any
 from zoneinfo import ZoneInfo
 
 import pytest
+from flask import Flask
+from flask.testing import FlaskClient
 
 pytest.importorskip("freezegun")
 from freezegun import freeze_time  # noqa: E402
 
 
-def test_playlist_rotation_respects_device_timezone_freeze(device_config_dev):
+def test_playlist_rotation_respects_device_timezone_freeze(
+    device_config_dev: Any,
+) -> None:
     # Configure device timezone to US/Eastern
     device_config_dev.update_value("timezone", "US/Eastern", write=True)
 
@@ -30,8 +35,8 @@ def test_playlist_rotation_respects_device_timezone_freeze(device_config_dev):
 
 
 def test_refresh_cadence_interval_respects_device_timezone_freeze(
-    device_config_dev, monkeypatch
-):
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     # Set device timezone
     device_config_dev.update_value("timezone", "US/Eastern", write=True)
     # Ensure a short plugin cycle interval (1 hour)
@@ -88,7 +93,9 @@ def test_refresh_cadence_interval_respects_device_timezone_freeze(
         assert p is not None and inst is not None
 
 
-def test_logs_api_uses_device_timezone_for_since(client, flask_app, monkeypatch):
+def test_logs_api_uses_device_timezone_for_since(
+    client: FlaskClient, flask_app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> Any:
     # Switch device tz
     dc = flask_app.config["DEVICE_CONFIG"]
     dc.update_value("timezone", "US/Eastern", write=True)
@@ -99,16 +106,16 @@ def test_logs_api_uses_device_timezone_for_since(client, flask_app, monkeypatch)
     captured: dict[str, int] = {"since_usec": 0}
 
     class FakeJR:
-        def open(self, mode):
+        def open(self, mode: Any) -> Any:
             return None
 
-        def add_filter(self, rule):
+        def add_filter(self, rule: Any) -> Any:
             return None
 
-        def seek_realtime_usec(self, usec):
+        def seek_realtime_usec(self, usec: Any) -> None:
             captured["since_usec"] = int(usec)
 
-        def __iter__(self):
+        def __iter__(self) -> Any:
             return iter(())
 
     monkeypatch.setattr(settings_mod, "JOURNAL_AVAILABLE", True, raising=True)
@@ -133,8 +140,8 @@ def test_logs_api_uses_device_timezone_for_since(client, flask_app, monkeypatch)
 
 
 def test_logs_api_formats_journal_timestamps_in_device_timezone(
-    client, flask_app, monkeypatch
-):
+    client: FlaskClient, flask_app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> Any:
     dc = flask_app.config["DEVICE_CONFIG"]
     dc.update_value("timezone", "America/Los_Angeles", write=True)
 
@@ -143,23 +150,23 @@ def test_logs_api_formats_journal_timestamps_in_device_timezone(
     class FakeRecord:
         data = {"PRIORITY": "6", "MESSAGE": "hello from journal"}
 
-        def get_realtime_usec(self):
+        def get_realtime_usec(self) -> Any:
             return 1735693200 * 1_000_000  # 2025-01-01T01:00:00Z
 
     class FakeJR:
-        def open(self, mode):
+        def open(self, mode: Any) -> Any:
             return None
 
-        def add_filter(self, rule):
+        def add_filter(self, rule: Any) -> Any:
             return None
 
-        def seek_realtime_usec(self, usec):
+        def seek_realtime_usec(self, usec: Any) -> Any:
             return None
 
-        def __iter__(self):
+        def __iter__(self) -> Any:
             return iter([FakeRecord()])
 
-        def close(self):
+        def close(self) -> Any:
             return None
 
     monkeypatch.setattr(settings_mod, "JOURNAL_AVAILABLE", True, raising=True)

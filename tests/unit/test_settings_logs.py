@@ -1,4 +1,10 @@
-def test_api_logs_clamp_and_meta(client, monkeypatch):
+import pytest
+from flask.testing import FlaskClient
+
+
+def test_api_logs_clamp_and_meta(
+    client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
     # Request with out-of-range parameters; expect clamped values in meta
     resp = client.get(
         "/api/logs?hours=9999&limit=999999&level=errors&contains=" + ("x" * 500)
@@ -16,7 +22,9 @@ def test_api_logs_clamp_and_meta(client, monkeypatch):
     assert len(meta["contains"]) <= 200
 
 
-def test_api_logs_size_guard(client, monkeypatch):
+def test_api_logs_size_guard(
+    client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
     # Ask for a large limit; handler should ensure response size guardrail
     resp = client.get("/api/logs?hours=2&limit=5000&level=all")
     assert resp.status_code == 200
@@ -26,10 +34,10 @@ def test_api_logs_size_guard(client, monkeypatch):
     assert "meta" in data
 
 
-def test_api_logs_rate_limit(client, monkeypatch):
+def test_api_logs_rate_limit(client: FlaskClient, monkeypatch: pytest.MonkeyPatch):
     # Simulate many quick requests from same remote addr to trigger 429
     # Flask test client sets REMOTE_ADDR=127.0.0.1 by default
-    # Hit enough times to exceed _RATE_LIMIT_MAX_REQUESTS (120)
+    # Hit enough times to exceed _RATE_LIMIT_MAX_REQUESTS (120) -> None -> None
     last = None
     for _ in range(130):
         last = client.get("/api/logs")
@@ -46,7 +54,7 @@ def test_api_logs_rate_limit(client, monkeypatch):
 # ---- Additional edge-case tests ----
 
 
-def test_download_logs_filename_timestamp(client):
+def test_download_logs_filename_timestamp(client: FlaskClient) -> None:
     """Download filename matches inkypi_YYYYMMDD-HHMMSS.log pattern."""
     import re
 
@@ -57,7 +65,9 @@ def test_download_logs_filename_timestamp(client):
     assert match is not None
 
 
-def test_download_logs_exception_500(client, monkeypatch):
+def test_download_logs_exception_500(
+    client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """_read_log_lines raising returns 500 text response."""
     import blueprints.settings as mod
 
@@ -69,7 +79,7 @@ def test_download_logs_exception_500(client, monkeypatch):
     assert resp.status_code == 500
 
 
-def test_api_logs_level_warn_errors(client):
+def test_api_logs_level_warn_errors(client: FlaskClient) -> None:
     """level=warn_errors is accepted and echoed back in meta."""
     resp = client.get("/api/logs?level=warn_errors")
     assert resp.status_code == 200
@@ -77,7 +87,7 @@ def test_api_logs_level_warn_errors(client):
     assert data["meta"]["level"] == "warn_errors"
 
 
-def test_api_logs_level_all(client):
+def test_api_logs_level_all(client: FlaskClient) -> None:
     """level=all is accepted and echoed back in meta."""
     resp = client.get("/api/logs?level=all")
     assert resp.status_code == 200
@@ -85,7 +95,7 @@ def test_api_logs_level_all(client):
     assert data["meta"]["level"] == "all"
 
 
-def test_api_logs_contains_case_insensitive(client):
+def test_api_logs_contains_case_insensitive(client: FlaskClient) -> None:
     """contains parameter is accepted and echoed back in meta."""
     resp = client.get("/api/logs?contains=ERROR")
     assert resp.status_code == 200
@@ -93,7 +103,7 @@ def test_api_logs_contains_case_insensitive(client):
     assert data["meta"]["contains"] == "ERROR"
 
 
-def test_api_logs_truncated_hours_clamped(client):
+def test_api_logs_truncated_hours_clamped(client: FlaskClient) -> None:
     """hours=999 → truncated is true (clamped to 24)."""
     resp = client.get("/api/logs?hours=999")
     assert resp.status_code == 200
@@ -102,7 +112,7 @@ def test_api_logs_truncated_hours_clamped(client):
     assert data["meta"]["hours"] == 24
 
 
-def test_api_logs_truncated_limit_clamped(client):
+def test_api_logs_truncated_limit_clamped(client: FlaskClient) -> None:
     """limit=999999 → truncated is true (clamped to 2000)."""
     resp = client.get("/api/logs?limit=999999")
     assert resp.status_code == 200
@@ -111,7 +121,9 @@ def test_api_logs_truncated_limit_clamped(client):
     assert data["meta"]["limit"] == 2000
 
 
-def test_api_logs_response_size_guardrail(client, monkeypatch):
+def test_api_logs_response_size_guardrail(
+    client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Huge output is truncated under MAX_RESPONSE_BYTES."""
     import blueprints.settings as mod
 
@@ -127,7 +139,7 @@ def test_api_logs_response_size_guardrail(client, monkeypatch):
     assert len(raw) <= mod.MAX_RESPONSE_BYTES + 10000  # some overhead for JSON wrapping
 
 
-def test_format_journal_line_strips_internals():
+def test_format_journal_line_strips_internals() -> None:
     """_format_journal_line maps priority to level and omits hostname/PID."""
     from blueprints.settings import _format_journal_line
 
@@ -145,7 +157,7 @@ def test_format_journal_line_strips_internals():
     assert "1234" not in result
 
 
-def test_format_journal_line_defaults_to_info():
+def test_format_journal_line_defaults_to_info() -> None:
     """Missing PRIORITY defaults to INFO level."""
     from blueprints.settings import _format_journal_line
 
@@ -153,7 +165,9 @@ def test_format_journal_line_defaults_to_info():
     assert result == "Apr 02 10:00:00 [INFO] hello"
 
 
-def test_log_lines_exclude_internal_details(client, monkeypatch):
+def test_log_lines_exclude_internal_details(
+    client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Log lines should not expose hostname, PID, or process identifiers."""
     import re
 

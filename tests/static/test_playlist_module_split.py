@@ -8,7 +8,7 @@ PLAYLIST_PAGE_JS = ROOT / "src" / "static" / "scripts" / "playlist" / "page.js"
 PLAYLIST_HTML = ROOT / "src" / "templates" / "playlist.html"
 
 
-def test_playlist_template_loads_split_scripts_in_order():
+def test_playlist_template_loads_split_scripts_in_order() -> None:
     html = PLAYLIST_HTML.read_text()
     scripts = [
         "scripts/playlist/shared.js",
@@ -29,7 +29,7 @@ def test_playlist_template_loads_split_scripts_in_order():
     ), "playlist module scripts must load before the bootstrap"
 
 
-def test_playlist_bootstrap_stays_thin_and_boot_oriented():
+def test_playlist_bootstrap_stays_thin_and_boot_oriented() -> None:
     js = PLAYLIST_BOOTSTRAP_JS.read_text()
     assert "InkyPiPlaylistPage" in js
     assert "createPlaylistPage" in js
@@ -47,12 +47,12 @@ def test_playlist_bootstrap_stays_thin_and_boot_oriented():
         ), f"{moved_symbol} should live in a playlist module, not playlist.js"
 
 
-def test_playlist_page_drops_dead_next_in_timer():
+def test_playlist_page_drops_dead_next_in_timer() -> None:
     js = PLAYLIST_PAGE_JS.read_text()
     assert "renderNextIn" not in js
 
 
-def test_playlist_name_input_matches_client_validation_limits():
+def test_playlist_name_input_matches_client_validation_limits() -> None:
     html = PLAYLIST_HTML.read_text(encoding="utf-8")
     assert 'id="playlist_name"' in html
     assert 'maxlength="64"' in html

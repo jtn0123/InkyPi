@@ -22,7 +22,7 @@ def _read_js() -> str:
     return API_KEYS_JS.read_text(encoding="utf-8")
 
 
-def test_refresh_key_counts_function_exists_and_updates_both_chips():
+def test_refresh_key_counts_function_exists_and_updates_both_chips() -> None:
     """The page must have a function that recomputes both badges from the
     current DOM. Without this the labels stay stale after add/delete."""
     js = _read_js()
@@ -34,7 +34,9 @@ def test_refresh_key_counts_function_exists_and_updates_both_chips():
     assert 'getElementById("configuredCountSummary")' in js
 
 
-def test_refresh_key_counts_uses_distinct_semantics_for_provider_vs_configured():
+def test_refresh_key_counts_uses_distinct_semantics_for_provider_vs_configured() -> (
+    None
+):
     """The two badges MUST distinguish 'has a key entered' from 'has a value
     saved'. Otherwise they remain redundantly identical (ISSUE-004)."""
     js = _read_js()
@@ -57,7 +59,7 @@ def test_refresh_key_counts_uses_distinct_semantics_for_provider_vs_configured()
     ), "configured count must depend on value/existing state, not just key presence"
 
 
-def test_refresh_key_counts_called_after_add_delete_and_value_input():
+def test_refresh_key_counts_called_after_add_delete_and_value_input() -> None:
     """The badges must update on every state-change path: addRow,
     deleteRow, value input. Otherwise they go stale."""
     js = _read_js()
@@ -82,7 +84,7 @@ def test_refresh_key_counts_called_after_add_delete_and_value_input():
     assert "refreshKeyCounts()" in delete_match.group("body")
 
 
-def test_save_generic_keys_marks_empty_value_input_aria_invalid():
+def test_save_generic_keys_marks_empty_value_input_aria_invalid() -> None:
     """On submit, an empty new-row value must produce an inline aria-invalid
     + validation-message on the field — not just a corner toast (ISSUE-005)."""
     js = _read_js()
@@ -109,7 +111,7 @@ def test_save_generic_keys_marks_empty_value_input_aria_invalid():
     assert ".focus()" in body
 
 
-def test_save_generic_clears_prior_aria_invalid_at_start_of_each_submit():
+def test_save_generic_clears_prior_aria_invalid_at_start_of_each_submit() -> None:
     """Each new submit must clear stale aria-invalid from the previous run
     so a fixed input doesn't keep its old error state visually."""
     js = _read_js()

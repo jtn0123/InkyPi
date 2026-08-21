@@ -1,9 +1,15 @@
 from __future__ import annotations
 
 import shutil
+from pathlib import Path
+
+import pytest
+from flask.testing import FlaskClient
 
 
-def test_missing_state_directory_degrades_gracefully(client, monkeypatch, tmp_path):
+def test_missing_state_directory_degrades_gracefully(
+    client: FlaskClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     import blueprints.diagnostics as diag
 
     state_dir = tmp_path / "var-lib-inkypi"

@@ -1,24 +1,31 @@
 from __future__ import annotations
 
+from typing import Any
+
+import pytest
+from flask import Flask
+from flask.testing import FlaskClient
 from PIL import Image
 
 
-def test_wifi_drop_mid_refresh_then_retry_succeeds(client, flask_app, monkeypatch):
+def test_wifi_drop_mid_refresh_then_retry_succeeds(
+    client: FlaskClient, flask_app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> Any:
     refresh_task = flask_app.config["REFRESH_TASK"]
     device_config = flask_app.config["DEVICE_CONFIG"]
     monkeypatch.setenv("INKYPI_PLUGIN_RETRY_MAX", "0")
 
     class FlakyWifiPlugin:
-        def __init__(self):
+        def __init__(self) -> None:
             self.calls = 0
 
-        def generate_image(self, _settings, cfg):
+        def generate_image(self, _settings: Any, cfg: Any) -> Any:
             self.calls += 1
             if self.calls == 1:
                 raise ConnectionError("wifi dropped for 60s")
             return Image.new("RGB", cfg.get_resolution(), "white")
 
-        def get_latest_metadata(self):
+        def get_latest_metadata(self) -> Any:
             return None
 
     plugin = FlakyWifiPlugin()
