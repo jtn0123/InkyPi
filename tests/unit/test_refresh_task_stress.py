@@ -7,6 +7,8 @@ requests, and edge cases without deadlocks or race conditions.
 import os
 import threading
 import time
+from collections.abc import Iterator
+from typing import Any
 
 import psutil
 import pytest
@@ -15,8 +17,13 @@ from PIL import Image
 from display.display_manager import DisplayManager
 from refresh_task import ManualRefresh, RefreshTask
 
+# Resident-set-size assertions only mean something when this process is not
+# competing for memory with sibling workers, so these are excluded from the
+# parallel run (scripts/test-fast.sh) and executed serially instead.
+pytestmark = pytest.mark.memory
 
-def wait_until(predicate, timeout=1.0, interval=0.01):
+
+def wait_until(predicate: Any, timeout: Any = 1.0, interval: Any = 0.01) -> Any:
     """Poll until a condition becomes true."""
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
@@ -27,14 +34,14 @@ def wait_until(predicate, timeout=1.0, interval=0.01):
 
 
 @pytest.fixture
-def mock_plugin():
+def mock_plugin() -> Any:
     """Create a mock plugin that returns images quickly."""
 
     class FastPlugin:
         config = {"image_settings": []}
         call_count = 0
 
-        def generate_image(self, settings, device_config):
+        def generate_image(self, settings: Any, device_config: Any) -> Any:
             self.call_count += 1
             # Simulate very fast image generation
             return Image.new("RGB", device_config.get_resolution(), "white")
@@ -43,7 +50,7 @@ def mock_plugin():
 
 
 @pytest.fixture
-def refresh_task(device_config_dev):
+def refresh_task(device_config_dev: Any) -> Iterator[Any]:
     """Create a RefreshTask instance for testing."""
     dm = DisplayManager(device_config_dev)
     task = RefreshTask(device_config_dev, dm)
@@ -53,7 +60,9 @@ def refresh_task(device_config_dev):
         task.stop()
 
 
-def test_rapid_manual_updates(device_config_dev, mock_plugin, monkeypatch):
+def test_rapid_manual_updates(
+    device_config_dev: Any, mock_plugin: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Test handling of many manual updates in quick succession."""
     dm = DisplayManager(device_config_dev)
     task = RefreshTask(device_config_dev, dm)
@@ -83,8 +92,8 @@ def test_rapid_manual_updates(device_config_dev, mock_plugin, monkeypatch):
 
 
 def test_concurrent_manual_updates_from_multiple_threads(
-    device_config_dev, mock_plugin, monkeypatch
-):
+    device_config_dev: Any, mock_plugin: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Test concurrent manual update requests from multiple threads."""
     dm = DisplayManager(device_config_dev)
     task = RefreshTask(device_config_dev, dm)
@@ -102,7 +111,7 @@ def test_concurrent_manual_updates_from_multiple_threads(
         completed = []
         errors = []
 
-        def send_update(thread_id):
+        def send_update(thread_id: Any) -> None:
             try:
                 for _i in range(5):
                     refresh = ManualRefresh("test", {})
@@ -130,7 +139,7 @@ def test_concurrent_manual_updates_from_multiple_threads(
         task.stop()
 
 
-def test_start_stop_cycles(device_config_dev):
+def test_start_stop_cycles(device_config_dev: Any) -> None:
     """Test rapid start/stop cycles don't cause issues."""
     dm = DisplayManager(device_config_dev)
 
@@ -144,7 +153,9 @@ def test_start_stop_cycles(device_config_dev):
         assert not task.running
 
 
-def test_stop_while_refresh_in_progress(device_config_dev, monkeypatch):
+def test_stop_while_refresh_in_progress(
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> Any:
     """Test stopping the task while a refresh is in progress."""
     dm = DisplayManager(device_config_dev)
     task = RefreshTask(device_config_dev, dm)
@@ -153,8 +164,12 @@ def test_stop_while_refresh_in_progress(device_config_dev, monkeypatch):
     slow_plugin_can_finish = threading.Event()
 
     def fake_perform(
-        refresh_action, latest_refresh, current_dt, request_id=None, **kwargs
-    ):
+        refresh_action: Any,
+        latest_refresh: Any,
+        current_dt: Any,
+        request_id: Any = None,
+        **kwargs: Any,
+    ) -> Any:
         slow_plugin_started.set()
         slow_plugin_can_finish.wait(timeout=2)
         return (
@@ -203,7 +218,9 @@ def test_stop_while_refresh_in_progress(device_config_dev, monkeypatch):
             task.stop()
 
 
-def test_manual_update_queue_ordering(device_config_dev, monkeypatch):
+def test_manual_update_queue_ordering(
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Test that manual updates are processed in order."""
     dm = DisplayManager(device_config_dev)
     task = RefreshTask(device_config_dev, dm)
@@ -245,7 +262,9 @@ def test_manual_update_queue_ordering(device_config_dev, monkeypatch):
         task.stop()
 
 
-def test_exception_during_refresh_does_not_crash_task(device_config_dev, monkeypatch):
+def test_exception_during_refresh_does_not_crash_task(
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> Any:
     """Test that exceptions during refresh are captured and re-raised but don't crash the background thread."""
     monkeypatch.setenv("INKYPI_PLUGIN_RETRY_MAX", "0")
     dm = DisplayManager(device_config_dev)
@@ -254,8 +273,12 @@ def test_exception_during_refresh_does_not_crash_task(device_config_dev, monkeyp
     calls = {"count": 0}
 
     def fake_perform(
-        refresh_action, latest_refresh, current_dt, request_id=None, **kwargs
-    ):
+        refresh_action: Any,
+        latest_refresh: Any,
+        current_dt: Any,
+        request_id: Any = None,
+        **kwargs: Any,
+    ) -> Any:
         calls["count"] += 1
         if calls["count"] == 1:
             raise RuntimeError("Simulated plugin failure")
@@ -297,8 +320,8 @@ def test_exception_during_refresh_does_not_crash_task(device_config_dev, monkeyp
 
 
 def test_manual_update_returns_metrics_after_update(
-    device_config_dev, mock_plugin, monkeypatch
-):
+    device_config_dev: Any, mock_plugin: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Test that manual updates return per-request metrics."""
     dm = DisplayManager(device_config_dev)
     task = RefreshTask(device_config_dev, dm)
@@ -322,8 +345,8 @@ def test_manual_update_returns_metrics_after_update(
 
 
 def test_high_frequency_updates_dont_deadlock(
-    device_config_dev, mock_plugin, monkeypatch
-):
+    device_config_dev: Any, mock_plugin: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Test that very high frequency updates don't cause deadlocks."""
     dm = DisplayManager(device_config_dev)
     task = RefreshTask(device_config_dev, dm)
@@ -356,8 +379,8 @@ def test_high_frequency_updates_dont_deadlock(
 
 
 def test_memory_not_growing_with_many_updates(
-    device_config_dev, mock_plugin, monkeypatch
-):
+    device_config_dev: Any, mock_plugin: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Test that memory doesn't grow excessively with many updates."""
     dm = DisplayManager(device_config_dev)
     task = RefreshTask(device_config_dev, dm)

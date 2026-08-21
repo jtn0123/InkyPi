@@ -15,10 +15,13 @@ import base64
 import hashlib
 import json
 import sys
+from collections.abc import Iterator
 from pathlib import Path
+from typing import Any
 from unittest.mock import patch
 
 import pytest
+from flask import Flask
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SRC_ROOT = REPO_ROOT / "src"
@@ -59,7 +62,14 @@ class TestComputeSri:
         f.write_bytes(b"const x = 1;")
         from utils.sri import compute_sri
 
-        assert compute_sri(f) == compute_sri(f)
+        # Assert against a known-good digest rather than comparing the
+        # function to itself: `compute_sri(f) == compute_sri(f)` holds for any
+        # implementation, including one that returns a constant or None.
+        expected = (
+            "sha384-tiuF6jOlT2JxytQTL/sE7cTofDIQh6DQIjzjPiit7uJxegLt3kQ/A2yC84C2mT+P"
+        )
+        assert compute_sri(f) == expected
+        assert compute_sri(f) == compute_sri(f), "must also be stable across calls"
 
     def test_different_content_different_hash(self, tmp_path: Path) -> None:
         f1 = tmp_path / "a.js"
@@ -93,7 +103,7 @@ class TestComputeSri:
 
 class TestSriFor:
     @pytest.fixture(autouse=True)
-    def reset_cache(self):
+    def reset_cache(self) -> Iterator[Any]:
         from utils import sri as sri_mod
 
         sri_mod._reset_cache_for_tests()
@@ -177,7 +187,7 @@ class TestSriFor:
 
 class TestCdnSri:
     @pytest.fixture(autouse=True)
-    def reset_cdn_cache(self):
+    def reset_cdn_cache(self) -> Iterator[Any]:
         from utils import sri as sri_mod
 
         sri_mod._reset_cache_for_tests()
@@ -236,7 +246,7 @@ class TestCdnSri:
 
 
 class TestInitSri:
-    def test_jinja_globals_registered(self, flask_app) -> None:
+    def test_jinja_globals_registered(self, flask_app: Flask) -> None:
         from utils.sri import init_sri
 
         init_sri(flask_app)
@@ -245,7 +255,9 @@ class TestInitSri:
         assert callable(flask_app.jinja_env.globals["sri_for"])
         assert callable(flask_app.jinja_env.globals["cdn_sri"])
 
-    def test_sri_for_renders_in_template(self, tmp_path: Path, flask_app) -> None:
+    def test_sri_for_renders_in_template(
+        self, tmp_path: Path, flask_app: Flask
+    ) -> None:
         """sri_for should render a valid sha384- string in a Jinja template."""
         from utils import sri as sri_mod
         from utils.sri import init_sri
@@ -265,7 +277,9 @@ class TestInitSri:
 
         assert rendered == expected
 
-    def test_cdn_sri_renders_in_template(self, tmp_path: Path, flask_app) -> None:
+    def test_cdn_sri_renders_in_template(
+        self, tmp_path: Path, flask_app: Flask
+    ) -> None:
         from utils import sri as sri_mod
         from utils.sri import init_sri
 
@@ -325,7 +339,7 @@ class TestCdnManifest:
 
 class TestUpdateCdnSriScript:
     @pytest.fixture(autouse=True)
-    def patch_sys_path(self):
+    def patch_sys_path(self) -> Iterator[Any]:
         if str(SCRIPTS_ROOT) not in sys.path:
             sys.path.insert(0, str(SCRIPTS_ROOT))
         yield

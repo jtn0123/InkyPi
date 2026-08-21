@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from typing import Any
 from unittest.mock import patch
 
 import pytest
@@ -21,11 +22,11 @@ from utils.rate_limit import (
 
 
 class TestTokenBucket:
-    def test_initial_acquire_succeeds(self):
+    def test_initial_acquire_succeeds(self) -> None:
         bucket = TokenBucket(capacity=5, refill_rate=1 / 30)
         assert bucket.try_acquire("192.168.1.1") is True
 
-    def test_acquire_up_to_capacity(self):
+    def test_acquire_up_to_capacity(self) -> None:
         bucket = TokenBucket(capacity=3, refill_rate=0)
         # First acquisition uses up one token from a new bucket that starts at capacity
         assert bucket.try_acquire("ip") is True  # capacity-1 = 2 tokens remain
@@ -33,12 +34,12 @@ class TestTokenBucket:
         assert bucket.try_acquire("ip") is True  # 0 tokens remain
         assert bucket.try_acquire("ip") is False  # denied
 
-    def test_acquire_denied_when_empty(self):
+    def test_acquire_denied_when_empty(self) -> None:
         bucket = TokenBucket(capacity=1, refill_rate=0)
         assert bucket.try_acquire("ip") is True
         assert bucket.try_acquire("ip") is False
 
-    def test_refill_after_time_passes(self):
+    def test_refill_after_time_passes(self) -> None:
         bucket = TokenBucket(capacity=3, refill_rate=1)  # 1 token/second
         with patch("utils.rate_limit.time.monotonic", return_value=100.0):
             # Drain: first call creates bucket at cap-1=2, then two more
@@ -53,14 +54,14 @@ class TestTokenBucket:
             assert bucket.try_acquire("ip") is True
             assert bucket.try_acquire("ip") is False
 
-    def test_different_keys_tracked_separately(self):
+    def test_different_keys_tracked_separately(self) -> None:
         bucket = TokenBucket(capacity=1, refill_rate=0)
         assert bucket.try_acquire("ip-a") is True
         assert bucket.try_acquire("ip-a") is False
         # ip-b is unaffected
         assert bucket.try_acquire("ip-b") is True
 
-    def test_stale_buckets_evicted(self):
+    def test_stale_buckets_evicted(self) -> None:
         bucket = TokenBucket(capacity=5, refill_rate=1, ttl=10)
         with patch("utils.rate_limit.time.monotonic", return_value=100.0):
             bucket.try_acquire("stale-ip")
@@ -72,7 +73,7 @@ class TestTokenBucket:
 
         assert "stale-ip" not in bucket._buckets
 
-    def test_capacity_not_exceeded_by_refill(self):
+    def test_capacity_not_exceeded_by_refill(self) -> None:
         bucket = TokenBucket(capacity=5, refill_rate=100)  # fast refill
         with patch("utils.rate_limit.time.monotonic", return_value=100.0):
             bucket.try_acquire("ip")  # creates bucket
@@ -84,14 +85,14 @@ class TestTokenBucket:
             # 6th should fail
             assert bucket.try_acquire("ip") is False
 
-    def test_thread_safety(self):
+    def test_thread_safety(self) -> None:
         import threading
 
         bucket = TokenBucket(capacity=100, refill_rate=0)
         allowed_count = {"n": 0}
         lock = threading.Lock()
 
-        def worker():
+        def worker() -> None:
             local = sum(1 for _ in range(20) if bucket.try_acquire("shared"))
             with lock:
                 allowed_count["n"] += local
@@ -112,47 +113,61 @@ class TestTokenBucket:
 
 
 class TestParseRateEnv:
-    def test_defaults_returned_when_env_unset(self, monkeypatch):
+    def test_defaults_returned_when_env_unset(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         monkeypatch.delenv("INKYPI_RATE_LIMIT_AUTH", raising=False)
         cap, rate = _parse_rate_env("INKYPI_RATE_LIMIT_AUTH", 5, 1 / 30)
         assert cap == 5.0
         assert rate == pytest.approx(1 / 30)
 
-    def test_parses_valid_env(self, monkeypatch):
+    def test_parses_valid_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("INKYPI_RATE_LIMIT_AUTH", "10/60")
         cap, rate = _parse_rate_env("INKYPI_RATE_LIMIT_AUTH", 5, 1 / 30)
         assert cap == 10.0
         assert rate == pytest.approx(1 / 60)
 
-    def test_invalid_env_falls_back_to_defaults(self, monkeypatch):
+    def test_invalid_env_falls_back_to_defaults(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         monkeypatch.setenv("INKYPI_RATE_LIMIT_AUTH", "bad/value")
         cap, rate = _parse_rate_env("INKYPI_RATE_LIMIT_AUTH", 5, 1 / 30)
         assert cap == 5.0
         assert rate == pytest.approx(1 / 30)
 
-    def test_make_auth_bucket_uses_defaults(self, monkeypatch):
+    def test_make_auth_bucket_uses_defaults(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         monkeypatch.delenv("INKYPI_RATE_LIMIT_AUTH", raising=False)
         b = make_auth_bucket()
         assert b._capacity == 5.0
 
-    def test_make_refresh_bucket_uses_defaults(self, monkeypatch):
+    def test_make_refresh_bucket_uses_defaults(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         monkeypatch.delenv("INKYPI_RATE_LIMIT_REFRESH", raising=False)
         b = make_refresh_bucket()
         assert b._capacity == 10.0
 
-    def test_make_auth_bucket_respects_env(self, monkeypatch):
+    def test_make_auth_bucket_respects_env(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         monkeypatch.setenv("INKYPI_RATE_LIMIT_AUTH", "7/45")
         b = make_auth_bucket()
         assert b._capacity == 7.0
         assert b._refill_rate == pytest.approx(1 / 45)
 
-    def test_make_mutating_bucket_uses_defaults(self, monkeypatch):
+    def test_make_mutating_bucket_uses_defaults(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         monkeypatch.delenv("INKYPI_RATE_LIMIT_MUTATING", raising=False)
         b = make_mutating_bucket()
         assert b._capacity == 10.0
         assert b._refill_rate == pytest.approx(10 / 60)
 
-    def test_make_mutating_bucket_respects_env(self, monkeypatch):
+    def test_make_mutating_bucket_respects_env(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         monkeypatch.setenv("INKYPI_RATE_LIMIT_MUTATING", "15/30")
         b = make_mutating_bucket()
         assert b._capacity == 15.0
@@ -165,7 +180,7 @@ class TestParseRateEnv:
 
 
 @pytest.fixture()
-def rate_limit_app():
+def rate_limit_app() -> Any:
     """Minimal Flask app with per-endpoint token-bucket rate limiting."""
     from utils.rate_limit import TokenBucket
 
@@ -183,7 +198,7 @@ def rate_limit_app():
     from utils.http_utils import json_error
 
     @app.before_request
-    def _rl():
+    def _rl() -> Any:
         from flask import make_response, request
 
         if request.method in ("GET", "HEAD", "OPTIONS"):
@@ -206,50 +221,50 @@ def rate_limit_app():
         return None
 
     @app.route("/login", methods=["POST"])
-    def login():
+    def login() -> Any:
         return {"ok": True}
 
     @app.route("/display-next", methods=["POST"])
-    def display_next():
+    def display_next() -> Any:
         return {"ok": True}
 
     @app.route("/refresh", methods=["POST"])
-    def refresh_alias():
+    def refresh_alias() -> Any:
         return {"ok": True}
 
     @app.route("/api/health", methods=["GET"])
-    def health():
+    def health() -> Any:
         return {"status": "ok"}
 
     @app.route("/api/other", methods=["POST"])
-    def other():
+    def other() -> Any:
         return {"ok": True}
 
     return app
 
 
 class TestLoginEndpointRateLimit:
-    def test_five_logins_succeed(self, rate_limit_app):
+    def test_five_logins_succeed(self, rate_limit_app: Any) -> None:
         client = rate_limit_app.test_client()
         for _ in range(5):
             resp = client.post("/login")
             assert resp.status_code == 200
 
-    def test_sixth_login_returns_429(self, rate_limit_app):
+    def test_sixth_login_returns_429(self, rate_limit_app: Any) -> None:
         client = rate_limit_app.test_client()
         for _ in range(5):
             client.post("/login")
         resp = client.post("/login")
         assert resp.status_code == 429
 
-    def test_sixth_login_has_retry_after_header(self, rate_limit_app):
+    def test_sixth_login_has_retry_after_header(self, rate_limit_app: Any) -> None:
         client = rate_limit_app.test_client()
         for _ in range(5):
             client.post("/login")
         resp = client.post("/login")
         assert resp.headers.get("Retry-After") == "30"
 
-    def test_sixth_login_has_json_error_body(self, rate_limit_app):
+    def test_sixth_login_has_json_error_body(self, rate_limit_app: Any) -> None:
         client = rate_limit_app.test_client()
         for _ in range(5):
             client.post("/login")
@@ -263,27 +278,27 @@ class TestLoginEndpointRateLimit:
 
 
 class TestRefreshEndpointRateLimit:
-    def test_ten_refresh_calls_succeed(self, rate_limit_app):
+    def test_ten_refresh_calls_succeed(self, rate_limit_app: Any) -> None:
         client = rate_limit_app.test_client()
         for _ in range(10):
             resp = client.post("/display-next")
             assert resp.status_code == 200
 
-    def test_eleventh_refresh_returns_429(self, rate_limit_app):
+    def test_eleventh_refresh_returns_429(self, rate_limit_app: Any) -> None:
         client = rate_limit_app.test_client()
         for _ in range(10):
             client.post("/display-next")
         resp = client.post("/display-next")
         assert resp.status_code == 429
 
-    def test_eleventh_refresh_has_retry_after_header(self, rate_limit_app):
+    def test_eleventh_refresh_has_retry_after_header(self, rate_limit_app: Any) -> None:
         client = rate_limit_app.test_client()
         for _ in range(10):
             client.post("/display-next")
         resp = client.post("/display-next")
         assert resp.headers.get("Retry-After") == "6"
 
-    def test_refresh_alias_also_rate_limited(self, rate_limit_app):
+    def test_refresh_alias_also_rate_limited(self, rate_limit_app: Any) -> None:
         client = rate_limit_app.test_client()
         for _ in range(10):
             client.post("/refresh")
@@ -292,7 +307,7 @@ class TestRefreshEndpointRateLimit:
 
 
 class TestIpIsolation:
-    def test_different_ips_tracked_separately(self, rate_limit_app):
+    def test_different_ips_tracked_separately(self, rate_limit_app: Any) -> None:
         """Exhausting one IP's bucket should not affect another IP."""
         with rate_limit_app.test_client() as client:
             # Exhaust ip-a by overriding remote_addr via environ_base
@@ -307,13 +322,15 @@ class TestIpIsolation:
 
 
 class TestNonRateLimitedEndpoints:
-    def test_health_get_not_rate_limited(self, rate_limit_app):
+    def test_health_get_not_rate_limited(self, rate_limit_app: Any) -> None:
         client = rate_limit_app.test_client()
         for _ in range(20):
             resp = client.get("/api/health")
             assert resp.status_code == 200
 
-    def test_other_post_not_covered_by_endpoint_limiter(self, rate_limit_app):
+    def test_other_post_not_covered_by_endpoint_limiter(
+        self, rate_limit_app: Any
+    ) -> None:
         """General endpoints should not be blocked by the per-endpoint bucket."""
         client = rate_limit_app.test_client()
         # The other endpoint has no rate limit in this fixture
@@ -328,7 +345,7 @@ class TestNonRateLimitedEndpoints:
 
 
 @pytest.fixture()
-def mutating_rate_app():
+def mutating_rate_app() -> Any:
     """Minimal Flask app with mutating-endpoint token-bucket rate limiting (JTN-513)."""
     from utils.http_utils import json_error
     from utils.rate_limit import TokenBucket
@@ -349,7 +366,7 @@ def mutating_rate_app():
         return path in _MUTATING_PATHS or path.startswith(_MUTATING_PREFIX)
 
     @app.before_request
-    def _rl():
+    def _rl() -> Any:
         from flask import make_response, request
 
         if request.method in ("GET", "HEAD", "OPTIONS"):
@@ -370,27 +387,27 @@ def mutating_rate_app():
         return None
 
     @app.route("/login", methods=["POST"])
-    def login():
+    def login() -> Any:
         return {"ok": True}
 
     @app.route("/save_plugin_settings", methods=["POST"])
-    def save_plugin_settings():
+    def save_plugin_settings() -> Any:
         return {"ok": True}
 
     @app.route("/update_now", methods=["POST"])
-    def update_now():
+    def update_now() -> Any:
         return {"ok": True}
 
     @app.route("/api/refresh/<path:sub>", methods=["POST"])
-    def api_refresh(sub):
+    def api_refresh(sub: Any) -> Any:
         return {"ok": True}
 
     @app.route("/api/health", methods=["GET"])
-    def health():
+    def health() -> Any:
         return {"status": "ok"}
 
     @app.route("/api/other", methods=["POST"])
-    def other():
+    def other() -> Any:
         return {"ok": True}
 
     return app
@@ -399,27 +416,31 @@ def mutating_rate_app():
 class TestMutatingEndpointRateLimit:
     """JTN-513: /save_plugin_settings, /update_now, /api/refresh/* get strict token-bucket."""
 
-    def test_ten_update_now_calls_succeed(self, mutating_rate_app):
+    def test_ten_update_now_calls_succeed(self, mutating_rate_app: Any) -> None:
         client = mutating_rate_app.test_client()
         for _ in range(10):
             resp = client.post("/update_now")
             assert resp.status_code == 200
 
-    def test_eleventh_update_now_returns_429(self, mutating_rate_app):
+    def test_eleventh_update_now_returns_429(self, mutating_rate_app: Any) -> None:
         client = mutating_rate_app.test_client()
         for _ in range(10):
             client.post("/update_now")
         resp = client.post("/update_now")
         assert resp.status_code == 429
 
-    def test_eleventh_update_now_has_retry_after_header(self, mutating_rate_app):
+    def test_eleventh_update_now_has_retry_after_header(
+        self, mutating_rate_app: Any
+    ) -> None:
         client = mutating_rate_app.test_client()
         for _ in range(10):
             client.post("/update_now")
         resp = client.post("/update_now")
         assert resp.headers.get("Retry-After") == "6"
 
-    def test_eleventh_update_now_has_json_error_body(self, mutating_rate_app):
+    def test_eleventh_update_now_has_json_error_body(
+        self, mutating_rate_app: Any
+    ) -> None:
         client = mutating_rate_app.test_client()
         for _ in range(10):
             client.post("/update_now")
@@ -431,20 +452,24 @@ class TestMutatingEndpointRateLimit:
             or "request" in data.get("error", "").lower()
         )
 
-    def test_ten_save_plugin_settings_calls_succeed(self, mutating_rate_app):
+    def test_ten_save_plugin_settings_calls_succeed(
+        self, mutating_rate_app: Any
+    ) -> None:
         client = mutating_rate_app.test_client()
         for _ in range(10):
             resp = client.post("/save_plugin_settings")
             assert resp.status_code == 200
 
-    def test_eleventh_save_plugin_settings_returns_429(self, mutating_rate_app):
+    def test_eleventh_save_plugin_settings_returns_429(
+        self, mutating_rate_app: Any
+    ) -> None:
         client = mutating_rate_app.test_client()
         for _ in range(10):
             client.post("/save_plugin_settings")
         resp = client.post("/save_plugin_settings")
         assert resp.status_code == 429
 
-    def test_api_refresh_subpath_rate_limited(self, mutating_rate_app):
+    def test_api_refresh_subpath_rate_limited(self, mutating_rate_app: Any) -> None:
         """POST /api/refresh/* is matched by prefix and rate-limited."""
         client = mutating_rate_app.test_client()
         for _ in range(10):
@@ -452,14 +477,14 @@ class TestMutatingEndpointRateLimit:
         resp = client.post("/api/refresh/all")
         assert resp.status_code == 429
 
-    def test_get_requests_not_rate_limited(self, mutating_rate_app):
+    def test_get_requests_not_rate_limited(self, mutating_rate_app: Any) -> None:
         """GET requests to /api/health are never subject to mutating rate limits."""
         client = mutating_rate_app.test_client()
         for _ in range(20):
             resp = client.get("/api/health")
             assert resp.status_code == 200
 
-    def test_login_uses_its_own_tighter_bucket(self, mutating_rate_app):
+    def test_login_uses_its_own_tighter_bucket(self, mutating_rate_app: Any) -> None:
         """Login still uses its own auth bucket; exhausting it doesn't affect mutating paths."""
         client = mutating_rate_app.test_client()
         # Exhaust the auth bucket (capacity=5)
@@ -470,11 +495,12 @@ class TestMutatingEndpointRateLimit:
         assert resp.status_code == 429
         # But /update_now still works (has its own bucket, capacity=10)
         resp2 = client.post("/update_now")
-        assert resp2 == resp2  # just check it doesn't crash
         # The mutating bucket still has capacity
         assert resp2.status_code == 200
 
-    def test_different_ips_get_independent_mutating_buckets(self, mutating_rate_app):
+    def test_different_ips_get_independent_mutating_buckets(
+        self, mutating_rate_app: Any
+    ) -> None:
         """Exhausting one IP's mutating bucket does not affect another IP."""
         with mutating_rate_app.test_client() as client:
             for _ in range(10):
@@ -488,7 +514,9 @@ class TestMutatingEndpointRateLimit:
             )
             assert resp_b.status_code == 200
 
-    def test_non_mutating_post_not_blocked_by_mutating_bucket(self, mutating_rate_app):
+    def test_non_mutating_post_not_blocked_by_mutating_bucket(
+        self, mutating_rate_app: Any
+    ) -> None:
         """/api/other POST is not subject to the mutating token bucket."""
         client = mutating_rate_app.test_client()
         # Even after the mutating bucket is exhausted for this IP

@@ -49,13 +49,15 @@ class TestRequirementsLockfile:
     def test_requirements_txt_exists(self) -> None:
         assert REQUIREMENTS_TXT.exists(), (
             f"{REQUIREMENTS_TXT} does not exist. "
-            "Run: pip-compile --generate-hashes install/requirements.in -o install/requirements.txt"
+            "Run: uv lock && uv export --format requirements.txt --no-dev --no-emit-project --output-file install/requirements.txt"
         )
 
     def test_requirements_dev_txt_exists(self) -> None:
         assert REQUIREMENTS_DEV_TXT.exists(), (
             f"{REQUIREMENTS_DEV_TXT} does not exist. "
-            "Run: pip-compile --generate-hashes install/requirements-dev.in -o install/requirements-dev.txt"
+            "Run (on Linux only — pip-compile on macOS drops the "
+            "sys_platform=='linux' packages): pip-compile --generate-hashes "
+            "install/requirements-dev.in -o install/requirements-dev.txt"
         )
 
     def test_requirements_txt_has_hashes(self) -> None:
@@ -66,7 +68,7 @@ class TestRequirementsLockfile:
         assert not missing, (
             f"The following packages in {REQUIREMENTS_TXT} have no --hash=sha256: entries:\n"
             + "\n".join(f"  {p}" for p in missing)
-            + "\nRegenerate with: pip-compile --generate-hashes install/requirements.in -o install/requirements.txt"
+            + "\nRegenerate with: Run: uv lock && uv export --format requirements.txt --no-dev --no-emit-project --output-file install/requirements.txt"
         )
 
     def test_requirements_dev_txt_has_hashes(self) -> None:

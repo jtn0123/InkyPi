@@ -14,10 +14,12 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
+import pytest
 from PIL import Image
 
 _TRUTHY = {"1", "true", "yes"}
@@ -140,11 +142,41 @@ def _build_diff_overlay(
     return Image.alpha_composite(base, overlay).convert("RGB")
 
 
+def _pixel_comparison_skip_reason() -> str | None:
+    """Why pixel comparison cannot be trusted in this environment, if so.
+
+    These baselines are rendered on ubuntu-24.04 with its font set and are only
+    reproducible there (see tests/snapshots/README.md). On macOS the same code
+    renders text differently, so the comparison fails for reasons unrelated to
+    the change under test — which leaves every local run permanently red and
+    trains developers to ignore failures.
+
+    ``SKIP_VISUAL=1`` mirrors the flag tests/integration/test_visual_regression.py
+    already honours; non-Linux hosts opt out by default. Set
+    ``REQUIRE_SNAPSHOTS=1`` to force the comparison anywhere (CI does).
+    """
+    if os.getenv("REQUIRE_SNAPSHOTS", "").strip().lower() in {"1", "true", "yes"}:
+        return None
+    if os.getenv("SKIP_VISUAL", "").strip().lower() in {"1", "true", "yes"}:
+        return "SKIP_VISUAL is set"
+    if sys.platform != "linux":
+        return (
+            f"pixel baselines are Linux-rendered; {sys.platform} font rendering "
+            "differs. Set REQUIRE_SNAPSHOTS=1 to force, or regenerate baselines "
+            "from a CI run (see tests/snapshots/README.md)."
+        )
+    return None
+
+
 def assert_image_snapshot(
     image: Image.Image,
     plugin_name: str,
     case_name: str,
 ) -> None:
+    skip_reason = _pixel_comparison_skip_reason()
+    if skip_reason is not None:
+        pytest.skip(f"snapshot comparison skipped: {skip_reason}")
+
     png_path, _digest_path = _snapshot_paths(plugin_name, case_name)
     actual_png, diff_png, stats_json = _artifact_paths(plugin_name, case_name)
 

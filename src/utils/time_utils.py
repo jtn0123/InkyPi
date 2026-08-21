@@ -59,6 +59,21 @@ def parse_cron_field(field: str, min_val: int, max_val: int) -> set[int]:
         part = part.strip()
         if not part:
             continue
+        # Step syntax: "*/N" and "a-b/N". Without this, int("*/6") raises and
+        # the part is skipped, so "*/6" silently parsed to the empty set — a
+        # schedule that never fires rather than an error.
+        step = 1
+        if "/" in part:
+            part, _, step_s = part.partition("/")
+            try:
+                step = int(step_s)
+            except ValueError:
+                continue
+            if step < 1:
+                continue
+            part = part.strip()
+            if part == "*":
+                part = f"{min_val}-{max_val}"
         if "-" in part:
             start_s, end_s = part.split("-", 1)
             try:
@@ -67,7 +82,9 @@ def parse_cron_field(field: str, min_val: int, max_val: int) -> set[int]:
                 continue
             if start > end:
                 start, end = end, start
-            values.update(v for v in range(start, end + 1) if min_val <= v <= max_val)
+            values.update(
+                v for v in range(start, end + 1, step) if min_val <= v <= max_val
+            )
         else:
             try:
                 value = int(part)

@@ -44,7 +44,17 @@ scripts/test.sh tests/unit/test_inkypi.py -v
 
 # Run with coverage
 SKIP_BROWSER=1 .venv/bin/python -m pytest tests/ --cov=src --cov-report=term-missing
+
+# Fast parallel run (~6.5 min vs ~10 min serial); takes any pytest args
+scripts/test-fast.sh
+scripts/test-fast.sh tests/unit -k weather
 ```
+
+On macOS the plugin pixel-snapshot tests skip themselves: their baselines are
+rendered with ubuntu-24.04's fonts and are only reproducible on Linux, so
+comparing them here fails for reasons unrelated to your change. Set
+`REQUIRE_SNAPSHOTS=1` to force them, or `SKIP_VISUAL=1` to skip the layout
+snapshots too. CI runs on Linux and always enforces both.
 
 ### Running Browser Tests Locally
 

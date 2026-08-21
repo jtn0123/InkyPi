@@ -494,7 +494,8 @@ def history_redisplay() -> tuple[dict[str, Any], int] | Any:
         if err_code is not None:
             return _filename_error_response(err_code)
 
-        assert filename is not None
+        if filename is None:
+            return _filename_error_response(_ERRCODE_FILENAME_REQUIRED)
         _safe_path, err_code = _validate_and_resolve_history_file(history_dir, filename)
         if err_code is not None:
             return _filename_error_response(err_code)
@@ -519,7 +520,8 @@ def history_delete() -> tuple[dict[str, Any], int] | Any:
         if err_code is not None:
             return _filename_error_response(err_code)
 
-        assert filename is not None
+        if filename is None:
+            return _filename_error_response(_ERRCODE_FILENAME_REQUIRED)
         safe_path, err_code = _validate_and_resolve_history_file(history_dir, filename)
         if err_code is not None:
             return _filename_error_response(err_code)

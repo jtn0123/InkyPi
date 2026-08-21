@@ -8,7 +8,9 @@ import gc
 import os
 import time
 import tracemalloc
+from collections.abc import Iterator
 from io import BytesIO
+from typing import Any
 
 import psutil
 import pytest
@@ -22,8 +24,13 @@ from utils.image_utils import (
     resize_image,
 )
 
+# Resident-set-size assertions only mean something when this process is not
+# competing for memory with sibling workers, so these are excluded from the
+# parallel run (scripts/test-fast.sh) and executed serially instead.
+pytestmark = pytest.mark.memory
 
-def settle_memory(rounds=3, pause_s=0.01):
+
+def settle_memory(rounds: Any = 3, pause_s: Any = 0.01) -> None:
     """Give GC and RSS accounting a short chance to settle."""
     for _ in range(rounds):
         gc.collect()
@@ -31,7 +38,7 @@ def settle_memory(rounds=3, pause_s=0.01):
 
 
 @pytest.fixture
-def memory_baseline():
+def memory_baseline() -> Iterator[Any]:
     """Establish a memory baseline before each test."""
     # Force garbage collection
     gc.collect()
@@ -47,7 +54,7 @@ def memory_baseline():
     gc.collect()
 
 
-def test_image_resize_no_memory_leak(memory_baseline):
+def test_image_resize_no_memory_leak(memory_baseline: Any) -> None:
     """Test that repeated image resizing doesn't leak memory."""
     # Create a test image
     test_img = Image.new("RGB", (800, 600), color=(100, 150, 200))
@@ -71,7 +78,7 @@ def test_image_resize_no_memory_leak(memory_baseline):
     assert memory_growth < 10, f"Memory grew by {memory_growth:.2f}MB (potential leak)"
 
 
-def test_image_enhancement_no_memory_leak(memory_baseline):
+def test_image_enhancement_no_memory_leak(memory_baseline: Any) -> None:
     """Test that repeated image enhancement doesn't leak memory."""
     test_img = Image.new("RGB", (400, 300), color=(128, 128, 128))
 
@@ -96,7 +103,7 @@ def test_image_enhancement_no_memory_leak(memory_baseline):
     assert memory_growth < 10, f"Memory grew by {memory_growth:.2f}MB (potential leak)"
 
 
-def test_image_load_from_bytes_no_memory_leak(memory_baseline):
+def test_image_load_from_bytes_no_memory_leak(memory_baseline: Any) -> None:
     """Test that repeatedly loading images from bytes doesn't leak memory."""
     # Create test image bytes
     bio = BytesIO()
@@ -119,14 +126,14 @@ def test_image_load_from_bytes_no_memory_leak(memory_baseline):
 
 
 def test_plugin_execution_no_memory_leak(
-    device_config_dev, monkeypatch, memory_baseline
-):
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch, memory_baseline: Any
+) -> Any:
     """Test that repeated plugin execution doesn't leak memory."""
 
     class SimplePlugin:
         config = {"image_settings": []}
 
-        def generate_image(self, settings, device_config):
+        def generate_image(self, settings: Any, device_config: Any) -> Any:
             # Simulate typical plugin work: create an image, do some processing
             img = Image.new(
                 "RGB", device_config.get_resolution(), color=(255, 255, 255)
@@ -172,7 +179,9 @@ def test_plugin_execution_no_memory_leak(
         task.stop()
 
 
-def test_display_manager_no_memory_leak(device_config_dev, memory_baseline):
+def test_display_manager_no_memory_leak(
+    device_config_dev: Any, memory_baseline: Any
+) -> None:
     """Test that repeated display_image calls don't leak memory."""
     dm = DisplayManager(device_config_dev)
 
@@ -192,7 +201,7 @@ def test_display_manager_no_memory_leak(device_config_dev, memory_baseline):
     assert memory_growth < 20, f"Memory grew by {memory_growth:.2f}MB (potential leak)"
 
 
-def test_tracemalloc_image_processing():
+def test_tracemalloc_image_processing() -> None:
     """Use tracemalloc to detect memory allocation patterns in image processing."""
     tracemalloc.start()
 
@@ -229,7 +238,9 @@ def test_tracemalloc_image_processing():
     ), f"Largest memory allocation was {largest_growth_mb:.2f}MB (potential leak)"
 
 
-def test_long_running_refresh_task(device_config_dev, monkeypatch):
+def test_long_running_refresh_task(
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> Any:
     """Test refresh task over an extended period to detect slow leaks."""
 
     class CyclingPlugin:
@@ -238,7 +249,7 @@ def test_long_running_refresh_task(device_config_dev, monkeypatch):
         config = {"image_settings": []}
         call_count = 0
 
-        def generate_image(self, settings, device_config):
+        def generate_image(self, settings: Any, device_config: Any) -> Any:
             self.call_count += 1
             # Create temporary objects
             Image.new("RGB", (100, 100), color=(self.call_count % 256, 128, 200))
@@ -289,7 +300,7 @@ def test_long_running_refresh_task(device_config_dev, monkeypatch):
         task.stop()
 
 
-def test_repeated_plugin_instantiation_no_leak(device_config_dev):
+def test_repeated_plugin_instantiation_no_leak(device_config_dev: Any) -> Any:
     """Test that creating and destroying plugin instances doesn't leak."""
     tracemalloc.start()
 
@@ -304,7 +315,7 @@ def test_repeated_plugin_instantiation_no_leak(device_config_dev):
         class TempPlugin:
             config = {"id": f"temp_{i}", "image_settings": []}
 
-            def generate_image(self, settings, device_config):
+            def generate_image(self, settings: Any, device_config: Any) -> Any:
                 return Image.new("RGB", (100, 100), color=(128, 128, 128))
 
         plugin = TempPlugin()
@@ -325,7 +336,7 @@ def test_repeated_plugin_instantiation_no_leak(device_config_dev):
     ), f"Largest memory allocation was {largest_growth_mb:.2f}MB (potential leak)"
 
 
-def test_image_history_doesnt_accumulate_in_memory(device_config_dev):
+def test_image_history_doesnt_accumulate_in_memory(device_config_dev: Any) -> None:
     """Test that saving history images doesn't accumulate in memory."""
     dm = DisplayManager(device_config_dev)
 
