@@ -1,3 +1,6 @@
+from typing import Any
+
+import pytest
 import requests
 
 
@@ -111,7 +114,6 @@ def test_shared_session_thread_isolation():
 
 from unittest.mock import Mock, patch  # noqa: E402
 
-import pytest  # noqa: E402
 from flask import Flask  # noqa: E402
 
 from src.utils.http_utils import (  # noqa: E402
@@ -561,3 +563,51 @@ class TestWantsJson:
 
         with patch("src.utils.http_utils.request", mock_request):
             assert wants_json() is False
+
+
+class TestRequestIdIsNotReflectedUnvalidated:
+    """The inbound X-Request-Id is echoed into every json_* response body.
+
+    An unvalidated header is client-controlled data reflected in a response —
+    CodeQL py/reflective-xss, 95 pre-existing alerts across the codebase all
+    tracing back to this one line.
+    """
+
+    def _request_id(self, flask_app: Any, header: str | None) -> Any:
+        from utils.http_utils import json_success
+
+        headers = {"X-Request-Id": header} if header is not None else {}
+        with flask_app.test_request_context("/", headers=headers):
+            body, _status = json_success("ok")
+            return body.get_json().get("request_id")
+
+    def test_a_well_formed_id_is_preserved(self, flask_app: Any) -> None:
+        assert self._request_id(flask_app, "abc-123_XY.z:9") == "abc-123_XY.z:9"
+
+    def test_a_uuid_is_preserved(self, flask_app: Any) -> None:
+        rid = "3f2504e0-4f89-11d3-9a0c-0305e82c3301"
+        assert self._request_id(flask_app, rid) == rid
+
+    @pytest.mark.parametrize(
+        "header",
+        [
+            "<script>alert(1)</script>",
+            "abc<img src=x onerror=alert(1)>",
+            # A CRLF value is not tested here: werkzeug refuses to build such a
+            # header at all, so header injection is already blocked upstream of
+            # this code and the case cannot be represented.
+            "a" * 129,
+            "spaces are not ids",
+        ],
+    )
+    def test_markup_and_oversized_values_are_replaced(
+        self, flask_app: Any, header: str
+    ) -> None:
+        got = self._request_id(flask_app, header)
+        assert got != header, "the header must not be echoed back verbatim"
+        assert "<" not in got and ">" not in got and "\n" not in got
+        # Replaced with a generated uuid rather than a cleaned-up version.
+        assert len(got) == 36
+
+    def test_absent_header_still_yields_an_id(self, flask_app: Any) -> None:
+        assert self._request_id(flask_app, None)

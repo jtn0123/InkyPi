@@ -44,6 +44,7 @@ from __future__ import annotations
 import ipaddress
 import logging
 import os
+import re
 import socket
 import threading
 from collections.abc import Iterator
@@ -65,6 +66,10 @@ if TYPE_CHECKING:  # pragma: no cover — type hints only
 from utils.form_utils import sanitize_response_value
 
 logger = logging.getLogger(__name__)
+
+#: Accepted shape for an inbound ``X-Request-Id``. Covers uuids, hex ids, and
+#: the ``trace:span`` forms proxies emit, without admitting markup.
+_REQUEST_ID_RE = re.compile(r"[A-Za-z0-9._:-]{1,128}")
 
 
 def _sanitize_details(details: dict[str, Any]) -> dict[str, Any]:
@@ -134,9 +139,16 @@ def _get_or_set_request_id() -> str | None:
         rid_existing: str | None = getattr(g, "request_id", None)
         if rid_existing is not None and rid_existing != "":
             return rid_existing
-        # Prefer inbound X-Request-Id if provided by client/proxy
+        # Prefer inbound X-Request-Id if provided by client/proxy.
+        #
+        # The value is echoed back in every json_error/json_success body, so an
+        # unvalidated header is client-controlled data reflected in a response
+        # (CodeQL py/reflective-xss). A request id is an opaque correlation
+        # token, so anything outside a conservative charset is not one — reject
+        # it and generate our own rather than trying to clean it up. Also
+        # bounded, so a multi-megabyte header cannot ride along on every reply.
         rid_hdr: str | None = request.headers.get("X-Request-Id")
-        if rid_hdr is not None and rid_hdr != "":
+        if rid_hdr and _REQUEST_ID_RE.fullmatch(rid_hdr):
             g.request_id = rid_hdr
             return rid_hdr
         # Generate
