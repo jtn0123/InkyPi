@@ -14,12 +14,14 @@ import io
 import os
 from functools import lru_cache
 from pathlib import Path
-from typing import cast
 
 from flask import Response, send_from_directory
 from PIL import Image
 from werkzeug.exceptions import NotFound
-from werkzeug.utils import safe_join
+
+# `safe_join` lives in werkzeug.security and is only re-exported by
+# werkzeug.utils, which does not list it in __all__.
+from werkzeug.security import safe_join
 
 # ---------------------------------------------------------------------------
 # Internal cache
@@ -121,7 +123,7 @@ def _safe_join(root: str, filename: str) -> str:
     joined = safe_join(root, filename)
     if joined is None or not os.path.isfile(joined):
         raise NotFound
-    return cast(str, joined)
+    return joined
 
 
 # ---------------------------------------------------------------------------

@@ -1110,7 +1110,11 @@ def update_now() -> Any:
 
         if parsed.want_async:
             queue = get_job_queue()
-            app = current_app._get_current_object()  # real app, not proxy
+            # `current_app` is a LocalProxy at runtime, but flask types it as
+            # `Flask` for convenience, so the unwrap is invisible to mypy. The
+            # real object is needed because the proxy is bound to this request
+            # context and the job runs outside it.
+            app = cast(Any, current_app)._get_current_object()
             job_id = queue.enqueue(_run_update_now, app, plugin_id, plugin_settings)
             return jsonify({"job_id": job_id}), 202
 

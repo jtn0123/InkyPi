@@ -433,7 +433,12 @@ def _lookup_static_version_factory(
         cached = cache.get(filename)
         if cached is not None:
             return cached
-        static_path = Path(app.static_folder) / filename
+        static_root = app.static_folder
+        if static_root is None:
+            # Flask allows a static-less app; without this the next line raises
+            # TypeError rather than falling back to the plain version token.
+            return version
+        static_path = Path(static_root) / filename
         try:
             if static_path.is_file():
                 token = f"{version}-{int(static_path.stat().st_mtime)}"
@@ -721,14 +726,19 @@ if __name__ == "__main__":
     ):
         import threading
 
+        # Bound here rather than captured: the narrowing above cannot follow
+        # `device_cfg` into a closure that runs on another thread, because
+        # nothing stops the name being rebound in between.
+        startup_cfg = device_cfg
+
         def _show_startup() -> None:
             try:
                 logger.info("Displaying startup image")
-                img = generate_startup_image(device_cfg.get_resolution())
+                img = generate_startup_image(startup_cfg.get_resolution())
                 display_manager_obj = created_app.config.get("DISPLAY_MANAGER")
                 if display_manager_obj is not None:
                     display_manager_obj.display_image(img)
-                device_cfg.update_value("startup", False, write=True)
+                startup_cfg.update_value("startup", False, write=True)
             except Exception:
                 logger.exception("Startup image failed")
 

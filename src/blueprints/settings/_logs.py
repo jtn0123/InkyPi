@@ -2,6 +2,7 @@
 
 import io
 import re
+from collections.abc import Mapping
 from typing import Any
 
 from flask import Response, current_app, jsonify, request
@@ -38,8 +39,14 @@ def download_logs() -> Response:
 
 
 def _parse_log_params(
-    args: dict[str, str | None],
+    args: Mapping[str, str | None],
 ) -> tuple[int, int, str, bool, str, int, int]:
+    """Parse the log query parameters.
+
+    Takes a Mapping rather than a dict so `request.args` — a werkzeug
+    MultiDict, which is a Mapping but not a dict — can be passed directly
+    instead of being copied at each call site.
+    """
     raw_hours = args.get("hours")
     raw_limit = args.get("limit")
     raw_contains_full = args.get("contains") or ""

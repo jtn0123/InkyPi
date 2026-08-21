@@ -301,7 +301,7 @@ class BasePlugin:
             template = self.env.get_template(html_file)
             update_step(f"Rendering template with {len(template_params)} parameters")
             t0 = perf_counter()
-            rendered_html = cast(str, template.render(template_params))
+            rendered_html = template.render(template_params)
             elapsed_ms = int((perf_counter() - t0) * 1000)
             complete_step(
                 f"Template rendered successfully for {html_file} ({elapsed_ms}ms)"
@@ -333,8 +333,13 @@ class BasePlugin:
             timeout_desc = f" (timeout: {timeout_ms}ms)" if timeout_ms else ""
             update_step(f"Taking screenshot of rendered HTML{timeout_desc}")
             t1 = perf_counter()
-            screenshot_html = cast(Any, take_screenshot_html)
-            image = screenshot_html(rendered_html, dimensions, timeout_ms=timeout_ms)
+            # The `cast(Any, ...)` this replaces existed only because the real
+            # signature was invisible with imports skipped; it turned the
+            # already-correct `Image.Image | None` into Any and took the None
+            # check below with it.
+            image = take_screenshot_html(
+                rendered_html, dimensions, timeout_ms=timeout_ms
+            )
             elapsed_ms = int((perf_counter() - t1) * 1000)
             if image is None:
                 image = self._screenshot_fallback(dimensions, elapsed_ms)

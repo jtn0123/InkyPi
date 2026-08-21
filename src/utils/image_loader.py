@@ -247,7 +247,7 @@ class AdaptiveImageLoader:
         _ensure_heif_opener()
 
         try:
-            img = Image.open(data)
+            img: Image.Image = Image.open(data)
             original_size = img.size
             original_pixels = original_size[0] * original_size[1]
             logger.info(
@@ -331,7 +331,7 @@ class AdaptiveImageLoader:
     ) -> Image.Image | None:
         """Low-memory file loading using draft mode."""
         try:
-            img = Image.open(path)
+            img: Image.Image = Image.open(path)
             original_size = img.size
             original_pixels = original_size[0] * original_size[1]
             logger.info(
@@ -397,7 +397,7 @@ class AdaptiveImageLoader:
             )
             response.raise_for_status()
 
-            img = Image.open(BytesIO(response.content))
+            img: Image.Image = Image.open(BytesIO(response.content))
             original_size = img.size
             original_pixels = original_size[0] * original_size[1]
             logger.info(
@@ -428,7 +428,7 @@ class AdaptiveImageLoader:
     ) -> Image.Image | None:
         """High-performance file loading using in-memory processing."""
         try:
-            img = Image.open(path)
+            img: Image.Image = Image.open(path)
             img.load()  # Force decode to release file handle
             original_size = img.size
             original_pixels = original_size[0] * original_size[1]

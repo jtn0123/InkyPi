@@ -16,4 +16,7 @@
 # type means test doubles like DummyDeviceConfig/FakeDeviceConfig are now
 # checked against the real DeviceConfigLike protocol, which they do not fully
 # implement. Tightening those fakes is follow-up work.
-645
+639
+
+# 645 -> 639 (2026-08-21): src/ contracts got more precise, so several
+# test-side mismatches resolved themselves.

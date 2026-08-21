@@ -47,7 +47,14 @@ def parse_env_file(filepath: str) -> list[tuple[str, str]]:
 
     try:
         env_dict = dotenv_values(filepath)
-        return list(env_dict.items())
+        # `dotenv_values` yields None for a bare key — a line like `FOO` with no
+        # `=`. The declared return type says str, and consumers iterate the
+        # value (`_has_invalid_control_chars`), so a None reached them as
+        # `TypeError: 'NoneType' object is not iterable` and broke the whole
+        # API-keys page. A key with no value is an empty value.
+        return [
+            (key, "" if value is None else value) for key, value in env_dict.items()
+        ]
     except Exception as e:
         logger.error(f"Error parsing .env file: {e}")
         return []

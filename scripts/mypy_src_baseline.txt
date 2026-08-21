@@ -23,7 +23,7 @@
 # return-value, arg-type and attr-defined are the ones most likely to be real
 # defects rather than annotation noise; they are the intended next piece of
 # work (item I2 in .claude/grade-report.md). This number must only go down.
-50
+23
 
 # 90 -> 50 (2026-08-21). Worked the highest-signal rules. Three were real:
 #   * calendar.get_contrast_color unpacked ImageColor.getrgb() into three
@@ -38,3 +38,24 @@
 # json_error's dict fallback (named JsonResponse in utils/http_utils), werkzeug
 # vs flask Response from redirect(), and `-> Image` naming the PIL module
 # rather than Image.Image.
+
+# 50 -> 23 (2026-08-21). Two more real defects, both from an annotation that
+# promised more than the value delivered:
+#   * blueprints/apikeys.parse_env_file declared list[tuple[str, str]] while
+#     dotenv_values yields None for a bare key (a line like `FOO` with no `=`).
+#     Consumers iterate the value, so that reached them as
+#     `TypeError: 'NoneType' object is not iterable` and broke the API-keys
+#     page. A key with no value is now an empty value.
+#   * inkypi._lookup_static_version called Path(app.static_folder) unguarded.
+#     Flask allows a static-less app, where that is Path(None) -> TypeError.
+#
+# Also: the startup-image thread captured `device_cfg` across a `is not None`
+# check that cannot follow into a closure; it now binds the narrowed value.
+# `safe_join` was imported from werkzeug.utils, which only re-exports it —
+# corrected to werkzeug.security. Two redundant casts and one `cast(Any, ...)`
+# removed: the last existed only because the real signature was invisible, and
+# it erased an already-correct `Image.Image | None`.
+#
+# 40 more `cast(Any, ...)` remain in src/. Most predate this work and exist to
+# quiet a checker that could not see across modules; they are the main source
+# of the residual `no-any-return`. Removing them is the obvious next pass.

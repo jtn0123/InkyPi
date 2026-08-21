@@ -9,14 +9,25 @@ user-identifying information.
 
 from __future__ import annotations
 
+from collections.abc import Callable
+from typing import Any, cast
+
 from flask import Blueprint, Response
 
-try:
-    from prometheus_client.exposition import generate_latest
-except ModuleNotFoundError:
-    generate_latest = None
-
 from utils.metrics import metrics_registry, update_uptime
+
+# prometheus_client is a declared dependency, but the import stays guarded so a
+# partial install on the device degrades to a disabled /metrics endpoint rather
+# than a 500. The explicit annotation is what lets mypy see that this is
+# genuinely optional — narrowing to the imported symbol made the None branch
+# below look like dead code.
+generate_latest: Callable[..., bytes] | None
+try:
+    from prometheus_client.exposition import (  # noqa: E402
+        generate_latest as generate_latest,
+    )
+except ModuleNotFoundError:  # pragma: no cover - exercised only without the dep
+    generate_latest = None
 
 metrics_bp = Blueprint("metrics", __name__)
 
@@ -33,5 +44,5 @@ def prometheus_metrics() -> Response:
             content_type=_CONTENT_TYPE,
         )
     update_uptime()
-    data = generate_latest(metrics_registry)
+    data = generate_latest(cast(Any, metrics_registry))
     return Response(data, status=200, content_type=_CONTENT_TYPE)

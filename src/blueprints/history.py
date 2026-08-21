@@ -20,7 +20,7 @@ from flask import (
 from werkzeug.exceptions import BadRequest
 
 from utils.form_utils import sanitize_log_field
-from utils.http_utils import json_error, json_internal_error, json_success
+from utils.http_utils import JsonResponse, json_error, json_internal_error, json_success
 from utils.image_serving import maybe_serve_webp
 from utils.security_utils import validate_file_path
 from utils.time_utils import get_timezone, now_device_tz
@@ -471,7 +471,7 @@ def history_page() -> Response | str:
 
 
 @history_bp.route("/history/image/<path:filename>", methods=["GET"])
-def history_image(filename: str) -> Response | tuple[dict[str, Any], int]:
+def history_image(filename: str) -> Response | JsonResponse:
     device_config = current_app.config[_CONFIG_KEY]
     history_dir = device_config.history_image_dir
     try:
