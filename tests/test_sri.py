@@ -68,8 +68,13 @@ class TestComputeSri:
         expected = (
             "sha384-tiuF6jOlT2JxytQTL/sE7cTofDIQh6DQIjzjPiit7uJxegLt3kQ/A2yC84C2mT+P"
         )
-        assert compute_sri(f) == expected
-        assert compute_sri(f) == compute_sri(f), "must also be stable across calls"
+        # Both calls are checked against the constant. Comparing the two calls
+        # to each other would be another self-comparison — it holds for any
+        # implementation, which is the bug this test used to have.
+        first = compute_sri(f)
+        second = compute_sri(f)
+        assert first == expected
+        assert second == expected, "repeated calls must agree with the digest"
 
     def test_different_content_different_hash(self, tmp_path: Path) -> None:
         f1 = tmp_path / "a.js"
