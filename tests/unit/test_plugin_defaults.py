@@ -34,8 +34,8 @@ def _plugin(cls, plugin_id: str) -> Any:
 def test_comic_defaults_to_xkcd_when_settings_empty(
     monkeypatch: pytest.MonkeyPatch,
 ) -> Any:
-    from src.plugins.comic import comic_parser as cp
-    from src.plugins.comic.comic import Comic
+    from plugins.comic import comic_parser as cp
+    from plugins.comic.comic import Comic
 
     captured: dict[str, Any] = {}
 
@@ -49,7 +49,7 @@ def test_comic_defaults_to_xkcd_when_settings_empty(
 
     monkeypatch.setattr(cp, "get_panel", fake_get_panel)
     # comic.py imports get_panel into its module namespace
-    from src.plugins.comic import comic as comic_mod
+    from plugins.comic import comic as comic_mod
 
     monkeypatch.setattr(comic_mod, "get_panel", fake_get_panel)
 
@@ -67,7 +67,7 @@ def test_comic_defaults_to_xkcd_when_settings_empty(
 def test_countdown_defaults_title_and_date_when_empty(
     monkeypatch: pytest.MonkeyPatch,
 ) -> Any:
-    from src.plugins.countdown.countdown import Countdown
+    from plugins.countdown.countdown import Countdown
 
     captured: dict[str, Any] = {}
 
@@ -88,8 +88,8 @@ def test_countdown_defaults_title_and_date_when_empty(
 
 
 def test_newspaper_defaults_slug_when_empty(monkeypatch: pytest.MonkeyPatch) -> Any:
-    from src.plugins.newspaper import newspaper as np_mod
-    from src.plugins.newspaper.newspaper import Newspaper
+    from plugins.newspaper import newspaper as np_mod
+    from plugins.newspaper.newspaper import Newspaper
 
     captured: dict[str, Any] = {}
 
@@ -112,7 +112,7 @@ def test_newspaper_defaults_slug_when_empty(monkeypatch: pytest.MonkeyPatch) -> 
 
 
 def test_rss_defaults_feed_url_when_empty(monkeypatch: pytest.MonkeyPatch) -> Any:
-    from src.plugins.rss.rss import Rss
+    from plugins.rss.rss import Rss
 
     captured: dict[str, Any] = {}
 
@@ -136,7 +136,7 @@ def test_rss_defaults_feed_url_when_empty(monkeypatch: pytest.MonkeyPatch) -> An
 def test_weather_defaults_use_openmeteo_when_empty(
     monkeypatch: pytest.MonkeyPatch,
 ) -> Any:
-    from src.plugins.weather.weather import Weather
+    from plugins.weather.weather import Weather
 
     captured: dict[str, Any] = {}
 

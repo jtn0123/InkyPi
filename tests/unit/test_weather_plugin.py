@@ -5,7 +5,7 @@ from zoneinfo import ZoneInfoNotFoundError
 
 import pytest
 
-from src.plugins.weather.weather import Weather
+from plugins.weather.weather import Weather
 
 
 class DummyConfig(dict):
