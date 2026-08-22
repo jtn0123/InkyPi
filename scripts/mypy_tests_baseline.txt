@@ -16,9 +16,25 @@
 # type means test doubles like DummyDeviceConfig/FakeDeviceConfig are now
 # checked against the real DeviceConfigLike protocol, which they do not fully
 # implement. Tightening those fakes is follow-up work.
-630
+661
 
 # 645 -> 639 (2026-08-21): src/ contracts got more precise, so several
 # test-side mismatches resolved themselves.
 
 # 639 -> 630 (2026-08-21): follows from src/ reaching zero.
+
+# 630 -> 661 (2026-08-21). Not new debt: this baseline is calibrated to CI, and
+# CI's count is higher than any macOS run's.
+#
+# The ratchet gates CI, so CI is the number that matters. CI runs on Linux and
+# therefore installs the `sys_platform == "linux"` dependencies — cysystemd,
+# inky, gpiod, spidev — which a macOS checkout skips. Those change what mypy
+# can resolve, and the delta lands in files pulled in through follow_imports
+# (scripts/format_memory_diff.py, tests/helpers/path_utils.py and similar).
+#
+# Expect a local macOS run to report ~630 and pass as "ratchet improved". Do not
+# lower this file from a macOS measurement — take the number from a CI run, or
+# the next Linux CI run will fail. The same applies to the interpreter: CI lints
+# under Python 3.12, and mypy's results genuinely differ from 3.13 in ways
+# `--python-version 3.12` does not reproduce.
+661
