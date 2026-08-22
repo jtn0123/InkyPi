@@ -21,12 +21,13 @@ from utils.metrics import metrics_registry, update_uptime
 # than a 500. Bound via a private alias and declared once, because importing
 # directly into the annotated name is a redefinition, and annotating only one
 # branch makes mypy treat that branch's type as definitive.
+generate_latest: Callable[..., bytes] | None
 try:
-    from prometheus_client.exposition import generate_latest as _real_generate_latest
+    from prometheus_client.exposition import generate_latest as _imported
 except ModuleNotFoundError:  # pragma: no cover - exercised only without the dep
-    _real_generate_latest = None  # type: ignore[assignment]
-
-generate_latest: Callable[..., bytes] | None = _real_generate_latest
+    generate_latest = None
+else:
+    generate_latest = _imported
 
 metrics_bp = Blueprint("metrics", __name__)
 
