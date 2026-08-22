@@ -18,16 +18,15 @@ from utils.metrics import metrics_registry, update_uptime
 
 # prometheus_client is a declared dependency, but the import stays guarded so a
 # partial install on the device degrades to a disabled /metrics endpoint rather
-# than a 500. The explicit annotation is what lets mypy see that this is
-# genuinely optional — narrowing to the imported symbol made the None branch
-# below look like dead code.
-generate_latest: Callable[..., bytes] | None
+# than a 500. Bound via a private alias and declared once, because importing
+# directly into the annotated name is a redefinition, and annotating only one
+# branch makes mypy treat that branch's type as definitive.
 try:
-    from prometheus_client.exposition import (  # noqa: E402
-        generate_latest as generate_latest,
-    )
+    from prometheus_client.exposition import generate_latest as _real_generate_latest
 except ModuleNotFoundError:  # pragma: no cover - exercised only without the dep
-    generate_latest = None
+    _real_generate_latest = None  # type: ignore[assignment]
+
+generate_latest: Callable[..., bytes] | None = _real_generate_latest
 
 metrics_bp = Blueprint("metrics", __name__)
 
