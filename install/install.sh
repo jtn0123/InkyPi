@@ -281,12 +281,12 @@ preflight_checks() {
   if [ ! -d "$src_path" ]; then
     _preflight_fail \
       "source path $src_path does not exist" \
-      "clone the repository via 'git clone https://github.com/fatihak/InkyPi.git' and run install/install.sh from inside the clone"
+      "clone the repository via 'git clone https://github.com/jtn0123/InkyPi.git' and run install/install.sh from inside the clone"
   fi
   if ! git -c safe.directory='*' -C "$src_path" rev-parse --git-dir >/dev/null 2>&1; then
     _preflight_fail \
       "source tree at $src_path is not a git repository" \
-      "install.sh must run from a git clone (not a downloaded tarball) so 'git describe' and waveshare pin verification work. Run: git clone https://github.com/fatihak/InkyPi.git"
+      "install.sh must run from a git clone (not a downloaded tarball) so 'git describe' and waveshare pin verification work. Run: git clone https://github.com/jtn0123/InkyPi.git"
   fi
 
   echo_success "\tPreflight checks passed (free space, writable targets, git repo)"
@@ -709,7 +709,7 @@ ask_for_reboot() {
   echo_header "$(echo_success "${APPNAME^^} Installation Complete!")"
   echo_header "[•] A reboot of your Raspberry Pi is required for the changes to take effect"
   echo_header "[•] After your Pi is rebooted, you can access the web UI by going to $(echo_blue "'$hostname.local'") or $(echo_blue "'$ip_address'") in your browser."
-  echo_header "[•] If you encounter any issues or have suggestions, please submit them here: https://github.com/fatihak/InkyPi/issues"
+  echo_header "[•] If you encounter any issues or have suggestions, please submit them here: https://github.com/jtn0123/InkyPi/issues"
 
   read -r -p "Would you like to restart your Raspberry Pi now? [Y/N] " userInput
   userInput="${userInput^^}"
