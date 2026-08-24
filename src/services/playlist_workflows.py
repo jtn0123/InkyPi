@@ -335,3 +335,213 @@ def prepare_add_plugin_workflow(
         refresh_config=refresh_config or {},
         plugin_dict=plugin_dict,
     )
+
+
+def _validate_composite_regions(
+    raw_regions: list[dict[str, Any]], device_config: Any
+) -> tuple[list[dict[str, Any]] | None, WorkflowError | None]:
+    """Structurally validate a composite screen's regions, shape, and bounds.
+
+    Mirrors CompositeScreenRenderer.generate_image's own validation (shape +
+    bounds + "is this plugin actually installed") so a bad region is
+    rejected at save time rather than surfacing only on the next refresh.
+    Unlike a real plugin's validate_settings(settings) — which never
+    receives device_config, so BasePlugin subclasses can only check
+    resolution-independent shape at save time — this workflow function does
+    receive device_config, so it can check real canvas bounds too instead
+    of waiting for the next refresh to reject an out-of-bounds region.
+    """
+    from plugins.base_plugin.base_plugin import BasePlugin
+    from refresh_task.composite_render import CompositeScreenRenderer, parse_regions
+
+    if not raw_regions:
+        return None, WorkflowError(
+            "At least one region must be configured", status=422, field="regionsJson"
+        )
+    try:
+        regions = parse_regions(raw_regions)
+    except RuntimeError as e:
+        return None, WorkflowError(str(e), status=422, field="regionsJson")
+
+    canvas_w, canvas_h = BasePlugin.get_oriented_dimensions(device_config)
+    for region in regions:
+        shape_error = CompositeScreenRenderer._validate_region(
+            region, canvas_w, canvas_h
+        )
+        if shape_error:
+            return None, WorkflowError(shape_error, status=422, field="regionsJson")
+        try:
+            plugin_config = device_config.get_plugin(region["plugin_id"])
+        except Exception:
+            logger.debug(
+                "Could not look up plugin config for composite region %s",
+                sanitize_log_field(region["plugin_id"]),
+                exc_info=True,
+            )
+            plugin_config = None
+        if not plugin_config:
+            return None, WorkflowError(
+                f"Plugin '{region['plugin_id']}' is not installed/registered.",
+                status=422,
+                field="regionsJson",
+            )
+
+    return regions, None
+
+
+def prepare_add_composite_screen_workflow(
+    raw_regions: list[dict[str, Any]],
+    refresh_settings: dict[str, Any],
+    *,
+    playlist_manager: Any,
+    device_config: Any,
+) -> AddPluginWorkflowResult:
+    """Validate and execute the add-composite-screen workflow.
+
+    Parallel to prepare_add_plugin_workflow, reusing its playlist/instance-
+    name/refresh-settings validation and add_plugin_to_playlist plumbing —
+    a composite screen is a normal PluginInstance (model.COMPOSITE_PLUGIN_ID)
+    whose settings["regions"] this function validates before saving.
+    """
+    from model import COMPOSITE_PLUGIN_ID
+
+    playlist = refresh_settings.get("playlist")
+    if not playlist:
+        return _failure(
+            PLAYLIST_NAME_REQUIRED_ERROR,
+            status=422,
+            field="playlist",
+        )
+
+    instance_name, name_err = normalize_instance_name(
+        refresh_settings.get("instance_name")
+    )
+    if name_err:
+        return _failure(
+            name_err.message,
+            status=name_err.status,
+            code=name_err.code,
+            field=name_err.field,
+        )
+
+    existing = playlist_manager.find_plugin(COMPOSITE_PLUGIN_ID, instance_name)
+    if existing:
+        return _failure(
+            f"Plugin instance '{instance_name}' already exists",
+            status=400,
+            field="instance_name",
+        )
+
+    refresh_config, refresh_err = validate_plugin_refresh_settings(refresh_settings)
+    if refresh_err:
+        return _failure(
+            refresh_err.message,
+            status=refresh_err.status,
+            field=refresh_err.field,
+        )
+
+    regions, regions_err = _validate_composite_regions(raw_regions, device_config)
+    if regions_err:
+        return _failure(
+            regions_err.message,
+            status=regions_err.status,
+            field=regions_err.field,
+        )
+
+    assert instance_name is not None
+    assert regions is not None
+    plugin_dict = build_playlist_plugin_dict(
+        COMPOSITE_PLUGIN_ID, {"regions": regions}, refresh_config or {}, instance_name
+    )
+
+    try:
+        add_result: list[bool] = []
+
+        def _do_add(cfg: dict[str, Any]) -> None:
+            add_result.append(
+                playlist_manager.add_plugin_to_playlist(playlist, plugin_dict)
+            )
+            cfg["playlist_config"] = playlist_manager.to_dict()
+
+        device_config.update_atomic(_do_add)
+        if not add_result or not add_result[0]:
+            return _failure("Failed to add to playlist", status=500)
+    except Exception:
+        logger.exception("Add-composite-screen workflow failed")
+        return _failure(
+            _MSG_INVALID_PLAYLIST_REQUEST,
+            status=500,
+            code="internal_error",
+        )
+
+    return AddPluginWorkflowResult(
+        ok=True,
+        message="Scheduled refresh configured.",
+        playlist_name=playlist,
+        instance_name=instance_name,
+        refresh_config=refresh_config or {},
+        plugin_dict=plugin_dict,
+    )
+
+
+def prepare_update_composite_screen_workflow(
+    instance_name: str,
+    raw_regions: list[dict[str, Any]],
+    *,
+    playlist_manager: Any,
+    device_config: Any,
+) -> AddPluginWorkflowResult:
+    """Validate and apply a region-list update to an existing composite screen.
+
+    Only settings["regions"] changes here — refresh cadence is edited through
+    the same generic "Edit refresh settings" modal every other plugin
+    instance uses (PUT /update_plugin_instance/<name>), and a composite
+    screen can't be moved between playlists any more than a real plugin
+    instance can via that same route.
+    """
+    from model import COMPOSITE_PLUGIN_ID
+
+    instance_name = (instance_name or "").strip()
+    if not instance_name:
+        return _failure("Instance name is required", status=422, field="instance_name")
+
+    plugin_instance = playlist_manager.find_plugin(COMPOSITE_PLUGIN_ID, instance_name)
+    if plugin_instance is None:
+        return _failure(
+            f"Composite screen '{instance_name}' was not found",
+            status=404,
+            code="not_found",
+        )
+
+    regions, regions_err = _validate_composite_regions(raw_regions, device_config)
+    if regions_err:
+        return _failure(
+            regions_err.message,
+            status=regions_err.status,
+            field=regions_err.field,
+        )
+    assert regions is not None
+
+    try:
+
+        def _do_update(cfg: dict[str, Any]) -> None:
+            plugin_instance.settings = {"regions": regions}
+
+        device_config.update_atomic(_do_update)
+    except Exception:
+        logger.exception(
+            "Update-composite-screen workflow failed for %s",
+            sanitize_log_field(instance_name),
+        )
+        return _failure(
+            _MSG_INVALID_PLAYLIST_REQUEST,
+            status=500,
+            code="internal_error",
+        )
+
+    return AddPluginWorkflowResult(
+        ok=True,
+        message="Composite screen updated.",
+        instance_name=instance_name,
+        plugin_dict={"regions": regions},
+    )

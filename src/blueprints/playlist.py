@@ -16,9 +16,13 @@ from flask import (
     url_for,
 )
 
-from model import Playlist
+from model import COMPOSITE_PLUGIN_ID, Playlist
 from refresh_task import PlaylistRefresh
-from services.playlist_workflows import prepare_add_plugin_workflow
+from services.playlist_workflows import (
+    prepare_add_composite_screen_workflow,
+    prepare_add_plugin_workflow,
+    prepare_update_composite_screen_workflow,
+)
 from utils.app_utils import handle_request_files, parse_form
 from utils.backend_errors import (
     ClientInputError,
@@ -436,6 +440,202 @@ def add_plugin() -> Any:
     return json_success("Scheduled refresh configured.")
 
 
+def _parse_add_composite_screen_form(
+    form: Mapping[str, Any],
+) -> tuple[list[dict[str, Any]] | None, dict[str, Any] | None, Any]:
+    """Parse and validate the add_composite_screen form data.
+
+    Returns ``(regions, refresh_settings, error_response)``. On success
+    ``error_response`` is None; on failure the first two are None.
+    """
+    raw_refresh = form.get("refresh_settings")
+    refresh_settings, err = _parse_refresh_settings_json(raw_refresh)
+    if err:
+        _p1, _p2, _p3, error_response = err
+        return None, None, error_response
+    raw_regions = form.get("regionsJson")
+    if not raw_regions or not isinstance(raw_regions, str):
+        _p1, _p2, _p3, error_response = _form_parse_error(
+            "regionsJson is required", status=422, field="regionsJson"
+        )
+        return None, None, error_response
+    try:
+        regions = json.loads(raw_regions)
+    except (json.JSONDecodeError, ValueError):
+        _p1, _p2, _p3, error_response = _form_parse_error(
+            "Invalid JSON in regionsJson", status=422, field="regionsJson"
+        )
+        return None, None, error_response
+    if not isinstance(regions, list):
+        _p1, _p2, _p3, error_response = _form_parse_error(
+            "regionsJson must be a JSON array", status=422, field="regionsJson"
+        )
+        return None, None, error_response
+    return regions, refresh_settings, None
+
+
+@playlist_bp.route("/add_composite_screen", methods=["POST"])
+def add_composite_screen() -> Any:
+    """Add a native composite ("multi-region") screen to a playlist.
+
+    Parallel to add_plugin() above, but for a screen that renders several
+    other plugins into named regions on one canvas instead of a single
+    plugin's own settings form — see model.COMPOSITE_PLUGIN_ID and
+    refresh_task/composite_render.py.
+    """
+    device_config = current_app.config["DEVICE_CONFIG"]
+    playlist_manager = device_config.get_playlist_manager()
+
+    with route_error_boundary(
+        "add composite screen to playlist",
+        logger=logger,
+        hint="Validate region JSON; ensure playlist exists and instance name is not duplicated.",
+    ):
+        regions, refresh_settings, parse_err = _parse_add_composite_screen_form(
+            request.form
+        )
+        if parse_err:
+            return parse_err
+        assert regions is not None
+        assert refresh_settings is not None
+
+        result = prepare_add_composite_screen_workflow(
+            regions,
+            refresh_settings,
+            playlist_manager=playlist_manager,
+            device_config=device_config,
+        )
+        if not result.ok:
+            error = result.error
+            if error is None:
+                raise OperationFailedError("Failed to add to playlist")
+            return json_error(error.message, **error.as_json_kwargs())
+    return json_success("Scheduled refresh configured.")
+
+
+def _render_composite_screen_editor(
+    *,
+    edit_instance_name: str | None,
+    initial_regions: list[dict[str, Any]] | None,
+    default_playlist: str,
+) -> Any:
+    from plugins.base_plugin.base_plugin import BasePlugin
+
+    device_config = current_app.config["DEVICE_CONFIG"]
+    playlist_manager = device_config.get_playlist_manager()
+
+    available_plugins = sorted(
+        (
+            {"id": p["id"], "display_name": p.get("display_name") or p["id"]}
+            for p in device_config.get_plugins()
+            if isinstance(p.get("id"), str)
+        ),
+        key=lambda p: p["display_name"].lower(),
+    )
+    canvas_w, canvas_h = BasePlugin.get_oriented_dimensions(device_config)
+
+    return render_template(
+        "composite_screen.html",
+        available_plugins=available_plugins,
+        playlist_names=playlist_manager.get_playlist_names(),
+        default_playlist=default_playlist,
+        canvas_w=canvas_w,
+        canvas_h=canvas_h,
+        edit_instance_name=edit_instance_name,
+        initial_regions_json=json.dumps(initial_regions or []),
+        active_nav="playlists",
+    )
+
+
+@playlist_bp.route("/composite_screen/new", methods=["GET"])
+def new_composite_screen() -> Any:
+    """Region editor for creating a new composite screen.
+
+    Reached from a playlist card's "Add composite screen" link — see
+    playlist.html. Unlike a real plugin, there is no /plugin/<id> settings
+    page for this: the playlist target, instance name, refresh schedule, and
+    region list are all collected on this one page and posted together to
+    add_composite_screen() above.
+    """
+    return _render_composite_screen_editor(
+        edit_instance_name=None,
+        initial_regions=None,
+        default_playlist=request.args.get("playlist") or "",
+    )
+
+
+@playlist_bp.route("/composite_screen/edit/<string:instance_name>", methods=["GET"])
+def edit_composite_screen(instance_name: str) -> Any:
+    """Region editor for an existing composite screen's regions.
+
+    Refresh cadence isn't edited here — that's the same generic "Edit
+    refresh settings" modal every plugin instance uses (playlist.html's
+    edit-refresh action, PUT /update_plugin_instance/<name>), which works
+    unmodified for a composite instance since it doesn't touch settings when
+    the request carries none. This page only round-trips settings["regions"]
+    via update_composite_screen() below.
+    """
+    device_config = current_app.config["DEVICE_CONFIG"]
+    playlist_manager = device_config.get_playlist_manager()
+    plugin_instance = playlist_manager.find_plugin(COMPOSITE_PLUGIN_ID, instance_name)
+    if plugin_instance is None:
+        raise ResourceLookupError(
+            f"Composite screen '{instance_name}' was not found", status=404
+        )
+
+    regions = plugin_instance.settings.get("regions")
+    return _render_composite_screen_editor(
+        edit_instance_name=instance_name,
+        initial_regions=regions if isinstance(regions, list) else [],
+        default_playlist="",
+    )
+
+
+@playlist_bp.route("/update_composite_screen/<string:instance_name>", methods=["PUT"])
+def update_composite_screen(instance_name: str) -> Any:
+    """Persist an edited region list for an existing composite screen."""
+    device_config = current_app.config["DEVICE_CONFIG"]
+    playlist_manager = device_config.get_playlist_manager()
+
+    with route_error_boundary(
+        "update composite screen",
+        logger=logger,
+        hint="Validate region JSON; ensure the composite screen instance exists.",
+    ):
+        raw_regions = request.form.get("regionsJson")
+        if not raw_regions or not isinstance(raw_regions, str):
+            return json_error(
+                "regionsJson is required", status=422, details={"field": "regionsJson"}
+            )
+        try:
+            regions = json.loads(raw_regions)
+        except (json.JSONDecodeError, ValueError):
+            return json_error(
+                "Invalid JSON in regionsJson",
+                status=422,
+                details={"field": "regionsJson"},
+            )
+        if not isinstance(regions, list):
+            return json_error(
+                "regionsJson must be a JSON array",
+                status=422,
+                details={"field": "regionsJson"},
+            )
+
+        result = prepare_update_composite_screen_workflow(
+            instance_name,
+            regions,
+            playlist_manager=playlist_manager,
+            device_config=device_config,
+        )
+        if not result.ok:
+            error = result.error
+            if error is None:
+                raise OperationFailedError("Failed to update composite screen")
+            return json_error(error.message, **error.as_json_kwargs())
+    return json_success("Composite screen updated.")
+
+
 @playlist_bp.route("/playlists", methods=["GET"])
 def playlists_redirect() -> Any:
     return redirect(url_for("playlist.playlists"))
@@ -544,6 +744,7 @@ def playlists() -> Any:
         device_cycle_minutes=device_cycle_minutes,
         playlist_timing=playlist_timing,
         rotation_eta=rotation_eta,
+        composite_plugin_id=COMPOSITE_PLUGIN_ID,
         active_nav="playlists",
     )
 

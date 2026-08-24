@@ -98,10 +98,15 @@
                         {% set pi_label = plugin_instance.name | friendly_instance_label(plugin_instance.plugin_id) %}
                         {% set pi_suffix = plugin_instance.name | instance_suffix_label(plugin_instance.plugin_id) %}
                         {% set is_playing = playlist.name == refresh_info.playlist and plugin_instance.name == refresh_info.plugin_instance %}
+                        {% set is_composite = plugin_instance.plugin_id == composite_plugin_id %}
                         <div class="plugin-item pl-item{% if is_playing %} is-playing{% endif %}" data-plugin-id="{{ plugin_instance.plugin_id }}" data-instance-name="{{ plugin_instance.name }}" data-instance-label="{{ pi_label }}">
                             <span class="drag-handle" aria-hidden="true">{{ icon('dots-six-vertical', 'drag-handle-icon') | safe }}</span>
                             <span class="pl-item-icon" aria-hidden="true">
+                                {% if is_composite %}
+                                {{ icon('squares-four', 'plugin-icon') | safe }}
+                                {% else %}
                                 <img src="{{ url_for('plugin.image', plugin_id=plugin_instance.plugin_id, filename='icon.png') }}" alt="" class="plugin-icon">
+                                {% endif %}
                             </span>
                             <div class="pl-item-main plugin-info" id="{{plugin_instance.name}}">
                                 <div class="pl-item-name"><span class="plugin-instance">{{ pi_label }}{% if pi_suffix and pi_suffix != pi_label %} <span class="plugin-instance-suffix">({{ pi_suffix }})</span>{% endif %}</span>{% if is_playing %}<span class="displayed-now">Playing</span>{% endif %}</div>
@@ -128,7 +133,7 @@
                                 <div class="plugin-thumbnail-container lightboxable"
                                      data-thumbnail-playlist="{{ playlist.name }}"
                                      data-thumbnail-plugin="{{ plugin_instance.plugin_id }}"
-                                     data-thumbnail-display-name="{{ (plugins.get(plugin_instance.plugin_id, {}).display_name or plugin_instance.plugin_id) }}"
+                                     data-thumbnail-display-name="{{ 'Composite Screen' if is_composite else (plugins.get(plugin_instance.plugin_id, {}).display_name or plugin_instance.plugin_id) }}"
                                      data-thumbnail-instance="{{ plugin_instance.name }}"
                                      data-thumbnail-instance-label="{{ pi_label }}">
                                     <div class="img-skeleton" aria-hidden="true"></div>
@@ -160,10 +165,17 @@
                                     {{ icon('clock', 'action-icon') | safe }}
                                     <span class="sr-only">Edit schedule for {{ pi_label }}</span>
                                 </button>
+                                {% if is_composite %}
+                                <a href="{{ url_for('playlist.edit_composite_screen', instance_name=plugin_instance.name) }}" class="header-button is-secondary edit-button playlist-row-icon-btn edit-plugin-link" title="Edit regions for {{ pi_label }}">
+                                    {{ icon('pencil-simple', 'action-icon') | safe }}
+                                    <span class="sr-only">Edit regions for {{ pi_label }}</span>
+                                </a>
+                                {% else %}
                                 <a href="{{ url_for('plugin.plugin_page', plugin_id=plugin_instance.plugin_id) }}?instance={{ plugin_instance.name }}" class="header-button is-secondary edit-button playlist-row-icon-btn edit-plugin-link" title="Edit plugin {{ pi_label }}">
                                     {{ icon('pencil-simple', 'action-icon') | safe }}
                                     <span class="sr-only">Edit plugin {{ pi_label }}</span>
                                 </a>
+                                {% endif %}
                                 {# data-test-skip-click: removes a plugin instance from the playlist #}
                                 <button class="header-button is-secondary ghost-danger delete-button delete-instance-btn playlist-row-icon-btn" type="button" title="Delete plugin instance {{ pi_label }}" data-playlist-action="delete-instance" data-playlist="{{ playlist.name }}" data-plugin-id="{{ plugin_instance.plugin_id }}" data-instance="{{ plugin_instance.name }}" data-instance-label="{{ pi_label }}" data-test-skip-click="true">
                                     {{ icon('trash', 'action-icon') | safe }}
@@ -178,6 +190,9 @@
                     {% endif %}
                     <a href="{{ url_for('plugin.plugins_page') }}" class="pl-add-row" title="Add plugin instance to {{ playlist.name }}">
                         {{ icon('plus', 'icon-xs') | safe }}<span>Add plugin instance</span><span class="sr-only"> to {{ playlist.name }}</span>
+                    </a>
+                    <a href="{{ url_for('playlist.new_composite_screen', playlist=playlist.name) }}" class="pl-add-row" title="Add composite screen to {{ playlist.name }}">
+                        {{ icon('squares-four', 'icon-xs') | safe }}<span>Add composite screen</span><span class="sr-only"> to {{ playlist.name }}</span>
                     </a>
                     </div>
             </div>

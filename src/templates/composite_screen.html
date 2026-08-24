@@ -1,0 +1,910 @@
+{% extends "base.html" %}
+{% block title %}InkyPi - {{ 'Edit' if edit_instance_name else 'New' }} composite screen{% endblock %}
+{% block body_attrs %} data-page="composite-screen"{% endblock %}
+{% block body %}
+    {% from 'macros/icons.html' import icon, breadcrumb %}
+    {% from 'macros/pageheader.html' import pageheader %}
+    <main id="main-content" role="main" tabindex="-1" class="page-shell page-shell-dashboard" data-page-shell="dashboard">
+    <div class="frame playlist-frame">
+        {{ breadcrumb([{'label': 'Home', 'url': url_for('main.main_page')}, {'label': 'Playlists', 'url': url_for('playlist.playlists')}, {'label': 'Edit regions' if edit_instance_name else 'New composite screen'}]) }}
+        {% call pageheader(
+            title=('Edit regions — ' + edit_instance_name) if edit_instance_name else 'New composite screen',
+            eyebrow='Composite screen',
+            description='Compose several existing plugins into named regions on one canvas, rendered as a single playlist entry.'
+        ) %}{% endcall %}
+
+        <form id="compositeForm" class="settings-form schedule-form-card" data-form-state aria-busy="false" aria-label="{{ 'Edit' if edit_instance_name else 'New' }} composite screen">
+            {% if edit_instance_name %}
+            <div class="settings-callout">
+                {{ icon('info', 'icon-image') | safe }}
+                <div>
+                    <p>Editing regions for <strong>{{ edit_instance_name }}</strong>. Its playlist and refresh
+                    schedule are unchanged here — use the clock icon on the
+                    <a href="{{ url_for('playlist.playlists') }}">Playlists</a> page to edit those.</p>
+                </div>
+            </div>
+            {% else %}
+            <div class="schedule-form-grid">
+                <section class="schedule-fieldset" aria-labelledby="compositeDestinationHeading">
+                    <div class="schedule-fieldset-title" id="compositeDestinationHeading">Destination</div>
+                    <div class="form-group">
+                        <label for="playlist" class="form-label">Playlist</label>
+                        <select id="playlist" name="playlist" class="form-input">
+                            {% for playlist_name in playlist_names %}
+                            <option value="{{ playlist_name }}"{% if playlist_name == default_playlist %} selected{% endif %}>{{ playlist_name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="instance" class="form-label">Instance Name</label>
+                        <input type="text" id="instance" name="instance_name" placeholder="Enter instance name" required pattern="[A-Za-z0-9 _-]+" title="Letters, numbers, spaces, underscores, and hyphens only" class="form-input" aria-required="true">
+                    </div>
+                </section>
+                <section class="schedule-fieldset" aria-labelledby="compositeCadenceHeading">
+                    <div class="schedule-fieldset-title" id="compositeCadenceHeading">Cadence</div>
+                    <div class="form-group schedule-inline-group">
+                        <input type="radio" id="refreshTypeInterval" name="refreshType" value="interval" checked>
+                        <label for="refreshTypeInterval">Every</label>
+                        <input type="number" id="scheduleInterval" name="interval" class="form-input" required min="1" placeholder="Enter interval" aria-label="Interval value">
+                        <select id="scheduleUnit" name="unit" class="form-input" required aria-label="Time unit">
+                            <option value="minute">Minute</option>
+                            <option value="hour">Hour</option>
+                            <option value="day">Day</option>
+                        </select>
+                    </div>
+                    <div class="form-group schedule-inline-group">
+                        <input type="radio" id="refreshTypeScheduled" name="refreshType" value="scheduled">
+                        <label for="refreshTypeScheduled">Daily at</label>
+                        <input id="scheduleTime" class="time-input" type="time" name="refreshTime" step="900" aria-label="Scheduled time" disabled>
+                    </div>
+                </section>
+            </div>
+            {% endif %}
+
+            <div class="settings-card" style="margin-top: 16px;">
+                <div class="settings-card-title">Regions</div>
+                <p class="field-note">
+                    Each region assigns an installed plugin to a rectangular area of the
+                    {{ canvas_w }}&times;{{ canvas_h }} canvas, using that plugin's own settings form. Drag a
+                    region to move it, or drag its bottom-right corner to resize. Regions can't overlap, and
+                    edges snap to the canvas border or a neighboring region so you can tile the screen with
+                    no gaps.
+                </p>
+
+                <div class="form-group schedule-inline-group" role="radiogroup" aria-label="Region size display">
+                    <span class="form-label" style="margin-right:8px;">Show size as</span>
+                    <input type="radio" id="sizeUnitPercent" name="sizeUnit" value="percent" checked>
+                    <label for="sizeUnitPercent">Percentage</label>
+                    <input type="radio" id="sizeUnitPixels" name="sizeUnit" value="pixels">
+                    <label for="sizeUnitPixels">Pixels</label>
+                </div>
+
+                <div id="compositePreview" style="position:relative; width:100%; max-width:{{ canvas_w }}px; aspect-ratio:{{ canvas_w }}/{{ canvas_h }}; background:var(--surface); border:1px solid var(--surface-border); overflow:hidden; margin-bottom:16px; touch-action:none;"></div>
+
+                <div class="form-group" style="position:sticky; top:0; background:var(--surface); border-bottom:1px solid var(--surface-border); padding:10px 0; z-index:5;">
+                    <button type="button" id="addRegionBtn" class="action-button is-secondary">{{ icon('plus', 'btn-leading-icon') | safe }}Add region</button>
+                </div>
+
+                <div id="regionList"></div>
+            </div>
+
+            <div class="form-group">
+                <span id="compositeError" class="validation-message" role="alert"></span>
+            </div>
+
+            <div class="schedule-form-actions">
+                <button type="submit" id="compositeSubmitBtn" class="action-button">{{ 'Save regions' if edit_instance_name else 'Add to Playlist' }}</button>
+                <a href="{{ url_for('playlist.playlists') }}" class="action-button is-secondary">Cancel</a>
+            </div>
+        </form>
+    </div>
+    </main>
+
+    <template id="regionRowTemplate">
+        <div class="settings-card region-row" style="margin-bottom:12px;">
+            <div class="form-group">
+                <label class="form-label">Plugin</label>
+                <select class="form-input region-plugin-id">
+                    {% for p in available_plugins %}
+                    <option value="{{ p.id }}">{{ p.display_name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="schema-row">
+                <div class="form-group">
+                    <label class="form-label">X</label>
+                    <input type="number" class="form-input region-x" value="0" min="0" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Y</label>
+                    <input type="number" class="form-input region-y" value="0" min="0" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Width</label>
+                    <input type="number" class="form-input region-w" value="{{ canvas_w }}" min="1" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Height</label>
+                    <input type="number" class="form-input region-h" value="{{ canvas_h }}" min="1" required>
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Settings</label>
+                <div class="region-settings-container"></div>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Cache this region's render for (minutes, optional)</label>
+                <input type="number" class="form-input region-refresh-minutes" min="0" placeholder="Always re-render">
+            </div>
+            <button type="button" class="action-button is-secondary ghost-danger remove-region-btn">{{ icon('trash', 'btn-leading-icon') | safe }}Remove region</button>
+        </div>
+    </template>
+
+    <script nonce="{{ csp_nonce }}">
+    document.addEventListener('DOMContentLoaded', () => {
+        const CANVAS_W = {{ canvas_w | tojson }};
+        const CANVAS_H = {{ canvas_h | tojson }};
+        const EDIT_INSTANCE_NAME = {{ edit_instance_name | tojson }};
+        const INITIAL_REGIONS = {{ initial_regions_json | safe }};
+        const ADD_COMPOSITE_SCREEN_URL = {{ url_for('playlist.add_composite_screen') | tojson }};
+        const UPDATE_COMPOSITE_SCREEN_BASE_URL = {{ url_for('playlist.update_composite_screen', instance_name='') | tojson }};
+        const PLUGIN_PAGE_BASE_URL = {{ url_for('plugin.plugin_page', plugin_id='__PID__') | tojson }};
+        const PLAYLISTS_URL = {{ url_for('playlist.playlists') | tojson }};
+        const REGION_COLORS = ['#1976D2', '#D32F2F', '#388E3C', '#F57C00', '#7B1FA2', '#00838F'];
+
+        const regionList = document.getElementById('regionList');
+        const preview = document.getElementById('compositePreview');
+        const rowTemplate = document.getElementById('regionRowTemplate');
+        const errorEl = document.getElementById('compositeError');
+        const form = document.getElementById('compositeForm');
+
+        // ---------------------------------------------------------------
+        // Per-region "use the target plugin's real settings form" editor
+        // ---------------------------------------------------------------
+        // Fetches /plugin/<id>, pulls out the same [data-settings-schema]
+        // markup that plugin's own settings page renders, and embeds it
+        // here — namespaced so N regions on the same plugin don't collide,
+        // and with existing region settings applied so re-opening this page
+        // shows the region's real saved values instead of blanks. Plugins
+        // with no schema-driven settings (e.g. a bespoke settings.html) fall
+        // back to a raw JSON textarea, same as before.
+
+        const pluginSchemaCache = new Map();
+        let regionUidCounter = 0;
+
+        function fetchPluginSchema(pluginId) {
+            if (pluginSchemaCache.has(pluginId)) return pluginSchemaCache.get(pluginId);
+            const promise = fetch(PLUGIN_PAGE_BASE_URL.replace('__PID__', encodeURIComponent(pluginId)))
+                .then((response) => (response.ok ? response.text() : ''))
+                .then((html) => {
+                    if (!html) return null;
+                    const doc = new DOMParser().parseFromString(html, 'text/html');
+                    return doc.querySelector('[data-settings-schema]');
+                })
+                .catch(() => null);
+            pluginSchemaCache.set(pluginId, promise);
+            return promise;
+        }
+
+        function namespaceFragment(root, uid) {
+            const prefix = 'region-' + uid + '-';
+            root.querySelectorAll('[id]').forEach((el) => {
+                const oldId = el.id;
+                const newId = prefix + oldId;
+                el.id = newId;
+                root.querySelectorAll('label[for]').forEach((label) => {
+                    if (label.getAttribute('for') === oldId) label.setAttribute('for', newId);
+                });
+                root.querySelectorAll('[list]').forEach((el2) => {
+                    if (el2.getAttribute('list') === oldId) el2.setAttribute('list', newId);
+                });
+                root.querySelectorAll('[aria-describedby]').forEach((el2) => {
+                    const value = el2
+                        .getAttribute('aria-describedby')
+                        .split(/\s+/)
+                        .map((token) => (token === oldId ? newId : token))
+                        .join(' ');
+                    el2.setAttribute('aria-describedby', value);
+                });
+            });
+            root.querySelectorAll('[name]').forEach((el) => {
+                el.name = prefix + el.name;
+            });
+        }
+
+        function collectFieldsByName(root) {
+            const groups = {};
+            root.querySelectorAll('[data-field-name]').forEach((el) => {
+                const name = el.dataset.fieldName;
+                (groups[name] = groups[name] || []).push(el);
+            });
+            return groups;
+        }
+
+        function getFieldGroupValue(elements) {
+            const first = elements[0];
+            if (first.type === 'checkbox') {
+                const checked = elements.find((el) => el.type === 'checkbox' && el.checked);
+                if (checked) return checked.dataset.checkedValue || checked.value || 'true';
+                const uncheckedSource = elements.find((el) => el.dataset.uncheckedValue !== undefined);
+                return uncheckedSource ? uncheckedSource.dataset.uncheckedValue : undefined;
+            }
+            if (first.type === 'radio') {
+                const checked = elements.find((el) => el.checked);
+                return checked ? checked.value : undefined;
+            }
+            return first.value;
+        }
+
+        function setFieldGroupValue(elements, value) {
+            if (value === undefined || value === null) return;
+            const first = elements[0];
+            if (first.type === 'checkbox') {
+                elements
+                    .filter((el) => el.type === 'checkbox')
+                    .forEach((el) => {
+                        el.checked = String(value) === String(el.dataset.checkedValue || 'true');
+                    });
+                return;
+            }
+            if (first.type === 'radio') {
+                elements.forEach((el) => {
+                    el.checked = String(el.value) === String(value);
+                });
+                return;
+            }
+            elements.forEach((el) => {
+                el.value = value;
+            });
+        }
+
+        function readSchemaSettings(container) {
+            const settings = {};
+            const groups = collectFieldsByName(container);
+            Object.keys(groups).forEach((name) => {
+                const value = getFieldGroupValue(groups[name]);
+                if (value !== undefined) settings[name] = value;
+            });
+            return settings;
+        }
+
+        function applySchemaSettings(container, settings) {
+            const groups = collectFieldsByName(container);
+            Object.keys(groups).forEach((name) => {
+                if (!(name in settings)) return;
+                // Widget-owned fields (e.g. clock-face-picker's hidden face
+                // field, weather-map's lat/lon) were already seeded by
+                // InkyPiPluginSchema.initWidgetsIn's own config-driven init
+                // before this runs — re-setting them here would just repeat
+                // the same value, so skip fields living inside a widget.
+                if (groups[name][0].closest('[data-hybrid-widget]')) return;
+                setFieldGroupValue(groups[name], settings[name]);
+            });
+        }
+
+        async function refreshRegionSettingsEditor(row) {
+            const pluginId = row.querySelector('.region-plugin-id').value;
+            const container = row.querySelector('.region-settings-container');
+            const existingSettings = row._compositeSettings || {};
+
+            container.innerHTML = '<p class="field-note">Loading settings…</p>';
+            const schemaEl = await fetchPluginSchema(pluginId).catch(() => null);
+            container.innerHTML = '';
+
+            if (!schemaEl) {
+                const textarea = document.createElement('textarea');
+                textarea.className = 'form-input region-settings-json';
+                textarea.rows = 3;
+                textarea.spellcheck = false;
+                textarea.value = JSON.stringify(existingSettings, null, 2);
+                container.appendChild(textarea);
+                row.dataset.settingsMode = 'json';
+                return;
+            }
+
+            const fragment = schemaEl.cloneNode(true);
+            fragment.querySelectorAll('[name]').forEach((el) => {
+                if (!el.dataset.fieldName) el.dataset.fieldName = el.name;
+            });
+            container.appendChild(fragment);
+
+            // Widgets need real, un-namespaced ids to find their own
+            // elements (e.g. widget.querySelector('#literalId')) at init
+            // time; JS listeners bind to element references, not id
+            // strings, so namespacing immediately afterward is safe.
+            if (window.InkyPiPluginSchema && typeof window.InkyPiPluginSchema.initWidgetsIn === 'function') {
+                try {
+                    window.InkyPiPluginSchema.initWidgetsIn(container, existingSettings);
+                } catch (error) {
+                    console.debug('Composite screen: widget init failed for', pluginId, error);
+                }
+            }
+
+            namespaceFragment(container, regionUidFor(row));
+            applySchemaSettings(container, existingSettings);
+            row.dataset.settingsMode = 'schema';
+        }
+
+        function regionUidFor(row) {
+            if (!row.dataset.regionUid) {
+                regionUidCounter += 1;
+                row.dataset.regionUid = String(regionUidCounter);
+            }
+            return row.dataset.regionUid;
+        }
+
+        function readRegionSettings(row) {
+            if (row.dataset.settingsMode === 'schema') {
+                return readSchemaSettings(row.querySelector('.region-settings-container'));
+            }
+            const textarea = row.querySelector('.region-settings-json');
+            if (!textarea) return {};
+            const raw = textarea.value.trim();
+            if (!raw) return {};
+            try {
+                return JSON.parse(raw);
+            } catch {
+                return null;
+            }
+        }
+
+        // ---------------------------------------------------------------
+        // Region rows
+        // ---------------------------------------------------------------
+
+        function addRegionRow(initial) {
+            const fragment = rowTemplate.content.cloneNode(true);
+            const row = fragment.querySelector('.region-row');
+            regionList.appendChild(fragment);
+            const appendedRow = regionList.lastElementChild;
+
+            if (initial) {
+                appendedRow.querySelector('.region-plugin-id').value = initial.plugin_id || '';
+                appendedRow.querySelector('.region-x').value = initial.x ?? 0;
+                appendedRow.querySelector('.region-y').value = initial.y ?? 0;
+                appendedRow.querySelector('.region-w').value = initial.w ?? CANVAS_W;
+                appendedRow.querySelector('.region-h').value = initial.h ?? CANVAS_H;
+                if (initial.refresh_minutes !== null && initial.refresh_minutes !== undefined) {
+                    appendedRow.querySelector('.region-refresh-minutes').value = initial.refresh_minutes;
+                }
+                appendedRow._compositeSettings = initial.settings || {};
+            } else {
+                // A freshly-added blank region defaults to the largest free
+                // rectangle instead of the full canvas — with other regions
+                // already placed, defaulting to 100% would just overlap
+                // them, forcing every "Add region" click into an immediate
+                // manual resize. When the free space left by existing
+                // regions isn't itself a rectangle (an L-shaped remainder,
+                // say), this picks the single largest rectangle that fits
+                // inside it.
+                const freeRect = computeLargestFreeRect(getOtherRegionRects(appendedRow));
+                appendedRow.querySelector('.region-x').value = freeRect.x;
+                appendedRow.querySelector('.region-y').value = freeRect.y;
+                appendedRow.querySelector('.region-w').value = freeRect.w;
+                appendedRow.querySelector('.region-h').value = freeRect.h;
+            }
+
+            appendedRow.querySelector('.region-plugin-id').addEventListener('change', () => {
+                appendedRow._compositeSettings = {};
+                refreshRegionSettingsEditor(appendedRow).then(renderPreview);
+            });
+
+            refreshRegionSettingsEditor(appendedRow).then(renderPreview);
+            return appendedRow;
+        }
+
+        function removeRegionRow(row) {
+            row.remove();
+            renderPreview();
+        }
+
+        function collectRegions() {
+            let sawInvalidJson = false;
+            const regions = Array.from(regionList.querySelectorAll('.region-row')).map((row) => {
+                const refreshMinutesRaw = row.querySelector('.region-refresh-minutes').value.trim();
+                const settings = readRegionSettings(row);
+                if (settings === null) sawInvalidJson = true;
+                return {
+                    plugin_id: row.querySelector('.region-plugin-id').value,
+                    x: Number.parseInt(row.querySelector('.region-x').value, 10),
+                    y: Number.parseInt(row.querySelector('.region-y').value, 10),
+                    w: Number.parseInt(row.querySelector('.region-w').value, 10),
+                    h: Number.parseInt(row.querySelector('.region-h').value, 10),
+                    settings: settings || {},
+                    refresh_minutes: refreshMinutesRaw ? Number.parseInt(refreshMinutesRaw, 10) : null,
+                };
+            });
+            regions._hasInvalidJson = sawInvalidJson;
+            return regions;
+        }
+
+        // ---------------------------------------------------------------
+        // Visual preview: render + drag-to-move + drag-to-resize, with
+        // overlap friction and edge snapping.
+        // ---------------------------------------------------------------
+
+        let activeDrag = null;
+        // ~1.5% of the canvas's smaller dimension — close enough for a
+        // free-hand pointer drag to reliably land on "flush," since fast
+        // mouse movement routinely jumps past the exact touching value
+        // between two pointermove events.
+        const SNAP_THRESHOLD = 0.015 * Math.min(CANVAS_W, CANVAS_H);
+
+        function clamp(value, min, max) {
+            return Math.min(Math.max(value, min), max);
+        }
+
+        function sizeUnit() {
+            return document.getElementById('sizeUnitPixels').checked ? 'pixels' : 'percent';
+        }
+
+        function formatSize(w, h) {
+            if (sizeUnit() === 'pixels') {
+                return w + '×' + h + 'px';
+            }
+            const pctW = Math.round((100 * w) / CANVAS_W);
+            const pctH = Math.round((100 * h) / CANVAS_H);
+            return pctW + '%×' + pctH + '%';
+        }
+
+        function getOtherRegionRects(excludeRow) {
+            return Array.from(regionList.querySelectorAll('.region-row'))
+                .filter((row) => row !== excludeRow)
+                .map((row) => ({
+                    x: Number.parseInt(row.querySelector('.region-x').value, 10) || 0,
+                    y: Number.parseInt(row.querySelector('.region-y').value, 10) || 0,
+                    w: Number.parseInt(row.querySelector('.region-w').value, 10) || 0,
+                    h: Number.parseInt(row.querySelector('.region-h').value, 10) || 0,
+                }));
+        }
+
+        function rangesOverlap(aLo, aHi, bLo, bHi) {
+            return aLo < bHi && aHi > bLo;
+        }
+
+        function rectsOverlap(a, b) {
+            return (
+                rangesOverlap(a.x, a.x + a.w, b.x, b.x + b.w) &&
+                rangesOverlap(a.y, a.y + a.h, b.y, b.y + b.h)
+            );
+        }
+
+        // Largest axis-aligned empty rectangle among existingRects on the
+        // canvas — the default geometry for a newly-added region. Uses
+        // coordinate compression (every existing rect's edges, plus the
+        // canvas edges, become grid lines) rather than a per-pixel grid, so
+        // this stays fast regardless of canvas resolution: the compressed
+        // grid has at most 2*existingRects.length+1 rows/columns. Each cell
+        // is fully inside or fully outside any given rect (cells are cut
+        // exactly on rect boundaries), so testing one point per cell —
+        // its center — correctly classifies the whole cell. Finding the
+        // largest all-empty rectangle in that cell grid is the classic
+        // "maximal rectangle in a binary matrix" problem, solved here with
+        // the standard histogram method (Θ(rows·cols), negligible at this
+        // grid size). The result's edges always land on one of the
+        // existing rects' edges or the canvas border — true for any
+        // maximal empty rectangle among axis-aligned rects — so mapping
+        // the winning cell-range back through the same coordinate arrays
+        // recovers exact canvas units, not an approximation.
+        function computeLargestFreeRect(existingRects) {
+            const fullCanvas = { x: 0, y: 0, w: CANVAS_W, h: CANVAS_H };
+            if (!existingRects.length) return fullCanvas;
+
+            const xsSet = new Set([0, CANVAS_W]);
+            const ysSet = new Set([0, CANVAS_H]);
+            existingRects.forEach((r) => {
+                xsSet.add(clamp(r.x, 0, CANVAS_W));
+                xsSet.add(clamp(r.x + r.w, 0, CANVAS_W));
+                ysSet.add(clamp(r.y, 0, CANVAS_H));
+                ysSet.add(clamp(r.y + r.h, 0, CANVAS_H));
+            });
+            const xs = Array.from(xsSet).sort((a, b) => a - b);
+            const ys = Array.from(ysSet).sort((a, b) => a - b);
+            const numCols = xs.length - 1;
+            const numRows = ys.length - 1;
+            if (numCols <= 0 || numRows <= 0) return fullCanvas;
+
+            const isEmpty = [];
+            for (let row = 0; row < numRows; row++) {
+                const cy = (ys[row] + ys[row + 1]) / 2;
+                const rowCells = [];
+                for (let col = 0; col < numCols; col++) {
+                    const cx = (xs[col] + xs[col + 1]) / 2;
+                    const occupied = existingRects.some(
+                        (r) => cx > r.x && cx < r.x + r.w && cy > r.y && cy < r.y + r.h
+                    );
+                    rowCells.push(!occupied);
+                }
+                isEmpty.push(rowCells);
+            }
+
+            const heights = new Array(numCols).fill(0);
+            let best = { area: 0, top: 0, left: 0, bottom: -1, right: -1 };
+            for (let row = 0; row < numRows; row++) {
+                for (let col = 0; col < numCols; col++) {
+                    heights[col] = isEmpty[row][col] ? heights[col] + 1 : 0;
+                }
+                const stack = [];
+                for (let col = 0; col <= numCols; col++) {
+                    const h = col === numCols ? 0 : heights[col];
+                    while (stack.length && heights[stack[stack.length - 1]] >= h) {
+                        const height = heights[stack.pop()];
+                        const left = stack.length ? stack[stack.length - 1] + 1 : 0;
+                        const width = col - left;
+                        const area = height * width;
+                        if (area > best.area) {
+                            best = { area, top: row - height + 1, left, bottom: row, right: col - 1 };
+                        }
+                    }
+                    stack.push(col);
+                }
+            }
+
+            if (best.area <= 0) return fullCanvas;
+            return {
+                x: xs[best.left],
+                y: ys[best.top],
+                w: xs[best.right + 1] - xs[best.left],
+                h: ys[best.bottom + 1] - ys[best.top],
+            };
+        }
+
+        // Regions the dragged one already overlapped *before the gesture
+        // started* are exempt from blocking for the rest of the gesture —
+        // otherwise a region that starts out overlapping something (e.g. a
+        // saved config predating this constraint) could never be dragged
+        // again at all, not even away from the overlap.
+        function preExistingOverlaps(startRect, others) {
+            const exempt = new Set();
+            others.forEach((o, i) => {
+                if (rectsOverlap(startRect, o)) exempt.add(i);
+            });
+            return exempt;
+        }
+
+        function resolveMove(startX, startY, w, h, dx, dy, others, exempt) {
+            // X axis first (Y held at start), then Y using the resolved X —
+            // this is what makes a diagonal drag slide along whichever axis
+            // isn't blocked, instead of freezing both at first contact.
+            let newX = clamp(startX + dx, 0, Math.max(0, CANVAS_W - w));
+            others.forEach((o, i) => {
+                if (exempt.has(i)) return;
+                if (!rangesOverlap(startY, startY + h, o.y, o.y + o.h)) return;
+                if (dx > 0 && o.x >= startX) newX = Math.min(newX, o.x - w);
+                if (dx < 0 && o.x + o.w <= startX + w) newX = Math.max(newX, o.x + o.w);
+            });
+            newX = clamp(newX, 0, Math.max(0, CANVAS_W - w));
+
+            let newY = clamp(startY + dy, 0, Math.max(0, CANVAS_H - h));
+            others.forEach((o, i) => {
+                if (exempt.has(i)) return;
+                if (!rangesOverlap(newX, newX + w, o.x, o.x + o.w)) return;
+                if (dy > 0 && o.y >= startY) newY = Math.min(newY, o.y - h);
+                if (dy < 0 && o.y + o.h <= startY + h) newY = Math.max(newY, o.y + o.h);
+            });
+            newY = clamp(newY, 0, Math.max(0, CANVAS_H - h));
+
+            return { x: newX, y: newY };
+        }
+
+        function resolveResize(startX, startY, startW, startH, dx, dy, others, exempt) {
+            let newW = clamp(startW + dx, 1, Math.max(1, CANVAS_W - startX));
+            if (dx > 0) {
+                others.forEach((o, i) => {
+                    if (exempt.has(i)) return;
+                    if (!rangesOverlap(startY, startY + startH, o.y, o.y + o.h)) return;
+                    if (o.x >= startX) newW = Math.min(newW, o.x - startX);
+                });
+            }
+            newW = Math.max(1, newW);
+
+            let newH = clamp(startH + dy, 1, Math.max(1, CANVAS_H - startY));
+            if (dy > 0) {
+                others.forEach((o, i) => {
+                    if (exempt.has(i)) return;
+                    if (!rangesOverlap(startX, startX + newW, o.x, o.x + o.w)) return;
+                    if (o.y >= startY) newH = Math.min(newH, o.y - startY);
+                });
+            }
+            newH = Math.max(1, newH);
+
+            return { w: newW, h: newH };
+        }
+
+        function snapToNearest(value, candidates) {
+            let best = value;
+            let bestDist = SNAP_THRESHOLD;
+            candidates.forEach((candidate) => {
+                const dist = Math.abs(value - candidate);
+                if (dist <= bestDist) {
+                    bestDist = dist;
+                    best = candidate;
+                }
+            });
+            return best;
+        }
+
+        function snapMove(x, y, w, h, others) {
+            const xCandidates = [0, CANVAS_W - w];
+            const yCandidates = [0, CANVAS_H - h];
+            others.forEach((o) => {
+                xCandidates.push(o.x - w, o.x + o.w);
+                yCandidates.push(o.y - h, o.y + o.h);
+            });
+            return {
+                x: clamp(snapToNearest(x, xCandidates), 0, Math.max(0, CANVAS_W - w)),
+                y: clamp(snapToNearest(y, yCandidates), 0, Math.max(0, CANVAS_H - h)),
+            };
+        }
+
+        function snapResize(startX, startY, w, h, others) {
+            const rightCandidates = [CANVAS_W];
+            const bottomCandidates = [CANVAS_H];
+            others.forEach((o) => {
+                rightCandidates.push(o.x, o.x + o.w);
+                bottomCandidates.push(o.y, o.y + o.h);
+            });
+            const snappedRight = snapToNearest(startX + w, rightCandidates);
+            const snappedBottom = snapToNearest(startY + h, bottomCandidates);
+            return {
+                w: Math.max(1, Math.min(snappedRight, CANVAS_W) - startX),
+                h: Math.max(1, Math.min(snappedBottom, CANVAS_H) - startY),
+            };
+        }
+
+        function renderPreview() {
+            preview.innerHTML = '';
+            const rows = Array.from(regionList.querySelectorAll('.region-row'));
+            const regions = collectRegions();
+
+            rows.forEach((row, index) => {
+                const region = regions[index];
+                if (
+                    !Number.isFinite(region.x) || !Number.isFinite(region.y) ||
+                    !Number.isFinite(region.w) || !Number.isFinite(region.h)
+                ) {
+                    return;
+                }
+                const color = REGION_COLORS[index % REGION_COLORS.length];
+                const box = document.createElement('div');
+                box.className = 'composite-region-box';
+                box.style.position = 'absolute';
+                box.style.left = (100 * region.x / CANVAS_W) + '%';
+                box.style.top = (100 * region.y / CANVAS_H) + '%';
+                box.style.width = (100 * region.w / CANVAS_W) + '%';
+                box.style.height = (100 * region.h / CANVAS_H) + '%';
+                box.style.border = '2px solid ' + color;
+                box.style.boxSizing = 'border-box';
+                box.style.overflow = 'hidden';
+                box.style.fontSize = '11px';
+                box.style.color = color;
+                box.style.padding = '2px 4px';
+                box.style.cursor = 'move';
+                box.style.userSelect = 'none';
+                box.style.display = 'flex';
+                box.style.flexDirection = 'column';
+                box.style.gap = '2px';
+                box.style.lineHeight = '1.2';
+
+                const label = document.createElement('div');
+                label.textContent = region.plugin_id || ('Region ' + (index + 1));
+                const sizeLabel = document.createElement('div');
+                sizeLabel.className = 'composite-region-size-label';
+                sizeLabel.style.opacity = '0.85';
+                sizeLabel.textContent = formatSize(region.w, region.h);
+                box.appendChild(label);
+                box.appendChild(sizeLabel);
+
+                const handle = document.createElement('div');
+                handle.className = 'composite-region-handle';
+                handle.style.position = 'absolute';
+                handle.style.right = '0';
+                handle.style.bottom = '0';
+                handle.style.width = '14px';
+                handle.style.height = '14px';
+                handle.style.cursor = 'nwse-resize';
+                handle.style.background = color;
+                handle.style.opacity = '0.6';
+                box.appendChild(handle);
+
+                box.addEventListener('pointerdown', (event) => startDrag(event, row, 'move'));
+                handle.addEventListener('pointerdown', (event) => startDrag(event, row, 'resize'));
+
+                preview.appendChild(box);
+            });
+        }
+
+        document.getElementById('sizeUnitPercent').addEventListener('change', renderPreview);
+        document.getElementById('sizeUnitPixels').addEventListener('change', renderPreview);
+
+        function startDrag(event, row, mode) {
+            event.preventDefault();
+            event.stopPropagation();
+            const previewRect = preview.getBoundingClientRect();
+            const unitsPerPxX = CANVAS_W / previewRect.width;
+            const unitsPerPxY = CANVAS_H / previewRect.height;
+            const startX = Number.parseInt(row.querySelector('.region-x').value, 10) || 0;
+            const startY = Number.parseInt(row.querySelector('.region-y').value, 10) || 0;
+            const startW = Number.parseInt(row.querySelector('.region-w').value, 10) || 1;
+            const startH = Number.parseInt(row.querySelector('.region-h').value, 10) || 1;
+            const others = getOtherRegionRects(row);
+            activeDrag = {
+                row,
+                mode,
+                startClientX: event.clientX,
+                startClientY: event.clientY,
+                unitsPerPxX,
+                unitsPerPxY,
+                startX,
+                startY,
+                startW,
+                startH,
+                others,
+                exempt: preExistingOverlaps({ x: startX, y: startY, w: startW, h: startH }, others),
+            };
+            window.addEventListener('pointermove', onDragMove);
+            window.addEventListener('pointerup', onDragEnd, { once: true });
+        }
+
+        function onDragMove(event) {
+            if (!activeDrag) return;
+            const dx = Math.round((event.clientX - activeDrag.startClientX) * activeDrag.unitsPerPxX);
+            const dy = Math.round((event.clientY - activeDrag.startClientY) * activeDrag.unitsPerPxY);
+            const { row, mode, startX, startY, startW, startH, others, exempt } = activeDrag;
+
+            if (mode === 'move') {
+                const resolved = resolveMove(startX, startY, startW, startH, dx, dy, others, exempt);
+                const snapped = snapMove(resolved.x, resolved.y, startW, startH, others);
+                row.querySelector('.region-x').value = snapped.x;
+                row.querySelector('.region-y').value = snapped.y;
+            } else {
+                const resolved = resolveResize(startX, startY, startW, startH, dx, dy, others, exempt);
+                const snapped = snapResize(startX, startY, resolved.w, resolved.h, others);
+                row.querySelector('.region-w').value = snapped.w;
+                row.querySelector('.region-h').value = snapped.h;
+            }
+            renderPreview();
+        }
+
+        function onDragEnd() {
+            activeDrag = null;
+            window.removeEventListener('pointermove', onDragMove);
+        }
+
+        document.getElementById('addRegionBtn').addEventListener('click', () => addRegionRow());
+
+        regionList.addEventListener('click', (event) => {
+            const removeBtn = event.target.closest('.remove-region-btn');
+            if (removeBtn) {
+                removeRegionRow(removeBtn.closest('.region-row'));
+            }
+        });
+        regionList.addEventListener('input', (event) => {
+            // Settings-container edits (schema fields, JSON textarea) don't
+            // change geometry and would just churn the preview/dropdowns —
+            // only re-render for the geometry inputs themselves.
+            if (event.target.closest('.region-settings-container')) return;
+            renderPreview();
+        });
+        regionList.addEventListener('change', (event) => {
+            if (event.target.closest('.region-settings-container')) return;
+            renderPreview();
+        });
+
+        {% if not edit_instance_name %}
+        // Radio-toggle between interval and scheduled cadence, mirroring
+        // the plugin settings page's own schedule form behavior.
+        const intervalRadio = document.getElementById('refreshTypeInterval');
+        const scheduledRadio = document.getElementById('refreshTypeScheduled');
+        const intervalInput = document.getElementById('scheduleInterval');
+        const unitInput = document.getElementById('scheduleUnit');
+        const timeInput = document.getElementById('scheduleTime');
+
+        function syncCadenceInputs() {
+            const useInterval = intervalRadio.checked;
+            intervalInput.disabled = !useInterval;
+            unitInput.disabled = !useInterval;
+            timeInput.disabled = useInterval;
+        }
+        intervalRadio.addEventListener('change', syncCadenceInputs);
+        scheduledRadio.addEventListener('change', syncCadenceInputs);
+        syncCadenceInputs();
+        {% endif %}
+
+        if (EDIT_INSTANCE_NAME && INITIAL_REGIONS.length) {
+            INITIAL_REGIONS.forEach((region) => addRegionRow(region));
+        } else {
+            addRegionRow();
+        }
+
+        form.addEventListener('submit', (event) => {
+            event.preventDefault();
+            errorEl.textContent = '';
+
+            const regions = collectRegions();
+            if (regions._hasInvalidJson) {
+                errorEl.textContent = "A region's Settings field is not valid JSON.";
+                return;
+            }
+            if (!regions.length) {
+                errorEl.textContent = 'At least one region must be configured.';
+                return;
+            }
+            for (const region of regions) {
+                if (!region.plugin_id) {
+                    errorEl.textContent = 'Every region needs a plugin selected.';
+                    return;
+                }
+                if (!(region.w > 0) || !(region.h > 0)) {
+                    errorEl.textContent = "Region for '" + region.plugin_id + "' must have positive width and height.";
+                    return;
+                }
+                if (region.x < 0 || region.y < 0) {
+                    errorEl.textContent = "Region for '" + region.plugin_id + "' has a negative x or y.";
+                    return;
+                }
+                if (region.x + region.w > CANVAS_W || region.y + region.h > CANVAS_H) {
+                    errorEl.textContent = "Region for '" + region.plugin_id + "' exceeds the " + CANVAS_W + 'x' + CANVAS_H + ' canvas.';
+                    return;
+                }
+            }
+
+            const body = new URLSearchParams();
+            body.set('regionsJson', JSON.stringify(regions));
+
+            const submitBtn = document.getElementById('compositeSubmitBtn');
+            submitBtn.disabled = true;
+
+            let requestUrl;
+            let method;
+            if (EDIT_INSTANCE_NAME) {
+                requestUrl = UPDATE_COMPOSITE_SCREEN_BASE_URL + encodeURIComponent(EDIT_INSTANCE_NAME);
+                method = 'PUT';
+            } else {
+                const refreshType = intervalRadio.checked ? 'interval' : 'scheduled';
+                const refreshSettings = {
+                    playlist: document.getElementById('playlist').value,
+                    instance_name: document.getElementById('instance').value.trim(),
+                    refreshType,
+                };
+                if (refreshType === 'interval') {
+                    refreshSettings.interval = intervalInput.value;
+                    refreshSettings.unit = unitInput.value;
+                } else {
+                    refreshSettings.refreshTime = timeInput.value;
+                }
+                if (!refreshSettings.playlist) {
+                    errorEl.textContent = 'A playlist is required.';
+                    submitBtn.disabled = false;
+                    return;
+                }
+                if (!refreshSettings.instance_name) {
+                    errorEl.textContent = 'Instance name is required.';
+                    submitBtn.disabled = false;
+                    return;
+                }
+                body.set('refresh_settings', JSON.stringify(refreshSettings));
+                requestUrl = ADD_COMPOSITE_SCREEN_URL;
+                method = 'POST';
+            }
+
+            fetch(requestUrl, {
+                method,
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: body.toString(),
+            })
+                .then((response) => response.json().then((data) => ({ ok: response.ok, data })))
+                .then(({ ok, data }) => {
+                    if (!ok) {
+                        throw new Error((data && data.message) || 'Failed to save composite screen.');
+                    }
+                    window.location.href = PLAYLISTS_URL;
+                })
+                .catch((error) => {
+                    errorEl.textContent = error.message || 'Failed to save composite screen.';
+                    submitBtn.disabled = false;
+                });
+        });
+    });
+    </script>
+{% endblock %}
