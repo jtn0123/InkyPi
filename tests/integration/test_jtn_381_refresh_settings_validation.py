@@ -174,3 +174,45 @@ def test_update_plugin_instance_without_refresh_settings_still_works(
     assert resp.status_code == 200
     pm = device_config_dev.get_playlist_manager()
     assert pm.find_plugin("ai_text", "Inst One").refresh == {"interval": 300}
+
+
+def test_refresh_only_edit_does_not_wipe_plugin_settings(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
+    """The playlist page's "Edit refresh settings" modal (actions.js
+    saveRefreshSettings) posts only plugin_id + refresh_settings — no
+    plugin-specific fields — so plugin_settings parses to {} for that
+    request alone. update_plugin_instance previously overwrote
+    plugin_instance.settings with that empty dict unconditionally, silently
+    deleting the instance's real settings on every schedule-only edit.
+    """
+    pm = device_config_dev.get_playlist_manager()
+    if not pm.get_playlist("Default"):
+        pm.add_playlist("Default", "00:00", "24:00")
+    pl = pm.get_playlist("Default")
+    pl.add_plugin(
+        {
+            "plugin_id": "clock",
+            "name": "Clock Inst",
+            "plugin_settings": {"selectedClockFace": "digital"},
+            "refresh": {"interval": 300},
+        }
+    )
+    device_config_dev.write_config()
+
+    # Mirrors saveRefreshSettings' actual payload: plugin_id + refresh_settings
+    # only, nothing else.
+    resp = client.put(
+        "/update_plugin_instance/Clock Inst",
+        data={
+            "plugin_id": "clock",
+            "refresh_settings": json.dumps(
+                {"refreshType": "interval", "interval": "20", "unit": "minute"}
+            ),
+        },
+    )
+    assert resp.status_code == 200
+
+    instance = pm.find_plugin("clock", "Clock Inst")
+    assert instance.refresh == {"interval": 1200}
+    assert instance.settings == {"selectedClockFace": "digital"}

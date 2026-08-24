@@ -604,16 +604,25 @@ def update_plugin_instance(instance_name: str) -> Any:
                         raise ClientInputError(settings_error, status=400)
 
         before_settings = dict(plugin_instance.settings or {})
+        # The playlist page's "Edit refresh settings" modal (actions.js
+        # saveRefreshSettings) intentionally posts only plugin_id +
+        # refresh_settings — no plugin-specific fields — so plugin_settings
+        # parses to {} for that request. Overwriting settings with an empty
+        # dict on every schedule-only edit silently deleted the instance's
+        # real settings (confirmed for a plain plugin like clock, and would
+        # equally wipe a composite screen's settings["regions"]). Only
+        # replace settings when this request actually carried some.
+        applied_settings = plugin_settings if plugin_settings else before_settings
 
         def _do_update_instance(cfg: Any) -> None:
-            plugin_instance.settings = plugin_settings
+            plugin_instance.settings = applied_settings
             if new_refresh_config is not None:
                 plugin_instance.refresh = new_refresh_config
 
         device_config.update_atomic(_do_update_instance)
         config_dir = os.path.dirname(device_config.config_file)
         _record_plugin_change(
-            config_dir, instance_name, before_settings, plugin_settings
+            config_dir, instance_name, before_settings, applied_settings
         )
 
     return json_success(message=f"Updated plugin instance {instance_name}.")
