@@ -711,6 +711,18 @@ ask_for_reboot() {
   echo_header "[•] After your Pi is rebooted, you can access the web UI by going to $(echo_blue "'$hostname.local'") or $(echo_blue "'$ip_address'") in your browser."
   echo_header "[•] If you encounter any issues or have suggestions, please submit them here: https://github.com/jtn0123/InkyPi/issues"
 
+  # Only ask when there is somebody there to answer. Without this guard the
+  # prompt is unconditional, and every non-interactive caller — image builds,
+  # `curl ... | sudo bash`, Ansible, container builds — either blocks here
+  # forever or, if stdin happens to be at EOF, falls through to the "Unknown
+  # input" branch below by luck rather than intent. Rebooting is never the
+  # right default for those callers, so skip straight to the advisory.
+  if [ ! -t 0 ]; then
+    echo "Non-interactive session; not prompting to reboot."
+    echo "Restart your Raspberry Pi later to apply changes by running 'sudo reboot now'."
+    return 0
+  fi
+
   read -r -p "Would you like to restart your Raspberry Pi now? [Y/N] " userInput
   userInput="${userInput^^}"
 

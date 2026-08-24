@@ -238,6 +238,29 @@ class TestInstallScript:
         # should use self.combined so they keep passing after the refactor.
         self.combined = self.content + "\n" + _read("_common.sh")
 
+    def test_reboot_prompt_is_skipped_when_not_interactive(self):
+        # ask_for_reboot used to prompt unconditionally. Every non-interactive
+        # caller — the pre-installed image build, `curl ... | sudo bash`,
+        # Ansible, container builds — then either blocked forever or fell
+        # through to the "Unknown input" branch by luck, because install.sh
+        # sets no `set -e` and `read` at EOF just returns non-zero. Rebooting
+        # is never the right default for those callers.
+        fn_start = self.content.index("ask_for_reboot() {")
+        fn = self.content[fn_start : self.content.index("\n}\n", fn_start)]
+        guard = fn.index("[ ! -t 0 ]")
+        prompt = fn.index("Would you like to restart")
+        assert guard < prompt, "the TTY check must come before the prompt"
+        # It must return, not exit: the caller runs it as the final step and a
+        # bare `exit` here would mask a non-zero status from anything after it.
+        guard_block = fn[guard : guard + 400]
+        assert "return 0" in guard_block
+
+    def test_reboot_prompt_still_offered_interactively(self):
+        # The guard must not remove the prompt outright — an operator running
+        # install.sh by hand should still be offered the reboot.
+        assert "Would you like to restart your Raspberry Pi now?" in self.content
+        assert "read -r -p" in self.content
+
     def test_install_enables_spi(self) -> None:
         assert "dtparam=spi=" in self.content
 
