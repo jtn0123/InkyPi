@@ -5,6 +5,10 @@
   padding: 0;
 }
 
+html, body, .container {
+  height: 100%;
+}
+
 .calendar {
   width: 100%;
   height: 100%;

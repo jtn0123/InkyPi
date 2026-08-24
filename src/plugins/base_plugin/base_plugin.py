@@ -29,6 +29,7 @@ PLUGIN_API_VERSION = "1.0"
 PLUGINS_DIR = resolve_path("plugins")
 BASE_PLUGIN_DIR = os.path.join(PLUGINS_DIR, "base_plugin")
 BASE_PLUGIN_RENDER_DIR = os.path.join(BASE_PLUGIN_DIR, "render")
+STATIC_DIR = resolve_path("static")
 
 FRAME_STYLES = [
     {"name": "None", "icon": "frames/blank.png"},
@@ -407,6 +408,7 @@ class BasePlugin:
             css_file, cast(Sequence[str], extra_css_files)
         )
         template_params["style_sheets"] = [self.to_file_url(path) for path in css_files]
+        template_params["static_dir"] = self.to_file_url(STATIC_DIR)
         template_params["width"] = dimensions[0]
         template_params["height"] = dimensions[1]
 
