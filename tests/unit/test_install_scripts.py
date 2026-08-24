@@ -1,6 +1,7 @@
 # pyright: reportMissingImports=false
 """Structural validation of install/setup scripts — no shell execution."""
 
+import os
 import re
 from pathlib import Path
 from typing import Any
@@ -1111,7 +1112,7 @@ class TestCommonWheelhouseFunctions:
         assert "armv7l" in body
         assert "aarch64" in body
 
-    def test_downloads_from_jtn0123_fork(self) -> None:
+    def test_downloads_from_release_fork(self) -> None:
         # The wheelhouse download URL must target the fork, not upstream,
         # since that's where our release workflow publishes artifacts.
         body = self._fetch_fn_body()
@@ -1443,6 +1444,7 @@ class TestPiImageBuildWorkflow:
     """JTN-533: release-time workflow that builds a pre-installed .img.xz."""
 
     WORKFLOW_PATH = REPO_ROOT / ".github" / "workflows" / "build-pi-image.yml"
+    BUILD_SCRIPT_PATH = SCRIPTS_DIR / "build_pi_image.sh"
 
     @pytest.fixture(autouse=True)
     def _load(self) -> None:
@@ -1450,6 +1452,12 @@ class TestPiImageBuildWorkflow:
             self.WORKFLOW_PATH.exists()
         ), f"Expected workflow file at {self.WORKFLOW_PATH}"
         self.content = self.WORKFLOW_PATH.read_text()
+        self.build_sh = self.BUILD_SCRIPT_PATH.read_text()
+        # The build steps now live in scripts/build_pi_image.sh so a local run
+        # exercises the same code as CI. Assertions about *what the pipeline
+        # does* search both; assertions about workflow structure parse
+        # `content` as YAML and must keep using it alone.
+        self.sources = self.content + "\n" + self.build_sh
 
     def test_workflow_is_valid_yaml(self) -> None:
         import yaml
@@ -1494,35 +1502,35 @@ class TestPiImageBuildWorkflow:
 
     def test_workflow_verifies_base_image_checksum(self) -> None:
         # The downloaded base image must be checksum-verified before use.
-        assert "sha256sum -c" in self.content
+        assert "sha256sum -c" in self.sources
 
     def test_workflow_uses_qemu_user_static_and_chroot(self) -> None:
         # Building arm64 binaries on an x86_64 runner requires
         # qemu-user-static for binfmt + chroot + copy of qemu-aarch64-static
         # into the mounted rootfs.
-        assert "qemu-user-static" in self.content
-        assert "qemu-aarch64-static" in self.content
-        assert "chroot" in self.content
+        assert "qemu-user-static" in self.sources
+        assert "qemu-aarch64-static" in self.sources
+        assert "chroot" in self.sources
 
     def test_workflow_bind_mounts_proc_sys_dev(self) -> None:
         # chroot needs /proc, /sys, /dev visible for install.sh to succeed.
-        assert "/proc" in self.content
-        assert "/sys" in self.content
-        assert "/dev" in self.content
-        assert "mount --bind" in self.content
+        assert "/proc" in self.sources
+        assert "/sys" in self.sources
+        assert "/dev" in self.sources
+        assert "mount --bind" in self.sources
 
     def test_workflow_clones_at_release_tag_not_main(self) -> None:
         # Must build from the release tag so install.sh/requirements match
         # the shipped version.
-        assert "--branch" in self.content
-        assert "tag_name" in self.content or "inputs.tag" in self.content
+        assert "--branch" in self.sources
+        assert "tag_name" in self.sources or "inputs.tag" in self.sources
         # Never pin to main/HEAD
-        assert "--branch main" not in self.content
-        assert "--branch master" not in self.content
+        assert "--branch main" not in self.sources
+        assert "--branch master" not in self.sources
 
     def test_workflow_runs_install_sh_in_chroot(self) -> None:
         # The whole point — chroot + install.sh is what produces the image.
-        assert "install/install.sh" in self.content or "install.sh" in self.content
+        assert "install/install.sh" in self.sources or "install.sh" in self.sources
 
     def test_workflow_does_not_modify_install_sh(self) -> None:
         # JTN-533 constraint: install.sh must stay self-contained for
@@ -1541,27 +1549,52 @@ class TestPiImageBuildWorkflow:
             )
         )
 
-    def test_workflow_pishrink_pinned_by_commit(self) -> None:
-        # pishrink.sh has no tagged releases — must be pinned by full SHA.
-        assert "PISHRINK_COMMIT:" in self.content
-        sha_match = re.search(r"PISHRINK_COMMIT:\s*([0-9a-f]{40})", self.content)
+    def test_workflow_pishrink_pinned_by_tag(self) -> None:
+        # pishrink.sh is fetched from upstream and run as root, so the ref must
+        # be an immutable-by-convention release tag, never a branch whose head
+        # upstream can move under us.
+        assert "PISHRINK_TAG:" in self.sources
+        tag_match = re.search(r"PISHRINK_TAG:\s*(\S+)", self.sources)
+        assert (
+            tag_match is not None
+        ), "PISHRINK_TAG must be set to an upstream release tag"
+        assert re.fullmatch(
+            r"v\d+\.\d+\.\d+", tag_match.group(1)
+        ), f"PISHRINK_TAG must be a version tag, got {tag_match.group(1)!r}"
+        # refs/tags/ must be spelled out so the ref cannot resolve to a branch.
+        assert "refs/tags/${PISHRINK_TAG}" in self.sources
+
+    def test_workflow_pishrink_download_is_checksum_verified(self):
+        # A tag can be moved upstream, so the tag pin alone is not enough:
+        # the downloaded script runs as root over the image and must be
+        # checksum-verified before it is made executable.
+        sha_match = re.search(r"PISHRINK_SHA256:\s*([0-9a-f]{64})", self.sources)
         assert (
             sha_match is not None
-        ), "PISHRINK_COMMIT must be a 40-char lowercase hex commit SHA"
+        ), "PISHRINK_SHA256 must be a 64-char lowercase hex sha256"
+        assert "sha256sum -c pishrink.sha256" in self.sources
+        # Verification must precede chmod +x, or a tampered script could be
+        # made executable before anything checks it.
+        # The build script runs from inside build/, so these paths are relative.
+        verify_pos = self.sources.index("sha256sum -c pishrink.sha256")
+        chmod_pos = self.sources.index("chmod +x pishrink.sh")
+        assert (
+            verify_pos < chmod_pos
+        ), "pishrink.sh checksum must be verified before chmod +x"
 
     def test_workflow_runs_pishrink(self) -> None:
         assert "pishrink.sh" in self.content
 
     def test_workflow_zero_fills_free_space_before_compression(self) -> None:
         # Better xz ratio — zero-fill unused blocks so they compress away.
-        assert "dd if=/dev/zero" in self.content
+        assert "dd if=/dev/zero" in self.sources
 
     def test_workflow_recompresses_with_xz(self) -> None:
-        assert "xz -9" in self.content
+        assert "xz -9" in self.sources
 
     def test_workflow_produces_expected_image_name(self) -> None:
-        assert "inkypi-" in self.content
-        assert "pi-zero-2-w.img" in self.content
+        assert "inkypi-" in self.sources
+        assert "pi-zero-2-w.img" in self.sources
 
     def test_workflow_generates_sha256_sidecar(self) -> None:
         assert "sha256sum" in self.content
@@ -1569,12 +1602,23 @@ class TestPiImageBuildWorkflow:
 
     def test_workflow_has_boot_verification_job(self) -> None:
         # JTN-533: unverified images must not ship. A separate job boots the
-        # image in qemu and grep's for "login:" before attach-release runs.
-        assert "verify-boot" in self.content or "boot-verify" in self.content
-        assert (
-            "qemu-system-aarch64" in self.content or "qemu-system-arm" in self.content
-        )
-        assert "login:" in self.content
+        # image in qemu and waits for a login prompt or multi-user.target
+        # before attach-release runs.
+        #
+        # The "login:" check itself lives in scripts/boot_verify_image.sh now.
+        # This used to assert it against the workflow text, where it only
+        # matched a comment — passing for the wrong reason.
+        assert "verify-boot" in self.content
+        assert "scripts/boot_verify_image.sh" in self.content
+        boot_sh = (SCRIPTS_DIR / "boot_verify_image.sh").read_text()
+        assert "qemu-system-aarch64" in boot_sh
+        assert "login:" in boot_sh
+
+    def test_workflow_delegates_boot_verify_to_script(self):
+        # The boot arguments live in a script so they can be exercised by hand.
+        # Iterating on them through a full CI round trip is how several
+        # silent-boot bugs stayed hidden.
+        assert "scripts/boot_verify_image.sh" in self.content
 
     def test_workflow_attach_release_requires_boot_verification(self) -> None:
         # The attach job must `needs: verify-boot` AND gate on its verified
@@ -1595,10 +1639,30 @@ class TestPiImageBuildWorkflow:
     def test_workflow_uploads_release_asset(self) -> None:
         assert "softprops/action-gh-release" in self.content
 
-    def test_workflow_attach_gated_on_release_event(self):
-        # attach-release step must only fire on `release` events, never on
-        # workflow_dispatch (which is a dry run) -> None -> None.
-        assert "github.event_name == 'release'" in self.content
+    def test_workflow_attach_not_gated_on_event_name(self):
+        # This asserted the opposite until v1.0.2 shipped with no image.
+        #
+        # In a reusable workflow the github context belongs to the CALLER, and
+        # release.yml is triggered by push, so github.event_name is 'push' —
+        # never 'release'. Gating attach-release on it skipped the job on the
+        # only path that actually cuts releases. JTN-745 also settled that
+        # manual rebuilds should attach (see build-wheelhouse.yml), so
+        # workflow_dispatch is not a dry run either.
+        attach = yaml.safe_load(self.content)["jobs"]["attach-release"]
+        assert "github.event_name" not in attach["if"], (
+            "attach-release must not gate on github.event_name — under "
+            "workflow_call that is the caller's event, not 'release'"
+        )
+        assert "needs.verify-boot.outputs.verified == 'true'" in attach["if"]
+
+    def test_workflow_attach_uses_resolved_tag(self):
+        # github.event.release.tag_name is empty on the workflow_call and
+        # workflow_dispatch paths, so the upload would target no tag at all.
+        attach = yaml.safe_load(self.content)["jobs"]["attach-release"]
+        tag_name = attach["steps"][-1]["with"]["tag_name"]
+        assert (
+            "needs.build-image.outputs.tag" in tag_name
+        ), f"attach-release must upload against the resolved tag, got {tag_name!r}"
 
 
 class TestReleaseWorkflow:
@@ -3356,7 +3420,7 @@ class TestInstallPreflight:
         """Regression gate for CodeRabbit review on PR #546.
 
         Canonical production flow:
-            git clone https://github.com/fatihak/InkyPi.git ~/inkypi
+            git clone https://github.com/jtn0123/InkyPi.git ~/inkypi
             sudo bash ~/inkypi/install/install.sh
 
         After CVE-2022-24765 (fixed in git 2.35.2+), git refuses to operate on
@@ -3676,3 +3740,307 @@ class TestMemoryCapTiering:
             text=True,
         )
         assert result.returncode == 0, f"bash -n failed:\n{result.stderr}"
+
+
+class TestBootVerifyScript:
+    """JTN-533: scripts/boot_verify_image.sh — shared by CI and local runs."""
+
+    SCRIPT_PATH = SCRIPTS_DIR / "boot_verify_image.sh"
+
+    @pytest.fixture(autouse=True)
+    def _load(self):
+        assert self.SCRIPT_PATH.exists(), f"Expected {self.SCRIPT_PATH}"
+        self.script = self.SCRIPT_PATH.read_text()
+
+    def test_script_is_executable(self):
+        assert os.access(self.SCRIPT_PATH, os.X_OK), (
+            "boot_verify_image.sh must be executable — the workflow invokes it "
+            "as ./scripts/boot_verify_image.sh"
+        )
+
+    def test_boots_image_own_kernel_on_raspi3b(self):
+        # The point of the gate is to boot what we ship. A generic "virt"
+        # machine would need a foreign distro kernel plus an initramfs (distro
+        # arm64 kernels build virtio_blk as a module, so the rootfs never
+        # mounts without one) and would prove nothing about kernel8.img.
+        assert "-M raspi3b" in self.script
+        assert "-kernel kernel8.img" in self.script
+        assert "bcm2710-rpi-3-b.dtb" in self.script
+
+    def test_replaces_pi_console_args(self):
+        # Pi OS ships "console=serial0,... console=tty1". serial0 is a firmware
+        # alias the kernel cannot resolve, and the kernel hands /dev/console to
+        # the LAST console=, so a leftover tty1 would put getty on the virtual
+        # terminal where the log scrape cannot see it. Strip them all first,
+        # then append our own.
+        strip_pos = self.script.index("s/console=[^ ]*//g")
+        append_pos = self.script.index('CMDLINE="${CMDLINE} console=ttyS0')
+        assert (
+            strip_pos < append_pos
+        ), "serial consoles must be appended after existing console= args are stripped"
+
+    def test_console_ttyama1_is_last(self):
+        # Observed on a real run: Pi OS's DTB aliases serial1 = &uart0, so the
+        # PL011 enumerates as ttyAMA1, and the mini UART fails to probe under
+        # qemu so ttyS0 never exists. Naming only ttyAMA0/ttyS0 bound no
+        # console at all ("unable to open an initial console") — no getty, no
+        # login prompt. The kernel gives /dev/console to the last console= it
+        # successfully registered, so ttyAMA1 must come last.
+        for tty in ("ttyS0", "ttyAMA0", "ttyAMA1"):
+            assert f"console={tty},115200" in self.script
+        last = self.script.index("console=ttyAMA1,115200")
+        for tty in ("ttyS0", "ttyAMA0"):
+            assert self.script.index(f"console={tty},115200") < last, (
+                f"console={tty} must precede ttyAMA1 so /dev/console lands on "
+                "the UART that actually registers"
+            )
+
+    def test_masks_units_that_cannot_work_without_hardware(self):
+        # inkypi.service drives an Inky HAT via inky.auto(), which identifies
+        # the panel by reading an EEPROM over I2C. There is no HAT under qemu,
+        # so it fails every time, and Restart=on-failure with RestartSec=60 and
+        # StartLimitBurst=5 turned that into ~350s of a 600s budget with
+        # multi-user.target queued behind it. NetworkManager-wait-online holds
+        # network-online.target for a NIC raspi3b does not emulate, and
+        # inkypi.service is ordered after that, so the two delays stack.
+        #
+        # The gate measures whether the image boots. Whether the app runs on
+        # real hardware is checked by audit_pi_image.sh instead.
+        assert "systemd.mask=inkypi.service" in self.script
+        assert "systemd.mask=NetworkManager-wait-online.service" in self.script
+
+    def test_masking_is_compensated_by_the_image_audit(self):
+        # Masking inkypi.service in the boot test is only safe because
+        # something else still checks the app is wired up correctly.
+        audit = (SCRIPTS_DIR / "audit_pi_image.sh").read_text()
+        for probe in ("/usr/local/inkypi/src", "inkypi.service", "i2c-dev"):
+            assert (
+                probe in audit
+            ), f"audit must still check {probe} — the boot test no longer does"
+
+    def test_pins_systemd_logging_to_kmsg(self):
+        # systemd switches from kmsg to the journal as soon as journald starts.
+        # The journal is a file inside the guest that we never read, so its
+        # messages disappeared at "Started systemd-journald.service", leaving
+        # only kernel output — which stops entirely once the system goes quiet.
+        # That reads as a hang, and it means the multi-user.target marker this
+        # script waits for could never appear.
+        assert "systemd.log_target=kmsg" in self.script
+
+    def test_captures_both_uarts(self):
+        # qemu wires serial_hd(0) to the PL011 and serial_hd(1) to the mini
+        # UART. Attaching only one of them yielded an empty log and an
+        # unexplained timeout, so drive both and accept a prompt on either.
+        pl011 = self.script.index("-serial file:uart-pl011.log")
+        mini = self.script.index("-serial file:uart-mini.log")
+        assert pl011 < mini, "PL011 must be serial_hd(0), mini UART serial_hd(1)"
+        assert "uart-pl011.log uart-mini.log" in self.script
+
+    def test_keeps_console_output_alive_through_sysctl(self):
+        # Everything we can see arrives over printk: /dev/console never opens
+        # under qemu, so systemd falls back to /dev/kmsg. systemd-sysctl then
+        # applies Pi OS's kernel.printk and the log went silent mid-boot,
+        # which is indistinguishable from a hang. keep_bootcon holds earlycon
+        # open and ignore_loglevel overrides the loglevel sysctl just set.
+        assert "keep_bootcon" in self.script
+        assert "ignore_loglevel" in self.script
+
+    def test_accepts_boot_completion_without_a_login_prompt(self):
+        # "login:" needs a getty on a UART we can see, which the missing
+        # /dev/console makes unreliable. Reaching multi-user.target proves what
+        # the gate actually cares about — rootfs mounted, fstab sane, userspace
+        # up — and arrives over printk, so accept it too.
+        assert "Reached target multi-user.target" in self.script
+        assert "login:" in self.script
+
+    def test_pads_sd_to_power_of_two(self):
+        # qemu's raspi machines reject an SD image whose size is not a power
+        # of two, and pishrink deliberately leaves the image at minimum size.
+        assert "SD_BYTES=$((SD_BYTES * 2))" in self.script
+        assert "truncate -s" in self.script
+
+    def test_detects_qemu_exit(self):
+        # A startup failure (bad romfile, bad machine type) kills qemu in under
+        # a second. Without a liveness check the loop burns the whole budget
+        # and reports a misleading timeout instead of the real error.
+        assert 'kill -0 "${QPID}"' in self.script
+        # $! must be qemu itself, so its output is redirected rather than piped
+        # into tee — in a pipeline $! is the last element, not qemu.
+        assert "> qemu-stderr.log 2>&1 &" in self.script
+
+    def test_reports_verified_output_for_ci(self):
+        # The workflow gates attach-release on steps.verify.outputs.verified,
+        # so the script must still write it when running under Actions.
+        assert 'echo "verified=$1" >> "${GITHUB_OUTPUT}"' in self.script
+
+
+class TestPiImageShipsNoBuildScaffolding:
+    """The chroot scaffolding must not reach users.
+
+    v1.0.2 shipped with the build's systemctl/raspi-config stubs still on
+    PATH and the builder's resolv.conf in place, producing an image that could
+    neither join wifi nor resolve DNS. Nothing in the pipeline inspected the
+    contents of what it was about to publish.
+    """
+
+    BUILD_SCRIPT = SCRIPTS_DIR / "build_pi_image.sh"
+    AUDIT_SCRIPT = SCRIPTS_DIR / "audit_pi_image.sh"
+    WORKFLOW_PATH = REPO_ROOT / ".github" / "workflows" / "build-pi-image.yml"
+
+    @pytest.fixture(autouse=True)
+    def _load(self):
+        self.build_sh = self.BUILD_SCRIPT.read_text()
+        self.audit_sh = self.AUDIT_SCRIPT.read_text()
+        self.workflow = self.WORKFLOW_PATH.read_text()
+
+    def test_scripts_are_executable(self):
+        for path in (self.BUILD_SCRIPT, self.AUDIT_SCRIPT):
+            assert os.access(path, os.X_OK), f"{path.name} must be executable"
+
+    def test_workflow_delegates_build_to_script(self):
+        # A local build has to run the same code CI runs, or reproducing a
+        # problem locally proves nothing about the pipeline.
+        assert "scripts/build_pi_image.sh" in self.workflow
+
+    def test_workflow_audits_image_before_upload(self):
+        # The gate that would have caught v1.0.2 before it was published.
+        wf = yaml.safe_load(self.workflow)
+        names = [s.get("name", "") for s in wf["jobs"]["build-image"]["steps"]]
+        audit = next(i for i, n in enumerate(names) if "Audit" in n)
+        upload = next(i for i, n in enumerate(names) if "Upload" in n)
+        assert audit < upload, "the image must be audited before it is uploaded"
+        assert "scripts/audit_pi_image.sh" in self.workflow
+
+    def test_removes_systemctl_and_raspi_config_stubs(self):
+        # /usr/local/sbin precedes both /usr/sbin and /usr/bin in root's PATH,
+        # so a leftover stub shadows the real binary permanently. raspi-config
+        # is how Pi OS sets the wifi regulatory domain; stubbed out, the radio
+        # stays rfkill-blocked.
+        assert 'rm -f "${MNT}/usr/local/sbin/raspi-config"' in self.build_sh
+        assert '"${MNT}/usr/local/sbin/systemctl"' in self.build_sh
+
+    def test_restores_images_own_resolv_conf(self):
+        # The build overwrites resolv.conf for chroot network access. Shipping
+        # the builder's copy pointed users at 127.0.0.53 — systemd-resolved's
+        # stub, which Pi OS Lite does not run — so DNS failed everywhere.
+        assert "resolv.conf.build-orig" in self.build_sh
+        assert (
+            self.build_sh.count("resolv.conf.build-orig") >= 2
+        ), "resolv.conf must be both saved before the overwrite and restored"
+
+    def test_blanks_machine_id(self):
+        # dpkg populates machine-id during the chroot run. Shipping it means
+        # every flashed card shares one identity and they collide over DHCP.
+        assert 'truncate -s 0 "${MNT}/etc/machine-id"' in self.build_sh
+
+    def test_scaffolding_removed_before_packaging(self):
+        # Removal has to happen while the image is still mounted; after
+        # pishrink it would never reach the artifact.
+        cleanup = self.build_sh.index("remove_scaffolding\n")
+        shrink = self.build_sh.index("pishrink.sh -s")
+        assert cleanup < shrink
+
+    def test_emulator_removed_after_last_chroot(self):
+        # qemu-aarch64-static is what lets the chroot run arm64 binaries, so
+        # pulling it earlier breaks the build rather than the image.
+        last_chroot = self.build_sh.rindex('chroot "${MNT}"')
+        rm_emu = self.build_sh.index('rm -f "${MNT}/usr/bin/qemu-aarch64-static"')
+        assert last_chroot < rm_emu, "emulator must outlive the last chroot"
+
+    def test_install_chroot_reads_stdin_from_devnull(self):
+        # install.sh ends with `read -r -p "Would you like to restart ..."` and
+        # sets no `set -e`, so at EOF it takes its "Unknown input" branch and
+        # exits 0. GitHub Actions gives every step /dev/null on stdin, so CI has
+        # always sailed past that prompt by accident; the same build from a
+        # terminal blocks forever. Redirect explicitly so both behave the same
+        # way for the same reason.
+        install_call = self.build_sh.index("bash ./install.sh")
+        tail = self.build_sh[install_call : install_call + 200]
+        assert "< /dev/null" in tail, (
+            "the chroot running install.sh must take stdin from /dev/null, or a "
+            "local build hangs on the reboot prompt"
+        )
+
+    def test_ci_marker_env_var_is_not_load_bearing(self):
+        # INKYPI_CI_IMAGE_BUILD is set by the build but read by nothing in
+        # install/ or src/. It looks like it suppresses the reboot prompt and
+        # does not, so the script must say so rather than let the next reader
+        # assume it is the mechanism.
+        if "INKYPI_CI_IMAGE_BUILD" in self.build_sh:
+            consumers = [
+                p
+                for p in (REPO_ROOT / "install").rglob("*")
+                if p.is_file()
+                and "INKYPI_CI_IMAGE_BUILD" in p.read_text(errors="ignore")
+            ]
+            assert not consumers, (
+                "install/ now reads INKYPI_CI_IMAGE_BUILD — update the comment in "
+                f"build_pi_image.sh, which says nothing does: {consumers}"
+            )
+            assert "not* what makes this work" in self.build_sh
+
+    def test_readme_documents_custom_toml_not_cloud_init(self):
+        # Raspberry Pi OS does not ship cloud-init; the note used to send users
+        # to /boot/firmware/user-data, which nothing on the image reads.
+        assert "custom.toml" in self.build_sh
+        assert "user-data" not in self.build_sh
+        # The defaults-to-true trap that silently breaks logins and wifi.
+        assert "password_encrypted = false" in self.build_sh
+
+    def test_build_keeps_the_source_checkout(self):
+        # /opt/inkypi-src looks like build residue and is not: install.sh does
+        #     ln -sf "$SRC_PATH" "$INSTALL_STAGING/src"
+        # so /usr/local/inkypi/src points into the clone. A cleanup pass
+        # deleted it and every boot then failed with
+        #   realpath: /usr/local/inkypi/src/inkypi.py: No such file or directory
+        # Its .git matters too — do_update.sh and rollback.sh run git there.
+        cleanup_start = self.build_sh.index("remove_scaffolding() {")
+        cleanup_end = self.build_sh.index("\n}\n", cleanup_start)
+        cleanup = self.build_sh[cleanup_start:cleanup_end]
+        assert (
+            "rm -rf" not in cleanup
+            or "inkypi-src" not in cleanup.split("rm -rf")[1][:60]
+        ), (
+            "remove_scaffolding must not delete /opt/inkypi-src — it is the "
+            "installed source tree, not leftovers"
+        )
+
+    def test_build_registers_i2c_dev_module(self):
+        # install.sh enables the buses twice: seds on config.txt, which work in
+        # a chroot, and `raspi-config nonint do_i2c 0`, which hits the stub and
+        # does nothing. Only I2C suffers — spidev appears from dtparam alone,
+        # but /dev/i2c-1 needs the i2c-dev module in /etc/modules, which is the
+        # part raspi-config would have added. Without it the Inky driver's
+        # inky.auto() cannot read the HAT EEPROM at 0x50 and raises
+        # "No EEPROM detected", so the panel is never driven.
+        assert "i2c-dev" in self.build_sh
+        assert "grep -qxF 'i2c-dev' \"${MNT}/etc/modules\"" in self.build_sh
+
+    def test_audit_checks_i2c_and_device_config(self):
+        assert "i2c-dev" in self.audit_sh
+        assert "No EEPROM detected" in self.audit_sh
+        assert "device.json" in self.audit_sh
+
+    def test_audit_checks_the_app_can_start(self):
+        # Reaching multi-user.target says nothing about whether the app works.
+        # These are the invariants that were broken on a shipped image.
+        for probe in (
+            "/usr/local/inkypi/src",
+            "inkypi.py",
+            "venv_inkypi/bin/python",
+            "/usr/local/bin/inkypi",
+            "inkypi.service",
+        ):
+            assert probe in self.audit_sh, f"audit must check {probe}"
+
+    def test_audit_checks_every_scaffolding_class(self):
+        for probe in (
+            "/usr/local/sbin/raspi-config",
+            "/usr/local/sbin/systemctl",
+            "qemu-aarch64-static",
+            "machine-id",
+            "127",
+            "init=/usr/lib/raspberrypi-sys-mods/firstboot",
+            "python3",
+        ):
+            assert probe in self.audit_sh, f"audit must check {probe}"

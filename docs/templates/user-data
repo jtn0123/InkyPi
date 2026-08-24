@@ -1,0 +1,28 @@
+#cloud-config
+manage_resolv_conf: false
+
+hostname: inkypi
+manage_etc_hosts: true
+packages:
+- avahi-daemon
+apt:
+  preserve_sources_list: true
+  conf: |
+    Acquire {
+      Check-Date "false";
+    };
+timezone: America/Los_Angeles
+keyboard:
+  model: pc105
+  layout: "us"
+user:
+  name: <your-username>
+  shell: /bin/bash
+  lock_passwd: false
+  passwd: "<your-password-hash>"
+  ssh_authorized_keys:
+    - "<your-ssh-public-key>"
+  sudo: null
+ssh_pwauth: false
+runcmd:
+  - [ systemctl, enable, --now, ssh ]

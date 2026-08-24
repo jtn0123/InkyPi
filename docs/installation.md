@@ -17,8 +17,23 @@ serve the web UI on first boot.
 **What the image is:** Pi OS Lite arm64 + InkyPi at the matching release tag,
 built inside a chroot with `qemu-aarch64-static`, shrunk with `pishrink.sh`,
 and boot-verified in `qemu-system-aarch64` before it ships. Nothing personal
-(no hostname, no Wi-Fi, no SSH credentials) is baked into the image — Pi
-Imager's advanced options still handle all of that at flash time.
+(no hostname, no Wi-Fi, no user account) is baked into the image — you set
+those yourself by hand-editing two files on the boot partition (see
+[Configuring Wi-Fi, user account, and SSH](#configuring-wi-fi-user-account-and-ssh-before-first-boot)
+below).
+
+> **Note:** Raspberry Pi Imager's "Edit Settings" (gear icon) customisation
+> dialog is **version-dependent** for a sideloaded/custom image like this
+> one. **Imager 1.9.6 and earlier** does show it and writes your settings
+> into `user-data`/`network-config` at flash time, same as it does for an
+> official OS image. **Imager 2.0 and later removed that** — the dialog
+> never appears for a custom `.img.xz`, full stop, regardless of what you
+> select. If you're on Imager 2.0+, flashing writes the image
+> byte-for-byte with zero customisation, and hand-editing the boot
+> partition (below) is the only way to configure anything. If you're on
+> 1.9.6 or earlier, the gear icon works as expected and you can use it
+> instead of hand-editing, though the instructions below still apply if
+> you prefer them or need to change something after flashing.
 
 **What the image is not:** not a substitute for a real-Pi dogfooding pass.
 The workflow's qemu boot verification proves the kernel reaches userspace
@@ -47,21 +62,162 @@ same install.sh flow on-device in about 2–3 minutes.
 3. Open Pi Imager, click **Choose OS → Use custom** and select the
    `.img.xz` you just downloaded. Pi Imager handles the `.xz` decompression
    transparently.
-4. **Critical:** click the gear icon (advanced options) and set hostname,
-   SSH, Wi-Fi SSID + password, locale, and a non-default user. Pi Imager
-   writes these into `/boot/firmware/user-data` for cloud-init to apply on
-   first boot. The pre-built image intentionally does not carry any of
-   these — that's what Pi Imager is for.
-5. Flash the SD card, insert it into the Pi Zero 2 W, and power up.
-6. On first boot cloud-init applies the hostname/Wi-Fi/SSH settings from
-   step 4, the InkyPi systemd service starts automatically, and the web UI
-   becomes available at `http://<hostname>.local/` (typically within
-   30–60 seconds of power-on).
+4. **On Imager 1.9.6 or earlier only:** click the gear icon (advanced
+   options) and set hostname, SSH, Wi-Fi SSID + password, locale, and a
+   non-default user, same as you would for an official image. If you're on
+   Imager 2.0+, skip this — the dialog won't appear (see the note above);
+   continue to step 5 and configure everything by hand instead.
+5. Flash the SD card. If you used the gear icon in step 4, skip to step 8 —
+   you're done, no hand-editing needed. Otherwise, do **not** insert it
+   into the Pi yet.
+6. Re-insert the SD card into your computer (or leave it in — most OSes
+   remount the boot partition automatically after a flash). It shows up as
+   a plain FAT32 drive named `bootfs` or similar, readable/writable
+   natively on Windows/Mac/Linux — no special tools needed.
+7. Follow
+   [Configuring Wi-Fi, user account, and SSH](#configuring-wi-fi-user-account-and-ssh-before-first-boot)
+   below to hand-edit `user-data` and `network-config` on that boot
+   partition.
+8. Eject the SD card, insert it into the Pi Zero 2 W, and power up.
+9. On first boot cloud-init applies the hostname/Wi-Fi/user settings you
+   configured (via the gear icon or by hand), the InkyPi systemd service
+   starts automatically, and the web UI becomes available at
+   `http://<hostname>.local/` (typically within 30–60 seconds of
+   power-on). SSH is enabled out of the box regardless of which path you
+   took — no separate configuration needed for that part.
 
 If the web UI never comes up, see
 [Option 2](#option-2--install-from-source-contributors-custom-boards) — you
 can always reflash with plain Pi OS and run `install.sh` by hand to get a
 detailed install log.
+
+### Configuring Wi-Fi, user account, and SSH before first boot
+
+Two plain-text files on the boot partition control everything: `user-data`
+(hostname, login account, SSH) and `network-config` (Wi-Fi). Both already
+ship on the image as stock cloud-init templates with everything commented
+out — deliberately inert, so nothing half-applies until you edit them.
+Ready-to-fill versions are also available as standalone files at
+[`docs/templates/user-data`](./templates/user-data) and
+[`docs/templates/network-config`](./templates/network-config) if you'd
+rather copy those over wholesale instead of editing what's on the card.
+
+#### `network-config` — Wi-Fi
+
+```yaml
+network:
+  version: 2
+  ethernets:
+    eth0:
+      dhcp4: true
+      dhcp6: true
+      optional: true
+  wifis:
+    wlan0:
+      dhcp4: true
+      regulatory-domain: "US"
+      access-points:
+        "<your-wifi-ssid>":
+          password: "<your-wifi-password>"
+      optional: true
+```
+
+- Set `<your-wifi-ssid>` to your network's SSID.
+- Set `regulatory-domain` to your actual [ISO country code](https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2)
+  (e.g. `"GB"`, `"DE"`) — this unlocks the full channel/power set for your
+  region rather than the conservative worldwide default. Wi-Fi will still
+  generally work without this, but may be flaky on some channels.
+- **`<your-wifi-password>` — plaintext works, but netplan also accepts a
+  pre-hashed PSK**, which avoids the plaintext password sitting in a file
+  on the SD card. Generate one with `wpa_passphrase` (part of
+  `wpasupplicant`, preinstalled on most Linux distros; on macOS,
+  `brew install wpa_supplicant`):
+  ```bash
+  wpa_passphrase "<your-wifi-ssid>" "<your-wifi-password>"
+  ```
+  This prints something like:
+  ```
+  network={
+          ssid="<your-wifi-ssid>"
+          #psk="<your-wifi-password>"
+          psk=333d4a16a320a9927ff24c7e2bdaface9a7f9eb741e6d5030ec272ab9245c9bd
+  }
+  ```
+  Copy just the 64-character hex value after `psk=` (no quotes needed —
+  netplan recognizes a bare 64-hex-character string as a pre-computed PSK
+  rather than a literal password) into the `password:` field.
+
+#### `user-data` — hostname, user account, SSH
+
+```yaml
+#cloud-config
+manage_resolv_conf: false
+
+hostname: inkypi
+manage_etc_hosts: true
+packages:
+- avahi-daemon
+apt:
+  preserve_sources_list: true
+  conf: |
+    Acquire {
+      Check-Date "false";
+    };
+timezone: America/Los_Angeles
+keyboard:
+  model: pc105
+  layout: "us"
+user:
+  name: <your-username>
+  shell: /bin/bash
+  lock_passwd: false
+  passwd: "<your-password-hash>"
+  ssh_authorized_keys:
+    - "<your-ssh-public-key>"
+  sudo: null
+ssh_pwauth: false
+runcmd:
+  - [ systemctl, enable, --now, ssh ]
+```
+
+- Set `hostname:` and `timezone:` to whatever you want (timezone list:
+  `timedatectl list-timezones` on any Linux box, or the
+  [tz database names](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones)).
+- **`<your-password-hash>` must be a crypt(3) hash, not a plaintext
+  password** — cloud-init writes this directly into `/etc/shadow`. Trixie's
+  own default hashing scheme is `yescrypt`; either of these works (cloud-init
+  and PAM accept any valid crypt hash regardless of which scheme the OS
+  itself defaults to for new passwords):
+  ```bash
+  # Matches Trixie's own default scheme (needs the `whois` package for mkpasswd)
+  mkpasswd --method=yescrypt
+
+  # Universally available, no extra package needed (SHA-512 — also fine)
+  openssl passwd -6
+  ```
+  Both prompt for the password interactively (don't pass it as a CLI
+  argument — it'd land in your shell history) and print a hash starting
+  with `$y$` or `$6$` respectively. Paste the whole string, quotes
+  included, into `passwd:`.
+- **SSH access — pick one:**
+  - **Key-based (recommended):** get your public key with
+    `cat ~/.ssh/id_ed25519.pub` (or `~/.ssh/id_rsa.pub`). If you don't have
+    a key yet, generate one first: `ssh-keygen -t ed25519`. Paste the
+    single-line output (starts with `ssh-ed25519` or `ssh-rsa`) into
+    `ssh_authorized_keys:`. Leave `ssh_pwauth: false` as shipped — this
+    disables password login over SSH entirely, which is the safer default
+    once a key is in place.
+  - **Password-based instead:** if you'd rather log in with the account
+    password you set above (no key), change `ssh_pwauth: false` to
+    `ssh_pwauth: true` and delete the `ssh_authorized_keys:` block (or
+    leave it empty) — an empty/missing key list is fine as long as
+    password auth is turned on.
+- The `runcmd:` line (`systemctl enable --now ssh`) is already live and
+  should be left as-is — it's what actually starts sshd on first boot;
+  removing it would leave nothing listening on port 22 even with a valid
+  account configured above.
+
+Once both files are saved, eject the card and continue with step 7 above.
 
 ### Why the image exists
 
