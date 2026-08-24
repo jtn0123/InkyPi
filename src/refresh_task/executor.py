@@ -14,7 +14,9 @@ from typing import Any, Protocol, cast
 
 from PIL import Image
 
+from model import COMPOSITE_PLUGIN_ID
 from refresh_task.actions import RefreshAction
+from refresh_task.composite_render import resolve_composite_renderer
 from refresh_task.context import RefreshContext
 from refresh_task.recorder import RefreshRecorder
 from refresh_task.worker import (
@@ -289,7 +291,10 @@ class RefreshExecutor:
             _cancel: threading.Event = cancel_event,
         ) -> None:
             try:
-                plugin = get_plugin_instance(dict(plugin_config))
+                if plugin_config.get("id") == COMPOSITE_PLUGIN_ID:
+                    plugin: Any = resolve_composite_renderer(refresh_action)
+                else:
+                    plugin = get_plugin_instance(dict(plugin_config))
                 image = refresh_action.execute(plugin, device_config, current_dt)
                 meta = None
                 if hasattr(plugin, "get_latest_metadata"):

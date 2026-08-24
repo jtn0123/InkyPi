@@ -17,8 +17,10 @@ from flask import (
     send_from_directory,
 )
 
+from model import COMPOSITE_PLUGIN_ID
 from plugins.plugin_registry import get_plugin_instance
 from refresh_task import ManualRefresh, PlaylistRefresh
+from refresh_task.composite_render import CompositeScreenRenderer
 from refresh_task.job_queue import get_job_queue
 from services.plugin_workflows import save_plugin_settings_workflow
 from utils.app_utils import handle_request_files, parse_form, resolve_path
@@ -1457,10 +1459,19 @@ def instance_image(plugin_id: str, instance_name: str) -> Any:
         plugin_inst = playlist_manager.find_plugin(plugin_id, instance_name)
         if not plugin_inst:
             return (_ERR_NOT_FOUND, 404)
-        plugin_config = device_config.get_plugin(plugin_id)
-        if not plugin_config:
-            return (_ERR_NOT_FOUND, 404)
-        plugin = get_plugin_instance(plugin_config)
+        if plugin_id == COMPOSITE_PLUGIN_ID:
+            # A composite screen has no plugins/<id>/ entry to resolve via
+            # get_plugin_instance — render it the same way the refresh path
+            # does (see refresh_task.composite_render).
+            regions = plugin_inst.settings.get("regions")
+            plugin: Any = CompositeScreenRenderer(
+                list(regions) if isinstance(regions, list) else []
+            )
+        else:
+            plugin_config = device_config.get_plugin(plugin_id)
+            if not plugin_config:
+                return (_ERR_NOT_FOUND, 404)
+            plugin = get_plugin_instance(plugin_config)
         image = plugin.generate_image(plugin_inst.settings, device_config)
         image.save(path)
         return _cacheable_send_file(path)

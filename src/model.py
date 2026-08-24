@@ -6,6 +6,22 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
+#: Reserved ``plugin_id`` for a composite ("multi-region") screen — a
+#: PluginInstance that renders several *other* plugins into named regions on
+#: one canvas instead of a single plugin's own generate_image(). Never
+#: resolved via plugins.plugin_registry (there is no plugins/<id>/ directory
+#: for it); its region list lives in the instance's own settings["regions"].
+#: Kept here rather than in refresh_task/composite_render.py so model.py has
+#: no import-time dependency on the render module, avoiding a cycle.
+COMPOSITE_PLUGIN_ID = "__composite__"
+
+
+def is_composite_instance(plugin_instance: PluginInstance | None) -> bool:
+    """Return whether *plugin_instance* is a composite (multi-region) screen."""
+    return (
+        plugin_instance is not None and plugin_instance.plugin_id == COMPOSITE_PLUGIN_ID
+    )
+
 
 def _sanitize_log_value(value: object) -> str:
     """Sanitize a value for safe inclusion in log messages."""

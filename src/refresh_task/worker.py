@@ -12,8 +12,10 @@ from collections.abc import Callable, Mapping
 from datetime import datetime
 from typing import TYPE_CHECKING, Protocol, TypedDict, cast
 
+from model import COMPOSITE_PLUGIN_ID
 from plugins.plugin_registry import get_plugin_instance, load_plugins
 from refresh_task.actions import PluginLike, RefreshAction
+from refresh_task.composite_render import resolve_composite_renderer
 from refresh_task.context import RefreshContext, SupportsRefreshConfig
 from utils.plugin_errors import (
     PermanentPluginError,
@@ -275,11 +277,18 @@ def _execute_refresh_attempt_worker(
         get_plugins = getattr(child_config, "get_plugins", None)
         if callable(get_plugins):
             load_plugins(get_plugins())
-        plugin_loader = cast(
-            Callable[[Mapping[str, object]], PluginLike],
-            get_plugin_instance,
-        )
-        plugin = plugin_loader(plugin_config)
+        if plugin_config.get("id") == COMPOSITE_PLUGIN_ID:
+            # A composite screen has no plugins/<id>/ directory to register —
+            # it's rendered natively rather than resolved through the plugin
+            # registry. See model.COMPOSITE_PLUGIN_ID and
+            # composite_render.resolve_composite_renderer.
+            plugin: PluginLike = resolve_composite_renderer(refresh_action)
+        else:
+            plugin_loader = cast(
+                Callable[[Mapping[str, object]], PluginLike],
+                get_plugin_instance,
+            )
+            plugin = plugin_loader(plugin_config)
         image = refresh_action.execute(plugin, child_config, current_dt)
         plugin_meta = None
         if hasattr(plugin, "get_latest_metadata"):

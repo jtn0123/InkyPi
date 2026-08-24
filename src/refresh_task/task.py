@@ -10,7 +10,7 @@ from time import monotonic, perf_counter
 from typing import Any, ClassVar, NoReturn, cast
 from uuid import uuid4
 
-from model import PlaylistManager, RefreshInfo
+from model import COMPOSITE_PLUGIN_ID, PlaylistManager, RefreshInfo
 from plugins.plugin_registry import get_plugin_instance
 from refresh_task import recorder as refresh_recorder
 from refresh_task.actions import ManualUpdateRequest, PlaylistRefresh, RefreshAction
@@ -75,6 +75,11 @@ def _plugin_requires_api_key(plugin_config: Mapping[str, Any]) -> bool:
     """Return whether plugin metadata declares API-key configuration."""
     plugin_id = plugin_config.get("id")
     if not isinstance(plugin_id, str):
+        return False
+    # A composite screen isn't a registered plugin — its own API-key needs
+    # are whatever its child regions' plugins declare, which this pre-flight
+    # check has no way to evaluate up front. Never block scheduling on it.
+    if plugin_id == COMPOSITE_PLUGIN_ID:
         return False
 
     try:
@@ -490,6 +495,11 @@ class RefreshTask:
             return None
         if not isinstance(refresh_action, PlaylistRefresh):
             return None
+        # A composite screen has no skip_display_condition of its own to ask
+        # — it isn't resolved via plugins.plugin_registry at all (see
+        # _perform_refresh's composite branch below).
+        if plugin_config.get("id") == COMPOSITE_PLUGIN_ID:
+            return None
 
         settings = getattr(refresh_action.plugin_instance, "settings", None)
         if not isinstance(settings, Mapping):
@@ -537,7 +547,16 @@ class RefreshTask:
         Threading:
             Must be called without holding ``self.condition``.
         """
-        plugin_config = self.device_config.get_plugin(refresh_action.get_plugin_id())
+        if refresh_action.get_plugin_id() == COMPOSITE_PLUGIN_ID:
+            # A composite screen has no plugins/<id>/plugin-info.json entry —
+            # its own "plugin config" is just its id; the regions it renders
+            # each resolve their own real plugin config independently inside
+            # CompositeScreenRenderer.
+            plugin_config: dict[str, Any] | None = {"id": COMPOSITE_PLUGIN_ID}
+        else:
+            plugin_config = self.device_config.get_plugin(
+                refresh_action.get_plugin_id()
+            )
         if plugin_config is None:
             logger.error(
                 f"Plugin config not found for '{refresh_action.get_plugin_id()}'."
