@@ -21,6 +21,7 @@ command -v debugfs >/dev/null 2>&1 || {
     echo "ERROR: debugfs not found (package e2fsprogs)" >&2; exit 2; }
 
 WORK=""
+# shellcheck disable=SC2317 # only invoked indirectly via `trap ... EXIT` below
 cleanup() { [ -n "${WORK}" ] && rm -rf "${WORK}"; }
 trap cleanup EXIT
 
@@ -40,8 +41,10 @@ read -r BOOT_OFF ROOT_OFF <<<"$(
     fdisk -l -o Start,Type "${IMG}" 2>/dev/null \
         | awk '$1 ~ /^[0-9]+$/ {printf "%d ", $1 * 512}'
 )"
-[ -n "${ROOT_OFF:-}" ] && [ "${ROOT_OFF}" -gt 0 ] || {
-    echo "ERROR: could not read partition table from ${IMG}" >&2; exit 2; }
+if [ -z "${ROOT_OFF:-}" ] || [ "${ROOT_OFF}" -le 0 ]; then
+    echo "ERROR: could not read partition table from ${IMG}" >&2
+    exit 2
+fi
 
 FS="${IMG}?offset=${ROOT_OFF}"
 d() { debugfs -R "$1" "${FS}" 2>/dev/null; }
@@ -59,6 +62,24 @@ absent() { ! d "stat $1" | grep -q "Inode:"; }
 echo ""
 echo "Auditing $(basename "${1}")  (rootfs at offset ${ROOT_OFF})"
 echo ""
+
+echo "Shipped artifact size:"
+MAX_SHIPPED_BYTES=943718400
+case "$1" in
+    *.xz)
+        SHIPPED_BYTES=$(stat -c %s "$1")
+        if [ "${SHIPPED_BYTES}" -gt "${MAX_SHIPPED_BYTES}" ]; then
+            bad "$(basename "$1") is $(numfmt --to=iec "${SHIPPED_BYTES}"), over the $(numfmt --to=iec "${MAX_SHIPPED_BYTES}") ceiling — unexpected bloat?"
+        else
+            ok "$(basename "$1") is $(numfmt --to=iec "${SHIPPED_BYTES}"), under the $(numfmt --to=iec "${MAX_SHIPPED_BYTES}") ceiling"
+        fi
+        ;;
+    *)
+        echo "  (skipped — not a .img.xz)"
+        ;;
+esac
+echo ""
+
 echo "Build scaffolding must not ship:"
 
 for stub in /usr/local/sbin/raspi-config /usr/local/sbin/systemctl; do

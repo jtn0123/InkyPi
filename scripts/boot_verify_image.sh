@@ -120,6 +120,7 @@ esac
 
 # ── extract kernel, dtb, cmdline from the boot partition ──────────────────────
 LOOP=$(sudo losetup --show -Pf "${IMG}")
+# shellcheck disable=SC2317 # only invoked indirectly via `trap ... EXIT` below
 cleanup_loop() {
     sudo umount ./mnt-boot 2>/dev/null || true
     sudo losetup -d "${LOOP}" 2>/dev/null || true
@@ -156,6 +157,7 @@ CMDLINE=$(tr -d '\n' < cmdline.txt \
     | sed -E 's/console=[^ ]*//g
               s#init=/usr/lib/raspberrypi-sys-mods/firstboot##g
               s/(^| )quiet( |$)/ /g
+              s/(^| )resize( |$)/ /g
               s/  +/ /g
               s/^ //; s/ $//')
 # earlycon writes straight to the PL011 MMIO window before any device probing,

@@ -49,13 +49,17 @@ on:
         description: 'Release tag to build an image for (e.g. v0.42.3)'
         required: true
         type: string
+  pull_request:
+    paths:
+      - .github/workflows/build-pi-image.yml
+      - scripts/build_pi_image.sh
 
 permissions:
   contents: write
 
 concurrency:
-  group: build-pi-image-${{ github.event.release.tag_name || inputs.tag || github.run_id }}
-  cancel-in-progress: false
+  group: build-pi-image-${{ github.event.release.tag_name || inputs.tag || github.head_ref || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 # =============================================================================
 # PIN POINT — bump these when rolling to a newer Pi OS base image, or to a
@@ -100,7 +104,7 @@ jobs:
       - name: Resolve release tag
         id: tag
         env:
-          RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
+          RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag || github.head_ref }}
         run: |
           set -euo pipefail
           TAG="$RELEASE_TAG"
@@ -224,11 +228,10 @@ jobs:
     #
     # Gate on boot verification alone. Every way into this workflow
     # (workflow_call from release.yml, release:published, workflow_dispatch by
-    # a maintainer) is a deliberate request to build an image for a tag, and
-    # there is no push/PR trigger that could reach here by accident. This is
-    # what build-wheelhouse.yml already does, which is why wheels attached and
-    # the image did not.
-    if: needs.verify-boot.outputs.verified == 'true'
+    # a maintainer) is a deliberate request to build an image for a tag. This
+    # is what build-wheelhouse.yml already does, which is why wheels attached
+    # and the image did not.
+    if: needs.verify-boot.outputs.verified == 'true' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - name: Download image artifact

@@ -31,7 +31,12 @@ PISHRINK_SHA256="${PISHRINK_SHA256:-71026f0c02ac099e588a3eb8f70760c1b680aa8ea3ac
 
 SRC_REPO="${INKYPI_SRC_REPO:-https://github.com/jtn0123/InkyPi.git}"
 BUILD_DIR="${BUILD_DIR:-build}"
-MNT="${MNT:-/mnt/pi-root}"
+if [ -n "${MNT:-}" ]; then
+    MNT_AUTO=0
+else
+    MNT="$(mktemp -d /tmp/pi-image-root.XXXXXX)"
+    MNT_AUTO=1
+fi
 TAG=""
 FAST=0
 
@@ -44,7 +49,7 @@ Builds inkypi-<version>-pi-zero-2-w.img.xz from the pinned Pi OS Lite base.
 Options:
   -t, --tag TAG      Release tag to build from, e.g. v1.0.2 (required)
   -r, --repo URL     Git URL to clone inside the image
-                     (default: $INKYPI_SRC_REPO or the cartagena fork)
+                     (default: $INKYPI_SRC_REPO or jtn0123/InkyPi)
   -b, --builddir DIR Work directory (default: build)
       --fast         xz -0 instead of -9 and skip the zero-fill. Much faster,
                      much larger output. For iterating, never for a release.
@@ -99,6 +104,7 @@ banner() {
 }
 
 LOOP=""
+# shellcheck disable=SC2317 # only invoked indirectly via `trap ... EXIT` below
 cleanup() {
     # Ordering matters: nested mounts before the ones they sit inside, or the
     # loop device stays busy and the image is left mounted.
@@ -108,7 +114,12 @@ cleanup() {
     umount "${MNT}/sys" 2>/dev/null || true
     umount "${MNT}/boot/firmware" 2>/dev/null || true
     umount "${MNT}" 2>/dev/null || true
-    [ -n "${LOOP}" ] && losetup -d "${LOOP}" 2>/dev/null || true
+    if [ -n "${LOOP}" ]; then
+        losetup -d "${LOOP}" 2>/dev/null || true
+    fi
+    if [ "${MNT_AUTO:-0}" -eq 1 ]; then
+        rmdir "${MNT}" 2>/dev/null || true
+    fi
 }
 trap cleanup EXIT
 

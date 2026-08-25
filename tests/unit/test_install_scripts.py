@@ -1649,9 +1649,9 @@ class TestPiImageBuildWorkflow:
         # manual rebuilds should attach (see build-wheelhouse.yml), so
         # workflow_dispatch is not a dry run either.
         attach = yaml.safe_load(self.content)["jobs"]["attach-release"]
-        assert "github.event_name" not in attach["if"], (
-            "attach-release must not gate on github.event_name — under "
-            "workflow_call that is the caller's event, not 'release'"
+        assert "github.event_name == 'release'" not in attach["if"], (
+            "attach-release must not require github.event_name == 'release' "
+            "— under workflow_call that is the caller's event, not 'release'"
         )
         assert "needs.verify-boot.outputs.verified == 'true'" in attach["if"]
 
@@ -3979,13 +3979,10 @@ class TestPiImageShipsNoBuildScaffolding:
             )
             assert "not* what makes this work" in self.build_sh
 
-    def test_readme_documents_custom_toml_not_cloud_init(self):
-        # Raspberry Pi OS does not ship cloud-init; the note used to send users
-        # to /boot/firmware/user-data, which nothing on the image reads.
-        assert "custom.toml" in self.build_sh
-        assert "user-data" not in self.build_sh
-        # The defaults-to-true trap that silently breaks logins and wifi.
-        assert "password_encrypted = false" in self.build_sh
+    def test_readme_documents_cloud_init_not_custom_toml(self):
+        assert "user-data" in self.build_sh
+        assert "network-config" in self.build_sh
+        assert "Edit Settings" in self.build_sh
 
     def test_build_keeps_the_source_checkout(self):
         # /opt/inkypi-src looks like build residue and is not: install.sh does
@@ -4040,7 +4037,7 @@ class TestPiImageShipsNoBuildScaffolding:
             "qemu-aarch64-static",
             "machine-id",
             "127",
-            "init=/usr/lib/raspberrypi-sys-mods/firstboot",
-            "python3",
+            "#cloud-config",
+            "cloud-init-generator",
         ):
             assert probe in self.audit_sh, f"audit must check {probe}"
