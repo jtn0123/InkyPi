@@ -236,6 +236,7 @@ jobs:
           name: coverage-3.12
         continue-on-error: true
       - name: SonarCloud Scan
+        continue-on-error: true  # a dead SONAR_TOKEN must not gate a PR
         uses: SonarSource/sonarqube-scan-action@v7
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
