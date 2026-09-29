@@ -15,11 +15,11 @@ pillow>=11.0,<13
 # pi-heif has wheels for all major platforms (Linux, macOS, Windows) — no platform guard.
 pi-heif==1.4.0
 tzdata>=2024.1
-openai>=2.0,<3
-google-genai>=1.14,<2
+openai>=3.0,<4
+google-genai>=2.0,<3
 # numpy 2.5 requires Python 3.12+; keep in sync with the cap in pyproject.toml.
 numpy>=2.0,<2.5
-icalendar>=6.0,<7
+icalendar>=7.0,<8
 recurring-ical-events>=3.0,<4
 psutil>=7.0,<8
 # cysystemd — only available on Linux; provides journald integration
