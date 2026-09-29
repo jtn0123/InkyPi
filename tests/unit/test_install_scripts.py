@@ -1269,6 +1269,42 @@ echo "DIR=[$WHEELHOUSE_DIR]"
         assert "integrity check failed" in combined.lower()
 
 
+class TestUvConcurrencyLimits:
+    """install.sh and update.sh both source _common.sh, which bounds uv's
+    parallelism so `uv pip install` fits a 512 MB Pi Zero 2 W."""
+
+    def _source_and_print(self, env: dict[str, str]) -> str:
+        import os
+        import subprocess
+
+        result = subprocess.run(
+            [
+                "bash",
+                "-c",
+                f'source "{INSTALL_DIR / "_common.sh"}"; '
+                'echo "$UV_CONCURRENT_DOWNLOADS $UV_CONCURRENT_INSTALLS '
+                '$UV_CONCURRENT_BUILDS"; '
+                "bash -c 'echo \"child=$UV_CONCURRENT_INSTALLS\"'",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            env={"PATH": os.environ["PATH"], **env},
+        )
+        assert result.returncode == 0, result.stderr
+        return result.stdout
+
+    def test_defaults_are_exported_to_child_processes(self) -> None:
+        out = self._source_and_print({})
+        assert "4 1 1" in out
+        # uv runs as a child process, so the values must be exported.
+        assert "child=1" in out
+
+    def test_caller_can_override(self) -> None:
+        out = self._source_and_print({"UV_CONCURRENT_INSTALLS": "3"})
+        assert "4 3 1" in out
+
+
 class TestInstallWheelhouseFetch:
     """JTN-604: install.sh sources _common.sh for wheelhouse helpers and
     wires them into create_venv.
