@@ -17,22 +17,20 @@ concurrency:
 
 jobs:
   linkcheck:
-    # The GNU build loops through Shopify redirects where same-runner curl
-    # succeeds. The native Darwin release validates the same URLs normally.
-    runs-on: macos-latest
+    runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Install the verified native link checker
+      - name: Install the verified link checker
         run: |
           case "$(uname -m)" in
-            arm64) tool_arch=aarch64 ;;
+            aarch64) tool_arch=aarch64 ;;
             x86_64) tool_arch=x86_64 ;;
             *) exit 1 ;;
           esac
-          tool_target="${tool_arch}-apple-darwin"
+          tool_target="${tool_arch}-unknown-linux-gnu"
           tool_asset="lychee-${tool_target}.tar.gz"
           tool_dir="${RUNNER_TEMP}/inkypi-lychee"
           mkdir -p "${tool_dir}/bin"
@@ -42,7 +40,7 @@ jobs:
             "${release_url}/${tool_asset}" --output "${tool_asset}"
           curl --fail --silent --show-error --location --max-time 30 \
             "${release_url}/${tool_asset}.sha256" --output "${tool_asset}.sha256"
-          shasum --algorithm 256 --check "${tool_asset}.sha256"
+          sha256sum --check "${tool_asset}.sha256"
           tar -xzf "${tool_asset}"
           install -m 755 "lychee-${tool_target}/lychee" "${tool_dir}/bin/lychee"
           printf '%s\n' "${tool_dir}/bin" >> "${GITHUB_PATH}"
@@ -50,25 +48,22 @@ jobs:
       - name: Check links with lychee
         run: |
           lychee --version
-          # Vendor storefronts rate-limit request bursts. Keep failures visible,
-          # but check fewer links at once and allow transient services to recover.
-          # Preserve session cookies through storefront redirects in this job only.
-          lychee --no-progress --verbose --max-concurrency 4 --retry-wait-time 5 \
+          # Some storefronts reject Lychee while same-runner curl GET succeeds.
+          # Independently recheck 429s; every URL still requires a real success.
+          python3 scripts/check_links.py \
             --cookie-jar "${RUNNER_TEMP}/lychee-cookies.json" \
-            --format markdown --output "${RUNNER_TEMP}/inkypi-links.md" \
+            --report "${RUNNER_TEMP}/inkypi-links.json" \
             README.md docs/**/*.md
-          # Preserve the action's default failIfEmpty behavior.
-          test -s "${RUNNER_TEMP}/inkypi-links.md"
-          if grep -Eq 'Total[[:space:]]+\|[[:space:]]+0([[:space:]]|\|)' "${RUNNER_TEMP}/inkypi-links.md"; then
-            printf 'No links were found; refusing an empty validation pass.\n' >&2
-            exit 1
-          fi
         env:
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
 
       - name: Publish link report
         if: always()
         run: |
-          if [[ -f "${RUNNER_TEMP}/inkypi-links.md" ]]; then
-            cat "${RUNNER_TEMP}/inkypi-links.md" >> "${GITHUB_STEP_SUMMARY}"
+          if [[ -f "${RUNNER_TEMP}/inkypi-links.json" ]]; then
+            {
+              printf '```json\n'
+              cat "${RUNNER_TEMP}/inkypi-links.json"
+              printf '\n```\n'
+            } >> "${GITHUB_STEP_SUMMARY}"
           fi
