@@ -98,6 +98,16 @@ stop_service() {
 # Memory-pressure helpers
 # ---------------------------------------------------------------------------
 
+# Bound uv's parallelism for `uv pip install` in install.sh and update.sh. uv's
+# defaults (50 concurrent downloads, one install/build worker per core) peaked
+# at ~163 MB RSS installing requirements.txt under a 512 MB cgroup, and the
+# install-matrix job (512 MB cap, Pi Zero 2 W parity) was intermittently
+# OOM-killed mid-install. These limits measured ~115 MB for about the same
+# wall time. Exported defaults, so a caller can still override them.
+export UV_CONCURRENT_DOWNLOADS="${UV_CONCURRENT_DOWNLOADS:-4}"
+export UV_CONCURRENT_INSTALLS="${UV_CONCURRENT_INSTALLS:-1}"
+export UV_CONCURRENT_BUILDS="${UV_CONCURRENT_BUILDS:-1}"
+
 setup_zramswap_service() {
   # If the OS already provides zram swap (e.g. Pi OS Trixie preinstalls
   # zram-swap), skip zram-tools — they fight over /dev/zram0 and cause mkswap

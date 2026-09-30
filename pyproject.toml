@@ -14,12 +14,15 @@ dependencies = [
   "urllib3>=2.0,<3",
   "werkzeug>=3.1,<4",
   "pillow>=11.0,<13",
-  "pi-heif==1.3.0",
+  "pi-heif==1.4.0",
   "tzdata>=2024.1",
-  "openai>=2.0,<3",
-  "google-genai>=1.14,<2",
-  "numpy>=2.0,<3",
-  "icalendar>=6.0,<7",
+  "openai>=3.0,<4",
+  "google-genai>=2.0,<3",
+  # numpy 2.5 requires Python 3.12+. Capped so uv.lock resolves one version for
+  # every supported Python; a split breaks CI, which co-installs this export with
+  # the pip-compiled dev lock. Lift the cap when 3.11 support is dropped.
+  "numpy>=2.0,<2.5",
+  "icalendar>=7.0,<8",
   "recurring-ical-events>=3.0,<4",
   "psutil>=7.0,<8",
   "cysystemd>=2.0,<3; sys_platform == 'linux'",

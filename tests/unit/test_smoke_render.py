@@ -14,7 +14,6 @@ in a live container so the peak RSS sample actually reflects a real
 
 from __future__ import annotations
 
-from collections.abc import Iterator
 from typing import Any
 
 import pytest
@@ -58,6 +57,7 @@ class _StubDeviceConfig:
 
 def _make_app(
     *,
+    monkeypatch: pytest.MonkeyPatch,
     device_config: _StubDeviceConfig | None = None,
     stub_plugin: _StubPlugin | None = None,
 ) -> Flask:
@@ -71,24 +71,10 @@ def _make_app(
     if stub_plugin is not None:
         import plugins.plugin_registry as registry
 
-        app._orig_get_plugin_instance = registry.get_plugin_instance  # type: ignore[attr-defined]
-        registry.get_plugin_instance = lambda plugin_config: stub_plugin  # type: ignore[assignment]
+        monkeypatch.setattr(
+            registry, "get_plugin_instance", lambda plugin_config: stub_plugin
+        )
     return app
-
-
-@pytest.fixture(autouse=True)
-def _restore_registry(request: pytest.FixtureRequest) -> Iterator[Any]:
-    """Restore plugins.plugin_registry.get_plugin_instance after each test."""
-    yield
-    try:
-        import plugins.plugin_registry as registry
-
-        for app in getattr(request.node, "_smoke_apps", []) or []:
-            orig = getattr(app, "_orig_get_plugin_instance", None)
-            if orig is not None:
-                registry.get_plugin_instance = orig
-    except Exception:
-        pass
 
 
 def test_smoke_render_not_registered_without_env_var(
@@ -97,7 +83,7 @@ def test_smoke_render_not_registered_without_env_var(
     monkeypatch.delenv(SMOKE_RENDER_ENV_VAR, raising=False)
     assert smoke_render_enabled() is False
 
-    app = _make_app()
+    app = _make_app(monkeypatch=monkeypatch)
     client = app.test_client()
 
     # Route should not exist — Flask returns 404 for unregistered paths.
@@ -131,7 +117,9 @@ def test_smoke_render_registered_when_env_var_set(
     monkeypatch.setenv(SMOKE_RENDER_ENV_VAR, "1")
     stub_plugin = _StubPlugin(_StubImage(width=800, height=480))
     device_config = _StubDeviceConfig({"clock": {"plugin_id": "clock"}})
-    app = _make_app(device_config=device_config, stub_plugin=stub_plugin)
+    app = _make_app(
+        monkeypatch=monkeypatch, device_config=device_config, stub_plugin=stub_plugin
+    )
 
     rules = [str(rule) for rule in app.url_map.iter_rules()]
     assert SMOKE_RENDER_PATH in rules
@@ -141,7 +129,9 @@ def test_smoke_render_calls_generate_image(monkeypatch: pytest.MonkeyPatch) -> N
     monkeypatch.setenv(SMOKE_RENDER_ENV_VAR, "1")
     stub_plugin = _StubPlugin(_StubImage(width=800, height=480))
     device_config = _StubDeviceConfig({"clock": {"plugin_id": "clock"}})
-    app = _make_app(device_config=device_config, stub_plugin=stub_plugin)
+    app = _make_app(
+        monkeypatch=monkeypatch, device_config=device_config, stub_plugin=stub_plugin
+    )
     client = app.test_client()
 
     resp = client.post(SMOKE_RENDER_PATH, data={"plugin_id": "clock"})
@@ -166,7 +156,9 @@ def test_smoke_render_missing_plugin_id_returns_422(
 ) -> None:
     monkeypatch.setenv(SMOKE_RENDER_ENV_VAR, "1")
     device_config = _StubDeviceConfig({})
-    app = _make_app(device_config=device_config, stub_plugin=_StubPlugin())
+    app = _make_app(
+        monkeypatch=monkeypatch, device_config=device_config, stub_plugin=_StubPlugin()
+    )
     client = app.test_client()
 
     resp = client.post(SMOKE_RENDER_PATH, data={})
@@ -178,7 +170,9 @@ def test_smoke_render_unknown_plugin_returns_404(
 ) -> None:
     monkeypatch.setenv(SMOKE_RENDER_ENV_VAR, "1")
     device_config = _StubDeviceConfig({})  # no plugins at all
-    app = _make_app(device_config=device_config, stub_plugin=_StubPlugin())
+    app = _make_app(
+        monkeypatch=monkeypatch, device_config=device_config, stub_plugin=_StubPlugin()
+    )
     client = app.test_client()
 
     resp = client.post(SMOKE_RENDER_PATH, data={"plugin_id": "missing"})
@@ -195,7 +189,9 @@ def test_smoke_render_generate_image_exception_returns_500(
             raise RuntimeError("boom")
 
     device_config = _StubDeviceConfig({"clock": {"plugin_id": "clock"}})
-    app = _make_app(device_config=device_config, stub_plugin=_Boom())
+    app = _make_app(
+        monkeypatch=monkeypatch, device_config=device_config, stub_plugin=_Boom()
+    )
     client = app.test_client()
 
     resp = client.post(SMOKE_RENDER_PATH, data={"plugin_id": "clock"})
@@ -217,7 +213,9 @@ def test_smoke_render_does_not_touch_display_manager(
 
     stub_plugin = _StubPlugin()
     device_config = _StubDeviceConfig({"clock": {"plugin_id": "clock"}})
-    app = _make_app(device_config=device_config, stub_plugin=stub_plugin)
+    app = _make_app(
+        monkeypatch=monkeypatch, device_config=device_config, stub_plugin=stub_plugin
+    )
     tracking_display = _TrackingDisplay()
     app.config["DISPLAY_MANAGER"] = tracking_display
 
@@ -244,7 +242,9 @@ def test_smoke_render_csrf_exempt_in_security_middleware(
 
     stub_plugin = _StubPlugin()
     device_config = _StubDeviceConfig({"clock": {"plugin_id": "clock"}})
-    app = _make_app(device_config=device_config, stub_plugin=stub_plugin)
+    app = _make_app(
+        monkeypatch=monkeypatch, device_config=device_config, stub_plugin=stub_plugin
+    )
     setup_csrf_protection(app)
 
     client = app.test_client()
@@ -264,7 +264,7 @@ def test_smoke_render_csrf_still_enforced_for_other_paths(
     monkeypatch.setenv(SMOKE_RENDER_ENV_VAR, "1")
     from app_setup.security_middleware import setup_csrf_protection
 
-    app = _make_app()
+    app = _make_app(monkeypatch=monkeypatch)
     setup_csrf_protection(app)
 
     @app.route("/other_mutation", methods=["POST"])
