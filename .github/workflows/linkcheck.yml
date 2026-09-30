@@ -27,7 +27,7 @@ jobs:
         with:
           # Vendor storefronts rate-limit request bursts. Keep failures visible,
           # but check fewer links at once and allow transient services to recover.
-          args: --no-progress --verbose --max-concurrency 4 --retry-wait-time 5 README.md docs/**/*.md
+          # Preserve session cookies through storefront redirects in this job only.
+          args: --no-progress --verbose --max-concurrency 4 --retry-wait-time 5 --cookie-jar /tmp/lychee-cookies.json README.md docs/**/*.md
         env:
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
-
