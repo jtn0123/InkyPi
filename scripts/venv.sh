@@ -1,7 +1,6 @@
 #!/bin/bash
 
 VENV_DIR=".venv"
-REQUIREMENTS_FILE="install/requirements-dev.txt"
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}" 2>/dev/null)" && cd .. && pwd)"
 SRC_DIR="src"
 SRC_ABS="${REPO_ROOT}/${SRC_DIR}"
@@ -59,8 +58,9 @@ else
     PY_BIN=python
 fi
 
-$PY_BIN -m pip install --upgrade pip
-$PY_BIN -m pip install --no-cache-dir -r "$REQUIREMENTS_FILE"
+if ! "$PY_BIN" "${REPO_ROOT}/scripts/dev_environment.py"; then
+    "$PY_BIN" "${REPO_ROOT}/scripts/dev_environment.py" --sync || return 1 2>/dev/null || exit 1
+fi
 
 setup_pythonpath
 

@@ -30,10 +30,17 @@ python3 -m venv .venv
 source .venv/bin/activate  # Windows: .venv\Scripts\activate
 
 # 3. Install Python dependencies and vendor assets
-pip install -r install/requirements-dev.txt
+python scripts/dev_environment.py --sync
 bash install/update_vendors.sh
 python src/inkypi.py --dev
 ```
+
+`scripts/test.sh` checks installed versions against the committed requirements
+before running tests. To inspect the active environment without installing or
+using the network, run `python scripts/dev_environment.py`. If it reports drift,
+run `source scripts/venv.sh` (or `python scripts/dev_environment.py --sync` in an
+already activated environment). Sync installs with `--require-hashes` and records
+a lock fingerprint. Unchanged environments take the check-only fast path.
 
 </td>
 <td>

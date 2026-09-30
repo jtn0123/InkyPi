@@ -17,6 +17,8 @@ if [[ -z "${VIRTUAL_ENV:-}" ]]; then
     fi
 fi
 
+python scripts/dev_environment.py
+
 export PYTHONPATH="src${PYTHONPATH:+:$PYTHONPATH}"
 
 if [[ "${1:-}" == "browser-smoke" ]]; then
