@@ -204,9 +204,15 @@ def mock_screenshot(monkeypatch: pytest.MonkeyPatch) -> Any:
         return Image.new("RGB", (width, height), "white")
 
     import plugins.base_plugin.base_plugin as base_plugin
+    import plugins.screenshot.screenshot as screenshot_plugin
     import utils.image_utils as image_utils
 
     monkeypatch.setattr(image_utils, "take_screenshot", _fake_screenshot, raising=True)
+    # The plugin can be imported during collection, before this fixture patches
+    # image_utils. Patch its captured import too, independent of collection order.
+    monkeypatch.setattr(
+        screenshot_plugin, "take_screenshot", _fake_screenshot, raising=True
+    )
     monkeypatch.setattr(
         image_utils,
         "take_screenshot_html",

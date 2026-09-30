@@ -17,6 +17,8 @@ if [[ -z "${VIRTUAL_ENV:-}" ]]; then
     fi
 fi
 
+python scripts/dev_environment.py
+
 export PYTHONPATH="src${PYTHONPATH:+:$PYTHONPATH}"
 
 if [[ "${1:-}" == "browser-smoke" ]]; then
@@ -27,6 +29,7 @@ fi
 
 BROWSER_TEST_TARGETS=(
     tests/integration/test_browser_smoke.py
+    tests/integration/test_remote_browser_boundary.py
     tests/integration/test_e2e_form_workflows.py
     tests/integration/test_more_a11y.py
     tests/integration/test_playlist_a11y.py

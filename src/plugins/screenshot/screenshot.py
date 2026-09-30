@@ -69,7 +69,7 @@ class Screenshot(BasePlugin):  # type: ignore[misc, unused-ignore]
                         submit_unchecked=True,
                     ),
                     callout(
-                        "Only use trusted URLs. Slow or heavily scripted sites may fail to render before the screenshot timeout.",
+                        "Public websites only; private network addresses are blocked. Slow or heavily scripted sites may fail to render before the screenshot timeout.",
                         tone="warning",
                     ),
                 )

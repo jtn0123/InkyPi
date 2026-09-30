@@ -6,6 +6,7 @@ import shutil
 import tempfile
 import threading
 from collections.abc import Callable
+from copy import deepcopy
 from typing import Any, cast
 
 from dotenv import load_dotenv, set_key, unset_key
@@ -23,6 +24,13 @@ from utils.paths import (
 from utils.refresh_info import RefreshInfoRepository
 
 logger = logging.getLogger(__name__)
+
+_ConfigSnapshot = tuple[
+    dict[str, Any],
+    PlaylistManager,
+    RefreshInfo,
+    list[tuple[dict[str, Any], dict[str, Any]]],
+]
 
 _DEVICE_JSON = "device.json"
 
@@ -152,9 +160,11 @@ class Config:
         """Restore the RLock when unpickling."""
         self.__dict__.update(state)
         self._config_lock = threading.RLock()
+        self._atomic_depth = 0
 
     def __init__(self) -> None:
         self._config_lock = threading.RLock()
+        self._atomic_depth = 0
         self._last_written_hash: str | None = None
         # mtime-based read cache: skip JSON parse + schema validation when the
         # file has not changed.  Stored as (mtime_ns: int, data: dict).
@@ -189,6 +199,7 @@ class Config:
         self.playlist_manager: PlaylistManager = self.load_playlist_manager()
         self.refresh_info: RefreshInfo = self.load_refresh_info()
         self._refresh_info_repo: RefreshInfoRepository | None = None
+        self._persisted_state = self._capture_mutable_state()
 
     def _resolve_runtime_paths(self) -> None:
         runtime_dir = (os.getenv("INKYPI_RUNTIME_DIR") or "").strip() or None
@@ -369,7 +380,7 @@ class Config:
 
             # Update cache after successful parse+validate
             self._config_cache_mtime = current_mtime_ns
-            self._config_cache_data = config
+            self._config_cache_data = deepcopy(config)
 
             return config
 
@@ -419,7 +430,49 @@ class Config:
             self._plugins_list_cache_data = [plugin.copy() for plugin in plugins_list]
             return plugins_list
 
+    def _capture_mutable_state(self) -> _ConfigSnapshot:
+        """Snapshot values while retaining references held by refresh workers."""
+        models: list[object] = [
+            self.playlist_manager,
+            self.refresh_info,
+        ]
+        for playlist in self.playlist_manager.playlists:
+            models.append(playlist)
+            models.extend(playlist.plugins)
+        memo = {id(model): model for model in models}
+        targets = [self.config] + [vars(model) for model in models]
+        return (
+            self.config,
+            self.playlist_manager,
+            self.refresh_info,
+            [(target, deepcopy(target, memo)) for target in targets],
+        )
+
+    def _restore_mutable_state(self, state: _ConfigSnapshot) -> None:
+        self.config, self.playlist_manager, self.refresh_info, targets = state
+        for target, values in targets:
+            target.clear()
+            target.update(values)
+
     def write_config(self) -> None:
+        """Persist model state, restoring the last committed state on failure."""
+        with self._config_lock:
+            if self._atomic_depth:
+                # A callback may call a saving helper. Commit once, after the
+                # outermost callback succeeds, so a later exception cannot
+                # leave a partially committed transaction on disk.
+                return
+            try:
+                self._write_config()
+            except Exception:
+                self._restore_mutable_state(self._persisted_state)
+                # The snapshot was consumed by restoration; rebuild it so
+                # later mutations cannot corrupt the next rollback.
+                self._persisted_state = self._capture_mutable_state()
+                raise
+            self._persisted_state = self._capture_mutable_state()
+
+    def _write_config(self) -> None:
         """Updates the cached config from the model objects and writes to the config file.
 
         Skips the disk write when the serialized content is identical to the
@@ -453,7 +506,7 @@ class Config:
                 try:
                     new_mtime_ns = os.stat(self.config_file).st_mtime_ns
                     self._config_cache_mtime = new_mtime_ns
-                    self._config_cache_data = self.config.copy()
+                    self._config_cache_data = deepcopy(self.config)
                 except OSError:
                     # Non-fatal: cache will be rebuilt on the next read_config().
                     self._config_cache_mtime = None
@@ -522,16 +575,15 @@ class Config:
 
     def update_config(self, config: dict[str, Any]) -> None:
         """Updates the config with the new values provided and writes to the config file."""
-        with self._config_lock:
-            self.config.update(config)
-            self.write_config()
+        self.update_atomic(lambda current: current.update(config))
 
     def update_value(self, key: str, value: Any, write: bool = False) -> None:
         """Updates a specific key in the configuration with a new value and optionally writes it to the config file."""
         with self._config_lock:
-            self.config[key] = value
             if write:
-                self.write_config()
+                self.update_atomic(lambda current: current.__setitem__(key, value))
+            else:
+                self.config[key] = value
 
     def update_atomic(self, update_fn: Callable[[dict[str, Any]], None]) -> None:
         """Run update_fn(self._config) while holding the config lock and atomically write.
@@ -543,8 +595,20 @@ class Config:
         ``update_fn``.
         """
         with self._config_lock:
-            update_fn(self.config)
-            self.write_config()
+            before = self._capture_mutable_state()
+            self._atomic_depth += 1
+            try:
+                update_fn(self.config)
+            except Exception:
+                self._restore_mutable_state(before)
+                raise
+            finally:
+                self._atomic_depth -= 1
+            try:
+                self.write_config()
+            except Exception:
+                self._restore_mutable_state(before)
+                raise
 
     def get_env_file_path(self) -> str:
         """Return absolute path to the .env file used for secrets.

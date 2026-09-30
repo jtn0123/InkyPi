@@ -1,4 +1,4 @@
-const CACHE_NAME = "inkypi-shell-v23";
+const CACHE_NAME = "inkypi-shell-v24";
 
 const SHELL_ASSETS = [
   "/static/styles/main.css",
@@ -41,19 +41,26 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  event.respondWith(
-    caches.match(request).then((cached) => {
-      if (cached) {
-        return cached;
-      }
-      return fetch(request).then((response) => {
-        if (!response || response.status !== 200) {
-          return response;
-        }
-        const clone = response.clone();
-        caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
-        return response;
-      });
-    })
-  );
+  event.respondWith((async () => {
+    const cache = await caches.open(CACHE_NAME);
+    const cached = await cache.match(request);
+    const path = new URL(request.url).pathname;
+    // Only build-generated content hashes make cache-first safe across updates.
+    const immutable = /^\/static\/dist\/common\.bundle\.[a-f0-9]{8}\.(?:min\.)?(?:js|css)$/.test(path);
+    if (immutable && cached) return cached;
+
+    let response;
+    try {
+      // Revalidate the browser's HTTP cache as well as the worker's cache.
+      response = await fetch(request, { cache: "no-cache" });
+    } catch (error) {
+      if (cached) return cached;
+      throw error;
+    }
+    if (response?.status === 200) {
+      // A full/unavailable offline cache must not hide a successful download.
+      await cache.put(request, response.clone()).catch(() => {});
+    }
+    return response;
+  })());
 });

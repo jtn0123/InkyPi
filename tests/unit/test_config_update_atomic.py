@@ -122,6 +122,130 @@ def test_update_atomic_exception_does_not_write(
 
     # The hash should still be None (no write happened)
     assert cfg._last_written_hash == original_hash
+    assert "should_not_persist" not in cfg.config
+
+
+@pytest.mark.parametrize("operation", ["atomic", "config", "value"])
+def test_failed_save_restores_live_and_disk_state(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, operation: str
+) -> None:
+    from copy import deepcopy
+
+    cfg = _make_config(tmp_path, monkeypatch)
+    cfg.write_config()
+    before = deepcopy(cfg.config)
+    disk_before = Path(cfg.config_file).read_bytes()
+    hash_before = cfg._last_written_hash
+    manager = cfg.playlist_manager
+    playlist = manager.playlists[0]
+    refresh = cfg.refresh_info
+    cache_before = deepcopy(cfg._config_cache_data)
+
+    def fail_replace(*args: Any) -> None:
+        raise OSError("injected disk failure")
+
+    monkeypatch.setattr("config.os.replace", fail_replace)
+
+    def mutate(data: dict[str, Any]) -> None:
+        data["name"] = "failed change"
+        data["image_settings"]["brightness"] = 9
+        playlist.name = "failed playlist"
+        manager.add_playlist("failed new playlist")
+        refresh.plugin_id = "failed plugin"
+
+    saves = {
+        "atomic": lambda: cfg.update_atomic(mutate),
+        "config": lambda: cfg.update_config({"name": "failed change"}),
+        "value": lambda: cfg.update_value("name", "failed change", write=True),
+    }
+    save = saves[operation]
+    with pytest.raises(OSError):
+        save()
+
+    assert cfg.config == before
+    assert Path(cfg.config_file).read_bytes() == disk_before
+    assert cfg._last_written_hash == hash_before
+    assert cfg._config_cache_data == cache_before
+    assert cfg.playlist_manager is manager
+    assert cfg.playlist_manager.playlists[0] is playlist
+    assert cfg.refresh_info is refresh
+    assert manager.to_dict() == before["playlist_config"]
+    assert refresh.to_dict() == before["refresh_info"]
+
+
+def test_callback_saving_helper_does_not_commit_before_callback_succeeds(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    cfg = _make_config(tmp_path, monkeypatch)
+    cfg.write_config()
+    disk_before = Path(cfg.config_file).read_bytes()
+
+    def mutate(current: dict[str, Any]) -> None:
+        cfg.update_value("name", "partial", write=True)
+        cfg.write_config()
+        raise RuntimeError("callback failed after nested save")
+
+    with pytest.raises(RuntimeError):
+        cfg.update_atomic(mutate)
+    assert Path(cfg.config_file).read_bytes() == disk_before
+    assert cfg.get_config("name") == "AtomicTest"
+    cfg.update_value("name", "successful retry", write=True)
+    assert json.loads(Path(cfg.config_file).read_text())["name"] == "successful retry"
+
+
+def test_direct_model_save_failure_restores_existing_model_references(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    cfg = _make_config(tmp_path, monkeypatch)
+    manager = cfg.playlist_manager
+    manager.add_plugin_to_playlist(
+        "Default",
+        {
+            "plugin_id": "clock",
+            "name": "clock",
+            "refresh": {"interval": 3600},
+            "plugin_settings": {"nested": [1]},
+        },
+    )
+    cfg.write_config()
+    playlist = manager.playlists[0]
+    plugin = playlist.plugins[0]
+    disk_before = Path(cfg.config_file).read_bytes()
+    plugin.settings["nested"].append(2)
+    manager.delete_playlist("Default")
+
+    def fail(*args: Any) -> None:
+        raise OSError("disk failure")
+
+    monkeypatch.setattr("config.os.replace", fail)
+    with pytest.raises(OSError):
+        cfg.write_config()
+    assert manager.playlists[0] is playlist
+    assert playlist.plugins[0] is plugin
+    assert plugin.settings["nested"] == [1]
+    assert Path(cfg.config_file).read_bytes() == disk_before
+
+
+def test_failed_callback_restores_replaced_model_roots(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from model import PlaylistManager, RefreshInfo
+
+    cfg = _make_config(tmp_path, monkeypatch)
+    manager = cfg.playlist_manager
+    refresh = cfg.refresh_info
+
+    def mutate(current: dict[str, Any]) -> None:
+        cfg.playlist_manager = PlaylistManager()
+        cfg.refresh_info = RefreshInfo("Manual Update", "failed", None, None)
+        current["image_settings"]["brightness"] = 9
+        raise RuntimeError("failed callback")
+
+    with pytest.raises(RuntimeError):
+        cfg.update_atomic(mutate)
+    assert cfg.playlist_manager is manager
+    assert cfg.refresh_info is refresh
+    assert cfg._config_cache_data["image_settings"]["brightness"] == 1
 
 
 # ---------------------------------------------------------------------------
