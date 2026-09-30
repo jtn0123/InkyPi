@@ -553,6 +553,12 @@ def _find_browser_command(
         "chromium-headless-shell",
         "google-chrome",
     ]
+    if target.startswith(("http://", "https://")):
+        # The dedicated shell avoids full-Chrome desktop initialization and
+        # consumes fewer resources on small boards. Retain installed Chrome
+        # as a fallback when the shell package is unavailable.
+        browsers.remove("chromium-headless-shell")
+        browsers.insert(0, "chromium-headless-shell")
 
     for browser in browsers:
         if os.path.exists(browser) or shutil.which(browser):

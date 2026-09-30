@@ -17,6 +17,9 @@ and non-proxied WebRTC UDP are disabled. HTTPS tunnels are limited to port 443,
 and plain WebSocket upgrades are unsupported. Private dashboards and custom-port
 HTTPS sites therefore cannot be captured by this plugin.
 
+For remote capture, `chromium-headless-shell` is preferred when installed; it
+avoids full Chrome's desktop initialization. On Debian/Pi OS, install it with
+`sudo apt install chromium-headless-shell` if the full Chromium backend hangs.
 The browser must be installed and its sandbox must work for the unprivileged
 account. Failure returns a rendering error; there is no fallback to an
 unsandboxed remote browser. On Raspberry Pi, test a public Screenshot playlist

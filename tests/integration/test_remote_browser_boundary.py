@@ -7,6 +7,7 @@ import shutil
 import socket
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -66,6 +67,13 @@ def test_remote_renderer_blocks_private_subresources_and_redirects(
     monkeypatch.setattr(remote_rendering, "connect_public", fixture_connect)
     with sync_playwright() as playwright:
         executable = playwright.chromium.executable_path
+    shell = list(
+        Path(executable)
+        .parents[2]
+        .glob("chromium_headless_shell-*/chrome-linux*/headless_shell")
+    )
+    assert shell, "Install Playwright Chromium including Headless Shell for this lane"
+    executable = str(shell[0])
     original_command = image_utils._find_browser_command
     monkeypatch.setattr(shutil, "which", lambda _: executable)
 
