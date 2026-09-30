@@ -572,14 +572,18 @@ def _find_browser_command(
                 "--disable-extensions",
                 "--disable-plugins",
                 "--mute-audio",
-                "--no-sandbox",
-                # Allow loading local file-based resources referenced by templates
-                "--allow-file-access-from-files",
-                "--enable-local-file-accesses",
-                # Relax same-origin so file:// linked assets load predictably
-                "--disable-web-security",
-                target,
             ]
+            if target.startswith("file://"):
+                # These permissions belong exclusively to trusted templates.
+                command.extend(
+                    [
+                        "--no-sandbox",
+                        "--allow-file-access-from-files",
+                        "--enable-local-file-accesses",
+                        "--disable-web-security",
+                    ]
+                )
+            command.append(target)
             if timeout_ms:
                 command.append(f"--timeout={timeout_ms}")
             if render_wait_ms:
@@ -611,7 +615,10 @@ def _tempfile_is_empty(img_file_path: str | None) -> bool:
 
 
 def _run_browser_subprocess(
-    command: list[str], timeout_seconds: float, attempt: int
+    command: list[str],
+    timeout_seconds: float,
+    attempt: int,
+    process_options: dict[str, Any] | None = None,
 ) -> tuple[subprocess.CompletedProcess[bytes] | None, bool]:
     """Run the chromium subprocess. Returns ``(result, transient_flag)``.
 
@@ -632,7 +639,12 @@ def _run_browser_subprocess(
     out of reach of that worker-level cleanup and leak the tree.
     """
     try:
-        result = subprocess.run(command, capture_output=True, timeout=timeout_seconds)
+        result = subprocess.run(
+            command,
+            capture_output=True,
+            timeout=timeout_seconds,
+            **(process_options or {}),
+        )
     except FileNotFoundError:
         logger.error("%s Browser binary not found.", _SCREENSHOT_ERROR_PREFIX)
         return None, False
@@ -644,6 +656,54 @@ def _run_browser_subprocess(
         )
         return None, True
     return result, False
+
+
+def _remote_screenshot_once(
+    target: str,
+    dimensions: tuple[int, int],
+    timeout_ms: int | None,
+    attempt: int,
+    render_wait_ms: int | None,
+) -> tuple[Image.Image | None, bool]:
+    from utils.remote_rendering import public_proxy, remote_process_options
+
+    with tempfile.TemporaryDirectory(prefix="inkypi-remote-") as directory:
+        output = os.path.join(directory, "capture.png")
+        command = _find_browser_command(
+            target, output, dimensions, timeout_ms, render_wait_ms
+        )
+        if command is None:
+            return None, False
+        options = remote_process_options(directory)
+        with public_proxy() as port:
+            command[1:1] = [
+                f"--user-data-dir={directory}/profile",
+                f"--proxy-server=http://127.0.0.1:{port}",
+                "--proxy-bypass-list=<-loopback>",
+                "--disable-quic",
+                "--disable-background-networking",
+                "--force-webrtc-ip-handling-policy=disable_non_proxied_udp",
+                "--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE 127.0.0.1",
+            ]
+            timeout = min(
+                (timeout_ms / 1000) if timeout_ms else _DEFAULT_SCREENSHOT_TIMEOUT_S,
+                _MAX_SCREENSHOT_TIMEOUT_S,
+            )
+            result, transient = _run_browser_subprocess(
+                command, timeout, attempt, options
+            )
+        if result is None:
+            return None, transient
+        if result.returncode:
+            logger.error(
+                "%s Restricted remote browser exited %s (attempt %s)",
+                _SCREENSHOT_ERROR_PREFIX,
+                result.returncode,
+                attempt,
+            )
+            return None, _tempfile_is_empty(output)
+        image = load_image_from_path(output)
+        return image, image is None
 
 
 def _take_screenshot_once(
@@ -665,6 +725,12 @@ def _take_screenshot_once(
     img_file_path: str | None = None
     transient = False
     try:
+        if target.startswith(("http://", "https://")):
+            return _remote_screenshot_once(
+                target, dimensions, timeout_ms, attempt, render_wait_ms
+            )
+        if not target.startswith("file://"):
+            return None, False
         with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as img_file:
             img_file_path = img_file.name
 

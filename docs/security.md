@@ -1,5 +1,32 @@
 # Security
 
+## Remote-page rendering
+
+The Screenshot plugin accepts public HTTP/HTTPS websites. Its Chromium process
+uses a fresh temporary profile, receives a minimal environment without provider
+keys or application secrets, and retains Chromium's sandbox and web security.
+When InkyPi runs as root, the remote browser drops to the system `nobody` account
+with no supplementary groups. Local HTML templates use a separate rendering
+path; their file-access permissions are never applied to remote pages.
+
+A per-render loopback proxy validates all DNS answers and connects to a validated
+numeric IP for each remote connection, including redirects and subresources.
+Private, loopback, link-local and non-global addresses are rejected. Chromium's
+implicit loopback proxy bypass is disabled, with no direct proxy fallback; QUIC
+and non-proxied WebRTC UDP are disabled. HTTPS tunnels are limited to port 443,
+and plain WebSocket upgrades are unsupported. Private dashboards and custom-port
+HTTPS sites therefore cannot be captured by this plugin.
+
+The browser must be installed and its sandbox must work for the unprivileged
+account. Failure returns a rendering error; there is no fallback to an
+unsandboxed remote browser. On Raspberry Pi, test a public Screenshot playlist
+after upgrading and check the service log if Chromium cannot start. Desktop and
+simulated checks do not establish a physical-Pi sandbox or memory-pressure pass.
+The proxy is an application-level egress boundary, not a separate network
+namespace or protection against a compromised Chromium network process.
+
+Chromium documents [proxy behavior and loopback bypass rules](https://chromium.googlesource.com/chromium/src/+/main/net/docs/proxy.md).
+
 ## Software Bill of Materials (SBOM)
 
 Every GitHub release includes a CycloneDX JSON SBOM attached as a release asset named

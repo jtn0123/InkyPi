@@ -696,6 +696,7 @@ jobs:
           # env and share the ubuntu-24.04 font fallback.
           pytest \
             tests/integration/test_browser_smoke.py \
+            tests/integration/test_remote_browser_boundary.py \
             tests/integration/test_visual_regression.py \
             tests/snapshots/ \
             -q
