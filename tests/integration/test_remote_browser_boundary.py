@@ -89,7 +89,8 @@ def test_remote_renderer_blocks_private_subresources_and_redirects(
         image, transient = image_utils._take_screenshot_once(
             "http://public.test/", (400, 300), 20_000, 1, 2000
         )
-        assert image is not None and not transient
+        assert image is not None
+        assert not transient
         assert image.convert("RGB").getpixel((399, 299)) == (40, 167, 69)
         assert "/" in hits
         assert "/redirect" in hits

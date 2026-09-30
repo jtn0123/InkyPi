@@ -34,7 +34,8 @@ def test_trusted_template_retains_local_asset_permissions(
     command = image_utils._find_browser_command(
         "file:///tmp/template.html", "/tmp/out.png", (800, 480), 1000
     )
-    assert command and "--allow-file-access-from-files" in command
+    assert command is not None
+    assert "--allow-file-access-from-files" in command
 
 
 def test_sandbox_failure_is_actionable_and_has_no_unsafe_fallback(
