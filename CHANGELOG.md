@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.4.2 (2026-09-30)
+
+### Bug Fixes
+
+- **deps**: Update stable packages and modernize CI tooling
+  ([#654](https://github.com/jtn0123/InkyPi/pull/654),
+  [`dc063e9`](https://github.com/jtn0123/InkyPi/commit/dc063e982c05319d40b05659e2f8a925381c4205))
+
 
 ## v1.4.1 (2026-09-30)
 
