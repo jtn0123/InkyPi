@@ -17,35 +17,51 @@ concurrency:
 
 jobs:
   linkcheck:
-    runs-on: ubuntu-latest
+    # The GNU build loops through Shopify redirects where same-runner curl
+    # succeeds. The native Darwin release validates the same URLs normally.
+    runs-on: macos-latest
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
+      - name: Install the verified native link checker
+        run: |
+          case "$(uname -m)" in
+            arm64) tool_arch=aarch64 ;;
+            x86_64) tool_arch=x86_64 ;;
+            *) exit 1 ;;
+          esac
+          tool_target="${tool_arch}-apple-darwin"
+          tool_asset="lychee-${tool_target}.tar.gz"
+          tool_dir="${RUNNER_TEMP}/inkypi-lychee"
+          mkdir -p "${tool_dir}/bin"
+          cd "${tool_dir}"
+          release_url='https://github.com/lycheeverse/lychee/releases/download/lychee-v0.24.2'
+          curl --fail --silent --show-error --location --max-time 60 \
+            "${release_url}/${tool_asset}" --output "${tool_asset}"
+          curl --fail --silent --show-error --location --max-time 30 \
+            "${release_url}/${tool_asset}.sha256" --output "${tool_asset}.sha256"
+          shasum --algorithm 256 --check "${tool_asset}.sha256"
+          tar -xzf "${tool_asset}"
+          install -m 755 "lychee-${tool_target}/lychee" "${tool_dir}/bin/lychee"
+          printf '%s\n' "${tool_dir}/bin" >> "${GITHUB_PATH}"
+
       - name: Check links with lychee
-        uses: lycheeverse/lychee-action@e7477775783ea5526144ba13e8db5eec57747ce8 # v2.9.0
-        with:
+        run: |
           # Vendor storefronts rate-limit request bursts. Keep failures visible,
           # but check fewer links at once and allow transient services to recover.
           # Preserve session cookies through storefront redirects in this job only.
-          args: --no-progress --verbose --max-concurrency 4 --retry-wait-time 5 --cookie-jar /tmp/lychee-cookies.json README.md docs/**/*.md
+          lychee --no-progress --verbose --max-concurrency 4 --retry-wait-time 5 \
+            --cookie-jar "${RUNNER_TEMP}/lychee-cookies.json" \
+            --format markdown --output "${RUNNER_TEMP}/inkypi-links.md" \
+            README.md docs/**/*.md
         env:
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
 
-      - name: Diagnose storefront responses if link validation fails
-        if: failure()
+      - name: Publish link report
+        if: always()
         run: |
-          # Compare client identity on the same runner. Print status/redirects
-          # only; do not print response headers, cookies or the workflow token.
-          for client_agent in 'lychee/0.24.2' 'curl/8.4.0'; do
-            cookie_file="${RUNNER_TEMP}/storefront-${client_agent//\//-}.json"
-            for storefront_url in 'https://collabs.shop/jrzqmf' 'https://collabs.shop/q2jmza'; do
-              printf 'client=%s url=%s ' "${client_agent}" "${storefront_url}"
-              curl --silent --show-error --location --max-redirs 5 --max-time 25 \
-                --user-agent "${client_agent}" \
-                --cookie "${cookie_file}" --cookie-jar "${cookie_file}" \
-                --output /dev/null \
-                --write-out 'status=%{http_code} redirects=%{num_redirects}\n' \
-                "${storefront_url}" || true
-            done
-          done
+          if [[ -f "${RUNNER_TEMP}/inkypi-links.md" ]]; then
+            cat "${RUNNER_TEMP}/inkypi-links.md" >> "${GITHUB_STEP_SUMMARY}"
+          fi
