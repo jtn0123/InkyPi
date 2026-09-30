@@ -45,7 +45,7 @@ def _app(*, playlist: Any, refresh_task: Any) -> Any:
 
 class TestRunOnce:
     def test_refreshes_the_next_plugin_and_succeeds(self) -> None:
-        refresh_task = MagicMock()
+        refresh_task = MagicMock(_work_started_at=None)
         playlist = _FakePlaylist(_FakePluginInstance())
 
         assert inkypi.run_once(_app(playlist=playlist, refresh_task=refresh_task)) == 0
@@ -58,7 +58,7 @@ class TestRunOnce:
 
     def test_stops_the_refresh_task_before_returning(self) -> None:
         """Nothing should be left running — the process is about to exit."""
-        refresh_task = MagicMock()
+        refresh_task = MagicMock(_work_started_at=None)
         playlist = _FakePlaylist(_FakePluginInstance())
 
         inkypi.run_once(_app(playlist=playlist, refresh_task=refresh_task))
@@ -66,7 +66,7 @@ class TestRunOnce:
         assert refresh_task.stop.called
 
     def test_stops_the_refresh_task_even_when_the_refresh_raises(self) -> None:
-        refresh_task = MagicMock()
+        refresh_task = MagicMock(_work_started_at=None)
         refresh_task.manual_update.side_effect = RuntimeError("plugin exploded")
         playlist = _FakePlaylist(_FakePluginInstance())
 
@@ -74,12 +74,12 @@ class TestRunOnce:
         assert refresh_task.stop.called
 
     def test_no_active_playlist_is_a_failure(self) -> None:
-        refresh_task = MagicMock()
+        refresh_task = MagicMock(_work_started_at=None)
         assert inkypi.run_once(_app(playlist=None, refresh_task=refresh_task)) == 1
         assert not refresh_task.manual_update.called
 
     def test_no_eligible_plugin_is_a_failure(self) -> None:
-        refresh_task = MagicMock()
+        refresh_task = MagicMock(_work_started_at=None)
         playlist = _FakePlaylist(None)
         assert inkypi.run_once(_app(playlist=playlist, refresh_task=refresh_task)) == 1
         assert not refresh_task.manual_update.called
