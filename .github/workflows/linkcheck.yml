@@ -31,3 +31,21 @@ jobs:
           args: --no-progress --verbose --max-concurrency 4 --retry-wait-time 5 --cookie-jar /tmp/lychee-cookies.json README.md docs/**/*.md
         env:
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
+
+      - name: Diagnose storefront responses if link validation fails
+        if: failure()
+        run: |
+          # Compare client identity on the same runner. Print status/redirects
+          # only; do not print response headers, cookies or the workflow token.
+          for client_agent in 'lychee/0.24.2' 'curl/8.4.0'; do
+            cookie_file="${RUNNER_TEMP}/storefront-${client_agent//\//-}.json"
+            for storefront_url in 'https://collabs.shop/jrzqmf' 'https://collabs.shop/q2jmza'; do
+              printf 'client=%s url=%s ' "${client_agent}" "${storefront_url}"
+              curl --silent --show-error --location --max-redirs 5 --max-time 25 \
+                --user-agent "${client_agent}" \
+                --cookie "${cookie_file}" --cookie-jar "${cookie_file}" \
+                --output /dev/null \
+                --write-out 'status=%{http_code} redirects=%{num_redirects}\n' \
+                "${storefront_url}" || true
+            done
+          done
