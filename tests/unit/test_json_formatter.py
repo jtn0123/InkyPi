@@ -3,6 +3,7 @@
 import json
 import logging
 import sys
+from datetime import UTC
 from pathlib import Path
 from typing import Any
 
@@ -63,7 +64,8 @@ def test_msg_arg_interpolation() -> None:
     assert data["msg"] == "Hello world"
 
 
-def test_ts_is_iso8601_utc() -> None:
+def test_ts_is_iso8601_utc(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("utils.logging_utils._LOG_TIMEZONE", UTC)
     record = _make_record()
     data = json.loads(JsonFormatter().format(record))
     ts = data["ts"]
