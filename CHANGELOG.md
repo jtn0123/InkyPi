@@ -2,6 +2,15 @@
 
 <!-- version list -->
 
+## v1.4.3 (2026-09-30)
+
+### Bug Fixes
+
+- Resolve audit security, persistence, cache and setup priorities
+  ([#655](https://github.com/jtn0123/InkyPi/pull/655),
+  [`49d42c5`](https://github.com/jtn0123/InkyPi/commit/49d42c547ddfbf28f02dfddc0c474ee332a076bd))
+
+
 ## v1.4.2 (2026-09-30)
 
 ### Bug Fixes
