@@ -49,6 +49,7 @@ jobs:
 
       - name: Check links with lychee
         run: |
+          lychee --version
           # Vendor storefronts rate-limit request bursts. Keep failures visible,
           # but check fewer links at once and allow transient services to recover.
           # Preserve session cookies through storefront redirects in this job only.
@@ -56,6 +57,12 @@ jobs:
             --cookie-jar "${RUNNER_TEMP}/lychee-cookies.json" \
             --format markdown --output "${RUNNER_TEMP}/inkypi-links.md" \
             README.md docs/**/*.md
+          # Preserve the action's default failIfEmpty behavior.
+          test -s "${RUNNER_TEMP}/inkypi-links.md"
+          if grep -Eq 'Total[[:space:]]+\|[[:space:]]+0([[:space:]]|\|)' "${RUNNER_TEMP}/inkypi-links.md"; then
+            printf 'No links were found; refusing an empty validation pass.\n' >&2
+            exit 1
+          fi
         env:
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
 
