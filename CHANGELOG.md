@@ -1,6 +1,116 @@
 # CHANGELOG
 
 
+## v1.4.1 (2026-09-30)
+
+### Bug Fixes
+
+- **install**: Refresh dependencies and bound installer memory
+  ([#653](https://github.com/jtn0123/InkyPi/pull/653),
+  [`30ef8d6`](https://github.com/jtn0123/InkyPi/commit/30ef8d64bf12605e81f98abcfec6fc04ad2066d1))
+
+* chore(deps): refresh runtime and dev lockfiles
+
+Upgrade everything within the existing ranges, plus: - gitpython 3.1.58 -> 3.1.62 (security; fixes
+  the pip-audit failure on main) - pi-heif 1.3.0 -> 1.4.0 (same wheel coverage for
+  aarch64/x86_64/macOS) - pytest-cov 5 -> 7, pytest-benchmark 4 -> 5, types-PyYAML bump - pre-commit
+  hook revs (mypy hook held at 1.20.2 to match the lock)
+
+numpy is capped <2.5 because 2.5 needs Python 3.12+: uv split the runtime lock into two numpy
+  versions, which conflicts with the dev lock when CI co-installs both. The dev lock is now compiled
+  on Python 3.11 (Linux) so every pin installs across the whole 3.11-3.13 matrix.
+
+python-semantic-release is pinned to 9.21.1 to match release.yml; 9.21.2 narrowed click to ~=8.1.0
+  and would drag dev click behind prod.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+* chore(deps): bump openai 3, google-genai 2, icalendar 7, mypy 2, cyclonedx-bom 7
+
+None of these majors change an API this repo calls: - openai 3: only swaps httpx for httpx2
+  internally; chat.completions, images.generate, response models and exception attributes are
+  unchanged. TLS now verifies against the OS trust store via truststore. - google-genai 2: the break
+  is limited to the Interactions API; generate_content / generate_images are unaffected. - icalendar
+  7: text decoded() now returns str, and some prop/parser names moved; calendar.py uses from_ical,
+  str(get()) and date decoded() only. recurring-ical-events 3.8.2 already allows <8. - mypy 2: src/
+  stays clean, tests/ holds the 661 baseline. Pre-commit hook rev follows. - cyclonedx-bom 7:
+  `environment --of JSON -o` is unchanged.
+
+* fix(install): bound uv concurrency so installs fit 512 MB
+
+The install-matrix job (512 MB cgroup, Pi Zero 2 W parity) has been intermittently OOM-killing `uv
+  pip install`, leaving a venv without flask. It hit bookworm on main and trixie on this branch.
+
+Measured under a native arm64 512 MB container, uv's default parallelism peaked at 141 MB RSS with
+  the previous lockfile and 163 MB with this one. Capping downloads at 4 and installs/builds at 1
+  brings it to ~115 MB for about the same wall time. The limits live in _common.sh, so install.sh
+  and update.sh both get them, and callers can still override.
+
+* test: isolate smoke plugin mocks and UTC formatter state
+
+* test: model idle display state in run-once fixtures
+
+---------
+
+Co-authored-by: Claude Opus 5.5 <noreply@anthropic.com>
+
+### Continuous Integration
+
+- Stop a dead SONAR_TOKEN from failing PRs ([#649](https://github.com/jtn0123/InkyPi/pull/649),
+  [`61364e6`](https://github.com/jtn0123/InkyPi/commit/61364e6cd171dd1aa95db8ee04b0c8b877f6cd2b))
+
+SonarCloud is failing across 8 of the 12 public repos that run it. The cause is a credential, not
+  code, and a code-quality report should not gate a merge.
+
+continue-on-error goes on the STEP, not the job. landing-page carried it at job level for weeks with
+  the comment "a scan failure never blocks a PR" and its sonarqube check reported red the entire
+  time: a job-level flag stops the workflow failing but does not change the check conclusion.
+
+The scan still runs and still publishes to sonarcloud.io when the token is valid. Only its ability
+  to gate a PR is removed.
+
+Co-authored-by: Claude Opus 5 <noreply@anthropic.com>
+
+### Refactoring
+
+- Make the type checker real, and fix the six bugs it found
+  ([#643](https://github.com/jtn0123/InkyPi/pull/643),
+  [`deb4110`](https://github.com/jtn0123/InkyPi/commit/deb4110a0728c45b1773ed2b762bac34fae18daa))
+
+mypy ran with `follow_imports = skip`, so it never read an imported module and every cross-module
+  call resolved to Any. src/ reported a comforting zero while whole classes of mismatch were
+  unreportable. Turning it on surfaced 214 pre-existing errors; src/ is now genuinely clean, and
+  tests/ went 7506 -> 630.
+
+Six real bugs it found, each with a regression test verified by reverting only the fix:
+
+* A control-only plugin crashed the playlist path — PlaylistRefresh.execute called image.save() on a
+  None return. The PluginLike Protocol still declared -> Image.Image after the base class was
+  widened, so callers type-checked against a contract the implementation no longer honoured. *
+  ImageColor.getrgb returns a 4-tuple for alpha colours, so pasting #ff000080 as a calendar colour
+  raised ValueError and failed the whole render. * dotenv_values yields None for a bare key, which
+  reached consumers that iterate the value as TypeError and broke the API-keys page. *
+  Clock.draw_clock_center defaulted width to None, which PIL rejects. * A clock face with no
+  renderer returned None, which the refresh task reads as 'control-only plugin, nothing to display'
+  — so the clock silently stopped updating instead of erroring. * Seven deprecated Pillow constants
+  that break on the <13 bump the pin allows.
+
+Two None checks had been disabled by the casts meant to help them: cast(Any, take_screenshot) and
+  cast(Any, take_screenshot_html) each erased an already-correct Optional return. One cast on
+  AdaptiveImageLoader forced seven more downstream.
+
+Every module now has one identity: utils.http_utils and src.utils.http_utils were two distinct
+  module objects, so test_http_utils.py had been exercising a second copy with its own HTTP session
+  singleton rather than the one the app imports.
+
+Also annotates the test suite (6326 parameters, 5752 return types across 411 files) with real
+  fixture types, and adds types-PyYAML, without which mypy aborts the entire tests/ run.
+
+The mypy baselines are calibrated to CI, not to a local macOS run — CI is Linux and installs the
+  sys_platform=='linux' dependencies, and lints under 3.12 rather than 3.13. Both differences change
+  mypy's results; the baseline file records this.
+
+
 ## v1.4.0 (2026-08-22)
 
 ### Features
