@@ -60,6 +60,9 @@ regenerates the file is different.
 
 ## Dev Requirements
 
-`install/requirements-dev.txt` is **not** part of this migration. It still
-tracks `install/requirements-dev.in` via pip-compile. Migrating dev deps is
-deferred to a follow-up (Phase 3 of JTN-616).
+`install/requirements-dev.in` remains the source for dev/CI dependencies. It is
+compiled with `uv --no-config pip compile --universal --python-version 3.11` rather than
+platform-specific pip-compile. This preserves conditional dependencies across
+Linux/macOS and Python 3.11–3.13, including Linux-only memray and libcst's
+Python 3.13 YAML backend. See [Dependency Management](dependencies.md) for the
+full command. The drift check validates both runtime and dev outputs.

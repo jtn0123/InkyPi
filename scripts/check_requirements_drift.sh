@@ -25,6 +25,7 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 REQ_TXT="${REPO_ROOT}/install/requirements.txt"
+DEV_TXT="${REPO_ROOT}/install/requirements-dev.txt"
 
 cd "${REPO_ROOT}"
 
@@ -46,7 +47,8 @@ fi
 
 echo "==> Checking install/requirements.txt matches uv export ..."
 tmp_export="$(mktemp /tmp/requirements-check-XXXXXX.txt)"
-trap 'rm -f "${tmp_export}"' EXIT
+tmp_dev="$(mktemp /tmp/requirements-dev-check-XXXXXX.txt)"
+trap 'rm -f "${tmp_export}" "${tmp_dev}"' EXIT
 
 uv export \
     --format requirements.txt \
@@ -88,6 +90,47 @@ else
     echo "      --output-file install/requirements.txt"
     echo ""
     DRIFT_FOUND=1
+fi
+
+echo "==> Checking universal dev requirements match their source ..."
+# Constrain to the committed versions so drift checks do not upgrade packages.
+# --no-config prevents inheriting runtime-only Pi wheel requirements for
+# desktop dev tools such as Playwright. Universal resolution still preserves
+# platform and interpreter-specific dependencies
+# (including Linux memray and libcst's Python 3.13 YAML backend).
+if ! uv --no-config pip compile \
+    --universal --python-version 3.11 --fork-strategy fewest \
+    --prerelease disallow --generate-hashes \
+    --constraints "${DEV_TXT}" --no-header --no-annotate \
+    install/requirements-dev.in --output-file "${tmp_dev}" --quiet; then
+    echo "ERROR: dev requirements no longer resolve against the committed pins."
+    DRIFT_FOUND=1
+elif ! python3 - "${DEV_TXT}" "${tmp_dev}" <<'PY'
+import difflib
+import sys
+from pathlib import Path
+
+
+def normalized(path):
+    return [
+        line + "\n"
+        for line in Path(path).read_text().splitlines()
+        if line.strip() and not line.lstrip().startswith("#")
+    ]
+
+
+committed, generated = map(normalized, sys.argv[1:])
+if committed != generated:
+    sys.stdout.writelines(difflib.unified_diff(
+        committed, generated, fromfile=sys.argv[1], tofile="regenerated dev requirements"
+    ))
+    raise SystemExit(1)
+PY
+then
+    echo "ERROR: regenerate install/requirements-dev.txt with uv pip compile --universal."
+    DRIFT_FOUND=1
+else
+    echo "    OK — universal dev requirements are up to date."
 fi
 
 if [ "${DRIFT_FOUND}" -ne 0 ]; then

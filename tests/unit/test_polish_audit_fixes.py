@@ -75,7 +75,9 @@ def test_manual_update_raises_when_queue_full() -> None:
         task.manual_update(ManualRefresh("test_plugin", {}))
 
 
-def test_manual_update_succeeds_when_queue_has_space() -> None:
+def test_manual_update_succeeds_when_queue_has_space(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """manual_update enqueues without raising when there is room in the deque."""
     from refresh_task import ManualRefresh, RefreshTask
 
@@ -87,6 +89,7 @@ def test_manual_update_succeeds_when_queue_has_space() -> None:
     task.running = True
     task.thread = MagicMock()
     task.thread.is_alive.return_value = True
+    monkeypatch.setenv("INKYPI_MANUAL_UPDATE_WAIT_S_TEST_PLUGIN", "2")
 
     # manual_update blocks waiting for done event; we need to set it from another thread
     import threading
@@ -96,19 +99,18 @@ def test_manual_update_succeeds_when_queue_has_space() -> None:
         for _ in range(100):
             if task.manual_update_requests:
                 req = task.manual_update_requests[-1]
-                req.done.set()
+                task._complete_manual_request(req, metrics={"completed": True})
                 return
             time.sleep(0.01)
 
     t = threading.Thread(target=set_done_after_enqueue, daemon=True)
     t.start()
 
-    # Should not raise (the thread above will unblock it)
-    try:
-        task.manual_update(ManualRefresh("test_plugin", {}))
-    except TimeoutError:
-        pass  # Acceptable if thread timing is tight
+    # The fake worker must signal image_saved as well as done, like the real
+    # completion path. A timeout is a failure, not a successful queue test.
+    assert task.manual_update(ManualRefresh("test_plugin", {})) == {"completed": True}
     t.join(timeout=2)
+    assert not t.is_alive()
 
 
 # ---------------------------------------------------------------------------

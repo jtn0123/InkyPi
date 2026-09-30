@@ -110,10 +110,28 @@ known-first-party = ["src"]
 
 
 [tool.mutmut]
-paths_to_mutate = "src/app_setup/,src/blueprints/,src/utils/,src/refresh_task/"
-tests_dir = "tests/"
-runner = "python -m pytest tests/ -x --tb=no -q"
-dict_synonyms = ""
+# Copy the full source tree so imports and runtime assets remain available,
+# while preserving the original four-package mutation scope.
+source_paths = ["src/"]
+only_mutate = [
+  "src/app_setup/*",
+  "src/blueprints/*",
+  "src/utils/*",
+  "src/refresh_task/*",
+]
+pytest_add_cli_args = ["-x", "--tb=no", "-q", "-m", "not container"]
+pytest_add_cli_args_test_selection = ["tests/"]
+# The suite checks repository configuration and runs helper scripts from the
+# isolated mutants/ tree, so copy those inputs alongside the tests and source.
+also_copy = [
+  "pytest.ini", "mypy.ini", "VERSION", "CHANGELOG.md", "README.md",
+  "CONTRIBUTING.md", "LICENSE", "Dockerfile", "docker-compose.yml",
+  "sonar-project.properties", ".coveragerc", ".gitignore", ".dockerignore",
+  ".pre-commit-config.yaml", ".github/", "install/", "scripts/", "docs/",
+  "clients/", "runtime/", "templates/", "translations/", "vendor/",
+  "devbox.json", ".editorconfig", ".gitattributes", ".gitmodules",
+  ".gitleaks.toml", ".lycheeignore", ".stylelintrc.json",
+]
 
 [tool.semantic_release]
 # Keep BOTH the PEP-621 [project].version and the semantic-release anchor in
@@ -125,9 +143,8 @@ version_toml = [
   "pyproject.toml:tool.semantic_release.version",
 ]
 version = "1.4.1"
-branch = "main"
+commit_parser = "conventional"
 tag_format = "v{version}"
-upload_to_pypi = false
 # Regenerate VERSION from the canonical pyproject.toml value on each release.
 # Using NEW_VERSION (env var exported by python-semantic-release to
 # build_command) avoids relying on shell {version} expansion, which PSR does
@@ -139,6 +156,16 @@ assets = ["VERSION", "uv.lock"]
 # Without `uv lock`, the lockfile drifts from pyproject.toml and the "Lockfile
 # drift" CI check fails on every new PR (see JTN-655).
 build_command = "printf '%s\\n' \"$NEW_VERSION\" > VERSION && uv lock"
+
+
+[tool.semantic_release.changelog]
+mode = "update"
+insertion_flag = "<!-- version list -->"
+
+[tool.semantic_release.commit_parser_options]
+# Preserve v9 parsing behavior for this repo's squash-merged PR messages.
+parse_squash_commits = false
+ignore_merge_commits = false
 
 
 [build-system]

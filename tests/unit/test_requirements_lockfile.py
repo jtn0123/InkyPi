@@ -1,13 +1,19 @@
 """
 Tests that install/requirements.txt and install/requirements-dev.txt are valid
-pip-compile hash-pinned lockfiles. This prevents regressions where someone
+hash-pinned lockfiles. This prevents regressions where someone
 accidentally replaces a hashed lockfile with a bare requirements file.
 
 Related: JTN-516 (Grade F1 — supply-chain integrity)
 """
 
 import re
+from importlib.metadata import requires
 from pathlib import Path
+
+import pytest
+from packaging.markers import default_environment
+from packaging.requirements import Requirement
+from packaging.utils import canonicalize_name
 
 INSTALL_DIR = Path(__file__).parent.parent.parent / "install"
 REQUIREMENTS_TXT = INSTALL_DIR / "requirements.txt"
@@ -15,7 +21,7 @@ REQUIREMENTS_DEV_TXT = INSTALL_DIR / "requirements-dev.txt"
 
 # Lines that begin a pinned package block (package==version \\)
 _PIN_LINE_RE = re.compile(r"^\S+==\S+")
-# Hash lines produced by pip-compile --generate-hashes
+# Hash lines produced by uv --generate-hashes
 _HASH_LINE_RE = re.compile(r"--hash=sha256:[0-9a-f]{64}")
 
 
@@ -43,8 +49,49 @@ def _parse_lockfile(path: Path) -> dict[str, list[str]]:
     return packages
 
 
+def _active_pins(path: Path, environment: dict[str, str]) -> dict[str, Requirement]:
+    pins: dict[str, Requirement] = {}
+    for line in path.read_text().splitlines():
+        if not _PIN_LINE_RE.match(line):
+            continue
+        requirement = Requirement(line.rstrip(" \\"))
+        if requirement.marker is None or requirement.marker.evaluate(environment):
+            pins[canonicalize_name(requirement.name)] = requirement
+    return pins
+
+
+@pytest.mark.parametrize("python_version", ["3.11", "3.12", "3.13"])
+@pytest.mark.parametrize("platform", ["linux", "darwin"])
+def test_universal_dev_lock_is_compatible(python_version: str, platform: str) -> None:
+    environment = {key: str(value) for key, value in default_environment().items()}
+    environment.update(
+        python_version=python_version,
+        python_full_version=python_version + ".0",
+        sys_platform=platform,
+    )
+    runtime = _active_pins(REQUIREMENTS_TXT, environment)
+    dev = _active_pins(REQUIREMENTS_DEV_TXT, environment)
+    for name in runtime.keys() & dev.keys():
+        assert runtime[name].specifier == dev[name].specifier, name
+
+    # libcst (used by mutmut 3) selects a separate YAML distribution on 3.13.
+    # A lock compiled only on 3.11 misses it and fails hash-checked installation.
+    for dependency in requires("libcst") or []:
+        requirement = Requirement(dependency)
+        if requirement.marker is not None and not requirement.marker.evaluate(
+            environment
+        ):
+            continue
+        name = canonicalize_name(requirement.name)
+        assert (
+            name in dev
+        ), f"{dependency} missing for Python {python_version} on {platform}"
+        version = next(iter(dev[name].specifier)).version
+        assert requirement.specifier.contains(version), dependency
+
+
 class TestRequirementsLockfile:
-    """Verify that both lockfiles contain pip-compile-style hash annotations."""
+    """Verify that both lockfiles contain hash annotations."""
 
     def test_requirements_txt_exists(self) -> None:
         assert REQUIREMENTS_TXT.exists(), (
@@ -55,9 +102,7 @@ class TestRequirementsLockfile:
     def test_requirements_dev_txt_exists(self) -> None:
         assert REQUIREMENTS_DEV_TXT.exists(), (
             f"{REQUIREMENTS_DEV_TXT} does not exist. "
-            "Run (on Linux only — pip-compile on macOS drops the "
-            "sys_platform=='linux' packages): pip-compile --generate-hashes "
-            "install/requirements-dev.in -o install/requirements-dev.txt"
+            "Regenerate the universal dev requirements with uv pip compile --universal."
         )
 
     def test_requirements_txt_has_hashes(self) -> None:
@@ -79,7 +124,7 @@ class TestRequirementsLockfile:
         assert not missing, (
             f"The following packages in {REQUIREMENTS_DEV_TXT} have no --hash=sha256: entries:\n"
             + "\n".join(f"  {p}" for p in missing)
-            + "\nRegenerate with: pip-compile --generate-hashes install/requirements-dev.in -o install/requirements-dev.txt"
+            + "\nRegenerate with: uv pip compile --universal --python-version 3.11 --generate-hashes install/requirements-dev.in -o install/requirements-dev.txt"
         )
 
     def test_requirements_txt_hash_count(self) -> None:
@@ -88,7 +133,7 @@ class TestRequirementsLockfile:
         count = content.count("--hash=sha256:")
         assert count > 10, (
             f"Expected >10 hash entries in {REQUIREMENTS_TXT}, found {count}. "
-            "The file may not be a pip-compile lockfile."
+            "The file may not be a hashed requirements file."
         )
 
     def test_requirements_dev_txt_hash_count(self) -> None:
@@ -97,28 +142,28 @@ class TestRequirementsLockfile:
         count = content.count("--hash=sha256:")
         assert count > 10, (
             f"Expected >10 hash entries in {REQUIREMENTS_DEV_TXT}, found {count}. "
-            "The file may not be a pip-compile lockfile."
+            "The file may not be a hashed requirements file."
         )
 
     def test_types_requests_pin_preserved(self) -> None:
-        """types-requests must stay pinned at 2.32.0.20241016 (PR #301 / JTN-525)."""
+        """Requests stubs must match the explicitly validated source pin."""
         content = REQUIREMENTS_DEV_TXT.read_text()
-        assert "types-requests==2.32.0.20241016" in content, (
-            "types-requests==2.32.0.20241016 is missing from requirements-dev.txt. "
-            "This pin was added in PR #301 (JTN-525) for mypy strict-mode compatibility. "
-            "Ensure requirements-dev.in specifies: types-requests==2.32.0.20241016"
+        source = (INSTALL_DIR / "requirements-dev.in").read_text()
+        pin = next(
+            line for line in source.splitlines() if line.startswith("types-requests==")
         )
+        assert pin in content, f"{pin} is missing from requirements-dev.txt"
 
     def test_requirements_in_exists(self) -> None:
         """Source .in files must be committed alongside lockfiles."""
         assert (INSTALL_DIR / "requirements.in").exists(), (
             "install/requirements.in is missing. "
-            "This is the human-maintained source file for pip-compile."
+            "This is the human-maintained constraints reference."
         )
 
     def test_requirements_dev_in_exists(self) -> None:
         """Dev source .in file must be committed alongside the dev lockfile."""
         assert (INSTALL_DIR / "requirements-dev.in").exists(), (
             "install/requirements-dev.in is missing. "
-            "This is the human-maintained source file for pip-compile."
+            "This is the human-maintained constraints reference."
         )

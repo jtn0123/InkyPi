@@ -1,10 +1,11 @@
 # pyright: reportMissingImports=false
 """Tests for settings blueprint — logs, health, misc routes, and helpers."""
 
+import logging
 import time
 from pathlib import Path
 from typing import Any
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 from flask.testing import FlaskClient
@@ -518,17 +519,20 @@ class TestHelpers:
         result = _window_since_seconds("abch")
         assert abs(result - (time.time() - 24 * 3600)) < 2
 
-    def test_window_since_seconds_invalid_does_not_log_raw_input(self) -> None:
+    def test_window_since_seconds_invalid_does_not_log_raw_input(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
         from blueprints.settings import _window_since_seconds
 
         raw_window = "not-a-number\nforged-log-lineh"
-        logger = _window_since_seconds.__globals__["logger"]
-        with patch.object(logger, "warning") as warning_mock:
+        with caplog.at_level(logging.WARNING, logger="blueprints.settings"):
             _window_since_seconds(raw_window)
 
-        warning_mock.assert_called_once_with(
+        assert caplog.messages == [
             "Invalid benchmark window provided, defaulting to 24h"
-        )
+        ]
+        assert caplog.records[0].levelno == logging.WARNING
+        assert raw_window not in caplog.text
 
     def test_pct_empty(self) -> None:
         from blueprints.settings import _pct

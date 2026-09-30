@@ -20,7 +20,7 @@ second opinion on test quality independent of coverage metrics.
 ## Which files are currently in scope?
 
 As of JTN-508 the scope was expanded from three individual files to four full
-directories. See `pyproject.toml` → `[tool.mutmut]` → `paths_to_mutate`:
+directories. See `pyproject.toml` → `[tool.mutmut]` → `only_mutate`:
 
 | Path | Reason chosen |
 |------|--------------|
@@ -43,14 +43,14 @@ pip install -r install/requirements-dev.txt
 Run the mutation pass against the configured files:
 
 ```bash
-INKYPI_ENV=dev INKYPI_NO_REFRESH=1 PYTHONPATH=src mutmut run
+INKYPI_ENV=dev INKYPI_NO_REFRESH=1 SKIP_BROWSER=1 mutmut run --max-children 2
 ```
 
 Run a narrower shard when you are triaging one package locally:
 
 ```bash
-INKYPI_ENV=dev INKYPI_NO_REFRESH=1 PYTHONPATH=src \
-  mutmut run --paths-to-mutate src/utils/
+INKYPI_ENV=dev INKYPI_NO_REFRESH=1 SKIP_BROWSER=1 \
+  mutmut run --max-children 2 "utils.*"
 ```
 
 Check the summary after the run completes:
@@ -59,27 +59,29 @@ Check the summary after the run completes:
 mutmut results
 ```
 
-Inspect a specific surviving mutant (replace `<id>` with the number from `results`):
+Inspect a specific surviving mutant (replace `<id>` with the named mutant from `results`):
 
 ```bash
 mutmut show <id>
 ```
 
-Apply a surviving mutant to the working tree for manual investigation:
+Apply a surviving mutant to a clean working tree for manual investigation
+(mutmut 3 has no `unapply`; restore the affected file through Git):
 
 ```bash
 mutmut apply <id>
 # ... investigate / add a test ...
-mutmut unapply
+git restore -- <changed-file>
 ```
 
 ## How to expand scope
 
-1. Add the directory (or file, if intentionally narrow) path to `paths_to_mutate` in `pyproject.toml`:
+1. Add the directory (or file, if intentionally narrow) path to `only_mutate` in `pyproject.toml`:
 
    ```toml
    [tool.mutmut]
-   paths_to_mutate = "src/app_setup/,src/blueprints/,src/utils/,src/refresh_task/,src/new_area/"
+   source_paths = ["src/"]
+   only_mutate = ["src/app_setup/*", "src/blueprints/*", "src/utils/*", "src/refresh_task/*", "src/new_area/*"]
    ```
 
 2. Add the new path to `EXPECTED_FILES` in `tests/test_mutmut_config.py` so the
@@ -103,8 +105,17 @@ The job is sharded by package so each package has its own runtime budget:
 | `utils` | `src/utils/` |
 | `refresh-task` | `src/refresh_task/` |
 
-Results are uploaded as `mutmut-cache-<shard>` artifacts and can be downloaded
-from the GitHub Actions run summary.
+Mutmut 3 uses named mutant patterns (`app_setup.*`, `blueprints.*`, `utils.*`,
+`refresh_task.*`) to select each shard. CI bounds each run to two child processes.
+It copies the source, tests, and repository inputs into an isolated `mutants/`
+tree and stores results there; the production source stays unchanged.
+
+CI sets `SKIP_BROWSER=1` and excludes container tests for this backend mutation
+pass. Browser and container tests have their own CI jobs. Run without
+`PYTHONPATH=src`: mutmut sets up the isolated imports itself.
+
+Results are uploaded as `mutmut-cache-<shard>` artifacts containing `mutants/`
+and can be downloaded from the GitHub Actions run summary.
 
 ## Narrow PR Mutation Gate
 
