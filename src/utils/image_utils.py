@@ -701,6 +701,19 @@ def _remote_screenshot_once(
         if result is None:
             return None, transient
         if result.returncode:
+            if any(
+                message in result.stderr.lower()
+                for message in (
+                    b"no usable sandbox",
+                    b"failed to move to new namespace",
+                    b"running as root without --no-sandbox",
+                )
+            ):
+                # Use a fixed diagnostic, never echo remote-page stderr/URLs.
+                raise ScreenshotBackendError(
+                    "Remote browser sandbox unavailable. Configure sandbox-capable "
+                    "Chromium for the unprivileged account; see docs/security.md."
+                )
             logger.error(
                 "%s Restricted remote browser exited %s (attempt %s)",
                 _SCREENSHOT_ERROR_PREFIX,
@@ -793,6 +806,8 @@ def _take_screenshot_once(
             )
             return None, True
 
+    except ScreenshotBackendError:
+        raise
     except Exception as e:
         logger.error("%s %s (attempt %s)", _SCREENSHOT_ERROR_PREFIX, str(e), attempt)
         transient = True

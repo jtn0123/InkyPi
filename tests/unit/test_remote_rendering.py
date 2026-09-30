@@ -37,6 +37,26 @@ def test_trusted_template_retains_local_asset_permissions(
     assert command and "--allow-file-access-from-files" in command
 
 
+def test_sandbox_failure_is_actionable_and_has_no_unsafe_fallback(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import subprocess
+
+    from utils.plugin_errors import ScreenshotBackendError
+
+    monkeypatch.setattr(
+        image_utils, "_find_browser_command", lambda *args: ["fixture-browser"]
+    )
+    result = subprocess.CompletedProcess(
+        ["fixture-browser"], -6, b"", b"No usable sandbox!"
+    )
+    monkeypatch.setattr(
+        image_utils, "_run_browser_subprocess", lambda *args: (result, False)
+    )
+    with pytest.raises(ScreenshotBackendError, match="sandbox unavailable"):
+        image_utils._take_screenshot_once("https://public.test/", (400, 300), 1000, 1)
+
+
 @pytest.mark.parametrize(
     "target",
     [
