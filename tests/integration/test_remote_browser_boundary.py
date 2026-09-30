@@ -67,10 +67,11 @@ def test_remote_renderer_blocks_private_subresources_and_redirects(
     monkeypatch.setattr(remote_rendering, "connect_public", fixture_connect)
     with sync_playwright() as playwright:
         executable = playwright.chromium.executable_path
-    shell = list(
-        Path(executable)
-        .parents[2]
-        .glob("chromium_headless_shell-*/chrome-linux*/headless_shell")
+    cache = Path(executable).parents[2]
+    revision = Path(executable).parents[1].name.removeprefix("chromium-")
+    shell = list(cache.glob(f"chromium_headless_shell-{revision}/**/headless_shell"))
+    shell += list(
+        cache.glob(f"chromium_headless_shell-{revision}/**/chrome-headless-shell")
     )
     assert shell, "Install Playwright Chromium including Headless Shell for this lane"
     executable = str(shell[0])

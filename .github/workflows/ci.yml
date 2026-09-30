@@ -679,6 +679,30 @@ jobs:
       - name: Install Playwright Chromium
         run: |
           python -m playwright install --with-deps chromium
+      - name: Allow the test browser to create its sandbox namespaces
+        run: |
+          # Ubuntu restricts user namespaces for downloaded Chromium binaries.
+          # Permit only this exact test binary; keep Chromium sandboxing enabled.
+          if [[ -f /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]] &&
+             [[ "$(cat /proc/sys/kernel/apparmor_restrict_unprivileged_userns)" == "1" ]]; then
+            python - <<'PYPROFILE' > /tmp/inkypi-headless-shell.apparmor
+          from pathlib import Path
+          from playwright.sync_api import sync_playwright
+          with sync_playwright() as p:
+              executable = Path(p.chromium.executable_path)
+          cache = executable.parents[2]
+          revision = executable.parents[1].name.removeprefix("chromium-")
+          binaries = list(cache.glob(f"chromium_headless_shell-{revision}/**/headless_shell"))
+          binaries += list(cache.glob(f"chromium_headless_shell-{revision}/**/chrome-headless-shell"))
+          assert len(binaries) == 1, binaries
+          print('abi <abi/4.0>,')
+          print('include <tunables/global>')
+          print(f'profile inkypi-headless-shell "{binaries[0]}" flags=(unconfined) {{')
+          print('  userns,')
+          print('}')
+          PYPROFILE
+            sudo apparmor_parser -r /tmp/inkypi-headless-shell.apparmor
+          fi
       - name: Build CSS
         run: python scripts/build_css.py
       - name: Run browser smoke suite
