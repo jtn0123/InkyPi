@@ -25,8 +25,9 @@ jobs:
       - name: Check links with lychee
         uses: lycheeverse/lychee-action@e7477775783ea5526144ba13e8db5eec57747ce8 # v2.9.0
         with:
-          args: --no-progress --verbose README.md docs/**/*.md
+          # Vendor storefronts rate-limit request bursts. Keep failures visible,
+          # but check fewer links at once and allow transient services to recover.
+          args: --no-progress --verbose --max-concurrency 4 --retry-wait-time 5 README.md docs/**/*.md
         env:
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
-
 
