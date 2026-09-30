@@ -1,6 +1,6 @@
 # InkyPi dev/CI dependencies — loose constraints for universal uv compilation.
 # Edit this file to add/upgrade dependencies, then regenerate:
-#   uv pip compile --universal --python-version 3.11 --fork-strategy fewest \
+#   uv --no-config pip compile --universal --python-version 3.11 --fork-strategy fewest \
 #     --prerelease disallow --generate-hashes install/requirements-dev.in \
 #     -o install/requirements-dev.txt
 #
@@ -8,6 +8,7 @@
 # Use uv for committed lockfiles so platform/interpreter markers are preserved.
 
 # Core dev tooling
+uv==0.12.21
 pip-tools>=7.0,<8
 
 # Testing

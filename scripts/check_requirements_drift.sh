@@ -94,9 +94,11 @@ fi
 
 echo "==> Checking universal dev requirements match their source ..."
 # Constrain to the committed versions so drift checks do not upgrade packages.
-# Universal resolution preserves platform and interpreter-specific dependencies
+# --no-config prevents inheriting runtime-only Pi wheel requirements for
+# desktop dev tools such as Playwright. Universal resolution still preserves
+# platform and interpreter-specific dependencies
 # (including Linux memray and libcst's Python 3.13 YAML backend).
-if ! uv pip compile \
+if ! uv --no-config pip compile \
     --universal --python-version 3.11 --fork-strategy fewest \
     --prerelease disallow --generate-hashes \
     --constraints "${DEV_TXT}" --no-header --no-annotate \

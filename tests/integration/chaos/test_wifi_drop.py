@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from threading import Event
+from time import monotonic, sleep
 from typing import Any
 
 import pytest
@@ -14,6 +16,25 @@ def test_wifi_drop_mid_refresh_then_retry_succeeds(
     refresh_task = flask_app.config["REFRESH_TASK"]
     device_config = flask_app.config["DEVICE_CONFIG"]
     monkeypatch.setenv("INKYPI_PLUGIN_RETRY_MAX", "0")
+    monkeypatch.setenv("INKYPI_MANUAL_UPDATE_DONE_GRACE_S", "0")
+
+    # Hold the hardware phase after image_saved to exercise the API's early
+    # response deterministically, rather than depending on host scheduling.
+    release_display = Event()
+    display_image = refresh_task.display_manager.display_image
+
+    def delayed_display(*args: Any, **kwargs: Any) -> Any:
+        on_saved = kwargs.get("on_image_saved")
+        if on_saved is not None:
+
+            def saved(metrics: Any) -> None:
+                on_saved(metrics)
+                assert release_display.wait(5), "Test did not release the display phase"
+
+            kwargs["on_image_saved"] = saved
+        return display_image(*args, **kwargs)
+
+    monkeypatch.setattr(refresh_task.display_manager, "display_image", delayed_display)
 
     class FlakyWifiPlugin:
         def __init__(self) -> None:
@@ -54,7 +75,16 @@ def test_wifi_drop_mid_refresh_then_retry_succeeds(
         second = client.post("/update_now", data={"plugin_id": "wifi_fault"})
         assert second.status_code == 200
 
-        diag_after_retry = client.get("/api/diagnostics").get_json()
-        assert diag_after_retry["refresh_task"]["last_error"] is None
+        release_display.set()
+        deadline = monotonic() + 5
+        while True:
+            diag_after_retry = client.get("/api/diagnostics").get_json()
+            if diag_after_retry["refresh_task"]["last_error"] is None:
+                break
+            assert (
+                monotonic() < deadline
+            ), "Successful refresh did not clear the Wi-Fi error"
+            sleep(0.01)
     finally:
+        release_display.set()
         refresh_task.stop()

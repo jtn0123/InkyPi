@@ -219,7 +219,7 @@ Dev constraints live in `install/requirements-dev.in`. Regenerate their hashed,
 universal requirements file with:
 
 ```bash
-uv pip compile --universal --python-version 3.11 --fork-strategy fewest \
+uv --no-config pip compile --universal --python-version 3.11 --fork-strategy fewest \
     --prerelease disallow --upgrade --generate-hashes \
     install/requirements-dev.in -o install/requirements-dev.txt
 bash scripts/check_requirements_drift.sh

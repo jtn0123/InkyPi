@@ -30,12 +30,17 @@ the oldest supported interpreter. Universal mode preserves Linux-only `memray`
 and libcst's Python 3.13-specific YAML backend even when run on a Mac:
 
 ```bash
-uv pip compile --universal --python-version 3.11 --fork-strategy fewest \
+uv --no-config pip compile --universal --python-version 3.11 --fork-strategy fewest \
     --prerelease disallow --upgrade --generate-hashes \
     install/requirements-dev.in -o install/requirements-dev.txt
 ```
 
 Use `--upgrade-package <name>` instead of `--upgrade` for a targeted refresh.
+`--no-config` keeps dev compilation independent of the runtime ARM32 Pi wheel
+requirements in `pyproject.toml`: Playwright only supports desktop/64-bit Linux
+developer hosts. Runtime resolution retains all Pi targets. uv 0.12.21 is pinned
+in the dev input and CI/release compiler steps for consistent resolution.
+
 A platform-specific pip-compile run omits conditional dependencies and must not
 replace this universal file. `scripts/check_requirements_drift.sh` re-resolves
 against the committed pins to detect missing dependencies without upgrading.

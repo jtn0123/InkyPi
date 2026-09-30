@@ -128,7 +128,9 @@ also_copy = [
   "CONTRIBUTING.md", "LICENSE", "Dockerfile", "docker-compose.yml",
   "sonar-project.properties", ".coveragerc", ".gitignore", ".dockerignore",
   ".pre-commit-config.yaml", ".github/", "install/", "scripts/", "docs/",
-  "clients/", "runtime/", "templates/",
+  "clients/", "runtime/", "templates/", "translations/", "vendor/",
+  "devbox.json", ".editorconfig", ".gitattributes", ".gitmodules",
+  ".gitleaks.toml", ".lycheeignore", ".stylelintrc.json",
 ]
 
 [tool.semantic_release]
