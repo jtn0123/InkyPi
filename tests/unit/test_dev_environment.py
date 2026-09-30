@@ -13,7 +13,8 @@ import pytest
 def doctor() -> Any:
     path = Path(__file__).parents[2] / "scripts/dev_environment.py"
     spec = importlib.util.spec_from_file_location("dev_environment", path)
-    assert spec and spec.loader
+    assert spec is not None
+    assert spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
