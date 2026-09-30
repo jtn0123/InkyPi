@@ -57,7 +57,7 @@ self.addEventListener("fetch", (event) => {
       if (cached) return cached;
       throw error;
     }
-    if (response && response.status === 200) {
+    if (response?.status === 200) {
       // A full/unavailable offline cache must not hide a successful download.
       await cache.put(request, response.clone()).catch(() => {});
     }
