@@ -30,6 +30,11 @@ _INTERNAL_KEYS: frozenset[str] = frozenset(
 API_KEY_VALIDATION_ERROR = "Invalid API key entry"
 
 
+def _is_internal_key(key: str) -> bool:
+    """Application configuration is outside the provider-credential editor."""
+    return key in _INTERNAL_KEYS or key.startswith("INKYPI_")
+
+
 # Path to .env file
 def get_env_path() -> str:
     """Get path to .env file in the project root."""
@@ -97,6 +102,9 @@ def _validate_api_key_entry(
 
     if not re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", key):
         return None, "", json_error("Invalid key format", status=400)
+
+    if _is_internal_key(key):
+        return None, "", json_error(API_KEY_VALIDATION_ERROR, status=400)
 
     if keep_existing:
         value = existing_values.get(key) or ""
@@ -179,7 +187,7 @@ def apikeys_page() -> Response | str:
     template_entries = [
         {"key": key, "masked": mask_value(value)}
         for key, value in entries
-        if key not in _INTERNAL_KEYS
+        if not _is_internal_key(key)
     ]
 
     api_key_plugins = {
@@ -213,7 +221,12 @@ def save_apikeys() -> tuple[Response | dict[str, Any], int] | Response | dict[st
 
         # Load existing values for keys marked as keepExisting
         env_path = get_env_path()
-        existing_values = dict(parse_env_file(env_path))
+        # Fail closed on read/parse errors: an empty fallback could erase the
+        # internal values this save is required to preserve.
+        existing_values = {
+            key: "" if value is None else value
+            for key, value in dotenv_values(env_path).items()
+        }
 
         # Validate and process entries
         valid_entries: list[tuple[str, str]] = []
@@ -225,7 +238,12 @@ def save_apikeys() -> tuple[Response | dict[str, Any], int] | Response | dict[st
                 continue
             valid_entries.append((key, value))
 
-        if write_env_file(env_path, valid_entries):
+        internal_entries = [
+            (key, value)
+            for key, value in existing_values.items()
+            if _is_internal_key(key)
+        ]
+        if write_env_file(env_path, internal_entries + valid_entries):
             # Keys are persisted in .env; plugins reload via
             # device_config.load_env_key() which calls load_dotenv().
             # Do NOT inject into os.environ to avoid leaking secrets

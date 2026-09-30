@@ -142,6 +142,74 @@ def test_get_env_path_default(monkeypatch: pytest.MonkeyPatch) -> None:
 # ---- Route tests ----
 
 
+def test_provider_save_preserves_internal_keys_and_allows_provider_deletion(
+    client: FlaskClient, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from blueprints.apikeys import parse_env_file
+
+    env = tmp_path / ".env"
+    env.write_text(
+        "SECRET_KEY=internal-test-value\nINKYPI_AUTH_PIN=1234\nOLD_PROVIDER=remove\n"
+    )
+    monkeypatch.setattr("blueprints.apikeys.get_env_path", lambda: str(env))
+    response = client.post(
+        "/api-keys/save", json={"entries": [{"key": "NEW_PROVIDER", "value": "new"}]}
+    )
+    assert response.status_code == 200
+    assert dict(parse_env_file(str(env))) == {
+        "SECRET_KEY": "internal-test-value",
+        "INKYPI_AUTH_PIN": "1234",
+        "NEW_PROVIDER": "new",
+    }
+
+
+def test_provider_save_does_not_overwrite_unreadable_existing_env(
+    client: FlaskClient, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    env = tmp_path / ".env"
+    original = "SECRET_KEY=fixture-value\n"
+    env.write_text(original)
+    monkeypatch.setattr("blueprints.apikeys.get_env_path", lambda: str(env))
+    with patch("blueprints.apikeys.dotenv_values", side_effect=OSError("unreadable")):
+        response = client.post("/api-keys/save", json={"entries": []})
+    assert response.status_code == 500
+    assert env.read_text() == original
+
+
+@pytest.mark.parametrize(
+    "key",
+    [
+        "SECRET_KEY",
+        "WTF_CSRF_SECRET_KEY",
+        "TEST_KEY",
+        "INKYPI_AUTH_PIN",
+        "INKYPI_READONLY_TOKEN",
+    ],
+)
+@pytest.mark.parametrize("keep_existing", [False, True])
+def test_provider_save_rejects_reserved_keys_without_writing(
+    client: FlaskClient,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    key: str,
+    keep_existing: bool,
+) -> None:
+    env = tmp_path / ".env"
+    original = "SECRET_KEY=internal-test-value\nPROVIDER=old\n"
+    env.write_text(original)
+    monkeypatch.setattr("blueprints.apikeys.get_env_path", lambda: str(env))
+    response = client.post(
+        "/api-keys/save",
+        json={
+            "entries": [
+                {"key": key, "value": "replacement", "keepExisting": keep_existing}
+            ]
+        },
+    )
+    assert response.status_code == 400
+    assert env.read_text() == original
+
+
 def test_apikeys_page_renders(
     client: FlaskClient, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
