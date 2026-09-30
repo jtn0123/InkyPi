@@ -184,6 +184,10 @@ def test_provider_save_does_not_overwrite_unreadable_existing_env(
         "TEST_KEY",
         "INKYPI_AUTH_PIN",
         "INKYPI_READONLY_TOKEN",
+        "PROJECT_DIR",
+        "PATH",
+        "PYTHONPATH",
+        "LD_PRELOAD",
     ],
 )
 @pytest.mark.parametrize("keep_existing", [False, True])

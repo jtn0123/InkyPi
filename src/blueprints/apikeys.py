@@ -24,6 +24,16 @@ _INTERNAL_KEYS: frozenset[str] = frozenset(
         "SECRET_KEY",
         "TEST_KEY",
         "WTF_CSRF_SECRET_KEY",
+        "PROJECT_DIR",
+        "HOME",
+        "PATH",
+        "SHELL",
+        "USER",
+        "LOGNAME",
+        "VIRTUAL_ENV",
+        "TMPDIR",
+        "TMP",
+        "TEMP",
     }
 )
 
@@ -32,7 +42,9 @@ API_KEY_VALIDATION_ERROR = "Invalid API key entry"
 
 def _is_internal_key(key: str) -> bool:
     """Application configuration is outside the provider-credential editor."""
-    return key in _INTERNAL_KEYS or key.startswith("INKYPI_")
+    return key in _INTERNAL_KEYS or key.startswith(
+        ("INKYPI_", "FLASK_", "WTF_", "PYTHON", "LD_", "DYLD_")
+    )
 
 
 # Path to .env file
