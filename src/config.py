@@ -11,7 +11,7 @@ from typing import Any, cast
 
 from dotenv import load_dotenv, set_key, unset_key
 
-from model import Playlist, PlaylistManager, PluginInstance, RefreshInfo
+from model import PlaylistManager, RefreshInfo
 from utils.config_schema import validate_device_config
 from utils.paths import (
     BASE_DIR as _PATHS_BASE_DIR,
@@ -432,7 +432,7 @@ class Config:
 
     def _capture_mutable_state(self) -> _ConfigSnapshot:
         """Snapshot values while retaining references held by refresh workers."""
-        models: list[PlaylistManager | RefreshInfo | Playlist | PluginInstance] = [
+        models: list[object] = [
             self.playlist_manager,
             self.refresh_info,
         ]

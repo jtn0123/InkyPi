@@ -153,13 +153,14 @@ def test_failed_save_restores_live_and_disk_state(
         manager.add_playlist("failed new playlist")
         refresh.plugin_id = "failed plugin"
 
+    saves = {
+        "atomic": lambda: cfg.update_atomic(mutate),
+        "config": lambda: cfg.update_config({"name": "failed change"}),
+        "value": lambda: cfg.update_value("name", "failed change", write=True),
+    }
+    save = saves[operation]
     with pytest.raises(OSError):
-        if operation == "atomic":
-            cfg.update_atomic(mutate)
-        elif operation == "config":
-            cfg.update_config({"name": "failed change"})
-        else:
-            cfg.update_value("name", "failed change", write=True)
+        save()
 
     assert cfg.config == before
     assert Path(cfg.config_file).read_bytes() == disk_before
