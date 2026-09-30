@@ -25,6 +25,13 @@ from utils.refresh_info import RefreshInfoRepository
 
 logger = logging.getLogger(__name__)
 
+_ConfigSnapshot = tuple[
+    dict[str, Any],
+    PlaylistManager,
+    RefreshInfo,
+    list[tuple[dict[str, Any], dict[str, Any]]],
+]
+
 _DEVICE_JSON = "device.json"
 
 # JTN-777: mirror the 64-character cap enforced by /save_settings
@@ -347,7 +354,7 @@ class Config:
                     "Config cache hit (mtime_ns=%s): skipping parse+validate",
                     current_mtime_ns,
                 )
-                return deepcopy(self._config_cache_data)
+                return self._config_cache_data.copy()
 
             logger.debug("Reading device config from %s", self.config_file)
             with open(self.config_file) as f:
@@ -423,7 +430,7 @@ class Config:
             self._plugins_list_cache_data = [plugin.copy() for plugin in plugins_list]
             return plugins_list
 
-    def _capture_mutable_state(self) -> list[tuple[dict[str, Any], dict[str, Any]]]:
+    def _capture_mutable_state(self) -> _ConfigSnapshot:
         """Snapshot values while retaining references held by refresh workers."""
         models: list[PlaylistManager | RefreshInfo | Playlist | PluginInstance] = [
             self.playlist_manager,
@@ -434,13 +441,16 @@ class Config:
             models.extend(playlist.plugins)
         memo = {id(model): model for model in models}
         targets = [self.config] + [vars(model) for model in models]
-        return [(target, deepcopy(target, memo)) for target in targets]
+        return (
+            self.config,
+            self.playlist_manager,
+            self.refresh_info,
+            [(target, deepcopy(target, memo)) for target in targets],
+        )
 
-    @staticmethod
-    def _restore_mutable_state(
-        state: list[tuple[dict[str, Any], dict[str, Any]]],
-    ) -> None:
-        for target, values in state:
+    def _restore_mutable_state(self, state: _ConfigSnapshot) -> None:
+        self.config, self.playlist_manager, self.refresh_info, targets = state
+        for target, values in targets:
             target.clear()
             target.update(values)
 

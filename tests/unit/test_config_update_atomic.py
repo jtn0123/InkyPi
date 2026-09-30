@@ -225,6 +225,28 @@ def test_direct_model_save_failure_restores_existing_model_references(
     assert Path(cfg.config_file).read_bytes() == disk_before
 
 
+def test_failed_callback_restores_replaced_model_roots(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from model import PlaylistManager, RefreshInfo
+
+    cfg = _make_config(tmp_path, monkeypatch)
+    manager = cfg.playlist_manager
+    refresh = cfg.refresh_info
+
+    def mutate(current: dict[str, Any]) -> None:
+        cfg.playlist_manager = PlaylistManager()
+        cfg.refresh_info = RefreshInfo("Manual Update", "failed", None, None)
+        current["image_settings"]["brightness"] = 9
+        raise RuntimeError("failed callback")
+
+    with pytest.raises(RuntimeError):
+        cfg.update_atomic(mutate)
+    assert cfg.playlist_manager is manager
+    assert cfg.refresh_info is refresh
+    assert cfg._config_cache_data["image_settings"]["brightness"] == 1
+
+
 # ---------------------------------------------------------------------------
 # Concurrent regression test: N threads each add a distinct plugin instance
 # ---------------------------------------------------------------------------
