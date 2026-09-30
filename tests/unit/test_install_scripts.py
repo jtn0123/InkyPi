@@ -1449,7 +1449,7 @@ class TestWheelhouseBuildWorkflow:
         assert ".manifest.sha256" in self.content
         # Manifest must be produced from the built wheels and uploaded as
         # a release asset alongside the tarball.
-        assert "sha256sum *.whl" in self.content
+        assert "sha256sum -- *.whl" in self.content
 
 
 class TestPiImageBuildWorkflow:
@@ -1598,12 +1598,14 @@ class TestPiImageBuildWorkflow:
         assert "verify-boot.outputs.verified" in self.content
 
     def test_workflow_uses_pinned_action_versions(self):
-        # Supply-chain: every external action must be pinned by major version.
-        # (SHA pinning is stronger but the rest of the repo uses @v4/@v2.) -> None -> None
-        assert "actions/checkout@v4" in self.content
-        assert "softprops/action-gh-release@v2" in self.content
-        assert "actions/upload-artifact@v4" in self.content
-        assert "actions/download-artifact@v4" in self.content
+        # Verify immutable pins without freezing the test to an obsolete major.
+        for action in (
+            "actions/checkout",
+            "softprops/action-gh-release",
+            "actions/upload-artifact",
+            "actions/download-artifact",
+        ):
+            assert re.search(rf"{re.escape(action)}@[0-9a-f]{{40}}\b", self.content)
 
     def test_workflow_uploads_release_asset(self) -> None:
         assert "softprops/action-gh-release" in self.content
@@ -2730,6 +2732,44 @@ class TestOsDriftNightlyWorkflow:
 
     def test_has_workflow_dispatch(self) -> None:
         assert "workflow_dispatch:" in self.content
+
+    @pytest.mark.parametrize(
+        ("event", "selected", "expected_skip"),
+        [
+            ("schedule", "", False),
+            ("workflow_dispatch", "", False),
+            ("workflow_dispatch", "all", False),
+            ("workflow_dispatch", "bookworm", False),
+            ("workflow_dispatch", "trixie", True),
+        ],
+    )
+    def test_codename_selection_runs_expected_legs(
+        self, tmp_path: Path, event: str, selected: str, expected_skip: bool
+    ) -> None:
+        import os
+        import subprocess
+
+        jobs = yaml.safe_load(self.content)["jobs"]
+        for name, job in jobs.items():
+            steps = [step for step in job.get("steps", []) if step.get("id") == "skip"]
+            for step in steps:
+                output = tmp_path / f"{name}.output"
+                subprocess.run(
+                    ["bash", "-c", step["run"]],
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                    env={
+                        **os.environ,
+                        "EVENT_NAME": event,
+                        "SELECTED_CODENAME": selected,
+                        "MATRIX_CODENAME": "bookworm",
+                        "GITHUB_OUTPUT": str(output),
+                    },
+                )
+                assert (
+                    output.read_text().strip() == f"skip={str(expected_skip).lower()}"
+                )
 
     def test_is_not_a_pr_gate(self) -> None:
         assert "pull_request:" not in self.content

@@ -206,18 +206,28 @@ Before marking your PR ready for review, confirm:
 
 ## Dependency Management
 
-Dependencies are managed via pip-tools lockfiles with cryptographic hashes. Edit
-`install/requirements.in` (runtime) or `install/requirements-dev.in` (dev), then
-regenerate the corresponding `.txt` lockfile:
+Runtime dependencies are declared in `pyproject.toml` and locked in `uv.lock`.
+After changing a runtime constraint, regenerate the hashed installer export:
 
 ```bash
-pip-compile --generate-hashes --no-strip-extras --allow-unsafe \
-    install/requirements.in -o install/requirements.txt
+uv lock
+uv export --format requirements.txt --no-dev --no-emit-project \
+    --output-file install/requirements.txt
 ```
 
-Always commit both the `.in` source file and the regenerated `.txt` together. See
-[docs/dependencies.md](docs/dependencies.md) for full details including CVE
-upgrades and cross-platform notes.
+Dev constraints live in `install/requirements-dev.in`. Regenerate their hashed,
+universal requirements file with:
+
+```bash
+uv pip compile --universal --python-version 3.11 --fork-strategy fewest \
+    --prerelease disallow --upgrade --generate-hashes \
+    install/requirements-dev.in -o install/requirements-dev.txt
+bash scripts/check_requirements_drift.sh
+```
+
+Commit the source changes and generated files together. See
+[docs/dependencies.md](docs/dependencies.md) for compatibility constraints and
+cross-platform notes.
 
 ## Plugin Development
 

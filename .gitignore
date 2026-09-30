@@ -242,3 +242,6 @@ tests/snapshots/layout/actual/
 
 # Dogfood QA output — generated screenshots/videos/report, not source.
 dogfood-output/
+
+# mutmut 3 isolated source tree and results
+/mutants/

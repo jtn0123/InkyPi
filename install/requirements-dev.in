@@ -1,9 +1,11 @@
-# InkyPi dev/CI dependencies — loose constraints for pip-compile.
+# InkyPi dev/CI dependencies — loose constraints for universal uv compilation.
 # Edit this file to add/upgrade dependencies, then regenerate:
-#   pip-compile --generate-hashes install/requirements-dev.in -o install/requirements-dev.txt
+#   uv pip compile --universal --python-version 3.11 --fork-strategy fewest \
+#     --prerelease disallow --generate-hashes install/requirements-dev.in \
+#     -o install/requirements-dev.txt
 #
-# pip-tools is included so contributors can regenerate lockfiles without a
-# separate install step.
+# pip-tools remains available for targeted compatibility investigation.
+# Use uv for committed lockfiles so platform/interpreter markers are preserved.
 
 # Core dev tooling
 pip-tools>=7.0,<8
@@ -29,8 +31,8 @@ mypy>=2.0,<3
 # type-check job rather than a nicety.
 types-PyYAML==6.0.12.20260906
 
-# Pin types-requests to preserve PR #301 (JTN-525) precision.
-types-requests==2.32.0.20241016
+# Keep the current requests stubs; validate updates with the strict mypy gate.
+types-requests==2.33.0.20260906
 
 # Linting / formatting
 black>=26.0,<27
@@ -74,15 +76,14 @@ defusedxml>=0.7,<1
 pip-audit>=2.0,<3
 cyclonedx-bom>=7.0,<8
 pre-commit>=4.0,<5
-# Matches the pin in .github/workflows/release.yml. 9.21.2 narrowed its click
-# requirement to ~=8.1.0, which would hold dev/CI click behind production.
-python-semantic-release==9.21.1
+# Matches the pin in .github/workflows/release.yml.
+python-semantic-release==10.7.0
 # Patched floor for transitive python-semantic-release dependency.
 GitPython>=3.1.59,<4
 pip-licenses>=5.0,<6
 
 # Mutation testing (optional — slow; run with: mutmut run)
-mutmut>=2.5,<3
+mutmut>=3.8,<4
 
 # Memory profiling for the per-PR memory diff comment (JTN-610). Linux-only
 # wheels; tracemalloc fallback is used on other platforms. Pinned to 1.x to

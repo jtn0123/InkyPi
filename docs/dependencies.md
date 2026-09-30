@@ -1,119 +1,81 @@
 # Dependency Management
 
-InkyPi uses a two-layer approach: loose `.in` source files that express intent,
-and `pip-compile --generate-hashes` lockfiles that pin every transitive dep with
-cryptographic hashes.
+Runtime dependencies are declared in `pyproject.toml`, resolved universally in
+`uv.lock`, and exported with hashes to `install/requirements.txt`. Dev and CI
+dependencies use `install/requirements-dev.in` and a universal,
+hash-pinned `install/requirements-dev.txt`.
 
-## Why hashes matter
+## Updating runtime dependencies
 
-Supply-chain attacks on PyPI are real. Typosquatted packages (`colorama` vs
-`colourama`), post-release tampering, and compromised mirrors have all been used
-to inject malicious code. `pip install --require-hashes` verifies every wheel's
-SHA-256 before execution, so a tampered artifact is rejected even if the version
-number looks correct.
-
-Example attack surface without hashes:
-
-- `pyyaml` — a popular dep; a mirror serving a backdoored wheel would pass a
-  plain `pip install pyyaml==6.0.1` without complaint.
-- `requests`, `urllib3` — network libraries; ideal injection vectors.
-- Any transitive dep added silently by an upstream package.
-
-## File layout
-
-| File | Purpose |
-|------|---------|
-| `install/requirements.in` | Human-maintained runtime constraints (`>=X.Y,<X+1`) |
-| `install/requirements-dev.in` | Human-maintained dev/CI constraints |
-| `install/requirements.txt` | **Generated** lockfile — hashed, exact pins, do not edit by hand |
-| `install/requirements-dev.txt` | **Generated** dev lockfile — hashed, exact pins, do not edit by hand |
-
-## How to bump a dependency
-
-1. Edit the relevant `.in` file (e.g. loosen or tighten a bound).
-2. Regenerate the lockfile:
-
-   ```bash
-   pip-compile --generate-hashes --no-strip-extras --allow-unsafe \
-       install/requirements.in -o install/requirements.txt
-   ```
-
-   Or for dev deps:
-
-   ```bash
-   pip-compile --generate-hashes --no-strip-extras --allow-unsafe \
-       install/requirements-dev.in -o install/requirements-dev.txt
-   ```
-
-3. Commit **both** the `.in` and the generated `.txt`.
-
-## How to add a new dependency
-
-1. Add it to the appropriate `.in` file with a semver cap (e.g. `newlib>=1.2,<2`).
-2. Run pip-compile as above.
-3. Commit both files.
-
-## How to upgrade after a CVE
-
-Use `--upgrade-package` to re-resolve only the affected package (and its
-transitive deps) without upgrading everything else:
+Edit `[project.dependencies]` when changing a version range. Keep the legacy
+`install/requirements.in` reference and duplicated runtime ranges in
+`install/requirements-dev.in` aligned. To update a package within its range:
 
 ```bash
-pip-compile --generate-hashes --no-strip-extras --allow-unsafe \
-    --upgrade-package requests \
-    install/requirements.in -o install/requirements.txt
+uv lock --upgrade-package openai
+uv export --format requirements.txt --no-dev --no-emit-project \
+    --output-file install/requirements.txt
+bash scripts/check_requirements_drift.sh
 ```
 
-## `--require-hashes` in install.sh
+Use `uv lock --upgrade` for a full refresh. Commit the source changes, lock,
+and export together. The universal lock covers Linux and macOS, including Pi
+architectures; Linux-only dependencies are resolved automatically. Do not
+append packages or hashes manually to the generated requirements file.
 
-`install/install.sh` passes `--require-hashes` to pip when installing runtime
-deps. This means pip will refuse to install any package whose wheel hash does not
-appear in `install/requirements.txt`. If a new package needs to be added, the
-lockfile must be regenerated (see above) before the installer will accept it.
+## Updating dev dependencies
 
-## Linux-only packages (inky, cysystemd and their transitive deps)
+Edit `install/requirements-dev.in`, then resolve universally from Python 3.11,
+the oldest supported interpreter. Universal mode preserves Linux-only `memray`
+and libcst's Python 3.13-specific YAML backend even when run on a Mac:
 
-`inky`, `cysystemd`, `gpiod`, `gpiodevice`, `smbus2`, and `spidev` are hardware
-drivers that only ship Linux wheels (or build from source on Linux). pip-compile
-cannot include them in the lockfile when run on macOS because the `sys_platform
-== "linux"` condition is False at compile time.
+```bash
+uv pip compile --universal --python-version 3.11 --fork-strategy fewest \
+    --prerelease disallow --upgrade --generate-hashes \
+    install/requirements-dev.in -o install/requirements-dev.txt
+```
 
-These packages are appended manually to the bottom of `install/requirements.txt`
-with `; sys_platform == "linux"` markers and all their PyPI hashes. pip skips
-them silently on macOS/Windows because the environment marker is False. On Linux
-(the Pi), pip installs and hash-verifies them.
+Use `--upgrade-package <name>` instead of `--upgrade` for a targeted refresh.
+A platform-specific pip-compile run omits conditional dependencies and must not
+replace this universal file. `scripts/check_requirements_drift.sh` re-resolves
+against the committed pins to detect missing dependencies without upgrading.
+Commit both dev files. Verify that the runtime and dev pins can be installed
+together, run `pip check`, and run the test and strict mypy gates.
 
-To update a Linux-only package:
-1. Find all new hashes on PyPI: `curl https://pypi.org/pypi/<pkg>/<ver>/json | python3 -c "import json,sys; [print(u['digests']['sha256']) for u in json.load(sys.stdin)['urls']]"`
-2. Edit the manually-appended block at the bottom of `install/requirements.txt`.
-3. Update `install/requirements.in` with the new version pin.
-4. Run `pip-compile --generate-hashes ...` to re-lock the rest of the file.
-5. Manually re-append the Linux-only block.
+## Compatibility constraints
 
-## Cross-platform note (Pi Zero 2 W — armv7l)
+- NumPy is capped below 2.5 because 2.5 requires Python 3.12. Runtime and dev
+  installs share one version while Python 3.11 is supported.
+- `pydantic-core` follows Pydantic's exact pin. Google GenAI currently caps
+  `websockets` below 17. Upgrade through their parent libraries.
+- Requests type stubs are explicitly pinned to a version validated by mypy.
+- Python Semantic Release is pinned in both the dev input and release workflow.
+  Its v10 changelog uses update mode and the `<!-- version list -->` marker;
+  keep that marker above the existing releases. The parser options preserve
+  the previous squash-commit behavior.
+- Mutmut 3 uses list-based configuration, named mutant filters, and `mutants/`
+  results. See [Mutation Testing](mutation_testing.md).
 
-`pip-compile` is run on a development machine (typically x86_64 or arm64 macOS).
-When `--generate-hashes` is used, pip-compile fetches the metadata for **all**
-wheels published for each package version on PyPI and records every hash. This
-means the resulting lockfile contains hashes for `manylinux_2_17_armv7l` wheels
-alongside `macosx_arm64` and `linux_x86_64` wheels.
+## CI and pre-commit tools
 
-When pip runs on the Pi with `--require-hashes`, it downloads only the armv7l
-wheel (or falls back to the sdist), looks up its hash in the lockfile, and
-verifies it — this works correctly because the lockfile already contains that
-hash.
+External GitHub Actions are pinned to full commit hashes, with stable release
+versions in comments. Update both together and review upstream migration notes.
+Node 24 actions require a current Actions runner: the self-hosted Pi runner
+must be at least version 2.327.1 (2.329.0 for authenticated Git in container
+actions). GitHub-hosted runners are managed by GitHub.
 
-If a package publishes no armv7l wheel and no universal sdist, pip will fail at
-install time. In that case:
+Pre-commit hook revisions are recorded in `.pre-commit-config.yaml`; keep Ruff
+and mypy aligned with the dev lock.
 
-1. Check whether the package builds from source on armv7l.
-2. If not, find an alternative package or pin to a version that does publish
-   armv7l wheels.
-3. Document the constraint in `requirements.in` with an inline comment.
+## Hash verification and Pi wheels
 
-Packages with `sys_platform == "linux"` guards in `requirements.in` (`inky`,
-`cysystemd`) only ship Linux wheels and cannot install on macOS/Windows; they
-are excluded from the pip-compile lockfile on macOS and manually appended with
-hashes (see "Linux-only packages" section above). `pi-heif`, by contrast, ships
-macOS/Windows wheels and is NOT platform-guarded — it resolves normally via
-pip-compile on all dev platforms.
+`install/install.sh` installs runtime requirements with `--require-hashes`.
+Hashes verify downloaded artifacts against the lock; they do not by themselves
+establish that an upstream package is trustworthy. Regenerate locks through
+the tools above, rather than editing hashes by hand.
+
+Check wheel availability or source-build support before upgrading native
+packages on Pi armv7l/armv6l. A local Mac test or a universal resolution does not
+prove that a package builds or runs on a physical Pi.
+
+See [Dependency Locking](dependency_locking.md) for the runtime lock design.
