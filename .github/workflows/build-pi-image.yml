@@ -66,7 +66,8 @@ env:
   PI_OS_IMAGE_FILENAME: 2025-05-13-raspios-bookworm-arm64-lite.img.xz
   # pishrink.sh pinned by commit SHA — upstream has no tagged releases.
   # https://github.com/Drewsif/PiShrink
-  PISHRINK_COMMIT: a46e1fc90ca697f3e9f2e1c2dd6e98d47d2e33e8
+  PISHRINK_COMMIT: 5f358d03eed4b7334657ee93867826a2b42f112a
+  PISHRINK_SHA256: 71026f0c02ac099e588a3eb8f70760c1b680aa8ea3acde61a0141fbaeb68c777
 
 jobs:
   build-image:
@@ -78,6 +79,7 @@ jobs:
       image_sha256: ${{ steps.package.outputs.image_sha256 }}
       image_size: ${{ steps.package.outputs.image_size }}
       version: ${{ steps.tag.outputs.version }}
+      tag: ${{ steps.tag.outputs.tag }}
     steps:
       - name: Checkout InkyPi repo (workflow + pishrink.sh)
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -89,8 +91,8 @@ jobs:
         run: |
           set -euo pipefail
           TAG="$RELEASE_TAG"
-          if [ -z "$TAG" ]; then
-            echo "ERROR: No release tag resolved" >&2
+          if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.-]+)?$ ]]; then
+            echo "ERROR: Expected a version release tag" >&2
             exit 1
           fi
           VERSION="${TAG#v}"
@@ -259,6 +261,7 @@ jobs:
         run: |
           set -euo pipefail
           sudo chroot /mnt/pi-root /bin/bash -euxo pipefail -c '
+            rm -f /usr/local/sbin/raspi-config /usr/local/sbin/systemctl /usr/bin/qemu-aarch64-static
             apt-get clean
             rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*.deb
             rm -rf /root/.cache/pip /root/.cache/uv
@@ -293,6 +296,7 @@ jobs:
           curl -fsSL \
             -o build/pishrink.sh \
             "https://raw.githubusercontent.com/Drewsif/PiShrink/${PISHRINK_COMMIT}/pishrink.sh"
+          echo "${PISHRINK_SHA256}  build/pishrink.sh" | sha256sum -c -
           chmod +x build/pishrink.sh
           # Print first 5 lines as a smoke test
           head -5 build/pishrink.sh
@@ -366,69 +370,52 @@ jobs:
           name: inkypi-pi-image-${{ needs.build-image.outputs.version }}
           path: build
 
+      - name: Enable ARM container emulation
+        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
+        with:
+          platforms: arm64
+
+      - name: Prepare generic ARM kernel and initramfs for rootfs verification
+        run: |
+          set -euo pipefail
+          docker run --rm --platform linux/arm64 -v "$PWD/build:/output" debian:bookworm bash -euc '
+            apt-get update
+            apt-get install -y --no-install-recommends linux-image-cloud-arm64 initramfs-tools
+            cp /boot/vmlinuz-* /output/verify-kernel
+            cp /boot/initrd.img-* /output/verify-initrd
+          '
+
       - name: Decompress + boot-verify
         id: verify
+        env:
+          IMAGE_NAME: ${{ needs.build-image.outputs.image_name }}
         run: |
-          set -euxo pipefail
+          set -euo pipefail
           cd build
-          IMAGES=(inkypi-*-pi-zero-2-w.img.xz)
-          XZ="${IMAGES[0]}"
-          xz -dk -T 0 "${XZ}"
-          IMG="${XZ%.xz}"
+          sha256sum -c "${IMAGE_NAME}.sha256"
+          xz -dk -T 0 "$IMAGE_NAME"
+          cd ..
+          # A generic ARM kernel verifies the shipped rootfs, not Pi hardware
+          # or the Pi-specific firmware/kernel boot path.
+          python3 scripts/verify_pi_image_boot.py \
+            --image "build/${IMAGE_NAME%.xz}" \
+            --kernel build/verify-kernel --initrd build/verify-initrd \
+            --log build/qemu-boot.log
+          echo "verified=true" >> "$GITHUB_OUTPUT"
 
-          # Boot the image in qemu-system-aarch64 with a 4-minute budget and
-          # scrape the serial console for "login:" — that proves the kernel
-          # booted, init finished, and getty spawned. This is the single
-          # best proof that pishrink didn't shrink the rootfs so hard that
-          # systemd can't write its tmpfiles, and that install.sh didn't
-          # break /etc/fstab or /boot/firmware/cmdline.txt.
-          #
-          # We use the generic "virt" machine with a Pi OS rootfs because
-          # raspi0/raspi3b machine models in qemu-system-aarch64 are fiddly
-          # about kernel/dtb pairs. virt + direct-kernel boot is good enough
-          # for boot verification (we're not testing Pi hardware — we're
-          # testing that the rootfs boots an arm64 Linux kernel to userspace).
-          #
-          # NOTE: if you need a hardware-faithful boot test, run arm-runner
-          # in a follow-up job.
-          timeout 240 qemu-system-aarch64 \
-            -M virt -cpu cortex-a72 -m 1024 \
-            -smp 2 \
-            -nographic \
-            -kernel /usr/lib/linux-image-*-cloud-arm64/vmlinuz 2>&1 \
-            -drive file="${IMG}",format=raw,if=none,id=hd0 \
-            -device virtio-blk-device,drive=hd0 \
-            -append "root=/dev/vda2 rootfstype=ext4 rw console=ttyAMA0" \
-            | tee qemu-boot.log &
-          QPID=$!
-
-          # Poll the log for login prompt for up to 4 minutes.
-          for i in $(seq 1 240); do
-            if grep -q "login:" qemu-boot.log 2>/dev/null; then
-              echo "Boot verified — login prompt observed at $i seconds"
-              echo "verified=true" >> "$GITHUB_OUTPUT"
-              kill -9 $QPID 2>/dev/null || true
-              exit 0
-            fi
-            sleep 1
-          done
-
-          # Timed out. Print what we got so CI has a diagnostic trail.
-          echo "Boot verification timed out after 240s — no login: prompt"
-          tail -200 qemu-boot.log || true
-          kill -9 $QPID 2>/dev/null || true
-          echo "verified=false" >> "$GITHUB_OUTPUT"
-          # JTN-533 constraint: "If boot verification fails, the release asset
-          # MUST NOT be uploaded. The build job should fail loud."
-          # We surface this by failing the step; the release-attach job below
-          # has `needs: verify-boot` + an `if` guard, so a failure here blocks
-          # upload without a silent skip.
-          exit 1
+      - name: Preserve boot diagnostics
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: pi-image-boot-log
+          path: build/qemu-boot.log
+          if-no-files-found: warn
+          retention-days: 7
 
   attach-release:
     name: Attach image to GitHub release
     needs: [build-image, verify-boot]
-    if: github.event_name == 'release' && needs.verify-boot.outputs.verified == 'true'
+    if: needs.verify-boot.outputs.verified == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Download image artifact
@@ -440,7 +427,7 @@ jobs:
       - name: Attach to release
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
-          tag_name: ${{ github.event.release.tag_name }}
+          tag_name: ${{ needs.build-image.outputs.tag }}
           files: |
             build/inkypi-*-pi-zero-2-w.img.xz
             build/inkypi-*-pi-zero-2-w.img.xz.sha256
