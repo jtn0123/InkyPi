@@ -50,6 +50,8 @@ def main() -> int:
         "-smp",
         "2",
         "-nographic",
+        "-nic",
+        "none",
         "-kernel",
         str(args.kernel),
         "-initrd",
