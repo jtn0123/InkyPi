@@ -2,6 +2,15 @@
 
 <!-- version list -->
 
+## v1.4.5 (2026-10-01)
+
+### Bug Fixes
+
+- **settings**: Make validation and save outcomes truthful
+  ([#658](https://github.com/jtn0123/InkyPi/pull/658),
+  [`5ff5465`](https://github.com/jtn0123/InkyPi/commit/5ff546565a62af186d06a7725775e4353c8cbd58))
+
+
 ## v1.4.4 (2026-10-01)
 
 ### Bug Fixes
