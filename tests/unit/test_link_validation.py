@@ -158,3 +158,12 @@ def test_browser_rejection_recheck_is_fail_closed(
         {url: {"verified": verified, "status": 200 if verified else status}},
     )
     assert bool(failures) is (not verified)
+
+
+def test_browser_cannot_accept_a_rejected_status(checker: ModuleType) -> None:
+    url = "https://example.test/resource"
+    assert checker.check_report(
+        error_report(url, 403),
+        lambda url: 0,
+        {url: {"verified": True, "status": 403}},
+    )

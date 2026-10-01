@@ -149,7 +149,12 @@ def check_report(
                 continue
         if status.get("code") in {403, 429} and browser_results:
             result = browser_results.get(url, {})
-            if result.get("verified") is True:
+            browser_status = result.get("status")
+            if (
+                result.get("verified") is True
+                and isinstance(browser_status, int)
+                and 200 <= browser_status < 300
+            ):
                 print(f"Verified with browser HTTP {result.get('status')}: {url}")
                 continue
         failures.append(f"Link validation failed: {url} ({status.get('code')})")
