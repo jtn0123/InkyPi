@@ -34,6 +34,7 @@ UI_BROWSER_TESTS = {
     "test_settings_round_trip_e2e.py",
     "test_plugin_workflow_e2e.py",
     "test_dashboard_display_next_e2e.py",
+    "test_dashboard_reliability_e2e.py",
     "test_api_keys_e2e.py",
     "test_modal_lifecycle_e2e.py",
     "test_theme_toggle_e2e.py",
