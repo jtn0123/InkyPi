@@ -240,13 +240,10 @@ jobs:
               bash ./install.sh
             "
 
-      - name: Seed first-boot cloud-init overlay
-        # Pi OS Lite already supports cloud-init via /boot/firmware/user-data
-        # when present on the boot partition. We drop in a minimal placeholder
-        # banner so the first-boot Pi Imager flow (which rewrites user-data
-        # with the user's Wi-Fi/hostname/password) still works. This avoids
-        # baking any credentials into the shipped image — the user picks them
-        # in Pi Imager's advanced options at flash time.
+      - name: Document Bookworm first-boot customization
+        # This pinned Bookworm image uses Imager systemd/firstrun.sh, not
+        # Trixie cloud-init. The accompanying OS manifest enables Imager 2.x
+        # customization for this custom image without shipping credentials.
         run: |
           set -euo pipefail
           sudo bash -c 'cat > /mnt/pi-root/boot/firmware/inkypi-readme.txt' <<'NOTE'
@@ -255,8 +252,9 @@ jobs:
 
           This image already has InkyPi installed and enabled. On first boot:
             * Set your Wi-Fi / hostname / SSH credentials in Pi Imager's
-              "advanced options" BEFORE flashing. Pi Imager writes these into
-              /boot/firmware/user-data so cloud-init applies them on first boot.
+              customization options BEFORE flashing. With Imager 2.x, load
+              the release OS manifest using --repo <manifest URL>. This image
+              uses Bookworm systemd/firstrun.sh customization, not cloud-init.
             * Once the Pi joins your network, visit:
                 http://<hostname>.local/
               in a browser on the same LAN — the InkyPi web UI will be up.
@@ -330,6 +328,8 @@ jobs:
           xz -9 -T 0 -v "${IMG_NAME}"
           XZ_NAME="${IMG_NAME}.xz"
           sha256sum "${XZ_NAME}" > "${XZ_NAME}.sha256"
+          python ../scripts/pi_image_manifest.py --image "$XZ_NAME" \
+            --tag "v${VERSION}" --output "inkypi-${VERSION}-os-list.json"
           SIZE=$(stat -c %s "${XZ_NAME}")
           SHA=$(awk '{print $1}' "${XZ_NAME}.sha256")
           {
@@ -349,6 +349,7 @@ jobs:
           path: |
             build/${{ steps.package.outputs.image_name }}
             build/${{ steps.package.outputs.image_name }}.sha256
+            build/inkypi-${{ steps.tag.outputs.version }}-os-list.json
           if-no-files-found: error
           retention-days: 7
 
@@ -457,4 +458,5 @@ jobs:
           files: |
             build/inkypi-*-pi-zero-2-w.img.xz
             build/inkypi-*-pi-zero-2-w.img.xz.sha256
+            build/inkypi-*-os-list.json
           fail_on_unmatched_files: true
