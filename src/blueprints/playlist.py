@@ -775,24 +775,23 @@ def reorder_plugins() -> Any:
         if parsed is None:
             raise ClientInputError("Invalid or missing JSON payload", status=400)
 
-        playlist = playlist_manager.get_playlist(parsed.playlist_name)
-        if not playlist:
-            raise ResourceLookupError(
-                _MSG_PLAYLIST_NOT_FOUND,
-                status=400,
-                code=_CODE_VALIDATION,
-                details={"field": "playlist_name"},
-            )
-
-        reorder_result: list[bool] = []
         ordered_payload = parsed.ordered_payload()
 
-        def _do_reorder(cfg: Any) -> None:
-            reorder_result.append(playlist.reorder_plugins(ordered_payload))
+        def _do_reorder(_cfg: object) -> None:
+            playlist = playlist_manager.get_playlist(parsed.playlist_name)
+            if not playlist:
+                raise ResourceLookupError(
+                    _MSG_PLAYLIST_NOT_FOUND,
+                    status=400,
+                    code=_CODE_VALIDATION,
+                    details={"field": "playlist_name"},
+                )
+            if not playlist.reorder_plugins(ordered_payload):
+                raise ClientInputError(
+                    "Invalid order payload", status=400, field="ordered"
+                )
 
         device_config.update_atomic(_do_reorder)
-        if not reorder_result or not reorder_result[0]:
-            raise ClientInputError("Invalid order payload", status=400)
 
         return json_success("Reordered plugins")
 

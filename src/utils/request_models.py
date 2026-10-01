@@ -442,6 +442,7 @@ def parse_playlist_reorder_request(
         )
 
     parsed_ordered: list[PlaylistPluginOrderItem] = []
+    seen: set[tuple[str, str]] = set()
     for item in ordered:
         if not isinstance(item, dict):
             return None, RequestModelError("Invalid order payload", field="ordered")
@@ -454,8 +455,12 @@ def parse_playlist_reorder_request(
             or not name.strip()
         ):
             return None, RequestModelError("Invalid order payload", field="ordered")
+        identity = (plugin_id.strip(), name.strip())
+        if identity in seen:
+            return None, RequestModelError("Invalid order payload", field="ordered")
+        seen.add(identity)
         parsed_ordered.append(
-            PlaylistPluginOrderItem(plugin_id=plugin_id.strip(), name=name.strip())
+            PlaylistPluginOrderItem(plugin_id=identity[0], name=identity[1])
         )
 
     return (
