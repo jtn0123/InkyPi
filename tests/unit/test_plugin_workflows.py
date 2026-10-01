@@ -12,6 +12,8 @@ from typing import Any
 @dataclass
 class _PluginInstance:
     settings: dict[str, Any]
+    name: str
+    plugin_id: str
 
 
 @dataclass
@@ -24,15 +26,17 @@ class _Playlist:
             (
                 inst
                 for inst in self.plugins
-                if getattr(inst, "name", None) == instance_name
+                if inst.name == instance_name and inst.plugin_id == plugin_id
             ),
             None,
         )
 
     def add_plugin(self, plugin_data: dict[str, Any]) -> bool:
-        inst = _PluginInstance(settings=dict(plugin_data.get("plugin_settings", {})))
-        inst.name = plugin_data["name"]
-        inst.plugin_id = plugin_data["plugin_id"]
+        inst = _PluginInstance(
+            settings=dict(plugin_data.get("plugin_settings", {})),
+            name=plugin_data["name"],
+            plugin_id=plugin_data["plugin_id"],
+        )
         self.plugins.append(inst)
         return True
 

@@ -1058,7 +1058,7 @@ class TestValidatorFieldAttribution:
 
     # --- delete ---
 
-    def test_delete_nonexistent(self, client: FlaskClient):
+    def test_delete_nonexistent(self, client: FlaskClient) -> None:
         # JTN-782: delete-of-missing is a 404 not_found (not a validation
         # error) -> None -> None, but we still attach field attribution so the UI can
         # highlight the offending input.

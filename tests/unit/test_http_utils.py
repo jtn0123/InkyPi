@@ -2,7 +2,7 @@ from typing import Any
 
 import pytest
 import requests
-from flask import Flask
+from flask import Flask, Response
 
 
 def test_http_get_user_agent_and_default_timeout(
@@ -170,6 +170,7 @@ class TestJsonError:
             assert status == 400
 
             # Check response data
+            assert isinstance(response, Response)
             response_data = response.get_json()
             assert response_data["error"] == "Test error"
             assert "code" not in response_data
@@ -182,6 +183,7 @@ class TestJsonError:
         with app.test_request_context("/", headers={"X-Request-Id": "abc-123"}):
             response, status = json_error("oops")
             assert status == 400
+            assert isinstance(response, Response)
             data = response.get_json()
             assert data.get("error") == "oops"
             assert data.get("request_id") == "abc-123"
@@ -200,6 +202,7 @@ class TestJsonError:
             )
 
             assert returned_status == 422
+            assert isinstance(response, Response)
             data = response.get_json()
             assert data["error"] == "safe fallback message"
             assert "code" not in data
@@ -326,6 +329,7 @@ def test_retry_backoff_env_configuration(monkeypatch: pytest.MonkeyPatch) -> Non
         """Test json_error with error code."""
         with app.app_context():
             response, status = json_error("Test error", code="TEST_001")
+            assert isinstance(response, Response)
             response_data = response.get_json()
             assert response_data["error"] == "Test error"
             assert response_data["code"] == "TEST_001"
@@ -335,6 +339,7 @@ def test_retry_backoff_env_configuration(monkeypatch: pytest.MonkeyPatch) -> Non
         details = {"field": "username", "issue": "required"}
         with app.app_context():
             response, status = json_error("Validation error", details=details)
+            assert isinstance(response, Response)
             response_data = response.get_json()
             assert response_data["error"] == "Validation error"
             assert response_data["details"] == details
@@ -344,6 +349,7 @@ def test_retry_backoff_env_configuration(monkeypatch: pytest.MonkeyPatch) -> Non
         with app.app_context():
             response, status = json_error("Not found", status=404)
             assert status == 404
+            assert isinstance(response, Response)
             response_data = response.get_json()
             assert response_data["error"] == "Not found"
 
@@ -356,6 +362,7 @@ class TestJsonInternalError:
         with app.app_context():
             response, status = json_internal_error("test context")
             assert status == 500
+            assert isinstance(response, Response)
             response_data = response.get_json()
             assert response_data["error"] == "An internal error occurred"
             assert response_data["code"] == "internal_error"
@@ -367,6 +374,7 @@ class TestJsonInternalError:
         with app.app_context():
             response, status = json_internal_error("processing", details=details)
             assert status == 500
+            assert isinstance(response, Response)
             response_data = response.get_json()
             assert response_data["error"] == "An internal error occurred"
             assert response_data["code"] == "internal_error"
@@ -382,6 +390,7 @@ class TestJsonInternalError:
                 "db failure", status=503, code="DB_DOWN"
             )
             assert status == 503
+            assert isinstance(response, Response)
             response_data = response.get_json()
             assert response_data["error"] == "An internal error occurred"
             assert response_data["code"] == "DB_DOWN"
@@ -396,6 +405,7 @@ class TestJsonSuccess:
         with app.app_context():
             response, status = json_success()
             assert status == 200
+            assert isinstance(response, Response)
             response_data = response.get_json()
             assert response_data["success"] is True
             assert "message" not in response_data
@@ -404,6 +414,7 @@ class TestJsonSuccess:
         """Test json_success with message."""
         with app.app_context():
             response, status = json_success("Operation completed")
+            assert isinstance(response, Response)
             response_data = response.get_json()
             assert response_data["success"] is True
             assert response_data["message"] == "Operation completed"
@@ -412,6 +423,7 @@ class TestJsonSuccess:
         """Test json_success with additional payload data."""
         with app.app_context():
             response, status = json_success("Created", id=123, name="test")
+            assert isinstance(response, Response)
             response_data = response.get_json()
             assert response_data["success"] is True
             assert response_data["message"] == "Created"
@@ -584,6 +596,7 @@ class TestRequestIdIsNotReflectedUnvalidated:
         headers = {"X-Request-Id": header} if header is not None else {}
         with flask_app.test_request_context("/", headers=headers):
             body, _status = json_success("ok")
+            assert isinstance(body, Response)
             return body.get_json().get("request_id")
 
     def test_a_well_formed_id_is_preserved(self, flask_app: Any) -> None:

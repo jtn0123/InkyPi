@@ -74,8 +74,8 @@ class RuntimeCollector:
         self.base_url = base_url
         self.console_errors: list[str] = []
         self.page_errors: list[str] = []
-        self.request_failures: list[dict] = []
-        self.response_failures: list[dict] = []
+        self.request_failures: list[dict[str, object]] = []
+        self.response_failures: list[dict[str, object]] = []
 
         def handle_console(msg: Any) -> None:
             if msg.type != "error":

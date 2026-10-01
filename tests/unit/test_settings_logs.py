@@ -34,7 +34,9 @@ def test_api_logs_size_guard(
     assert "meta" in data
 
 
-def test_api_logs_rate_limit(client: FlaskClient, monkeypatch: pytest.MonkeyPatch):
+def test_api_logs_rate_limit(
+    client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
     # Simulate many quick requests from same remote addr to trigger 429
     # Flask test client sets REMOTE_ADDR=127.0.0.1 by default
     # Hit enough times to exceed _RATE_LIMIT_MAX_REQUESTS (120) -> None -> None

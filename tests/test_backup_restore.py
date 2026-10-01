@@ -13,6 +13,8 @@ from unittest.mock import patch
 
 import pytest
 
+from tests.helpers.archive import read_tar_member
+
 # ---------------------------------------------------------------------------
 # Helpers to load scripts without importing from src/
 # ---------------------------------------------------------------------------
@@ -113,8 +115,8 @@ class TestBackupConfig:
 
         with tarfile.open(output, "r:gz") as tar:
             member = tar.getmember("manifest.json")
-            fobj = tar.extractfile(member)
-            manifest = json.loads(fobj.read().decode("utf-8"))
+            fobj = read_tar_member(tar, member)
+            manifest = json.loads(fobj.decode("utf-8"))
 
         assert manifest["backup_version"] == backup_mod.BACKUP_FORMAT_VERSION
         assert "timestamp" in manifest
@@ -208,8 +210,8 @@ class TestBackupConfig:
         h = hashlib.sha256(device_json_path.read_bytes()).hexdigest()
 
         with tarfile.open(output, "r:gz") as tar:
-            fobj = tar.extractfile("manifest.json")
-            manifest = json.loads(fobj.read())
+            fobj = read_tar_member(tar, "manifest.json")
+            manifest = json.loads(fobj)
 
         assert manifest["device_json_checksum"] == h
 

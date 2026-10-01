@@ -204,6 +204,7 @@ class TestSdNotifyAdapter:
             # Re-add src to path if needed
             if str(SRC_DIR) not in sys.path:
                 sys.path.insert(0, str(SRC_DIR))
+            assert spec is not None and spec.loader is not None
             spec.loader.exec_module(module)
 
         return module, fake_notify, FakeNotification
@@ -264,6 +265,7 @@ class TestSdNotifyAdapter:
         module = importlib.util.module_from_spec(spec)
 
         with patch.dict(sys.modules, stub_mods):
+            assert spec is not None and spec.loader is not None
             spec.loader.exec_module(module)
 
         assert module._sd_notify is None, (

@@ -54,7 +54,7 @@ def test_plugin_settings_form_fields_editable(
 
 def test_plugin_page_renders_both_workflow_panels(
     live_server: str, mobile_page: Page, tmp_path: Path
-):
+) -> None:
     # Design refresh (post-JTN-89) -> None -> None: the Configure/Preview mode toggle was
     # retired in favor of always showing both panels stacked on mobile and
     # side-by-side on desktop. Confirm both panels render and neither is

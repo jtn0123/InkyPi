@@ -10,6 +10,8 @@ from typing import Any
 
 import pytest
 
+from tests.helpers.archive import read_tar_member
+
 # ---------------------------------------------------------------------------
 # Helper: load script without importing from src/
 # ---------------------------------------------------------------------------
@@ -101,7 +103,8 @@ class TestDiagnosticSnapshot:
 
         with tarfile.open(output, "r:gz") as tar:
             member = tar.getmember("manifest.json")
-            manifest = json.loads(tar.extractfile(member).read())
+
+            manifest = json.loads(read_tar_member(tar, member))
 
         assert manifest["snapshot_version"] == diag_mod.SNAPSHOT_FORMAT_VERSION
         assert "timestamp" in manifest
@@ -141,6 +144,7 @@ class TestDiagnosticSnapshot:
         )
 
         with tarfile.open(output, "r:gz") as tar:
+            assert tar.extractfile("system_info.txt") is not None
             text = tar.extractfile("system_info.txt").read().decode("utf-8")
 
         assert "uname" in text.lower() or "system" in text.lower()
@@ -176,6 +180,7 @@ class TestDiagnosticSnapshot:
         )
 
         with tarfile.open(output, "r:gz") as tar:
+            assert tar.extractfile("config_redacted.json") is not None
             redacted = json.loads(tar.extractfile("config_redacted.json").read())
 
         assert redacted.get("api_key") == "***REDACTED***"
@@ -196,6 +201,7 @@ class TestDiagnosticSnapshot:
         )
 
         with tarfile.open(output, "r:gz") as tar:
+            assert tar.extractfile("config_redacted.json") is not None
             redacted = json.loads(tar.extractfile("config_redacted.json").read())
 
         assert redacted.get("weather_token") == "***REDACTED***"
@@ -215,6 +221,7 @@ class TestDiagnosticSnapshot:
         )
 
         with tarfile.open(output, "r:gz") as tar:
+            assert tar.extractfile("config_redacted.json") is not None
             redacted = json.loads(tar.extractfile("config_redacted.json").read())
 
         assert redacted.get("admin_password") == "***REDACTED***"
@@ -234,6 +241,7 @@ class TestDiagnosticSnapshot:
         )
 
         with tarfile.open(output, "r:gz") as tar:
+            assert tar.extractfile("config_redacted.json") is not None
             redacted = json.loads(tar.extractfile("config_redacted.json").read())
 
         assert redacted.get("secret_pin") == "***REDACTED***"
@@ -251,6 +259,7 @@ class TestDiagnosticSnapshot:
         )
 
         with tarfile.open(output, "r:gz") as tar:
+            assert tar.extractfile("config_redacted.json") is not None
             redacted = json.loads(tar.extractfile("config_redacted.json").read())
 
         assert redacted.get("name") == "TestDevice"
@@ -274,6 +283,7 @@ class TestDiagnosticSnapshot:
         with tarfile.open(output, "r:gz") as tar:
             names = tar.getnames()
             assert "recent_logs.txt" in names
+            assert tar.extractfile("recent_logs.txt") is not None
             text = tar.extractfile("recent_logs.txt").read().decode("utf-8")
 
         # Only last 10 lines of 30 should be present (lines 20-29)
@@ -320,6 +330,7 @@ class TestDiagnosticSnapshot:
         )
 
         with tarfile.open(output, "r:gz") as tar:
+            assert tar.extractfile("manifest.json") is not None
             manifest = json.loads(tar.extractfile("manifest.json").read())
 
         assert "recent_logs.txt" not in manifest["files"]

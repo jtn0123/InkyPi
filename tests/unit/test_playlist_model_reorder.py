@@ -59,8 +59,11 @@ def test_get_next_eligible_advances_and_wraps() -> None:
     now = datetime(2025, 1, 1, 0, 0, tzinfo=UTC)
 
     p1 = pl.get_next_eligible_plugin(now)
+    assert p1 is not None
     assert p1.name == "A"
     p2 = pl.get_next_eligible_plugin(now)
+    assert p2 is not None
     assert p2.name == "B"
     p3 = pl.get_next_eligible_plugin(now)
+    assert p3 is not None
     assert p3.name == "A"

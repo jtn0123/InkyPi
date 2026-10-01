@@ -3,7 +3,7 @@ from datetime import datetime
 from model import Playlist, PlaylistManager
 
 
-def test_determine_active_playlist_midnight_wrap():
+def test_determine_active_playlist_midnight_wrap() -> None:
     # Playlist A active 23:00-01:00 (wraps) -> None -> None, B active 01:00-23:00
     a = Playlist("A", "23:00", "01:00", plugins=[])
     b = Playlist("B", "01:00", "23:00", plugins=[])

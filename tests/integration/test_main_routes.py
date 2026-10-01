@@ -245,7 +245,7 @@ def test_shell_marks_sidebar_active_on_management_pages(client: FlaskClient) -> 
         ), f"Expected sidebar link {active_href} to be active on {path}"
 
 
-def test_next_up_endpoint_and_ssr(client: FlaskClient, device_config_dev: Any):
+def test_next_up_endpoint_and_ssr(client: FlaskClient, device_config_dev: Any) -> None:
     # Seed playlist with two items so peek returns the second when index is None (first is candidate) -> None -> None
     pm = device_config_dev.get_playlist_manager()
     pm.add_playlist("Default", "00:00", "24:00")

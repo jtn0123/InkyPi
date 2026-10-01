@@ -179,7 +179,7 @@ def _mk_sample(
 
 
 class TestTrendSummary:
-    def test_monotonic_leak_shows_positive_slope(self):
+    def test_monotonic_leak_shows_positive_slope(self) -> None:
         # Simulate a slow leak: 50% -> 62% over 1 hour (3600s) -> None -> None. Slope per
         # hour must be very close to +12.
         samples = [
