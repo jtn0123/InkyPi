@@ -16,11 +16,23 @@ from __future__ import annotations
 import importlib
 import json
 import logging
-from typing import Any
+from typing import Any, Protocol, cast
 
 import pytest
-from flask import Flask  # noqa: E402
+from flask import Blueprint, Flask  # noqa: E402
 from flask.testing import FlaskClient
+from werkzeug.test import TestResponse
+
+from utils.rate_limit import TokenBucket as RateLimitBucket
+
+
+class _ClientLogModule(Protocol):
+    client_log_bp: Blueprint
+    _rate_limiter: RateLimitBucket
+    TokenBucket: type[RateLimitBucket]
+
+    def get_captured_reports(self) -> list[dict[str, object]]: ...
+
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -28,8 +40,8 @@ from flask.testing import FlaskClient
 
 
 def _fresh_module(
-    monkeypatch: pytest.MonkeyPatch = None, *, capture: bool | None = None
-) -> Any:
+    monkeypatch: pytest.MonkeyPatch | None = None, *, capture: bool | None = None
+) -> tuple[_ClientLogModule, Flask]:
     """Reload ``blueprints.client_log`` and return (module, Flask app)."""
     import blueprints.client_log as cl_mod
 
@@ -43,7 +55,9 @@ def _fresh_module(
     app = Flask(__name__)
     app.config["TESTING"] = True
     app.register_blueprint(cl_mod.client_log_bp)
-    return cl_mod, app
+    # Reloaded modules are dynamic objects; retain the concrete test-facing
+    # contract rather than allowing their entire API to become Any.
+    return cast(_ClientLogModule, cl_mod), app
 
 
 def _make_app() -> Flask:
@@ -52,15 +66,15 @@ def _make_app() -> Flask:
 
 
 @pytest.fixture()
-def cl_client() -> Any:
+def cl_client() -> FlaskClient:
     """Flask test client for the client_log blueprint."""
     app = _make_app()
     return app.test_client()
 
 
 def _post(
-    client: FlaskClient, payload: dict | None = None, *, body: bytes | None = None
-) -> Any:
+    client: FlaskClient, payload: object = None, *, body: bytes | None = None
+) -> TestResponse:
     """POST to /api/client-log with JSON payload or raw body."""
     if body is not None:
         return client.post(
@@ -410,7 +424,9 @@ class TestBatchFieldHandling:
         resp = _post(app.test_client(), [{"level": "warn", "message": huge}])
         assert resp.status_code == 204
         reports = cl_mod.get_captured_reports()
-        assert len(reports[0]["message"]) == 2048
+        message = reports[0]["message"]
+        assert isinstance(message, str)
+        assert len(message) == 2048
 
 
 class TestBurstAllLands:

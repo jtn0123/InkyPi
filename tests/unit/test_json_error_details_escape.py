@@ -6,16 +6,14 @@ innerHTML slip would otherwise expose stored XSS.  (JTN-657)
 
 from __future__ import annotations
 
-from typing import Any
-
 import pytest
-from flask import Flask
+from flask import Flask, Response
 
 from utils.http_utils import json_error
 
 
 @pytest.fixture
-def app() -> Any:
+def app() -> Flask:
     return Flask(__name__)
 
 
@@ -31,6 +29,7 @@ class TestJsonErrorDetailsEscape:
                 status=422,
                 details={"field": payload},
             )
+        assert isinstance(response, Response)
         data = response.get_json()
         assert status == 422
         field_value = data["details"]["field"]
@@ -46,6 +45,7 @@ class TestJsonErrorDetailsEscape:
                 "err",
                 details={"outer": {"inner": "<b>bold</b>"}},
             )
+        assert isinstance(response, Response)
         data = response.get_json()
         assert "<b>" not in data["details"]["outer"]["inner"]
         assert "&lt;b&gt;" in data["details"]["outer"]["inner"]
@@ -57,6 +57,7 @@ class TestJsonErrorDetailsEscape:
                 "err",
                 details={"errors": ["<bad>", "ok"]},
             )
+        assert isinstance(response, Response)
         data = response.get_json()
         assert "<bad>" not in data["details"]["errors"][0]
         assert "&lt;bad&gt;" in data["details"]["errors"][0]
@@ -69,6 +70,7 @@ class TestJsonErrorDetailsEscape:
                 "err",
                 details={"count": 3, "flag": True, "missing": None},
             )
+        assert isinstance(response, Response)
         data = response.get_json()
         assert data["details"]["count"] == 3
         assert data["details"]["flag"] is True
@@ -81,6 +83,7 @@ class TestJsonErrorDetailsEscape:
                 "err",
                 details={"msg": "a & b"},
             )
+        assert isinstance(response, Response)
         data = response.get_json()
         assert "&" not in data["details"]["msg"].replace("&amp;", "")
         assert "&amp;" in data["details"]["msg"]
@@ -89,5 +92,6 @@ class TestJsonErrorDetailsEscape:
         """When details is None the key is absent from the response."""
         with app.app_context():
             response, _ = json_error("err", details=None)
+        assert isinstance(response, Response)
         data = response.get_json()
         assert "details" not in data
