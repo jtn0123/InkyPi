@@ -2,6 +2,15 @@
 
 <!-- version list -->
 
+## v1.4.12 (2026-10-01)
+
+### Bug Fixes
+
+- **import**: Validate and atomically commit plugin batches
+  ([#674](https://github.com/jtn0123/InkyPi/pull/674),
+  [`eb6c29b`](https://github.com/jtn0123/InkyPi/commit/eb6c29b77e7fb7c61892a424dc9ec26e0d0cda90))
+
+
 ## v1.4.11 (2026-10-01)
 
 ### Bug Fixes
