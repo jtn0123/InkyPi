@@ -1610,10 +1610,16 @@ class TestPiImageBuildWorkflow:
     def test_workflow_uploads_release_asset(self) -> None:
         assert "softprops/action-gh-release" in self.content
 
-    def test_workflow_attach_gated_on_release_event(self):
-        # attach-release step must only fire on `release` events, never on
-        # workflow_dispatch (which is a dry run) -> None -> None.
-        assert "github.event_name == 'release'" in self.content
+    def test_workflow_attach_supports_reusable_release_and_manual_dry_run(self):
+        # Reusable release.yml calls inherit the push event. Manual image
+        # verification remains a dry run; every attachment requires a boot pass.
+        workflow = yaml.safe_load(self.content)
+        condition = workflow["jobs"]["attach-release"]["if"]
+        assert "github.event_name != 'workflow_dispatch'" in condition
+        assert "needs.verify-boot.outputs.verified == 'true'" in condition
+        assert "github.event_name == 'release'" not in condition
+        attach = workflow["jobs"]["attach-release"]["steps"][-1]
+        assert attach["with"]["tag_name"] == "${{ needs.build-image.outputs.tag }}"
 
 
 class TestReleaseWorkflow:

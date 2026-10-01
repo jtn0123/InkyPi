@@ -415,7 +415,7 @@ jobs:
   attach-release:
     name: Attach image to GitHub release
     needs: [build-image, verify-boot]
-    if: needs.verify-boot.outputs.verified == 'true'
+    if: github.event_name != 'workflow_dispatch' && needs.verify-boot.outputs.verified == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Download image artifact
