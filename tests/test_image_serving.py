@@ -192,7 +192,7 @@ def test_equal_size_same_second_overwrite_invalidates_webp(tmp_path: Path) -> No
 
 
 def test_conditional_revalidation_is_variant_specific(tmp_path: Path) -> None:
-    from flask import Flask, request
+    from flask import Flask, Response, request
 
     from utils.image_serving import maybe_serve_webp
 
@@ -200,7 +200,7 @@ def test_conditional_revalidation_is_variant_specific(tmp_path: Path) -> None:
     app = Flask(__name__)
 
     @app.route("/image")
-    def image():
+    def image() -> Response:
         return maybe_serve_webp(tmp_path, "test.png", request.headers.get("Accept"))
 
     client = app.test_client()
