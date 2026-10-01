@@ -2,6 +2,43 @@
 
 <!-- version list -->
 
+## v1.4.6 (2026-10-01)
+
+### Bug Fixes
+
+- **dependencies**: Lock installer tooling and refresh stable browser
+  ([#659](https://github.com/jtn0123/InkyPi/pull/659),
+  [`8bef4a0`](https://github.com/jtn0123/InkyPi/commit/8bef4a034a3ecbf0780194549a24d34b1bb739ae))
+
+- **release**: Allow image verifier artifact access from release caller
+  ([#665](https://github.com/jtn0123/InkyPi/pull/665),
+  [`999b8e7`](https://github.com/jtn0123/InkyPi/commit/999b8e71010428ce6ae0770010ab0e62351be20c))
+
+- **render**: Unify direct outcomes and revalidate image variants
+  ([#661](https://github.com/jtn0123/InkyPi/pull/661),
+  [`0648dc9`](https://github.com/jtn0123/InkyPi/commit/0648dc980925a466fbf1c86329b389c8397c9d91))
+
+- **setup**: Restore image builds and ARM drift diagnostics
+  ([#656](https://github.com/jtn0123/InkyPi/pull/656),
+  [`8560253`](https://github.com/jtn0123/InkyPi/commit/856025347274a7c4c067e45d96050a2d99333268))
+
+- **web**: Align bundled assets and accessible dialog focus
+  ([#660](https://github.com/jtn0123/InkyPi/pull/660),
+  [`54bda5b`](https://github.com/jtn0123/InkyPi/commit/54bda5b93d0af7695c9144f86a798c3d7fd4e269))
+
+### Refactoring
+
+- **types**: Tighten fixtures and lower measured test typing debt
+  ([#664](https://github.com/jtn0123/InkyPi/pull/664),
+  [`1d607b3`](https://github.com/jtn0123/InkyPi/commit/1d607b3aad142227cc8147ad2e9d42fe787bbde4))
+
+### Testing
+
+- **render**: Repeat visual goldens with useful failure diagnostics
+  ([#663](https://github.com/jtn0123/InkyPi/pull/663),
+  [`f81aaf0`](https://github.com/jtn0123/InkyPi/commit/f81aaf089f2ed6a76b14e2dacc483a3add6f8abf))
+
+
 ## v1.4.5 (2026-10-01)
 
 ### Bug Fixes
