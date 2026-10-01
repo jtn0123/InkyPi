@@ -2,6 +2,15 @@
 
 <!-- version list -->
 
+## v1.4.4 (2026-10-01)
+
+### Bug Fixes
+
+- **security**: Enforce HTTPS and document secure commissioning
+  ([#657](https://github.com/jtn0123/InkyPi/pull/657),
+  [`13d27e8`](https://github.com/jtn0123/InkyPi/commit/13d27e889b677b1eb270e77009b887581d48c02a))
+
+
 ## v1.4.3 (2026-09-30)
 
 ### Bug Fixes
