@@ -2811,7 +2811,12 @@ class TestOsDriftNightlyWorkflow:
         assert isinstance(jobs, dict)
         matrix = jobs["drift-check"]["strategy"]["matrix"]
         assert isinstance(matrix, dict)
-        assert isinstance(matrix["codename"], list)
+        # Supported defaults are Bookworm/Trixie; Bullseye is manual legacy.
+        codenames = matrix["codename"]
+        assert isinstance(codenames, str)
+        assert "fromJSON" in codenames
+        assert '["trixie", "bookworm"]' in codenames
+        assert "codename == 'bullseye'" in codenames
 
 
 # ---- memory-diff workflow ----

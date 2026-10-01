@@ -42,12 +42,17 @@ concurrency:
 jobs:
   drift-check:
     name: OS drift — debian:${{ matrix.codename }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm
+    defaults:
+      run:
+        shell: bash
     timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
-        codename: [trixie, bookworm, bullseye]
+        # Stock Bullseye has Python 3.9; current InkyPi requires 3.11+.
+        # Keep an explicit manual legacy probe, outside supported defaults.
+        codename: ${{ fromJSON(github.event.inputs.codename == 'bullseye' && '["bullseye"]' || '["trixie", "bookworm"]') }}
     # Run all steps directly inside the unpinned debian:${codename} image so
     # the apt-cache and pip resolution checks exercise the same package set
     # install.sh would see on that OS base. The :latest tag is intentional —
@@ -122,7 +127,10 @@ jobs:
           FAILED_LOG=artifacts/apt-missing-${{ matrix.codename }}.txt
           : > "$FAILED_LOG"
 
-          # Refresh the apt index from the unpinned debian mirror.
+          # Match the ARM install simulator's Pi OS repository overlay.
+          # trusted=yes is simulation-only (Debian sqv rejects its SHA1 key);
+          # never copy this setting to an installed Pi.
+          printf 'deb [trusted=yes] http://archive.raspberrypi.com/debian/ %s main\n' "${{ matrix.codename }}" > /etc/apt/sources.list.d/raspi.list
           apt-get update
 
           MISSING=0
@@ -171,6 +179,7 @@ jobs:
           python3 -m venv /tmp/drift-venv
           # shellcheck disable=SC1091
           . /tmp/drift-venv/bin/activate
+          python -c 'import sys; assert sys.version_info >= (3, 11), "Current InkyPi requires Python 3.11+; stock Bullseye is a legacy probe, not a supported install"'
           python -m pip install --upgrade pip wheel
 
           set +e
@@ -183,7 +192,7 @@ jobs:
             --ignore-installed \
             --retries 3 \
             --timeout 60 \
-            -r "$REQ_FILE" 2>&1 | tee "$LOG"
+            --require-hashes -r "$REQ_FILE" 2>&1 | tee "$LOG"
           rc=${PIPESTATUS[0]}
           set -e
 
@@ -213,7 +222,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        codename: [trixie, bookworm, bullseye]
+        # Stock Bullseye has Python 3.9; current InkyPi requires 3.11+.
+        # Keep an explicit manual legacy probe, outside supported defaults.
+        codename: ${{ fromJSON(github.event.inputs.codename == 'bullseye' && '["bullseye"]' || '["trixie", "bookworm"]') }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -252,7 +263,7 @@ jobs:
           # passed straight through as the unpinned base image tag, so this
           # is the nightly drift-detection variant of the same sim the day
           # job runs against pinned digests.
-          ./scripts/sim_install.sh "${{ matrix.codename }}" 2>&1 | tee "$LOG"
+          bash ./scripts/sim_install.sh "${{ matrix.codename }}" 2>&1 | tee "$LOG"
           exit "${PIPESTATUS[0]}"
 
       - name: Upload install sim log
@@ -334,6 +345,14 @@ jobs:
               ``,
               `Tracked via JTN-535. If you are closing this issue without a code change, also check whether the upstream package or Pi OS repo has since self-healed before the next nightly run.`,
             ].join('\n');
+
+            // Always retain diagnostics even if repository Issues are disabled.
+            await core.summary.addRaw(body).write();
+            const { data: repository } = await github.rest.repos.get(context.repo);
+            if (!repository.has_issues) {
+              core.info('Repository Issues are disabled; failure details are in the job summary and artifacts.');
+              return;
+            }
 
             // De-dupe: if an open drift issue with the same title already
             // exists, just add a comment pointing to this run instead of
