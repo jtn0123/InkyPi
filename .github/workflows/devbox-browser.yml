@@ -1,7 +1,7 @@
 name: Devbox stable browser
 on:
   pull_request:
-    paths: [devbox.json, '.github/workflows/devbox-browser.yml']
+    paths: [devbox.json, 'scripts/devbox_*.sh', 'scripts/devbox_*.py', '.github/workflows/devbox-browser.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -17,3 +17,10 @@ jobs:
       - name: Verify stable Chromium and run renderer smoke
         run: |
           devbox run verify-browser
+      - name: Preserve actual Chromium render
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: devbox-chromium-render
+          path: .Codex/devbox-render.png
+          if-no-files-found: ignore
