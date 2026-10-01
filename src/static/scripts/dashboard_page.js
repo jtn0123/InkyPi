@@ -184,6 +184,21 @@
     // the preview surfaces the same Now/Next information with matching
     // aria-live semantics, so the duplicate aside block was redundant.
 
+    function updatePreviewConnectivity(info, up) {
+      // A partial refresh is still stale; only full recovery clears the warning.
+      const connWarn = document.getElementById("connectivityWarning");
+      if (!info || !up) {
+        setConsecutiveFailures(getConsecutiveFailures() + 1);
+        if (connWarn) {
+          connWarn.textContent = "Some dashboard data is unavailable. Retrying…";
+          setHidden(connWarn, false);
+        }
+      } else {
+        setConsecutiveFailures(0);
+        if (connWarn) setHidden(connWarn, true);
+      }
+    }
+
     async function refreshPreview() {
       const sequence = ++previewRefreshSequence;
       const previewImg = document.getElementById("previewImage");
@@ -208,18 +223,7 @@
       // Initial/open/event fetches overlap; older completions cannot replace newer state.
       if (sequence !== previewRefreshSequence) return;
 
-      // A partial refresh is still stale; only full recovery clears the warning.
-      const connWarn = document.getElementById("connectivityWarning");
-      if (!info || !up) {
-        setConsecutiveFailures(getConsecutiveFailures() + 1);
-        if (connWarn) {
-          connWarn.textContent = "Some dashboard data is unavailable. Retrying…";
-          setHidden(connWarn, false);
-        }
-      } else {
-        setConsecutiveFailures(0);
-        if (connWarn) setHidden(connWarn, true);
-      }
+      updatePreviewConnectivity(info, up);
 
       if (info?.image_hash && info.image_hash !== getImageHash() && previewImg) {
         setImageHash(info.image_hash);
