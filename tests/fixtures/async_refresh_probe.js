@@ -20,7 +20,7 @@ const sandbox = {
   document: {getElementById: id => nodes[id] || null, querySelectorAll: () => [], querySelector: () => null},
   setTimeout(callback, delay) {scheduled.push({callback, delay}); return scheduled.length;},
   setInterval() {return 1;}, clearInterval() {}, addEventListener() {},
-  EventSource: class {close() {}},
+  EventSource: class extends EventTarget {close() {}},
   showResponseModal(status, message) {feedback.push({status, message});},
   fetch: async url => ({ok: true, json: async () => {
     if (scenario === "dashboard" && url === "/refresh") {
@@ -37,6 +37,10 @@ async function main() {
   if (scenario === "dashboard") {
     vm.runInNewContext(fs.readFileSync(path.join(root, "src/static/scripts/dashboard_page.js"), "utf8"), sandbox);
     sandbox.InkyPiDashboardPage.create({resolution: [800, 480], pushUrl: "/events", refreshInfoUrl: "/refresh", nextUpUrl: "/next"}).init();
+    // Startup hydration owns its own failure; isolate the manual action boundary.
+    await flush();
+    await flush();
+    feedback.length = 0;
     listeners.click();
     await flush();
     await flush();

@@ -73,6 +73,12 @@
     button.textContent = pending ? "Switching\u2026" : defaultLabel;
   }
 
+  async function fetchDashboardJson(url) {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`Dashboard request failed: ${response.status}`);
+    return response.json();
+  }
+
   function createDashboardPage(config) {
     const pollIntervalMs = config.pollIntervalMs || DEFAULTS.pollIntervalMs;
     const refreshDelayMs = config.refreshDelayMs || DEFAULTS.refreshDelayMs;
@@ -95,6 +101,8 @@
     let _legacyImageHash = config.imageHash;
     let _legacyFailures = 0;
     let refreshCountdownTimerId = null;
+    let previewRefreshSequence = 0;
+    let kpiRefreshSequence = 0;
     let currentRefreshInfo = config.initialRefreshInfo || null;
 
     const desktopPreviewQuery =
@@ -177,17 +185,18 @@
     // aria-live semantics, so the duplicate aside block was redundant.
 
     async function refreshPreview() {
+      const sequence = ++previewRefreshSequence;
       const previewImg = document.getElementById("previewImage");
       const previewSkel = document.getElementById("previewSkeleton");
       let info = null;
       let up = null;
       try {
         [info, up] = await Promise.all([
-          fetch(config.refreshInfoUrl).then((response) => response.json()).catch((err) => {
+          fetchDashboardJson(config.refreshInfoUrl).catch((err) => {
             console.warn("Failed to fetch refresh info:", err);
             return null;
           }),
-          fetch(config.nextUpUrl).then((response) => response.json()).catch((err) => {
+          fetchDashboardJson(config.nextUpUrl).catch((err) => {
             console.warn("Failed to fetch next-up info:", err);
             return null;
           }),
@@ -196,11 +205,15 @@
         console.warn("Dashboard preview refresh failed:", error);
       }
 
-      // Show connectivity warning after repeated failures
+      // Initial/open/event fetches overlap; older completions cannot replace newer state.
+      if (sequence !== previewRefreshSequence) return;
+
+      // A partial refresh is still stale; only full recovery clears the warning.
       const connWarn = document.getElementById("connectivityWarning");
-      if (!info && !up) {
+      if (!info || !up) {
         setConsecutiveFailures(getConsecutiveFailures() + 1);
-        if (getConsecutiveFailures() >= 3 && connWarn) {
+        if (connWarn) {
+          connWarn.textContent = "Some dashboard data is unavailable. Retrying…";
           setHidden(connWarn, false);
         }
       } else {
@@ -215,10 +228,11 @@
         previewImg.src = `${config.previewUrl}?t=${Date.now()}`;
       }
 
-      renderMeta(info);
-      const overviewEmpty = document.getElementById("overviewEmpty");
-      const hasData = info?.plugin_id || up?.plugin_id;
-      setHidden(overviewEmpty, hasData);
+      if (info) renderMeta(info);
+      if (info && up) {
+        const overviewEmpty = document.getElementById("overviewEmpty");
+        setHidden(overviewEmpty, info.plugin_id || up.plugin_id);
+      }
       updateHeroStrip(info, up);
       if (info?.playlist) {
         setQuickSwitchActiveRow(info.playlist);
@@ -334,15 +348,18 @@
     }
 
     function updateHeroStrip(info, up) {
-      const nowValue = info?.plugin_id ? (info.plugin_display_name || info.plugin_id) : "";
-      setCell("heroNowValue", "heroNowMeta", nowValue || "Idle", buildNowMeta(info));
-      const nowV = document.getElementById("heroNowValue");
-      if (nowV) nowV.classList.toggle("is-empty", !nowValue);
-
-      const nextValue = up?.plugin_id ? (up.plugin_display_name || up.plugin_id) : "";
-      const nextMeta = up?.playlist ? `Playlist: ${up.playlist}` : "";
-      setCell("heroNextValue", "heroNextMeta", nextValue, nextMeta);
-      updateRefreshCountdown(info);
+      if (info) {
+        const nowValue = info.plugin_id ? (info.plugin_display_name || info.plugin_id) : "";
+        setCell("heroNowValue", "heroNowMeta", nowValue || "Idle", buildNowMeta(info));
+        const nowV = document.getElementById("heroNowValue");
+        if (nowV) nowV.classList.toggle("is-empty", !nowValue);
+        updateRefreshCountdown(info);
+      }
+      if (up) {
+        const nextValue = up.plugin_id ? (up.plugin_display_name || up.plugin_id) : "";
+        const nextMeta = up.playlist ? `Playlist: ${up.playlist}` : "";
+        setCell("heroNextValue", "heroNextMeta", nextValue, nextMeta);
+      }
     }
 
     function setQuickSwitchActiveRow(playlistName) {
@@ -631,11 +648,12 @@
       return "";
     }
 
-    async function fetchStatsSnapshot(statsUrl) {
+    async function fetchStatsSnapshot(statsUrl, sequence) {
       try {
         const resp = await fetch(statsUrl, { headers: { Accept: "application/json" } });
         if (!resp.ok) return { reachable: false, hasTelemetry: false };
         const body = await resp.json();
+        if (sequence !== kpiRefreshSequence) return { reachable: false, hasTelemetry: false };
         const w = body.last_24h || {};
         const total = Number(w.total);
         setKpiText("kpiRefreshes", Number.isFinite(total) ? String(total) : "\u2014");
@@ -661,11 +679,12 @@
       }
     }
 
-    async function fetchHealthSnapshot(healthUrl) {
+    async function fetchHealthSnapshot(healthUrl, sequence) {
       try {
         const resp = await fetch(healthUrl, { headers: { Accept: "application/json" } });
         if (!resp.ok) return { reachable: false, hasTelemetry: false };
         const body = await resp.json();
+        if (sequence !== kpiRefreshSequence) return { reachable: false, hasTelemetry: false };
         const free = Number(body.disk_free_gb);
         setKpiText(
           "kpiStorageFree",
@@ -684,17 +703,23 @@
     }
 
     async function refreshKpis() {
+      const sequence = ++kpiRefreshSequence;
       const statsUrl = config.statsUrl || "/api/stats";
       const healthUrl = config.systemHealthUrl || "/api/health/system";
-      const stats = await fetchStatsSnapshot(statsUrl);
-      const health = await fetchHealthSnapshot(healthUrl);
+      const [stats, health] = await Promise.all([
+        fetchStatsSnapshot(statsUrl, sequence),
+        fetchHealthSnapshot(healthUrl, sequence),
+      ]);
+      if (sequence !== kpiRefreshSequence) return;
       const hasTelemetry = stats.hasTelemetry || health.hasTelemetry;
-      if (hasTelemetry) {
-        setKpiStatus("Last 24h snapshot");
-      } else if (stats.reachable || health.reachable) {
-        setKpiStatus("Awaiting telemetry");
-      } else {
+      if (!stats.reachable && !health.reachable) {
         setKpiStatus("Telemetry unavailable");
+      } else if (!stats.reachable || !health.reachable) {
+        setKpiStatus("Some telemetry unavailable");
+      } else if (hasTelemetry) {
+        setKpiStatus("Last 24h snapshot");
+      } else {
+        setKpiStatus("Awaiting telemetry");
       }
     }
 
