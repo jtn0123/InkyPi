@@ -2,6 +2,15 @@
 
 <!-- version list -->
 
+## v1.4.7 (2026-10-01)
+
+### Bug Fixes
+
+- **ui**: Authenticate HTMX plugin settings saves
+  ([#667](https://github.com/jtn0123/InkyPi/pull/667),
+  [`9f0ddc5`](https://github.com/jtn0123/InkyPi/commit/9f0ddc5b48ccf763f89782e947a6aa9f84b3f309))
+
+
 ## v1.4.6 (2026-10-01)
 
 ### Bug Fixes
