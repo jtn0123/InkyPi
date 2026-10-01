@@ -357,7 +357,7 @@ jobs:
     name: Boot-verify image in qemu
     needs: build-image
     if: always() && (needs.build-image.result == 'success' || (github.event_name == 'workflow_dispatch' && inputs.reuse_run_id != ''))
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm
     timeout-minutes: 20
     outputs:
       verified: ${{ steps.verify.outputs.verified }}

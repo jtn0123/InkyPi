@@ -5,6 +5,7 @@ import hashlib
 import json
 import lzma
 import re
+from datetime import UTC, datetime
 from pathlib import Path
 
 
@@ -27,6 +28,9 @@ def build_manifest(image: Path, tag: str) -> dict[str, object]:
                 "description": "Pre-installed InkyPi on Raspberry Pi OS Lite Bookworm arm64",
                 "url": f"https://github.com/jtn0123/InkyPi/releases/download/{tag}/{expected}",
                 "website": "https://github.com/jtn0123/InkyPi",
+                "icon": "https://raw.githubusercontent.com/jtn0123/InkyPi/main/src/static/images/inkypi.png",
+                "release_date": datetime.now(UTC).date().isoformat(),
+                "devices": ["pi2-zero"],
                 "init_format": "systemd",
                 "image_download_size": image.stat().st_size,
                 "extract_size": size,

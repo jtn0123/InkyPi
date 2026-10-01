@@ -16,6 +16,18 @@ def test_manifest_describes_actual_image(tmp_path: Path) -> None:
     assert isinstance(entry, list)
     item = entry[0]
     assert item["init_format"] == "systemd"
+    assert item["devices"] == ["pi2-zero"]
+    assert set(item) >= {
+        "name",
+        "description",
+        "icon",
+        "url",
+        "extract_size",
+        "extract_sha256",
+        "image_download_size",
+        "release_date",
+        "devices",
+    }
     assert item["extract_sha256"] == hashlib.sha256(source).hexdigest()
     assert item["extract_size"] == len(source)
     assert item["image_download_size"] == image.stat().st_size
