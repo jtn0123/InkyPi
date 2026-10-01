@@ -87,6 +87,7 @@
                         data-test-skip-click="true"
                         aria-describedby="save-settings-help"
                         hx-post="{{ url_for('plugin.save_plugin_settings') }}"
+                        hx-headers='{{ {"X-CSRFToken": csrf_token()} | tojson }}'
                         hx-include="#settingsForm"
                         hx-target="#plugin-form-errors"
                         hx-swap="innerHTML"

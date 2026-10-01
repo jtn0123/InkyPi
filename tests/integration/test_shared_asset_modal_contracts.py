@@ -144,3 +144,67 @@ def test_nested_dialog_restores_outer_focus(
     expect(page.locator("#rebootConfirmModal")).to_be_visible()
     page.keyboard.press("Escape")
     expect(page.locator("#rebootBtn")).to_be_focused()
+
+
+def test_header_save_settings_with_production_csrf(
+    asset_mode: bool, flask_app: Flask, live_server: str, browser_page: Page
+) -> None:
+    """The real HTMX button must save with production CSRF enforcement enabled."""
+    from app_setup.security_middleware import setup_csrf_protection
+
+    setup_csrf_protection(flask_app)
+    page = browser_page
+    navigate_and_wait(page, live_server, "/plugin/countdown")
+    page.locator('#settingsForm input[name="title"]').fill("CSRF-protected countdown")
+    page.locator('#settingsForm input[name="date"]').fill("2099-12-31")
+    with page.expect_response(
+        lambda response: response.url.endswith("/save_plugin_settings")
+        and response.request.method == "POST"
+    ) as submission:
+        page.locator("#savePluginSettingsBtn").click()
+    response = submission.value
+    assert response.status == 200
+    assert response.request.headers.get("hx-request") == "true"
+    assert bool(response.request.headers.get("x-csrftoken"))
+    expect(page.locator("#plugin-form-errors")).to_contain_text("Settings saved")
+    expect(page.locator(".toast.success")).to_contain_text("Settings saved")
+    saved = (
+        flask_app.config["DEVICE_CONFIG"]
+        .get_playlist_manager()
+        .find_plugin("countdown", "countdown_saved_settings")
+    )
+    assert saved is not None
+    assert saved.settings["title"] == "CSRF-protected countdown"
+    assert saved.settings["date"] == "2099-12-31"
+    assert "csrf_token" not in saved.settings
+
+
+@pytest.mark.parametrize("token", [None, "invalid-token"], ids=["missing", "invalid"])
+def test_header_save_settings_csrf_rejection_is_preserved(
+    asset_mode: bool,
+    flask_app: Flask,
+    live_server: str,
+    browser_page: Page,
+    token: str | None,
+) -> None:
+    """Neither HTMX markup nor the valid-save fix exempts this endpoint."""
+    from app_setup.security_middleware import setup_csrf_protection
+
+    setup_csrf_protection(flask_app)
+    page = browser_page
+    navigate_and_wait(page, live_server, "/plugin/countdown")
+    headers = {"HX-Request": "true"}
+    if token is not None:
+        headers["X-CSRFToken"] = token
+    response = page.request.post(
+        f"{live_server}/save_plugin_settings",
+        headers=headers,
+        form={"plugin_id": "countdown", "title": "Rejected", "date": "2099-12-31"},
+    )
+    assert response.status == 403
+    assert (
+        flask_app.config["DEVICE_CONFIG"]
+        .get_playlist_manager()
+        .find_plugin("countdown", "countdown_saved_settings")
+        is None
+    )
