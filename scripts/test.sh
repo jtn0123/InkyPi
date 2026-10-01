@@ -29,6 +29,7 @@ fi
 
 BROWSER_TEST_TARGETS=(
     tests/integration/test_browser_smoke.py
+    tests/integration/test_shared_asset_modal_contracts.py
     tests/integration/test_remote_browser_boundary.py
     tests/integration/test_e2e_form_workflows.py
     tests/integration/test_more_a11y.py

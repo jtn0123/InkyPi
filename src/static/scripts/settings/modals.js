@@ -36,10 +36,12 @@
       modal.classList.toggle("is-open", !!open);
       syncModalOpenState(ui);
       if (open) {
+        globalThis.InkyPiModalFocus.activate(modal, triggerEl, () => setDeviceActionModalOpen(modalId, false));
         const focusable = findFirstFocusable(modal);
         if (focusable) setTimeout(() => focusable.focus(), 0);
         return;
       }
+      globalThis.InkyPiModalFocus.deactivate(modal);
       if (
         lastDeviceActionTrigger &&
         typeof lastDeviceActionTrigger.focus === "function" &&
@@ -94,6 +96,7 @@
       modal.style.display = "flex";
       modal.classList.add("is-open");
       syncModalOpenState(ui);
+      globalThis.InkyPiModalFocus.activate(modal, lastWhatsNewTrigger, closeWhatsNew);
       const focusable = findFirstFocusable(modal);
       if (focusable) setTimeout(() => focusable.focus(), 0);
     }
@@ -104,6 +107,7 @@
       modal.hidden = true;
       modal.style.display = "none";
       modal.classList.remove("is-open");
+      globalThis.InkyPiModalFocus.deactivate(modal);
       syncModalOpenState(ui);
       if (
         lastWhatsNewTrigger &&

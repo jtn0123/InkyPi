@@ -23,6 +23,7 @@ if SRC_ABS not in sys.path:
     sys.path.insert(0, SRC_ABS)
 
 UI_BROWSER_TESTS = {
+    "test_shared_asset_modal_contracts.py",
     "test_browser_smoke.py",
     "test_e2e_form_workflows.py",
     "test_playlist_interactions.py",

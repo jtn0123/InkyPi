@@ -24,12 +24,17 @@
     node.style.display = open ? "flex" : "none";
     node.classList.toggle("is-open", open);
     if (open) {
+      globalThis.InkyPiModalFocus.activate(node, triggerEl, () => {
+        node.dispatchEvent(new CustomEvent("inkypi:modal-dismiss"));
+      });
       // Move focus to the first focusable element inside the modal
       const focusable = node.querySelector(
         'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
       );
       if (focusable) setTimeout(() => focusable.focus(), 0);
-    } else if (_lastHistoryModalTrigger) {
+    } else {
+      globalThis.InkyPiModalFocus.deactivate(node);
+      if (!_lastHistoryModalTrigger) return;
       if (typeof _lastHistoryModalTrigger.focus === "function") {
         _lastHistoryModalTrigger.focus();
       }
@@ -404,6 +409,10 @@
           closeLightbox();
         }
       });
+
+      document.getElementById("clearHistoryModal")?.addEventListener("inkypi:modal-dismiss", closeClearModal);
+      document.getElementById("deleteHistoryModal")?.addEventListener("inkypi:modal-dismiss", closeDeleteModal);
+      document.getElementById("lightboxModal")?.addEventListener("inkypi:modal-dismiss", closeLightbox);
 
       document.addEventListener("keydown", (event) => {
         if (event.key !== "Escape") return;

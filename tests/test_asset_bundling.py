@@ -231,9 +231,16 @@ class TestSetupAssetHelpers:
 
         manifest_path = tmp_path / "manifest.json"
         manifest_path.write_text(
-            json.dumps({"common.js": "common.bundle.aabbccdd.min.js"}),
+            json.dumps(
+                {
+                    "common.js": "common.bundle.aabbccdd.min.js",
+                    "common.css": "common.bundle.aabbccdd.min.css",
+                }
+            ),
             encoding="utf-8",
         )
+        (tmp_path / "common.bundle.aabbccdd.min.js").write_text("/* JS */")
+        (tmp_path / "common.bundle.aabbccdd.min.css").write_text("/* CSS */")
         ah._override_manifest_path_for_tests(manifest_path)
         ah.setup_asset_helpers(flask_app)
 
@@ -249,3 +256,35 @@ class TestSetupAssetHelpers:
         ah.setup_asset_helpers(flask_app)
 
         assert flask_app.jinja_env.globals["bundled_assets_enabled"] is False
+
+
+def test_fallback_sources_match_complete_bundle(
+    tmp_path: Path, flask_app: Flask
+) -> None:
+    sources = json.loads((SRC_ROOT / "static/scripts/common_manifest.json").read_text())
+    dist = tmp_path / "dist"
+    result = _run_build_assets(dist)
+    assert result.returncode == 0, result.stderr
+    manifest = json.loads((dist / "manifest.json").read_text())
+    bundle = (dist / manifest["common.js"]).read_text()
+    with flask_app.test_request_context("/"):
+        html = flask_app.jinja_env.get_template("base.html").render(
+            csrf_token=lambda: "token", csp_nonce="nonce"
+        )
+    positions = []
+    for source in sources:
+        assert f"// === {source['path']} ===" in bundle
+        positions.append(html.index("scripts/" + source["path"]))
+    assert positions == sorted(positions)
+
+
+def test_incomplete_manifest_uses_fallback(tmp_path: Path, flask_app: Flask) -> None:
+    import app_setup.asset_helpers as ah
+
+    manifest = tmp_path / "manifest.json"
+    manifest.write_text(
+        json.dumps({"common.js": "missing.js", "common.css": "missing.css"})
+    )
+    ah._override_manifest_path_for_tests(manifest)
+    ah.setup_asset_helpers(flask_app)
+    assert not flask_app.jinja_env.globals["bundled_assets_enabled"]
