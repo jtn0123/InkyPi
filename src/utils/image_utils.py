@@ -466,12 +466,17 @@ def _playwright_screenshot_html(
                         "Local render resource readiness failed", exc_info=True
                     )
                 if logger.isEnabledFor(logging.DEBUG):
-                    logger.debug(
-                        "Local render font state: %s",
-                        page.evaluate(
-                            "() => ({status: document.fonts.status, faces: Array.from(document.fonts, face => ({family: face.family, status: face.status}))})"
-                        ),
-                    )
+                    try:
+                        logger.debug(
+                            "Local render font state: %s",
+                            page.evaluate(
+                                "() => ({status: document.fonts.status, faces: Array.from(document.fonts, face => ({family: face.family, status: face.status}))})"
+                            ),
+                        )
+                    except Exception:
+                        logger.debug(
+                            "Local render font diagnostics failed", exc_info=True
+                        )
                 png_bytes = page.screenshot(
                     clip={
                         "x": 0,
