@@ -43,6 +43,7 @@ def execute_direct_render(
     """Apply identical no-image, failure, fallback and metric rules to all callers."""
     started = perf_counter()
     with track_progress() as tracker:
+        generating = True
         try:
             image = generate()
             generate_ms = int((perf_counter() - started) * 1000)
@@ -52,9 +53,14 @@ def execute_direct_render(
                     "Plugin produced no image; display unchanged",
                     metrics={"no_image": True},
                 )
+            generating = False
             display(image)
         except Exception as error:
-            if isinstance(error, URLValidationError):
+            if not generating:
+                outcome = DirectRenderOutcome(
+                    False, "An internal error occurred", 500, "internal_error"
+                )
+            elif isinstance(error, URLValidationError):
                 outcome = DirectRenderOutcome(
                     False,
                     error.safe_message(),

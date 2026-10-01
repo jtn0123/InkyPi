@@ -765,9 +765,12 @@ def _direct_render_outcome(
         return getattr(info, "display_ms", None), getattr(info, "preprocess_ms", None)
 
     def fallback(error: BaseException, record_history: bool) -> None:
-        logger.warning(
-            "Direct render failed for %s", sanitize_log_field(plugin_id), exc_info=error
+        message = (
+            "Unexpected error generating preview for %s"
+            if not isinstance(error, RuntimeError)
+            else "Plugin failed during direct render for %s"
         )
+        logger.error(message, sanitize_log_field(plugin_id), exc_info=error)
         _push_update_now_fallback(
             plugin_id,
             plugin_config,

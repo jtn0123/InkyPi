@@ -21,6 +21,7 @@ from utils.plugin_errors import ScreenshotBackendError, URLValidationError
         ("timeout", 504, "manual_update_timeout"),
         ("runtime", 400, "plugin_error"),
         ("unexpected", 500, "internal_error"),
+        ("display", 500, "internal_error"),
     ],
 )
 def test_direct_request_and_queued_job_match(
@@ -55,6 +56,8 @@ def test_direct_request_and_queued_job_match(
             return Image.new("RGB", (8, 8), "white")
 
     def display(image: object, **kwargs: object) -> None:
+        if case == "display":
+            raise RuntimeError("sensitive driver details")
         displayed.append(image)
 
     def fallback(*args: object, record_history: bool = True) -> None:
