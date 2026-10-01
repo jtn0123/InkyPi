@@ -577,10 +577,10 @@
           setPanelFailure("healthSummary", "Failed to load health data", error));
         progressES.addEventListener("done", refresh);
         progressES.addEventListener("error", async () => {
-          await refresh();
           if (progressES?.readyState === globalThis.EventSource.CLOSED) {
             stopProgressSSE();
           }
+          await refresh();
         });
       } catch (e) {
         console.warn("Progress SSE unavailable:", e);
