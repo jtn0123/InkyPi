@@ -81,9 +81,9 @@ def test_debug_console_filters_callback_names() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_base_template_includes_debug_console_script() -> None:
+def test_base_template_includes_debug_console_script(client: FlaskClient) -> None:
     """base.html must load debug_console.js."""
-    html = _BASE_TEMPLATE.read_text(encoding="utf-8")
+    html = client.get("/").get_data(as_text=True)
     assert (
         "debug_console.js" in html
     ), "base.html must include a <script> tag for debug_console.js"
