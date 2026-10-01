@@ -2,6 +2,26 @@
 
 <!-- version list -->
 
+## v1.4.9 (2026-10-01)
+
+### Bug Fixes
+
+- Preserve playlist entries during reorder validation
+  ([#669](https://github.com/jtn0123/InkyPi/pull/669),
+  [`2b27756`](https://github.com/jtn0123/InkyPi/commit/2b27756ec4bbd4422e61bef6d14408d686c17740))
+
+### Continuous Integration
+
+- Require preflash and repeated renders in CI gate
+  ([#670](https://github.com/jtn0123/InkyPi/pull/670),
+  [`9ad5463`](https://github.com/jtn0123/InkyPi/commit/9ad54635d579b7e958296a7a0262cd59504daaa0))
+
+### Testing
+
+- Drain owned SSE resources between app servers ([#671](https://github.com/jtn0123/InkyPi/pull/671),
+  [`d038f01`](https://github.com/jtn0123/InkyPi/commit/d038f011c40346bccb7ff23d9ecdc44ec633436e))
+
+
 ## v1.4.8 (2026-10-01)
 
 ### Bug Fixes
