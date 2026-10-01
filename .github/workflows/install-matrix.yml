@@ -39,13 +39,14 @@ jobs:
     # config, so bullseye has never been a real install target. Keeping the PR
     # gate on bookworm + trixie reflects reality; broader drift coverage still
     # lives in the nightly matrix and the separate memcap smoke coverage.
-    name: install.sh e2e (${{ matrix.codename }})
+    name: install.sh e2e (${{ matrix.codename }}, ${{ matrix.hardware }})
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
         codename: [bookworm, trixie]
+        hardware: [inky, waveshare]
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -72,6 +73,8 @@ jobs:
           cache-to: type=gha,mode=max,scope=install-matrix-${{ matrix.codename }}
 
       - name: Run install.sh + verification (${{ matrix.codename }}, 512 MB cap)
+        env:
+          INKYPI_INSTALL_MATRIX_WAVESHARE: ${{ matrix.hardware == 'waveshare' && 'epd7in5_V2' || '' }}
         run: |
           set -euo pipefail
           mkdir -p /tmp/install-matrix-logs
@@ -82,6 +85,7 @@ jobs:
             --platform linux/arm64 \
             --memory=512m \
             --memory-swap=512m \
+            --env INKYPI_INSTALL_MATRIX_WAVESHARE \
             --entrypoint bash \
             inkypi-install-matrix:${{ matrix.codename }} \
             /InkyPi/scripts/ci_install_matrix_verify.sh \
@@ -91,6 +95,6 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: install-matrix-logs-${{ matrix.codename }}
+          name: install-matrix-logs-${{ matrix.codename }}-${{ matrix.hardware }}
           path: /tmp/install-matrix-logs
           if-no-files-found: ignore

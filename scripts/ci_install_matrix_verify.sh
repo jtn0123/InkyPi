@@ -61,7 +61,11 @@ fi
 # wheelhouse would mask a broken requirements.txt.
 export INKYPI_SKIP_WHEELHOUSE=1
 
-if sudo bash ./install.sh; then
+install_args=()
+if [[ "${INKYPI_INSTALL_MATRIX_WAVESHARE:-}" != "" ]]; then
+    install_args=(-W "$INKYPI_INSTALL_MATRIX_WAVESHARE")
+fi
+if sudo bash ./install.sh "${install_args[@]}"; then
     pass "install.sh exited 0"
 else
     rc=$?
@@ -101,6 +105,11 @@ for dist, mod in mods.items():
     pass "flask, waitress, Pillow importable from install venv"
 else
     fail "one or more required packages missing from install venv"
+fi
+
+if [[ "${INKYPI_INSTALL_MATRIX_WAVESHARE:-}" != "" ]]; then
+    "${VENV_PATH}/bin/python" -c 'import gpiozero, lgpio, RPi.GPIO'
+    pass "hash-verified Waveshare extras import successfully"
 fi
 
 banner "Phase 4/4 — systemd-analyze verify install/inkypi.service"

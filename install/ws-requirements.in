@@ -1,0 +1,6 @@
+# Preserve verified GPIO versions; hardware upgrades need separate validation.
+gpiozero==2.0.1
+lgpio==0.2.2.0
+RPi.GPIO==0.7.1
+# colorzero requires setuptools at runtime.
+setuptools==84.0.0

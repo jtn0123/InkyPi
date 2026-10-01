@@ -831,7 +831,7 @@ class TestInstallScript:
             "-m pip install" in fn_body
         ), "create_venv() must contain a pip install call (JTN-605)"
         assert (
-            " uv" in fn_body
+            "uv-requirements.txt" in fn_body
         ), "create_venv() must install uv into the venv via 'pip install uv' (JTN-605)"
 
     def _logical_shell_lines(self, body: str) -> list[str]:
@@ -1976,7 +1976,7 @@ class TestUpdateScript:
             line
             for line in self.content.splitlines()
             if re.search(r"-m pip install", line)
-            and " uv" in line
+            and "uv-requirements.txt" in line
             and not line.strip().startswith("#")
         ]
         assert (
