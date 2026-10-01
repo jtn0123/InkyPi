@@ -2,6 +2,20 @@
 
 <!-- version list -->
 
+## v1.4.11 (2026-10-01)
+
+### Bug Fixes
+
+- **dashboard**: Reconcile events and preserve reliable status
+  ([#675](https://github.com/jtn0123/InkyPi/pull/675),
+  [`513baf4`](https://github.com/jtn0123/InkyPi/commit/513baf4a17ea9f303942e47b62a609ab90f37148))
+
+### Testing
+
+- Honor pytest ignores and visible navigation ([#673](https://github.com/jtn0123/InkyPi/pull/673),
+  [`da017c5`](https://github.com/jtn0123/InkyPi/commit/da017c5174fee0b3065055c29d398c13a6e46436))
+
+
 ## v1.4.10 (2026-10-01)
 
 ### Bug Fixes
