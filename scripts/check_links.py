@@ -14,8 +14,9 @@ import json
 import subprocess
 from collections.abc import Callable
 from pathlib import Path
+from time import monotonic
 from typing import Any
-from urllib.parse import urlsplit
+from urllib.parse import urlsplit, urlunsplit
 
 
 def curl_status(url: str) -> int:
@@ -68,33 +69,74 @@ def browser_document_valid(status: int, title: str, text: str) -> bool:
         "sign in",
         "log in",
         "login",
+        "security checkpoint",
+        "attention required",
+        "security verification",
     )
     return not any(marker in title.lower() for marker in error_titles)
 
 
 def verify_browser_pages(urls: list[str]) -> dict[str, dict[str, object]]:
-    from playwright.sync_api import sync_playwright
+    from playwright.sync_api import (
+        Error as PlaywrightError,
+        Frame,
+        Response,
+        sync_playwright,
+    )
+
+    def navigation_recorder(
+        frame: Frame, statuses: list[int]
+    ) -> Callable[[Response], None]:
+        def record(response: Response) -> None:
+            if response.request.is_navigation_request() and response.frame == frame:
+                statuses.append(response.status)
+
+        return record
 
     results: dict[str, dict[str, object]] = {}
     try:
         with sync_playwright() as playwright:
-            browser = playwright.chromium.launch()
+            browser = playwright.chromium.launch(channel="chromium")
             try:
                 for url in urls:
                     context = browser.new_context()
                     try:
                         page = context.new_page()
-                        response = page.goto(
-                            url, wait_until="domcontentloaded", timeout=30000
+                        statuses: list[int] = []
+
+                        page.on(
+                            "response", navigation_recorder(page.main_frame, statuses)
                         )
-                        status = response.status if response is not None else 0
-                        title = page.title()
-                        text = page.locator("body").inner_text(timeout=5000)
+                        page.goto(url, wait_until="domcontentloaded", timeout=30000)
+                        deadline = monotonic() + 10
+                        status = 0
+                        title = ""
+                        verified = False
+                        while True:
+                            status = statuses[-1] if statuses else 0
+                            try:
+                                title = page.title()
+                                text = page.locator("body").inner_text(timeout=1000)
+                                verified = browser_document_valid(status, title, text)
+                            except PlaywrightError:
+                                verified = False
+                            if verified or monotonic() >= deadline:
+                                break
+                            page.wait_for_timeout(200)
+                        final_url = urlsplit(page.url)
                         results[url] = {
                             "status": status,
                             "title": title,
-                            "final_url": page.url,
-                            "verified": browser_document_valid(status, title, text),
+                            "final_url": urlunsplit(
+                                (
+                                    final_url.scheme,
+                                    final_url.netloc,
+                                    final_url.path,
+                                    "",
+                                    final_url.fragment,
+                                )
+                            ),
+                            "verified": verified,
                         }
                     except Exception as error:
                         results[url] = {"verified": False, "error": str(error)[:500]}
