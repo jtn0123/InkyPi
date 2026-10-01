@@ -140,7 +140,7 @@ class TestWatchdogIntervalSeconds:
         monkeypatch.setenv("WATCHDOG_USEC", "0")
         assert self.module.RefreshTask._watchdog_interval_seconds() == 30.0
 
-    def test_minimum_is_1_second(self, monkeypatch: pytest.MonkeyPatch):
+    def test_minimum_is_1_second(self, monkeypatch: pytest.MonkeyPatch) -> None:
         # Very small WATCHDOG_USEC (e.g. 100µs) -> None -> None should still yield at least 1s
         monkeypatch.setenv("WATCHDOG_USEC", "100")
         assert self.module.RefreshTask._watchdog_interval_seconds() == 1.0

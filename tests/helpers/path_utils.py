@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 
 
 def path_get(payload: object, dotted_path: str) -> object:
@@ -23,7 +23,7 @@ def path_get(payload: object, dotted_path: str) -> object:
 
 def assert_baseline_preserved(
     baseline_values: dict[str, object],
-    actual_payload: dict,
+    actual_payload: Mapping[str, object],
     paths: Sequence[str],
     version: str | None = None,
 ) -> None:

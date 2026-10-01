@@ -48,7 +48,9 @@ def test_plugin_instance_update_and_image_path() -> None:
 def test_refresh_info_helpers() -> None:
     now = datetime.now(tz=UTC)
     ri = RefreshInfo("Manual Update", "ai_text", now.isoformat(), 123)
-    assert ri.get_refresh_datetime().date() == now.date()
+    refreshed_at = ri.get_refresh_datetime()
+    assert refreshed_at is not None
+    assert refreshed_at.date() == now.date()
     d = ri.to_dict()
     ri2 = RefreshInfo.from_dict(d)
     assert ri2.plugin_id == "ai_text"

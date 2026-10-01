@@ -173,7 +173,7 @@ class TestSecretRedactionFilter:
 
 
 class TestPlainTextOutput:
-    def test_formatted_message_redacted_via_msg(self):
+    def test_formatted_message_redacted_via_msg(self) -> None:
         # Secret is in the msg template itself (already fully interpolated) -> None -> None.
         record = _make_record("api_key=MYSECRETAPIKEY123")  # gitleaks:allow
         SecretRedactionFilter().filter(record)

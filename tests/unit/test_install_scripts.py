@@ -18,7 +18,7 @@ DOCS_DIR = REPO_ROOT / "docs"
 # ---- Helpers ----
 
 
-def _read(name: Any) -> Any:
+def _read(name: str) -> str:
     return (INSTALL_DIR / name).read_text()
 
 
@@ -47,7 +47,7 @@ class TestSystemdService:
     def test_service_resource_limits(self) -> None:
         assert "CPUQuota=40%" in self.content
 
-    def test_service_has_no_memory_caps_in_base_unit(self):
+    def test_service_has_no_memory_caps_in_base_unit(self) -> None:
         # JTN-785: The base unit must NOT hardcode MemoryHigh/MemoryMax.
         # install.sh and update.sh write device-specific caps to a drop-in at
         # /etc/systemd/system/inkypi.service.d/memory.conf so Pi Zero 2 W
@@ -63,7 +63,7 @@ class TestSystemdService:
             "not the base unit, so per-device scaling works"
         )
 
-    def test_service_oom_score_adjust_prefers_inkypi_as_victim(self):
+    def test_service_oom_score_adjust_prefers_inkypi_as_victim(self) -> None:
         # JTN-601: During memory crunch on Pi Zero 2 W, earlyoom was killing
         # sshd and making the Pi unreachable. Positive OOMScoreAdjust makes
         # inkypi the preferred OOM victim so we can still SSH in to debug.
@@ -124,7 +124,7 @@ class TestSystemdService:
         assert "RuntimeDirectory=inkypi" in self.content
         assert "WorkingDirectory=/run/inkypi" in self.content
 
-    def test_service_start_limit_burst(self):
+    def test_service_start_limit_burst(self) -> None:
         # JTN-671: Without StartLimitBurst the JTN-665 incident demonstrated
         # that inkypi.service can restart 4,091+ times before detection (~68 h
         # @ 60 s apart). StartLimitBurst=5 caps that to 5 attempts in
@@ -151,7 +151,7 @@ class TestSystemdService:
             unit_start < interval_pos < service_start
         ), "StartLimitIntervalSec=1800 must be inside the [Unit] section"
 
-    def test_service_on_failure_references_failure_helper(self):
+    def test_service_on_failure_references_failure_helper(self) -> None:
         # JTN-671: OnFailure= activates the sentinel-writer unit when the
         # start-limit is hit, making the failure detectable without parsing
         # journalctl (status LED, healthcheck, future webhook) -> None -> None.
@@ -258,7 +258,7 @@ class TestInstallScript:
     def test_install_builds_css(self) -> None:
         assert "build_css" in self.content
 
-    def test_install_skips_zramtools_when_zram_swap_already_active(self):
+    def test_install_skips_zramtools_when_zram_swap_already_active(self) -> None:
         # JTN-569: Pi OS Trixie preinstalls zram-swap which configures /dev/zram0 at
         # boot. Installing zram-tools on top fights over /dev/zram0 and makes
         # `systemctl start zramswap` exit 1. The guard must run before apt-get.
@@ -275,7 +275,7 @@ class TestInstallScript:
         apt_pos = self.combined.index(apt_install, fn_start)
         assert guard_pos < return_pos < apt_pos
 
-    def test_install_enables_zramswap_on_bookworm_and_trixie(self):
+    def test_install_enables_zramswap_on_bookworm_and_trixie(self) -> None:
         # JTN-528: zramswap must be enabled on Bullseye/Bookworm/Trixie so the
         # Pi Zero 2 W (512 MB RAM) doesn't OOM during pip install. The previous
         # check only matched Bookworm (12) -> None -> None exactly, leaving Trixie users broken.
@@ -314,7 +314,7 @@ class TestInstallScript:
         # JTN-592: the function must reference timedatectl to check NTP sync
         assert "timedatectl show -p NTPSynchronized" in self.content
 
-    def test_wait_for_clock_warns_but_does_not_fail_on_timeout(self):
+    def test_wait_for_clock_warns_but_does_not_fail_on_timeout(self) -> None:
         # JTN-592: on timeout the function must return 0, not exit 1
         # Find the function body between wait_for_clock() -> None -> None { and the closing }
         lines = self.content.splitlines()
@@ -338,7 +338,7 @@ class TestInstallScript:
         # Must have return 0 after the timeout warning (don't block install)
         assert "return 0" in func_body
 
-    def test_install_os_version_comment_lists_correct_codenames(self):
+    def test_install_os_version_comment_lists_correct_codenames(self) -> None:
         # The comment near get_os_version should list 11/12/13 with correct
         # codenames — including the 'Trixie' typo fix from JTN-528.
         # JTN-674: get_os_version() -> None -> None now lives in _common.sh — check combined.
@@ -347,7 +347,7 @@ class TestInstallScript:
         assert "13=Trixie" in self.combined
         assert "Trixe" not in self.combined  # typo guard
 
-    def test_zramswap_regex_matches_codename_comment_parity(self):
+    def test_zramswap_regex_matches_codename_comment_parity(self) -> None:
         # JTN-531: The codename comment near get_os_version() and the version
         # regex in the zramswap branch must list the same integer keys.
         # If someone adds 14=Forky to one without updating the other this test
@@ -392,7 +392,7 @@ class TestInstallScript:
             "zramswap branch when adding a new Debian release."
         )
 
-    def test_install_disables_dphys_swapfile_when_zram_active(self):
+    def test_install_disables_dphys_swapfile_when_zram_active(self) -> None:
         # JTN-593: maybe_disable_dphys_swapfile must be defined in install.sh
         # so it can reclaim /var/swap (~425 MB) -> None -> None when zram is already active.
         assert "maybe_disable_dphys_swapfile()" in self.content
@@ -499,7 +499,7 @@ class TestInstallScript:
                 f"when package is missing: {line!r}"
             )
 
-    def test_install_disables_service_during_install(self):
+    def test_install_disables_service_during_install(self) -> None:
         # JTN-600: stop_service() must DISABLE (not just stop) the service so
         # systemd cannot auto-restart the half-installed service during the ~15 min
         # install window and cause a memory-thrash cascade on the Pi Zero 2 W.
@@ -512,7 +512,7 @@ class TestInstallScript:
             "prevent systemd from restarting the half-installed service"
         )
 
-    def test_install_re_enables_service_at_end(self):
+    def test_install_re_enables_service_at_end(self) -> None:
         # JTN-600: Regression guard — install_app_service() must re-enable the
         # service at the end of the install after stop_service() -> None -> None disabled it.
         fn_start = self.content.index("install_app_service() {")
@@ -523,7 +523,7 @@ class TestInstallScript:
             "service after stop_service() disabled it during the install window"
         )
 
-    def test_install_app_service_installs_failure_helper(self):
+    def test_install_app_service_installs_failure_helper(self) -> None:
         # JTN-671: install_app_service() -> None -> None must also copy inkypi-failure.service
         # into /etc/systemd/system/ so the OnFailure= directive can resolve.
         fn_start = self.content.index("install_app_service() {")
@@ -534,7 +534,7 @@ class TestInstallScript:
             "OnFailure= directive in inkypi.service can resolve (JTN-671)"
         )
 
-    def test_install_creates_lockfile_near_top(self):
+    def test_install_creates_lockfile_near_top(self) -> None:
         # JTN-607: install.sh must create /var/lib/inkypi/.install-in-progress
         # early in the main script body (after check_permissions) so any
         # concurrent systemctl start attempt hits the ExecStartPre guard.
@@ -570,7 +570,7 @@ class TestInstallScript:
             "install_debian_dependencies (JTN-607)"
         )
 
-    def test_install_removes_lockfile_at_end_on_success(self):
+    def test_install_removes_lockfile_at_end_on_success(self) -> None:
         # JTN-607: At the very end of install.sh, after every install step
         # has succeeded, remove the lockfile so the service is allowed to
         # start. The removal must come AFTER install_app_service and the CSS
@@ -599,7 +599,7 @@ class TestInstallScript:
             "so a CSS build failure leaves the lockfile in place (JTN-607)"
         )
 
-    def test_service_enable_gated_on_css_build(self):
+    def test_service_enable_gated_on_css_build(self) -> None:
         # JTN-695: systemctl enable / install_app_service must only run AFTER
         # vendor download + CSS build both succeed. If either step fails, the
         # service must be left untouched so `systemctl is-enabled inkypi`
@@ -624,7 +624,7 @@ class TestInstallScript:
             "(JTN-695)"
         )
 
-    def test_install_asserts_main_css_exists_before_service_enable(self):
+    def test_install_asserts_main_css_exists_before_service_enable(self) -> None:
         # JTN-695: After build_css_bundle, install.sh must assert that
         # src/static/styles/main.css exists AND is non-empty (`-s`) before the
         # service is enabled. This catches silent truncation where the file
@@ -655,7 +655,7 @@ class TestInstallScript:
             "build_css_bundle and before install_app_service (JTN-695)"
         )
 
-    def test_install_lockfile_not_removed_by_error_trap(self):
+    def test_install_lockfile_not_removed_by_error_trap(self) -> None:
         # JTN-607: On failure exit, the lockfile must be LEFT in place so the
         # user is forced to rerun install.sh (or manually rm the file) -> None -> None before
         # the service can start. This means there must be NO trap that
@@ -710,7 +710,7 @@ class TestInstallScript:
             "concurrent-install lock is held (JTN-696)"
         )
 
-    def test_install_uses_atomic_swap_not_in_place_rm(self):
+    def test_install_uses_atomic_swap_not_in_place_rm(self) -> None:
         # JTN-696: install_src() -> None -> None must NOT do an in-place `rm -rf
         # "$INSTALL_PATH"` — that pattern left dangling symlinks / a
         # half-populated directory if the user hit Ctrl+C mid-delete.
@@ -736,7 +736,7 @@ class TestInstallScript:
             "staging dir before the swap (JTN-696)"
         )
 
-    def test_install_exit_trap_cleans_staging_not_lockfile(self):
+    def test_install_exit_trap_cleans_staging_not_lockfile(self) -> None:
         # JTN-696: The EXIT trap added to clean up staging dirs on an
         # interrupted install must NOT touch $LOCKFILE (that would defeat
         # JTN-607) and must NOT rm -rf $INSTALL_PATH itself (that would
@@ -769,7 +769,7 @@ class TestInstallScript:
                     f"(JTN-696): {line!r}"
                 )
 
-    def test_stop_service_disable_tolerates_already_disabled(self):
+    def test_stop_service_disable_tolerates_already_disabled(self) -> None:
         # JTN-600: The disable call must not fail if the service is already
         # disabled (e.g. fresh install). Must use '|| true' or '2>/dev/null'.
         # JTN-674: stop_service() -> None -> None now lives in _common.sh — check combined.
@@ -787,7 +787,7 @@ class TestInstallScript:
                 f"it doesn't fail when the service is already disabled: {line!r}"
             )
 
-    def test_install_uses_no_cache_dir(self):
+    def test_install_uses_no_cache_dir(self) -> None:
         # JTN-602: every pip install invocation in install.sh must include
         # --no-cache-dir to avoid wasting ~200 MB of SD card space and ~50 MB
         # of RAM on a Pi Zero 2 W (pip runs once per install cycle, cache is useless) -> None -> None.
@@ -802,7 +802,7 @@ class TestInstallScript:
                 "--no-cache-dir" in line
             ), f"pip install invocation is missing --no-cache-dir (JTN-602): {line!r}"
 
-    def test_install_installs_uv_into_venv(self):
+    def test_install_installs_uv_into_venv(self) -> None:
         # JTN-605: uv (Rust-based pip replacement) -> None -> None must be installed into the
         # venv BEFORE the main dependency install so the resolver uses ~10-20 MB
         # peak instead of pip's ~100-150 MB on a Pi Zero 2 W.
@@ -856,7 +856,7 @@ class TestInstallScript:
             out.append(buf)
         return out
 
-    def test_install_uses_uv_for_main_dependency_install(self):
+    def test_install_uses_uv_for_main_dependency_install(self) -> None:
         # JTN-605: the main dependency install should prefer uv when available.
         # Structural: there must be a `uv pip install ... -r ... requirements.txt`
         # invocation in create_venv() -> None -> None that carries --no-cache and --require-hashes.
@@ -893,7 +893,7 @@ class TestInstallScript:
             "--no-cache" in joined
         ), "uv pip install must use --no-cache equivalent of --no-cache-dir (JTN-602)"
 
-    def test_install_uv_pip_install_has_http_timeout(self):
+    def test_install_uv_pip_install_has_http_timeout(self) -> None:
         # JTN-605 / JTN-534: the pip fallback sets --retries 5 --timeout 60 to
         # survive flaky Wi-Fi on a Pi Zero 2 W. uv doesn't accept
         # --default-timeout as a CLI flag; it reads UV_HTTP_TIMEOUT from the
@@ -920,7 +920,7 @@ class TestInstallScript:
                 f"--timeout behavior (JTN-534): {line.strip()!r}"
             )
 
-    def test_install_has_pip_fallback_path(self):
+    def test_install_has_pip_fallback_path(self) -> None:
         # JTN-605: if uv cannot be installed or run (e.g. unsupported arch,
         # wheel download failure), install.sh must cleanly fall back to plain
         # pip. Structural grep: both a uv branch and a pip fallback branch must
@@ -993,7 +993,7 @@ class TestInstallScript:
             uv_bootstrap_pos < uv_main_pos
         ), "uv must be installed into the venv before the first 'uv pip install' call"
 
-    def test_install_no_cache_dir_in_all_venv_pip_calls(self):
+    def test_install_no_cache_dir_in_all_venv_pip_calls(self) -> None:
         # JTN-602: parse the create_venv() -> None -> None function body and assert every
         # pip install call inside it carries --no-cache-dir.
         lines = self.content.splitlines()
@@ -1137,7 +1137,7 @@ class TestCommonWheelhouseFunctions:
         assert "mktemp" in body
         assert 'rm -rf "$tmp_dir"' in body
 
-    def test_fetch_wheelhouse_verifies_integrity(self):
+    def test_fetch_wheelhouse_verifies_integrity(self) -> None:
         # JTN-697: After extraction, every wheel must be integrity-checked.
         # The original "at least one .whl exists" gate let truncated bundles
         # (zero-byte numpy wheels, corrupt zips) -> None -> None pass, with ImportError only
@@ -1404,7 +1404,7 @@ class TestWheelhouseBuildWorkflow:
         assert "inputs:" in self.content
         assert "required: true" in self.content
 
-    def test_workflow_builds_both_target_architectures(self):
+    def test_workflow_builds_both_target_architectures(self) -> None:
         # Pi Zero 2 W (armv7) + Pi 4/5 (aarch64) -> None -> None are the two supported
         # InkyPi targets — both must be built.
         assert "linux_armv7l" in self.content
@@ -1478,7 +1478,7 @@ class TestPiImageBuildWorkflow:
         assert "release:" in self.content
         assert "published" in self.content
 
-    def test_workflow_supports_manual_rebuild(self):
+    def test_workflow_supports_manual_rebuild(self) -> None:
         # workflow_dispatch lets maintainers rebuild an image for an existing
         # tag without cutting a new release (same pattern as JTN-604) -> None -> None.
         assert "workflow_dispatch:" in self.content
@@ -1597,7 +1597,7 @@ class TestPiImageBuildWorkflow:
         )
         assert "verify-boot.outputs.verified" in self.content
 
-    def test_workflow_uses_pinned_action_versions(self):
+    def test_workflow_uses_pinned_action_versions(self) -> None:
         # Verify immutable pins without freezing the test to an obsolete major.
         for action in (
             "actions/checkout",
@@ -1610,7 +1610,7 @@ class TestPiImageBuildWorkflow:
     def test_workflow_uploads_release_asset(self) -> None:
         assert "softprops/action-gh-release" in self.content
 
-    def test_workflow_attach_supports_reusable_release_and_manual_dry_run(self):
+    def test_workflow_attach_supports_reusable_release_and_manual_dry_run(self) -> None:
         # Reusable release.yml calls inherit the push event. Manual image
         # verification remains a dry run; every attachment requires a boot pass.
         workflow = yaml.safe_load(self.content)
@@ -1707,7 +1707,7 @@ class TestUpdateVendorsScript:
             "the cwd-anchoring requirement so the intent survives future edits"
         )
 
-    def test_vendor_destinations_are_repo_root_relative(self):
+    def test_vendor_destinations_are_repo_root_relative(self) -> None:
         # Every VENDORS entry has the form "name|url|output_path" on its own
         # line inside the `declare -a VENDORS=( ... )` block. The output paths
         # must still start with `src/static/` (not `../src/static/` or an
@@ -1727,7 +1727,7 @@ class TestUpdateVendorsScript:
                 f"anchors cwd to the repo root so this works."
             )
 
-    def test_install_sh_invokes_update_vendors(self):
+    def test_install_sh_invokes_update_vendors(self) -> None:
         # Sanity check that install.sh still actually calls update_vendors.sh
         # (the consumer side of the contract this test exists to protect) -> None -> None.
         install_sh = _read("install.sh")
@@ -1750,14 +1750,14 @@ class TestUpdateScript:
     def test_update_rebuilds_css(self) -> None:
         assert "build_css" in self.content
 
-    def test_update_restarts_service(self):
+    def test_update_restarts_service(self) -> None:
         # JTN-666: update.sh now stops first then starts (not restart) -> None -> None, because
         # stop_service is called before any file changes and update_app_service
         # re-enables + starts the service at the end.
         assert "systemctl" in self.content
         assert "systemctl start" in self.content
 
-    def test_update_stop_service_before_pip(self):
+    def test_update_stop_service_before_pip(self) -> None:
         # JTN-666: stop_service() must be called before pip install to prevent
         # systemd from restart-looping the half-installed venv during update.
         # JTN-674: stop_service() -> None -> None now lives in _common.sh — check combined.
@@ -1776,7 +1776,7 @@ class TestUpdateScript:
             main_call < pip_pos
         ), "stop_service must be called before pip install to prevent mid-update thrash"
 
-    def test_update_lockfile_created_before_stop_service(self):
+    def test_update_lockfile_created_before_stop_service(self) -> None:
         # JTN-666: The install-in-progress lockfile (JTN-607 parity) -> None -> None must be
         # created before stop_service is called, providing defense-in-depth so
         # that even a manual `systemctl start` cannot start mid-update.
@@ -1793,7 +1793,7 @@ class TestUpdateScript:
             touch_pos < stop_pos
         ), "Lockfile must be created before stop_service is called"
 
-    def test_update_lockfile_removed_before_service_start(self):
+    def test_update_lockfile_removed_before_service_start(self) -> None:
         # JTN-685: The lockfile must be removed BEFORE update_app_service() is
         # called so that ExecStartPre does not see the lockfile and reject the
         # `systemctl start` invocation.  The old ordering (rm after start) -> None -> None caused
@@ -1807,7 +1807,7 @@ class TestUpdateScript:
             rm_pos < update_service_call_pos
         ), "Lockfile removal must come BEFORE update_app_service call (JTN-685)"
 
-    def test_update_has_exit_trap_for_lockfile(self):
+    def test_update_has_exit_trap_for_lockfile(self) -> None:
         # JTN-704: EXIT trap unconditionally removes the lockfile on every exit
         # (success, explicit exit N, errexit, SIGINT, SIGTERM, SIGHUP) so a
         # failed update never leaves the service permanently blocked by a
@@ -1874,7 +1874,7 @@ class TestUpdateScript:
     def test_update_upgrades_pip_deps(self) -> None:
         assert "pip install" in self.content
 
-    def test_update_enables_zramswap_on_bullseye_bookworm_trixie(self):
+    def test_update_enables_zramswap_on_bullseye_bookworm_trixie(self) -> None:
         # JTN-667: update.sh must use the same multi-release zramswap guard as
         # install.sh — previously it only matched Bookworm (12) so Trixie (13)
         # and Bullseye (11) -> None -> None users would OOM during pip install on update.
@@ -1884,7 +1884,7 @@ class TestUpdateScript:
         # The skip branch should still exist for unknown future releases.
         assert "skipping zramswap setup" in self.content
 
-    def test_update_skips_zramtools_when_zram_swap_already_active(self):
+    def test_update_skips_zramtools_when_zram_swap_already_active(self) -> None:
         # JTN-667: setup_zramswap_service in update.sh must guard against
         # Trixie's preinstalled zram-swap to avoid /dev/zram0 conflicts.
         # JTN-674: setup_zramswap_service() -> None -> None now lives in _common.sh — check combined.
@@ -1900,7 +1900,7 @@ class TestUpdateScript:
         apt_pos = self.combined.index(apt_install, fn_start)
         assert guard_pos < return_pos < apt_pos
 
-    def test_update_codename_comment_has_no_trixie_typo(self):
+    def test_update_codename_comment_has_no_trixie_typo(self) -> None:
         # JTN-667: The comment near get_os_version must spell Trixie correctly.
         # JTN-674: get_os_version() -> None -> None now lives in _common.sh — check combined.
         assert "13=Trixie" in self.combined
@@ -1974,7 +1974,7 @@ class TestUpdateScript:
                 "--no-cache-dir" in line
             ), f"JTN-602 parity — pip install in update.sh missing --no-cache-dir: {line!r}"
 
-    def test_update_installs_uv_into_venv(self):
+    def test_update_installs_uv_into_venv(self) -> None:
         # JTN-670 / JTN-605 parity: uv must be installed into the venv so that
         # every update uses the low-memory uv resolver (~10-20 MB peak vs pip's
         # ~100-150 MB) -> None -> None. This prevents OOM thrashing on Pi Zero 2 W updates.
@@ -1993,7 +1993,7 @@ class TestUpdateScript:
                 "--no-cache-dir" in line
             ), f"pip install uv in update.sh missing --no-cache-dir: {line!r}"
 
-    def test_update_refreshes_apt_index_before_install(self):
+    def test_update_refreshes_apt_index_before_install(self) -> None:
         # JTN-788: update.sh must run `apt-get update` synchronously before
         # `apt-get install` so a stale /var/lib/apt/lists/ cache does not
         # abort the update when the Raspberry Pi archive has published a
@@ -2029,7 +2029,7 @@ class TestUpdateScript:
             "apt_update_rc" in self.content
         ), "JTN-788: update.sh must capture apt-get update's exit code"
 
-    def test_update_does_not_abort_on_apt_update_failure(self):
+    def test_update_does_not_abort_on_apt_update_failure(self) -> None:
         # JTN-788: A transient apt-get update failure (offline, DNS, mirror
         # hiccup) -> None -> None must NOT abort a bugfix-only update. The failure path
         # should warn and continue; the subsequent apt-get install decides
@@ -2044,7 +2044,7 @@ class TestUpdateScript:
             "ERROR: apt-get install failed — aborting update." in self.content
         ), "JTN-704 contract — apt-get install abort message must not change"
 
-    def test_update_uses_uv_pip_install_for_requirements(self):
+    def test_update_uses_uv_pip_install_for_requirements(self) -> None:
         # JTN-670 / JTN-605 parity: update.sh must prefer uv pip install when uv
         # is available, mirroring install.sh's create_venv() -> None -> None pattern.
         assert (
@@ -2141,7 +2141,7 @@ class TestUpdateScript:
                 "--no-cache-dir" in block
             ), "pip fallback in update.sh must preserve --no-cache-dir (JTN-670/JTN-602)"
 
-    def test_update_uv_install_uses_no_cache(self):
+    def test_update_uv_install_uses_no_cache(self) -> None:
         # JTN-670 / JTN-602 parity: uv pip install must use --no-cache (uv's
         # equivalent of pip's --no-cache-dir) -> None -> None to avoid wasting SD space on updates.
         lines = self.content.splitlines()
@@ -2165,7 +2165,7 @@ class TestUpdateScript:
                 "--no-cache" in block
             ), f"uv pip install in update.sh missing --no-cache (JTN-602 parity): {block!r}"
 
-    def test_update_app_service_checks_is_active_after_start(self):
+    def test_update_app_service_checks_is_active_after_start(self) -> None:
         # JTN-684: update_app_service() -> None -> None must verify the service reached active
         # state after systemctl start. systemctl start exits 0 even when the
         # service subsequently fails, so an explicit is-active check is required.
@@ -2240,7 +2240,7 @@ class TestUpdateScript:
             not offenders
         ), f"no call site may use a blocking `sudo journalctl`: {offenders}"
 
-    def test_update_service_wait_uses_timeout_bound(self):
+    def test_update_service_wait_uses_timeout_bound(self) -> None:
         # JTN-706: the 3-attempt sleep 1 loop (total cap 3s) was replaced with
         # a bounded wait via `timeout 45` so slow boots on Pi Zero 2 W (which
         # routinely take 5-8s) -> None -> None no longer trigger false-failure reports.
@@ -2316,7 +2316,7 @@ class TestRollbackScript:
                 code in self.content
             ), f"rollback.sh must use {code!r} for a distinct failure mode"
 
-    def test_rollback_delegates_to_update_sh(self):
+    def test_rollback_delegates_to_update_sh(self) -> None:
         # exec'ing update.sh lets its EXIT trap (JTN-704) -> None -> None record any failure
         # during the rollback to .last-update-failure for UI surfacing — the
         # same recovery path as a forward update.
@@ -2618,7 +2618,7 @@ class TestInstallMatrixWorkflow:
         job = data["jobs"]["install-matrix"]
         assert job.get("uses") == "./.github/workflows/install-matrix.yml"
 
-    def test_install_matrix_references_supported_os_bases(self):
+    def test_install_matrix_references_supported_os_bases(self) -> None:
         # JTN-615: bullseye was removed from the install-matrix because
         # Debian 11 ships Python 3.9.2 while InkyPi's requirements pin
         # packages that need Python>=3.10 (anyio==4.13.0 is the first to
@@ -2680,7 +2680,7 @@ class TestInstallMatrixWorkflow:
     def test_verify_script_asserts_venv_created(self) -> None:
         assert "/usr/local/inkypi/venv_inkypi" in self.verify_script
 
-    def test_verify_script_asserts_required_imports(self):
+    def test_verify_script_asserts_required_imports(self) -> None:
         # JTN-615: the check was rewritten to use importlib.metadata.version() -> None -> None
         # because waitress has no module-level __version__ attribute and Flask
         # 3.2 deprecates its own `__version__`. The test now asserts the three
@@ -3590,7 +3590,7 @@ class TestMemoryCapTiering:
         out = self._invoke_pick("Buffers: 0 kB\n", tmp_path)
         assert out == "250 350 standard"
 
-    def test_pick_caps_threshold_boundary(self, tmp_path: Path):
+    def test_pick_caps_threshold_boundary(self, tmp_path: Path) -> None:
         # Exactly 700000 kB (the threshold) -> None -> None → low-mem. 700001 kB → standard.
         out_at = self._invoke_pick("MemTotal:         700000 kB\n", tmp_path)
         out_over = self._invoke_pick("MemTotal:         700001 kB\n", tmp_path)

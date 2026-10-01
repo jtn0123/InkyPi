@@ -19,7 +19,7 @@ class RefreshInfo:
 
     Attributes:
         refresh_time (str): ISO-formatted time string of the refresh.
-        image_hash (int): SHA-256 hash of the image.
+        image_hash (str | int): SHA-256 hex digest; legacy integer values remain readable.
         refresh_type (str): Refresh type ['Manual Update', 'Playlist'].
         plugin_id (str): Plugin id of the refresh.
         playlist (str): Playlist name if refresh_type is 'Playlist'.
@@ -32,7 +32,7 @@ class RefreshInfo:
         refresh_type: str | None,
         plugin_id: str | None,
         refresh_time: str | None,
-        image_hash: int | None,
+        image_hash: str | int | None,
         playlist: str | None = None,
         plugin_instance: str | None = None,
         # Optional performance metrics

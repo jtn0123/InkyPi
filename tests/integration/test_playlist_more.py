@@ -182,7 +182,7 @@ def test_update_playlist_errors_and_failure_branch(
     assert r3.status_code == 500
 
 
-def test_delete_playlist_not_exist(client: FlaskClient):
+def test_delete_playlist_not_exist(client: FlaskClient) -> None:
     # JTN-782: missing playlist returns 404 (not_found) -> None -> None, not 400.
     resp = client.delete("/delete_playlist/NoSuch")
     assert resp.status_code == 404

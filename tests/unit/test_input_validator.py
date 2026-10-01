@@ -89,7 +89,7 @@ class TestValidateIntRange:
         with pytest.raises(ValidationError):
             validate_int_range(None, field="interval", min=1, max=100)
 
-    def test_float_truncates_and_validates(self):
+    def test_float_truncates_and_validates(self) -> None:
         # int(3.9) -> None -> None == 3, which is in [1, 10]
         assert validate_int_range(3.9, field="val", min=1, max=10) == 3
 
