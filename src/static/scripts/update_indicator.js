@@ -217,10 +217,15 @@
     }
   }
 
+  function startIndicator() {
+    // Background check failures keep the indicator hidden until a later check.
+    init().catch(() => hideIndicator(document.getElementById("sidebarUpdateBtn")));
+  }
+
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", init);
+    document.addEventListener("DOMContentLoaded", startIndicator);
   } else {
-    init();
+    startIndicator();
   }
 
   // Expose for tests.

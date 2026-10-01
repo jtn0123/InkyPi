@@ -201,7 +201,7 @@
           uploadedFiles,
           onAfterSuccess: () => {
             setTimeout(() => {
-              refreshPreviewsAfterSuccess();
+              refreshPreviewsAfterSuccess().catch(reportPreviewRefreshFailure);
             }, 250);
             closeModal("scheduleModal");
           },
@@ -251,6 +251,14 @@
       setLatestRefresh(resolvedRefresh);
       setCurrentDisplayRefresh(resolvedRefresh);
       await refreshInstancePreview({ force: true });
+    }
+
+    function reportPreviewRefreshFailure(error) {
+      console.warn("Failed to refresh preview after update:", error);
+      showResponseModal(
+        "failure",
+        "The update succeeded, but the preview could not be refreshed. Refresh this page to retry."
+      );
     }
 
     // Track the element that triggered the most-recently opened modal so focus
@@ -432,7 +440,7 @@
         } else {
           showResponseModal("success", `Success! ${result.message}`);
           setTimeout(() => {
-            refreshPreviewsAfterSuccess();
+            refreshPreviewsAfterSuccess().catch(reportPreviewRefreshFailure);
           }, 400);
         }
       } catch (e) {

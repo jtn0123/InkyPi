@@ -225,6 +225,13 @@
       }
     }
 
+    function refreshPreviewSafely() {
+      refreshPreview().catch(error => {
+        console.warn("Dashboard preview refresh failed:", error);
+        showResponseModal("failure", "Unable to refresh the dashboard. Please try again.");
+      });
+    }
+
     // setCell, formatRelativeSeconds, parseIsoDate, formatClockTime and
     // setQuickSwitchButtonPending are pure helpers hoisted to module scope
     // above (Sonar S7721). buildNowMeta stays in the closure only because it
@@ -387,8 +394,8 @@
         }
         setQuickSwitchActiveRow(result.playlist || playlistName);
         setTimeout(() => {
-          refreshPreview();
-          refreshKpis();
+          refreshPreviewSafely();
+          void refreshKpis();
         }, refreshDelayMs);
       } catch {
         // Network failure — surface a generic modal rather than rethrowing.
@@ -417,7 +424,7 @@
         if (!response.ok || !result.success) {
           showResponseModal("failure", `Failed to display next: ${result.error || "Unknown error"}`);
         } else {
-          setTimeout(refreshPreview, refreshDelayMs);
+          setTimeout(refreshPreviewSafely, refreshDelayMs);
         }
       } catch (error) {
         showResponseModal("failure", "Failed to display next");
@@ -500,8 +507,8 @@
     }
 
     function startPolling() {
-      refreshPreview();
-      return setInterval(refreshPreview, pollIntervalMs);
+      refreshPreviewSafely();
+      return setInterval(refreshPreviewSafely, pollIntervalMs);
     }
 
     function initRealtime() {
@@ -520,20 +527,20 @@
       if (pushUrl && globalThis.EventSource) {
         try {
           sseSource = new EventSource(pushUrl);
-          sseSource.onmessage = () => refreshPreview();
+          sseSource.onmessage = refreshPreviewSafely;
           sseSource.onerror = () => {
             console.warn("SSE connection lost, falling back to polling");
             if (sseSource) { sseSource.close(); sseSource = null; }
-            refreshPreview();
-            pollTimerId = setInterval(refreshPreview, pollIntervalMs);
+            refreshPreviewSafely();
+            pollTimerId = setInterval(refreshPreviewSafely, pollIntervalMs);
           };
           return;
         } catch (error) {
           console.warn("SSE not available, using polling:", error);
         }
       }
-      refreshPreview();
-      pollTimerId = setInterval(refreshPreview, pollIntervalMs);
+      refreshPreviewSafely();
+      pollTimerId = setInterval(refreshPreviewSafely, pollIntervalMs);
     }
 
     function init() {
@@ -560,7 +567,8 @@
       // we recover the button without closing over the loop variable.
       function handleQuickSwitchClick(event) {
         const button = event.currentTarget;
-        quickSwitchPlaylist(button.dataset.playlistName, button);
+        // quickSwitchPlaylist owns mutation failures and pending-button cleanup.
+        void quickSwitchPlaylist(button.dataset.playlistName, button);
       }
       document.querySelectorAll("[data-quick-switch-button]").forEach((button) => {
         button.addEventListener("click", handleQuickSwitchClick);
@@ -569,8 +577,8 @@
       document.getElementById("dashboardRefreshBtn")?.addEventListener("click", () => {
         // Manually re-fetch preview + refresh info + next-up; mirrors the
         // realtime SSE handler but triggered by user gesture.
-        refreshPreview();
-        refreshKpis();
+        refreshPreviewSafely();
+        void refreshKpis();
       });
       globalThis.addEventListener("beforeunload", () => {
         if (refreshCountdownTimerId) {
@@ -587,7 +595,8 @@
       startRefreshCountdown();
       initPreviewInteractions();
       initRealtime();
-      refreshKpis();
+      // KPI fetches render their own unavailable status on transport failures.
+      void refreshKpis();
     }
 
     // Today KPI card — populated from /api/stats (24h window) + /api/health/system.

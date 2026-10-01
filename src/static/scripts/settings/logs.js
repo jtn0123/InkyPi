@@ -212,7 +212,8 @@
       if (maxLines && ui.savePref) {
         ui.savePref("", prefKey("maxLines"), maxLines.value);
       }
-      fetchAndRenderLogs();
+      // fetchAndRenderLogs reports fetch/render errors internally.
+      void fetchAndRenderLogs();
     }
 
     function onLogsFilterChanged() {
@@ -354,7 +355,7 @@
         },
         ui
       );
-      fetchAndRenderLogs();
+      void fetchAndRenderLogs();
     }
 
     return {
