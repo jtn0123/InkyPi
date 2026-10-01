@@ -13,13 +13,8 @@
     node.hidden = hidden;
   }
 
-  // Track the element that triggered the most-recently opened modal so
-  // focus can be restored when the modal closes (WAI-ARIA best practice).
-  let _lastHistoryModalTrigger = null;
-
   function setModalOpen(node, open, triggerEl) {
     if (!node) return;
-    if (open && triggerEl) _lastHistoryModalTrigger = triggerEl;
     node.hidden = !open;
     node.style.display = open ? "flex" : "none";
     node.classList.toggle("is-open", open);
@@ -27,18 +22,9 @@
       globalThis.InkyPiModalFocus.activate(node, triggerEl, () => {
         node.dispatchEvent(new CustomEvent("inkypi:modal-dismiss"));
       });
-      // Move focus to the first focusable element inside the modal
-      const focusable = node.querySelector(
-        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
-      );
-      if (focusable) setTimeout(() => focusable.focus(), 0);
     } else {
       globalThis.InkyPiModalFocus.deactivate(node);
-      if (!_lastHistoryModalTrigger) return;
-      if (typeof _lastHistoryModalTrigger.focus === "function") {
-        _lastHistoryModalTrigger.focus();
-      }
-      _lastHistoryModalTrigger = null;
+
     }
   }
 

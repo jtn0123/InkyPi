@@ -12,44 +12,27 @@
     document.body.classList.toggle("modal-open", !!anyOpen);
   }
 
-  function findFirstFocusable(modal) {
-    return modal.querySelector(
-      'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
-    );
-  }
-
   function isDeviceActionModalOpen(modalId) {
     const modal = document.getElementById(modalId);
     return !!(modal && !modal.hidden);
   }
 
   function createModalModule({ ui }) {
-    let lastDeviceActionTrigger = null;
     let lastWhatsNewTrigger = null;
 
     function setDeviceActionModalOpen(modalId, open, triggerEl) {
       const modal = document.getElementById(modalId);
       if (!modal) return;
-      if (open && triggerEl) lastDeviceActionTrigger = triggerEl;
       modal.hidden = !open;
       modal.style.display = open ? "flex" : "none";
       modal.classList.toggle("is-open", !!open);
       syncModalOpenState(ui);
       if (open) {
         globalThis.InkyPiModalFocus.activate(modal, triggerEl, () => setDeviceActionModalOpen(modalId, false));
-        const focusable = findFirstFocusable(modal);
-        if (focusable) setTimeout(() => focusable.focus(), 0);
         return;
       }
       globalThis.InkyPiModalFocus.deactivate(modal);
-      if (
-        lastDeviceActionTrigger &&
-        typeof lastDeviceActionTrigger.focus === "function" &&
-        document.contains(lastDeviceActionTrigger)
-      ) {
-        lastDeviceActionTrigger.focus();
-      }
-      lastDeviceActionTrigger = null;
+
     }
 
     function openRebootConfirm(event) {
@@ -97,8 +80,6 @@
       modal.classList.add("is-open");
       syncModalOpenState(ui);
       globalThis.InkyPiModalFocus.activate(modal, lastWhatsNewTrigger, closeWhatsNew);
-      const focusable = findFirstFocusable(modal);
-      if (focusable) setTimeout(() => focusable.focus(), 0);
     }
 
     function closeWhatsNew() {
@@ -109,14 +90,7 @@
       modal.classList.remove("is-open");
       globalThis.InkyPiModalFocus.deactivate(modal);
       syncModalOpenState(ui);
-      if (
-        lastWhatsNewTrigger &&
-        typeof lastWhatsNewTrigger.focus === "function" &&
-        document.contains(lastWhatsNewTrigger)
-      ) {
-        lastWhatsNewTrigger.focus();
-      }
-      lastWhatsNewTrigger = null;
+
     }
 
     function bindGlobalDismissals() {

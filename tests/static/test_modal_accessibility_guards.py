@@ -65,8 +65,8 @@ def test_settings_page_device_action_modals_manage_focus() -> None:
     focus to the trigger on close."""
     content = _read_script("settings/modals.js")
 
-    assert "focusable.focus()" in content
-    assert "DeviceActionTrigger" in content
+    assert "InkyPiModalFocus.activate" in content
+    assert "InkyPiModalFocus.deactivate" in content
 
 
 def test_response_modal_restores_focus_to_trigger() -> None:
