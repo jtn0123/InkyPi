@@ -30,7 +30,7 @@ def build_manifest(image: Path, tag: str) -> dict[str, object]:
                 "website": "https://github.com/jtn0123/InkyPi",
                 "icon": "https://raw.githubusercontent.com/jtn0123/InkyPi/main/src/static/images/inkypi.png",
                 "release_date": datetime.now(UTC).date().isoformat(),
-                "devices": ["pi2-zero"],
+                "devices": ["pi3-64bit"],
                 "init_format": "systemd",
                 "image_download_size": image.stat().st_size,
                 "extract_size": size,

@@ -16,7 +16,7 @@ def test_manifest_describes_actual_image(tmp_path: Path) -> None:
     assert isinstance(entry, list)
     item = entry[0]
     assert item["init_format"] == "systemd"
-    assert item["devices"] == ["pi2-zero"]
+    assert item["devices"] == ["pi3-64bit"]
     assert set(item) >= {
         "name",
         "description",
