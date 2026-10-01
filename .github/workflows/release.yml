@@ -163,6 +163,10 @@ jobs:
     name: Build pre-installed Pi image
     needs: release
     if: needs.release.outputs.released == 'true'
+    # The reusable verifier reads Actions artifacts, including manual rechecks.
+    permissions:
+      contents: write
+      actions: read
     uses: ./.github/workflows/build-pi-image.yml
     with:
       tag: ${{ needs.release.outputs.tag }}
