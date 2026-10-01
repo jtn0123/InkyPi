@@ -58,6 +58,9 @@ jobs:
           python -m pip install --require-hashes -r install/requirements-dev.txt
           python -m playwright install --with-deps chromium
 
+      - name: Check browser verifier regression
+        run: python -m pytest -q tests/integration/test_link_browser_verification.py --reruns 0
+
       - name: Check links with lychee
         run: |
           shopt -s globstar nullglob
@@ -83,3 +86,12 @@ jobs:
               printf '\n```\n'
             } >> "${GITHUB_STEP_SUMMARY}"
           fi
+
+      - name: Preserve complete link diagnostics
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: docs-link-report
+          path: ${{ runner.temp }}/inkypi-links.json
+          if-no-files-found: warn
+          retention-days: 7

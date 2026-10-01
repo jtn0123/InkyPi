@@ -24,6 +24,7 @@ if SRC_ABS not in sys.path:
 
 UI_BROWSER_TESTS = {
     "test_shared_asset_modal_contracts.py",
+    "test_link_browser_verification.py",
     "test_browser_smoke.py",
     "test_e2e_form_workflows.py",
     "test_playlist_interactions.py",

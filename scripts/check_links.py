@@ -84,7 +84,9 @@ def verify_browser_pages(urls: list[str]) -> dict[str, dict[str, object]]:
                     context = browser.new_context()
                     try:
                         page = context.new_page()
-                        response = page.goto(url, wait_until="load", timeout=30000)
+                        response = page.goto(
+                            url, wait_until="domcontentloaded", timeout=30000
+                        )
                         status = response.status if response is not None else 0
                         title = page.title()
                         text = page.locator("body").inner_text(timeout=5000)
@@ -103,6 +105,8 @@ def verify_browser_pages(urls: list[str]) -> dict[str, dict[str, object]]:
     except Exception as error:
         for url in urls:
             results[url] = {"verified": False, "error": str(error)[:500]}
+    for url, result in results.items():
+        print("Browser verification: " + json.dumps({"url": url, **result}))
     return results
 
 
