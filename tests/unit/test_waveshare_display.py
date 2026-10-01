@@ -1,3 +1,4 @@
+import importlib
 import sys
 import types
 from typing import Any
@@ -60,31 +61,8 @@ class FakeBiColorEPD:
 def install_fake_epd_module(
     monkeypatch: pytest.MonkeyPatch, module_name: str, epd_class: Any
 ) -> None:
-    # Ensure the real display package is imported first
-    if "display" not in sys.modules:
-        try:
-            import importlib.util
-
-            if importlib.util.find_spec("display"):
-                __import__("display")
-        except ImportError:
-            pass
-
-    # Create fake module: display.waveshare_epd.<module_name>
-    ws_pkg = types.ModuleType("display.waveshare_epd")
-    # Ensure parent packages exist in sys.modules for importlib to find
-    display_pkg = sys.modules.get("display")
-    if display_pkg is None:
-        display_pkg = types.ModuleType("display")
-        sys.modules["display"] = display_pkg
-    elif hasattr(display_pkg, "__path__"):
-        # If display is already a proper package, don't override it
-        pass
-    else:
-        # If display exists but is not a package, we need to replace it
-        display_pkg = types.ModuleType("display")
-        sys.modules["display"] = display_pkg
-    sys.modules["display.waveshare_epd"] = ws_pkg
+    # Preserve the real package so sibling modules remain importable.
+    importlib.import_module("display.waveshare_epd")
 
     epd_mod = types.ModuleType(f"display.waveshare_epd.{module_name}")
 
@@ -94,7 +72,7 @@ def install_fake_epd_module(
     # Assign EPD attribute via setattr to avoid static analyzer complaints
     epd_mod.EPD = EPD
 
-    sys.modules[f"display.waveshare_epd.{module_name}"] = epd_mod
+    monkeypatch.setitem(sys.modules, f"display.waveshare_epd.{module_name}", epd_mod)
 
 
 def test_waveshare_initialize_sets_resolution(
@@ -350,3 +328,25 @@ def test_clear_receives_a_color_when_the_driver_requires_one(
     driver.display_image(Image.new("1", (200, 100), 255))
 
     assert driver.epd_display.clear_colors == [0xFF]
+
+
+def test_fake_driver_preserves_real_package_import_path() -> None:
+    """A driver double must keep sibling hardware modules importable."""
+    package = importlib.import_module("display.waveshare_epd")
+    package_path = package.__path__
+    with pytest.MonkeyPatch.context() as isolated:
+        install_fake_epd_module(isolated, "epd7in3e", FakeMonoEPD)
+        assert sys.modules["display.waveshare_epd"] is package
+        assert package.__path__ is package_path
+
+
+def test_fake_driver_module_restores_previous_registration() -> None:
+    """Test teardown must restore any driver cached by earlier pytest runs."""
+    module_name = "display.waveshare_epd.epd7in3e"
+    sentinel = types.ModuleType(module_name)
+    with pytest.MonkeyPatch.context() as previous:
+        previous.setitem(sys.modules, module_name, sentinel)
+        with pytest.MonkeyPatch.context() as isolated:
+            install_fake_epd_module(isolated, "epd7in3e", FakeMonoEPD)
+            assert sys.modules[module_name] is not sentinel
+        assert sys.modules[module_name] is sentinel

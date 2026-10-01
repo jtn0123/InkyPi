@@ -96,8 +96,8 @@ def make_fake_spidev_module() -> Any:
 
 def install_fake_modules(monkeypatch: pytest.MonkeyPatch) -> None:
     """Install fake spidev and gpiozero modules so RaspberryPi class can load."""
-    sys.modules["spidev"] = make_fake_spidev_module()
-    sys.modules["gpiozero"] = make_fake_gpio_module()
+    monkeypatch.setitem(sys.modules, "spidev", make_fake_spidev_module())
+    monkeypatch.setitem(sys.modules, "gpiozero", make_fake_gpio_module())
 
 
 def _load_epdconfig_as_rpi(
@@ -138,16 +138,11 @@ def test_gpio_operations_raspberry_pi(monkeypatch: pytest.MonkeyPatch) -> None:
     assert isinstance(busy_value, int | bool)
 
 
-def test_gpio_operations_without_hardware(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Test GPIO operations when hardware libraries are not available."""
-    # Don't install fake modules — simulate missing hardware
-    epdconfig = _load_epdconfig_as_rpi(monkeypatch, install_mocks=False)
-
-    epdconfig.digital_write(17, 1)  # Should not crash
-    epdconfig.digital_write(25, 0)
-
-    busy_value = epdconfig.digital_read(24)
-    assert busy_value == 0  # Default when GPIO not available
+def test_raspberry_pi_requires_spidev(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The vendor driver requires SPI; earlier leaked stubs hid this import."""
+    monkeypatch.setitem(sys.modules, "spidev", None)
+    with pytest.raises(ModuleNotFoundError, match="spidev"):
+        _load_epdconfig_as_rpi(monkeypatch, install_mocks=False)
 
 
 def test_spi_operations_raspberry_pi(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -270,17 +265,12 @@ def test_gpio_pin_constants(monkeypatch: pytest.MonkeyPatch) -> None:
     assert rpi.PWR_PIN == 18
 
 
-def test_hardware_import_error_handling(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Test graceful handling when hardware libraries fail to import."""
-    epdconfig = _load_epdconfig_as_rpi(monkeypatch, install_mocks=False)
-
-    assert hasattr(epdconfig, "module_init")
-    assert hasattr(epdconfig, "digital_write")
-    assert hasattr(epdconfig, "digital_read")
-
-    epdconfig.digital_write(17, 1)  # Should not crash
-    value = epdconfig.digital_read(24)
-    assert value == 0  # Default when GPIO not available
+def test_raspberry_pi_requires_gpiozero(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Missing GPIO must fail explicitly without inheriting another test's fake."""
+    monkeypatch.setitem(sys.modules, "spidev", make_fake_spidev_module())
+    monkeypatch.setitem(sys.modules, "gpiozero", None)
+    with pytest.raises(ModuleNotFoundError, match="gpiozero"):
+        _load_epdconfig_as_rpi(monkeypatch, install_mocks=False)
 
 
 def test_pin_mapping_comprehensive(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -335,3 +325,18 @@ def test_spi_configuration(monkeypatch: pytest.MonkeyPatch) -> None:
 
     epdconfig.module_init(cleanup=False)
     # Verify SPI configuration path was exercised (mock objects track this)
+
+
+def test_fake_hardware_modules_restore_previous_registrations() -> None:
+    """Repeated in-process test runs must not inherit fake GPIO/SPI modules."""
+    previous_gpio = types.ModuleType("gpiozero")
+    previous_spi = types.ModuleType("spidev")
+    with pytest.MonkeyPatch.context() as previous:
+        previous.setitem(sys.modules, "gpiozero", previous_gpio)
+        previous.setitem(sys.modules, "spidev", previous_spi)
+        with pytest.MonkeyPatch.context() as isolated:
+            install_fake_modules(isolated)
+            assert sys.modules["gpiozero"] is not previous_gpio
+            assert sys.modules["spidev"] is not previous_spi
+        assert sys.modules["gpiozero"] is previous_gpio
+        assert sys.modules["spidev"] is previous_spi
