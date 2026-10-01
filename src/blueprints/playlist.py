@@ -18,7 +18,10 @@ from flask import (
 
 from model import Playlist
 from refresh_task import PlaylistRefresh
-from services.playlist_workflows import prepare_add_plugin_workflow
+from services.playlist_workflows import (
+    prepare_add_plugin_workflow,
+    validate_plugin_refresh_settings as validate_refresh,
+)
 from utils.app_utils import handle_request_files, parse_form
 from utils.backend_errors import (
     ClientInputError,
@@ -41,7 +44,7 @@ from utils.request_models import (
     parse_playlist_reorder_request,
     parse_playlist_update_request,
 )
-from utils.time_utils import calculate_seconds, now_device_tz
+from utils.time_utils import now_device_tz
 
 logger = logging.getLogger(__name__)
 playlist_bp = Blueprint("playlist", __name__)
@@ -156,85 +159,11 @@ def _check_playlist_overlap(
 def validate_plugin_refresh_settings(
     refresh_settings: Mapping[str, Any],
 ) -> tuple[dict[str, int | str] | None, Any]:
-    """Validate the refresh portion of an add_plugin request.
-
-    Returns ``(refresh_config, error_response)``.  Exactly one of the two
-    values will be non-None.
-    """
-    refresh_type = refresh_settings.get("refreshType")
-    if not refresh_type or refresh_type not in ["interval", "scheduled"]:
-        return None, json_error(
-            "Refresh type is required",
-            status=422,
-            code=_CODE_VALIDATION,
-            details={"field": "refreshType"},
-        )
-
-    refresh_config: dict[str, int | str]
-    if refresh_type == "interval":
-        unit = refresh_settings.get("unit")
-        interval = refresh_settings.get("interval")
-        if not unit or unit not in ["minute", "hour", "day"]:
-            return None, json_error(
-                "Refresh interval unit is required",
-                status=422,
-                code=_CODE_VALIDATION,
-                details={"field": "unit"},
-            )
-        if not interval:
-            return None, json_error(
-                "Refresh interval is required",
-                status=422,
-                code=_CODE_VALIDATION,
-                details={"field": "interval"},
-            )
-        try:
-            interval_int = int(interval)
-        except (ValueError, TypeError):
-            return None, json_error(
-                "Refresh interval must be a number",
-                status=422,
-                code=_CODE_VALIDATION,
-                details={"field": "interval"},
-            )
-        if interval_int < 1 or interval_int > 999:
-            return None, json_error(
-                "Refresh interval must be between 1 and 999",
-                status=422,
-                code=_CODE_VALIDATION,
-                details={"field": "interval"},
-            )
-        refresh_config = {"interval": calculate_seconds(interval_int, unit)}
-    else:
-        refresh_time = refresh_settings.get("refreshTime")
-        if not refresh_time:
-            return None, json_error(
-                "Refresh time is required",
-                status=422,
-                code=_CODE_VALIDATION,
-                details={"field": "refreshTime"},
-            )
-        if not isinstance(refresh_time, str):
-            return None, json_error(
-                "Refresh time must be in HH:MM format",
-                status=422,
-                code=_CODE_VALIDATION,
-                details={"field": "refreshTime"},
-            )
-        refresh_time = refresh_time.strip()
-        try:
-            # Format-only validation; the parsed datetime is discarded. No tz needed.
-            datetime.strptime(refresh_time, "%H:%M")  # noqa: DTZ007
-        except ValueError:
-            return None, json_error(
-                "Refresh time must be in HH:MM format",
-                status=422,
-                code=_CODE_VALIDATION,
-                details={"field": "refreshTime"},
-            )
-        refresh_config = {"scheduled": refresh_time}
-
-    return refresh_config, None
+    """Adapt the shared pure refresh validator to the legacy JSON response."""
+    config, error = validate_refresh(dict(refresh_settings))
+    if error is not None:
+        return None, json_error(error.message, **error.as_json_kwargs())
+    return cast(dict[str, int | str] | None, config), None
 
 
 def _safe_next_index(pl: Any, num: int) -> int:

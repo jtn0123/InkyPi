@@ -20,6 +20,7 @@ from flask import (
 from plugins.plugin_registry import get_plugin_instance
 from refresh_task import ManualRefresh, PlaylistRefresh
 from refresh_task.job_queue import get_job_queue
+from services.playlist_workflows import validate_plugin_refresh_settings
 from services.plugin_workflows import save_plugin_settings_workflow
 from utils.app_utils import handle_request_files, parse_form, resolve_path
 from utils.backend_errors import (
@@ -552,13 +553,16 @@ def update_plugin_instance(instance_name: str) -> Any:
         # reverted the user's change while the toast said "success".
         new_refresh_config: dict[str, Any] | None = None
         if parsed.refresh_settings is not None:
-            from blueprints.playlist import validate_plugin_refresh_settings
-
             new_refresh_config, refresh_err = validate_plugin_refresh_settings(
                 parsed.refresh_settings
             )
             if refresh_err:
-                return refresh_err
+                raise ClientInputError(
+                    refresh_err.message,
+                    status=refresh_err.status,
+                    code=refresh_err.code,
+                    field=refresh_err.field,
+                )
 
         # Validate required fields and plugin-specific settings
         plugin_config = device_config.get_plugin(plugin_id)
