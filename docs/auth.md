@@ -1,154 +1,131 @@
-# Optional PIN Authentication
+# Authentication and HTTPS commissioning
 
-InkyPi supports an optional PIN that, when configured, protects all routes
-behind a login form. This feature is **off by default** — when no PIN is set
-the application behaves identically to before.
+The web server listens on all interfaces. **PIN authentication is off by
+default**: any reachable client can administer the display unless a PIN is
+configured. A read-only token alone does not turn authentication on. Keep this
+mode on a trusted LAN; do not expose it directly to the Internet.
 
-## Enabling PIN auth
+For authenticated access, configure a PIN and, for remote access, a TLS reverse
+proxy. `INKYPI_FORCE_HTTPS` redirects requests; it does not provide TLS itself.
 
-### Via environment variable (recommended)
+## Persistent configuration for the installed service
 
-```bash
-export INKYPI_AUTH_PIN="your-pin-here"
-```
-
-Set this in your systemd service file, Docker environment, or shell profile
-before starting InkyPi. The PIN is hashed with `hashlib.scrypt` in memory
-immediately on startup; the plaintext is never stored or logged.
-
-### Via device config (`device.json`)
-
-Add an `auth` section to your device config:
-
-```json
-{
-  "auth": {
-    "pin": "your-pin-here"
-  }
-}
-```
-
-> **Note:** Storing the PIN in the config file keeps it on disk in plaintext.
-> The env-var approach is preferred.
-
-## Behaviour when enabled
-
-- All routes except `/login`, `/logout`, `/sw.js`, `/static/*`, `/api/health`,
-  `/healthz`, and `/readyz` redirect unauthenticated users to `/login`.
-- A successful login sets a server-side session cookie valid for the browser
-  session.
-- Failed attempts increment a per-session counter; after **5 consecutive
-  failures** the session is locked out for **60 seconds**.
-- Visiting `/logout` clears the session and redirects to `/login`.
-
-## Security notes
-
-- Uses `hashlib.scrypt` (stdlib) with a per-process random salt — no new
-  dependencies.
-- Constant-time comparison via `hmac.compare_digest` prevents timing attacks.
-- The PIN hash is stored only in application memory and is regenerated from
-  the configured PIN on each startup.
-- Sessions are signed by Flask's `SECRET_KEY`. Rotate the secret key if you
-  need to invalidate all existing sessions.
-- For remote access, combine with HTTPS (see `INKYPI_FORCE_HTTPS`) so the PIN
-  is not transmitted in the clear.
-
----
-
-# HTTPS upgrade redirect
-
-InkyPi can transparently redirect plain HTTP requests to HTTPS via a
-`before_request` hook in the security middleware.
-
-## Enabling the redirect
-
-Set the following environment variables before starting InkyPi:
+Shell-profile exports affect a shell-launched development process, not the
+installed systemd service. Create a root-readable environment file:
 
 ```bash
-export INKYPI_FORCE_HTTPS=1
-# Optional — override the default allow-list of hostnames that may
-# appear in the redirect Location header. Comma-separated. Defaults to
-# "inkypi.local,localhost,127.0.0.1".
-export INKYPI_ALLOWED_HOSTS="inkypi.local,inkypi.example.com"
+sudo install -m 600 /dev/null /etc/inkypi-security.env
+sudoedit /etc/inkypi-security.env
 ```
 
-Requests arriving with `X-Forwarded-Proto: https` (e.g. behind a TLS-
-terminating reverse proxy) are treated as already-HTTPS and pass through
-unchanged. In `--dev` mode the redirect is always skipped regardless of
-`INKYPI_FORCE_HTTPS`.
+Add these settings, replacing the example PIN locally:
 
-## Host allow-list (JTN-317)
+```ini
+INKYPI_AUTH_PIN=replace-with-a-long-random-PIN
+```
 
-The redirect hook validates the inbound `Host` header against
-`INKYPI_ALLOWED_HOSTS` before building the new `Location`. Requests whose
-host is not in the allow-list receive a `400 Bad Request` instead of a
-redirect. This defends against open-redirect attacks (CodeQL rule
-`py/url-redirection`) where an attacker could previously spoof the
-`Host` header to have InkyPi emit `Location: https://evil.example/`.
+Then run `sudo systemctl edit inkypi` and add:
 
-When the server is reached by a hostname that is not in the default
-allow-list (for example a custom mDNS name or a public DNS record), add
-it to `INKYPI_ALLOWED_HOSTS` — otherwise all HTTP traffic will be
-rejected with a 400.
+```ini
+[Service]
+EnvironmentFile=/etc/inkypi-security.env
+```
 
----
-
-# Read-only API Token (JTN-477)
-
-InkyPi supports an optional read-only bearer token for monitoring scripts and
-automation tools that need to poll status endpoints without requiring an
-interactive PIN session. This feature is **independent** from PIN auth and can
-be used whether or not a PIN is configured.
-
-## Enabling the read-only token
-
-Set the `INKYPI_READONLY_TOKEN` environment variable before starting InkyPi:
+Apply it:
 
 ```bash
-export INKYPI_READONLY_TOKEN="your-long-random-token-here"
+sudo systemctl daemon-reload
+sudo systemctl restart inkypi
+curl -I http://inkypi.local/settings
 ```
 
-Use a cryptographically strong random value, for example:
+The unauthenticated request must redirect to `/login`. Public health/static
+routes intentionally remain available. Verify an administration route, rather
+than using a health response as evidence that authentication is enabled.
+
+Environment files and `device.json` values are plaintext on disk. Protect their
+permissions and backups. InkyPi hashes the PIN with scrypt in process memory;
+it does not remove the source value from the environment or config. The
+alternative `auth.pin` configuration in `device.json` has the same at-rest
+consideration.
+
+## HTTPS profile and direct proxy trust
+
+Add these to the same environment file for a TLS proxy running on the Pi:
+
+```ini
+INKYPI_FORCE_HTTPS=1
+INKYPI_ALLOWED_HOSTS=inkypi.local,inkypi.example.com
+INKYPI_TRUSTED_PROXIES=127.0.0.1/32,::1/128
+```
+
+Use the actual direct proxy IP/CIDR if it runs elsewhere. Broad unrestricted
+networks are rejected at startup. The trusted proxy must overwrite
+`X-Forwarded-Proto` with a single `https` or `http` value, preserve the intended
+Host, and strip client-supplied forwarded headers. InkyPi trusts only the scheme
+from a configured direct peer; it does not reinterpret forwarded host, port,
+path or client address. Block direct external access to the backend port with
+your proxy/firewall configuration.
+
+The HTTPS profile enables **Secure, HttpOnly, SameSite=Lax session cookies**.
+HSTS is emitted only for HTTPS or the accepted proxy scheme. An arbitrary
+client's `X-Forwarded-Proto: https` cannot bypass the redirect. Unknown redirect
+hosts receive 400; configure every intended hostname in `INKYPI_ALLOWED_HOSTS`.
+`INKYPI_SECURE_COOKIES=1` can enable Secure cookies independently when TLS is
+already enforced elsewhere. Dev mode skips the forced redirect; normal LAN
+HTTP remains available when the HTTPS profile is disabled.
+
+After restarting, verify both boundaries:
 
 ```bash
-python3 -c "import secrets; print(secrets.token_urlsafe(32))"
+# Direct HTTP with a spoofed header must still redirect to HTTPS when the
+# request does not originate from a configured proxy peer.
+curl -I -H 'X-Forwarded-Proto: https' http://inkypi.local/settings
+# The real HTTPS login response must include Secure on any session cookie.
+curl -I https://inkypi.example.com/login
 ```
 
-The token is hashed with `hashlib.sha256` immediately on startup; the
-plaintext is never stored or logged.
+A local curl from a trusted loopback peer intentionally receives proxy trust;
+run the spoof test from an untrusted LAN host. Review firewall restrictions
+separately from application tests.
 
-## Using the token
+## PIN sessions
 
-Pass the token in the `Authorization` header of your HTTP request:
+All administration routes require login when the PIN is configured. The login
+uses a signed **client-side Flask session cookie**, not a server-side session
+store. Treat its contents as visible to the browser; signing prevents edits,
+not disclosure. The persistent `SECRET_KEY` signs it; rotating the key
+invalidates existing sessions. `/logout` clears the session.
+
+PIN comparisons use constant-time verification. Repeated failures are limited
+by session and client IP; after five session failures, the session is locked
+for 60 seconds. HTTPS protects PIN transmission; hashing alone does not.
+
+## Read-only monitoring token
+
+With PIN authentication enabled, `INKYPI_READONLY_TOKEN` allows monitoring
+without an interactive session. Store a strong random token in the protected
+environment file and restart the service. Its hash is retained in memory; the
+configured source remains plaintext at rest. A token does not authorize admin
+or mutating routes. **Without a PIN, administration remains unauthenticated
+regardless of this token.**
+
+Allowed methods are GET/HEAD/OPTIONS on these paths:
+
+| Path | Purpose |
+|------|---------|
+| `/api/health` | Service health |
+| `/api/version/info` | Version |
+| `/api/uptime` | Uptime |
+| `/api/screenshot` | Display screenshot |
+| `/metrics` | Metrics |
+| `/api/stats` | Refresh statistics |
 
 ```bash
-curl -H "Authorization: Bearer <your-token>" http://inkypi.local:5000/api/uptime
+curl -H 'Authorization: Bearer <your-token>' https://inkypi.example.com/api/uptime
 ```
 
-## Allowed endpoints and methods
-
-The token grants **read-only** access (GET / HEAD / OPTIONS only) to the
-following paths:
-
-| Path               | Description                  |
-|--------------------|------------------------------|
-| `/api/health`      | Service health check         |
-| `/api/version/info`| Firmware / app version       |
-| `/api/uptime`      | Device uptime                |
-| `/api/screenshot`  | Current display screenshot   |
-| `/metrics`         | Prometheus-style metrics     |
-| `/api/stats`       | Refresh statistics           |
-
-Requests to any other path, or any mutating method (POST, PUT, DELETE, PATCH)
-on the above paths, are **not** authorised by the token — a PIN session is
-required.
-
-## Security notes
-
-- The raw token is never stored; only its SHA-256 hex digest is kept in
-  application memory.
-- Comparison uses `hmac.compare_digest` to prevent timing attacks.
-- Combine with HTTPS so the token is not transmitted in the clear.
-- To rotate the token, restart InkyPi with a new `INKYPI_READONLY_TOKEN` value.
-- PIN auth and bearer-token auth are independent: having a valid token does
-  **not** grant access to admin or mutating routes.
+For trusted LAN HTTP, the production default is port 80
+(`http://inkypi.local/api/uptime`); development defaults to 8080. Use HTTPS when
+transmitting a token over an untrusted network. To rotate it, update the
+protected environment file and restart the service.

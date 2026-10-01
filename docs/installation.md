@@ -271,3 +271,7 @@ always_rerun_modules: [runcmd]
 ```
 
 > **Warning:** `always_rerun_modules: [runcmd]` makes `runcmd` run on *every* boot. Remove it once your install is confirmed working, or the install script will re-run each time the Pi reboots.
+
+## Access control after installation
+
+The installed service listens on all interfaces with PIN authentication off by default. Complete [persistent authentication and HTTPS commissioning](auth.md) before permitting remote administration. Shell exports do not configure the systemd service, and a monitoring token alone does not protect administration.

@@ -60,6 +60,8 @@ sudo bash install/install.sh
 
 After install, reboot your Pi and the InkyPi splash screen appears. Open the web interface from any device on your network to configure plugins.
 
+The web server binds to all interfaces and PIN authentication is off by default. Use this on a trusted LAN, or follow [persistent authentication and HTTPS commissioning](./docs/auth.md) before allowing remote access. A read-only monitoring token alone does not protect administration.
+
 > For Waveshare displays, pass the model: `sudo bash install/install.sh -W epd7in3f`
 
 For detailed setup including Raspberry Pi OS imaging, see [installation.md](./docs/installation.md) or watch the [YouTube tutorial](https://youtu.be/L5PvQj1vfC4).
