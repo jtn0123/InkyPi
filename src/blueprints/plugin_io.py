@@ -18,7 +18,7 @@ from flask import Blueprint, Response, current_app, jsonify, request
 
 from services.playlist_workflows import validate_plugin_settings_security
 from utils.form_utils import sanitize_log_field
-from utils.http_utils import APIError, JsonResponse, json_error, json_internal_error
+from utils.http_utils import JsonResponse, json_error
 
 logger = logging.getLogger(__name__)
 
@@ -194,7 +194,7 @@ class _ImportInstance:
 
 def _prepare_import_instances(
     device_config: Any, instances: list[dict[str, Any]]
-) -> tuple[list[_ImportInstance], list[str]]:
+) -> tuple[list[_ImportInstance], list[str], JsonResponse | None]:
     """Validate the entire installed batch before touching playlist state."""
     installed_ids = {
         plugin["id"]
@@ -213,21 +213,29 @@ def _prepare_import_instances(
         field = f"instances[{index}].settings"
         settings = instance["settings"]
         if not isinstance(settings, dict):
-            raise APIError(
-                f"{field} must be an object", status=400, details={"field": field}
+            return (
+                [],
+                skipped,
+                json_error(
+                    f"{field} must be an object", status=400, details={"field": field}
+                ),
             )
         settings = deepcopy(settings)
         error = validate_plugin_settings_security(device_config, plugin_id, settings)
         if error is not None:
-            raise APIError(
-                f"{field}: {error.message}",
-                status=error.status,
-                code=error.code,
-                details={"field": field},
+            return (
+                [],
+                skipped,
+                json_error(
+                    f"{field}: {error.message}",
+                    status=error.status,
+                    code=error.code,
+                    details={"field": field},
+                ),
             )
         name = str(instance.get("name", "")).strip() or plugin_id
         prepared.append(_ImportInstance(plugin_id, name, settings))
-    return prepared, skipped
+    return prepared, skipped, None
 
 
 def _unique_import_name(name: str, existing_names: set[str]) -> str:
@@ -302,13 +310,20 @@ def import_plugins() -> (
         return json_error(validation_error, status=400)
 
     try:
-        prepared, skipped = _prepare_import_instances(device_config, instances)
+        prepared, skipped, import_error = _prepare_import_instances(
+            device_config, instances
+        )
+        if import_error is not None:
+            return import_error
         renamed = _add_import_instances(device_config, prepared)
-    except APIError:
-        raise
     except Exception:
         logger.exception("plugin import failed")
-        return json_internal_error("import plugins")
+        return json_error(
+            "An internal error occurred",
+            status=500,
+            code="internal_error",
+            details={"context": "import plugins"},
+        )
 
     return jsonify(
         {
