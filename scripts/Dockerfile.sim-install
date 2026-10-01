@@ -48,4 +48,4 @@ USER inkypi-ci
 # HEALTHCHECK NONE suppresses the DS-0026 "missing healthcheck" alert.
 HEALTHCHECK NONE
 
-CMD ["sudo", "bash", "-c", "cd /InkyPi/install && ./install.sh"]
+CMD ["sudo", "bash", "-c", "cd /InkyPi/install && bash ./install.sh"]

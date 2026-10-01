@@ -228,7 +228,7 @@ jobs:
               rm -rf /opt/inkypi-src
               git clone --branch '${TAG}' --depth 1 https://github.com/jtn0123/InkyPi.git /opt/inkypi-src
               cd /opt/inkypi-src/install
-              ./install.sh
+              bash ./install.sh
             "
 
       - name: Seed first-boot cloud-init overlay
