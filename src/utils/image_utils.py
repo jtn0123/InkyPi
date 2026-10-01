@@ -442,8 +442,14 @@ def _playwright_screenshot_html(
                     ]
                 )
             except Exception:
+                logger.warning(
+                    "Playwright launch failed; trying browser subprocess", exc_info=True
+                )
                 return None
             try:
+                logger.debug(
+                    "Local HTML renderer: Playwright Chromium %s", browser.version
+                )
                 page = browser.new_page(
                     viewport={"width": int(dimensions[0]), "height": int(dimensions[1])}
                 )
@@ -456,7 +462,16 @@ def _playwright_screenshot_html(
                         "() => Promise.all(Array.from(document.images).map(img => img.complete ? Promise.resolve() : new Promise(r => { img.onload = () => r(); img.onerror = () => r(); })))"
                     )
                 except Exception:
-                    pass
+                    logger.warning(
+                        "Local render resource readiness failed", exc_info=True
+                    )
+                if logger.isEnabledFor(logging.DEBUG):
+                    logger.debug(
+                        "Local render font state: %s",
+                        page.evaluate(
+                            "() => ({status: document.fonts.status, faces: Array.from(document.fonts, face => ({family: face.family, status: face.status}))})"
+                        ),
+                    )
                 png_bytes = page.screenshot(
                     clip={
                         "x": 0,
@@ -469,6 +484,10 @@ def _playwright_screenshot_html(
             finally:
                 browser.close()
     except Exception:
+        logger.warning(
+            "Playwright local HTML render failed; trying browser subprocess",
+            exc_info=True,
+        )
         return None
     return img
 

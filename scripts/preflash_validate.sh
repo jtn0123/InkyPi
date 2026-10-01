@@ -151,6 +151,11 @@ security_suite() {
 }
 
 flake_suite() {
+    mkdir -p artifacts
+    if [[ "$(uname -s)" == "Linux" ]]; then
+        python -m playwright --version > artifacts/render-environment.txt
+        fc-list | sort >> artifacts/render-environment.txt
+    fi
     local _run_index
     for _run_index in 1 2 3; do
         python -m pytest -q \
@@ -167,7 +172,12 @@ flake_suite() {
             tests/plugins/test_image_folder.py \
             tests/plugins/test_image_upload.py
         if [[ "$(uname -s)" == "Linux" ]]; then
-            REQUIRE_BROWSER_SMOKE=1 python -m pytest -q tests/integration/test_browser_smoke.py
+            REQUIRE_BROWSER_SMOKE=1 python -m pytest -q --reruns 0 \
+                tests/integration/test_browser_smoke.py \
+                tests/snapshots/test_plugin_snapshots.py \
+                tests/integration/test_visual_regression.py \
+                --log-file="artifacts/render-repeat-${_run_index}.log" \
+                --log-file-level=DEBUG
         fi
     done
 }
