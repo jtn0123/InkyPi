@@ -172,9 +172,11 @@ flake_suite() {
             tests/plugins/test_image_folder.py \
             tests/plugins/test_image_upload.py
         if [[ "$(uname -s)" == "Linux" ]]; then
+            # Capture plugin renderer diagnostics before app bootstrap replaces
+            # pytest's root log handlers in the browser/layout fixtures.
             REQUIRE_BROWSER_SMOKE=1 python -m pytest -q --force-reruns 0 \
-                tests/integration/test_browser_smoke.py \
                 tests/snapshots/test_plugin_snapshots.py \
+                tests/integration/test_browser_smoke.py \
                 tests/integration/test_visual_regression.py \
                 --log-file="artifacts/render-repeat-${_run_index}.log" \
                 --log-file-level=DEBUG
