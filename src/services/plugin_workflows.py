@@ -178,19 +178,23 @@ def _persist_plugin_settings(
     *,
     device_config: Any,
     playlist_manager: Any,
-    playlist: Any,
+    playlist_name: str,
     plugin_id: str,
     plugin_settings: dict[str, Any],
     instance_name: str,
     default_refresh_interval_seconds: int,
     plugin_log_id: str,
-) -> tuple[dict[str, Any] | None, PluginSettingsWorkflowResult | None]:
+) -> tuple[dict[str, Any] | None, bool, PluginSettingsWorkflowResult | None]:
     before_settings: dict[str, Any] = {}
+    created = False
 
     try:
 
         def _do_save_settings(cfg: dict[str, Any]) -> None:
-            nonlocal before_settings
+            nonlocal before_settings, created
+            playlist, created = ensure_playlist(playlist_manager, playlist_name)
+            if playlist is None:
+                raise RuntimeError("Could not create saved settings playlist")
             inst = playlist.find_plugin(plugin_id, instance_name)
             if inst:
                 before_settings = copy.deepcopy(inst.settings or {})
@@ -213,13 +217,17 @@ def _persist_plugin_settings(
         device_config.update_atomic(_do_save_settings)
     except Exception:
         logger.exception("Saving plugin settings failed for %s", plugin_log_id)
-        return None, _failure(
-            "An internal error occurred",
-            status=500,
-            code="internal_error",
+        return (
+            None,
+            False,
+            _failure(
+                "An internal error occurred",
+                status=500,
+                code="internal_error",
+            ),
         )
 
-    return before_settings, None
+    return before_settings, created, None
 
 
 def _record_saved_settings_change(
@@ -286,23 +294,15 @@ def save_plugin_settings_workflow(
     if validation_error is not None:
         return validation_error
 
-    playlist, created = ensure_playlist(playlist_manager, default_playlist_name)
-    if playlist is None:
-        return _failure(
-            "Failed to create Default playlist",
-            status=500,
-            code="internal_error",
-        )
-
     instance_name = build_saved_settings_instance_name(
         plugin_id, suffix=saved_instance_suffix
     )
     before_settings: dict[str, Any] = {}
     after_settings = copy.deepcopy(plugin_settings)
-    persisted_before_settings, persist_error = _persist_plugin_settings(
+    persisted_before_settings, created, persist_error = _persist_plugin_settings(
         device_config=device_config,
         playlist_manager=playlist_manager,
-        playlist=playlist,
+        playlist_name=default_playlist_name,
         plugin_id=plugin_id,
         plugin_settings=plugin_settings,
         instance_name=instance_name,
