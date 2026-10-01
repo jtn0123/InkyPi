@@ -268,13 +268,13 @@ class TestValidatePluginRequiredFields:
         result = validate_plugin_required_fields(NoSchema(), {})
         assert result is None
 
-    def test_schema_raises_returns_none(self) -> None:
+    def test_schema_failure_propagates(self) -> None:
         class BrokenPlugin:
             def build_settings_schema(self) -> None:
                 raise RuntimeError("broken")
 
-        result = validate_plugin_required_fields(BrokenPlugin(), {})
-        assert result is None
+        with pytest.raises(RuntimeError, match="broken"):
+            validate_plugin_required_fields(BrokenPlugin(), {})
 
     def test_multiple_missing_all_listed(self) -> None:
         schema = self._make_schema(

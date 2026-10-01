@@ -7,8 +7,9 @@ import logging
 import re
 import time as _time
 from dataclasses import dataclass, field
-from typing import Any, cast
+from typing import Any
 
+from services.plugin_workflows import validate_plugin_for_save
 from utils.form_utils import sanitize_log_field
 from utils.messages import PLAYLIST_NAME_REQUIRED_ERROR
 from utils.time_utils import calculate_seconds
@@ -203,32 +204,36 @@ def validate_plugin_settings_security(
                     sanitize_log_field(provider),
                     exc_info=True,
                 )
+                return WorkflowError(
+                    "Provider validation is unavailable. Settings were not saved.",
+                    status=503,
+                    code="backend_unavailable",
+                )
 
-    if not plugin_settings:
-        return None
-    plugin_config = None
     try:
         plugin_config = device_config.get_plugin(plugin_id)
-    except Exception:
-        logger.debug(
-            "Could not load plugin config for security validation", exc_info=True
-        )
-        return None
-    if not plugin_config:
-        return None
-
-    try:
+        if not plugin_config:
+            return WorkflowError("Plugin not found", status=404)
         from plugins.plugin_registry import get_plugin_instance as _get_plugin_instance
 
-        plugin_obj = cast(Any, _get_plugin_instance)(plugin_config)
-        settings_error = plugin_obj.validate_settings(plugin_settings)
-        if settings_error:
-            return WorkflowError(str(settings_error), status=400)
+        plugin_obj = _get_plugin_instance(plugin_config)
     except Exception:
-        logger.debug(
-            "Could not validate plugin schema for %s",
+        logger.warning(
+            "Could not load plugin for validation: %s",
             sanitize_log_field(plugin_id),
             exc_info=True,
+        )
+        return WorkflowError(
+            "Plugin validation is unavailable. Settings were not saved.",
+            status=503,
+            code="backend_unavailable",
+        )
+    error = validate_plugin_for_save(
+        plugin_obj, plugin_settings, sanitize_log_field(plugin_id)
+    )
+    if error is not None:
+        return WorkflowError(
+            error.message, status=error.status, code=error.code, field=error.field
         )
     return None
 
@@ -299,6 +304,7 @@ def prepare_add_plugin_workflow(
         return _failure(
             security_err.message,
             status=security_err.status,
+            code=security_err.code,
             field=security_err.field,
         )
 

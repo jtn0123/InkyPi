@@ -2,6 +2,7 @@ import json
 import logging
 import os
 from collections.abc import Mapping
+from html import escape
 from time import perf_counter
 from typing import Any, NoReturn, cast
 
@@ -20,7 +21,12 @@ from flask import (
 from plugins.plugin_registry import get_plugin_instance
 from refresh_task import ManualRefresh, PlaylistRefresh
 from refresh_task.job_queue import get_job_queue
-from services.plugin_workflows import save_plugin_settings_workflow
+from services.playlist_workflows import validate_plugin_refresh_settings
+from services.plugin_workflows import (
+    record_saved_settings_change,
+    save_plugin_settings_workflow,
+    validate_plugin_for_save,
+)
 from utils.app_utils import handle_request_files, parse_form, resolve_path
 from utils.backend_errors import (
     ClientInputError,
@@ -552,56 +558,45 @@ def update_plugin_instance(instance_name: str) -> Any:
         # reverted the user's change while the toast said "success".
         new_refresh_config: dict[str, Any] | None = None
         if parsed.refresh_settings is not None:
-            from blueprints.playlist import validate_plugin_refresh_settings
-
             new_refresh_config, refresh_err = validate_plugin_refresh_settings(
                 parsed.refresh_settings
             )
             if refresh_err:
-                return refresh_err
-
-        # Validate required fields and plugin-specific settings
-        plugin_config = device_config.get_plugin(plugin_id)
-        if plugin_config:
-            try:
-                plugin = get_plugin_instance(plugin_config)
-            except Exception:
-                logger.warning(
-                    "Could not load plugin for validation: %s",
-                    sanitize_log_field(plugin_id),
+                raise ClientInputError(
+                    refresh_err.message,
+                    status=refresh_err.status,
+                    code=refresh_err.code,
+                    field=refresh_err.field,
                 )
-                plugin = None
 
-            if plugin is not None:
-                try:
-                    validation_error = validate_plugin_required_fields(
-                        plugin, plugin_settings
-                    )
-                except Exception:
-                    logger.warning(
-                        "Required-field validation failed for %s",
-                        sanitize_log_field(plugin_id),
-                        exc_info=True,
-                    )
-                else:
-                    if validation_error:
-                        raise ClientInputError(validation_error, status=400)
-
-                try:
-                    settings_error = plugin.validate_settings(plugin_settings)
-                except Exception as exc:
-                    logger.warning(
-                        "Plugin validate_settings raised for %s",
-                        sanitize_log_field(plugin_id),
-                        exc_info=True,
-                    )
-                    raise ClientInputError(
-                        "Settings validation failed. Please check your input.",
-                        status=400,
-                    ) from exc
-                else:
-                    if settings_error:
-                        raise ClientInputError(settings_error, status=400)
+        try:
+            plugin_config = device_config.get_plugin(plugin_id)
+            plugin = get_plugin_instance(plugin_config) if plugin_config else None
+        except Exception:
+            logger.warning(
+                "Could not load plugin for validation: %s",
+                sanitize_log_field(plugin_id),
+                exc_info=True,
+            )
+            plugin = None
+        validation_error = validate_plugin_for_save(
+            plugin,
+            plugin_settings,
+            sanitize_log_field(plugin_id),
+            validate_plugin_required_fields,
+        )
+        if validation_error is not None:
+            if validation_error.status == 503:
+                return json_error(
+                    "Plugin validation is unavailable; settings were not saved.",
+                    status=503,
+                    code="backend_unavailable",
+                )
+            return json_error(
+                escape(validation_error.message, quote=True),
+                status=400,
+                code="validation_error",
+            )
 
         before_settings = dict(plugin_instance.settings or {})
 
@@ -611,12 +606,21 @@ def update_plugin_instance(instance_name: str) -> Any:
                 plugin_instance.refresh = new_refresh_config
 
         device_config.update_atomic(_do_update_instance)
-        config_dir = os.path.dirname(device_config.config_file)
-        _record_plugin_change(
-            config_dir, instance_name, before_settings, plugin_settings
+        history_warning = record_saved_settings_change(
+            device_config=device_config,
+            instance_name=instance_name,
+            before_settings=before_settings,
+            after_settings=plugin_settings,
+            plugin_log_id=sanitize_log_field(plugin_id),
+            record_change_fn=_record_plugin_change,
         )
 
-    return json_success(message=f"Updated plugin instance {instance_name}.")
+    return json_success(
+        message=escape(
+            history_warning or f"Updated plugin instance {instance_name}.", quote=True
+        ),
+        warnings=[escape(history_warning, quote=True)] if history_warning else [],
+    )
 
 
 @plugin_bp.route("/display_plugin_instance", methods=["POST"])
@@ -1324,6 +1328,9 @@ def _save_plugin_settings_common(
         plugin_settings,
         device_config,
         playlist_manager,
+        get_plugin_instance_fn=get_plugin_instance,
+        validate_required_fields_fn=validate_plugin_required_fields,
+        record_change_fn=_record_plugin_change,
     )
     if not result.ok:
         error = result.error
@@ -1349,6 +1356,7 @@ def _save_plugin_settings_common(
     return json_success(
         message=success_message,
         instance_name=result.instance_name,
+        warnings=result.warnings,
     )
 
 

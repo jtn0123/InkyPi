@@ -225,8 +225,8 @@ class TestImageFolderValidation:
 class TestPluginValidateSettingsException:
     """If validate_settings raises an exception, the error must be surfaced."""
 
-    def test_validate_settings_exception_returns_400(self, client: FlaskClient) -> None:
-        """A validate_settings method that raises should return 400, not silently succeed."""
+    def test_validate_settings_exception_returns_503(self, client: FlaskClient) -> None:
+        """An unavailable validator is a backend failure, not invalid input."""
         with patch(
             "plugins.weather.weather.Weather.validate_settings",
             side_effect=ValueError("unexpected error"),
@@ -241,9 +241,9 @@ class TestPluginValidateSettingsException:
                     "weatherProvider": "OpenMeteo",
                 },
             )
-            assert resp.status_code == 400
+            assert resp.status_code == 503
             data = resp.get_json()
-            assert "validation failed" in data["error"].lower()
+            assert data["code"] == "backend_unavailable"
 
     def test_validate_settings_exception_htmx_returns_error_partial(
         self, client: FlaskClient
@@ -264,15 +264,15 @@ class TestPluginValidateSettingsException:
                 },
                 headers={"HX-Request": "true"},
             )
-            assert resp.status_code == 400
+            assert resp.status_code == 503
             assert "text/html" in resp.headers.get("Content-Type", "")
             body = resp.get_data(as_text=True)
-            assert "validation failed" in body.lower()
+            assert "validation is unavailable" in body.lower()
 
-    def test_get_plugin_instance_exception_allows_save(
+    def test_get_plugin_instance_exception_blocks_save(
         self, client: FlaskClient, tmp_path: Path
     ) -> None:
-        """If get_plugin_instance raises, save should still succeed (plugin=None skips validation)."""
+        """An unavailable plugin must not bypass validation."""
         from PIL import Image
 
         folder = tmp_path / "pics"
@@ -290,14 +290,15 @@ class TestPluginValidateSettingsException:
                     "folder_path": str(folder),
                 },
             )
-            # Save succeeds because validation is skipped when the plugin
-            # instance cannot be loaded; the error is logged but not surfaced.
-            assert resp.status_code == 200
+            assert resp.status_code == 503
+            payload = resp.get_json()
+            assert payload is not None
+            assert payload["code"] == "backend_unavailable"
 
-    def test_validate_required_fields_exception_continues_to_validate_settings(
+    def test_validate_required_fields_exception_blocks_save(
         self, client: FlaskClient, tmp_path: Path
     ) -> None:
-        """If validate_plugin_required_fields raises, we still reach validate_settings."""
+        """A required-field validator failure must leave settings unchanged."""
         from PIL import Image
 
         folder = tmp_path / "pics"
@@ -315,10 +316,10 @@ class TestPluginValidateSettingsException:
                     "folder_path": str(folder),
                 },
             )
-            # validate_settings on image_folder returns None when folder exists
-            # and has images, so the save should succeed even though the
-            # required-field check raised and was swallowed/logged.
-            assert resp.status_code == 200
+            assert resp.status_code == 503
+            payload = resp.get_json()
+            assert payload is not None
+            assert payload["code"] == "backend_unavailable"
 
 
 class TestPluginIdLogSanitization:
@@ -404,11 +405,11 @@ class TestUpdatePluginInstanceValidation:
                     "weatherProvider": "OpenMeteo",
                 },
             )
-            assert resp.status_code == 400
+            assert resp.status_code == 503
             data = resp.get_json()
-            assert "validation failed" in data["error"].lower()
+            assert data["code"] == "backend_unavailable"
 
-    def test_update_continues_when_get_plugin_instance_raises(
+    def test_update_blocks_when_get_plugin_instance_raises(
         self, client: FlaskClient, flask_app: Flask, tmp_path: Path
     ) -> None:
         from PIL import Image
@@ -431,5 +432,7 @@ class TestUpdatePluginInstanceValidation:
                     "folder_path": str(folder),
                 },
             )
-            # Update still succeeds — validation is skipped and logged.
-            assert resp.status_code == 200
+            assert resp.status_code == 503
+            payload = resp.get_json()
+            assert payload is not None
+            assert payload["code"] == "backend_unavailable"

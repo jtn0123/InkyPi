@@ -49,6 +49,7 @@ import socket
 import threading
 from collections.abc import Iterator
 from contextlib import contextmanager
+from html import escape
 from time import perf_counter
 from typing import TYPE_CHECKING, Any, cast
 
@@ -146,7 +147,7 @@ def _get_or_set_request_id() -> str | None:
     try:
         rid_existing: str | None = getattr(g, "request_id", None)
         if rid_existing is not None and rid_existing != "":
-            return rid_existing
+            return escape(rid_existing, quote=True)
         # Prefer inbound X-Request-Id if provided by client/proxy.
         #
         # The value is echoed back in every json_error/json_success body, so an
@@ -164,7 +165,7 @@ def _get_or_set_request_id() -> str | None:
             # this is consistency and defence in depth rather than the guard.
             # Annotated because this module is in the mypy strict subset and
             # `follow_imports = skip` hides form_utils' `-> str` declaration.
-            rid_safe: str = sanitize_response_value(rid_hdr)
+            rid_safe: str = escape(rid_hdr, quote=True)
             g.request_id = rid_safe
             return rid_safe
         # Generate

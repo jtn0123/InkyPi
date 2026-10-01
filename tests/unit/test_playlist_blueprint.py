@@ -46,7 +46,13 @@ def _add_plugin_to_playlist(
     )
     return client.post(
         "/add_plugin",
-        data={"plugin_id": plugin_id, "refresh_settings": refresh_settings},
+        data={
+            "plugin_id": plugin_id,
+            "refresh_settings": refresh_settings,
+            "latitude": "40",
+            "longitude": "-74",
+            "weatherProvider": "OpenMeteo",
+        },
     )
 
 
@@ -661,7 +667,13 @@ class TestAddPlugin:
         )
         resp = client.post(
             "/add_plugin",
-            data={"plugin_id": "weather", "refresh_settings": refresh_settings},
+            data={
+                "plugin_id": "weather",
+                "latitude": "40",
+                "longitude": "-74",
+                "weatherProvider": "OpenMeteo",
+                "refresh_settings": refresh_settings,
+            },
         )
         assert resp.status_code == 200
 

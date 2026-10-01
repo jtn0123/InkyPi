@@ -124,6 +124,15 @@ class _Plugin:
         return self.validation_error
 
 
+@pytest.fixture(autouse=True)
+def registered_test_plugin(monkeypatch: pytest.MonkeyPatch) -> None:
+    # These workflow fixtures use synthetic plugin configs, so give them a
+    # working validator. Individual failure tests override this loader.
+    monkeypatch.setattr(
+        "plugins.plugin_registry.get_plugin_instance", lambda config: _Plugin()
+    )
+
+
 def _playlist_workflows_mod() -> ModuleType:
     return importlib.import_module("services.playlist_workflows")
 
@@ -384,7 +393,7 @@ def test_prepare_add_plugin_workflow_rejects_ai_image_provider_without_key() -> 
     assert result.error.message == "Google AI API Key not configured."
 
 
-def test_validate_ai_image_provider_key_lookup_failures_are_non_blocking() -> None:
+def test_validate_ai_image_provider_key_lookup_failure_blocks_save() -> None:
     playlist_workflows_mod = _playlist_workflows_mod()
 
     class _ExplodingDeviceConfig(_DeviceConfig):
@@ -397,4 +406,6 @@ def test_validate_ai_image_provider_key_lookup_failures_are_non_blocking() -> No
         {"provider": "openai"},
     )
 
-    assert err is None
+    assert err is not None
+    assert err.status == 503
+    assert err.code == "backend_unavailable"
