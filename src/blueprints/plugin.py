@@ -586,9 +586,16 @@ def update_plugin_instance(instance_name: str) -> Any:
             validate_plugin_required_fields,
         )
         if validation_error is not None:
+            if validation_error.status == 503:
+                return json_error(
+                    "Plugin validation is unavailable; settings were not saved.",
+                    status=503,
+                    code="backend_unavailable",
+                )
             return json_error(
                 escape(validation_error.message, quote=True),
-                **validation_error.as_json_kwargs(),
+                status=400,
+                code="validation_error",
             )
 
         before_settings = dict(plugin_instance.settings or {})
@@ -612,7 +619,7 @@ def update_plugin_instance(instance_name: str) -> Any:
         message=escape(
             history_warning or f"Updated plugin instance {instance_name}.", quote=True
         ),
-        warnings=[history_warning] if history_warning else [],
+        warnings=[escape(history_warning, quote=True)] if history_warning else [],
     )
 
 
