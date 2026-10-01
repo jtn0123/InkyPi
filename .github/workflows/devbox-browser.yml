@@ -1,0 +1,26 @@
+name: Devbox stable browser
+on:
+  pull_request:
+    paths: [devbox.json, 'scripts/devbox_*.sh', 'scripts/devbox_*.py', '.github/workflows/devbox-browser.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  chromium:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: jetify-com/devbox-install-action@8c6a66ed6273138b1915457069de78cb52fe3bd7 # v0.15.0
+        with:
+          enable-cache: true
+      - name: Verify stable Chromium and run renderer smoke
+        run: |
+          devbox run verify-browser
+      - name: Preserve actual Chromium render
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: devbox-chromium-render
+          path: .Codex/devbox-render.png
+          if-no-files-found: ignore

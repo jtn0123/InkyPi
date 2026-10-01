@@ -133,6 +133,22 @@ else
     echo "    OK — universal dev requirements are up to date."
 fi
 
+# Installer tools and optional hardware dependencies use the same integrity
+# contract as runtime dependencies. Resolve against committed versions.
+for lock_name in bootstrap uv ws; do
+    lock_txt="install/${lock_name}-requirements.txt"
+    if ! uv --no-config pip compile \
+        --universal --python-version 3.11 --prerelease disallow \
+        --generate-hashes --constraints "$lock_txt" --no-header --no-annotate \
+        "install/${lock_name}-requirements.in" --output-file "$tmp_dev" --quiet; then
+        echo "ERROR: ${lock_name} installer requirements do not resolve."
+        DRIFT_FOUND=1
+    elif ! diff -u "$lock_txt" "$tmp_dev"; then
+        echo "ERROR: regenerate ${lock_txt} with universal hash generation."
+        DRIFT_FOUND=1
+    fi
+done
+
 if [ "${DRIFT_FOUND}" -ne 0 ]; then
     echo "Lockfile drift detected. See diff output above."
     exit 1

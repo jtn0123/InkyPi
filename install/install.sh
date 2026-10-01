@@ -477,7 +477,7 @@ create_venv(){
   # pip's default retries=5 already; explicit so a future change to pip default doesn't bite us.
   # JTN-602: --no-cache-dir saves ~200 MB SD + ~50 MB RAM. Cache has no value
   # on the Pi (pip runs once per install, venv rebuilt on reinstall).
-  "$VENV_PATH/bin/python" -m pip install --retries 5 --timeout 60 --no-cache-dir --upgrade pip setuptools wheel > /dev/null
+  "$VENV_PATH/bin/python" -m pip install --retries 5 --timeout 60 --no-cache-dir --upgrade --require-hashes -r "$SCRIPT_DIR/bootstrap-requirements.txt" > /dev/null
 
   # JTN-604: Try to fetch a pre-built wheelhouse bundle. When it succeeds,
   # pip/uv can install every dependency from local wheels (no on-device
@@ -507,7 +507,7 @@ create_venv(){
   #   (b) uv is sandboxed inside the venv, not installed to /root/.local
   #   (c) if uv itself is unavailable for any reason, we cleanly fall back to pip
   local use_uv=0
-  if "$VENV_PATH/bin/python" -m pip install --retries 5 --timeout 60 --no-cache-dir uv > /dev/null 2>&1; then
+  if "$VENV_PATH/bin/python" -m pip install --retries 5 --timeout 60 --no-cache-dir --require-hashes -r "$SCRIPT_DIR/uv-requirements.txt" > /dev/null 2>&1; then
     if "$VENV_PATH/bin/python" -m uv --version > /dev/null 2>&1; then
       use_uv=1
       echo_success "\tuv installed into venv — using uv for dependency install"
@@ -552,12 +552,12 @@ create_venv(){
         --python "$VENV_PATH/bin/python" \
         --no-cache \
         "${uv_extra_args[@]}" \
-        -r "$WS_REQUIREMENTS_FILE" > ws_pip_install.log &
+        --require-hashes -r "$WS_REQUIREMENTS_FILE" > ws_pip_install.log &
       show_loader "\tInstalling additional Waveshare python dependencies (uv). "
     else
       "$VENV_PATH/bin/python" -m pip install --retries 5 --timeout 60 --no-cache-dir \
         "${pip_extra_args[@]}" \
-        -r "$WS_REQUIREMENTS_FILE" > ws_pip_install.log &
+        --require-hashes -r "$WS_REQUIREMENTS_FILE" > ws_pip_install.log &
       show_loader "\tInstalling additional Waveshare python dependencies (pip fallback). "
     fi
   fi

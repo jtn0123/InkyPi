@@ -541,7 +541,7 @@ echo "Upgrading pip..."
 # JTN-665: capture failure so a broken pip/setuptools upgrade does not silently
 # proceed to requirements install and leave the venv in a partially-broken state.
 # JTN-669: --retries 5 --timeout 60 --no-cache-dir for JTN-534/JTN-602 parity.
-if ! "$VENV_PATH/bin/python" -m pip install --retries 5 --timeout 60 --no-cache-dir --upgrade pip setuptools wheel > /dev/null; then
+if ! "$VENV_PATH/bin/python" -m pip install --retries 5 --timeout 60 --no-cache-dir --upgrade --require-hashes -r "$SCRIPT_DIR/bootstrap-requirements.txt" > /dev/null; then
   echo_error "ERROR: pip/setuptools upgrade failed — aborting update."
   exit 1
 fi
@@ -572,7 +572,7 @@ fi
 #   (b) uv is sandboxed inside the venv, not installed to /root/.local
 #   (c) if uv itself is unavailable for any reason, we cleanly fall back to pip
 use_uv=0
-if "$VENV_PATH/bin/python" -m pip install --retries 5 --timeout 60 --no-cache-dir uv > /dev/null 2>&1; then
+if "$VENV_PATH/bin/python" -m pip install --retries 5 --timeout 60 --no-cache-dir --require-hashes -r "$SCRIPT_DIR/uv-requirements.txt" > /dev/null 2>&1; then
   if "$VENV_PATH/bin/python" -m uv --version > /dev/null 2>&1; then
     use_uv=1
     echo_success "  uv installed into venv — using uv for dependency install"

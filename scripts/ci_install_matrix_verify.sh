@@ -61,7 +61,11 @@ fi
 # wheelhouse would mask a broken requirements.txt.
 export INKYPI_SKIP_WHEELHOUSE=1
 
-if sudo bash ./install.sh; then
+install_args=()
+if [[ "${INKYPI_INSTALL_MATRIX_WAVESHARE:-}" != "" ]]; then
+    install_args=(-W "$INKYPI_INSTALL_MATRIX_WAVESHARE")
+fi
+if sudo bash ./install.sh "${install_args[@]}"; then
     pass "install.sh exited 0"
 else
     rc=$?
@@ -101,6 +105,25 @@ for dist, mod in mods.items():
     pass "flask, waitress, Pillow importable from install venv"
 else
     fail "one or more required packages missing from install venv"
+fi
+
+if [[ "${INKYPI_INSTALL_MATRIX_WAVESHARE:-}" != "" ]]; then
+    "${VENV_PATH}/bin/python" -c 'import gpiozero, lgpio
+from importlib.metadata import distribution
+from pathlib import Path
+package = distribution("RPi.GPIO")
+assert package.version == "0.7.1"
+extensions = [Path(package.locate_file(item)) for item in package.files or [] if str(item).startswith("RPi/_GPIO") and str(item).endswith(".so")]
+assert len(extensions) == 1, extensions
+header = extensions[0].read_bytes()[:20]
+assert header[:5] == b"\x7fELF\x02" and int.from_bytes(header[18:20], "little") == 183
+try:
+    import RPi.GPIO
+except RuntimeError as error:
+    if str(error) != "This module can only be run on a Raspberry Pi!":
+        raise
+    print("RPi.GPIO compiled ARM64 extension loaded; GPIO probe requires physical Pi hardware")'
+    pass "hash-verified Waveshare extras import successfully"
 fi
 
 banner "Phase 4/4 — systemd-analyze verify install/inkypi.service"
