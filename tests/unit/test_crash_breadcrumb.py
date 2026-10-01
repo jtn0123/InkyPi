@@ -9,7 +9,11 @@ breadcrumb records what was in flight, and the quarantine acts on it.
 
 from __future__ import annotations
 
+import errno
 import json
+import logging
+import os
+import stat
 from pathlib import Path
 from typing import Any
 
@@ -264,6 +268,136 @@ class TestBreadcrumbPathsAreConstrained:
         crash_breadcrumb.drop("refresh", plugin_id="clock", instance="a")
         crash_breadcrumb.examine_boot()
         assert (state / "last_death.json").exists()
+
+
+class TestBreadcrumbWriteAndLogBoundaries:
+    def test_failed_stream_open_closes_descriptor_and_removes_temporary_file(
+        self,
+        isolated_dirs: tuple[Path, Path],
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        runtime, _state = isolated_dirs
+        crash_breadcrumb.drop("refresh", plugin_id="clock", instance="previous")
+        destination = runtime / "breadcrumb.json"
+        original = destination.read_bytes()
+        descriptors: list[int] = []
+
+        def unavailable_open(
+            descriptor: int, *_args: object, **_kwargs: object
+        ) -> None:
+            descriptors.append(descriptor)
+            raise OSError("injected stream-open failure")
+
+        monkeypatch.setattr(os, "fdopen", unavailable_open)
+
+        crash_breadcrumb.drop("refresh", plugin_id="weather", instance="failed")
+
+        assert len(descriptors) == 1
+        with pytest.raises(OSError) as closed:
+            os.fstat(descriptors[0])
+        assert closed.value.errno == errno.EBADF
+        assert destination.read_bytes() == original
+        assert list(runtime.iterdir()) == [destination]
+
+    @pytest.mark.parametrize("filename", ["breadcrumb.json", "last_death.json"])
+    def test_preexisting_temporary_symlink_cannot_overwrite_an_outside_file(
+        self, isolated_dirs: tuple[Path, Path], tmp_path: Path, filename: str
+    ) -> None:
+        runtime, state = isolated_dirs
+        directory = runtime if filename == "breadcrumb.json" else state
+        victim = tmp_path / "outside-configured-directory.txt"
+        victim.write_text("must remain unchanged")
+        planted = directory / f"{filename}.tmp"
+        planted.symlink_to(victim)
+
+        crash_breadcrumb.drop("refresh", plugin_id="clock", instance="a")
+        if filename == "last_death.json":
+            assert crash_breadcrumb.examine_boot() is not None
+
+        assert victim.read_text() == "must remain unchanged"
+        assert planted.is_symlink()
+        destination = directory / filename
+        assert destination.is_file() and not destination.is_symlink()
+        assert stat.S_IMODE(destination.stat().st_mode) == 0o600
+        data = json.loads(destination.read_text())
+        breadcrumb = data if filename == "breadcrumb.json" else data["last_death"]
+        assert breadcrumb["plugin_id"] == "clock"
+
+    @pytest.mark.parametrize("failure", ["serialization", "replacement", "sync"])
+    def test_failed_write_retains_previous_record_and_cleans_temporary_file(
+        self,
+        isolated_dirs: tuple[Path, Path],
+        monkeypatch: pytest.MonkeyPatch,
+        failure: str,
+    ) -> None:
+        runtime, _state = isolated_dirs
+        crash_breadcrumb.drop("refresh", plugin_id="clock", instance="previous")
+        destination = runtime / "breadcrumb.json"
+        original = destination.read_bytes()
+
+        def unavailable(*_args: object, **_kwargs: object) -> None:
+            raise OSError("injected filesystem failure")
+
+        if failure == "replacement":
+            monkeypatch.setattr(os, "replace", unavailable)
+        elif failure == "sync":
+            monkeypatch.setattr(os, "fsync", unavailable)
+
+        if failure == "serialization":
+            crash_breadcrumb.drop("refresh", not_json_serializable=object())
+        else:
+            crash_breadcrumb.drop("refresh", plugin_id="weather", instance="failed")
+
+        assert destination.read_bytes() == original
+        assert list(runtime.iterdir()) == [destination]
+
+    def test_breadcrumb_fields_do_not_choose_persistent_filenames(
+        self, isolated_dirs: tuple[Path, Path], tmp_path: Path
+    ) -> None:
+        runtime, state = isolated_dirs
+        outside = tmp_path / "outside.json"
+        payload = {
+            "operation": "refresh",
+            "plugin_id": "clock",
+            "path": str(outside),
+            "filename": "../../outside.json",
+        }
+        (runtime / "breadcrumb.json").write_text(json.dumps(payload))
+
+        assert crash_breadcrumb.examine_boot() == payload
+
+        assert not outside.exists()
+        assert list(state.iterdir()) == [state / "last_death.json"]
+
+    @pytest.mark.parametrize("field", ["operation", "started_at", "instance"])
+    def test_persisted_controls_cannot_forge_log_lines(
+        self,
+        isolated_dirs: tuple[Path, Path],
+        caplog: pytest.LogCaptureFixture,
+        field: str,
+    ) -> None:
+        runtime, _state = isolated_dirs
+        forged = "clock\r\nERROR forged\x00\t\u2028next"
+        payload = {
+            "operation": "refresh",
+            "started_at": "2026-10-01T00:00:00+00:00",
+            "plugin_id": "clock",
+            "instance": "a",
+        }
+        payload[field] = forged
+        (runtime / "breadcrumb.json").write_text(json.dumps(payload))
+        caplog.set_level(logging.ERROR, logger=crash_breadcrumb.__name__)
+
+        found = crash_breadcrumb.examine_boot()
+
+        assert found == payload
+        death = crash_breadcrumb.last_death()
+        assert death is not None
+        assert {key: death[key] for key in payload} == payload
+        messages = [r.getMessage() for r in caplog.records]
+        assert len(messages) == 1
+        assert not any(character in messages[0] for character in "\r\n\x00\t\u2028")
+        assert "forged" in messages[0]
 
 
 class TestQuarantineSanitisesTheBreadcrumb:
