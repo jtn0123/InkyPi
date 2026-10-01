@@ -5,6 +5,8 @@ on:
     paths:
       - 'README.md'
       - 'docs/**'
+      - 'scripts/check_links.py'
+      - '.github/workflows/linkcheck.yml'
   schedule:
     - cron: '0 5 * * *'
 
@@ -47,13 +49,15 @@ jobs:
 
       - name: Check links with lychee
         run: |
+          shopt -s globstar nullglob
+          document_inputs=(README.md docs/**/*.md)
           lychee --version
           # Some storefronts reject Lychee while same-runner curl GET succeeds.
           # Independently recheck 429s; every URL still requires a real success.
           python3 scripts/check_links.py \
             --cookie-jar "${RUNNER_TEMP}/lychee-cookies.json" \
             --report "${RUNNER_TEMP}/inkypi-links.json" \
-            README.md docs/**/*.md
+            "${document_inputs[@]}"
         env:
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
 

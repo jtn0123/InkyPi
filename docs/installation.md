@@ -9,20 +9,17 @@ tolerance for waiting.
 > v0.43.0 onwards. Flash and go — skips the ~15 minute on-device `install.sh`
 > run entirely.
 
-Every tagged GitHub release ships a pre-installed `.img.xz` built by
+Releases with a successful image build publish a pre-installed `.img.xz` built by
 `.github/workflows/build-pi-image.yml`. The image is Debian-based Pi OS Lite
 with InkyPi already installed, enabled as a systemd service, and ready to
 serve the web UI on first boot.
 
 **What the image is:** Pi OS Lite arm64 + InkyPi at the matching release tag,
 built inside a chroot with `qemu-aarch64-static`, shrunk with `pishrink.sh`,
-and boot-verified in `qemu-system-aarch64` before it ships. Nothing personal
-(no hostname, no Wi-Fi, no SSH credentials) is baked into the image — Pi
-Imager's advanced options still handle all of that at flash time.
+and checked with a generic ARM kernel/initramfs in `qemu-system-aarch64` before publication. No operator account, Wi-Fi or SSH credentials are baked into it. The pinned May 2025 Bookworm base uses Imager's `systemd`/`firstrun.sh` customization; it does not use Trixie cloud-init. See the [official Imager compatibility guide](https://github.com/raspberrypi/rpi-imager/blob/main/doc/os_customisation_formats.md).
 
 **What the image is not:** not a substitute for a real-Pi dogfooding pass.
-The workflow's qemu boot verification proves the kernel reaches userspace
-and spawns getty, but cannot simulate the Pi's GPIO / SPI hardware. Treat
+The workflow checks the image root filesystem reaches a serial login prompt under a generic ARM verification kernel. It does not boot the shipped Pi firmware/kernel or test account/Wi-Fi customization, GPIO or SPI. Treat
 the pre-built image like any other OS image — flash to a spare SD card and
 verify the display lights up before retiring your existing Pi.
 
@@ -39,19 +36,18 @@ same install.sh flow on-device in about 2–3 minutes.
    You want both files:
     - `inkypi-<version>-pi-zero-2-w.img.xz`
     - `inkypi-<version>-pi-zero-2-w.img.xz.sha256`
+    - For Imager 2.x: `inkypi-<version>-os-list.json` (customization metadata)
 2. Verify the download with the `.sha256` sidecar:
    ```bash
    shasum -a 256 -c inkypi-<version>-pi-zero-2-w.img.xz.sha256
    ```
    If the check fails, **do not flash it** — re-download or open an issue.
-3. Open Pi Imager, click **Choose OS → Use custom** and select the
-   `.img.xz` you just downloaded. Pi Imager handles the `.xz` decompression
-   transparently.
-4. **Critical:** click the gear icon (advanced options) and set hostname,
-   SSH, Wi-Fi SSID + password, locale, and a non-default user. Pi Imager
-   writes these into `/boot/firmware/user-data` for cloud-init to apply on
-   first boot. The pre-built image intentionally does not carry any of
-   these — that's what Pi Imager is for.
+3. With **Imager 2.x**, launch Imager with the release manifest URL as its `--repo` argument. For example, substitute the actual release tag/version:
+   ```bash
+   rpi-imager --repo https://github.com/jtn0123/InkyPi/releases/download/v<VERSION>/inkypi-<VERSION>-os-list.json
+   ```
+   Select the InkyPi entry. The manifest declares `init_format: systemd` and verifies the extracted image's hash/size. Choosing a raw custom `.img.xz` in Imager 2.x without metadata disables customization; use the manifest. On macOS the executable is typically `/Applications/Raspberry Pi Imager.app/Contents/MacOS/rpi-imager`.
+4. Before writing, set a non-default username/password, hostname, SSH, Wi-Fi and locale in customization. Bookworm applies these through `firstrun.sh`; the image has no preconfigured operator credentials.
 5. Flash the SD card, insert it into the Pi Zero 2 W, and power up.
 6. On first boot cloud-init applies the hostname/Wi-Fi/SSH settings from
    step 4, the InkyPi systemd service starts automatically, and the web UI
@@ -69,7 +65,7 @@ On a Pi Zero 2 W, `install.sh` takes ~15 minutes end-to-end (numpy + Pillow
 + playwright wheels compile on a single Cortex-A53 core; zramswap is
 critical to avoid OOM). Even with the JTN-604 wheelhouse it's ~2–3 minutes
 plus apt package fetch. Shipping a pre-installed image collapses all of
-that into the time it takes cloud-init to run its first-boot steps.
+that into the time it takes Bookworm customization to run its first-boot steps.
 
 The image is also easier to support: if a new user's install fails, we can
 ask them to reflash with the known-good `.img.xz` instead of triaging
