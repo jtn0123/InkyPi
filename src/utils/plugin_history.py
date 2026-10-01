@@ -51,11 +51,11 @@ def _history_file(config_dir: str, instance_name: str) -> str:
 
 def record_change(
     config_dir: str, instance_name: str, before: dict[str, Any], after: dict[str, Any]
-) -> None:
+) -> bool:
     """Append a change record to the instance's JSONL history file.
 
-    Silently logs and continues on any I/O error so that plugin save is never
-    blocked by a history write failure.
+    Return False and log I/O failures so callers can report saved settings
+    separately from unavailable history.
 
     The file is truncated to MAX_ENTRIES after each write (oldest entries dropped).
     """
@@ -95,12 +95,14 @@ def record_change(
             except OSError:
                 pass
             raise
+        return True
     except Exception as exc:
         # Sanitize user-controlled instance_name to prevent log injection (S5145)
         safe_name = str(instance_name).replace("\r", "").replace("\n", "")[:64]
         logger.warning(
             "plugin_history: could not record change for %r: %s", safe_name, exc
         )
+        return False
 
 
 def _safe_log_name(instance_name: str) -> str:

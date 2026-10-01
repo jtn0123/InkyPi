@@ -22,6 +22,7 @@ from refresh_task import ManualRefresh, PlaylistRefresh
 from refresh_task.job_queue import get_job_queue
 from services.playlist_workflows import validate_plugin_refresh_settings
 from services.plugin_workflows import (
+    record_saved_settings_change,
     save_plugin_settings_workflow,
     validate_plugin_for_save,
 )
@@ -596,12 +597,19 @@ def update_plugin_instance(instance_name: str) -> Any:
                 plugin_instance.refresh = new_refresh_config
 
         device_config.update_atomic(_do_update_instance)
-        config_dir = os.path.dirname(device_config.config_file)
-        _record_plugin_change(
-            config_dir, instance_name, before_settings, plugin_settings
+        history_warning = record_saved_settings_change(
+            device_config=device_config,
+            instance_name=instance_name,
+            before_settings=before_settings,
+            after_settings=plugin_settings,
+            plugin_log_id=sanitize_log_field(plugin_id),
+            record_change_fn=_record_plugin_change,
         )
 
-    return json_success(message=f"Updated plugin instance {instance_name}.")
+    return json_success(
+        message=history_warning or f"Updated plugin instance {instance_name}.",
+        warnings=[history_warning] if history_warning else [],
+    )
 
 
 @plugin_bp.route("/display_plugin_instance", methods=["POST"])
@@ -1311,6 +1319,7 @@ def _save_plugin_settings_common(
         playlist_manager,
         get_plugin_instance_fn=get_plugin_instance,
         validate_required_fields_fn=validate_plugin_required_fields,
+        record_change_fn=_record_plugin_change,
     )
     if not result.ok:
         error = result.error
@@ -1336,6 +1345,7 @@ def _save_plugin_settings_common(
     return json_success(
         message=success_message,
         instance_name=result.instance_name,
+        warnings=result.warnings,
     )
 
 

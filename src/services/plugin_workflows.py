@@ -63,6 +63,7 @@ class PluginSettingsWorkflowResult:
     before_settings: dict[str, Any] = field(default_factory=dict)
     after_settings: dict[str, Any] = field(default_factory=dict)
     error: WorkflowError | None = None
+    warnings: list[str] = field(default_factory=list)
 
 
 def build_saved_settings_instance_name(
@@ -230,28 +231,30 @@ def _persist_plugin_settings(
     return before_settings, created, None
 
 
-def _record_saved_settings_change(
+def record_saved_settings_change(
     *,
     device_config: Any,
     instance_name: str,
     before_settings: dict[str, Any],
     after_settings: dict[str, Any],
     plugin_log_id: str,
-    record_change_fn: Callable[[str, str, dict[str, Any], dict[str, Any]], None] | None,
-) -> PluginSettingsWorkflowResult | None:
+    record_change_fn: (
+        Callable[[str, str, dict[str, Any], dict[str, Any]], bool | None] | None
+    ),
+) -> str | None:
     if record_change_fn is None:
         return None
 
     try:
         config_dir = os.path.dirname(device_config.config_file)
-        record_change_fn(config_dir, instance_name, before_settings, after_settings)
+        recorded = record_change_fn(
+            config_dir, instance_name, before_settings, after_settings
+        )
+        if recorded is False:
+            return "Settings saved, but change history could not be recorded."
     except Exception:
         logger.exception("Recording plugin history failed for %s", plugin_log_id)
-        return _failure(
-            "An internal error occurred",
-            status=500,
-            code="internal_error",
-        )
+        return "Settings saved, but change history could not be recorded."
 
     return None
 
@@ -267,7 +270,7 @@ def save_plugin_settings_workflow(
         validate_plugin_required_fields
     ),
     record_change_fn: (
-        Callable[[str, str, dict[str, Any], dict[str, Any]], None] | None
+        Callable[[str, str, dict[str, Any], dict[str, Any]], bool | None] | None
     ) = _record_plugin_change,
     default_playlist_name: str = DEFAULT_PLAYLIST_NAME,
     saved_instance_suffix: str = DEFAULT_PLUGIN_INSTANCE_SUFFIX,
@@ -319,7 +322,7 @@ def save_plugin_settings_workflow(
     if persisted_before_settings is not None:
         before_settings = persisted_before_settings
 
-    record_error = _record_saved_settings_change(
+    history_warning = record_saved_settings_change(
         device_config=device_config,
         instance_name=instance_name,
         before_settings=before_settings,
@@ -327,12 +330,11 @@ def save_plugin_settings_workflow(
         plugin_log_id=plugin_log_id,
         record_change_fn=record_change_fn,
     )
-    if record_error is not None:
-        return record_error
 
     return PluginSettingsWorkflowResult(
         ok=True,
-        message=DEFAULT_SUCCESS_MESSAGE,
+        message=history_warning or DEFAULT_SUCCESS_MESSAGE,
+        warnings=[history_warning] if history_warning else [],
         instance_name=instance_name,
         playlist_name=default_playlist_name,
         default_playlist_created=created,
