@@ -76,10 +76,25 @@ cyclonedx-cli convert \
 
 ### Checking for known vulnerabilities
 
+From the repository root, use the committed development environment and audit
+the locked requirement files:
+
 ```bash
-pip install pip-audit
-pip-audit --sbom inkypi-vX.Y.Z-bom.json
+source scripts/venv.sh
+python -m pip_audit -r install/requirements.txt --format=json --output runtime-audit.json
+python -m pip_audit -r install/requirements-dev.txt --format=json --output dev-audit.json
 ```
+
+Generate a CycloneDX inventory separately:
+
+```bash
+python -m cyclonedx_py environment .venv/bin/python --of JSON -o sbom.json
+```
+
+An SBOM describes installed packages; generating or converting it does not
+perform the vulnerability audit above. The optional cyclonedx-cli conversion
+example requires that separate tool to be installed. These commands match CI's
+audit and inventory tools.
 
 ## Security Reporting
 

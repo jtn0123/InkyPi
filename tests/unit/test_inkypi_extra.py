@@ -201,7 +201,9 @@ def test_security_headers_basic(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_security_headers_hsts_conditions(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test HSTS header conditions are covered."""
-    mod = _reload_inkypi(monkeypatch, argv=["inkypi.py"], env={})
+    mod = _reload_inkypi(
+        monkeypatch, argv=["inkypi.py"], env={"INKYPI_TRUSTED_PROXIES": "127.0.0.1"}
+    )
     app = getattr(mod, "app", None)
     assert app is not None
 
@@ -212,9 +214,18 @@ def test_security_headers_hsts_conditions(monkeypatch: pytest.MonkeyPatch) -> No
     assert "Strict-Transport-Security" in https_resp.headers
 
     proxy_resp = app.test_client().get(
-        "/healthz", headers={"X-Forwarded-Proto": "https"}
+        "/healthz",
+        headers={"X-Forwarded-Proto": "https"},
+        environ_overrides={"REMOTE_ADDR": "127.0.0.1"},
     )
     assert "Strict-Transport-Security" in proxy_resp.headers
+
+    untrusted = app.test_client().get(
+        "/healthz",
+        headers={"X-Forwarded-Proto": "https"},
+        environ_overrides={"REMOTE_ADDR": "192.0.2.1"},
+    )
+    assert "Strict-Transport-Security" not in untrusted.headers
 
 
 def test_startup_image_generation_execution(monkeypatch: pytest.MonkeyPatch) -> None:

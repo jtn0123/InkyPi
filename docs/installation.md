@@ -149,7 +149,7 @@ As of the version that resolves [JTN-604](https://linear.app/jtn0123/issue/JTN-6
 **Opt out.** Set `INKYPI_SKIP_WHEELHOUSE=1` before running `install.sh` to skip the fetch entirely. Useful if you want to verify wheel builds reproduce locally or if you're debugging a dependency pin:
 
 ```bash
-sudo INKYPI_SKIP_WHEELHOUSE=1 ./install.sh
+sudo INKYPI_SKIP_WHEELHOUSE=1 bash install/install.sh
 ```
 
 ### uv resolver (faster + lighter dependency install — JTN-605)
@@ -271,3 +271,7 @@ always_rerun_modules: [runcmd]
 ```
 
 > **Warning:** `always_rerun_modules: [runcmd]` makes `runcmd` run on *every* boot. Remove it once your install is confirmed working, or the install script will re-run each time the Pi reboots.
+
+## Access control after installation
+
+The installed service listens on all interfaces with PIN authentication off by default. Complete [persistent authentication and HTTPS commissioning](auth.md) before permitting remote administration. Shell exports do not configure the systemd service, and a monitoring token alone does not protect administration.

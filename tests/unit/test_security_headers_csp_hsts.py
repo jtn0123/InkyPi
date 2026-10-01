@@ -102,10 +102,10 @@ def test_csp_nonce_not_injected_when_custom_csp_set(
     assert "nonce-" not in csp
 
 
-def test_hsts_only_under_https_or_forward_proto(
+def test_hsts_only_under_https_or_trusted_proxy(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    mod = _reload_inkypi(monkeypatch)
+    mod = _reload_inkypi(monkeypatch, env={"INKYPI_TRUSTED_PROXIES": "127.0.0.1"})
     app = mod.app
     client = app.test_client()
 
@@ -118,5 +118,16 @@ def test_hsts_only_under_https_or_forward_proto(
     assert "Strict-Transport-Security" in r2.headers
 
     # HSTS when forwarded proto HTTPS
-    r3 = client.get("/healthz", headers={"X-Forwarded-Proto": "https"})
+    r3 = client.get(
+        "/healthz",
+        headers={"X-Forwarded-Proto": "https"},
+        environ_overrides={"REMOTE_ADDR": "127.0.0.1"},
+    )
     assert "Strict-Transport-Security" in r3.headers
+
+    untrusted = client.get(
+        "/healthz",
+        headers={"X-Forwarded-Proto": "https"},
+        environ_overrides={"REMOTE_ADDR": "192.0.2.1"},
+    )
+    assert "Strict-Transport-Security" not in untrusted.headers
