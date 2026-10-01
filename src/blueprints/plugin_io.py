@@ -17,9 +17,8 @@ from typing import Any, cast
 from flask import Blueprint, Response, current_app, jsonify, request
 
 from services.playlist_workflows import validate_plugin_settings_security
-from utils.backend_errors import ClientInputError, route_error_boundary
 from utils.form_utils import sanitize_log_field
-from utils.http_utils import JsonResponse, json_error
+from utils.http_utils import APIError, JsonResponse, json_error, json_internal_error
 
 logger = logging.getLogger(__name__)
 
@@ -214,15 +213,17 @@ def _prepare_import_instances(
         field = f"instances[{index}].settings"
         settings = instance["settings"]
         if not isinstance(settings, dict):
-            raise ClientInputError(f"{field} must be an object", field=field)
+            raise APIError(
+                f"{field} must be an object", status=400, details={"field": field}
+            )
         settings = deepcopy(settings)
         error = validate_plugin_settings_security(device_config, plugin_id, settings)
         if error is not None:
-            raise ClientInputError(
+            raise APIError(
                 f"{field}: {error.message}",
                 status=error.status,
                 code=error.code,
-                field=field,
+                details={"field": field},
             )
         name = str(instance.get("name", "")).strip() or plugin_id
         prepared.append(_ImportInstance(plugin_id, name, settings))
@@ -300,9 +301,14 @@ def import_plugins() -> (
     if validation_error is not None:
         return json_error(validation_error, status=400)
 
-    with route_error_boundary("import plugins", logger=logger):
+    try:
         prepared, skipped = _prepare_import_instances(device_config, instances)
         renamed = _add_import_instances(device_config, prepared)
+    except APIError:
+        raise
+    except Exception:
+        logger.exception("plugin import failed")
+        return json_internal_error("import plugins")
 
     return jsonify(
         {
