@@ -9,11 +9,14 @@ from __future__ import annotations
 
 import json
 import logging
+from copy import deepcopy
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any, cast
 
 from flask import Blueprint, Response, current_app, jsonify, request
 
+from services.playlist_workflows import validate_plugin_settings_security
 from utils.form_utils import sanitize_log_field
 from utils.http_utils import JsonResponse, json_error
 
@@ -182,6 +185,109 @@ def _validate_payload(payload: object) -> tuple[str | None, list[dict[str, Any]]
     return None, instances
 
 
+@dataclass(frozen=True)
+class _ImportInstance:
+    plugin_id: str
+    name: str
+    settings: dict[str, Any]
+
+
+def _prepare_import_instances(
+    device_config: Any, instances: list[dict[str, Any]]
+) -> tuple[list[_ImportInstance], list[str], JsonResponse | None]:
+    """Validate the entire installed batch before touching playlist state."""
+    installed_ids = {
+        plugin["id"]
+        for plugin in device_config.get_plugins()
+        if isinstance(plugin, dict) and "id" in plugin
+    }
+    prepared: list[_ImportInstance] = []
+    skipped: list[str] = []
+    for index, instance in enumerate(instances):
+        plugin_id = str(instance["plugin_id"]).strip()
+        if plugin_id not in installed_ids:
+            logger.info("plugin_import: skipping unknown plugin_id=%r", plugin_id)
+            if plugin_id not in skipped:
+                skipped.append(plugin_id)
+            continue
+        field = f"instances[{index}].settings"
+        settings = instance["settings"]
+        if not isinstance(settings, dict):
+            return (
+                [],
+                skipped,
+                json_error(
+                    f"{field} must be an object", status=400, details={"field": field}
+                ),
+            )
+        settings = deepcopy(settings)
+        error = validate_plugin_settings_security(device_config, plugin_id, settings)
+        if error is not None:
+            return (
+                [],
+                skipped,
+                json_error(
+                    f"{field}: {error.message}",
+                    status=error.status,
+                    code=error.code,
+                    details={"field": field},
+                ),
+            )
+        name = str(instance.get("name", "")).strip() or plugin_id
+        prepared.append(_ImportInstance(plugin_id, name, settings))
+    return prepared, skipped, None
+
+
+def _unique_import_name(name: str, existing_names: set[str]) -> str:
+    if name not in existing_names:
+        return name
+    candidate = f"{name} (imported)"
+    suffix = 1
+    while candidate in existing_names:
+        suffix += 1
+        candidate = f"{name} (imported {suffix})"
+    return candidate
+
+
+def _add_import_instances(
+    device_config: Any, prepared: list[_ImportInstance]
+) -> list[str]:
+    """Commit creation, collision resolution and additions under one lock."""
+    renamed: list[str] = []
+    if not prepared:
+        return renamed
+
+    def apply_import(_config: object) -> None:
+        manager = device_config.get_playlist_manager()
+        existing_names = {
+            plugin.name for playlist in manager.playlists for plugin in playlist.plugins
+        }
+        playlist = manager.get_playlist("Default")
+        if playlist is None:
+            manager.add_playlist("Default")
+            playlist = manager.get_playlist("Default")
+        if playlist is None:
+            raise RuntimeError("Could not create import playlist")
+        for instance in prepared:
+            name = _unique_import_name(instance.name, existing_names)
+            if name != instance.name:
+                renamed.append(f"{instance.name} → {name}")
+            added = playlist.add_plugin(
+                {
+                    "plugin_id": instance.plugin_id,
+                    "name": name,
+                    "refresh": {"interval": 3600},
+                    "plugin_settings": instance.settings,
+                }
+            )
+            if not added:
+                raise RuntimeError("Could not add imported plugin")
+            existing_names.add(name)
+
+    device_config.update_atomic(apply_import)
+    return renamed
+
+
 @plugin_io_bp.route("/api/plugins/import", methods=["POST"])
 def import_plugins() -> (
     tuple[Response | dict[str, Any], int] | Response | dict[str, Any]
@@ -195,8 +301,6 @@ def import_plugins() -> (
             renamed  (list[str]): instances renamed to avoid name collisions
     """
     device_config = current_app.config[_CONFIG_KEY]
-    playlist_manager = device_config.get_playlist_manager()
-
     payload = _parse_import_body()
     if payload is None:
         return json_error("Could not parse JSON from request", status=400)
@@ -205,73 +309,26 @@ def import_plugins() -> (
     if validation_error is not None:
         return json_error(validation_error, status=400)
 
-    # Build set of installed plugin_ids for fast lookup
-    installed_ids: set[str] = {
-        p["id"]
-        for p in device_config.get_plugins()
-        if isinstance(p, dict) and "id" in p
-    }
-
-    # Collect existing instance names across all playlists for collision detection
-    existing_names: set[str] = {
-        plugin_inst.name
-        for playlist in playlist_manager.playlists
-        for plugin_inst in playlist.plugins
-    }
-
-    # Ensure there is a playlist to import into (use Default, create if needed)
-    default_playlist = playlist_manager.get_playlist("Default")
-    if not default_playlist:
-        playlist_manager.add_playlist("Default")
-        default_playlist = playlist_manager.get_playlist("Default")
-
-    imported = 0
-    skipped: list[str] = []
-    renamed: list[str] = []
-
-    for inst in instances:
-        plugin_id = str(inst.get("plugin_id", "")).strip()
-        name = str(inst.get("name", "")).strip() or plugin_id
-        settings = inst.get("settings", {})
-        if not isinstance(settings, dict):
-            settings = {}
-
-        # Security: reject unknown plugin_ids
-        if plugin_id not in installed_ids:
-            logger.info("plugin_import: skipping unknown plugin_id=%r", plugin_id)
-            if plugin_id not in skipped:
-                skipped.append(plugin_id)
-            continue
-
-        # Name collision: append suffix
-        original_name = name
-        if name in existing_names:
-            candidate = f"{name} (imported)"
-            suffix = 1
-            while candidate in existing_names:
-                suffix += 1
-                candidate = f"{name} (imported {suffix})"
-            name = candidate
-            renamed.append(f"{original_name} → {name}")
-
-        default_playlist.add_plugin(
-            {
-                "plugin_id": plugin_id,
-                "name": name,
-                "refresh": {"interval": 3600},
-                "plugin_settings": settings,
-            }
+    try:
+        prepared, skipped, import_error = _prepare_import_instances(
+            device_config, instances
         )
-        existing_names.add(name)
-        imported += 1
-
-    if imported > 0:
-        device_config.write_config()
+        if import_error is not None:
+            return import_error
+        renamed = _add_import_instances(device_config, prepared)
+    except Exception:
+        logger.exception("plugin import failed")
+        return json_error(
+            "An internal error occurred",
+            status=500,
+            code="internal_error",
+            details={"context": "import plugins"},
+        )
 
     return jsonify(
         {
             "success": True,
-            "imported": imported,
+            "imported": len(prepared),
             "skipped": skipped,
             "renamed": renamed,
         }
