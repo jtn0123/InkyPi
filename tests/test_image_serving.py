@@ -168,3 +168,55 @@ def test_path_traversal_rejected(tmp_path: Path) -> None:
             outside.unlink()
         except FileNotFoundError:
             pass
+
+
+def test_equal_size_same_second_overwrite_invalidates_webp(tmp_path: Path) -> None:
+    from flask import Flask
+
+    from utils.image_serving import maybe_serve_webp
+
+    png = _make_png(tmp_path)
+    timestamp = 1_700_000_000_000_000_000
+    os.utime(png, ns=(timestamp, timestamp))
+    size = png.stat().st_size
+    app = Flask(__name__)
+    with app.test_request_context("/"):
+        first = maybe_serve_webp(tmp_path, "test.png", "image/webp")
+    Image.new("RGB", (4, 4), (30, 20, 10)).save(png)
+    assert png.stat().st_size == size
+    os.utime(png, ns=(timestamp + 100_000, timestamp + 100_000))
+    with app.test_request_context("/"):
+        second = maybe_serve_webp(tmp_path, "test.png", "image/webp")
+    assert first.get_data() != second.get_data()
+    assert first.get_etag() != second.get_etag()
+
+
+def test_conditional_revalidation_is_variant_specific(tmp_path: Path) -> None:
+    from flask import Flask, request
+
+    from utils.image_serving import maybe_serve_webp
+
+    _make_png(tmp_path)
+    app = Flask(__name__)
+
+    @app.route("/image")
+    def image():
+        return maybe_serve_webp(tmp_path, "test.png", request.headers.get("Accept"))
+
+    client = app.test_client()
+    for accept in ("image/png", "image/webp"):
+        first = client.get("/image", headers={"Accept": accept})
+        assert "Accept" in first.vary
+        etag = first.headers["ETag"]
+        assert etag.startswith('"') and etag.endswith('"')
+        unchanged = client.get(
+            "/image", headers={"Accept": accept, "If-None-Match": etag}
+        )
+        assert unchanged.status_code == 304
+        assert unchanged.data == b""
+        other_accept = "image/png" if accept == "image/webp" else "image/webp"
+        other = client.get(
+            "/image", headers={"Accept": other_accept, "If-None-Match": etag}
+        )
+        assert other.status_code == 200
+        assert other.headers["ETag"] != etag
