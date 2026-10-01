@@ -20,6 +20,14 @@
   } = globalThis.InkyPiPluginPageShared;
   const { createProgressController } = globalThis.InkyPiPluginPageProgress;
 
+  function reportPreviewRefreshFailure(error) {
+    console.warn("Failed to refresh preview after update:", error);
+    showResponseModal(
+      "failure",
+      "The update succeeded, but the preview could not be refreshed. Refresh this page to retry."
+    );
+  }
+
   function createPluginPage(config) {
     const ui = globalThis.InkyPiUI || {};
     const mobileQuery = globalThis.matchMedia ? globalThis.matchMedia("(max-width: 768px)") : { matches: false, addEventListener() {} };
@@ -251,14 +259,6 @@
       setLatestRefresh(resolvedRefresh);
       setCurrentDisplayRefresh(resolvedRefresh);
       await refreshInstancePreview({ force: true });
-    }
-
-    function reportPreviewRefreshFailure(error) {
-      console.warn("Failed to refresh preview after update:", error);
-      showResponseModal(
-        "failure",
-        "The update succeeded, but the preview could not be refreshed. Refresh this page to retry."
-      );
     }
 
     // Track the element that triggered the most-recently opened modal so focus

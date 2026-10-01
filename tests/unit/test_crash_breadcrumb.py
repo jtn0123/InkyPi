@@ -317,7 +317,8 @@ class TestBreadcrumbWriteAndLogBoundaries:
         assert victim.read_text() == "must remain unchanged"
         assert planted.is_symlink()
         destination = directory / filename
-        assert destination.is_file() and not destination.is_symlink()
+        assert destination.is_file()
+        assert not destination.is_symlink()
         assert stat.S_IMODE(destination.stat().st_mode) == 0o600
         data = json.loads(destination.read_text())
         breadcrumb = data if filename == "breadcrumb.json" else data["last_death"]
