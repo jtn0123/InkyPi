@@ -158,7 +158,7 @@ flake_suite() {
     fi
     local _run_index
     for _run_index in 1 2 3; do
-        python -m pytest -q \
+        python -m pytest -q --force-reruns 0 \
             tests/unit/test_refresh_task_stress.py \
             tests/unit/test_memory_leaks.py \
             tests/unit/test_plugin_isolation.py \
@@ -172,7 +172,7 @@ flake_suite() {
             tests/plugins/test_image_folder.py \
             tests/plugins/test_image_upload.py
         if [[ "$(uname -s)" == "Linux" ]]; then
-            REQUIRE_BROWSER_SMOKE=1 python -m pytest -q --reruns 0 \
+            REQUIRE_BROWSER_SMOKE=1 python -m pytest -q --force-reruns 0 \
                 tests/integration/test_browser_smoke.py \
                 tests/snapshots/test_plugin_snapshots.py \
                 tests/integration/test_visual_regression.py \
