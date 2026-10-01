@@ -233,10 +233,8 @@ def validate_plugin_required_fields(
     """
     if not hasattr(plugin, "build_settings_schema"):
         return None
-    try:
-        schema = plugin.build_settings_schema()
-    except Exception:
-        return None
+    # A broken schema is unavailable validation, never successful validation.
+    schema = plugin.build_settings_schema()
 
     missing: list[str] = []
 

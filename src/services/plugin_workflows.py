@@ -143,34 +143,34 @@ def _load_plugin_for_validation(
         return None
 
 
-def _validate_plugin_settings(
+def validate_plugin_for_save(
     plugin: Any | None,
     plugin_settings: dict[str, Any],
     plugin_log_id: str,
-    validate_required_fields_fn: Callable[[Any, dict[str, Any]], str | None],
-) -> PluginSettingsWorkflowResult | None:
+    validate_required_fields_fn: Callable[
+        [Any, dict[str, Any]], str | None
+    ] = validate_plugin_required_fields,
+) -> WorkflowError | None:
+    """Distinguish invalid input from validators that cannot execute."""
+    unavailable = WorkflowError(
+        "Plugin validation is unavailable. Settings were not saved.",
+        status=503,
+        code="backend_unavailable",
+    )
     if plugin is None:
-        return None
-
+        return unavailable
     try:
-        validation_error = validate_required_fields_fn(plugin, plugin_settings)
-        if validation_error:
-            return _failure(validation_error, status=400)
-    except Exception:
-        logger.warning("Required-field validation failed for %s", plugin_log_id)
-
-    try:
+        required_error = validate_required_fields_fn(plugin, plugin_settings)
+        if required_error:
+            return WorkflowError(required_error)
         settings_error = plugin.validate_settings(plugin_settings)
         if settings_error:
-            return _failure(settings_error, status=400)
+            return WorkflowError(str(settings_error))
     except Exception:
         logger.warning(
-            "Plugin validate_settings raised for %s",
-            plugin_log_id,
-            exc_info=True,
+            "Plugin validation unavailable for %s", plugin_log_id, exc_info=True
         )
-        return _failure(DEFAULT_PLUGIN_VALIDATION_MESSAGE, status=400)
-
+        return unavailable
     return None
 
 
@@ -288,11 +288,16 @@ def save_plugin_settings_workflow(
     plugin = _load_plugin_for_validation(
         plugin_config, plugin_log_id, get_plugin_instance_fn
     )
-    validation_error = _validate_plugin_settings(
+    validation_error = validate_plugin_for_save(
         plugin, plugin_settings, plugin_log_id, validate_required_fields_fn
     )
     if validation_error is not None:
-        return validation_error
+        return _failure(
+            validation_error.message,
+            status=validation_error.status,
+            code=validation_error.code,
+            field=validation_error.field,
+        )
 
     instance_name = build_saved_settings_instance_name(
         plugin_id, suffix=saved_instance_suffix
