@@ -2,6 +2,15 @@
 
 <!-- version list -->
 
+## v1.4.10 (2026-10-01)
+
+### Bug Fixes
+
+- **plugins**: Allow intentional absence of settings schemas
+  ([#672](https://github.com/jtn0123/InkyPi/pull/672),
+  [`6df3398`](https://github.com/jtn0123/InkyPi/commit/6df3398ac0536f661db702b4f30a4d6053a6781d))
+
+
 ## v1.4.9 (2026-10-01)
 
 ### Bug Fixes
