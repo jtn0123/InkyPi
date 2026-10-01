@@ -506,9 +506,10 @@
       }
     }
 
-    function startPolling() {
+    function refreshDashboard() {
       refreshPreviewSafely();
-      return setInterval(refreshPreviewSafely, pollIntervalMs);
+      // KPI fetches own their transport and HTTP failures.
+      void refreshKpis();
     }
 
     function initRealtime() {
@@ -523,24 +524,30 @@
       globalThis.addEventListener("beforeunload", cleanup);
       globalThis.addEventListener("pagehide", cleanup);
 
+      refreshDashboard();
       const pushUrl = config.pushUrl;
       if (pushUrl && globalThis.EventSource) {
         try {
           sseSource = new EventSource(pushUrl);
-          sseSource.onmessage = refreshPreviewSafely;
+          sseSource.onmessage = refreshDashboard;
+          sseSource.onopen = refreshDashboard;
+          for (const event of ["refresh_started", "refresh_complete", "plugin_failed"]) {
+            sseSource.addEventListener(event, refreshDashboard);
+          }
           sseSource.onerror = () => {
             console.warn("SSE connection lost, falling back to polling");
             if (sseSource) { sseSource.close(); sseSource = null; }
-            refreshPreviewSafely();
-            pollTimerId = setInterval(refreshPreviewSafely, pollIntervalMs);
+            if (!pollTimerId) {
+              refreshDashboard();
+              pollTimerId = setInterval(refreshDashboard, pollIntervalMs);
+            }
           };
           return;
         } catch (error) {
           console.warn("SSE not available, using polling:", error);
         }
       }
-      refreshPreviewSafely();
-      pollTimerId = setInterval(refreshPreviewSafely, pollIntervalMs);
+      pollTimerId = setInterval(refreshDashboard, pollIntervalMs);
     }
 
     function init() {
@@ -577,8 +584,7 @@
       document.getElementById("dashboardRefreshBtn")?.addEventListener("click", () => {
         // Manually re-fetch preview + refresh info + next-up; mirrors the
         // realtime SSE handler but triggered by user gesture.
-        refreshPreviewSafely();
-        void refreshKpis();
+        refreshDashboard();
       });
       globalThis.addEventListener("beforeunload", () => {
         if (refreshCountdownTimerId) {
@@ -595,8 +601,6 @@
       startRefreshCountdown();
       initPreviewInteractions();
       initRealtime();
-      // KPI fetches render their own unavailable status on transport failures.
-      void refreshKpis();
     }
 
     // Today KPI card — populated from /api/stats (24h window) + /api/health/system.
