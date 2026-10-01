@@ -135,7 +135,7 @@ def client_log_capture(monkeypatch: pytest.MonkeyPatch) -> Iterator[Any]:
 
 
 @pytest.fixture()
-def browser_page() -> Iterator[Any]:
+def browser_page(request: pytest.FixtureRequest) -> Iterator[Any]:
     """Desktop-sized Playwright page (1280x900). Closes browser on teardown."""
     from playwright.sync_api import sync_playwright
 
@@ -143,12 +143,31 @@ def browser_page() -> Iterator[Any]:
         browser = p.chromium.launch()
         page = browser.new_page(viewport={"width": 1280, "height": 900})
         page.add_init_script(_CLIENT_LOG_META_INIT_SCRIPT)
-        yield page
-        browser.close()
+        from tests.fixtures.live_server import (
+            register_browser_context,
+            unregister_browser_context,
+        )
+
+        # No live-server/browser dependency is imposed on HTTP-only tests.
+        app = (
+            request.getfixturevalue("flask_app")
+            if "live_server" in request.fixturenames
+            else None
+        )
+        if app is not None:
+            register_browser_context(app, page.context)
+        try:
+            yield page
+        finally:
+            try:
+                browser.close()
+            finally:
+                if app is not None:
+                    unregister_browser_context(app, page.context)
 
 
 @pytest.fixture()
-def mobile_page() -> Iterator[Any]:
+def mobile_page(request: pytest.FixtureRequest) -> Iterator[Any]:
     """Mobile-sized Playwright page (360x800). Closes browser on teardown."""
     from playwright.sync_api import sync_playwright
 
@@ -156,5 +175,24 @@ def mobile_page() -> Iterator[Any]:
         browser = p.chromium.launch()
         page = browser.new_page(viewport={"width": 360, "height": 800})
         page.add_init_script(_CLIENT_LOG_META_INIT_SCRIPT)
-        yield page
-        browser.close()
+        from tests.fixtures.live_server import (
+            register_browser_context,
+            unregister_browser_context,
+        )
+
+        # No live-server/browser dependency is imposed on HTTP-only tests.
+        app = (
+            request.getfixturevalue("flask_app")
+            if "live_server" in request.fixturenames
+            else None
+        )
+        if app is not None:
+            register_browser_context(app, page.context)
+        try:
+            yield page
+        finally:
+            try:
+                browser.close()
+            finally:
+                if app is not None:
+                    unregister_browser_context(app, page.context)

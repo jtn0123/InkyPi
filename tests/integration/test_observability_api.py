@@ -74,8 +74,12 @@ def test_safe_reset_endpoint(client: FlaskClient) -> None:
 def test_progress_stream_sse(client: FlaskClient) -> None:
     # Hit endpoint to ensure it is streamable and emits event syntax
     r = client.get("/api/progress/stream", buffered=False)
-    assert r.status_code == 200
-    first = next(r.response)
-    body = first.decode("utf-8", errors="ignore")
-    # stream may start with keep-alive if no events yet
-    assert "event:" in body or ": keep-alive" in body
+    try:
+        assert r.status_code == 200
+        first = next(iter(r.response))
+        assert isinstance(first, bytes)
+        body = first.decode("utf-8", errors="ignore")
+        # stream may start with keep-alive if no events yet
+        assert any(marker in body for marker in ("event:", ": keep-alive"))
+    finally:
+        r.close()

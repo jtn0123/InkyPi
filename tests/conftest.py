@@ -12,7 +12,6 @@ from typing import Any
 import pytest
 from flask import Flask
 from PIL import Image
-from werkzeug.serving import make_server
 
 # Ensure both project root (for `src.*` imports) and src/ (for top-level `utils`, `display`) are on sys.path
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -384,7 +383,7 @@ def client(flask_app: Flask) -> Any:
 @pytest.fixture()
 def live_server(
     flask_app: Flask, free_tcp_port_factory: Any, monkeypatch: pytest.MonkeyPatch
-):  # free_tcp_port_factory: from anyio pytest plugin
+) -> Iterator[str]:  # free_tcp_port_factory: from anyio pytest plugin
     # Relax CSP for integration tests so Playwright's page.add_script_tag(content=...)
     # (used by axe-core and other in-page probes) isn't blocked as an inline script.
     # Unit CSP tests (tests/test_csp_report.py) -> Iterator[Any] -> Iterator[Any] use the `client` fixture instead and
@@ -398,12 +397,21 @@ def live_server(
     )
     host = "127.0.0.1"
     port = free_tcp_port_factory()
-    server = make_server(host, port, flask_app, threaded=True)
-    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    from tests.fixtures.live_server import OwnedTestServer, track_event_subscriptions
+    from utils.event_bus import get_event_bus
+    from utils.progress_events import get_progress_bus
+
+    track_event_subscriptions(get_event_bus(), monkeypatch)
+    server = OwnedTestServer(host, port, flask_app, progress_bus=get_progress_bus())
+    thread = threading.Thread(
+        target=server.serve_forever, kwargs={"poll_interval": 0.05}, daemon=True
+    )
     thread.start()
     try:
         yield f"http://{host}:{port}"
     finally:
-        server.shutdown()
-        server.server_close()
-        thread.join(timeout=5)
+        try:
+            server.close_owned_resources(flask_app)
+        finally:
+            thread.join(timeout=1)
+            assert not thread.is_alive(), "Test server accept loop did not stop"
