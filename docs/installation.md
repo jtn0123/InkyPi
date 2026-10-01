@@ -44,15 +44,13 @@ same install.sh flow on-device in about 2–3 minutes.
    If the check fails, **do not flash it** — re-download or open an issue.
 3. With **Imager 2.x**, launch Imager with the release manifest URL as its `--repo` argument. For example, substitute the actual release tag/version:
    ```bash
-   rpi-imager --repo https://github.com/jtn0123/InkyPi/releases/download/v<VERSION>/inkypi-<VERSION>-os-list.json
+   RELEASE_VERSION="X.Y.Z"  # Replace with the release that has image assets.
+   rpi-imager --repo "https://github.com/jtn0123/InkyPi/releases/download/v${RELEASE_VERSION}/inkypi-${RELEASE_VERSION}-os-list.json"
    ```
    Select the InkyPi entry. The manifest declares `init_format: systemd` and verifies the extracted image's hash/size. Choosing a raw custom `.img.xz` in Imager 2.x without metadata disables customization; use the manifest. On macOS the executable is typically `/Applications/Raspberry Pi Imager.app/Contents/MacOS/rpi-imager`.
 4. Before writing, set a non-default username/password, hostname, SSH, Wi-Fi and locale in customization. Bookworm applies these through `firstrun.sh`; the image has no preconfigured operator credentials.
 5. Flash the SD card, insert it into the Pi Zero 2 W, and power up.
-6. On first boot cloud-init applies the hostname/Wi-Fi/SSH settings from
-   step 4, the InkyPi systemd service starts automatically, and the web UI
-   becomes available at `http://<hostname>.local/` (typically within
-   30–60 seconds of power-on).
+6. On first boot Bookworm customization applies the operator account, hostname, Wi-Fi and SSH settings. The enabled InkyPi service starts, and the web UI becomes available at `http://<hostname>.local/`. First-boot timing depends on the card and network; QEMU does not verify Wi-Fi, SSH or the panel.
 
 If the web UI never comes up, see
 [Option 2](#option-2--install-from-source-contributors-custom-boards) — you
