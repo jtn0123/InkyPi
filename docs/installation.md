@@ -149,7 +149,7 @@ As of the version that resolves [JTN-604](https://linear.app/jtn0123/issue/JTN-6
 **Opt out.** Set `INKYPI_SKIP_WHEELHOUSE=1` before running `install.sh` to skip the fetch entirely. Useful if you want to verify wheel builds reproduce locally or if you're debugging a dependency pin:
 
 ```bash
-sudo INKYPI_SKIP_WHEELHOUSE=1 ./install.sh
+sudo INKYPI_SKIP_WHEELHOUSE=1 bash install/install.sh
 ```
 
 ### uv resolver (faster + lighter dependency install — JTN-605)
