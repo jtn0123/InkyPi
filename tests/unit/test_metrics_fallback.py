@@ -39,6 +39,13 @@ def _import_fallback_modules(
 ) -> tuple[ModuleType, ModuleType, Callable[[], None]]:
     original_metrics_module = sys.modules.get("utils.metrics")
     original_blueprints_metrics_module = sys.modules.get("blueprints.metrics")
+    missing = object()
+    original_parent_attributes = []
+    for package_name in ("utils", "blueprints"):
+        parent = importlib.import_module(package_name)
+        original_parent_attributes.append(
+            (parent, vars(parent).get("metrics", missing))
+        )
 
     _block_prometheus_imports(monkeypatch)
     monkeypatch.delitem(sys.modules, "utils.metrics", raising=False)
@@ -56,6 +63,12 @@ def _import_fallback_modules(
             sys.modules.pop("blueprints.metrics", None)
         else:
             sys.modules["blueprints.metrics"] = original_blueprints_metrics_module
+
+        for parent, original_attribute in original_parent_attributes:
+            if original_attribute is missing:
+                vars(parent).pop("metrics", None)
+            else:
+                vars(parent)["metrics"] = original_attribute
 
     return metrics_module, blueprints_metrics_module, restore_modules
 
@@ -102,3 +115,29 @@ def test_metrics_endpoint_fallback_response_when_prometheus_missing(
         assert b"prometheus_client not installed" in response.data
     finally:
         restore_modules()
+
+
+@pytest.mark.parametrize("package_name", ["utils", "blueprints"])
+@pytest.mark.parametrize("attribute_present", [False, True])
+def test_fallback_import_restores_parent_package_attribute(
+    package_name: str, attribute_present: bool
+) -> None:
+    """Restoring sys.modules must also restore dotted-import package lookup."""
+    module_name = f"{package_name}.metrics"
+    original_module = importlib.import_module(module_name)
+    parent = importlib.import_module(package_name)
+    with pytest.MonkeyPatch.context() as original_attribute:
+        if attribute_present:
+            original_attribute.setattr(
+                parent, "metrics", original_module, raising=False
+            )
+        else:
+            original_attribute.delattr(parent, "metrics", raising=False)
+        with pytest.MonkeyPatch.context() as isolated:
+            _, _, restore_modules = _import_fallback_modules(isolated)
+            restore_modules()
+            assert sys.modules[module_name] is original_module
+            if attribute_present:
+                assert vars(parent)["metrics"] is original_module
+            else:
+                assert not hasattr(parent, "metrics")
