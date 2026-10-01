@@ -291,7 +291,9 @@ class TestPluginValidateSettingsException:
                 },
             )
             assert resp.status_code == 503
-            assert resp.json["code"] == "backend_unavailable"
+            payload = resp.get_json()
+            assert payload is not None
+            assert payload["code"] == "backend_unavailable"
 
     def test_validate_required_fields_exception_blocks_save(
         self, client: FlaskClient, tmp_path: Path
@@ -315,7 +317,9 @@ class TestPluginValidateSettingsException:
                 },
             )
             assert resp.status_code == 503
-            assert resp.json["code"] == "backend_unavailable"
+            payload = resp.get_json()
+            assert payload is not None
+            assert payload["code"] == "backend_unavailable"
 
 
 class TestPluginIdLogSanitization:
@@ -429,4 +433,6 @@ class TestUpdatePluginInstanceValidation:
                 },
             )
             assert resp.status_code == 503
-            assert resp.json["code"] == "backend_unavailable"
+            payload = resp.get_json()
+            assert payload is not None
+            assert payload["code"] == "backend_unavailable"

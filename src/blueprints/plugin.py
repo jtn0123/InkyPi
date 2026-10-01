@@ -2,6 +2,7 @@ import json
 import logging
 import os
 from collections.abc import Mapping
+from html import escape
 from time import perf_counter
 from typing import Any, NoReturn, cast
 
@@ -36,7 +37,6 @@ from utils.backend_errors import (
 from utils.fallback_image import render_error_image
 from utils.form_utils import (
     sanitize_log_field,
-    sanitize_response_value,
     validate_plugin_required_fields,
 )
 from utils.http_utils import json_error, json_success
@@ -587,7 +587,7 @@ def update_plugin_instance(instance_name: str) -> Any:
         )
         if validation_error is not None:
             return json_error(
-                sanitize_response_value(validation_error.message),
+                escape(validation_error.message, quote=True),
                 **validation_error.as_json_kwargs(),
             )
 
@@ -609,8 +609,8 @@ def update_plugin_instance(instance_name: str) -> Any:
         )
 
     return json_success(
-        message=sanitize_response_value(
-            history_warning or f"Updated plugin instance {instance_name}."
+        message=escape(
+            history_warning or f"Updated plugin instance {instance_name}.", quote=True
         ),
         warnings=[history_warning] if history_warning else [],
     )
