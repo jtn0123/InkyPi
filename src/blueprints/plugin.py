@@ -3,7 +3,6 @@ import logging
 import os
 from collections.abc import Mapping
 from html import escape
-from time import perf_counter
 from typing import Any, NoReturn, cast
 
 from flask import (
@@ -21,6 +20,11 @@ from flask import (
 from plugins.plugin_registry import get_plugin_instance
 from refresh_task import ManualRefresh, PlaylistRefresh
 from refresh_task.job_queue import get_job_queue
+from services.direct_render import (
+    DirectRenderFailure,
+    DirectRenderOutcome,
+    execute_direct_render,
+)
 from services.playlist_workflows import validate_plugin_refresh_settings
 from services.plugin_workflows import (
     record_saved_settings_change,
@@ -47,7 +51,6 @@ from utils.plugin_errors import (
     ScreenshotBackendError,
 )
 from utils.plugin_history import record_change as _record_plugin_change
-from utils.progress import track_progress
 from utils.request_models import (
     RequestModelError,
     parse_plugin_instance_action_request,
@@ -733,187 +736,74 @@ def _safe_display_image(
         return display_manager.display_image(image, image_settings=image_settings)
 
 
-def _update_now_direct(
+def _direct_render_outcome(
     plugin_id: str,
     plugin_settings: dict[str, Any],
     device_config: Any,
     display_manager: Any,
-) -> Any:
-    """Execute a plugin directly (refresh task not running) and push to display.
-
-    Returns a Flask response tuple.  On plugin failure, a fallback error-card
-    image is pushed to the display before the error response is returned so the
-    screen does not stay frozen on stale content.
-    """
+) -> DirectRenderOutcome:
     plugin_config = device_config.get_plugin(plugin_id)
     if not plugin_config:
-        logger.warning(
-            "_update_now_direct: plugin not found plugin_id=%s",
-            sanitize_log_field(plugin_id),
-        )
-        return json_error(_ERR_PLUGIN_NOT_FOUND, status=404)
+        return DirectRenderOutcome(False, _ERR_PLUGIN_NOT_FOUND, 404, "not_found")
+    history_meta = {
+        "refresh_type": "Manual Update",
+        "plugin_id": plugin_id,
+        "playlist": None,
+        "plugin_instance": None,
+    }
 
-    plugin = get_plugin_instance(plugin_config)
-    with track_progress() as tracker:
-        _t_req_start = perf_counter()
-        _t_gen_start = perf_counter()
-        try:
-            image = plugin.generate_image(plugin_settings, device_config)
-        except URLValidationError as e:
-            # JTN-776: URL validation failures are user errors, not server
-            # errors. ``safe_message()`` returns a response string looked up
-            # from the module-level whitelist in :mod:`utils.security_utils`,
-            # which avoids any exception-derived text flowing to the client
-            # (CodeQL ``py/stack-trace-exposure``).
-            safe_msg = e.safe_message()
-            logger.info(
-                "Plugin %s rejected URL: %s",
-                sanitize_log_field(plugin_id),
-                sanitize_log_field(safe_msg),
-            )
-            # ISSUE-006: still surface the error image on the device, but
-            # do NOT write a history sidecar — the user just typed an
-            # invalid URL, no render was actually attempted, and we
-            # shouldn't bump Dashboard "Refreshes / Errors" for a typo.
-            _push_update_now_fallback(
-                plugin_id,
-                plugin_config,
-                device_config,
-                display_manager,
-                e,
-                record_history=False,
-            )
-            return json_error(
-                safe_msg,
-                status=422,
-                code="validation_error",
-                details={"field": "url"},
-            )
-        except ScreenshotBackendError as e:
-            # JTN-789: chromium subprocess failed twice in a row (initial
-            # + one retry) inside the plugin.  Surface a specific 503
-            # ``backend_unavailable`` instead of the generic 400
-            # ``plugin_error`` the RuntimeError handler below would produce
-            # — this signals transience (operators can retry) and points at
-            # the backend, not the user's configuration.  Response body
-            # comes from a module-level constant, never from ``str(exc)``,
-            # to satisfy CodeQL ``py/stack-trace-exposure`` (same pattern
-            # the JTN-776 URLValidationError handler uses).
-            logger.warning(
-                "Plugin %s: screenshot backend unavailable",
-                sanitize_log_field(plugin_id),
-                exc_info=True,
-            )
-            _push_update_now_fallback(
-                plugin_id, plugin_config, device_config, display_manager, e
-            )
-            return json_error(
-                SCREENSHOT_BACKEND_UNAVAILABLE_MSG,
-                status=503,
-                code="backend_unavailable",
-            )
-        except TimeoutError as e:
-            # JTN-K4: ``refresh_task.manual_update`` raises TimeoutError
-            # when a plugin render exceeds INKYPI_PLUGIN_TIMEOUT_S (default
-            # 60s).  TimeoutError is NOT a RuntimeError subclass (inherits
-            # from OSError), so without this handler it falls through to
-            # the generic 500 ``internal_error`` below — unhelpful signal.
-            # Map it to a typed 504 ``manual_update_timeout`` so operators
-            # see a transient-retryable error, mirroring JTN-789's 503
-            # ``backend_unavailable`` pattern.
-            logger.warning(
-                "Plugin %s: manual update timed out",
-                sanitize_log_field(plugin_id),
-            )
-            _push_update_now_fallback(
-                plugin_id, plugin_config, device_config, display_manager, e
-            )
-            return json_error(
-                MANUAL_UPDATE_TIMEOUT_MSG,
-                status=504,
-                code="manual_update_timeout",
-            )
-        except ProviderReportedPluginError as e:
-            safe_msg = e.safe_message()
-            logger.info(
-                "Plugin %s provider rejected request: %s",
-                sanitize_log_field(plugin_id),
-                sanitize_log_field(str(e)),
-            )
-            _push_update_now_fallback(
-                plugin_id, plugin_config, device_config, display_manager, e
-            )
-            return json_error(
-                safe_msg,
-                status=400,
-                code="provider_rejected",
-            )
-        except RuntimeError as e:
-            # RuntimeError is raised by plugins to signal a user-actionable
-            # failure (bad config, upstream API returned empty, etc.).  Do not
-            # echo the exception text to the client — CodeQL
-            # py/stack-trace-exposure, and plugin messages can occasionally
-            # embed tainted fragments.  Log the details server-side (JTN-326).
-            logger.exception(
-                "Plugin %s failed to generate preview",
-                sanitize_log_field(plugin_id),
-            )
-            _push_update_now_fallback(
-                plugin_id, plugin_config, device_config, display_manager, e
-            )
-            return json_error(
-                _ERR_INTERNAL,
-                status=400,
-                code="plugin_error",
-            )
-        except Exception:
-            # Unexpected exceptions must not leak exception text to the client
-            # (JTN-318): could contain stack-traces, DB credentials, etc.
-            logger.exception(
-                "Unexpected error generating preview for plugin %s",
-                sanitize_log_field(plugin_id),
-            )
-            _push_update_now_fallback_from_current_exception(
-                plugin_id, plugin_config, device_config, display_manager
-            )
-            return json_error(_ERR_INTERNAL, status=500, code="internal_error")
-        if image is None:
-            # A control-only plugin legitimately produces no image (see
-            # BasePlugin.generate_image). That is a completed refresh with
-            # nothing to show, not a failure — leave the panel alone.
-            logger.info(
-                "update_now: %s produced no image; display unchanged",
-                sanitize_log_field(plugin_id),
-            )
-            return json_error("Plugin produced no image to display", status=409)
-        generate_ms = int((perf_counter() - _t_gen_start) * 1000)
-        history_meta = {
-            "refresh_type": "Manual Update",
-            "plugin_id": plugin_id,
-            "playlist": None,
-            "plugin_instance": None,
-        }
+    def display(image: Any) -> None:
         _safe_display_image(
             display_manager,
             image,
             plugin_config.get("image_settings", []),
             history_meta,
         )
-        try:
-            ri = device_config.get_refresh_info()
-            display_ms = getattr(ri, "display_ms", None)
-            preprocess_ms = getattr(ri, "preprocess_ms", None)
-        except Exception:
-            display_ms = preprocess_ms = None
-        request_ms = int((perf_counter() - _t_req_start) * 1000)
-        metrics = {
-            "request_ms": request_ms,
-            "display_ms": display_ms,
-            "generate_ms": generate_ms,
-            "preprocess_ms": preprocess_ms,
-            "steps": tracker.get_steps(),
-        }
-    return json_success(message=_MSG_DISPLAY_UPDATED, metrics=metrics)
+
+    def timings() -> tuple[int | None, int | None]:
+        info = device_config.get_refresh_info()
+        return getattr(info, "display_ms", None), getattr(info, "preprocess_ms", None)
+
+    def fallback(error: BaseException, record_history: bool) -> None:
+        logger.warning(
+            "Direct render failed for %s", sanitize_log_field(plugin_id), exc_info=error
+        )
+        _push_update_now_fallback(
+            plugin_id,
+            plugin_config,
+            device_config,
+            display_manager,
+            error,
+            record_history=record_history,
+        )
+
+    return execute_direct_render(
+        lambda: get_plugin_instance(plugin_config).generate_image(
+            plugin_settings, device_config
+        ),
+        display,
+        timings,
+        fallback,
+    )
+
+
+def _update_now_direct(
+    plugin_id: str,
+    plugin_settings: dict[str, Any],
+    device_config: Any,
+    display_manager: Any,
+) -> Any:
+    outcome = _direct_render_outcome(
+        plugin_id, plugin_settings, device_config, display_manager
+    )
+    if outcome.ok:
+        return json_success(message=outcome.message, metrics=outcome.metrics)
+    return json_error(
+        outcome.message,
+        status=outcome.status,
+        code=outcome.code,
+        details=outcome.details or None,
+    )
 
 
 def _push_update_now_fallback(
@@ -970,30 +860,6 @@ def _push_update_now_fallback(
         )
 
 
-def _push_update_now_fallback_from_current_exception(
-    plugin_id: str,
-    plugin_config: dict[str, Any] | Mapping[str, Any],
-    device_config: Any,
-    display_manager: Any,
-) -> None:
-    """Variant of _push_update_now_fallback that uses the currently-raised exception.
-
-    Centralised so callers don't need to capture the exception into a local
-    variable (which would make it too tempting to embed the raw ``str(exc)``
-    in the JSON error response).  The exception text is still rendered on the
-    fallback image because that image is pushed to the e-paper screen, not
-    returned via HTTP.
-    """
-    import sys
-
-    exc = sys.exc_info()[1]
-    if exc is None:
-        return
-    _push_update_now_fallback(
-        plugin_id, plugin_config, device_config, display_manager, exc
-    )
-
-
 @plugin_bp.route("/api/job/<job_id>", methods=["GET"])
 def job_status(job_id: str) -> tuple[Any, int]:
     """Poll the status of an asynchronous render job."""
@@ -1025,62 +891,12 @@ def _run_update_now(
                 "metrics": metrics,
             }
 
-        logger.info("Refresh task not running, updating display directly")
-        plugin_config = device_config.get_plugin(plugin_id)
-        if not plugin_config:
-            raise RuntimeError(f"Plugin '{plugin_id}' not found")
-
-        plugin = get_plugin_instance(plugin_config)
-        with track_progress() as tracker:
-            _t_req_start = perf_counter()
-            _t_gen_start = perf_counter()
-            image = plugin.generate_image(plugin_settings, device_config)
-            if image is None:
-                # A control-only plugin legitimately produces no image (see
-                # BasePlugin.generate_image). Nothing to push, but the refresh
-                # itself succeeded. This worker reports outcomes by return
-                # value, so return a success dict rather than falling through
-                # and handing None to the display manager.
-                logger.info(
-                    "update_now: %s produced no image; display unchanged",
-                    plugin_id,
-                )
-                return {
-                    "success": True,
-                    "message": "Plugin produced no image; display unchanged",
-                    "metrics": {"no_image": True},
-                }
-            generate_ms = int((perf_counter() - _t_gen_start) * 1000)
-            history_meta = {
-                "refresh_type": "Manual Update",
-                "plugin_id": plugin_id,
-                "playlist": None,
-                "plugin_instance": None,
-            }
-            _safe_display_image(
-                display_manager,
-                image,
-                plugin_config.get("image_settings", []),
-                history_meta,
-            )
-            try:
-                ri = device_config.get_refresh_info()
-                display_ms = getattr(ri, "display_ms", None)
-                preprocess_ms = getattr(ri, "preprocess_ms", None)
-            except Exception:
-                display_ms = preprocess_ms = None
-            request_ms = int((perf_counter() - _t_req_start) * 1000)
-            return {
-                "success": True,
-                "message": _MSG_DISPLAY_UPDATED,
-                "metrics": {
-                    "request_ms": request_ms,
-                    "display_ms": display_ms,
-                    "generate_ms": generate_ms,
-                    "preprocess_ms": preprocess_ms,
-                    "steps": tracker.get_steps(),
-                },
-            }
+        outcome = _direct_render_outcome(
+            plugin_id, plugin_settings, device_config, display_manager
+        )
+        if not outcome.ok:
+            raise DirectRenderFailure(outcome)
+        return {"success": True, "message": outcome.message, "metrics": outcome.metrics}
 
 
 @plugin_bp.route("/update_now", methods=["POST"])
