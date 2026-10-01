@@ -8,12 +8,16 @@ POST /api/plugins/import                   – import instances from JSON body o
 from __future__ import annotations
 
 import json
+from copy import deepcopy
+from dataclasses import dataclass
 import logging
 from datetime import UTC, datetime
 from typing import Any, cast
 
 from flask import Blueprint, Response, current_app, jsonify, request
 
+from services.playlist_workflows import validate_plugin_settings_security
+from utils.backend_errors import ClientInputError, route_error_boundary
 from utils.form_utils import sanitize_log_field
 from utils.http_utils import JsonResponse, json_error
 
@@ -182,6 +186,49 @@ def _validate_payload(payload: object) -> tuple[str | None, list[dict[str, Any]]
     return None, instances
 
 
+@dataclass(frozen=True)
+class _ImportInstance:
+    plugin_id: str
+    name: str
+    settings: dict[str, Any]
+
+
+def _prepare_import_instances(
+    device_config: Any, instances: list[dict[str, Any]]
+) -> tuple[list[_ImportInstance], list[str]]:
+    """Validate the entire installed batch before touching playlist state."""
+    installed_ids = {
+        plugin["id"]
+        for plugin in device_config.get_plugins()
+        if isinstance(plugin, dict) and "id" in plugin
+    }
+    prepared: list[_ImportInstance] = []
+    skipped: list[str] = []
+    for index, instance in enumerate(instances):
+        plugin_id = str(instance["plugin_id"]).strip()
+        if plugin_id not in installed_ids:
+            logger.info("plugin_import: skipping unknown plugin_id=%r", plugin_id)
+            if plugin_id not in skipped:
+                skipped.append(plugin_id)
+            continue
+        field = f"instances[{index}].settings"
+        settings = instance["settings"]
+        if not isinstance(settings, dict):
+            raise ClientInputError(f"{field} must be an object", field=field)
+        settings = deepcopy(settings)
+        error = validate_plugin_settings_security(device_config, plugin_id, settings)
+        if error is not None:
+            raise ClientInputError(
+                f"{field}: {error.message}",
+                status=error.status,
+                code=error.code,
+                field=field,
+            )
+        name = str(instance.get("name", "")).strip() or plugin_id
+        prepared.append(_ImportInstance(plugin_id, name, settings))
+    return prepared, skipped
+
+
 @plugin_io_bp.route("/api/plugins/import", methods=["POST"])
 def import_plugins() -> (
     tuple[Response | dict[str, Any], int] | Response | dict[str, Any]
@@ -205,12 +252,7 @@ def import_plugins() -> (
     if validation_error is not None:
         return json_error(validation_error, status=400)
 
-    # Build set of installed plugin_ids for fast lookup
-    installed_ids: set[str] = {
-        p["id"]
-        for p in device_config.get_plugins()
-        if isinstance(p, dict) and "id" in p
-    }
+    prepared, skipped = _prepare_import_instances(device_config, instances)
 
     # Collect existing instance names across all playlists for collision detection
     existing_names: set[str] = {
@@ -226,22 +268,12 @@ def import_plugins() -> (
         default_playlist = playlist_manager.get_playlist("Default")
 
     imported = 0
-    skipped: list[str] = []
     renamed: list[str] = []
 
-    for inst in instances:
-        plugin_id = str(inst.get("plugin_id", "")).strip()
-        name = str(inst.get("name", "")).strip() or plugin_id
-        settings = inst.get("settings", {})
-        if not isinstance(settings, dict):
-            settings = {}
-
-        # Security: reject unknown plugin_ids
-        if plugin_id not in installed_ids:
-            logger.info("plugin_import: skipping unknown plugin_id=%r", plugin_id)
-            if plugin_id not in skipped:
-                skipped.append(plugin_id)
-            continue
+    for instance in prepared:
+        plugin_id = instance.plugin_id
+        name = instance.name
+        settings = instance.settings
 
         # Name collision: append suffix
         original_name = name
