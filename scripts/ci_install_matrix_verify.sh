@@ -108,7 +108,21 @@ else
 fi
 
 if [[ "${INKYPI_INSTALL_MATRIX_WAVESHARE:-}" != "" ]]; then
-    "${VENV_PATH}/bin/python" -c 'import gpiozero, lgpio, RPi.GPIO'
+    "${VENV_PATH}/bin/python" -c 'import gpiozero, lgpio
+from importlib.metadata import distribution
+from pathlib import Path
+package = distribution("RPi.GPIO")
+assert package.version == "0.7.1"
+extensions = [Path(package.locate_file(item)) for item in package.files or [] if str(item).startswith("RPi/_GPIO") and str(item).endswith(".so")]
+assert len(extensions) == 1, extensions
+header = extensions[0].read_bytes()[:20]
+assert header[:5] == b"\x7fELF\x02" and int.from_bytes(header[18:20], "little") == 183
+try:
+    import RPi.GPIO
+except RuntimeError as error:
+    if str(error) != "This module can only be run on a Raspberry Pi!":
+        raise
+    print("RPi.GPIO compiled ARM64 extension loaded; GPIO probe requires physical Pi hardware")'
     pass "hash-verified Waveshare extras import successfully"
 fi
 
