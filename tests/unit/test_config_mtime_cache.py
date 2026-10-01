@@ -316,15 +316,13 @@ def test_concurrent_reads_are_thread_safe(
     cfg = _make_config(tmp_path, monkeypatch)
 
     errors: list[Exception] = []
-    results: list[dict] = []
+    results: list[object] = []
     lock = threading.Lock()
 
     def reader() -> None:
         try:
             for _ in range(50):
                 r = cfg.read_config()
-                assert isinstance(r, dict)
-                assert "name" in r
                 with lock:
                     results.append(r)
         except Exception as exc:
@@ -337,9 +335,11 @@ def test_concurrent_reads_are_thread_safe(
     for t in threads:
         t.join(timeout=10)
 
+    assert all(not t.is_alive() for t in threads), "Config readers did not finish"
     assert not errors, f"Concurrent read errors: {errors}"
     assert len(results) == 8 * 50
     for r in results:
+        assert isinstance(r, dict)
         assert r["name"] == "CacheTest"
 
 
@@ -350,15 +350,18 @@ def test_concurrent_read_and_write_are_thread_safe(
     cfg = _make_config(tmp_path, monkeypatch)
 
     errors: list[Exception] = []
+    results: list[object] = []
+    lock = threading.Lock()
     stop_event = threading.Event()
 
     def reader() -> None:
         while not stop_event.is_set():
             try:
                 r = cfg.read_config()
-                assert isinstance(r, dict)
+                with lock:
+                    results.append(r)
             except Exception as exc:
-                with threading.Lock():
+                with lock:
                     errors.append(exc)
                 return
 
@@ -369,7 +372,7 @@ def test_concurrent_read_and_write_are_thread_safe(
                 cfg.write_config()
                 time.sleep(0.005)
             except Exception as exc:
-                with threading.Lock():
+                with lock:
                     errors.append(exc)
                 return
 
@@ -384,7 +387,14 @@ def test_concurrent_read_and_write_are_thread_safe(
     for t in readers:
         t.join(timeout=5)
 
+    assert not writer_thread.is_alive(), "Config writer did not finish"
+    assert all(not t.is_alive() for t in readers), "Config readers did not stop"
     assert not errors, f"Concurrent read/write errors: {errors}"
+    assert results, "Concurrent readers must observe configuration data"
+    for result in results:
+        assert isinstance(result, dict)
+        assert result["name"] == "CacheTest"
+        assert result["plugin_cycle_interval_seconds"] in range(300, 305)
 
 
 # ---------------------------------------------------------------------------
