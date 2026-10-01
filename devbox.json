@@ -3,8 +3,7 @@
   "packages": {
     "python": "3.13",
     "ninja":  "latest",
-    "chromium": {
-      "version":   "142.0.7444.59", // Normally latest is in the nix cache, but for whatever reason, chromium latest is not currently cached, so pinning to a version that is cached to avoid long build times.
+    "github:NixOS/nixpkgs/b4fd65b198c599cbe814fcb9f42d25d021595ec9#chromium": { // Chromium 154.0.8037.57 stable; pinned Nixpkgs source and hashes.
       "platforms": ["aarch64-linux", "x86_64-linux"], // Chromium is unstable on MacOS, use system's Google Chrome there.
     },
     "git": { // Devbox on MacOS cannot find system git

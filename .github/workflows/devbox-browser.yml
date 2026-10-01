@@ -1,0 +1,23 @@
+name: Devbox stable browser
+on:
+  pull_request:
+    paths: [devbox.json, '.github/workflows/devbox-browser.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  chromium:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: jetify-com/devbox-install-action@8c6a66ed6273138b1915457069de78cb52fe3bd7 # v0.15.0
+        with:
+          enable-cache: true
+      - name: Verify stable Chromium and run renderer smoke
+        run: |
+          devbox run -- bash -euc '
+            chromium --version
+            chromium --version | grep -F "154.0.8037.57"
+            SKIP_UI=1 SKIP_A11Y=1 python -m pytest -q tests/plugins/test_countdown.py
+          '
