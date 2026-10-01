@@ -18,6 +18,7 @@ PLAYLIST_NAME_FORMAT_ERROR = (
 )
 INVALID_TIME_FORMAT_MESSAGE = "Invalid start/end time format"
 SAME_TIME_MESSAGE = "Start time and End time cannot be the same"
+INVALID_ORDER_PAYLOAD_MESSAGE = "Invalid order payload"
 CYCLE_MINUTES_MIN = 1
 CYCLE_MINUTES_MAX = 1440
 
@@ -445,7 +446,9 @@ def parse_playlist_reorder_request(
     seen: set[tuple[str, str]] = set()
     for item in ordered:
         if not isinstance(item, dict):
-            return None, RequestModelError("Invalid order payload", field="ordered")
+            return None, RequestModelError(
+                INVALID_ORDER_PAYLOAD_MESSAGE, field="ordered"
+            )
         plugin_id = item.get("plugin_id")
         name = item.get("name")
         if (
@@ -454,10 +457,14 @@ def parse_playlist_reorder_request(
             or not isinstance(name, str)
             or not name.strip()
         ):
-            return None, RequestModelError("Invalid order payload", field="ordered")
+            return None, RequestModelError(
+                INVALID_ORDER_PAYLOAD_MESSAGE, field="ordered"
+            )
         identity = (plugin_id.strip(), name.strip())
         if identity in seen:
-            return None, RequestModelError("Invalid order payload", field="ordered")
+            return None, RequestModelError(
+                INVALID_ORDER_PAYLOAD_MESSAGE, field="ordered"
+            )
         seen.add(identity)
         parsed_ordered.append(
             PlaylistPluginOrderItem(plugin_id=identity[0], name=identity[1])
