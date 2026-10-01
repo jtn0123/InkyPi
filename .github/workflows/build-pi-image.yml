@@ -404,7 +404,11 @@ jobs:
           set -euo pipefail
           docker run --rm --platform linux/arm64 -v "$PWD/build:/output" debian:bookworm bash -euc '
             apt-get update
-            apt-get install -y --no-install-recommends linux-image-cloud-arm64 initramfs-tools
+            apt-get install -y --no-install-recommends linux-image-arm64 initramfs-tools
+            # The guest carries Pi kernel modules, so preload the generic
+            # verifier kernel FAT/NLS modules before switching to its rootfs.
+            printf "%s\n" vfat nls_cp437 nls_ascii nls_iso8859-1 >> /etc/initramfs-tools/modules
+            update-initramfs -u
             cp /boot/vmlinuz-* /output/verify-kernel
             cp /boot/initrd.img-* /output/verify-initrd
           '
