@@ -16,6 +16,8 @@ from collections.abc import Callable
 from concurrent.futures import Future, ThreadPoolExecutor
 from time import monotonic
 
+from services.direct_render import DirectRenderFailure
+
 logger = logging.getLogger(__name__)
 
 # Singleton job queue — created lazily via ``get_job_queue()``.
@@ -157,6 +159,10 @@ class JobQueue:
         except Exception as exc:
             logger.exception("Job %s failed", entry.job_id)
             entry.error = str(exc)
+            if isinstance(exc, DirectRenderFailure):
+                entry.error_code = exc.outcome.code
+                entry.error_status = exc.outcome.status
+                entry.error_details = exc.outcome.details
             entry.status = STATUS_ERROR
             entry.finished_at = self._clock()
             raise
@@ -165,13 +171,26 @@ class JobQueue:
 class _JobEntry:
     """Mutable record tracking one enqueued job."""
 
-    __slots__ = ("job_id", "status", "result", "error", "future", "finished_at")
+    __slots__ = (
+        "job_id",
+        "status",
+        "result",
+        "error",
+        "future",
+        "finished_at",
+        "error_code",
+        "error_status",
+        "error_details",
+    )
 
     def __init__(self, job_id: str) -> None:
         self.job_id = job_id
         self.status: str = STATUS_PENDING
         self.result: object | None = None
         self.error: str | None = None
+        self.error_code: str | None = None
+        self.error_status: int | None = None
+        self.error_details: dict[str, object] = {}
         self.future: Future[object | None] | None = None
         self.finished_at: float | None = None
 
@@ -181,6 +200,11 @@ class _JobEntry:
             d["result"] = self.result
         if self.status == STATUS_ERROR and self.error is not None:
             d["error"] = self.error
+            if self.error_code is not None:
+                d["code"] = self.error_code
+                d["http_status"] = self.error_status
+                if self.error_details:
+                    d["details"] = self.error_details
         return d
 
 

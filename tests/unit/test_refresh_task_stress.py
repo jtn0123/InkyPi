@@ -322,7 +322,8 @@ def test_exception_during_refresh_does_not_crash_task(
 def test_manual_update_returns_metrics_after_update(
     device_config_dev: Any, mock_plugin: Any, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Test that manual updates return per-request metrics."""
+    """Check early-stage metrics and eventually persisted completion metrics."""
+    monkeypatch.setenv("INKYPI_MANUAL_UPDATE_DONE_GRACE_S", "0")
     dm = DisplayManager(device_config_dev)
     task = RefreshTask(device_config_dev, dm)
 
@@ -338,7 +339,14 @@ def test_manual_update_returns_metrics_after_update(
         refresh = ManualRefresh("test", {})
         metrics = task.manual_update(refresh)
         assert isinstance(metrics, dict)
-        assert "request_ms" in metrics
+        assert metrics.get("stage") == "image_saved" or "request_ms" in metrics
+        # JTN-786 may return before the panel write and final metrics finish.
+        # Observe the actual completion record instead of relying on the grace.
+        assert wait_until(
+            lambda: device_config_dev.get_refresh_info().request_ms is not None,
+            timeout=5.0,
+        )
+        assert device_config_dev.get_refresh_info().request_ms >= 0
 
     finally:
         task.stop()
