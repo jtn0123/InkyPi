@@ -16,8 +16,4 @@ jobs:
           enable-cache: true
       - name: Verify stable Chromium and run renderer smoke
         run: |
-          devbox run -- bash -euc '
-            chromium --version
-            chromium --version | grep -F "154.0.8037.57"
-            SKIP_UI=1 SKIP_A11Y=1 python -m pytest -q tests/plugins/test_countdown.py
-          '
+          devbox run verify-browser

@@ -18,6 +18,7 @@
       "export PYTHONPATH=\"${DEVBOX_PROJECT_ROOT}:${DEVBOX_PROJECT_ROOT}/src${PYTHONPATH:+:$PYTHONPATH}\"",
     ],
     "scripts": {
+      "verify-browser": "bash scripts/devbox_verify_browser.sh",
       "dev": [
         "python src/inkypi.py --dev",
       ],
