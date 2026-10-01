@@ -212,6 +212,7 @@ def test_determine_active_playlist_priority() -> None:
     )
     pm = PlaylistManager([p1, p2])
     active = pm.determine_active_playlist(now)
+    assert active is not None
     assert active.name == "Lunch"
 
 

@@ -23,8 +23,9 @@ def _load_script(script_name: str) -> Any:
     spec = importlib.util.spec_from_file_location(
         script_name, scripts_dir / f"{script_name}.py"
     )
-    mod = importlib.util.module_from_spec(spec)  # type: ignore[arg-type]
-    spec.loader.exec_module(mod)  # type: ignore[union-attr]
+    assert spec is not None and spec.loader is not None
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
     return mod
 
 
@@ -38,11 +39,11 @@ def diag_mod() -> Any:
 # ---------------------------------------------------------------------------
 
 
-def _make_config_dir(base: Path, extra_keys: dict | None = None) -> Path:
+def _make_config_dir(base: Path, extra_keys: dict[str, object] | None = None) -> Path:
     """Create a minimal config dir with device.json."""
     config_dir = base / "config"
     config_dir.mkdir(parents=True, exist_ok=True)
-    device: dict = {
+    device: dict[str, object] = {
         "name": "TestDevice",
         "display_type": "mock",
         "resolution": [800, 480],
@@ -144,8 +145,7 @@ class TestDiagnosticSnapshot:
         )
 
         with tarfile.open(output, "r:gz") as tar:
-            assert tar.extractfile("system_info.txt") is not None
-            text = tar.extractfile("system_info.txt").read().decode("utf-8")
+            text = read_tar_member(tar, "system_info.txt").decode("utf-8")
 
         assert "uname" in text.lower() or "system" in text.lower()
         assert "python" in text.lower()
@@ -180,8 +180,7 @@ class TestDiagnosticSnapshot:
         )
 
         with tarfile.open(output, "r:gz") as tar:
-            assert tar.extractfile("config_redacted.json") is not None
-            redacted = json.loads(tar.extractfile("config_redacted.json").read())
+            redacted = json.loads(read_tar_member(tar, "config_redacted.json"))
 
         assert redacted.get("api_key") == "***REDACTED***"
         # Literal secret value must not appear anywhere in the JSON
@@ -201,8 +200,7 @@ class TestDiagnosticSnapshot:
         )
 
         with tarfile.open(output, "r:gz") as tar:
-            assert tar.extractfile("config_redacted.json") is not None
-            redacted = json.loads(tar.extractfile("config_redacted.json").read())
+            redacted = json.loads(read_tar_member(tar, "config_redacted.json"))
 
         assert redacted.get("weather_token") == "***REDACTED***"
         raw_json = json.dumps(redacted)
@@ -221,8 +219,7 @@ class TestDiagnosticSnapshot:
         )
 
         with tarfile.open(output, "r:gz") as tar:
-            assert tar.extractfile("config_redacted.json") is not None
-            redacted = json.loads(tar.extractfile("config_redacted.json").read())
+            redacted = json.loads(read_tar_member(tar, "config_redacted.json"))
 
         assert redacted.get("admin_password") == "***REDACTED***"
         raw_json = json.dumps(redacted)
@@ -241,8 +238,7 @@ class TestDiagnosticSnapshot:
         )
 
         with tarfile.open(output, "r:gz") as tar:
-            assert tar.extractfile("config_redacted.json") is not None
-            redacted = json.loads(tar.extractfile("config_redacted.json").read())
+            redacted = json.loads(read_tar_member(tar, "config_redacted.json"))
 
         assert redacted.get("secret_pin") == "***REDACTED***"
 
@@ -259,8 +255,7 @@ class TestDiagnosticSnapshot:
         )
 
         with tarfile.open(output, "r:gz") as tar:
-            assert tar.extractfile("config_redacted.json") is not None
-            redacted = json.loads(tar.extractfile("config_redacted.json").read())
+            redacted = json.loads(read_tar_member(tar, "config_redacted.json"))
 
         assert redacted.get("name") == "TestDevice"
         assert redacted.get("safe_setting") == "keep-this-value"
@@ -283,8 +278,7 @@ class TestDiagnosticSnapshot:
         with tarfile.open(output, "r:gz") as tar:
             names = tar.getnames()
             assert "recent_logs.txt" in names
-            assert tar.extractfile("recent_logs.txt") is not None
-            text = tar.extractfile("recent_logs.txt").read().decode("utf-8")
+            text = read_tar_member(tar, "recent_logs.txt").decode("utf-8")
 
         # Only last 10 lines of 30 should be present (lines 20-29)
         assert "line 29" in text
@@ -330,8 +324,7 @@ class TestDiagnosticSnapshot:
         )
 
         with tarfile.open(output, "r:gz") as tar:
-            assert tar.extractfile("manifest.json") is not None
-            manifest = json.loads(tar.extractfile("manifest.json").read())
+            manifest = json.loads(read_tar_member(tar, "manifest.json"))
 
         assert "recent_logs.txt" not in manifest["files"]
 
