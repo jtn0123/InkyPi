@@ -167,18 +167,14 @@ def test_reboot_shutdown_modals_handle_escape(client: FlaskClient) -> None:
 def test_reboot_shutdown_modals_move_focus_on_open(client: FlaskClient) -> None:
     """JTN-652: opening the confirm modal moves focus inside it."""
     js = _read_settings_modals_js(client)
-    # setDeviceActionModalOpen should query for focusable elements and focus them.
-    assert "focusable.focus()" in js
-    # Trigger must be captured so focus can be restored on close.
-    assert "DeviceActionTrigger" in js
+    # The shared controller owns focus/trigger state for nested dialogs.
+    assert "InkyPiModalFocus.activate(modal, triggerEl" in js
 
 
 def test_reboot_shutdown_modals_restore_focus_on_close(client: FlaskClient) -> None:
     """JTN-652: closing the modal restores focus to the trigger."""
     js = _read_settings_modals_js(client)
-    # The close branch inside setDeviceActionModalOpen calls .focus() on the
-    # remembered trigger.
-    assert "DeviceActionTrigger.focus()" in js
+    assert "InkyPiModalFocus.deactivate(modal)" in js
 
 
 def test_reboot_shutdown_modals_toggle_is_open_class(client: FlaskClient) -> None:
