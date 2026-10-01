@@ -573,13 +573,14 @@
       try {
         if (!globalThis.EventSource || progressES) return;
         progressES = new EventSource("/api/progress/stream");
-        const refresh = () => refreshHealth();
+        const refresh = () => refreshHealth().catch(error =>
+          setPanelFailure("healthSummary", "Failed to load health data", error));
         progressES.addEventListener("done", refresh);
-        progressES.addEventListener("error", () => {
-          refresh();
+        progressES.addEventListener("error", async () => {
           if (progressES?.readyState === globalThis.EventSource.CLOSED) {
             stopProgressSSE();
           }
+          await refresh();
         });
       } catch (e) {
         console.warn("Progress SSE unavailable:", e);

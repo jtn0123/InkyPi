@@ -335,7 +335,7 @@
             setTimeout(logs.fetchAndRenderLogs, 500);
             // Silent refresh — the user was just watching the update log
             // stream, they don't need another toast announcing the state.
-            checkForUpdates({ silent: true });
+            await checkForUpdates({ silent: true });
         }
       } catch (e) {
         console.warn("Settings update status poll failed:", logLabel, e);

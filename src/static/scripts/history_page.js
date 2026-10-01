@@ -321,7 +321,8 @@
           const filename = state.lightboxFilename;
           if (!filename) return;
           closeLightbox();
-          redisplay(filename, event.currentTarget);
+          // redisplay owns request errors, user feedback and button restoration.
+          void redisplay(filename, event.currentTarget);
         });
       document
         .getElementById("lightboxDeleteBtn")
