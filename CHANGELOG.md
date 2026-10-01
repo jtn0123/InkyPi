@@ -2,6 +2,21 @@
 
 <!-- version list -->
 
+## v1.4.8 (2026-10-01)
+
+### Bug Fixes
+
+- Repair main security and reliability quality contracts
+  ([#668](https://github.com/jtn0123/InkyPi/pull/668),
+  [`b23b031`](https://github.com/jtn0123/InkyPi/commit/b23b031d241acc550ee970a6e9819dd08e74108f))
+
+### Testing
+
+- **types**: Check HTTP and diagnostic fixture contracts
+  ([#666](https://github.com/jtn0123/InkyPi/pull/666),
+  [`cff0c6a`](https://github.com/jtn0123/InkyPi/commit/cff0c6a123d66e45759d0ff767bee23e7a8bdec6))
+
+
 ## v1.4.7 (2026-10-01)
 
 ### Bug Fixes
