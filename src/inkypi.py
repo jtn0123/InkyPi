@@ -768,7 +768,14 @@ if __name__ == "__main__":
 
         web_threads = _get_web_threads()
         logger.info(f"waitress threads: {web_threads}")
-        serve(created_app, host="0.0.0.0", port=PORT, threads=web_threads)
+        serve(
+            created_app,
+            host="0.0.0.0",
+            port=PORT,
+            threads=web_threads,
+            # Scheme trust is enforced against the direct peer by our WSGI wrapper.
+            clear_untrusted_proxy_headers=False,
+        )
     finally:
         refresh_task_obj = created_app.config.get("REFRESH_TASK")
         if refresh_task_obj is not None:

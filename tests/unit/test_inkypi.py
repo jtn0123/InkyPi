@@ -792,11 +792,19 @@ def test_no_redirect_when_already_https(monkeypatch: pytest.MonkeyPatch) -> None
     mod = _reload_inkypi(
         monkeypatch,
         argv=["inkypi.py"],
-        env={"INKYPI_FORCE_HTTPS": "1", "INKYPI_ENV": "production"},
+        env={
+            "INKYPI_FORCE_HTTPS": "1",
+            "INKYPI_ENV": "production",
+            "INKYPI_TRUSTED_PROXIES": "127.0.0.1",
+        },
     )
     app = getattr(mod, "app", None)
     assert app is not None
 
     client = app.test_client()
-    resp = client.get("/healthz", headers={"X-Forwarded-Proto": "https"})
+    resp = client.get(
+        "/healthz",
+        headers={"X-Forwarded-Proto": "https"},
+        environ_overrides={"REMOTE_ADDR": "127.0.0.1"},
+    )
     assert resp.status_code == 200

@@ -15,7 +15,7 @@ import os
 import secrets
 from collections.abc import Callable
 from time import perf_counter
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, Protocol, cast
 from urllib.parse import quote, urlencode, urlunsplit
 
 from flask import Flask, Response, abort, g, redirect, request, session
@@ -24,6 +24,7 @@ from flask import Flask, Response, abort, g, redirect, request, session
 # plain dict when there is no app context — see utils.http_utils.
 from werkzeug.wrappers import Response as WerkzeugResponse
 
+from app_setup.scheme_proxy import TrustedSchemeProxy
 from app_setup.smoke import SMOKE_RENDER_PATH, smoke_render_enabled
 from config import Config
 from utils.http_utils import JsonResponse, json_error
@@ -34,6 +35,15 @@ from utils.rate_limit import (
     make_refresh_bucket,
 )
 from utils.rate_limiter import SlidingWindowLimiter
+
+if TYPE_CHECKING:
+    from _typeshed.wsgi import WSGIApplication
+
+
+class _WSGIHost(Protocol):
+    # Flask intentionally permits replacing its bound wsgi_app with middleware.
+    wsgi_app: WSGIApplication
+
 
 logger = logging.getLogger(__name__)
 
@@ -119,15 +129,18 @@ def setup_secret_key(app: Flask, device_config: Config) -> None:
 def setup_https_redirect(app: Flask, *, dev_mode: bool) -> None:
     """When INKYPI_FORCE_HTTPS=1 (and not in dev mode), redirect HTTP→HTTPS."""
     force_https = not dev_mode and _env_bool("INKYPI_FORCE_HTTPS")
+    app.config["SESSION_COOKIE_SECURE"] = force_https or _env_bool(
+        "INKYPI_SECURE_COOKIES"
+    )
+    cast(_WSGIHost, app).wsgi_app = TrustedSchemeProxy(
+        app.wsgi_app, os.getenv("INKYPI_TRUSTED_PROXIES", "")
+    )
 
     @app.before_request
     def _redirect_to_https() -> Response | WerkzeugResponse | JsonResponse | None:
         if not force_https:
             return None
-        if (
-            request.is_secure
-            or request.headers.get("X-Forwarded-Proto", "").lower() == "https"
-        ):
+        if request.is_secure:
             return None
         # Defend against open-redirect via spoofed Host header (JTN-317,
         # CodeQL py/url-redirection alert #52). ``request.url`` is
@@ -176,6 +189,10 @@ def setup_https_redirect(app: Flask, *, dev_mode: bool) -> None:
             ("https", safe_authority, safe_path, safe_query, "")
         )  # NOSONAR
         return redirect(safe_url, code=301)
+
+    hooks = app.before_request_funcs[None]
+    hooks.remove(_redirect_to_https)
+    hooks.insert(0, _redirect_to_https)
 
 
 # ---------------------------------------------------------------------------
@@ -449,11 +466,7 @@ def _apply_baseline_security_headers(response: Response) -> None:
 
 def _apply_hsts_header(response: Response) -> None:
     """Set HSTS when the request arrived over HTTPS (or via a TLS proxy)."""
-    is_https = (
-        request.is_secure
-        or request.headers.get("X-Forwarded-Proto", "").lower() == "https"
-    )
-    if is_https:
+    if request.is_secure:
         response.headers.setdefault(
             "Strict-Transport-Security",
             "max-age=31536000; includeSubDomains",

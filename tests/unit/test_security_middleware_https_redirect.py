@@ -40,6 +40,7 @@ def _reload_inkypi(monkeypatch: pytest.MonkeyPatch, env: Any) -> Any:
         "PORT",
         "INKYPI_FORCE_HTTPS",
         "INKYPI_ALLOWED_HOSTS",
+        "INKYPI_TRUSTED_PROXIES",
     ):
         monkeypatch.delenv(key, raising=False)
     for key, value in env.items():
@@ -151,7 +152,11 @@ def test_x_forwarded_proto_https_bypass_still_works(
     """
     mod = _reload_inkypi(
         monkeypatch,
-        env={"INKYPI_FORCE_HTTPS": "1", "INKYPI_ENV": "production"},
+        env={
+            "INKYPI_FORCE_HTTPS": "1",
+            "INKYPI_ENV": "production",
+            "INKYPI_TRUSTED_PROXIES": "127.0.0.1",
+        },
     )
     app = mod.app
 
@@ -159,6 +164,7 @@ def test_x_forwarded_proto_https_bypass_still_works(
     resp = client.get(
         "/healthz",
         headers={"X-Forwarded-Proto": "https", "Host": "whatever.example"},
+        environ_overrides={"REMOTE_ADDR": "127.0.0.1"},
     )
     assert resp.status_code == 200
 
