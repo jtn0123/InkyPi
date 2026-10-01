@@ -21,7 +21,8 @@ def _jobs() -> dict[str, dict[str, object]]:
     assert isinstance(jobs, dict)
     result: dict[str, dict[str, object]] = {}
     for name, job in jobs.items():
-        assert isinstance(name, str) and isinstance(job, dict)
+        assert isinstance(name, str)
+        assert isinstance(job, dict)
         assert all(isinstance(key, str) for key in job)
         result[name] = dict(job)
     return result
@@ -43,7 +44,8 @@ def _mandatory_jobs(jobs: dict[str, dict[str, object]]) -> set[str]:
 
 def _needs(gate: dict[str, object]) -> list[str]:
     needs = gate["needs"]
-    assert isinstance(needs, list) and all(isinstance(name, str) for name in needs)
+    assert isinstance(needs, list)
+    assert all(isinstance(name, str) for name in needs)
     return list(needs)
 
 
@@ -51,7 +53,8 @@ def _gate_script(gate: dict[str, object]) -> str:
     steps = gate["steps"]
     assert isinstance(steps, list)
     runs = [step["run"] for step in steps if isinstance(step, dict) and "run" in step]
-    assert len(runs) == 1 and isinstance(runs[0], str)
+    assert len(runs) == 1
+    assert isinstance(runs[0], str)
     return runs[0]
 
 
