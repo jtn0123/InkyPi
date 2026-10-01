@@ -125,11 +125,11 @@ def _playwright_browser_available() -> bool:
         return False
 
 
-def pytest_ignore_collect(collection_path: Any, config: Any) -> Any:
+def pytest_ignore_collect(collection_path: Any, config: Any) -> bool | None:
     path = Path(str(collection_path))
     group = _browser_test_group(path)
     if group is None:
-        return False
+        return None
 
     # SKIP_BROWSER=1 skips all browser-dependent tests (a11y + UI).
     # SKIP_A11Y=1 / SKIP_UI=1 skip their respective groups independently.
@@ -143,7 +143,7 @@ def pytest_ignore_collect(collection_path: Any, config: Any) -> Any:
     if skip_ui and group == "ui" and not require_browser_smoke:
         return True
     if _playwright_browser_available():
-        return False
+        return None
     if require_browser_smoke and path.name == "test_browser_smoke.py":
         raise RuntimeError(
             "REQUIRE_BROWSER_SMOKE=1 but Playwright Chromium is unavailable. "

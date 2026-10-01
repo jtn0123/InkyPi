@@ -2,10 +2,10 @@
 from __future__ import annotations
 
 import os
-from typing import Any
+from typing import Any, cast
 
 import pytest
-from playwright.sync_api import Page
+from playwright.sync_api import Page, expect
 from tests.integration.browser_helpers import navigate_and_wait
 
 pytestmark = pytest.mark.skipif(
@@ -33,29 +33,36 @@ def test_all_pages_load_without_js_errors(
     rc.assert_no_errors(name=f"page_load_{label}")
 
 
-def test_nav_links_work(live_server: str, browser_page: Page) -> None:
-    page = browser_page
-    navigate_and_wait(page, live_server, "/")
-
-    # Navigate to settings
-    settings_link = page.locator("a[href='/settings']").first
-    settings_link.click()
-    page.wait_for_selector("[data-page-shell]", timeout=10000)
-    assert "/settings" in page.url
-
-    # Go back to dashboard to find playlist link
-    navigate_and_wait(page, live_server, "/")
-    playlist_link = page.locator("a[href='/playlist']").first
-    playlist_link.click()
-    page.wait_for_selector("[data-page-shell]", timeout=10000)
-    assert "/playlist" in page.url
-
-    # Go back to dashboard to find history link
-    navigate_and_wait(page, live_server, "/")
-    history_link = page.locator("a[href='/history']").first
-    history_link.click()
-    page.wait_for_selector("[data-page-shell]", timeout=10000)
-    assert "/history" in page.url
+@pytest.mark.parametrize(
+    "page_fixture", ["browser_page", "mobile_page"], ids=["desktop", "mobile"]
+)
+def test_nav_links_work(
+    live_server: str, page_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    page = cast(Page, request.getfixturevalue(page_fixture))
+    for path in ("/settings", "/playlist", "/history"):
+        collector = navigate_and_wait(page, live_server, "/")
+        if page_fixture == "mobile_page":
+            menu = page.locator(".mobile-site-nav-summary")
+            expect(menu).to_be_visible()
+            menu.click()
+        # Both desktop and mobile links exist in the DOM. Click the navigation
+        # visible to this viewport, as a user would, rather than the hidden first.
+        navigation = page.get_by_role(
+            "navigation",
+            name=(
+                "Mobile site navigation"
+                if page_fixture == "mobile_page"
+                else "Site navigation"
+            ),
+            exact=True,
+        )
+        link = navigation.locator(f"a[href='{path}']:visible")
+        expect(link).to_have_count(1)
+        link.click()
+        page.wait_for_selector("[data-page-shell]", timeout=10000)
+        expect(page).to_have_url(f"{live_server}{path}")
+        collector.assert_no_errors(name=f"{page_fixture}_navigation_{path}")
 
 
 def test_browser_back_forward(live_server: str, browser_page: Page) -> None:
