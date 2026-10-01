@@ -125,3 +125,36 @@ def test_failed_tool_cannot_use_a_stale_success_report(
         lambda *args, **kwargs: subprocess.CompletedProcess(args=[], returncode=2),
     )
     assert checker.main() == 1
+
+
+@pytest.mark.parametrize(
+    "status,title,text,valid",
+    [
+        (200, "Real resource", "Public resource content " * 10, True),
+        (403, "Real resource", "Public resource content " * 10, False),
+        (429, "Real resource", "Public resource content " * 10, False),
+        (200, "Just a moment...", "Verify your browser " * 10, False),
+        (200, "Page not found", "Missing resource " * 10, False),
+        (200, "Sign in", "Account credentials required " * 10, False),
+        (200, "", "Public resource content " * 10, False),
+        (200, "Resource", "", False),
+    ],
+)
+def test_browser_requires_successful_content(
+    checker: ModuleType, status: int, title: str, text: str, valid: bool
+) -> None:
+    assert checker.browser_document_valid(status, title, text) is valid
+
+
+@pytest.mark.parametrize("status", [403, 429])
+@pytest.mark.parametrize("verified", [True, False])
+def test_browser_rejection_recheck_is_fail_closed(
+    checker: ModuleType, status: int, verified: bool
+) -> None:
+    url = "https://example.test/resource"
+    failures = checker.check_report(
+        error_report(url, status),
+        lambda url: 0,
+        {url: {"verified": verified, "status": 200 if verified else status}},
+    )
+    assert bool(failures) is (not verified)

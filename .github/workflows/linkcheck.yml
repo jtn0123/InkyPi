@@ -47,14 +47,26 @@ jobs:
           install -m 755 "lychee-${tool_target}/lychee" "${tool_dir}/bin/lychee"
           printf '%s\n' "${tool_dir}/bin" >> "${GITHUB_PATH}"
 
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: install/requirements-dev.txt
+
+      - name: Install locked browser verifier
+        run: |
+          python -m pip install --require-hashes -r install/requirements-dev.txt
+          python -m playwright install --with-deps chromium
+
       - name: Check links with lychee
         run: |
           shopt -s globstar nullglob
           document_inputs=(README.md docs/**/*.md)
           lychee --version
-          # Some storefronts reject Lychee while same-runner curl GET succeeds.
-          # Independently recheck 429s; every URL still requires a real success.
+          # Recheck HTTP client rejection with actual browser navigation.
+          # Every URL still requires valid TLS and a real HTTP 2xx document.
           python3 scripts/check_links.py \
+            --browser-verify \
             --cookie-jar "${RUNNER_TEMP}/lychee-cookies.json" \
             --report "${RUNNER_TEMP}/inkypi-links.json" \
             "${document_inputs[@]}"
