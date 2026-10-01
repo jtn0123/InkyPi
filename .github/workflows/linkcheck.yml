@@ -59,7 +59,7 @@ jobs:
           python -m playwright install --with-deps chromium
 
       - name: Check browser verifier regression
-        run: python -m pytest -q tests/integration/test_link_browser_verification.py --reruns 0
+        run: python -m pytest -q tests/integration/test_link_browser_verification.py --force-reruns 0
 
       - name: Check links with lychee
         run: |
