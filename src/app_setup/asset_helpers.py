@@ -77,7 +77,20 @@ def setup_asset_helpers(app: Flask) -> None:
     - ``bundled_assets_enabled`` — True when the manifest exists and is non-empty
     """
     manifest = _load_manifest()
-    enabled = bool(manifest)
+    enabled = all(
+        isinstance(manifest.get(name), str)
+        and Path(manifest[name]).name == manifest[name]
+        and (_MANIFEST_PATH.parent / manifest[name]).is_file()
+        and (_MANIFEST_PATH.parent / manifest[name]).stat().st_size > 0
+        for name in ("common.js", "common.css")
+    )
+    sources = json.loads(
+        (
+            Path(__file__).resolve().parent.parent
+            / "static/scripts/common_manifest.json"
+        ).read_text()
+    )
+    app.jinja_env.globals["common_script_sources"] = sources
 
     app.jinja_env.globals["bundled_asset"] = bundled_asset
     app.jinja_env.globals["bundled_assets_enabled"] = enabled

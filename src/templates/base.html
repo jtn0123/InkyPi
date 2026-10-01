@@ -39,16 +39,9 @@
     {% if bundled_assets_enabled %}
     <script src="{{ url_for('static', filename='dist/' + bundled_asset('common.js')) }}" defer></script>
     {% else %}
-    <script src="{{ url_for('static', filename='scripts/theme.js') }}"></script>
-    <script src="{{ url_for('static', filename='scripts/csrf.js') }}"></script>
-    <script src="{{ url_for('static', filename='scripts/client_errors.js') }}"></script>
-    <script src="{{ url_for('static', filename='scripts/client_error_reporter.js') }}" defer></script>
-    <script src="{{ url_for('static', filename='scripts/client_log_reporter.js') }}" defer></script>
-    <script src="{{ url_for('static', filename='scripts/status_badge.js') }}" defer></script>
-    <script src="{{ url_for('static', filename='scripts/debug_console.js') }}" defer></script>
-    <script src="{{ url_for('static', filename='scripts/form_validator.js') }}" defer></script>
-    <script src="{{ url_for('static', filename='scripts/response_modal.js') }}" defer></script>
-    <script src="{{ url_for('static', filename='scripts/form_state.js') }}" defer></script>
+    {% for script in common_script_sources %}
+    <script src="{{ url_for('static', filename='scripts/' + script.path) }}"{% if script.defer %} defer{% endif %}></script>
+    {% endfor %}
     {% endif %}
     <script src="{{ url_for('static', filename='vendor/htmx.min.js') }}" defer
             integrity="{{ sri_for('vendor/htmx.min.js') }}" crossorigin="anonymous"></script>

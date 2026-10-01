@@ -27,6 +27,7 @@ import json
 import re
 import sys
 from pathlib import Path
+from typing import cast
 
 # ---------------------------------------------------------------------------
 # Paths
@@ -45,16 +46,9 @@ DIST_DIR = REPO_ROOT / "src" / "static" / "dist"
 # ---------------------------------------------------------------------------
 
 JS_MANIFEST: list[str] = [
-    "theme.js",
-    "csrf.js",
-    "client_errors.js",
-    "form_validator.js",
-    "response_modal.js",
-    "form_state.js",
-    "dark_mode.js",
-    "ui_helpers.js",
+    item["path"]
+    for item in json.loads((SCRIPTS_DIR / "common_manifest.json").read_text())
 ]
-
 # ---------------------------------------------------------------------------
 # CSS source — reuse the already-bundled main.css produced by build_css.py.
 # We further minify it (or just copy) into the dist directory with a hash.
@@ -92,9 +86,9 @@ def _minify_js_simple(js: str) -> str:
 def _minify_js(js: str) -> str:
     """Minify JS using rjsmin if available, else fall back to simple strip."""
     try:
-        import rjsmin  # type: ignore[import]
+        import rjsmin
 
-        return rjsmin.jsmin(js)
+        return cast(str, rjsmin.jsmin(js))
     except ImportError:
         return _minify_js_simple(js)
 
@@ -138,8 +132,7 @@ def build_js_bundle(minify: bool = True) -> tuple[str, list[str]]:
     for filename in JS_MANIFEST:
         path = SCRIPTS_DIR / filename
         if not path.is_file():
-            print(f"WARNING: JS file not found, skipping: {path}", file=sys.stderr)
-            continue
+            raise FileNotFoundError(f"Required common script missing: {path}")
         source = path.read_text(encoding="utf-8")
         parts.append(f"// === {filename} ===\n{source}")
         included.append(filename)

@@ -218,7 +218,11 @@ build_css_bundle() {
     echo_error "ERROR: CSS bundle was not generated at $css_output."
     exit 1
   fi
-  echo_success "CSS bundle built."
+  if ! "$VENV_PATH/bin/python" "$SCRIPT_DIR/../scripts/build_assets.py"; then
+    echo_error "ERROR: Hashed JS/CSS asset build failed."
+    exit 1
+  fi
+  echo_success "CSS and hashed JS/CSS bundles built."
 }
 
 # ---------------------------------------------------------------------------

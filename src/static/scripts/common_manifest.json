@@ -1,0 +1,46 @@
+[
+  {
+    "path": "theme.js",
+    "defer": false
+  },
+  {
+    "path": "csrf.js",
+    "defer": false
+  },
+  {
+    "path": "client_errors.js",
+    "defer": false
+  },
+  {
+    "path": "client_error_reporter.js",
+    "defer": true
+  },
+  {
+    "path": "client_log_reporter.js",
+    "defer": true
+  },
+  {
+    "path": "status_badge.js",
+    "defer": true
+  },
+  {
+    "path": "debug_console.js",
+    "defer": true
+  },
+  {
+    "path": "form_validator.js",
+    "defer": true
+  },
+  {
+    "path": "modal_focus.js",
+    "defer": true
+  },
+  {
+    "path": "response_modal.js",
+    "defer": true
+  },
+  {
+    "path": "form_state.js",
+    "defer": true
+  }
+]
