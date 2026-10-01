@@ -74,7 +74,7 @@ echo "======================================================================"
 echo ""
 
 IMAGE_TAG="inkypi-sim:${CODENAME}"
-DOCKERFILE="${SCRIPT_DIR}/Dockerfile.sim-install"
+DOCKERFILE="${SCRIPT_DIR}/Dockerfile.install-matrix"
 
 # ── build ─────────────────────────────────────────────────────────────────────
 echo "Building image ${IMAGE_TAG} ..."
@@ -96,7 +96,8 @@ if docker run \
     --platform linux/arm64 \
     --memory=512m \
     --memory-swap=512m \
-    "${IMAGE_TAG}"; then
+    --entrypoint bash \
+    "${IMAGE_TAG}" /InkyPi/scripts/ci_install_matrix_verify.sh; then
     RUN_EXIT=0
 else
     RUN_EXIT=$?
