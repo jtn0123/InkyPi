@@ -36,6 +36,7 @@ from utils.backend_errors import (
 from utils.fallback_image import render_error_image
 from utils.form_utils import (
     sanitize_log_field,
+    sanitize_response_value,
     validate_plugin_required_fields,
 )
 from utils.http_utils import json_error, json_success
@@ -586,7 +587,8 @@ def update_plugin_instance(instance_name: str) -> Any:
         )
         if validation_error is not None:
             return json_error(
-                validation_error.message, **validation_error.as_json_kwargs()
+                sanitize_response_value(validation_error.message),
+                **validation_error.as_json_kwargs(),
             )
 
         before_settings = dict(plugin_instance.settings or {})
@@ -607,7 +609,9 @@ def update_plugin_instance(instance_name: str) -> Any:
         )
 
     return json_success(
-        message=history_warning or f"Updated plugin instance {instance_name}.",
+        message=sanitize_response_value(
+            history_warning or f"Updated plugin instance {instance_name}."
+        ),
         warnings=[history_warning] if history_warning else [],
     )
 
