@@ -5,6 +5,7 @@ Theme 2 of dogfood pass 3: weather lat/lon, calendar URL, and image_folder path
 fields must reject invalid data at save time with a clear error.
 """
 
+import json
 from pathlib import Path
 from typing import Any
 from unittest.mock import patch
@@ -12,6 +13,73 @@ from unittest.mock import patch
 import pytest
 from flask import Flask
 from flask.testing import FlaskClient
+
+
+class TestOptionalSettingsSchema:
+    @pytest.mark.parametrize("htmx", [False, True])
+    def test_year_progress_saves_without_declarative_schema(
+        self, client: FlaskClient, flask_app: Flask, htmx: bool
+    ) -> None:
+        """The real no-input plugin must save through both HTTP adapters."""
+        headers = {"HX-Request": "true"} if htmx else {}
+        resp = client.post(
+            "/save_plugin_settings",
+            data={"plugin_id": "year_progress"},
+            headers=headers,
+        )
+        assert resp.status_code == 200
+        if htmx:
+            assert "pluginSettingsSaved" in resp.headers["HX-Trigger"]
+        else:
+            assert resp.get_json()["success"] is True
+        config_path = Path(flask_app.config["DEVICE_CONFIG"].config_file)
+        persisted = json.loads(config_path.read_text())
+        default = next(
+            playlist
+            for playlist in persisted["playlist_config"]["playlists"]
+            if playlist["name"] == "Default"
+        )
+        saved = next(
+            plugin
+            for plugin in default["plugins"]
+            if plugin["name"] == "year_progress_saved_settings"
+        )
+        assert saved["plugin_id"] == "year_progress"
+        assert saved["plugin_settings"] == {}
+
+    def test_optional_schema_still_runs_plugin_validation(
+        self, client: FlaskClient, flask_app: Flask
+    ) -> None:
+        config_path = Path(flask_app.config["DEVICE_CONFIG"].config_file)
+        before = config_path.read_bytes()
+        with patch(
+            "plugins.year_progress.year_progress.YearProgress.validate_settings",
+            return_value="Invalid year progress settings",
+        ) as validator:
+            resp = client.post(
+                "/save_plugin_settings", data={"plugin_id": "year_progress"}
+            )
+        assert resp.status_code == 400
+        assert resp.get_json()["error"] == "Invalid year progress settings"
+        validator.assert_called_once_with({})
+        assert config_path.read_bytes() == before
+
+    @pytest.mark.parametrize("schema", [False, 0, "", []])
+    def test_malformed_schema_blocks_save(
+        self, client: FlaskClient, flask_app: Flask, schema: object
+    ) -> None:
+        config_path = Path(flask_app.config["DEVICE_CONFIG"].config_file)
+        before = config_path.read_bytes()
+        with patch(
+            "plugins.year_progress.year_progress.YearProgress.build_settings_schema",
+            return_value=schema,
+        ):
+            resp = client.post(
+                "/save_plugin_settings", data={"plugin_id": "year_progress"}
+            )
+        assert resp.status_code == 503
+        assert resp.get_json()["code"] == "backend_unavailable"
+        assert config_path.read_bytes() == before
 
 
 class TestWeatherValidation:

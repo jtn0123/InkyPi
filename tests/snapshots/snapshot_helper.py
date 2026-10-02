@@ -159,13 +159,15 @@ def _pixel_comparison_skip_reason() -> str | None:
         return None
     if os.getenv("SKIP_VISUAL", "").strip().lower() in {"1", "true", "yes"}:
         return "SKIP_VISUAL is set"
-    if sys.platform != "linux":
-        return (
+    return (
+        (
             f"pixel baselines are Linux-rendered; {sys.platform} font rendering "
             "differs. Set REQUIRE_SNAPSHOTS=1 to force, or regenerate baselines "
             "from a CI run (see tests/snapshots/README.md)."
         )
-    return None
+        if sys.platform != "linux"
+        else None
+    )
 
 
 def assert_image_snapshot(

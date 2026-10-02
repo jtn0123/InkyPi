@@ -1,8 +1,21 @@
-from typing import Any
+from typing import Any, Protocol, TypedDict
 
 import pytest
 import requests
-from flask import Flask
+from flask import Flask, Response
+from requests.adapters import HTTPAdapter
+
+
+class _CapturedRequest(TypedDict, total=False):
+    headers: object
+    timeout: object
+
+
+class _ResponseStub(Protocol):
+    status_code: int
+    content: bytes
+
+    def json(self) -> dict[str, object]: ...
 
 
 def test_http_get_user_agent_and_default_timeout(
@@ -12,16 +25,16 @@ def test_http_get_user_agent_and_default_timeout(
 
     http_utils._reset_shared_session_for_tests()
 
-    captured = {}
+    captured: _CapturedRequest = {}
 
-    def fake_get(self, url: Any, **kwargs: Any) -> Any:  # type: ignore[no-redef]
+    def fake_get(self: requests.Session, url: str, **kwargs: object) -> _ResponseStub:
         captured["headers"] = kwargs.get("headers")
         captured["timeout"] = kwargs.get("timeout")
 
         class R:
             status_code = 200
 
-            def json(self) -> Any:
+            def json(self) -> dict[str, object]:
                 return {}
 
             content = b""
@@ -32,8 +45,11 @@ def test_http_get_user_agent_and_default_timeout(
 
     http_utils.http_get("https://example.com")
 
-    assert isinstance(captured.get("headers"), dict)
-    assert captured["headers"].get("User-Agent", "").startswith("InkyPi/")
+    headers = captured.get("headers")
+    assert isinstance(headers, dict)
+    user_agent = headers.get("User-Agent")
+    assert isinstance(user_agent, str)
+    assert user_agent.startswith("InkyPi/")
     assert captured.get("timeout") == http_utils.DEFAULT_TIMEOUT_SECONDS
 
 
@@ -50,15 +66,15 @@ def test_http_get_timeout_override(monkeypatch: pytest.MonkeyPatch) -> Any:
     except ImportError:
         pass
 
-    captured = {}
+    captured: _CapturedRequest = {}
 
-    def fake_get(self, url: Any, **kwargs: Any) -> Any:  # type: ignore[no-redef]
+    def fake_get(self: requests.Session, url: str, **kwargs: object) -> _ResponseStub:
         captured["timeout"] = kwargs.get("timeout")
 
         class R:
             status_code = 200
 
-            def json(self) -> Any:
+            def json(self) -> dict[str, object]:
                 return {}
 
             content = b""
@@ -79,9 +95,10 @@ def test_shared_session_retry_configuration(monkeypatch: pytest.MonkeyPatch) -> 
     http_utils._reset_shared_session_for_tests()
     session = http_utils.get_shared_session()
     https_adapter = session.adapters.get("https://")
-    assert https_adapter is not None
+    assert isinstance(https_adapter, HTTPAdapter)
     assert isinstance(getattr(https_adapter, "max_retries", None), Retry)
-    retry: Retry = https_adapter.max_retries  # type: ignore[assignment]
+    retry = https_adapter.max_retries
+    assert isinstance(retry, Retry)
     assert retry.backoff_factor == 0.0
     assert "GET" in (retry.allowed_methods or set())
     assert 503 in (retry.status_forcelist or set())
@@ -128,7 +145,7 @@ from utils.http_utils import (  # noqa: E402
 
 
 @pytest.fixture
-def app() -> Any:
+def app() -> Flask:
     """Create a test Flask application."""
     return Flask(__name__)
 
@@ -170,6 +187,7 @@ class TestJsonError:
             assert status == 400
 
             # Check response data
+            assert isinstance(response, Response)
             response_data = response.get_json()
             assert response_data["error"] == "Test error"
             assert "code" not in response_data
@@ -182,6 +200,7 @@ class TestJsonError:
         with app.test_request_context("/", headers={"X-Request-Id": "abc-123"}):
             response, status = json_error("oops")
             assert status == 400
+            assert isinstance(response, Response)
             data = response.get_json()
             assert data.get("error") == "oops"
             assert data.get("request_id") == "abc-123"
@@ -200,6 +219,7 @@ class TestJsonError:
             )
 
             assert returned_status == 422
+            assert isinstance(response, Response)
             data = response.get_json()
             assert data["error"] == "safe fallback message"
             assert "code" not in data
@@ -225,16 +245,16 @@ def test_http_get_timeout_tuple_from_env(monkeypatch: pytest.MonkeyPatch) -> Any
     except ImportError:
         pass
 
-    captured = {}
+    captured: _CapturedRequest = {}
 
-    def fake_get(self, url: Any, **kwargs: Any) -> Any:  # type: ignore[no-redef]
+    def fake_get(self: requests.Session, url: str, **kwargs: object) -> _ResponseStub:
         captured["timeout"] = kwargs.get("timeout")
 
         class R:
             status_code = 200
             content = b"ok"
 
-            def json(self) -> Any:
+            def json(self) -> dict[str, object]:
                 return {}
 
         return R()
@@ -262,12 +282,12 @@ def test_http_get_latency_logging_success_and_failure(
     caplog.set_level(logging.INFO, logger=http_utils.__name__)
 
     # Success path
-    def ok_get(self, url: Any, **kwargs: Any) -> Any:  # type: ignore[no-redef]
+    def ok_get(self: requests.Session, url: str, **kwargs: object) -> _ResponseStub:
         class R:
             status_code = 200
             content = b"x"
 
-            def json(self) -> Any:
+            def json(self) -> dict[str, object]:
                 return {}
 
         return R()
@@ -280,7 +300,7 @@ def test_http_get_latency_logging_success_and_failure(
     )
 
     # Failure path
-    def err_get(self, url: Any, **kwargs: Any) -> None:  # type: ignore[no-redef]
+    def err_get(self: requests.Session, url: str, **kwargs: object) -> None:
         raise requests.exceptions.ConnectionError("boom")
 
     caplog.clear()
@@ -310,7 +330,7 @@ def test_retry_backoff_env_configuration(monkeypatch: pytest.MonkeyPatch) -> Non
     http_utils._reset_shared_session_for_tests()
     session = http_utils.get_shared_session()
     https_adapter = session.adapters.get("https://")
-    assert https_adapter is not None
+    assert isinstance(https_adapter, HTTPAdapter)
     retry = https_adapter.max_retries
     # Depending on type hints, retry may be Retry or int; ensure it's Retry-like
     from urllib3.util.retry import Retry
@@ -322,28 +342,31 @@ def test_retry_backoff_env_configuration(monkeypatch: pytest.MonkeyPatch) -> Non
     assert retry.status == 4
     assert retry.backoff_factor == 0.25
 
-    def test_json_error_with_code(self, app: Flask) -> None:
+    def test_json_error_with_code(self: object, app: Flask) -> None:
         """Test json_error with error code."""
         with app.app_context():
             response, status = json_error("Test error", code="TEST_001")
+            assert isinstance(response, Response)
             response_data = response.get_json()
             assert response_data["error"] == "Test error"
             assert response_data["code"] == "TEST_001"
 
-    def test_json_error_with_details(self, app: Flask) -> None:
+    def test_json_error_with_details(self: object, app: Flask) -> None:
         """Test json_error with details."""
         details = {"field": "username", "issue": "required"}
         with app.app_context():
             response, status = json_error("Validation error", details=details)
+            assert isinstance(response, Response)
             response_data = response.get_json()
             assert response_data["error"] == "Validation error"
             assert response_data["details"] == details
 
-    def test_json_error_custom_status(self, app: Flask) -> None:
+    def test_json_error_custom_status(self: object, app: Flask) -> None:
         """Test json_error with custom HTTP status."""
         with app.app_context():
             response, status = json_error("Not found", status=404)
             assert status == 404
+            assert isinstance(response, Response)
             response_data = response.get_json()
             assert response_data["error"] == "Not found"
 
@@ -356,6 +379,7 @@ class TestJsonInternalError:
         with app.app_context():
             response, status = json_internal_error("test context")
             assert status == 500
+            assert isinstance(response, Response)
             response_data = response.get_json()
             assert response_data["error"] == "An internal error occurred"
             assert response_data["code"] == "internal_error"
@@ -367,6 +391,7 @@ class TestJsonInternalError:
         with app.app_context():
             response, status = json_internal_error("processing", details=details)
             assert status == 500
+            assert isinstance(response, Response)
             response_data = response.get_json()
             assert response_data["error"] == "An internal error occurred"
             assert response_data["code"] == "internal_error"
@@ -382,6 +407,7 @@ class TestJsonInternalError:
                 "db failure", status=503, code="DB_DOWN"
             )
             assert status == 503
+            assert isinstance(response, Response)
             response_data = response.get_json()
             assert response_data["error"] == "An internal error occurred"
             assert response_data["code"] == "DB_DOWN"
@@ -396,6 +422,7 @@ class TestJsonSuccess:
         with app.app_context():
             response, status = json_success()
             assert status == 200
+            assert isinstance(response, Response)
             response_data = response.get_json()
             assert response_data["success"] is True
             assert "message" not in response_data
@@ -404,6 +431,7 @@ class TestJsonSuccess:
         """Test json_success with message."""
         with app.app_context():
             response, status = json_success("Operation completed")
+            assert isinstance(response, Response)
             response_data = response.get_json()
             assert response_data["success"] is True
             assert response_data["message"] == "Operation completed"
@@ -412,6 +440,7 @@ class TestJsonSuccess:
         """Test json_success with additional payload data."""
         with app.app_context():
             response, status = json_success("Created", id=123, name="test")
+            assert isinstance(response, Response)
             response_data = response.get_json()
             assert response_data["success"] is True
             assert response_data["message"] == "Created"
@@ -584,6 +613,7 @@ class TestRequestIdIsNotReflectedUnvalidated:
         headers = {"X-Request-Id": header} if header is not None else {}
         with flask_app.test_request_context("/", headers=headers):
             body, _status = json_success("ok")
+            assert isinstance(body, Response)
             return body.get_json().get("request_id")
 
     def test_a_well_formed_id_is_preserved(self, flask_app: Any) -> None:

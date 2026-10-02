@@ -1,8 +1,7 @@
 import logging
 from datetime import UTC, datetime, timedelta, tzinfo
+from typing import Protocol
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
-
-from config import Config
 
 logger = logging.getLogger(__name__)
 
@@ -39,13 +38,17 @@ def now_in_timezone(tz_name: str | None = "UTC") -> datetime:
     return datetime.now(tz)
 
 
-def now_device_tz(device_config: Config) -> datetime:
+class TimezoneConfigLike(Protocol):
+    def get_config(self, key: str, default: object = None) -> object: ...
+
+
+def now_device_tz(device_config: TimezoneConfigLike) -> datetime:
     """Return timezone-aware current datetime using device configuration timezone."""
     try:
         tz_name = device_config.get_config("timezone", default="UTC")
     except Exception:
         tz_name = "UTC"
-    return now_in_timezone(tz_name)
+    return now_in_timezone(tz_name if isinstance(tz_name, str) else None)
 
 
 def parse_cron_field(field: str, min_val: int, max_val: int) -> set[int]:

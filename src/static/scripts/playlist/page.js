@@ -114,9 +114,11 @@
     );
     if (!thumbs.length) return;
 
+    // loadThumb owns missing/unavailable-image fallback and transport errors.
+
     if (!("IntersectionObserver" in global)) {
       thumbs.forEach((img) => {
-        loadThumb(img);
+        void loadThumb(img);
       });
       return;
     }
@@ -127,7 +129,7 @@
           if (!entry.isIntersecting) return;
           const img = entry.target;
           observer.unobserve(img);
-          loadThumb(img);
+          void loadThumb(img);
         });
       },
       {

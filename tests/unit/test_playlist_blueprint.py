@@ -1058,7 +1058,7 @@ class TestValidatorFieldAttribution:
 
     # --- delete ---
 
-    def test_delete_nonexistent(self, client: FlaskClient):
+    def test_delete_nonexistent(self, client: FlaskClient) -> None:
         # JTN-782: delete-of-missing is a 404 not_found (not a validation
         # error) -> None -> None, but we still attach field attribution so the UI can
         # highlight the offending input.
@@ -1175,6 +1175,8 @@ class TestEtaCacheThreadSafety:
         _add_plugin_to_playlist(client, "Conc", "P2", "weather")
 
         errors: list[Exception] = []
+        statuses: list[int] = []
+        lock = threading.Lock()
         barrier = threading.Barrier(4, timeout=5)
 
         def _hit_eta() -> None:
@@ -1182,9 +1184,11 @@ class TestEtaCacheThreadSafety:
                 barrier.wait()
                 for _ in range(10):
                     resp = client.get("/playlist/eta/Conc")
-                    assert resp.status_code == 200
+                    with lock:
+                        statuses.append(resp.status_code)
             except Exception as exc:
-                errors.append(exc)
+                with lock:
+                    errors.append(exc)
 
         threads = [threading.Thread(target=_hit_eta) for _ in range(4)]
         for t in threads:
@@ -1192,7 +1196,10 @@ class TestEtaCacheThreadSafety:
         for t in threads:
             t.join(timeout=10)
 
+        assert all(not t.is_alive() for t in threads), "ETA requests did not finish"
         assert not errors, f"Concurrent ETA requests raised: {errors}"
+        assert len(statuses) == 40
+        assert all(status == 200 for status in statuses), statuses
 
     def test_eta_cache_lock_exists(self) -> None:
         """Verify the lock is present at module level."""

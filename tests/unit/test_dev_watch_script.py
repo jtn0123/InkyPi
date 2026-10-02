@@ -118,7 +118,7 @@ class TestDispatcherStructure:
         for kind in ("css", "js", "template"):
             assert f'"{kind}"' in self.content or f"'{kind}'" in self.content
 
-    def test_log_format_matches_spec(self):
+    def test_log_format_matches_spec(self) -> None:
         # Required format: "[<iso-timestamp>] <action> (source: <name>) -> None -> None"
         assert "rebuild css" in self.content
         assert "rebuild js" in self.content

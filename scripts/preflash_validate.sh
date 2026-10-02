@@ -151,9 +151,14 @@ security_suite() {
 }
 
 flake_suite() {
+    mkdir -p artifacts
+    if [[ "$(uname -s)" == "Linux" ]]; then
+        python -m playwright --version > artifacts/render-environment.txt
+        fc-list | sort >> artifacts/render-environment.txt
+    fi
     local _run_index
     for _run_index in 1 2 3; do
-        python -m pytest -q \
+        python -m pytest -q --force-reruns 0 \
             tests/unit/test_refresh_task_stress.py \
             tests/unit/test_memory_leaks.py \
             tests/unit/test_plugin_isolation.py \
@@ -167,7 +172,14 @@ flake_suite() {
             tests/plugins/test_image_folder.py \
             tests/plugins/test_image_upload.py
         if [[ "$(uname -s)" == "Linux" ]]; then
-            REQUIRE_BROWSER_SMOKE=1 python -m pytest -q tests/integration/test_browser_smoke.py
+            # Capture plugin renderer diagnostics before app bootstrap replaces
+            # pytest's root log handlers in the browser/layout fixtures.
+            REQUIRE_BROWSER_SMOKE=1 python -m pytest -q --force-reruns 0 \
+                tests/snapshots/test_plugin_snapshots.py \
+                tests/integration/test_browser_smoke.py \
+                tests/integration/test_visual_regression.py \
+                --log-file="artifacts/render-repeat-${_run_index}.log" \
+                --log-file-level=DEBUG
         fi
     done
 }

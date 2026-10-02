@@ -56,7 +56,7 @@ class TestImportSettings:
 
     def test_import_filters_disallowed_env_keys(
         self, client: FlaskClient, device_config_dev: Any
-    ):
+    ) -> None:
         # Pair a disallowed env key with at least one allowed config key so
         # the request still has *something* to apply; otherwise it would 400
         # (see test_import_rejects_payload_with_no_recognized_keys below) -> None -> None.

@@ -19,7 +19,7 @@ class RefreshInfo:
 
     Attributes:
         refresh_time (str): ISO-formatted time string of the refresh.
-        image_hash (int): SHA-256 hash of the image.
+        image_hash (str | int): SHA-256 hex digest; legacy integer values remain readable.
         refresh_type (str): Refresh type ['Manual Update', 'Playlist'].
         plugin_id (str): Plugin id of the refresh.
         playlist (str): Playlist name if refresh_type is 'Playlist'.
@@ -32,7 +32,7 @@ class RefreshInfo:
         refresh_type: str | None,
         plugin_id: str | None,
         refresh_time: str | None,
-        image_hash: int | None,
+        image_hash: str | int | None,
         playlist: str | None = None,
         plugin_instance: str | None = None,
         # Optional performance metrics
@@ -442,38 +442,59 @@ class Playlist:
         finally:
             self.current_plugin_index = saved
 
+    @staticmethod
+    def _reorder_identity(item: object) -> tuple[str, str] | None:
+        """Validate a supported order item before using it as a mapping key."""
+        if isinstance(item, dict):
+            pid = item.get("plugin_id")
+            name = item.get("name")
+            if name is None or name == "":
+                name = item.get("instance_name")
+        elif isinstance(item, list | tuple) and len(item) == 2:
+            pid, name = item
+        else:
+            return None
+        if (
+            not isinstance(pid, str)
+            or not pid.strip()
+            or not isinstance(name, str)
+            or not name.strip()
+        ):
+            return None
+        return pid, name
+
     def reorder_plugins(self, ordered_pairs: object) -> bool:
-        """Reorder plugins using a list of ordered (plugin_id, name) pairs.
+        """Reorder plugins using an exact permutation of existing identities.
 
         The ordered_pairs may be a list of tuples or dicts with keys 'plugin_id' and 'name'.
         Returns True on success, False if validation fails.
         """
-        if not isinstance(ordered_pairs, list):
+        if not isinstance(ordered_pairs, list) or len(ordered_pairs) != len(
+            self.plugins
+        ):
             return False
 
         def _key_for(p_inst: PluginInstance) -> tuple[str, str]:
             return (p_inst.plugin_id, p_inst.name)
 
         mapping = {(_key_for(p)): p for p in self.plugins}
+        if len(mapping) != len(self.plugins):
+            return False
 
-        normalized_keys: list[tuple[Any, Any]] = []
+        normalized_keys: list[tuple[str, str]] = []
         for item in ordered_pairs:
-            if isinstance(item, dict):
-                pid = item.get("plugin_id")
-                name = item.get("name") or item.get("instance_name")
-                normalized_keys.append((pid, name))
-            elif isinstance(item, list | tuple) and len(item) == 2:
-                normalized_keys.append((item[0], item[1]))
-            else:
+            identity = self._reorder_identity(item)
+            if identity is None:
                 return False
+            normalized_keys.append(identity)
 
-        # Validate count and membership
-        if len(normalized_keys) != len(self.plugins):
+        # Every existing identity must occur exactly once, with no additions.
+        requested_keys = set(normalized_keys)
+        if len(requested_keys) != len(normalized_keys) or requested_keys != set(
+            mapping
+        ):
             return False
-        try:
-            new_order = [mapping[(pid, name)] for (pid, name) in normalized_keys]
-        except KeyError:
-            return False
+        new_order = [mapping[key] for key in normalized_keys]
 
         self.plugins = new_order
         # Reset index within bounds after reorder

@@ -15,7 +15,7 @@ import os
 from functools import lru_cache
 from pathlib import Path
 
-from flask import Response, send_from_directory
+from flask import Response, request, send_from_directory
 from PIL import Image
 from werkzeug.exceptions import NotFound
 
@@ -88,6 +88,7 @@ def maybe_serve_webp(
         # send_from_directory performs path-traversal validation internally;
         # this is the recognized sanitization sink.
         resp = send_from_directory(root_str, filename, mimetype="image/png")
+        resp.vary.add("Accept")
         resp.headers["Content-Disposition"] = f'inline; filename="{filename}"'
         return resp
 
@@ -100,16 +101,18 @@ def maybe_serve_webp(
     safe_path = _safe_join(root_str, filename)
 
     stat = os.stat(safe_path)
-    mtime = int(stat.st_mtime)
+    mtime = stat.st_mtime_ns
     size = stat.st_size
 
     webp_bytes = _encode_webp(safe_path, mtime, size)
 
-    etag = _make_etag(safe_path, mtime)
+    etag = _make_etag(safe_path, mtime, size)
     response = Response(webp_bytes, mimetype="image/webp")
-    response.headers["ETag"] = etag
+    response.set_etag(etag)
+    response.vary.add("Accept")
     response.headers["Cache-Control"] = "no-cache"
     response.headers["Content-Disposition"] = f'inline; filename="{filename}"'
+    response.make_conditional(request)
     return response
 
 
@@ -138,9 +141,9 @@ def _client_accepts_webp(accept_header: str | None) -> bool:
     return "image/webp" in accept_header
 
 
-def _make_etag(path: str, mtime: int) -> str:
+def _make_etag(path: str, mtime: int, size: int) -> str:
     """Produce a stable ETag string from *path*, *mtime*, and the literal ``"webp"``."""
-    raw = f"{path}:{mtime}:webp"
+    raw = f"{path}:{mtime}:{size}:webp"
     # sha256 used purely for cache-key fingerprinting (not security-sensitive),
     # but we use it instead of sha1 to keep SonarCloud quiet (rule S4790).
     return hashlib.sha256(raw.encode()).hexdigest()[:40]

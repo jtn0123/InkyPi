@@ -233,8 +233,11 @@ def validate_plugin_required_fields(
     """
     if not hasattr(plugin, "build_settings_schema"):
         return None
-    # A broken schema is unavailable validation, never successful validation.
+    # BasePlugin uses None for plugins with bespoke/no-input settings forms.
+    # Other malformed schema values and construction errors must still fail.
     schema = plugin.build_settings_schema()
+    if schema is None:
+        return None
 
     missing: list[str] = []
 

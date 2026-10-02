@@ -12,7 +12,6 @@ from typing import Any
 import pytest
 from flask import Flask
 from PIL import Image
-from werkzeug.serving import make_server
 
 # Ensure both project root (for `src.*` imports) and src/ (for top-level `utils`, `display`) are on sys.path
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -36,6 +35,7 @@ UI_BROWSER_TESTS = {
     "test_settings_round_trip_e2e.py",
     "test_plugin_workflow_e2e.py",
     "test_dashboard_display_next_e2e.py",
+    "test_dashboard_reliability_e2e.py",
     "test_api_keys_e2e.py",
     "test_modal_lifecycle_e2e.py",
     "test_theme_toggle_e2e.py",
@@ -127,11 +127,11 @@ def _playwright_browser_available() -> bool:
         return False
 
 
-def pytest_ignore_collect(collection_path: Any, config: Any) -> Any:
+def pytest_ignore_collect(collection_path: Any, config: Any) -> bool | None:
     path = Path(str(collection_path))
     group = _browser_test_group(path)
     if group is None:
-        return False
+        return None
 
     # SKIP_BROWSER=1 skips all browser-dependent tests (a11y + UI).
     # SKIP_A11Y=1 / SKIP_UI=1 skip their respective groups independently.
@@ -145,7 +145,7 @@ def pytest_ignore_collect(collection_path: Any, config: Any) -> Any:
     if skip_ui and group == "ui" and not require_browser_smoke:
         return True
     if _playwright_browser_available():
-        return False
+        return None
     if require_browser_smoke and path.name == "test_browser_smoke.py":
         raise RuntimeError(
             "REQUIRE_BROWSER_SMOKE=1 but Playwright Chromium is unavailable. "
@@ -385,7 +385,7 @@ def client(flask_app: Flask) -> Any:
 @pytest.fixture()
 def live_server(
     flask_app: Flask, free_tcp_port_factory: Any, monkeypatch: pytest.MonkeyPatch
-):  # free_tcp_port_factory: from anyio pytest plugin
+) -> Iterator[str]:  # free_tcp_port_factory: from anyio pytest plugin
     # Relax CSP for integration tests so Playwright's page.add_script_tag(content=...)
     # (used by axe-core and other in-page probes) isn't blocked as an inline script.
     # Unit CSP tests (tests/test_csp_report.py) -> Iterator[Any] -> Iterator[Any] use the `client` fixture instead and
@@ -399,12 +399,21 @@ def live_server(
     )
     host = "127.0.0.1"
     port = free_tcp_port_factory()
-    server = make_server(host, port, flask_app, threaded=True)
-    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    from tests.fixtures.live_server import OwnedTestServer, track_event_subscriptions
+    from utils.event_bus import get_event_bus
+    from utils.progress_events import get_progress_bus
+
+    track_event_subscriptions(get_event_bus(), monkeypatch)
+    server = OwnedTestServer(host, port, flask_app, progress_bus=get_progress_bus())
+    thread = threading.Thread(
+        target=server.serve_forever, kwargs={"poll_interval": 0.05}, daemon=True
+    )
     thread.start()
     try:
         yield f"http://{host}:{port}"
     finally:
-        server.shutdown()
-        server.server_close()
-        thread.join(timeout=5)
+        try:
+            server.close_owned_resources(flask_app)
+        finally:
+            thread.join(timeout=1)
+            assert not thread.is_alive(), "Test server accept loop did not stop"

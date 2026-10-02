@@ -81,6 +81,7 @@ def test_single_plugin_failure_doesnt_crash_task(
 ) -> Any:
     """Test that a single plugin failure doesn't crash the refresh task."""
     monkeypatch.setenv("INKYPI_PLUGIN_RETRY_MAX", "0")
+    monkeypatch.setenv("INKYPI_MANUAL_UPDATE_DONE_GRACE_S", "0")
     dm = DisplayManager(device_config_dev)
     task = RefreshTask(device_config_dev, dm)
 
@@ -113,8 +114,14 @@ def test_single_plugin_failure_doesnt_crash_task(
         refresh = ManualRefresh("good", {})
         metrics = task.manual_update(refresh)
         assert metrics is not None
-        health = task.get_health_snapshot()
-        assert health["good"]["success_count"] == 1
+        # manual_update may return as soon as the image is saved, before
+        # panel I/O and health recording finish. Observe that separate
+        # completion contract instead of assuming they happen together.
+        assert wait_until(
+            lambda: task.get_health_snapshot().get("good", {}).get("success_count")
+            == 1,
+            timeout=5.0,
+        )
 
     finally:
         task.stop()

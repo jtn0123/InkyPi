@@ -25,7 +25,7 @@ import os
 from flask.testing import FlaskClient
 
 
-def test_client_log_endpoint_routable_and_capture_env_set(client: FlaskClient):
+def test_client_log_endpoint_routable_and_capture_env_set(client: FlaskClient) -> None:
     # The autouse integration fixture (tests/integration/conftest.py) -> None -> None must
     # turn capture on — otherwise the tripwire cannot observe anything.
     assert os.environ.get("INKYPI_TEST_CAPTURE_CLIENT_LOG", "").lower() in {

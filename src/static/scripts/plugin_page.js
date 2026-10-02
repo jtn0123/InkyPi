@@ -20,6 +20,14 @@
   } = globalThis.InkyPiPluginPageShared;
   const { createProgressController } = globalThis.InkyPiPluginPageProgress;
 
+  function reportPreviewRefreshFailure(error) {
+    console.warn("Failed to refresh preview after update:", error);
+    showResponseModal(
+      "failure",
+      "The update succeeded, but the preview could not be refreshed. Refresh this page to retry."
+    );
+  }
+
   function createPluginPage(config) {
     const ui = globalThis.InkyPiUI || {};
     const mobileQuery = globalThis.matchMedia ? globalThis.matchMedia("(max-width: 768px)") : { matches: false, addEventListener() {} };
@@ -201,7 +209,7 @@
           uploadedFiles,
           onAfterSuccess: () => {
             setTimeout(() => {
-              refreshPreviewsAfterSuccess();
+              refreshPreviewsAfterSuccess().catch(reportPreviewRefreshFailure);
             }, 250);
             closeModal("scheduleModal");
           },
@@ -432,7 +440,7 @@
         } else {
           showResponseModal("success", `Success! ${result.message}`);
           setTimeout(() => {
-            refreshPreviewsAfterSuccess();
+            refreshPreviewsAfterSuccess().catch(reportPreviewRefreshFailure);
           }, 400);
         }
       } catch (e) {

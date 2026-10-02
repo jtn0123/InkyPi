@@ -524,7 +524,7 @@ jobs:
   flake-detection:
     name: Flake detection
     needs: tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 35
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -561,6 +561,17 @@ jobs:
           INKYPI_VALIDATE_FLAKE: '1'
         run: |
           scripts/preflash_validate.sh
+      - name: Preserve repeated renderer diagnostics
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: render-repeat-diagnostics
+          path: |
+            artifacts/render-*.log
+            artifacts/render-environment.txt
+            tests/snapshots/actual/
+            tests/snapshots/layout/actual/
+          if-no-files-found: warn
 
   soak-nightly:
     name: Soak nightly
@@ -812,20 +823,20 @@ jobs:
 
   ci-gate:
     name: CI gate (all checks pass)
-    needs: [lint, shellcheck, lockfile-drift, tests, sonarcloud, smoke, smoke-matrix, coverage-gate, security, browser-smoke, install-smoke-memcap, install-matrix, install-crash-loop-gate]
+    needs: [lint, shellcheck, lockfile-drift, tests, sonarcloud, smoke, smoke-matrix, coverage-gate, security, browser-smoke, install-smoke-memcap, install-matrix, install-crash-loop-gate, preflash-validate, flake-detection]
     runs-on: ubuntu-latest
     if: always()
     steps:
       - name: Check all required jobs passed
         run: |
           # Fail this job (and therefore the gate) if any required job did not succeed.
-          # 'sonarcloud' is advisory (secrets may be absent on forks), so we only
-          # require it to not be in an explicit failure state — cancelled/skipped is OK.
+          # 'sonarcloud' is advisory (secrets may be absent on forks); its result
+          # is reported separately rather than required to succeed here.
           results='${{ toJSON(needs) }}'
           echo "$results"
 
           # Jobs that must be 'success'
-          for job in lint shellcheck lockfile-drift tests smoke smoke-matrix coverage-gate security browser-smoke install-smoke-memcap install-matrix install-crash-loop-gate; do
+          for job in lint shellcheck lockfile-drift tests smoke smoke-matrix coverage-gate security browser-smoke install-smoke-memcap install-matrix install-crash-loop-gate preflash-validate flake-detection; do
             result=$(echo "$results" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('$job',{}).get('result','missing'))")
             if [ "$result" != "success" ]; then
               echo "Required job '$job' did not succeed (result: $result)"

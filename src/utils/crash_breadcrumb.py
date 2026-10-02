@@ -30,11 +30,14 @@ from __future__ import annotations
 import json
 import logging
 import os
+import tempfile
 from collections.abc import Iterator
 from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+
+from utils.form_utils import sanitize_log_field
 
 logger = logging.getLogger(__name__)
 
@@ -60,10 +63,9 @@ def _resolved_dir(candidate: str, fallback: str) -> Path:
     them where the next boot looks, so requiring an absolute path is both the
     safer and the more correct reading.
 
-    SonarCloud reports S2083 (path built from user-controlled data) against the
-    write this feeds. Assessed as a false positive — these variables come from
-    the systemd unit, not from a request — and tracked, with the reasoning and
-    what was hardened anyway, in
+    The fixed filenames and exclusive temporary-file writes are independent of
+    breadcrumb JSON content. Environment overrides remain launcher-controlled
+    configuration, not a request-level permission boundary; see
     ``docs/security/sonar-s2083-crash-breadcrumb-tracking.md``.
     """
     try:
@@ -127,13 +129,41 @@ def _now_iso() -> str:
 
 def _write_json(path: Path, payload: dict[str, Any]) -> None:
     """Write *payload* atomically, swallowing every failure."""
+    temporary: str | None = None
+    descriptor: int | None = None
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
-        tmp = path.with_suffix(path.suffix + ".tmp")
-        tmp.write_text(json.dumps(payload), encoding="utf-8")
-        tmp.replace(path)
+        descriptor, temporary = tempfile.mkstemp(
+            dir=path.parent, prefix=".crash-breadcrumb-", suffix=".tmp"
+        )
+        # Write through the exclusively created descriptor. A pre-planted
+        # breadcrumb.json.tmp symlink must never select the file we open.
+        output = os.fdopen(descriptor, "w", encoding="utf-8")
+        descriptor = None  # The stream owns it only after fdopen succeeds.
+        with output:
+            json.dump(payload, output)
+            output.flush()
+            os.fsync(output.fileno())
+        os.replace(temporary, path)
     except Exception:
         logger.debug("crash breadcrumb: could not write %s", path, exc_info=True)
+    finally:
+        if descriptor is not None:
+            try:
+                os.close(descriptor)
+            except OSError:
+                logger.debug(
+                    "crash breadcrumb: could not close temporary file", exc_info=True
+                )
+        if temporary is not None:
+            try:
+                os.unlink(temporary)
+            except FileNotFoundError:
+                pass
+            except OSError:
+                logger.debug(
+                    "crash breadcrumb: could not remove temporary file", exc_info=True
+                )
 
 
 def _read_json(path: Path) -> dict[str, Any] | None:
@@ -194,10 +224,8 @@ def examine_boot() -> dict[str, Any] | None:
         return None
 
     logger.error(
-        "Previous run died during operation '%s' (started %s); details: %s",
-        breadcrumb.get("operation", "unknown"),
-        breadcrumb.get("started_at", "unknown"),
-        {k: v for k, v in breadcrumb.items() if k not in ("operation", "started_at")},
+        "Previous run died; breadcrumb: %s",
+        sanitize_log_field(json.dumps(breadcrumb, ensure_ascii=True), max_len=2000),
     )
 
     record = _read_json(_last_death_path()) or {}

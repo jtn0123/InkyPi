@@ -171,32 +171,34 @@ def test_weather_code_mapping_openmeteo() -> None:
 
 
 def test_openmeteo_forecast_parsing() -> None:
-    """Test OpenMeteo forecast parsing."""
-    from plugins.weather.weather import Weather
+    """Exercise the actual parser and verify its daily forecast values."""
+    from plugins.weather.weather_data import parse_open_meteo_forecast
 
-    _weather = Weather({"id": "weather"})
-    _tz = UTC
-
-    # Mock OpenMeteo forecast data
     forecast_data = {
         "time": ["2025-01-01"],
         "temperature_2m_max": [25.0],
         "temperature_2m_min": [10.0],
         "weathercode": [1],
     }
+    forecast = parse_open_meteo_forecast(
+        forecast_data, UTC, is_day=1, lat=40.7, plugin_dir="/weather", units="metric"
+    )
 
-    # This should trigger the forecast parsing logic
-    try:
-        # The parsing logic should handle the data structure
-        temp_max = cast(list[float], forecast_data.get("temperature_2m_max", []))
-        temp_min = cast(list[float], forecast_data.get("temperature_2m_min", []))
-        weather_codes = cast(list[int], forecast_data.get("weathercode", []))
+    assert len(forecast) == 1
+    assert forecast[0]["day"] == "Wed"
+    assert forecast[0]["high"] == 25
+    assert forecast[0]["low"] == 10
+    assert forecast[0]["icon"].endswith("02d.png")
 
-        assert len(temp_max) > 0
-        assert len(temp_min) > 0
-        assert len(weather_codes) > 0
-    except Exception:
-        pass  # Expected to fail without full data, but covers the parsing attempt
+
+def test_openmeteo_forecast_invalid_date_raises() -> None:
+    """Malformed provider dates must surface the parser's ValueError."""
+    from plugins.weather.weather_data import parse_open_meteo_forecast
+
+    with pytest.raises(ValueError, match="Invalid isoformat string"):
+        parse_open_meteo_forecast(
+            {"time": ["not-a-date"]}, UTC, is_day=1, lat=40.7, plugin_dir="/weather"
+        )
 
 
 def test_openmeteo_hourly_parsing() -> None:

@@ -2,6 +2,119 @@
 
 <!-- version list -->
 
+## v1.4.12 (2026-10-01)
+
+### Bug Fixes
+
+- **import**: Validate and atomically commit plugin batches
+  ([#674](https://github.com/jtn0123/InkyPi/pull/674),
+  [`eb6c29b`](https://github.com/jtn0123/InkyPi/commit/eb6c29b77e7fb7c61892a424dc9ec26e0d0cda90))
+
+
+## v1.4.11 (2026-10-01)
+
+### Bug Fixes
+
+- **dashboard**: Reconcile events and preserve reliable status
+  ([#675](https://github.com/jtn0123/InkyPi/pull/675),
+  [`513baf4`](https://github.com/jtn0123/InkyPi/commit/513baf4a17ea9f303942e47b62a609ab90f37148))
+
+### Testing
+
+- Honor pytest ignores and visible navigation ([#673](https://github.com/jtn0123/InkyPi/pull/673),
+  [`da017c5`](https://github.com/jtn0123/InkyPi/commit/da017c5174fee0b3065055c29d398c13a6e46436))
+
+
+## v1.4.10 (2026-10-01)
+
+### Bug Fixes
+
+- **plugins**: Allow intentional absence of settings schemas
+  ([#672](https://github.com/jtn0123/InkyPi/pull/672),
+  [`6df3398`](https://github.com/jtn0123/InkyPi/commit/6df3398ac0536f661db702b4f30a4d6053a6781d))
+
+
+## v1.4.9 (2026-10-01)
+
+### Bug Fixes
+
+- Preserve playlist entries during reorder validation
+  ([#669](https://github.com/jtn0123/InkyPi/pull/669),
+  [`2b27756`](https://github.com/jtn0123/InkyPi/commit/2b27756ec4bbd4422e61bef6d14408d686c17740))
+
+### Continuous Integration
+
+- Require preflash and repeated renders in CI gate
+  ([#670](https://github.com/jtn0123/InkyPi/pull/670),
+  [`9ad5463`](https://github.com/jtn0123/InkyPi/commit/9ad54635d579b7e958296a7a0262cd59504daaa0))
+
+### Testing
+
+- Drain owned SSE resources between app servers ([#671](https://github.com/jtn0123/InkyPi/pull/671),
+  [`d038f01`](https://github.com/jtn0123/InkyPi/commit/d038f011c40346bccb7ff23d9ecdc44ec633436e))
+
+
+## v1.4.8 (2026-10-01)
+
+### Bug Fixes
+
+- Repair main security and reliability quality contracts
+  ([#668](https://github.com/jtn0123/InkyPi/pull/668),
+  [`b23b031`](https://github.com/jtn0123/InkyPi/commit/b23b031d241acc550ee970a6e9819dd08e74108f))
+
+### Testing
+
+- **types**: Check HTTP and diagnostic fixture contracts
+  ([#666](https://github.com/jtn0123/InkyPi/pull/666),
+  [`cff0c6a`](https://github.com/jtn0123/InkyPi/commit/cff0c6a123d66e45759d0ff767bee23e7a8bdec6))
+
+
+## v1.4.7 (2026-10-01)
+
+### Bug Fixes
+
+- **ui**: Authenticate HTMX plugin settings saves
+  ([#667](https://github.com/jtn0123/InkyPi/pull/667),
+  [`9f0ddc5`](https://github.com/jtn0123/InkyPi/commit/9f0ddc5b48ccf763f89782e947a6aa9f84b3f309))
+
+
+## v1.4.6 (2026-10-01)
+
+### Bug Fixes
+
+- **dependencies**: Lock installer tooling and refresh stable browser
+  ([#659](https://github.com/jtn0123/InkyPi/pull/659),
+  [`8bef4a0`](https://github.com/jtn0123/InkyPi/commit/8bef4a034a3ecbf0780194549a24d34b1bb739ae))
+
+- **release**: Allow image verifier artifact access from release caller
+  ([#665](https://github.com/jtn0123/InkyPi/pull/665),
+  [`999b8e7`](https://github.com/jtn0123/InkyPi/commit/999b8e71010428ce6ae0770010ab0e62351be20c))
+
+- **render**: Unify direct outcomes and revalidate image variants
+  ([#661](https://github.com/jtn0123/InkyPi/pull/661),
+  [`0648dc9`](https://github.com/jtn0123/InkyPi/commit/0648dc980925a466fbf1c86329b389c8397c9d91))
+
+- **setup**: Restore image builds and ARM drift diagnostics
+  ([#656](https://github.com/jtn0123/InkyPi/pull/656),
+  [`8560253`](https://github.com/jtn0123/InkyPi/commit/856025347274a7c4c067e45d96050a2d99333268))
+
+- **web**: Align bundled assets and accessible dialog focus
+  ([#660](https://github.com/jtn0123/InkyPi/pull/660),
+  [`54bda5b`](https://github.com/jtn0123/InkyPi/commit/54bda5b93d0af7695c9144f86a798c3d7fd4e269))
+
+### Refactoring
+
+- **types**: Tighten fixtures and lower measured test typing debt
+  ([#664](https://github.com/jtn0123/InkyPi/pull/664),
+  [`1d607b3`](https://github.com/jtn0123/InkyPi/commit/1d607b3aad142227cc8147ad2e9d42fe787bbde4))
+
+### Testing
+
+- **render**: Repeat visual goldens with useful failure diagnostics
+  ([#663](https://github.com/jtn0123/InkyPi/pull/663),
+  [`f81aaf0`](https://github.com/jtn0123/InkyPi/commit/f81aaf089f2ed6a76b14e2dacc483a3add6f8abf))
+
+
 ## v1.4.5 (2026-10-01)
 
 ### Bug Fixes

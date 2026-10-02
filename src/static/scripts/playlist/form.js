@@ -260,6 +260,11 @@
     }
   }
 
+  function reportPlaylistSaveFailure(error) {
+    console.error("Failed to save playlist:", error);
+    showResponseModal("failure", "An error occurred while processing your request.");
+  }
+
   function initFormControls() {
     if (ns.runtime.formControlsBound) return;
     bindPlaylistNameLengthGuard();
@@ -276,9 +281,9 @@
         const mode =
           document.getElementById("playlistModal")?.dataset.mode || "create";
         if (mode === "edit") {
-          updatePlaylist();
+          updatePlaylist().catch(reportPlaylistSaveFailure);
         } else {
-          createPlaylist();
+          createPlaylist().catch(reportPlaylistSaveFailure);
         }
       });
     }

@@ -268,6 +268,18 @@ class TestValidatePluginRequiredFields:
         result = validate_plugin_required_fields(NoSchema(), {})
         assert result is None
 
+    def test_optional_schema_returns_none(self) -> None:
+        assert validate_plugin_required_fields(_FakePlugin(None), {}) is None
+
+    @pytest.mark.parametrize(
+        "schema",
+        [False, 0, "", [], {"sections": [None]}, {"sections": [{"items": [None]}]}],
+    )
+    def test_malformed_schema_is_not_optional(self, schema: object) -> None:
+        plugin = _FakePlugin(schema)
+        with pytest.raises((AttributeError, TypeError)):
+            validate_plugin_required_fields(plugin, {})
+
     def test_schema_failure_propagates(self) -> None:
         class BrokenPlugin:
             def build_settings_schema(self) -> None:

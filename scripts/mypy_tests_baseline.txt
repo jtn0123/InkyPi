@@ -16,7 +16,7 @@
 # type means test doubles like DummyDeviceConfig/FakeDeviceConfig are now
 # checked against the real DeviceConfigLike protocol, which they do not fully
 # implement. Tightening those fakes is follow-up work.
-661
+504
 
 # 645 -> 639 (2026-08-21): src/ contracts got more precise, so several
 # test-side mismatches resolved themselves.
@@ -37,4 +37,14 @@
 # the next Linux CI run will fail. The same applies to the interpreter: CI lints
 # under Python 3.12, and mypy's results genuinely differ from 3.13 in ways
 # `--python-version 3.12` does not reproduce.
-661
+504
+
+# 661 -> 554 (2026-09-30): measured by Linux Python 3.12 CI run 36803027870,
+# lint job 110181341394. Fixture contracts, archive readers, response narrowing,
+# return types and nullable lookups were corrected without new Any or ignores.
+# The matching macOS environment reports 555; Linux remains authoritative.
+
+# 554 -> 504 (2026-10-01): matching Linux Python 3.12 CI run 36819980440,
+# lint job 110233267496. Five HTTP/logging/diagnostic/model test modules
+# now have precise fixture contracts; 50 actual findings removed.
+# Same macOS Python 3.13.15 measurement falls from 555 to 505.

@@ -549,7 +549,7 @@ def test_readyz_states(monkeypatch: pytest.MonkeyPatch) -> None:
     assert r.status_code == 503 and b"not-ready" in r.data
 
 
-def test_csp_headers_default_and_overrides(monkeypatch: pytest.MonkeyPatch):
+def test_csp_headers_default_and_overrides(monkeypatch: pytest.MonkeyPatch) -> None:
     # Default in production: CSP is enforced (not report-only) -> None -> None
     mod = _reload_inkypi(monkeypatch, argv=["inkypi.py"], env={})
     app = getattr(mod, "app", None)
