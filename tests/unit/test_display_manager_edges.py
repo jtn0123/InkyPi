@@ -233,7 +233,9 @@ class TestSaveHistoryEntry:
         visible_during_save: list[str] = []
         real_save = Image.Image.save
 
-        def save_and_peek(self: Image.Image, fp: Any, *args: Any, **kwargs: Any) -> None:
+        def save_and_peek(
+            self: Image.Image, fp: Any, *args: Any, **kwargs: Any
+        ) -> None:
             real_save(self, fp, *args, **kwargs)
             visible_during_save.extend(
                 f for f in os.listdir(history_dir) if f.endswith(".png")
