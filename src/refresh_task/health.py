@@ -180,15 +180,11 @@ class PluginHealthTracker:
             self.plugin_health.get(plugin_id, {}).get("last_error") or "unknown"
         )
 
-        newly_paused = False
-
         def _record_failure() -> None:
             # The counter's read-modify-write happens under the config lock so
             # a concurrent update_atomic rollback cannot undo it.
-            nonlocal newly_paused
             plugin_instance.consecutive_failure_count += 1
             if plugin_instance.consecutive_failure_count >= threshold:
-                newly_paused = True
                 plugin_instance.paused = True
                 plugin_instance.disabled_reason = (
                     f"Paused after {plugin_instance.consecutive_failure_count} "
@@ -209,7 +205,9 @@ class PluginHealthTracker:
             plugin_instance.consecutive_failure_count,
             threshold,
         )
-        if newly_paused:
+        # The early return above means any pause now is new, and a failed
+        # write rolls the model back, so this reflects what was persisted.
+        if plugin_instance.paused:
             set_circuit_breaker_open(plugin_id, True)
             logger.error(
                 "plugin circuit_breaker: paused | plugin_id=%s instance=%s"

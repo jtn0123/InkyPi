@@ -88,7 +88,8 @@ def _race_with_failed_update(
     other.start()
     web.join(timeout=5)
     other.join(timeout=5)
-    assert not web.is_alive() and not other.is_alive()
+    assert not web.is_alive()
+    assert not other.is_alive()
     assert errors == []
 
 
