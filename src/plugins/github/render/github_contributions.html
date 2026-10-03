@@ -27,7 +27,7 @@
         {% set col_span = next_label_idx - start %}
         {% if col_span >= 3 %}
           <div class="month-label"
-              style="grid-column-start: {{ start + 2 }}; grid-row-start: 1;">
+              style="grid-column: {{ start + 2 }} / span {{ col_span }}; grid-row-start: 1;">
             {{ label.name }}
           </div>
         {% endif %}

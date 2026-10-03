@@ -1,7 +1,7 @@
 
 .rss-container {
-    align-items: center; 
-    justify-content: center;
+    display: flex;
+    flex-direction: column;
     font-family: "Jost", sans-serif;
     height: 100%;
     width: 100%;
@@ -9,33 +9,35 @@
 }
 
 .items-container {
+    flex: 1;
+    min-height: 0;
     overflow: hidden;
-    height: 100%;
 }
 
 
 .title {
     text-align: center;
-    font-size: calc(min(6dvh, 5vw) * var(--font-scale));
+    font-size: calc(min(7dvh, 6vw) * var(--font-scale));
     font-weight: bold;
-    padding-bottom: 0.5dvh;
+    line-height: 1.1;
+    padding-bottom: 1.5dvh;
 }
 
 .rss-item {
     display: flex;
     flex-direction: row;
     align-items: flex-start;
-    gap: 1dvw;
-    padding-bottom: 2dvh;
-    padding-top: 2dvh;
+    gap: 2dvw;
+    padding-bottom: 1.8dvh;
+    padding-top: 1.8dvh;
     border-top: 1px solid ;
     overflow: hidden;
 }
 
 .rss-item .item-title {
-    font-weight: bold;
-    padding-bottom: 1dvh;
-    font-size: calc(min(4dvh, 3vw) * var(--font-scale));
+    font-weight: 600;
+    padding-bottom: 0.6dvh;
+    font-size: calc(min(4.6dvh, 4.2vw) * var(--font-scale));
 }
 
 .rss-item .item-image {
@@ -50,7 +52,7 @@
 }
 
 .rss-item .item-description {
-    font-size: calc(min(3.5dvh, 3vw) * var(--font-scale));
+    font-size: calc(min(3.8dvh, 3.6vw) * var(--font-scale));
 }
 
 .rss-item .text-container {
