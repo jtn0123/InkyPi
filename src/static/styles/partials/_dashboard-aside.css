@@ -192,11 +192,14 @@ a.quick-row-link:hover {
   gap: 6px;
   flex: 0 0 auto;
   width: auto;
-  min-height: 32px;
-  padding: 7px 12px;
-  border-radius: 6px;
-  font-size: 13px;
-  font-weight: 500;
+  /* Same scale as every other .pageheader action (44px / 14px). The old
+     32px/13px variant made Dashboard and History headers look like a
+     different app from Plugins and Settings. */
+  min-height: 44px;
+  padding: 10px 16px;
+  border-radius: var(--border-radius-md);
+  font-size: 14px;
+  font-weight: 600;
   letter-spacing: 0;
   line-height: 1;
   box-shadow: none;
@@ -208,9 +211,9 @@ a.quick-row-link:hover {
 }
 
 .dashboard-header-button.is-secondary {
-  background: transparent;
-  color: var(--text-2);
-  border-color: transparent;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--surface-border);
 }
 
 .dashboard-header-button.is-secondary:hover {
