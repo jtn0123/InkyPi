@@ -7,8 +7,12 @@
         WebSocket, form posts, <base> hijacks, plugins, frames). Images stay
         open to http(s) because RSS item thumbnails are remote; scripts are
         limited to inline blocks, local files and the SRI-pinned jsDelivr CDN
-        (Chart.js in weather_ny). Must precede any resource-loading tag. #}
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' file: https://cdn.jsdelivr.net; style-src 'unsafe-inline' file:; font-src file: data:; img-src file: data: blob: http: https:; connect-src 'none'; form-action 'none'; base-uri 'none'; object-src 'none'; frame-src 'none'; worker-src 'none'; media-src 'none'; manifest-src 'none'">
+        (Chart.js in weather_ny). Must precede any resource-loading tag.
+        'unsafe-inline' is deliberate: plugin templates (built-in and
+        third-party) rely on inline <script> blocks and style="" attributes,
+        and every template value is autoescaped. The exfiltration directives
+        above are what this policy is for. #}
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' file: https://cdn.jsdelivr.net; style-src 'unsafe-inline' file:; font-src file: data:; img-src file: data: blob: http: https:; connect-src 'none'; form-action 'none'; base-uri 'none'; object-src 'none'; frame-src 'none'; worker-src 'none'; media-src 'none'; manifest-src 'none'"> <!-- NOSONAR: unsafe-inline required by plugin templates, see note above -->
     <title>InkyPi Plugin</title>
     {% if inline_styles %}
         {% for css in inline_styles %}

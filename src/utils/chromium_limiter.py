@@ -52,7 +52,7 @@ _held_fds_lock = threading.Lock()
 def _close_inherited_fds() -> None:
     # Closing the child's duplicate does not release the parent's lock: an
     # flock is only dropped once every descriptor sharing it is closed.
-    for fd in list(_held_fds):
+    for fd in tuple(_held_fds):
         try:
             os.close(fd)
         except OSError:
@@ -121,6 +121,46 @@ def slot_wait_limit(timeout_s: float) -> Iterator[None]:
         _local.wait_limit = previous
 
 
+def _acquire_lock(fd: int, path: str, purpose: str, wait_s: float) -> None:
+    """Poll for the exclusive flock on *fd*, raising once *wait_s* elapses."""
+    started = time.monotonic()
+    deadline = started + wait_s
+    logged_wait = False
+    while True:
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            break
+        except BlockingIOError:
+            if not logged_wait:
+                logger.info(
+                    "Chromium limiter: %s waiting for another browser "
+                    "instance to finish (lock=%s, timeout=%.0fs)",
+                    purpose,
+                    path,
+                    wait_s,
+                )
+                logged_wait = True
+            if time.monotonic() >= deadline:
+                logger.error(
+                    "Chromium limiter: %s gave up after %.1fs; another "
+                    "headless browser still holds %s",
+                    purpose,
+                    time.monotonic() - started,
+                    path,
+                )
+                raise ScreenshotBackendError(
+                    "Renderer busy: another headless browser is still "
+                    f"running after {wait_s:.0f}s. Try again shortly."
+                ) from None
+            time.sleep(_POLL_INTERVAL_S)
+    if logged_wait:
+        logger.info(
+            "Chromium limiter: %s acquired slot after %.1fs",
+            purpose,
+            time.monotonic() - started,
+        )
+
+
 @contextmanager
 def chromium_slot(
     purpose: str = "render", timeout_s: float | None = None
@@ -156,43 +196,8 @@ def chromium_slot(
         wait_s = _wait_timeout_s() if wait_limit is None else wait_limit
     else:
         wait_s = max(0.0, timeout_s)
-    started = time.monotonic()
-    deadline = started + wait_s
-    logged_wait = False
     try:
-        while True:
-            try:
-                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-                break
-            except BlockingIOError:
-                if not logged_wait:
-                    logger.info(
-                        "Chromium limiter: %s waiting for another browser "
-                        "instance to finish (lock=%s, timeout=%.0fs)",
-                        purpose,
-                        path,
-                        wait_s,
-                    )
-                    logged_wait = True
-                if time.monotonic() >= deadline:
-                    logger.error(
-                        "Chromium limiter: %s gave up after %.1fs; another "
-                        "headless browser still holds %s",
-                        purpose,
-                        time.monotonic() - started,
-                        path,
-                    )
-                    raise ScreenshotBackendError(
-                        "Renderer busy: another headless browser is still "
-                        f"running after {wait_s:.0f}s. Try again shortly."
-                    ) from None
-                time.sleep(_POLL_INTERVAL_S)
-        if logged_wait:
-            logger.info(
-                "Chromium limiter: %s acquired slot after %.1fs",
-                purpose,
-                time.monotonic() - started,
-            )
+        _acquire_lock(fd, path, purpose, wait_s)
         with _held_fds_lock:
             _held_fds.add(fd)
         _local.depth = 1

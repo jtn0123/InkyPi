@@ -41,7 +41,7 @@ _PROBE_TEMPLATE = """{% extends "plugin.html" %}
 """
 
 
-@pytest.fixture()
+@pytest.fixture
 def request_log() -> Iterator[tuple[int, list[str]]]:
     hits: list[str] = []
 

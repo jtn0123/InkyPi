@@ -108,9 +108,9 @@ def test_busy_slot_times_out_with_backend_error(isolated_lock_dir: Path) -> None
     proc = _spawn_holder(isolated_lock_dir, "time.sleep(30)")
     try:
         started = time.monotonic()
-        with pytest.raises(ScreenshotBackendError, match="Renderer busy"):
-            with chromium_slot("starved", timeout_s=0.3):
-                pytest.fail("slot should not have been granted")
+        slot = chromium_slot("starved", timeout_s=0.3)
+        with pytest.raises(ScreenshotBackendError, match="Renderer busy"), slot:
+            pytest.fail("slot should not have been granted")
         assert time.monotonic() - started < 5
     finally:
         proc.kill()
@@ -127,10 +127,10 @@ def test_slot_released_when_holder_process_is_killed(isolated_lock_dir: Path) ->
 
 
 def test_slot_released_when_launch_raises() -> None:
-    with pytest.raises(RuntimeError, match="boom"):
-        with chromium_slot("failing launcher", timeout_s=1):
-            assert not _slot_is_free()
-            raise RuntimeError("boom")
+    slot = chromium_slot("failing launcher", timeout_s=1)
+    with pytest.raises(RuntimeError, match="boom"), slot:
+        assert not _slot_is_free()
+        raise RuntimeError("boom")
     assert _slot_is_free()
     with chromium_slot("next launcher", timeout_s=0):
         pass
@@ -186,7 +186,8 @@ def test_browser_subprocess_runs_inside_slot(monkeypatch: pytest.MonkeyPatch) ->
     monkeypatch.setattr(subprocess, "run", fake_run)
     result, transient = image_utils._run_browser_subprocess(["chromium"], 1.0, 1)
 
-    assert result is not None and not transient
+    assert result is not None
+    assert not transient
     assert observed == {"slot_free_during_launch": False}
     assert _slot_is_free()
 
