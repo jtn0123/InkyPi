@@ -74,10 +74,16 @@ Browser tests use Playwright with a headless Chromium instance. There are two gr
 
 ```bash
 SKIP_BROWSER=0 .venv/bin/python -m pytest tests/
-# Or simply omit SKIP_BROWSER — it defaults to unset (tests run); Chromium must
-# be installed or browser tests will fail (they are not auto-skipped on missing Chromium):
+# Or simply omit SKIP_BROWSER — it defaults to unset (tests run):
 .venv/bin/python -m pytest tests/
 ```
+
+Without Chromium installed, the browser modules drop out of a local run. Under
+`CI=true` or `REQUIRE_BROWSER_SMOKE=1` a missing Chromium is instead a
+collection error, so CI jobs without a browser must deselect the suites
+explicitly with `SKIP_BROWSER=1`. Every test in those modules carries the
+auto-applied `browser` marker; CI runs them (plus `-m journey`) in the sharded
+`browser-full` job.
 
 **Run the lightweight browser smoke gate used by the frontend pre-commit hook:**
 

@@ -21,7 +21,9 @@ Flow:
 
 Gating: ``SKIP_UI=1`` disables the browser-based checks (live_server +
 browser_page). The API-only portion still runs so the journey has value
-even in minimal CI lanes.  ``SKIP_BROWSER=1`` is honored identically.
+even in minimal CI lanes.  ``SKIP_BROWSER=1`` is honored identically. A
+missing Chromium only skips the UI variant outside CI; see
+``tests.conftest.browser_required``.
 """
 
 from __future__ import annotations
@@ -36,6 +38,7 @@ import pytest
 from flask import Flask
 from flask.testing import FlaskClient
 from playwright.sync_api import Page
+from tests.conftest import _playwright_browser_available, browser_required
 
 pytestmark = pytest.mark.journey
 
@@ -45,25 +48,11 @@ _SKIP_UI = os.getenv("SKIP_UI", "").lower() in ("1", "true") or os.getenv(
 ).lower() in ("1", "true")
 
 
-def _playwright_chromium_available() -> bool:
-    """Return True only when a real Chromium binary is installed locally.
-
-    Mirrors the detection in ``tests/conftest.py`` so the UI variant of this
-    journey cleanly skips in CI lanes that don't install Playwright browsers
-    (the main ``pytest`` job) instead of erroring at fixture setup.
-    """
-    try:  # pragma: no cover - best-effort probe
-        from playwright.sync_api import sync_playwright
-
-        with sync_playwright() as pw:
-            browser = pw.chromium.launch()
-            browser.close()
-        return True
-    except Exception:
-        return False
-
-
-_SKIP_UI = _SKIP_UI or not _playwright_chromium_available()
+# Share the repo-wide browser policy from ``tests/conftest.py``: without
+# Chromium the UI variant skips locally, but under CI=true or
+# REQUIRE_BROWSER_SMOKE=1 it must run (and fail loudly at browser launch)
+# rather than silently skip. CI lanes without a browser set SKIP_BROWSER=1.
+_SKIP_UI = _SKIP_UI or (not browser_required() and not _playwright_browser_available())
 
 
 def _latest_history_sidecar(history_dir: Path) -> dict | None:
