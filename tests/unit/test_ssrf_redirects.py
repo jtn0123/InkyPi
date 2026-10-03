@@ -111,7 +111,7 @@ class Router:
         return self.routes[url]
 
 
-@pytest.fixture()
+@pytest.fixture
 def http_get_router(monkeypatch: pytest.MonkeyPatch) -> Any:
     """Route ``utils.http_utils.http_get``'s session through a Router."""
     from utils import http_utils
@@ -285,7 +285,8 @@ def test_get_image_follows_public_redirect(monkeypatch: pytest.MonkeyPatch) -> N
         },
     )
     img = image_utils.get_image("http://public.example.com/i.png")
-    assert img is not None and img.size == (4, 4)
+    assert img is not None
+    assert img.size == (4, 4)
     assert router.calls[1]["ip"] == PUBLIC_B
 
 
@@ -385,8 +386,9 @@ def test_read_capped_rejects_declared_oversize_without_reading() -> None:
 def test_read_capped_rejects_streamed_oversize() -> None:
     from utils.http_utils import ResponseTooLargeError, read_capped
 
+    oversized = FakeResp(200, b"x" * 300, chunk=64)
     with pytest.raises(ResponseTooLargeError):
-        read_capped(FakeResp(200, b"x" * 300, chunk=64), 200)
+        read_capped(oversized, 200)
     assert read_capped(FakeResp(200, b"x" * 200, chunk=64), 200) == b"x" * 200
 
 
@@ -403,6 +405,11 @@ def test_safe_fetch_bytes_rejects_oversized_body(http_get_router: Any) -> None:
 # ---------------------------------------------------------------------------
 # pinned_dns: out-of-order thread exit must not leak / stack the wrapper
 # ---------------------------------------------------------------------------
+
+
+def _wait(event: threading.Event, what: str) -> None:
+    if not event.wait(5):
+        raise TimeoutError(f"timed out waiting for {what}")
 
 
 def _saved_resolver() -> object:
@@ -422,7 +429,7 @@ def test_pinned_dns_restores_resolver_when_threads_exit_out_of_order() -> None:
         try:
             with http_utils.pinned_dns("a.example.com", (PUBLIC_A,)):
                 a_entered.set()
-                assert b_entered.wait(5)
+                _wait(b_entered, "thread b to enter")
         except BaseException as exc:  # pragma: no cover - surfaced below
             errors.append(exc)
         finally:
@@ -430,10 +437,10 @@ def test_pinned_dns_restores_resolver_when_threads_exit_out_of_order() -> None:
 
     def thread_b() -> None:
         try:
-            assert a_entered.wait(5)
+            _wait(a_entered, "thread a to enter")
             with http_utils.pinned_dns("b.example.com", (PUBLIC_B,)):
                 b_entered.set()
-                assert a_exited.wait(5)
+                _wait(a_exited, "thread a to exit")
         except BaseException as exc:  # pragma: no cover - surfaced below
             errors.append(exc)
 
@@ -505,7 +512,8 @@ def test_rss_fetch_is_streamed_without_redirects(
     items = rss.parse_rss_feed("https://public.example.com/feed")
     assert [i["title"] for i in items] == ["Hello"]
     call = session.router.calls[0]
-    assert call["stream"] is True and call["allow_redirects"] is False
+    assert call["stream"] is True
+    assert call["allow_redirects"] is False
     assert call["headers"]["User-Agent"] == "Mozilla/5.0"
 
 

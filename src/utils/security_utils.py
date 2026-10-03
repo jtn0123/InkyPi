@@ -121,7 +121,7 @@ def validate_url_with_ips(
         # hostname is not a literal IP — fall through to DNS resolution
         literal = None
     if literal is not None:
-        _reject_private_ip(literal, hostname, allow_lan=allow_lan)
+        _reject_private_ip(literal, allow_lan=allow_lan)
         # Literal IP — no DNS required; the "resolved" set is the literal.
         return url, (hostname,)
 
@@ -135,7 +135,7 @@ def validate_url_with_ips(
     for info in addr_infos:
         ip_str = str(info[4][0])
         addr = ipaddress.ip_address(ip_str)
-        _reject_private_ip(addr, hostname, allow_lan=allow_lan)
+        _reject_private_ip(addr, allow_lan=allow_lan)
         if ip_str not in resolved:
             resolved.append(ip_str)
 
@@ -160,7 +160,6 @@ def _is_lan_address(addr: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool
 
 def _reject_private_ip(
     addr: ipaddress.IPv4Address | ipaddress.IPv6Address,
-    hostname: str,
     *,
     allow_lan: bool = False,
 ) -> None:
