@@ -30,12 +30,21 @@ const quickSwitchRows = [1, 2].map(version => ({
   querySelector() { return null; },
 }));
 class Source extends EventTarget {
-  constructor(url) { super(); this.url = url; this.closed = false; Source.instance = this; }
+  static CONNECTING = 0;
+  static OPEN = 1;
+  static CLOSED = 2;
+  static instances = [];
+  constructor(url) {
+    super(); this.url = url; this.closed = false; this.readyState = Source.CONNECTING;
+    Source.instance = this; Source.instances.push(this);
+  }
   set onmessage(callback) { this.addEventListener('message', callback); }
   set onopen(callback) { this.addEventListener('open', callback); }
   set onerror(callback) { this.addEventListener('error', callback); }
-  close() { this.closed = true; }
+  close() { this.closed = true; this.readyState = Source.CLOSED; }
 }
+const timeouts = new Map();
+let nextTimeoutId = 1;
 let generation = 1;
 const failures = new Set();
 let failureKind = 'http';
@@ -52,7 +61,9 @@ const sandbox = {
   addEventListener(name, callback) { (lifecycle[name] ||= []).push(callback); },
   setInterval(callback, ms) { const id = intervals.size + 1; intervals.set(id, {callback, ms}); return id; },
   clearInterval(id) { intervals.delete(id); },
-  setTimeout() {}, showResponseModal() {},
+  setTimeout(callback, ms) { const id = nextTimeoutId++; timeouts.set(id, {callback, ms}); return id; },
+  clearTimeout(id) { timeouts.delete(id); },
+  showResponseModal() {},
   fetch: async url => {
     calls.push(url);
     const version = generation;
@@ -82,7 +93,16 @@ sandbox.globalThis = sandbox;
 vm.runInNewContext(fs.readFileSync(source, 'utf8'), sandbox, {filename: source});
 const count = url => calls.filter(call => call === url).length;
 const refresh = async () => { nodes.dashboardRefreshBtn.handlers.click(); await flush(); };
-const dispatch = async name => { Source.instance.dispatchEvent(new Event(name)); await flush(); };
+const dispatch = async name => {
+  // Mirror the browser: open marks the stream OPEN before the event fires.
+  if (name === 'open') Source.instance.readyState = Source.OPEN;
+  Source.instance.dispatchEvent(new Event(name)); await flush();
+};
+// A server-ended stream reconnects in place; a refused (503) one is CLOSED.
+const streamError = async readyState => { Source.instance.readyState = readyState; await dispatch('error'); };
+const pollingTimers = () => [...intervals.values()].filter(timer => timer.ms === 5000);
+const timersWith = ms => [...timeouts.entries()].filter(([, timer]) => timer.ms === ms);
+const fireTimeout = async ([id, timer]) => { timeouts.delete(id); timer.callback(); await flush(); };
 
 async function main() {
   const noPush = scenario === 'polling';
@@ -158,20 +178,59 @@ async function main() {
     await dispatch('open');
     assert.equal(count('/refresh'), before + 1, 'Each successful open must reconcile missed events');
     assert.equal(nodes.heroNowValue.textContent, 'Weather 2');
+  } else if (scenario === 'rollover') {
+    await dispatch('open');
+    const first = Source.instance;
+    await streamError(Source.CONNECTING);
+    assert.equal(first.closed, false, 'A server-ended stream must reconnect in place');
+    assert.equal(Source.instances.length, 1, 'Reconnect must not create a duplicate stream');
+    assert.equal(pollingTimers().length, 0, 'A routine reconnect must not start polling');
+    assert.equal(timersWith(10000).length, 1, 'A stalled reconnect is guarded by one grace timer');
+    await streamError(Source.CONNECTING);
+    assert.equal(timersWith(10000).length, 1, 'Repeated errors must not stack grace timers');
+    const before = count('/refresh');
+    generation = 2;
+    await dispatch('open');
+    assert.equal(count('/refresh'), before + 1, 'Reconnect must reconcile missed events once');
+    assert.equal(nodes.heroNowValue.textContent, 'Weather 2');
+    assert.equal(timersWith(10000).length, 0, 'Reopen cancels the grace timer');
+    await dispatch('refresh_complete');
+    assert.equal(count('/refresh'), before + 2, 'Handlers must not be duplicated by reconnects');
+  } else if (scenario === 'stalled-reconnect') {
+    await streamError(Source.CONNECTING);
+    await fireTimeout(timersWith(10000)[0]);
+    assert.equal(pollingTimers().length, 1, 'A stalled reconnect falls back to polling');
+    assert.equal(Source.instance.closed, false, 'The browser keeps retrying the stream');
+    await dispatch('open');
+    assert.equal(pollingTimers().length, 0, 'A recovered stream stops polling');
   } else if (scenario === 'polling' || scenario === 'fallback') {
     if (!noPush) {
-      await dispatch('error');
-      await dispatch('error');
+      await streamError(Source.CLOSED);
+      await streamError(Source.CLOSED);
       assert.equal(Source.instance.closed, true);
+      const retries = timersWith(30000);
+      assert.equal(retries.length, 1, 'A refused stream schedules exactly one retry');
+      await fireTimeout(retries[0]);
+      assert.equal(Source.instances.length, 2, 'The retry opens a fresh stream');
+      assert.equal(pollingTimers().length, 1, 'Polling continues until the retry opens');
+      await streamError(Source.CLOSED);
+      assert.equal(timersWith(60000).length, 1, 'Repeated refusals back off exponentially');
+      await fireTimeout(timersWith(60000)[0]);
     }
-    const polling = [...intervals.values()].filter(timer => timer.ms === 5000);
+    const polling = pollingTimers();
     assert.equal(polling.length, 1, 'Fallback owns exactly one polling timer');
     generation = 2;
     polling[0].callback();
     await flush();
     assert.equal(nodes.heroNowValue.textContent, 'Weather 2');
+    if (!noPush) {
+      await dispatch('open');
+      assert.equal(pollingTimers().length, 0, 'A reopened stream replaces polling');
+    }
     for (const callback of lifecycle.pagehide) callback();
     assert.equal(intervals.size, 0, 'Page exit must release polling and countdown timers');
+    assert.equal(timersWith(30000).length + timersWith(60000).length + timersWith(10000).length, 0,
+      'Page exit must release stream retry timers');
   } else {
     await refresh(); // Establish known-good values independent of the C4 startup defect.
     assert.equal(nodes.heroNowValue.textContent, 'Weather 1');

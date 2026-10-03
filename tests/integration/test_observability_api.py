@@ -79,7 +79,7 @@ def test_progress_stream_sse(client: FlaskClient) -> None:
         first = next(iter(r.response))
         assert isinstance(first, bytes)
         body = first.decode("utf-8", errors="ignore")
-        # stream may start with keep-alive if no events yet
-        assert any(marker in body for marker in ("event:", ": keep-alive"))
+        # Every stream opens with the SSE reconnect hint before any event.
+        assert body.startswith("retry: ")
     finally:
         r.close()

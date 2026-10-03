@@ -3,6 +3,13 @@
   const DEFAULTS = {
     pollIntervalMs: 5000,
     refreshDelayMs: 300,
+    // The server ends each SSE response after ~55 s and EventSource reconnects
+    // in place (server `retry:` hint ~3 s). Only poll if that reconnect stalls.
+    sseReconnectGraceMs: 10000,
+    // After a refused stream (503: every stream slot busy) poll, and retry the
+    // stream with exponential back-off instead of hammering the server.
+    sseRetryBaseMs: 30000,
+    sseRetryMaxMs: 300000,
   };
 
   // Module-scope helpers — hoisted from createDashboardPage (JTN-281).
@@ -534,41 +541,103 @@
     }
 
     function initRealtime() {
+      const pushUrl = config.pushUrl;
+      const reconnectGraceMs = config.sseReconnectGraceMs || DEFAULTS.sseReconnectGraceMs;
+      const retryBaseMs = config.sseRetryBaseMs || DEFAULTS.sseRetryBaseMs;
+      const retryMaxMs = config.sseRetryMaxMs || DEFAULTS.sseRetryMaxMs;
       let pollTimerId = null;
       let sseSource = null;
+      let reconnectTimerId = null;
+      let retryTimerId = null;
+      let retryDelayMs = retryBaseMs;
+      let stopped = false;
+
+      function clearTimer(id) {
+        if (id) clearTimeout(id);
+        return null;
+      }
+
+      function startPolling() {
+        if (pollTimerId || stopped) return;
+        refreshDashboard();
+        pollTimerId = setInterval(refreshDashboard, pollIntervalMs);
+      }
+
+      function stopPolling() {
+        if (pollTimerId) { clearInterval(pollTimerId); pollTimerId = null; }
+      }
 
       function cleanup() {
+        stopped = true;
         if (sseSource) { sseSource.close(); sseSource = null; }
-        if (pollTimerId) { clearInterval(pollTimerId); pollTimerId = null; }
+        stopPolling();
+        reconnectTimerId = clearTimer(reconnectTimerId);
+        retryTimerId = clearTimer(retryTimerId);
+      }
+
+      function scheduleStreamRetry() {
+        if (stopped || retryTimerId) return;
+        const delay = retryDelayMs;
+        retryDelayMs = Math.min(retryDelayMs * 2, retryMaxMs);
+        retryTimerId = setTimeout(() => {
+          retryTimerId = null;
+          openStream();
+        }, delay);
+      }
+
+      function handleStreamOpen() {
+        // Each (re)open reconciles anything published while disconnected.
+        reconnectTimerId = clearTimer(reconnectTimerId);
+        retryDelayMs = retryBaseMs;
+        stopPolling();
+        refreshDashboard();
+      }
+
+      function handleStreamError(source) {
+        if (source !== sseSource) return;
+        if (source.readyState === globalThis.EventSource.CONNECTING) {
+          // Normal end of a bounded stream: the browser reconnects by itself.
+          if (!reconnectTimerId && !pollTimerId) {
+            reconnectTimerId = setTimeout(() => {
+              reconnectTimerId = null;
+              startPolling();
+            }, reconnectGraceMs);
+          }
+          return;
+        }
+        console.warn("SSE connection lost, falling back to polling");
+        source.close();
+        sseSource = null;
+        reconnectTimerId = clearTimer(reconnectTimerId);
+        startPolling();
+        scheduleStreamRetry();
+      }
+
+      function openStream() {
+        if (stopped || sseSource) return true;
+        try {
+          const source = new EventSource(pushUrl);
+          sseSource = source;
+          source.onmessage = refreshDashboard;
+          source.onopen = handleStreamOpen;
+          source.onerror = () => handleStreamError(source);
+          for (const event of ["refresh_started", "refresh_complete", "plugin_failed"]) {
+            source.addEventListener(event, refreshDashboard);
+          }
+          return true;
+        } catch (error) {
+          console.warn("SSE not available, using polling:", error);
+          sseSource = null;
+          return false;
+        }
       }
 
       globalThis.addEventListener("beforeunload", cleanup);
       globalThis.addEventListener("pagehide", cleanup);
 
       refreshDashboard();
-      const pushUrl = config.pushUrl;
-      if (pushUrl && globalThis.EventSource) {
-        try {
-          sseSource = new EventSource(pushUrl);
-          sseSource.onmessage = refreshDashboard;
-          sseSource.onopen = refreshDashboard;
-          for (const event of ["refresh_started", "refresh_complete", "plugin_failed"]) {
-            sseSource.addEventListener(event, refreshDashboard);
-          }
-          sseSource.onerror = () => {
-            console.warn("SSE connection lost, falling back to polling");
-            if (sseSource) { sseSource.close(); sseSource = null; }
-            if (!pollTimerId) {
-              refreshDashboard();
-              pollTimerId = setInterval(refreshDashboard, pollIntervalMs);
-            }
-          };
-          return;
-        } catch (error) {
-          console.warn("SSE not available, using polling:", error);
-        }
-      }
-      pollTimerId = setInterval(refreshDashboard, pollIntervalMs);
+      if (pushUrl && globalThis.EventSource && openStream()) return;
+      if (!pollTimerId) pollTimerId = setInterval(refreshDashboard, pollIntervalMs);
     }
 
     function init() {

@@ -129,14 +129,20 @@
 
 .plugin-inline-api-row {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
 }
 
+/* The API card shares a two-up row with the content card, so at desktop
+   widths it is only ~250px wide. Let the actions wrap under the copy instead
+   of pushing "Manage keys" out of the card. */
 .plugin-inline-api-copy {
   display: grid;
   gap: 4px;
+  flex: 1 1 160px;
+  min-width: 0;
 }
 
 .plugin-inline-api-actions {
@@ -148,6 +154,17 @@
 .plugin-inline-api-actions .status-chip,
 .plugin-inline-api-link {
   white-space: nowrap;
+}
+
+.action-button.plugin-inline-api-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: auto;
+  min-height: 40px;
+  padding: 9px 14px;
+  font-size: var(--text-sm);
+  text-decoration: none;
 }
 
 /* Schedule sub-panel summary card */

@@ -3,6 +3,9 @@
     /* Font families — refined typographic system */
     --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
     --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+    /* Display face for page titles and the wordmark. Jost ships in
+       static/fonts (see _reset.css) and matches the panel's own wordmark. */
+    --font-display: Jost, var(--font-sans);
 
     /* Core palette — warm paper stock with ink */
     --bg: #f5f3ef;
@@ -12,19 +15,25 @@
     --surface-3: #e0dcd4;
     --border-strong: #c6c0b6;
     --text: #1c1917;
-    --muted: #6b6560;
-    --text-3: #8a857d;
+    /* WCAG AA: --muted >= 4.5:1 and --text-3 >= 4.5:1 on --bg, --surface and
+       --surface-2 (eyebrows and meta text are 10-12px, so no large-text pass). */
+    --muted: #5f5a54;
+    --text-3: #6b665f;
     --divider: var(--surface-border);
     --button-bg: #f0ede8;
     --input-bg: #ffffff;
+    /* Selected segment fill: one step lighter than the --surface-2 track. */
+    --seg-active-bg: var(--surface);
     /* Refined teal accent — oklch for consistent perceptual luminance */
-    --accent: oklch(56% 0.08 170);
-    --accent-hover: oklch(48% 0.09 170);
+    /* L=50% keeps white button text and accent chip text on --accent-weak
+       above 4.5:1; 56% sat at 4.44:1. */
+    --accent: oklch(50% 0.08 170);
+    --accent-hover: oklch(44% 0.09 170);
     --accent-ink: #ffffff;
     --accent-weak: color-mix(in oklab, var(--accent) 14%, transparent);
     --panel-bg: #f0ede8;
     --panel-border: #ddd8d0;
-    --subtext: #6b6560;
+    --subtext: #5f5a54;
     --frame-lining: #9a9590;
     /* E-ink paper tint behind render thumbnails/previews. Intentionally
        theme-independent — the physical panel is this color in any theme. */
@@ -180,10 +189,12 @@
     --border-strong: #2f3640;
     --text: #e4e6e8;
     --muted: #a7adb3;
-    --text-3: #6f767d;
+    /* >= 4.5:1 on --bg through --surface-2 (was 3.7-4.2:1). */
+    --text-3: #868d94;
     --divider: var(--surface-border);
     --button-bg: #191c1e;
     --input-bg: #191c1e;
+    --seg-active-bg: var(--surface-3);
     /* Refined teal — muted, perceptually consistent */
     --accent: oklch(68% 0.08 170);
     --accent-hover: oklch(74% 0.09 170);
@@ -256,7 +267,7 @@
     --border-strong: #403a33;
     --text: #efe8dc;
     --muted: #b5ac9e;
-    --text-3: #827a6e;
+    --text-3: #988f82;
     --accent: oklch(72% 0.07 168);
     --accent-hover: oklch(78% 0.08 168);
     --accent-ink: #16130f;
@@ -277,7 +288,7 @@
     --border-strong: #242a31;
     --text: #ececed;
     --muted: #9ea4ac;
-    --text-3: #60666d;
+    --text-3: #7d838a;
     --panel-bg: #131619;
     --panel-border: #1c2126;
     --input-bg: #131619;

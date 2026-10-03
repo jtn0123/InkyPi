@@ -4,19 +4,27 @@ import logging
 import os
 import threading
 import time
-from collections.abc import Generator
+from collections.abc import Callable, Generator
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from flask import Response, current_app, request, stream_with_context
+from flask import Response, current_app, request
 
 import blueprints.settings as _mod
 from utils.http_utils import json_error, json_internal_error, json_success
 from utils.progress_events import get_progress_bus, to_sse
+from utils.sse import (
+    bounded_stream,
+    get_stream_slots,
+    sse_response,
+    stream_max_lifetime_s,
+    too_many_streams_response,
+)
 
 logger = logging.getLogger(__name__)
 _PROGRESS_STREAM_LOCK = threading.Lock()
 _PROGRESS_STREAM_ACTIVE = 0
+_PROGRESS_TOO_MANY = "Too many progress SSE connections"
 
 
 def _progress_stream_limit() -> int:
@@ -50,35 +58,51 @@ def _progress_stream_enabled() -> bool:
     )
 
 
-def _progress_stream_last_seq() -> int:
+def _progress_stream_last_seq(latest_seq: int) -> int:
+    """Return the last sequence the client has seen.
+
+    EventSource reconnects send ``Last-Event-ID`` (the ``id:`` of the final
+    event received); explicit ``?last_seq=`` is honoured for first connects.
+    An id newer than the bus has ever produced means the server restarted, so
+    the client is replayed from the beginning instead of silently stalling.
+    """
+    raw = request.headers.get("Last-Event-ID") or request.args.get("last_seq", "0")
     try:
-        return int(request.args.get("last_seq", "0"))
+        last_seq = int(raw)
     except Exception:
         return 0
+    if last_seq > latest_seq:
+        return 0
+    return max(0, last_seq)
 
 
-def _progress_stream_limit_response() -> Response:
-    logger.warning("/api/progress/stream: subscriber cap reached, returning 503")
-    return Response(
-        "Too many progress SSE connections",
-        status=503,
-        mimetype="text/plain",
-    )
-
-
-def _iter_progress_events(bus: Any, last_seq: int) -> Generator[str, None, None]:
+def _iter_progress_events(
+    bus: Any,
+    last_seq: int,
+    max_lifetime_s: float | None = None,
+    should_stop: Callable[[], bool] | None = None,
+) -> Generator[str, None, None]:
     for ev in bus.recent(limit=100):
-        if int(ev.get("seq", 0)) > last_seq:
-            yield to_sse(str(ev.get("state", "event")), ev)
+        seq = int(ev.get("seq", 0))
+        if seq > last_seq:
+            yield to_sse(str(ev.get("state", "event")), ev, event_id=seq)
     local_seq = last_seq
-    while True:
-        events = bus.wait_for(local_seq, timeout_s=15.0)
-        if not events:
-            yield ": keep-alive\n\n"
-            continue
-        for ev in events:
-            local_seq = max(local_seq, int(ev.get("seq", 0)))
-            yield to_sse(str(ev.get("state", "event")), ev)
+
+    def wait(timeout_s: float) -> list[str]:
+        nonlocal local_seq
+        frames: list[str] = []
+        for ev in bus.wait_for(local_seq, timeout_s=timeout_s):
+            seq = int(ev.get("seq", 0))
+            local_seq = max(local_seq, seq)
+            frames.append(to_sse(str(ev.get("state", "event")), ev, event_id=seq))
+        return frames
+
+    yield from bounded_stream(
+        wait,
+        heartbeat=": keep-alive\n\n",
+        max_lifetime_s=max_lifetime_s,
+        should_stop=should_stop,
+    )
 
 
 def _filter_health_by_window(health: dict[str, Any], window_min: int) -> dict[str, Any]:
@@ -151,30 +175,26 @@ def progress_stream() -> Response | tuple[Any, int]:
         return json_error("Progress SSE disabled", status=404)
 
     bus = get_progress_bus()
-    last_seq = _progress_stream_last_seq()
+    last_seq = _progress_stream_last_seq(bus.latest_seq())
 
     if not _reserve_progress_stream():
-        return _progress_stream_limit_response()
-
-    release_latch = threading.Lock()
-    released = False
-
-    def release_once() -> None:
-        nonlocal released
-        with release_latch:
-            if released:
-                return
-            released = True
+        return too_many_streams_response("/api/progress/stream", _PROGRESS_TOO_MANY)
+    slots = get_stream_slots(current_app)
+    lease = slots.try_acquire()
+    if lease is None:
         _release_progress_stream()
+        return too_many_streams_response("/api/progress/stream", _PROGRESS_TOO_MANY)
 
-    def gen() -> Generator[str, None, None]:
-        try:
-            yield from _iter_progress_events(bus, last_seq)
-        finally:
-            release_once()
+    def close() -> None:
+        _release_progress_stream()
+        slots.release(lease)
 
-    # Applied to the iterator, not used as a decorator — see the note in
-    # blueprints/events.py.
-    response = Response(stream_with_context(gen()), mimetype="text/event-stream")
-    response.call_on_close(release_once)
-    return response
+    return sse_response(
+        _iter_progress_events(
+            bus,
+            last_seq,
+            max_lifetime_s=stream_max_lifetime_s(),
+            should_stop=lease.stop_check(request.environ),
+        ),
+        on_close=close,
+    )

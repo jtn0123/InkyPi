@@ -130,8 +130,9 @@
 }
 
 .brand-name {
+  font-family: var(--font-display);
   font-weight: 600;
-  font-size: 0.95rem;
+  font-size: 1.05rem;
   letter-spacing: -0.01em;
   color: var(--text);
   white-space: nowrap;
@@ -524,15 +525,19 @@
   }
 }
 
+/* Phones: the hostname is already in the address bar, and with the device
+   name it stacked the brand into three lines that doubled the top strip. */
+@media (max-width: 640px) {
+  .brand-host {
+    display: none;
+  }
+}
+
 @media (max-width: 360px) {
   .shell-sidebar {
     grid-template-columns: auto minmax(72px, 1fr) auto;
     gap: 6px;
     padding: 8px;
-  }
-
-  .brand-host {
-    display: none;
   }
 
   .mobile-site-nav-summary {
