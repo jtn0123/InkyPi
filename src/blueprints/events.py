@@ -1,26 +1,37 @@
 """events.py — SSE endpoint for live dashboard updates.
 
 GET /api/events streams refresh lifecycle events (refresh_started,
-refresh_complete, plugin_failed) published by the refresh task.  The
-endpoint falls back gracefully: if the subscriber cap is reached it
-returns HTTP 503 so the client can fall back to polling.
+refresh_complete, plugin_failed) published by the refresh task.  Each
+response is bounded to ``stream_max_lifetime_s()`` so it cannot pin a
+waitress worker indefinitely; the client reconnects automatically and
+reconciles on open.  At the shared stream cap the oldest stream is evicted
+(see ``utils.sse``); if that is not possible, or the bus subscriber cap is
+reached, the endpoint returns HTTP 503 with ``Retry-After`` so the client can
+fall back to polling.
 """
 
 from __future__ import annotations
 
 import logging
-from typing import Any
+from collections.abc import Iterator
 
-from flask import Blueprint, Response, stream_with_context
+from flask import Blueprint, Response, current_app, request
 
 from utils.event_bus import get_event_bus
+from utils.sse import (
+    get_stream_slots,
+    sse_response,
+    stream_max_lifetime_s,
+    too_many_streams_response,
+)
 
 logger = logging.getLogger(__name__)
 
 events_bp = Blueprint("events", __name__)
 
+_TOO_MANY = "Too many SSE connections"
 
-@events_bp.route("/api/events", methods=["GET"])
+
 @events_bp.route("/api/events", methods=["GET"])
 def sse_events() -> Response:
     """Stream SSE events to the client.
@@ -28,27 +39,28 @@ def sse_events() -> Response:
     Yields ``event: <type>`` / ``data: <json>`` pairs for each refresh
     lifecycle event.  A ``: ping`` heartbeat comment is sent every 15 s
     when no event arrives so the connection stays alive through proxies.
-
-    If the maximum subscriber count is reached the endpoint returns 503
-    so the caller can fall back to polling.
+    The bus keeps no replay buffer, so clients re-fetch state when the
+    stream (re)opens rather than relying on ``Last-Event-ID``.
     """
+    slots = get_stream_slots(current_app)
+    lease = slots.try_acquire()
+    if lease is None:
+        return too_many_streams_response("/api/events", _TOO_MANY)
+
     bus = get_event_bus()
     q = bus.subscribe()
     if q is None:
-        logger.warning("/api/events: subscriber cap reached, returning 503")
-        return Response("Too many SSE connections", status=503, mimetype="text/plain")
+        slots.release(lease)
+        return too_many_streams_response("/api/events", _TOO_MANY)
 
-    def generate() -> Any:
-        try:
-            yield from bus.stream(q)
-        finally:
-            bus.unsubscribe(q)
+    def close() -> None:
+        bus.unsubscribe(q)
+        slots.release(lease)
 
-    # `stream_with_context` is applied to the iterator rather than used as a
-    # decorator. Both work, but the decorator form returns a callable at
-    # runtime while its type stub declares an Iterator, so `generate()` read as
-    # calling a non-callable.
-    response = Response(stream_with_context(generate()), mimetype="text/event-stream")
-    response.headers["Cache-Control"] = "no-cache"
-    response.headers["X-Accel-Buffering"] = "no"  # Disable nginx buffering
-    return response
+    lifetime_s = stream_max_lifetime_s()
+    should_stop = lease.stop_check(request.environ)
+
+    def generate() -> Iterator[str]:
+        yield from bus.stream(q, max_lifetime_s=lifetime_s, should_stop=should_stop)
+
+    return sse_response(generate(), on_close=close)

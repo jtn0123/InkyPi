@@ -84,6 +84,17 @@ journalctl -b | grep -Ei 'wlan0|brcmfmac|CTRL-EVENT|deauth|disassoc'
 
 If you still see drops after power-save hardening, compare signal strength across nearby APs with the same SSID and consider pinning the Pi to the strongest BSSID.
 
+## Web UI hangs while several tabs are open
+
+The web server (waitress) runs a fixed pool of worker threads, and every open live-update stream (the dashboard's `/api/events`, the plugin page and Settings → Maintenance `/api/progress/stream`) occupies one thread while it is open. To keep the UI responsive:
+
+- `INKYPI_WEB_THREADS` (default `4`) sets the thread pool size. Idle threads cost very little memory, so raising it to `6` on a Pi Zero 2 W is safe if you routinely keep many tabs open.
+- At most `INKYPI_WEB_THREADS - 2` streams (minimum 1) are open at once, so two threads always stay free for normal page loads. When a new tab needs a stream at the cap, the oldest stream is ended (it reconnects on its own if that tab is still open); if one is already being ended, the request gets `503` with `Retry-After` and the dashboard polls and retries its stream with back-off. Override the cap with `INKYPI_SSE_MAX_STREAMS` (`0` disables live streams entirely).
+- Streams also end within about a second of their tab closing.
+- Each stream is ended by the server after `INKYPI_SSE_MAX_LIFETIME_S` seconds (default `55`) and the browser reconnects automatically, which also frees threads held by tabs that closed without the server noticing.
+
+Set these in `.env` or a systemd drop-in, then restart the service.
+
 ## Restart the InkyPi Service
 
 ```bash

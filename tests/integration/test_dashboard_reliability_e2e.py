@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 from flask import Flask
-from playwright.sync_api import Page, Route, expect
+from playwright.sync_api import ConsoleMessage, Page, Request, Route, expect
 
 from utils.event_bus import get_event_bus
 
@@ -184,4 +184,57 @@ def test_http_503_retains_last_good_partial_success_and_recovers(
         page.locator("#dashboardRefreshBtn").click()
     expect(page.locator("#heroNowValue")).to_have_text("Weather 2")
     expect(page.locator("#connectivityWarning")).to_be_hidden()
+    assert errors == []
+
+
+def test_bounded_stream_reconnects_in_place_without_polling(
+    flask_app: Flask,
+    live_server: str,
+    browser_page: Page,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Server-ended streams reconnect with one handler set and no polling."""
+    monkeypatch.setenv("INKYPI_SSE_MAX_LIFETIME_S", "1")
+    page = browser_page
+    state = {"generation": 1}
+    stream_requests: list[str] = []
+    warnings: list[str] = []
+    errors: list[str] = []
+    page.on("pageerror", lambda error: errors.append(str(error)))
+
+    def record_console(message: ConsoleMessage) -> None:
+        if message.type == "warning":
+            warnings.append(message.text)
+
+    def record_request(request: Request) -> None:
+        if request.url.endswith("/api/events"):
+            stream_requests.append(request.url)
+
+    def refresh_response(route: Route) -> None:
+        route.fulfill(
+            json={
+                "plugin_id": "weather",
+                "plugin_display_name": f"Weather {state['generation']}",
+            }
+        )
+
+    page.on("console", record_console)
+    page.on("request", record_request)
+    page.route("**/refresh-info", refresh_response)
+    page.goto(live_server, wait_until="domcontentloaded")
+    expect(page.locator("#heroNowValue")).to_have_text("Weather 1")
+    # The 1 s lifetime plus the 3 s retry hint yields a reconnect within ~5 s.
+    deadline = time.monotonic() + 10
+    while len(stream_requests) < 2 and time.monotonic() < deadline:
+        page.wait_for_timeout(100)
+    assert len(stream_requests) >= 2, "EventSource did not reconnect after rollover"
+    bus = get_event_bus()
+    deadline = time.monotonic() + 5
+    while bus.subscriber_count() == 0 and time.monotonic() < deadline:
+        page.wait_for_timeout(25)
+    assert bus.subscriber_count() > 0
+    state["generation"] = 2
+    bus.publish("refresh_complete", {"plugin_id": "weather"})
+    expect(page.locator("#heroNowValue")).to_have_text("Weather 2")
+    assert not [w for w in warnings if "falling back to polling" in w]
     assert errors == []

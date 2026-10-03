@@ -16,6 +16,8 @@ import pytest
         "event:plugin_failed",
         "event:message",
         "reconnect",
+        "rollover",
+        "stalled-reconnect",
         "polling",
         "fallback",
         "http",
