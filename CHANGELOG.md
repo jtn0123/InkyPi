@@ -2,6 +2,19 @@
 
 <!-- version list -->
 
+## v1.4.16 (2026-10-03)
+
+### Bug Fixes
+
+- **refresh**: Persist plugin state from isolated workers and lock model mutations
+  ([#677](https://github.com/jtn0123/InkyPi/pull/677),
+  [`dcc3d7e`](https://github.com/jtn0123/InkyPi/commit/dcc3d7e34d4098554cd2e0e3d2de40aa37a7abe8))
+
+- **render**: Escape AI text output, add render CSP and cap concurrent Chromium
+  ([#680](https://github.com/jtn0123/InkyPi/pull/680),
+  [`c8d19f2`](https://github.com/jtn0123/InkyPi/commit/c8d19f260cb266b6b36ca649e8b9e35dd6b9a471))
+
+
 ## v1.4.15 (2026-10-03)
 
 ### Bug Fixes
