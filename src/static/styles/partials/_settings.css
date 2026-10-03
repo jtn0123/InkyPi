@@ -183,6 +183,13 @@
   gap: 12px;
 }
 
+/* `.form-group:last-child` drops its bottom margin, so cells in one row end
+   up with different heights and the wrapped flex lines stretch apart
+   (Longitude sat ~4px below Latitude). Pack each cell's lines to the top. */
+.inline-readonly-grid > .form-group {
+  align-content: flex-start;
+}
+
 .toggle-list {
   display: grid;
   gap: 10px;
@@ -356,6 +363,17 @@
 
 /* Status flows inline to the left of the action pair inside the pill.
    Hidden when empty so the pill shrinks to the two buttons. */
+/* The sticky save pill uses the compact button scale shared by page-header
+   actions; the base .action-button (16px/600, 48px tall) made it read as a
+   second, louder header. */
+.settings-panel .buttons-container .action-button {
+  flex: 0 0 auto;
+  width: auto;
+  min-height: 40px;
+  padding: 9px 18px;
+  font-size: var(--text-sm);
+}
+
 .settings-panel .buttons-container #settings-form-status {
   margin: 0;
   min-height: 0;
