@@ -61,6 +61,42 @@ def test_render_image_with_base_template(
     assert out.size == (100, 50)
 
 
+@pytest.mark.parametrize(
+    ("plugin_id", "template", "script"),
+    [
+        ("calendar", "calendar.html", "calendar.min.js"),
+        ("weather", "weather.html", "chart.js"),
+    ],
+)
+def test_render_image_points_vendored_scripts_at_static_dir(
+    plugin_id: str, template: str, script: str
+) -> None:
+    """Plugin HTML loads from file://, so {{ static_dir }} must be absolute."""
+    from plugins.base_plugin.base_plugin import STATIC_DIR, BasePlugin
+
+    captured: dict[str, str] = {}
+    p = BasePlugin({"id": plugin_id})
+    p._capture_screenshot = (  # type: ignore[method-assign]
+        lambda html, dims: captured.setdefault("html", html)
+    )
+    p.render_image(
+        (100, 50),
+        template,
+        template_params={
+            "plugin_settings": {"displayGraph": "true"},
+            "hourly_forecast": [],
+            "forecast": [{"high": 1, "low": 0}],
+            "data_points": [],
+            "events": [],
+            "font_scale": 1,
+        },
+    )
+
+    expected = f'src="file://{STATIC_DIR}/scripts/{script}"'
+    assert expected in captured["html"]
+    assert os.path.isdir(STATIC_DIR)
+
+
 # ---- Metadata hooks tests ----
 def test_set_and_get_latest_metadata() -> None:
     from plugins.base_plugin.base_plugin import BasePlugin
