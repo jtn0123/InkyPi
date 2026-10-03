@@ -6,7 +6,7 @@ import logging
 import os
 from collections.abc import Callable, Mapping
 from datetime import UTC
-from typing import TYPE_CHECKING, Protocol, cast
+from typing import TYPE_CHECKING, Any, Protocol, cast
 
 from utils.metrics import (
     record_refresh_failure,
@@ -59,7 +59,7 @@ class SupportsPluginHealth(Protocol):
 
     def get_config(self, key: str, default: object = ...) -> object: ...
 
-    def write_config(self) -> None: ...
+    def update_atomic(self, update_fn: Callable[[dict[str, Any]], None]) -> None: ...
 
 
 class PluginHealthTracker:
@@ -149,29 +149,20 @@ class PluginHealthTracker:
         """Reset the circuit breaker after a successful refresh."""
         if plugin_instance is None:
             return
-        changed = (
-            plugin_instance.paused or plugin_instance.consecutive_failure_count > 0
-        )
-        if changed:
-            logger.info(
-                "plugin circuit_breaker: recovered | plugin_id=%s instance=%s",
-                plugin_id,
-                instance,
-            )
-        plugin_instance.consecutive_failure_count = 0
-        plugin_instance.paused = False
-        plugin_instance.disabled_reason = None
         set_circuit_breaker_open(plugin_id, False)
-        if changed:
-            try:
-                self.device_config.write_config()
-            except Exception:
-                logger.warning(
-                    "plugin circuit_breaker: failed to persist reset for %s/%s",
-                    plugin_id,
-                    instance,
-                    exc_info=True,
-                )
+        if not self._breaker_state_set(plugin_instance):
+            return
+        logger.info(
+            "plugin circuit_breaker: recovered | plugin_id=%s instance=%s",
+            plugin_id,
+            instance,
+        )
+        self._persist(
+            lambda: self._clear_breaker(plugin_instance),
+            "plugin circuit_breaker: failed to persist reset for %s/%s",
+            plugin_id,
+            instance,
+        )
 
     def on_failure(
         self,
@@ -185,7 +176,32 @@ class PluginHealthTracker:
         if plugin_instance is None or plugin_instance.paused:
             return
         threshold = self.circuit_breaker_threshold()
-        plugin_instance.consecutive_failure_count += 1
+        error_msg = str(
+            self.plugin_health.get(plugin_id, {}).get("last_error") or "unknown"
+        )
+
+        newly_paused = False
+
+        def _record_failure() -> None:
+            # The counter's read-modify-write happens under the config lock so
+            # a concurrent update_atomic rollback cannot undo it.
+            nonlocal newly_paused
+            plugin_instance.consecutive_failure_count += 1
+            if plugin_instance.consecutive_failure_count >= threshold:
+                newly_paused = True
+                plugin_instance.paused = True
+                plugin_instance.disabled_reason = (
+                    f"Paused after {plugin_instance.consecutive_failure_count} "
+                    f"consecutive failures at {self._now_iso()}. "
+                    f"Last error: {error_msg[:120]}"
+                )
+
+        self._persist(
+            _record_failure,
+            "plugin circuit_breaker: failed to persist failure state for %s/%s",
+            plugin_id,
+            instance,
+        )
         logger.warning(
             "plugin circuit_breaker: failure | plugin_id=%s instance=%s count=%d/%d",
             plugin_id,
@@ -193,18 +209,7 @@ class PluginHealthTracker:
             plugin_instance.consecutive_failure_count,
             threshold,
         )
-        newly_paused = False
-        if plugin_instance.consecutive_failure_count >= threshold:
-            now_iso = self._now_iso()
-            error_msg = str(
-                self.plugin_health.get(plugin_id, {}).get("last_error") or "unknown"
-            )
-            plugin_instance.paused = True
-            plugin_instance.disabled_reason = (
-                f"Paused after {plugin_instance.consecutive_failure_count} consecutive "
-                f"failures at {now_iso}. Last error: {error_msg[:120]}"
-            )
-            newly_paused = True
+        if newly_paused:
             set_circuit_breaker_open(plugin_id, True)
             logger.error(
                 "plugin circuit_breaker: paused | plugin_id=%s instance=%s"
@@ -213,17 +218,6 @@ class PluginHealthTracker:
                 instance,
                 plugin_instance.consecutive_failure_count,
             )
-
-        if newly_paused or plugin_instance.consecutive_failure_count > 0:
-            try:
-                self.device_config.write_config()
-            except Exception:
-                logger.warning(
-                    "plugin circuit_breaker: failed to persist failure state for %s/%s",
-                    plugin_id,
-                    instance,
-                    exc_info=True,
-                )
 
         self._send_failure_webhook(
             plugin_id=plugin_id,
@@ -277,12 +271,15 @@ class PluginHealthTracker:
             return False
 
         started = breadcrumb.get("started_at") or "an earlier run"
-        plugin_instance.paused = True
-        plugin_instance.disabled_reason = (
-            f"Paused automatically: the service died while this plugin was "
-            f"rendering (started {started}). Re-enable it once the cause is "
-            f"understood."
-        )
+
+        def _quarantine() -> None:
+            plugin_instance.paused = True
+            plugin_instance.disabled_reason = (
+                f"Paused automatically: the service died while this plugin was "
+                f"rendering (started {started}). Re-enable it once the cause is "
+                f"understood."
+            )
+
         set_circuit_breaker_open(plugin_id, True)
         logger.error(
             "crash quarantine: paused | plugin_id=%s instance=%s — it was in "
@@ -290,15 +287,12 @@ class PluginHealthTracker:
             plugin_id,
             instance,
         )
-        try:
-            self.device_config.write_config()
-        except Exception:
-            logger.warning(
-                "crash quarantine: failed to persist paused state for %s/%s",
-                plugin_id,
-                instance,
-                exc_info=True,
-            )
+        self._persist(
+            _quarantine,
+            "crash quarantine: failed to persist paused state for %s/%s",
+            plugin_id,
+            instance,
+        )
         return True
 
     def reset_circuit_breaker(self, plugin_id: str, instance: str) -> bool:
@@ -306,14 +300,7 @@ class PluginHealthTracker:
         plugin_instance = self._find_plugin_instance(plugin_id, instance)
         if plugin_instance is None:
             return False
-        changed = (
-            plugin_instance.paused
-            or plugin_instance.consecutive_failure_count > 0
-            or plugin_instance.disabled_reason is not None
-        )
-        plugin_instance.consecutive_failure_count = 0
-        plugin_instance.paused = False
-        plugin_instance.disabled_reason = None
+        changed = self._breaker_state_set(plugin_instance)
         set_circuit_breaker_open(plugin_id, False)
         safe_pid = str(plugin_id).replace("\r", "").replace("\n", "")[:64]
         safe_inst = str(instance).replace("\r", "").replace("\n", "")[:64]
@@ -323,16 +310,45 @@ class PluginHealthTracker:
             safe_inst,
         )
         if changed:
-            try:
-                self.device_config.write_config()
-            except Exception:
-                logger.warning(
-                    "plugin circuit_breaker: failed to persist manual reset for %s/%s",
-                    safe_pid,
-                    safe_inst,
-                    exc_info=True,
-                )
+            self._persist(
+                lambda: self._clear_breaker(plugin_instance),
+                "plugin circuit_breaker: failed to persist manual reset for %s/%s",
+                safe_pid,
+                safe_inst,
+            )
         return True
+
+    @staticmethod
+    def _breaker_state_set(plugin_instance: PluginInstanceLike) -> bool:
+        """Return whether any circuit-breaker field differs from its reset value."""
+        return (
+            plugin_instance.paused
+            or plugin_instance.consecutive_failure_count > 0
+            or plugin_instance.disabled_reason is not None
+        )
+
+    @staticmethod
+    def _clear_breaker(plugin_instance: PluginInstanceLike) -> None:
+        plugin_instance.consecutive_failure_count = 0
+        plugin_instance.paused = False
+        plugin_instance.disabled_reason = None
+
+    def _persist(
+        self, mutate: Callable[[], None], failure_msg: str, *args: object
+    ) -> None:
+        """Apply *mutate* to the model and persist it under the config lock.
+
+        The refresh thread and web threads share these model objects. A bare
+        mutation followed by ``write_config()`` can land between another
+        thread's ``update_atomic`` snapshot and its rollback, which then
+        silently restores the old value. ``update_atomic`` serialises the
+        mutation with every other config transaction and rolls it back if the
+        write fails, matching ``write_config``'s own rollback on failure.
+        """
+        try:
+            self.device_config.update_atomic(lambda _config: mutate())
+        except Exception:
+            logger.warning(failure_msg, *args, exc_info=True)
 
     def snapshot(self) -> dict[str, HealthEntry]:
         """Return a shallow copy of the health snapshot."""
