@@ -18,8 +18,14 @@ from plugins.base_plugin.settings_schema import (
     section,
 )
 from utils.http_client import get_http_session
+from utils.http_utils import fetch_feed_bytes
 
 logger = logging.getLogger(__name__)
+
+#: Upper bound on a downloaded feed document.  Real feeds are tens to
+#: hundreds of KB; the cap stops a hostile or broken server from exhausting
+#: memory on a Pi Zero.
+MAX_FEED_BYTES = 5 * 1024 * 1024
 
 FONT_SIZES = {"x-small": 0.7, "small": 0.9, "normal": 1, "large": 1.1, "x-large": 1.3}
 
@@ -150,13 +156,18 @@ class Rss(BasePlugin):
     def parse_rss_feed(
         self, url: str, timeout: int = 10
     ) -> list[dict[str, str | None]]:
-        resp = get_http_session().get(
-            url, timeout=timeout, headers={"User-Agent": "Mozilla/5.0"}
+        # SSRF-guarded (every redirect hop is validated; LAN hosts need the
+        # INKYPI_ALLOW_PRIVATE_FEEDS opt-in) and size-capped.
+        content = fetch_feed_bytes(
+            url,
+            max_bytes=MAX_FEED_BYTES,
+            timeout=timeout,
+            headers={"User-Agent": "Mozilla/5.0"},
+            session=get_http_session(),
         )
-        resp.raise_for_status()
 
         # Parse the feed content
-        feed = feedparser.parse(resp.content)
+        feed = feedparser.parse(content)
         if feed.bozo and not feed.entries:
             raise RuntimeError(f"Failed to parse RSS feed: {feed.bozo_exception}")
         items: list[dict[str, str | None]] = []

@@ -8,8 +8,9 @@
         </svg>
         GitHub/{{ username }}
     </div>
-    <div class="title">
-        Earnings this month ${{ total_per_month }}
+    <div class="metric">
+        <div class="metric-title">Earnings this month</div>
+        <div class="metric-value">${{ total_per_month }}</div>
     </div>
 </div>
 {% endblock %}

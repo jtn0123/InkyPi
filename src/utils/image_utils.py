@@ -13,7 +13,7 @@ from PIL import Image
 from PIL.Image import Resampling
 
 from utils.chromium_limiter import chromium_slot
-from utils.http_utils import http_get, pinned_dns
+from utils.http_utils import guarded_fetch, http_get
 from utils.plugin_errors import ScreenshotBackendError
 from utils.security_utils import validate_url_with_ips
 
@@ -98,7 +98,8 @@ def get_image(image_url: str, timeout_seconds: float = 10.0) -> Image.Image | No
     """Fetch an image from a URL and return a PIL Image, or None on failure.
 
     The hostname is validated and DNS-pinned for the duration of the fetch
-    to mitigate DNS-rebinding SSRF (JTN-656).
+    to mitigate DNS-rebinding SSRF (JTN-656); redirects are followed only
+    after each target is validated and pinned the same way.
 
     Args:
         image_url: The URL of the image to fetch.
@@ -114,17 +115,15 @@ def get_image(image_url: str, timeout_seconds: float = 10.0) -> Image.Image | No
         logger.error(f"Rejected image URL {image_url}: {exc}")
         return None
 
-    import urllib.parse as _urlparse
-
-    hostname = _urlparse.urlparse(validated_url).hostname or ""
+    def _fetch(hop_url: str) -> Any:
+        try:
+            return http_get(hop_url, timeout=timeout_seconds, allow_redirects=False)
+        except TypeError:
+            # Fallback for tests that simulate environments without timeout support
+            return http_get(hop_url, allow_redirects=False)
 
     try:
-        with pinned_dns(hostname, pinned_ips):
-            try:
-                response = http_get(validated_url, timeout=timeout_seconds)
-            except TypeError:
-                # Fallback for tests that simulate environments without timeout support
-                response = http_get(validated_url)
+        response = guarded_fetch(validated_url, _fetch, first_hop_ips=pinned_ips)
     except Exception as e:
         logger.error(f"Failed to fetch image from {image_url}: {str(e)}")
         return None
@@ -142,27 +141,33 @@ def get_image(image_url: str, timeout_seconds: float = 10.0) -> Image.Image | No
     return img
 
 
-def _stream_to_disk(
-    url: str, timeout: float, hostname: str, pinned_ips: tuple[str, ...]
-) -> str:
+def _stream_to_disk(url: str, timeout: float, pinned_ips: tuple[str, ...]) -> str:
     """Download *url* to a temporary file via streaming and return its path.
 
+    *pinned_ips* are the addresses already vetted for *url*; any redirect
+    target is validated and pinned by :func:`utils.http_utils.guarded_fetch`.
     The caller is responsible for deleting the file when done.  The response
     is wrapped in ``contextlib.closing`` so the underlying connection is
     returned to the pool promptly even on low-memory devices.
     """
     from contextlib import closing
 
-    with pinned_dns(hostname, pinned_ips):
-        with closing(
-            http_get(url, timeout=timeout, stream=True, use_cache=False)
-        ) as response:
-            response.raise_for_status()
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".img") as tmp:
-                for chunk in response.iter_content(chunk_size=8192):
-                    if chunk:
-                        tmp.write(chunk)
-                return tmp.name
+    def _fetch(hop_url: str) -> Any:
+        return http_get(
+            hop_url,
+            timeout=timeout,
+            stream=True,
+            use_cache=False,
+            allow_redirects=False,
+        )
+
+    with closing(guarded_fetch(url, _fetch, first_hop_ips=pinned_ips)) as response:
+        response.raise_for_status()
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".img") as tmp:
+            for chunk in response.iter_content(chunk_size=8192):
+                if chunk:
+                    tmp.write(chunk)
+            return tmp.name
 
 
 def fetch_and_resize_remote_image(
@@ -173,7 +178,8 @@ def fetch_and_resize_remote_image(
     """Fetch a remote image and return a resized detached copy.
 
     The hostname is validated and DNS-pinned for the duration of the fetch
-    to mitigate DNS-rebinding SSRF (JTN-656).
+    to mitigate DNS-rebinding SSRF (JTN-656); redirects are followed only
+    after each target is validated and pinned the same way.
     """
     try:
         validated_url, pinned_ips = validate_url_with_ips(image_url)
@@ -181,11 +187,8 @@ def fetch_and_resize_remote_image(
         logger.error(f"Rejected remote image URL {image_url}: {exc}")
         return None
 
-    import urllib.parse as _urlparse
-
     from utils.image_loader import AdaptiveImageLoader
 
-    hostname = _urlparse.urlparse(validated_url).hostname or ""
     loader = AdaptiveImageLoader()
 
     # On low-memory devices, stream to disk first so large remote images do not
@@ -193,9 +196,7 @@ def fetch_and_resize_remote_image(
     if loader.is_low_resource:
         tmp_path = None
         try:
-            tmp_path = _stream_to_disk(
-                validated_url, timeout_seconds, hostname, pinned_ips
-            )
+            tmp_path = _stream_to_disk(validated_url, timeout_seconds, pinned_ips)
             return loader.from_file(tmp_path, dimensions, resize=True)
         except Exception as e:
             logger.error(f"Failed to fetch remote image from {image_url}: {e}")
@@ -208,9 +209,14 @@ def fetch_and_resize_remote_image(
                     logger.warning("Could not delete temp file %s", tmp_path)
 
     try:
-        with pinned_dns(hostname, pinned_ips):
-            response = http_get(validated_url, timeout=timeout_seconds)
-            response.raise_for_status()
+        response = guarded_fetch(
+            validated_url,
+            lambda hop_url: http_get(
+                hop_url, timeout=timeout_seconds, allow_redirects=False
+            ),
+            first_hop_ips=pinned_ips,
+        )
+        response.raise_for_status()
     except Exception as e:
         logger.error(f"Failed to fetch remote image from {image_url}: {e}")
         return None
