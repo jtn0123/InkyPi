@@ -2,6 +2,19 @@
 
 <!-- version list -->
 
+## v1.4.14 (2026-10-03)
+
+### Bug Fixes
+
+- **auth**: Require login for runtime images under /static
+  ([#678](https://github.com/jtn0123/InkyPi/pull/678),
+  [`47d3bd5`](https://github.com/jtn0123/InkyPi/commit/47d3bd5723e601782f592563a7ae5f00e041c5e3))
+
+- **web**: Stop SSE streams from exhausting waitress threads
+  ([#681](https://github.com/jtn0123/InkyPi/pull/681),
+  [`fe14f4e`](https://github.com/jtn0123/InkyPi/commit/fe14f4e52f03de5866bea2686245e7d5bedea8dc))
+
+
 ## v1.4.13 (2026-10-03)
 
 ### Bug Fixes
