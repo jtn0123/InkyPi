@@ -22,6 +22,7 @@ from utils.plugin_errors import (
 )
 
 __all__ = [
+    "LanAddressError",
     "URLValidationError",
     "validate_url",
     "validate_url_with_ips",
@@ -52,7 +53,21 @@ def validate_url(url: str) -> str:
     return url_out
 
 
-def validate_url_with_ips(url: str) -> tuple[str, tuple[str, ...]]:
+#: Site-local ranges that :func:`validate_url_with_ips` admits when the caller
+#: passes ``allow_lan=True`` (RFC 1918 IPv4 and RFC 4193 IPv6 unique-local).
+#: Loopback, link-local (cloud metadata), unspecified, reserved and multicast
+#: addresses stay blocked even then.
+_LAN_NETWORKS: tuple[ipaddress.IPv4Network | ipaddress.IPv6Network, ...] = (
+    ipaddress.ip_network("10.0.0.0/8"),
+    ipaddress.ip_network("172.16.0.0/12"),
+    ipaddress.ip_network("192.168.0.0/16"),
+    ipaddress.ip_network("fc00::/7"),
+)
+
+
+def validate_url_with_ips(
+    url: str, *, allow_lan: bool = False
+) -> tuple[str, tuple[str, ...]]:
     """Validate *url* and return ``(url, resolved_ips)``.
 
     The returned IP tuple is the exact set of addresses the URL's hostname
@@ -61,6 +76,10 @@ def validate_url_with_ips(url: str) -> tuple[str, tuple[str, ...]]:
     mitigate DNS-rebinding SSRF where an attacker-controlled DNS server flips
     the answer to a private IP between validation and the actual request
     (JTN-656).
+
+    When *allow_lan* is true, addresses inside :data:`_LAN_NETWORKS` are
+    accepted (an explicit per-deployment opt-in for feeds served from the
+    local network); every other private/special range is still rejected.
 
     Raises
     ------
@@ -91,14 +110,20 @@ def validate_url_with_ips(url: str) -> tuple[str, tuple[str, ...]]:
         raise ValueError(_URL_ERR_UNRESOLVABLE)
 
     # Reject bare IP addresses that are private/loopback/etc. before DNS
+    # The rejection must sit outside the ``try`` — otherwise its ValueError is
+    # swallowed and the literal is silently re-checked via getaddrinfo, which
+    # a patched or unusual resolver may answer differently.
     try:
-        addr = ipaddress.ip_address(hostname)
-        _reject_private_ip(addr, hostname)
-        # Literal IP — no DNS required; the "resolved" set is the literal.
-        return url, (hostname,)
+        literal: ipaddress.IPv4Address | ipaddress.IPv6Address | None = (
+            ipaddress.ip_address(hostname)
+        )
     except ValueError:
         # hostname is not a literal IP — fall through to DNS resolution
-        pass
+        literal = None
+    if literal is not None:
+        _reject_private_ip(literal, hostname, allow_lan=allow_lan)
+        # Literal IP — no DNS required; the "resolved" set is the literal.
+        return url, (hostname,)
 
     # Resolve hostname and check all resulting IPs
     try:
@@ -110,7 +135,7 @@ def validate_url_with_ips(url: str) -> tuple[str, tuple[str, ...]]:
     for info in addr_infos:
         ip_str = str(info[4][0])
         addr = ipaddress.ip_address(ip_str)
-        _reject_private_ip(addr, hostname)
+        _reject_private_ip(addr, hostname, allow_lan=allow_lan)
         if ip_str not in resolved:
             resolved.append(ip_str)
 
@@ -120,10 +145,35 @@ def validate_url_with_ips(url: str) -> tuple[str, tuple[str, ...]]:
     return url, tuple(resolved)
 
 
+class LanAddressError(ValueError):
+    """A URL was rejected only because it resolves to an opt-in LAN range.
+
+    Carries the same message as any other private-address rejection, so
+    existing callers and their whitelisted error text are unchanged.
+    """
+
+
+def _is_lan_address(addr: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
+    """Return True if *addr* sits in one of the opt-in :data:`_LAN_NETWORKS`."""
+    return any(addr in network for network in _LAN_NETWORKS)
+
+
 def _reject_private_ip(
-    addr: ipaddress.IPv4Address | ipaddress.IPv6Address, hostname: str
+    addr: ipaddress.IPv4Address | ipaddress.IPv6Address,
+    hostname: str,
+    *,
+    allow_lan: bool = False,
 ) -> None:
-    """Raise ValueError if *addr* is private, loopback, link-local, reserved, or multicast."""
+    """Raise ValueError if *addr* is private, loopback, link-local, reserved, or multicast.
+
+    With *allow_lan*, RFC 1918 / unique-local addresses are permitted.  When
+    they are not, the rejection is a :class:`LanAddressError` so callers that
+    offer an opt-in can tell "LAN host" apart from loopback/metadata targets.
+    """
+    if _is_lan_address(addr):
+        if allow_lan:
+            return
+        raise LanAddressError(_URL_ERR_PRIVATE)
     if (
         addr.is_private
         or addr.is_loopback

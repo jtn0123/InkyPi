@@ -7,6 +7,24 @@ import pytest
 import requests
 
 
+@pytest.fixture(autouse=True)
+def _public_dns(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Resolve example.* feed hosts to a public IP so the SSRF guard passes offline.
+
+    Other names (e.g. the local renderer's ``localhost``) keep the real resolver.
+    """
+    import socket
+
+    real_getaddrinfo = socket.getaddrinfo
+
+    def _resolve(host: Any, *args: Any, **kwargs: Any) -> Any:
+        if isinstance(host, str) and ".example." in f".{host}.":
+            return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("93.184.216.34", 0))]
+        return real_getaddrinfo(host, *args, **kwargs)
+
+    monkeypatch.setattr(socket, "getaddrinfo", _resolve)
+
+
 def _make_calendar_plugin() -> Any:
     from plugins.calendar.calendar import Calendar
 
@@ -34,11 +52,17 @@ def test_calendar_malformed_ics(monkeypatch: pytest.MonkeyPatch) -> None:
     p = _make_calendar_plugin()
 
     class FakeResp:
-        text = "THIS IS NOT ICS CONTENT AT ALL"
+        body = b"THIS IS NOT ICS CONTENT AT ALL"
         status_code = 200
 
         def raise_for_status(self) -> None:
             pass
+
+        def iter_content(self, chunk_size: int = 1) -> Any:
+            return iter([self.body])
+
+        def close(self) -> None:
+            return None
 
     mock_session = type(
         "S", (), {"get": staticmethod(lambda url, **kwargs: FakeResp())}
@@ -88,6 +112,9 @@ def test_calendar_http_403(monkeypatch: pytest.MonkeyPatch) -> None:
 
         def raise_for_status(self) -> None:
             raise requests.exceptions.HTTPError("403 Forbidden")
+
+        def close(self) -> None:
+            return None
 
     mock_session = type(
         "S", (), {"get": staticmethod(lambda url, **kwargs: ForbiddenResp())}

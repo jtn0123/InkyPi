@@ -7,6 +7,24 @@ import pytest
 from PIL import Image
 
 
+@pytest.fixture(autouse=True)
+def _public_dns(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Resolve example.* feed hosts to a public IP so the SSRF guard passes offline.
+
+    Other names (e.g. the local renderer's ``localhost``) keep the real resolver.
+    """
+    import socket
+
+    real_getaddrinfo = socket.getaddrinfo
+
+    def _resolve(host: Any, *args: Any, **kwargs: Any) -> Any:
+        if isinstance(host, str) and ".example." in f".{host}.":
+            return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("93.184.216.34", 0))]
+        return real_getaddrinfo(host, *args, **kwargs)
+
+    monkeypatch.setattr(socket, "getaddrinfo", _resolve)
+
+
 @pytest.fixture()
 def plugin_config() -> Any:
     return {"id": "rss", "class": "Rss", "name": "RSS"}
