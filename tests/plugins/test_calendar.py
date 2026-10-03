@@ -7,6 +7,24 @@ from zoneinfo import ZoneInfo
 import pytest
 
 
+@pytest.fixture(autouse=True)
+def _public_dns(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Resolve example.* feed hosts to a public IP so the SSRF guard passes offline.
+
+    Other names (e.g. the local renderer's ``localhost``) keep the real resolver.
+    """
+    import socket
+
+    real_getaddrinfo = socket.getaddrinfo
+
+    def _resolve(host: Any, *args: Any, **kwargs: Any) -> Any:
+        if isinstance(host, str) and ".example." in f".{host}.":
+            return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("93.184.216.34", 0))]
+        return real_getaddrinfo(host, *args, **kwargs)
+
+    monkeypatch.setattr(socket, "getaddrinfo", _resolve)
+
+
 def _make_calendar_settings(
     view: Any = "timeGridDay",
     urls: Any = None,
@@ -188,6 +206,9 @@ def test_fetch_calendar_http_error_raises(monkeypatch: pytest.MonkeyPatch) -> No
         def raise_for_status(self) -> None:
             raise requests.HTTPError("bad status")
 
+        def close(self) -> None:
+            return None
+
     mock_session = type("S", (), {"get": staticmethod(lambda url, **kwargs: Resp())})()
     monkeypatch.setattr(
         "plugins.calendar.calendar.get_http_session", lambda: mock_session
@@ -202,9 +223,15 @@ def test_fetch_calendar_bad_ical_raises(monkeypatch: pytest.MonkeyPatch) -> Any:
     from plugins.calendar.calendar import Calendar
 
     class Resp:
-        text = "not an ical"
+        body = b"not an ical"
 
         def raise_for_status(self) -> Any:
+            return None
+
+        def iter_content(self, chunk_size: int = 1) -> Any:
+            return iter([self.body])
+
+        def close(self) -> None:
             return None
 
     # Return a 200 OK but break ical parsing
@@ -260,6 +287,8 @@ def test_generate_image_vertical_orientation(
     )
 
     p = Calendar({"id": "calendar"})
+    # Keep the test hermetic: the feed fetch is not what is under test here.
+    monkeypatch.setattr(p, "fetch_ics_events", lambda *a, **kw: [])
     # This should not raise an exception
     try:
         p.generate_image(_make_calendar_settings(), device_config_dev)
@@ -446,9 +475,15 @@ def test_fetch_calendar_decode_error(monkeypatch: pytest.MonkeyPatch) -> Any:
     from plugins.calendar.calendar import Calendar
 
     class BadResponse:
-        text = "invalid utf-8: \xff\xfe"
+        body = b"invalid utf-8: \xff\xfe"
 
         def raise_for_status(self) -> Any:
+            return None
+
+        def iter_content(self, chunk_size: int = 1) -> Any:
+            return iter([self.body])
+
+        def close(self) -> None:
             return None
 
     mock_session = type(

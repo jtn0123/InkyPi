@@ -21,8 +21,15 @@ from plugins.base_plugin.settings_schema import (
 )
 from plugins.calendar.constants import FONT_SIZES, LOCALE_GROUPS, LOCALE_MAP
 from utils.http_client import get_http_session
+from utils.http_utils import fetch_feed_bytes
+from utils.plugin_errors import URLValidationError
 
 logger = logging.getLogger(__name__)
+
+#: Upper bound on a downloaded iCalendar document.  Large shared calendars
+#: with years of history reach a few MB; the cap stops a hostile or broken
+#: server from exhausting memory on a Pi Zero.
+MAX_ICS_BYTES = 10 * 1024 * 1024
 
 
 class _CalendarEvent(Protocol):
@@ -452,9 +459,19 @@ class Calendar(BasePlugin):
         if calendar_url.startswith("webcal://"):
             calendar_url = calendar_url.replace("webcal://", "https://")
         try:
-            response = get_http_session().get(calendar_url, timeout=30)
-            response.raise_for_status()
-            return icalendar.Calendar.from_ical(response.text)
+            # SSRF-guarded (every redirect hop is validated; LAN servers such
+            # as Nextcloud/Radicale need the INKYPI_ALLOW_PRIVATE_FEEDS
+            # opt-in) and size-capped.
+            content = fetch_feed_bytes(
+                calendar_url,
+                max_bytes=MAX_ICS_BYTES,
+                timeout=30,
+                session=get_http_session(),
+            )
+            return icalendar.Calendar.from_ical(content)
+        except URLValidationError:
+            # Keep the specific, response-safe reason for the UI.
+            raise
         except Exception as e:
             raise RuntimeError(f"Failed to fetch iCalendar url: {str(e)}") from e
 

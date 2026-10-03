@@ -61,6 +61,42 @@ def test_render_image_with_base_template(
     assert out.size == (100, 50)
 
 
+@pytest.mark.parametrize(
+    ("plugin_id", "template", "script"),
+    [
+        ("calendar", "calendar.html", "calendar.min.js"),
+        ("weather", "weather.html", "chart.js"),
+    ],
+)
+def test_render_image_points_vendored_scripts_at_static_dir(
+    plugin_id: str, template: str, script: str
+) -> None:
+    """Plugin HTML loads from file://, so {{ static_dir }} must be absolute."""
+    from plugins.base_plugin.base_plugin import STATIC_DIR, BasePlugin
+
+    captured: dict[str, str] = {}
+    p = BasePlugin({"id": plugin_id})
+    p._capture_screenshot = (  # type: ignore[method-assign]
+        lambda html, dims: captured.setdefault("html", html)
+    )
+    p.render_image(
+        (100, 50),
+        template,
+        template_params={
+            "plugin_settings": {"displayGraph": "true"},
+            "hourly_forecast": [],
+            "forecast": [{"high": 1, "low": 0}],
+            "data_points": [],
+            "events": [],
+            "font_scale": 1,
+        },
+    )
+
+    expected = f'src="file://{STATIC_DIR}/scripts/{script}"'
+    assert expected in captured["html"]
+    assert os.path.isdir(STATIC_DIR)
+
+
 # ---- Metadata hooks tests ----
 def test_set_and_get_latest_metadata() -> None:
     from plugins.base_plugin.base_plugin import BasePlugin
@@ -394,3 +430,50 @@ def test_build_inline_css_extra_css_lookup_failure_raises_and_logs(
     assert any(
         "Failed to process extra CSS string" in r.getMessage() for r in caplog.records
     )
+
+
+def test_rendered_plugin_page_carries_restrictive_csp() -> None:
+    """Plugin pages render in a privileged local Chromium.
+
+    The base template must ship a CSP that cuts off network exfiltration
+    channels, and it must precede every resource-loading tag in <head>.
+    """
+    import re
+
+    from plugins.base_plugin.base_plugin import BasePlugin
+
+    plugin = BasePlugin({"id": "rss"})
+    html = plugin._render_template(
+        "rss.html",
+        {
+            "title": "Feed",
+            "items": [],
+            "plugin_settings": {},
+            "style_sheets": ["file:///tmp/x.css"],
+            "font_faces": [],
+        },
+    )
+
+    match = re.search(
+        r'<meta http-equiv="Content-Security-Policy" content="([^"]+)">', html
+    )
+    assert match, "plugin.html must declare a Content-Security-Policy"
+    directives = dict(
+        part.strip().split(" ", 1) for part in match.group(1).split(";") if part.strip()
+    )
+    for name in ("default-src", "connect-src", "form-action", "base-uri"):
+        assert directives[name] == "'none'", name
+    for name in ("object-src", "frame-src", "worker-src"):
+        assert directives[name] == "'none'", name
+    # Scripts: inline + local files + the SRI-pinned Chart.js CDN only.
+    assert directives["script-src"].split() == [
+        "'unsafe-inline'",
+        "file:",
+        "https://cdn.jsdelivr.net",
+    ]
+
+    head = html.split("</head>", 1)[0]
+    csp_at = head.index("Content-Security-Policy")
+    for tag in ("<link", "<style", "<script"):
+        if tag in head:
+            assert head.index(tag) > csp_at, f"{tag} precedes the CSP meta tag"

@@ -672,6 +672,9 @@ class RefreshTask:
                     refresh_action=refresh_action,
                 )
                 raise
+            # A control-only plugin returns before the normal refresh-info
+            # write in ``_run``, so its new timestamp is persisted here.
+            self._commit_refresh_state(refresh_action, persist=image is None)
             self.recorder.save_stage(
                 benchmark_id,
                 "generate_image",
@@ -943,7 +946,7 @@ class RefreshTask:
         Threading:
             Should be invoked without holding ``self.condition``.
         """
-        self.device_config.refresh_info = RefreshInfo(
+        latest = RefreshInfo(
             **refresh_info,
             request_ms=metrics.get("request_ms"),
             display_ms=metrics.get("display_ms"),
@@ -951,7 +954,46 @@ class RefreshTask:
             preprocess_ms=metrics.get("preprocess_ms"),
             used_cached=used_cached,
         )
-        self.device_config.write_config()
+
+        def _set_refresh_info(_config: dict[str, Any]) -> None:
+            self.device_config.refresh_info = latest
+
+        # Under the config lock, so a web thread's update_atomic rollback
+        # cannot interleave with (and discard) this assignment.
+        self.device_config.update_atomic(_set_refresh_info)
+
+    def _commit_refresh_state(
+        self, refresh_action: RefreshAction, *, persist: bool
+    ) -> None:
+        """Apply plugin-instance state changed by the refresh to the live model.
+
+        With process isolation ``execute()`` ran against the worker's copy of
+        the plugin instance, so its new ``latest_refresh_time`` (and any
+        settings the plugin wrote back) only reach the parent through the
+        state delta. Without this every playlist turn re-renders, because
+        ``should_refresh()`` never sees the refresh happen. In-process the
+        live instance was already updated and re-applying is idempotent.
+
+        The change is made under the config lock. ``persist`` writes it
+        immediately; otherwise the refresh-info write at the end of the cycle
+        carries it to disk.
+        """
+        if not refresh_action.state_delta():
+            return
+        if not persist:
+            with self.device_config.locked():
+                refresh_action.commit_state()
+            return
+        try:
+            self.device_config.update_atomic(
+                lambda _config: refresh_action.commit_state()
+            )
+        except Exception:
+            logger.warning(
+                "Failed to persist refresh state for plugin %s",
+                refresh_action.get_plugin_id(),
+                exc_info=True,
+            )
 
     def _update_plugin_health_positional(
         self,
@@ -1305,6 +1347,19 @@ class RefreshTask:
         self, playlist_manager: Any, latest_refresh_info: Any, current_dt: datetime
     ) -> tuple[Any | None, Any | None]:
         """Determines the next plugin to refresh based on the active playlist, plugin cycle interval, and current time."""
+        # Selection mutates the playlist manager (active playlist, plugin
+        # index); hold the config lock so it cannot interleave with a web
+        # thread's update_atomic snapshot/rollback. Persisted by the
+        # refresh-info write at the end of the cycle.
+        with self.device_config.locked():
+            return self._determine_next_plugin_locked(
+                playlist_manager, latest_refresh_info, current_dt
+            )
+
+    def _determine_next_plugin_locked(
+        self, playlist_manager: Any, latest_refresh_info: Any, current_dt: datetime
+    ) -> tuple[Any | None, Any | None]:
+        """Body of :meth:`_determine_next_plugin`; caller holds the config lock."""
         playlist = playlist_manager.determine_active_playlist(current_dt)
         if not playlist:
             playlist_manager.active_playlist = None

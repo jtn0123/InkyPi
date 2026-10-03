@@ -31,6 +31,14 @@ URL_ERR_PRIVATE = (
     "URL must not resolve to a private, loopback, link-local, "
     "reserved, or multicast address"
 )
+#: Name of the per-deployment opt-in that lets RSS and Calendar feeds reach
+#: hosts on the local network (RFC 1918 / IPv6 unique-local addresses).
+ALLOW_PRIVATE_FEEDS_ENV = "INKYPI_ALLOW_PRIVATE_FEEDS"
+URL_ERR_PRIVATE_FEED = (
+    "URL resolves to a private network address. To allow feeds served on "
+    f"your local network, set {ALLOW_PRIVATE_FEEDS_ENV}=1 in the InkyPi "
+    "service environment and restart (see docs/security.md)"
+)
 URL_VALIDATOR_MESSAGES: frozenset[str] = frozenset(
     {
         URL_ERR_EMPTY,
@@ -39,6 +47,7 @@ URL_VALIDATOR_MESSAGES: frozenset[str] = frozenset(
         URL_ERR_LOCALHOST,
         URL_ERR_UNRESOLVABLE,
         URL_ERR_PRIVATE,
+        URL_ERR_PRIVATE_FEED,
     }
 )
 _URL_ERR_GENERIC = "URL failed validation"

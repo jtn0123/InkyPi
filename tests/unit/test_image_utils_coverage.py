@@ -279,10 +279,7 @@ def test_stream_to_disk_writes_chunks_and_returns_path() -> None:
     mock_response.close = Mock()
 
     with patch("utils.image_utils.http_get", return_value=mock_response):
-        with patch("utils.image_utils.pinned_dns"):
-            path = _stream_to_disk(
-                "http://example.com/img.png", 10.0, "example.com", ("1.2.3.4",)
-            )
+        path = _stream_to_disk("http://example.com/img.png", 10.0, ("1.2.3.4",))
 
     try:
         assert os.path.exists(path)
@@ -303,14 +300,11 @@ def test_stream_to_disk_raises_on_http_error() -> None:
     mock_response.close = Mock()
 
     with patch("utils.image_utils.http_get", return_value=mock_response):
-        with patch("utils.image_utils.pinned_dns"):
-            try:
-                _stream_to_disk(
-                    "http://example.com/img.png", 10.0, "example.com", ("1.2.3.4",)
-                )
-                assert False, "Should have raised"
-            except HTTPError:
-                pass
+        try:
+            _stream_to_disk("http://example.com/img.png", 10.0, ("1.2.3.4",))
+            assert False, "Should have raised"
+        except HTTPError:
+            pass
 
 
 # ---------------------------------------------------------------------------
@@ -427,7 +421,6 @@ def test_fetch_and_resize_non_low_memory_decode_failure_returns_none() -> None:
 
     with (
         patch("utils.image_utils.http_get", return_value=mock_response),
-        patch("utils.image_utils.pinned_dns"),
         patch("utils.image_loader.AdaptiveImageLoader", return_value=mock_loader),
     ):
         result = fetch_and_resize_remote_image(

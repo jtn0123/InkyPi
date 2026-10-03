@@ -13,7 +13,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Protocol, TypedDict, cast
 
 from plugins.plugin_registry import get_plugin_instance, load_plugins
-from refresh_task.actions import PluginLike, RefreshAction
+from refresh_task.actions import PluginLike, RefreshAction, StateDelta
 from refresh_task.context import RefreshContext, SupportsRefreshConfig
 from utils.plugin_errors import (
     PermanentPluginError,
@@ -40,8 +40,12 @@ class LegacyConfigLike(Protocol):
 
 class WorkerSuccessPayload(TypedDict):
     ok: bool
-    image_path: str
+    # None when a control-only plugin deliberately produced no image.
+    image_path: str | None
     plugin_meta: object
+    # Plugin-instance state execute() changed in this process; the parent
+    # applies it to its own copy (see RefreshAction.state_delta).
+    state_delta: StateDelta
 
 
 class WorkerErrorPayload(TypedDict):
@@ -208,6 +212,15 @@ def _remote_exception(error_type: str, error_message: str) -> BaseException:
     return exc_cls(error_message)
 
 
+def _collect_state_delta(refresh_action: RefreshAction) -> StateDelta:
+    """Return the action's state delta, tolerating duck-typed actions."""
+    getter = getattr(refresh_action, "state_delta", None)
+    if not callable(getter):
+        return {}
+    delta = getter()
+    return cast(StateDelta, delta) if isinstance(delta, dict) else {}
+
+
 def _execute_refresh_attempt_worker(
     result_queue: ResultQueueLike,
     plugin_config: Mapping[str, object],
@@ -220,9 +233,11 @@ def _execute_refresh_attempt_worker(
     Intended to be the ``target`` of a ``multiprocessing.Process``.
     Restores the config singleton in the child process, executes the refresh
     action, writes the resulting image to a tempfile, and pushes a result
-    dict carrying the **path** (not the bytes) onto *result_queue*.  Any
-    exception is caught and pushed as a failure payload so the parent
-    process can reconstruct it.
+    dict carrying the **path** (not the bytes) onto *result_queue*, along
+    with any plugin-instance state the action changed — this process only
+    holds a copy of that instance, so without the delta the parent would
+    never see it.  Any exception is caught and pushed as a failure payload so
+    the parent process can reconstruct it.
 
     Why a tempfile instead of raw bytes on the queue: ``Queue.put`` hands
     large payloads to a background feeder thread whose write to the pipe
@@ -285,8 +300,19 @@ def _execute_refresh_attempt_worker(
         if hasattr(plugin, "get_latest_metadata"):
             metadata_getter = cast(Callable[[], object], plugin.get_latest_metadata)
             plugin_meta = metadata_getter()
+        state_delta = _collect_state_delta(refresh_action)
         if image is None:
-            raise RuntimeError("Plugin returned None image")
+            # A control-only plugin produced no image on purpose — a completed
+            # refresh, exactly as in the in-process path, not a failure.
+            result_queue.put(
+                {
+                    "ok": True,
+                    "image_path": None,
+                    "plugin_meta": plugin_meta,
+                    "state_delta": state_delta,
+                }
+            )
+            return
         # Write PNG to a tempfile and hand off the path via the queue instead
         # of the raw bytes.  multiprocessing.Queue.put spawns a feeder thread
         # that writes the pickled payload to a pipe whose default buffer is
@@ -311,6 +337,7 @@ def _execute_refresh_attempt_worker(
                 "ok": True,
                 "image_path": image_path,
                 "plugin_meta": plugin_meta,
+                "state_delta": state_delta,
             }
         )
     except Exception as exc:
