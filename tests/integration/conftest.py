@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
@@ -99,7 +100,9 @@ _CLIENT_LOG_META_INIT_SCRIPT = """
 
 
 @pytest.fixture(autouse=True)
-def client_log_capture(monkeypatch: pytest.MonkeyPatch) -> Iterator[Any]:
+def client_log_capture(
+    request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
+) -> Iterator[Any]:
     """Enable /api/client-log capture for the duration of the test.
 
     On teardown, assert the captured list is empty — any POST during the
@@ -110,6 +113,11 @@ def client_log_capture(monkeypatch: pytest.MonkeyPatch) -> Iterator[Any]:
     automatically. Tests that intentionally trigger client logs (e.g. the
     dedicated tests in ``tests/test_client_log_forwarding.py``) live
     outside ``tests/integration`` and are unaffected.
+
+    A test that provokes specific warnings on purpose (injected 503s, say)
+    declares them with ``@pytest.mark.expected_client_logs(*regexes)``;
+    reports whose message matches one are ignored and any other report
+    still fails the test.
     """
     from blueprints.client_log import get_captured_reports, reset_captured_reports
 
@@ -120,6 +128,16 @@ def client_log_capture(monkeypatch: pytest.MonkeyPatch) -> Iterator[Any]:
 
     reports = get_captured_reports()
     reset_captured_reports()
+    expected = [
+        re.compile(pattern)
+        for marker in request.node.iter_markers("expected_client_logs")
+        for pattern in marker.args
+    ]
+    reports = [
+        r
+        for r in reports
+        if not any(p.search(str(r.get("message", ""))) for p in expected)
+    ]
     if reports:
         formatted = "\n".join(
             f"  [{r.get('level', '?')}] {r.get('message', '')} "

@@ -110,6 +110,7 @@ def test_real_named_events_hydrate_and_update_dashboard(
     assert errors == []
 
 
+@pytest.mark.expected_client_logs(r"^Failed to fetch (refresh|next-up) info:")
 def test_http_503_retains_last_good_partial_success_and_recovers(
     dashboard_asset_mode: bool, live_server: str, browser_page: Page
 ) -> None:

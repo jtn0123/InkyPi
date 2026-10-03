@@ -104,6 +104,17 @@ _ENUMERATE_JS = """
     // Skip things that will open a dialog — out of scope for in-place reflection.
     if (el.hasAttribute('data-modal-open')) continue;
     if (el.hasAttribute('data-open-modal')) continue;
+    // Single-select pressed-button groups (e.g. the clock face picker):
+    // re-clicking the member that is already pressed is a legitimate no-op
+    // — exactly one option must stay selected. Its reflection is still
+    // exercised because clicking each unpressed sibling (swept below) moves
+    // the selection and un-presses it.
+    if (el.getAttribute('aria-pressed') === 'true' && el.parentElement) {
+      const group = Array.from(el.parentElement.children)
+        .filter((sib) => sib.hasAttribute('aria-pressed'));
+      const pressed = group.filter((sib) => sib.getAttribute('aria-pressed') === 'true');
+      if (group.length > 1 && pressed.length === 1) continue;
+    }
 
     const marker = `__togglesweep_${idx++}`;
     el.setAttribute('data-togglesweep-id', marker);

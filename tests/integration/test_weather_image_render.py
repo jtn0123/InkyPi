@@ -10,9 +10,6 @@ pytestmark = pytest.mark.skipif(
 )
 
 
-@pytest.mark.skip(
-    reason="Weather template image loading broken by upstream merge - needs investigation"
-)
 def test_weather_template_loads_images(
     client: FlaskClient, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
 ) -> Any:
@@ -158,7 +155,13 @@ def test_weather_template_loads_images(
         assert imgs, "No <img> tags found in weather template"
         loaded = 0
         for img in imgs:
-            src = img.get_attribute("src") or ""
+            # The weather plugin emits bare absolute filesystem paths for its
+            # icons (see ``weather_data.icon_path``); production renders the
+            # HTML from a temp file via ``file://`` (``take_screenshot_html``)
+            # so those resolve to ``file:///...``. Check the *resolved* URL
+            # rather than the raw attribute so the assertion follows what the
+            # browser actually loads.
+            src = page.evaluate("img => img.currentSrc || img.src", img) or ""
             if src.startswith(("file://", "data:")):
                 # Wait for load and check naturalWidth
                 page.evaluate(

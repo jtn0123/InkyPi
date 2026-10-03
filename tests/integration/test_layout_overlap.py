@@ -97,6 +97,12 @@ _ENUMERATE_JS = r"""
     if (el.getAttribute('aria-hidden') === 'true') return false;
     if (el.disabled) return false;
     if (el.getAttribute('aria-disabled') === 'true') return false;
+    // Content of a closed <details> (e.g. the mobile "Menu" dropdown) is
+    // still laid out by Chromium — it sits under `content-visibility:
+    // hidden` via ::details-content rather than `display: none` — so it
+    // reports a real bounding rect even though it is neither painted nor
+    // hit-testable. checkVisibility() reports false for that subtree.
+    if (typeof el.checkVisibility === 'function' && !el.checkVisibility()) return false;
     // Walk up ancestors checking aria-hidden / inert / pointer-events.
     for (let node = el; node && node !== document.documentElement; node = node.parentElement) {
       if (node.getAttribute && node.getAttribute('aria-hidden') === 'true') return false;

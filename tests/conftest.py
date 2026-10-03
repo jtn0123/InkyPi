@@ -126,6 +126,35 @@ def _playwright_browser_available() -> bool:
         return False
 
 
+def browser_required() -> bool:
+    """True when a missing Playwright Chromium must fail instead of skip.
+
+    That is the case in CI (``CI=true``, which GitHub Actions always sets) and
+    whenever ``REQUIRE_BROWSER_SMOKE=1`` is exported. CI jobs that do not
+    install Chromium must opt out *visibly* with ``SKIP_BROWSER=1`` (or
+    ``SKIP_UI=1`` / ``SKIP_A11Y=1``) rather than relying on the browser
+    suites silently dropping out of collection.
+    """
+    return _is_truthy(os.getenv("CI", "")) or _is_truthy(
+        os.getenv("REQUIRE_BROWSER_SMOKE", "")
+    )
+
+
+def _targeted_by_args(path: Path, config: Any) -> bool:
+    """True if ``path`` is (inside) one of the paths pytest was asked to run.
+
+    ``config.args`` holds the CLI paths/node ids, or ``testpaths`` when none
+    were given, relative to the invocation directory.
+    """
+    base = Path(config.invocation_params.dir)
+    resolved = path.resolve()
+    for arg in config.args:
+        target = (base / str(arg).split("::", 1)[0]).resolve()
+        if resolved == target or target in resolved.parents:
+            return True
+    return False
+
+
 def pytest_ignore_collect(collection_path: Any, config: Any) -> bool | None:
     path = Path(str(collection_path))
     group = _browser_test_group(path)
@@ -143,14 +172,78 @@ def pytest_ignore_collect(collection_path: Any, config: Any) -> bool | None:
         return True
     if skip_ui and group == "ui" and not require_browser_smoke:
         return True
+    if not _targeted_by_args(path, config):
+        # pytest visits every entry of a directory it collects from, even
+        # when only sibling files were requested (e.g. preflash running
+        # tests/integration/test_api_contracts.py). Such a module is never
+        # collected, so leave the decision to pytest and do not demand a
+        # browser for it.
+        return None
     if _playwright_browser_available():
         return None
-    if require_browser_smoke and path.name == "test_browser_smoke.py":
+    if browser_required():
+        reason = (
+            "REQUIRE_BROWSER_SMOKE=1"
+            if require_browser_smoke
+            else "CI=true (browser suites must not silently drop out in CI)"
+        )
         raise RuntimeError(
-            "REQUIRE_BROWSER_SMOKE=1 but Playwright Chromium is unavailable. "
-            "Install browsers with `playwright install chromium`."
+            f"{path.name} needs Playwright Chromium, but Chromium is unavailable "
+            f"and {reason}. Install browsers with `python -m playwright install "
+            "chromium`, or deselect browser suites explicitly with SKIP_BROWSER=1 "
+            "(or SKIP_UI=1 / SKIP_A11Y=1)."
         )
     return True
+
+
+def pytest_itemcollected(item: pytest.Item) -> None:
+    """Tag every test from a browser-gated module with the ``browser`` marker.
+
+    Lets CI select the browser suites with ``-m browser`` from the same
+    UI_BROWSER_TESTS / A11Y_BROWSER_TESTS source of truth that gates
+    collection, so the lists cannot drift from the workflow. Done per item at
+    collection time so the marker exists before ``-m`` filtering runs.
+    """
+    if _browser_test_group(Path(item.path)) is not None:
+        item.add_marker(pytest.mark.browser)
+
+
+def _parse_test_shard(raw: str) -> tuple[int, int] | None:
+    """Parse ``INKYPI_TEST_SHARD`` (``"<index>/<total>"``, 1-based)."""
+    raw = raw.strip()
+    if not raw:
+        return None
+    index_text, sep, total_text = raw.partition("/")
+    try:
+        index, total = int(index_text), int(total_text)
+    except ValueError:
+        index = total = 0
+    if not sep or total < 1 or not 1 <= index <= total:
+        raise pytest.UsageError(
+            f"INKYPI_TEST_SHARD must look like '<index>/<total>' with "
+            f"1 <= index <= total, got {raw!r}"
+        )
+    return index, total
+
+
+@pytest.hookimpl(trylast=True)
+def pytest_collection_modifyitems(config: Any, items: list[pytest.Item]) -> None:
+    """Split the selected tests across CI shards (``INKYPI_TEST_SHARD=i/n``).
+
+    Runs after ``-m`` / ``-k`` / ``--deselect`` filtering (``trylast``) and
+    deals the remaining items round-robin in collection order, which is
+    deterministic, so every shard (and every xdist worker inside a shard)
+    computes the same partition and the union of all shards is the full set.
+    """
+    shard = _parse_test_shard(os.getenv("INKYPI_TEST_SHARD", ""))
+    if shard is None:
+        return
+    index, total = shard
+    selected = [item for pos, item in enumerate(items) if pos % total == index - 1]
+    deselected = [item for pos, item in enumerate(items) if pos % total != index - 1]
+    if deselected:
+        config.hook.pytest_deselected(items=deselected)
+    items[:] = selected
 
 
 @pytest.fixture(autouse=True)

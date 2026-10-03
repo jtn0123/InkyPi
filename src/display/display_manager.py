@@ -1,3 +1,4 @@
+import contextlib
 import fnmatch
 import json
 import logging
@@ -178,7 +179,16 @@ class DisplayManager:
                     candidate_path = os.path.join(history_dir, f"{candidate}.png")
                     if os.path.exists(candidate_path):
                         continue
-                    processed_image.save(candidate_path, optimize=True)
+                    # Publish atomically: the history page lists and decodes
+                    # display_*.png, so it must never see a half-written file.
+                    tmp_path = os.path.join(history_dir, f".{candidate}.png.tmp")
+                    try:
+                        processed_image.save(tmp_path, format="PNG", optimize=True)
+                        os.replace(tmp_path, candidate_path)
+                    except BaseException:
+                        with contextlib.suppress(OSError):
+                            os.remove(tmp_path)
+                        raise
                     base_name = candidate
                     png_path = candidate_path
                     break

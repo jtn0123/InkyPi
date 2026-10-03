@@ -221,6 +221,55 @@ class TestSaveHistoryEntry:
         json_files = [f for f in os.listdir(history_dir) if f.endswith(".json")]
         assert len(json_files) == 0
 
+    def test_png_is_published_atomically(
+        self, device_config_dev: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """No display_*.png is visible until the encode has finished."""
+        from display.display_manager import DisplayManager
+
+        dm = DisplayManager(device_config_dev)
+        history_dir = str(tmp_path / "history_atomic")
+        device_config_dev.history_image_dir = history_dir
+        visible_during_save: list[str] = []
+        real_save = Image.Image.save
+
+        def save_and_peek(
+            self: Image.Image, fp: Any, *args: Any, **kwargs: Any
+        ) -> None:
+            real_save(self, fp, *args, **kwargs)
+            visible_during_save.extend(
+                f for f in os.listdir(history_dir) if f.endswith(".png")
+            )
+
+        monkeypatch.setattr(Image.Image, "save", save_and_peek)
+        dm._save_history_entry(Image.new("RGB", (10, 10), "red"))
+
+        assert visible_during_save == []
+        published = os.listdir(history_dir)
+        assert len(published) == 1
+        assert published[0].startswith("display_")
+        with Image.open(os.path.join(history_dir, published[0])) as img:
+            assert img.size == (10, 10)
+
+    def test_failed_save_leaves_no_temp_file(
+        self, device_config_dev: Any, tmp_path: Path
+    ) -> None:
+        from display.display_manager import DisplayManager
+
+        dm = DisplayManager(device_config_dev)
+        history_dir = str(tmp_path / "history_tmp_cleanup")
+        device_config_dev.history_image_dir = history_dir
+        img = MagicMock()
+
+        def partial_write(fp: str, *args: Any, **kwargs: Any) -> None:
+            Path(fp).write_bytes(b"\x89PNG partial")
+            raise OSError("disk full")
+
+        img.save.side_effect = partial_write
+        dm._save_history_entry(img, history_meta={"plugin": "test"})
+
+        assert os.listdir(history_dir) == []
+
     def test_meta_write_failure(
         self, device_config_dev: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:

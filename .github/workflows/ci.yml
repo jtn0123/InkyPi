@@ -14,7 +14,10 @@ permissions:
   pull-requests: write
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  # The event name is part of the key so a push to main (same ref) can no
+  # longer cancel an in-flight scheduled run (soak / mutation nightlies take
+  # up to 2h). Superseded PR pushes still cancel their previous run.
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -199,6 +202,12 @@ jobs:
           INKYPI_ENV: dev
           INKYPI_NO_REFRESH: '1'
           PYTHONPATH: src
+          # Explicit, visible opt-out: this job installs no Chromium. Under
+          # CI=true tests/conftest.py turns a silently dropped browser suite
+          # into a collection error, so the deselection has to be stated.
+          # The UI/a11y/journey suites run in `browser-full`; smoke, plugin
+          # snapshots and visual regression run in `browser-smoke`.
+          SKIP_BROWSER: '1'
         run: |
           # Keep CI serial while the local pytest-xdist path soaks.
           # Note: tests/snapshots/ are collected here but skip automatically
@@ -591,6 +600,13 @@ jobs:
         run: |
           python -m pip install -U pip wheel
           pip install -r install/requirements.txt -r install/requirements-dev.txt
+      - name: Create venv for preflash script
+        # scripts/preflash_validate.sh hard-requires .venv (it sources
+        # .venv/bin/activate); without this step the job fails immediately
+        # with "FAIL venv .venv is required".
+        run: |
+          python -m venv .venv
+          .venv/bin/pip install -r install/requirements.txt -r install/requirements-dev.txt
       - name: Run soak validation
         env:
           INKYPI_VALIDATE_SOAK: '1'
@@ -758,6 +774,92 @@ jobs:
           path: tests/snapshots/layout/actual/
           if-no-files-found: ignore
 
+  browser-full:
+    # Every UI / a11y / journey browser suite: the `browser` marker is applied
+    # by tests/conftest.py from UI_BROWSER_TESTS + A11Y_BROWSER_TESTS, plus
+    # `-m journey`. Before this job they only ran on developer machines with
+    # Chromium installed; in CI they silently dropped out of collection.
+    # REQUIRE_BROWSER_SMOKE=1 (and CI=true) make a missing Chromium a hard
+    # collection error instead of a skip. Files already covered by
+    # browser-smoke are deselected so they do not run twice.
+    # Sharded round-robin via INKYPI_TEST_SHARD (tests/conftest.py): ~280
+    # tests took ~11 min on 4 local xdist workers, so 2 shards keep each
+    # comfortably inside the timeout.
+    name: Browser full (UI + a11y + journeys, shard ${{ matrix.shard }}/2)
+    needs: tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: |
+            install/requirements.txt
+            install/requirements-dev.txt
+      - name: Install OS dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libopenjp2-7 \
+            libopenblas-dev \
+            libfreetype6-dev \
+            fonts-noto-color-emoji
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip wheel
+          pip install -r install/requirements.txt -r install/requirements-dev.txt
+      - name: Install Playwright Chromium
+        run: |
+          python -m playwright install --with-deps chromium
+      - name: Allow the test browser to create its sandbox namespaces
+        run: |
+          # Same AppArmor allowance as browser-smoke: permit only this exact
+          # test binary to create user namespaces; Chromium sandbox stays on.
+          if [[ -f /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]] &&
+             [[ "$(cat /proc/sys/kernel/apparmor_restrict_unprivileged_userns)" == "1" ]]; then
+            python - <<'PYPROFILE' > /tmp/inkypi-headless-shell.apparmor
+          from pathlib import Path
+          from playwright.sync_api import sync_playwright
+          with sync_playwright() as p:
+              executable = Path(p.chromium.executable_path)
+          cache = executable.parents[2]
+          revision = executable.parents[1].name.removeprefix("chromium-")
+          binaries = list(cache.glob(f"chromium_headless_shell-{revision}/**/headless_shell"))
+          binaries += list(cache.glob(f"chromium_headless_shell-{revision}/**/chrome-headless-shell"))
+          assert len(binaries) == 1, binaries
+          print('abi <abi/4.0>,')
+          print('include <tunables/global>')
+          print(f'profile inkypi-headless-shell "{binaries[0]}" flags=(unconfined) {{')
+          print('  userns,')
+          print('}')
+          PYPROFILE
+            sudo apparmor_parser -r /tmp/inkypi-headless-shell.apparmor
+          fi
+      - name: Build CSS
+        run: python scripts/build_css.py
+      - name: Run browser suites (shard ${{ matrix.shard }}/2)
+        env:
+          INKYPI_ENV: dev
+          INKYPI_NO_REFRESH: '1'
+          INKYPI_TEST_SHARD: ${{ matrix.shard }}/2
+          PYTHONPATH: src
+          REQUIRE_BROWSER_SMOKE: '1'
+        run: |
+          # xdist is safe here: every browser test boots its own live server
+          # on a free port and its own Chromium instance (verified locally
+          # with -n 4 and -n 8).
+          pytest tests/integration \
+            -m "browser or journey" \
+            --deselect tests/integration/test_browser_smoke.py \
+            --deselect tests/integration/test_shared_asset_modal_contracts.py \
+            -n auto -q -rfEsR
+
   install-matrix:
     # Keep the required install matrix in a reusable workflow so ci.yml and any
     # manual reruns share one implementation instead of drifting apart.
@@ -818,12 +920,15 @@ jobs:
         env:
           REQUIRE_INSTALL_CRASH_LOOP_TEST: '1'
           PYTHONPATH: src
+          # `-m container` collects the whole tree; no Chromium here, so
+          # deselect the browser suites explicitly (see tests/conftest.py).
+          SKIP_BROWSER: '1'
         run: |
           pytest -m container -v
 
   ci-gate:
     name: CI gate (all checks pass)
-    needs: [lint, shellcheck, lockfile-drift, tests, sonarcloud, smoke, smoke-matrix, coverage-gate, security, browser-smoke, install-smoke-memcap, install-matrix, install-crash-loop-gate, preflash-validate, flake-detection]
+    needs: [lint, shellcheck, lockfile-drift, tests, sonarcloud, smoke, smoke-matrix, coverage-gate, security, browser-smoke, browser-full, install-smoke-memcap, install-matrix, install-crash-loop-gate, preflash-validate, flake-detection]
     runs-on: ubuntu-latest
     if: always()
     steps:
@@ -836,7 +941,7 @@ jobs:
           echo "$results"
 
           # Jobs that must be 'success'
-          for job in lint shellcheck lockfile-drift tests smoke smoke-matrix coverage-gate security browser-smoke install-smoke-memcap install-matrix install-crash-loop-gate preflash-validate flake-detection; do
+          for job in lint shellcheck lockfile-drift tests smoke smoke-matrix coverage-gate security browser-smoke browser-full install-smoke-memcap install-matrix install-crash-loop-gate preflash-validate flake-detection; do
             result=$(echo "$results" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('$job',{}).get('result','missing'))")
             if [ "$result" != "success" ]; then
               echo "Required job '$job' did not succeed (result: $result)"
