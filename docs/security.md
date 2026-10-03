@@ -30,6 +30,44 @@ namespace or protection against a compromised Chromium network process.
 
 Chromium documents [proxy behavior and loopback bypass rules](https://chromium.googlesource.com/chromium/src/+/main/net/docs/proxy.md).
 
+## Server-side fetches of user URLs
+
+Plugins that download a user-supplied URL on the Pi (Image URL, remote images,
+RSS and Calendar) validate the URL before connecting: the scheme must be
+HTTP/HTTPS and every address the hostname resolves to must be public. The
+connection is pinned to the addresses that were checked, so a DNS answer that
+changes between the check and the request cannot redirect it. Redirects are
+not followed automatically. Each `Location` target, including relative ones,
+is checked and pinned in the same way, with a limit of 5 hops. A public site
+that redirects to `192.168.x.x`, `127.0.0.1` or a cloud metadata address is
+refused. Credential headers are dropped when a redirect leaves the original
+host.
+
+RSS and Calendar downloads are streamed with a size cap: 5 MB for a feed and
+10 MB for an `.ics` file. Larger responses fail the refresh and nothing is
+rendered from them.
+
+### Feeds on your local network (opt-in)
+
+RSS and Calendar refuse private-network addresses by default. When one is
+configured, the plugin shows an error that names the setting below. To fetch
+feeds from a server on your LAN, such as Nextcloud or Radicale on
+`192.168.x.x`, opt in for the deployment. Add the setting to the service
+environment file described in [auth.md](auth.md) and restart:
+
+```ini
+INKYPI_ALLOW_PRIVATE_FEEDS=1
+```
+
+The opt-in admits only site-local ranges: `10.0.0.0/8`, `172.16.0.0/12`,
+`192.168.0.0/16` and IPv6 unique-local `fc00::/7`. Loopback (`localhost`,
+`127.0.0.1`, `::1`), link-local and cloud-metadata (`169.254.0.0/16`),
+unspecified, reserved and multicast addresses stay blocked. To use a calendar
+server running on the Pi itself, give its LAN address instead of `localhost`.
+The setting affects only RSS and Calendar. Image URL, Screenshot and Image
+Album (Immich) are unchanged. Enable it only if everyone who can edit plugin
+settings may make the Pi send GET requests to hosts on your network.
+
 ## Software Bill of Materials (SBOM)
 
 Every GitHub release includes a CycloneDX JSON SBOM attached as a release asset named
