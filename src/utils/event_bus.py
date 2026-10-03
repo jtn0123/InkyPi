@@ -12,8 +12,10 @@ import logging
 import queue
 import threading
 import time
-from collections.abc import Generator
+from collections.abc import Callable, Generator
 from typing import Any
+
+from utils.sse import bounded_stream
 
 logger = logging.getLogger(__name__)
 
@@ -89,12 +91,21 @@ class EventBus:
     # ------------------------------------------------------------------
 
     def stream(
-        self, q: queue.Queue[dict[str, Any] | object], heartbeat_s: float = 15.0
+        self,
+        q: queue.Queue[dict[str, Any] | object],
+        heartbeat_s: float = 15.0,
+        max_lifetime_s: float | None = None,
+        should_stop: Callable[[], bool] | None = None,
     ) -> Generator[str, None, None]:
         """Yield SSE-formatted strings from *q* until the client disconnects.
 
         A comment heartbeat (`: ping`) is yielded every *heartbeat_s* seconds
         when no event arrives, keeping the connection alive through proxies.
+        When *max_lifetime_s* is set the generator returns once that many
+        seconds have elapsed so the worker thread is released; EventSource
+        clients reconnect on their own.  *should_stop* is polled about once a
+        second so the stream ends promptly when evicted or when the client
+        leaves (see ``utils.sse.StreamLease.stop_check``).
 
         Usage::
 
@@ -106,20 +117,28 @@ class EventBus:
             finally:
                 bus.unsubscribe(q)
         """
+
+        def wait(timeout_s: float) -> list[str] | None:
+            try:
+                item = q.get(timeout=timeout_s)
+            except queue.Empty:
+                return []
+            if item is _SENTINEL:
+                return None
+            if not isinstance(item, dict):
+                return []
+            event_type = item.get("event", "message")
+            data = json.dumps(item, separators=(",", ":"))
+            return [f"event: {event_type}\ndata: {data}\n\n"]
+
         try:
-            while True:
-                try:
-                    item = q.get(timeout=heartbeat_s)
-                except queue.Empty:
-                    yield ": ping\n\n"
-                    continue
-                if item is _SENTINEL:
-                    return
-                if not isinstance(item, dict):
-                    continue
-                event_type = item.get("event", "message")
-                data = json.dumps(item, separators=(",", ":"))
-                yield f"event: {event_type}\ndata: {data}\n\n"
+            yield from bounded_stream(
+                wait,
+                heartbeat=": ping\n\n",
+                heartbeat_s=heartbeat_s,
+                max_lifetime_s=max_lifetime_s,
+                should_stop=should_stop,
+            )
         except GeneratorExit:
             pass
 

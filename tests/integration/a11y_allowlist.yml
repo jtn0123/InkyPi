@@ -32,17 +32,9 @@
 # and (ideally) a Linear / GitHub ticket tracking the fix. Entries without
 # a reason are treated as a lint error in review.
 
-default:
-  - id: color-contrast
-    reason: >-
-      WCAG AA contrast audit pending across chips/placeholders/dim text.
-      Tracked in JTN-510.
+default: []
 
 plugin_default:
-  - id: color-contrast
-    reason: >-
-      Inherits main-app chrome contrast issues. Fixes in JTN-510 will land for
-      both main + plugin pages.
   - id: aria-hidden-focus
     reason: >-
       Hidden-by-default modals (response modal, schedule modal) still contain

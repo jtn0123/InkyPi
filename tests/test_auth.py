@@ -7,7 +7,8 @@ Coverage:
 - Correct PIN → session authed, redirect to /
 - Wrong PIN → login page re-rendered with error
 - Rate-limit lockout after 5 failed attempts
-- Exempt paths (/sw.js, /static/*, /api/health) accessible without auth
+- Exempt paths (/sw.js, public /static/ asset subtrees, /api/health) accessible
+  without auth; /static/images/ (display images, history, uploads) is gated
 - /logout clears session and redirects to /login
 """
 
@@ -51,7 +52,9 @@ def _make_auth_app(
 
     importlib.reload(auth_bp_mod)
 
-    app = Flask(__name__)
+    # No built-in static route: the stub below must answer every /static/ path
+    # so the tests observe only the auth decision.
+    app = Flask(__name__, static_folder=None)
     app.secret_key = "test-secret-key"
     app.config["TESTING"] = True
     app.config["WTF_CSRF_ENABLED"] = False
@@ -80,9 +83,9 @@ def _make_auth_app(
     def sw() -> Any:
         return ("sw", 200)
 
-    @app.route("/static/test.css")
-    def static_css() -> Any:
-        return ("css", 200)
+    @app.route("/static/<path:filename>")
+    def static_file(filename: str) -> Any:
+        return ("static", 200)
 
     # Provide a CSRF token in the session for POST requests
     @app.context_processor
@@ -106,6 +109,35 @@ def _make_auth_app(
     auth_mod.init_auth(app, _FakeConfig())
 
     return app
+
+
+# Shipped application assets that stay public with a PIN configured.
+PUBLIC_STATIC_PATHS = (
+    "/static/styles/main.css",
+    "/static/scripts/csrf.js",
+    "/static/vendor/htmx.min.js",
+    "/static/dist/common.bundle.a1b2c3d4.min.css",
+    "/static/fonts/Jost.ttf",
+    "/static/icons/clock.svg",
+)
+
+# User/display data under /static/ that must require a session when a PIN is
+# set, including normalisation tricks that resolve into images/ and top-level
+# files outside the public subtrees.
+PRIVATE_STATIC_PATHS = (
+    "/static/images/current_image.png",
+    "/static/images/processed_image.png",
+    "/static/images/history/display_20260101_000000.png",
+    "/static/images/plugins/clock_Default.png",
+    "/static/images/saved/holiday-photo.jpg",
+    "/static/styles/../images/current_image.png",
+    "/static/./images/saved/holiday-photo.jpg",
+    "/static/styles/%2e%2e/images/history/display_20260101_000000.png",
+    "/static/scripts/../../static/images/current_image.png",
+    "/static/Images/current_image.png",
+    "/static/styles",
+    "/static/openapi.json",
+)
 
 
 def _get_csrf(client: FlaskClient) -> str:
@@ -141,7 +173,14 @@ class TestAuthDisabled:
         assert resp.status_code == 200
 
     def test_static_accessible(self, client: FlaskClient) -> None:
-        resp = client.get("/static/test.css")
+        resp = client.get("/static/styles/test.css")
+        assert resp.status_code == 200
+
+    @pytest.mark.parametrize("path", PRIVATE_STATIC_PATHS)
+    def test_static_images_accessible_without_pin(
+        self, client: FlaskClient, path: str
+    ) -> None:
+        resp = client.get(path)
         assert resp.status_code == 200
 
 
@@ -193,8 +232,26 @@ class TestAuthEnabled:
         resp = client.get("/sw.js")
         assert resp.status_code == 200
 
-    def test_static_exempt(self, client: FlaskClient) -> None:
-        resp = client.get("/static/test.css")
+    @pytest.mark.parametrize("path", PUBLIC_STATIC_PATHS)
+    def test_public_static_assets_exempt(self, client: FlaskClient, path: str) -> None:
+        resp = client.get(path)
+        assert resp.status_code == 200
+
+    @pytest.mark.parametrize("path", PRIVATE_STATIC_PATHS)
+    def test_private_static_requires_login(
+        self, client: FlaskClient, path: str
+    ) -> None:
+        resp = client.get(path)
+        assert resp.status_code == 302
+        assert "/login" in resp.headers["Location"]
+
+    @pytest.mark.parametrize("path", PRIVATE_STATIC_PATHS)
+    def test_private_static_accessible_when_authenticated(
+        self, client: FlaskClient, path: str
+    ) -> None:
+        with client.session_transaction() as sess:
+            sess["authed"] = True
+        resp = client.get(path)
         assert resp.status_code == 200
 
     def test_api_health_exempt(self, client: FlaskClient) -> None:

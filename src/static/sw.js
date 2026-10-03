@@ -1,4 +1,9 @@
-const CACHE_NAME = "inkypi-shell-v24";
+const CACHE_NAME = "inkypi-shell-v25";
+
+// Mirrors _PUBLIC_STATIC_DIRS in src/app_setup/auth.py. Other /static/
+// subtrees (e.g. images/) can hold private display images and require login,
+// so they must never be persisted in the shared offline cache.
+const PUBLIC_STATIC_PATH = /^\/static\/(?:dist|fonts|icons|scripts|styles|vendor)\//;
 
 const SHELL_ASSETS = [
   "/static/styles/main.css",
@@ -33,10 +38,11 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   const { request } = event;
 
-  // Only handle same-origin GET requests to /static/*
+  // Only handle same-origin GET requests to public /static/ asset subtrees
   if (
     request.method !== "GET" ||
-    !request.url.startsWith(self.location.origin + "/static/")
+    !request.url.startsWith(self.location.origin + "/static/") ||
+    !PUBLIC_STATIC_PATH.test(new URL(request.url).pathname)
   ) {
     return;
   }
