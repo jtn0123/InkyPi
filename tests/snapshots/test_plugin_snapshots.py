@@ -86,7 +86,9 @@ def test_snapshot_year_progress_mid_year(
     ) as mock_dt:
         mock_dt.now.return_value = frozen
         plugin = YearProgress(year_progress_plugin_config)
-        result = plugin.generate_image({}, device_config_dev)
+        # The settings form always submits textColor (default #000000); the
+        # progress bar fill takes its colour from it, so {} renders no bar.
+        result = plugin.generate_image({"textColor": "#000000"}, device_config_dev)
 
     assert isinstance(result, Image.Image)
     assert_image_snapshot(result, "year_progress", "mid_year_horizontal")
@@ -105,7 +107,9 @@ def test_snapshot_year_progress_start_of_year(
     ) as mock_dt:
         mock_dt.now.return_value = frozen
         plugin = YearProgress(year_progress_plugin_config)
-        result = plugin.generate_image({}, device_config_dev)
+        # The settings form always submits textColor (default #000000); the
+        # progress bar fill takes its colour from it, so {} renders no bar.
+        result = plugin.generate_image({"textColor": "#000000"}, device_config_dev)
 
     assert isinstance(result, Image.Image)
     assert_image_snapshot(result, "year_progress", "start_of_year_horizontal")
