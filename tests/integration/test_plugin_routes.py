@@ -689,6 +689,84 @@ def test_instance_image_uses_latest_matching_history_entry(
     assert img.getpixel((0, 0)) == (0, 128, 0)
 
 
+def test_instance_image_busy_renderer_serves_history_without_waiting(
+    client: FlaskClient,
+    device_config_dev: Any,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Any,
+) -> None:
+    """A preview GET must not park a request thread behind another Chromium.
+
+    While a refresh holds the machine-wide Chromium slot, the in-request
+    render gives up after a short wait and the route serves the latest
+    history image instead.
+    """
+    import io
+    import json
+    import os
+    import threading
+    import time
+
+    from PIL import Image
+
+    from utils.chromium_limiter import chromium_slot
+
+    monkeypatch.setenv("INKYPI_CHROMIUM_LOCK_DIR", str(tmp_path))
+    # Make the limiter's default wait long enough that only the route's own
+    # cap can explain a fast response.
+    monkeypatch.setenv("INKYPI_CHROMIUM_LOCK_TIMEOUT_S", "60")
+    _setup_playlist_for_instance(device_config_dev)
+
+    path = device_config_dev.get_plugin_image_path("ai_text", "Inst One")
+    if os.path.exists(path):
+        os.remove(path)
+
+    history_dir = device_config_dev.history_image_dir
+    Image.new("RGB", (10, 10), "red").save(
+        os.path.join(history_dir, "display_000001.png")
+    )
+    with open(
+        os.path.join(history_dir, "display_000001.json"), "w", encoding="utf-8"
+    ) as fh:
+        json.dump({"plugin_id": "ai_text", "plugin_instance": "Inst One"}, fh)
+
+    class _ChromiumPlugin:
+        def generate_image(self, settings: Any, device_config: Any) -> Any:
+            with chromium_slot("stub render"):
+                return Image.new("RGB", (10, 10), "blue")
+
+    monkeypatch.setattr(
+        "blueprints.plugin.get_plugin_instance",
+        lambda cfg: _ChromiumPlugin(),
+        raising=True,
+    )
+
+    held = threading.Event()
+    release = threading.Event()
+
+    def _hold_slot() -> None:
+        with chromium_slot("simulated refresh"):
+            held.set()
+            release.wait(30)
+
+    holder = threading.Thread(target=_hold_slot, daemon=True)
+    holder.start()
+    assert held.wait(5)
+    try:
+        started = time.monotonic()
+        resp = client.get("/instance_image/ai_text/Inst One")
+        elapsed = time.monotonic() - started
+    finally:
+        release.set()
+        holder.join(5)
+
+    assert resp.status_code == 200
+    assert Image.open(io.BytesIO(resp.data)).getpixel((0, 0)) == (255, 0, 0)
+    assert elapsed < 15
+    # Nothing was rendered, so no stale cache file was written either.
+    assert not os.path.exists(path)
+
+
 def test_delete_plugin_instance_cleans_up_cache(
     client: FlaskClient, device_config_dev: Any
 ) -> None:

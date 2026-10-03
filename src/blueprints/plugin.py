@@ -38,6 +38,7 @@ from utils.backend_errors import (
     UnsupportedMediaTypeRouteError,
     route_error_boundary,
 )
+from utils.chromium_limiter import slot_wait_limit
 from utils.fallback_image import render_error_image
 from utils.form_utils import (
     sanitize_log_field,
@@ -74,6 +75,11 @@ _ERR_PLUGIN_INSTANCE_NOT_FOUND = "Plugin instance not found"
 _ERR_PLUGIN_NOT_FOUND = "Plugin not found"
 _ERR_PLAYLIST_NOT_FOUND = "Playlist not found"
 _MSG_CIRCUIT_BREAKER_RESET = "Circuit-breaker reset for plugin instance."
+#: A preview GET renders in the request thread on a cache miss. When another
+#: headless browser already holds the machine-wide Chromium slot, give up fast
+#: and serve the history fallback instead of parking a server thread for the
+#: limiter's full default wait.
+_INSTANCE_IMAGE_RENDER_WAIT_S = 3.0
 
 
 def _raise_request_model_error(error: RequestModelError) -> NoReturn:
@@ -1279,7 +1285,8 @@ def instance_image(plugin_id: str, instance_name: str) -> Any:
         if not plugin_config:
             return (_ERR_NOT_FOUND, 404)
         plugin = get_plugin_instance(plugin_config)
-        image = plugin.generate_image(plugin_inst.settings, device_config)
+        with slot_wait_limit(_INSTANCE_IMAGE_RENDER_WAIT_S):
+            image = plugin.generate_image(plugin_inst.settings, device_config)
         image.save(path)
         return _cacheable_send_file(path)
     except Exception:

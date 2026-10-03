@@ -12,6 +12,7 @@ from typing import Any, cast
 from PIL import Image
 from PIL.Image import Resampling
 
+from utils.chromium_limiter import chromium_slot
 from utils.http_utils import guarded_fetch, http_get
 from utils.plugin_errors import ScreenshotBackendError
 from utils.security_utils import validate_url_with_ips
@@ -438,7 +439,9 @@ def _playwright_screenshot_html(
 
     img: Image.Image | None = None
     try:
-        with sync_playwright() as p:
+        # The slot spans the driver start-up as well as the browser: Playwright
+        # launches Chromium inside this block and only reaps it on exit.
+        with chromium_slot("playwright local render"), sync_playwright() as p:
             try:
                 browser = p.chromium.launch(
                     args=[
@@ -494,6 +497,10 @@ def _playwright_screenshot_html(
                 img = load_image_from_bytes(png_bytes)
             finally:
                 browser.close()
+    except ScreenshotBackendError:
+        # Renderer slot contention: falling through to the subprocess path
+        # would just wait on the same slot again.
+        raise
     except Exception:
         logger.warning(
             "Playwright local HTML render failed; trying browser subprocess",
@@ -675,12 +682,13 @@ def _run_browser_subprocess(
     out of reach of that worker-level cleanup and leak the tree.
     """
     try:
-        result = subprocess.run(
-            command,
-            capture_output=True,
-            timeout=timeout_seconds,
-            **(process_options or {}),
-        )
+        with chromium_slot(f"browser subprocess attempt {attempt}"):
+            result = subprocess.run(
+                command,
+                capture_output=True,
+                timeout=timeout_seconds,
+                **(process_options or {}),
+            )
     except FileNotFoundError:
         logger.error("%s Browser binary not found.", _SCREENSHOT_ERROR_PREFIX)
         return None, False
