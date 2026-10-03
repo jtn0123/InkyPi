@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Validate Lychee results, independently fetching HTTP 429 URLs with curl.
 
-Some storefronts reject Lychee's requests while the same-runner curl GET
-succeeds. A 429 is never accepted: curl must fetch that exact URL with valid
-TLS and finish with HTTP 2xx. All other errors remain failures.
+Some hosts reject simple HTTP clients while a normal browser succeeds.
+Rejected HTTP 403/429 responses remain failures unless a fresh independent
+request fetches the same URL with valid TLS and HTTP 2xx. Optional browser
+verification also rejects empty, challenge, login and soft-error documents.
 """
 
 from __future__ import annotations
@@ -13,8 +14,9 @@ import json
 import subprocess
 from collections.abc import Callable
 from pathlib import Path
+from time import monotonic
 from typing import Any
-from urllib.parse import urlsplit
+from urllib.parse import urlsplit, urlunsplit
 
 
 def curl_status(url: str) -> int:
@@ -54,6 +56,102 @@ def curl_status(url: str) -> int:
     return int(status) if result.returncode == 0 and status.isdigit() else 0
 
 
+def browser_document_valid(status: int, title: str, text: str) -> bool:
+    if not 200 <= status < 300 or not title.strip() or len(text.strip()) < 80:
+        return False
+    error_titles = (
+        "just a moment",
+        "access denied",
+        "verify you are human",
+        "forbidden",
+        "not found",
+        "page not found",
+        "sign in",
+        "log in",
+        "login",
+        "security checkpoint",
+        "attention required",
+        "security verification",
+    )
+    return not any(marker in title.lower() for marker in error_titles)
+
+
+def verify_browser_pages(urls: list[str]) -> dict[str, dict[str, object]]:
+    from playwright.sync_api import (
+        Error as PlaywrightError,
+        Frame,
+        Response,
+        sync_playwright,
+    )
+
+    def navigation_recorder(
+        frame: Frame, statuses: list[int]
+    ) -> Callable[[Response], None]:
+        def record(response: Response) -> None:
+            if response.request.is_navigation_request() and response.frame == frame:
+                statuses.append(response.status)
+
+        return record
+
+    results: dict[str, dict[str, object]] = {}
+    try:
+        with sync_playwright() as playwright:
+            browser = playwright.chromium.launch(channel="chromium")
+            try:
+                for url in urls:
+                    context = browser.new_context()
+                    try:
+                        page = context.new_page()
+                        statuses: list[int] = []
+
+                        page.on(
+                            "response", navigation_recorder(page.main_frame, statuses)
+                        )
+                        page.goto(url, wait_until="domcontentloaded", timeout=30000)
+                        deadline = monotonic() + 10
+                        status = 0
+                        title = ""
+                        verified = False
+                        while True:
+                            status = statuses[-1] if statuses else 0
+                            try:
+                                title = page.title()
+                                text = page.locator("body").inner_text(timeout=1000)
+                                verified = browser_document_valid(status, title, text)
+                            except PlaywrightError:
+                                verified = False
+                            if verified or monotonic() >= deadline:
+                                break
+                            page.wait_for_timeout(200)
+                        final_url = urlsplit(page.url)
+                        results[url] = {
+                            "status": status,
+                            "title": title,
+                            "final_url": urlunsplit(
+                                (
+                                    final_url.scheme,
+                                    final_url.netloc,
+                                    final_url.path,
+                                    "",
+                                    final_url.fragment,
+                                )
+                            ),
+                            "verified": verified,
+                        }
+                    except Exception as error:
+                        results[url] = {"verified": False, "error": str(error)[:500]}
+                    finally:
+                        context.close()
+            finally:
+                browser.close()
+    except Exception as error:
+        for url in urls:
+            results[url] = {"verified": False, "error": str(error)[:500]}
+    for url, result in results.items():
+        print("Browser verification: " + json.dumps({"url": url, **result}))
+    return results
+
+
 def report_errors(report: dict[str, Any]) -> list[dict[str, Any]] | None:
     buckets = report.get("error_map")
     if not isinstance(buckets, dict):
@@ -69,7 +167,9 @@ def report_errors(report: dict[str, Any]) -> list[dict[str, Any]] | None:
 
 
 def check_report(
-    report: dict[str, Any], fetch_status: Callable[[str], int] = curl_status
+    report: dict[str, Any],
+    fetch_status: Callable[[str], int] = curl_status,
+    browser_results: dict[str, dict[str, object]] | None = None,
 ) -> list[str]:
     total = report.get("total")
     errors = report_errors(report)
@@ -93,6 +193,16 @@ def check_report(
             if 200 <= verified[url] < 300:
                 print(f"Verified with curl HTTP {verified[url]}: {url}")
                 continue
+        if status.get("code") in {403, 429} and browser_results:
+            result = browser_results.get(url, {})
+            browser_status = result.get("status")
+            if (
+                result.get("verified") is True
+                and isinstance(browser_status, int)
+                and 200 <= browser_status < 300
+            ):
+                print(f"Verified with browser HTTP {result.get('status')}: {url}")
+                continue
         failures.append(f"Link validation failed: {url} ({status.get('code')})")
     print(f"Checked {total} link occurrences; {len(failures)} failures remain.")
     return failures
@@ -102,6 +212,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--report", type=Path, required=True)
     parser.add_argument("--cookie-jar", required=True)
+    parser.add_argument("--browser-verify", action="store_true")
     parser.add_argument("inputs", nargs="+")
     args = parser.parse_args()
     result = subprocess.run(
@@ -139,7 +250,22 @@ def main() -> int:
             verified[url] = curl_status(url)
             return verified[url]
 
-        failures = check_report(report, verify)
+        browser_results = None
+        if args.browser_verify:
+            errors = report_errors(report)
+            urls = sorted(
+                {
+                    entry["url"]
+                    for entry in errors or []
+                    if isinstance(entry.get("url"), str)
+                    and isinstance(entry.get("status"), dict)
+                    and entry["status"].get("code") in {403, 429}
+                    and urlsplit(entry["url"]).scheme in {"http", "https"}
+                }
+            )
+            browser_results = verify_browser_pages(urls) if urls else {}
+            report["browser_verification"] = browser_results
+        failures = check_report(report, verify, browser_results)
         report["curl_verification"] = verified
         report["validation_errors"] = failures
         args.report.write_text(json.dumps(report, indent=2) + "\n")

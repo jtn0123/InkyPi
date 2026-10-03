@@ -28,7 +28,7 @@ simulated checks do not establish a physical-Pi sandbox or memory-pressure pass.
 The proxy is an application-level egress boundary, not a separate network
 namespace or protection against a compromised Chromium network process.
 
-Chromium documents [proxy behavior and loopback bypass rules](https://chromium.googlesource.com/chromium/src/+/main/net/docs/proxy.md).
+Chromium documents [proxy behavior and loopback bypass rules](https://github.com/chromium/chromium/blob/main/net/docs/proxy.md).
 
 ## Software Bill of Materials (SBOM)
 

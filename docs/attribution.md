@@ -6,7 +6,7 @@ This project uses various fonts and icons, each with specific licensing terms. B
 |---------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------|
 [Jost by Owen Earl](https://fonts.google.com/specimen/Jost) | [SIL OFL v1.1](https://fonts.google.com/specimen/Jost/license) |
 [Dogica Pixel by Roberto Mocci ](https://www.dafont.com/dogica.font) | [SIL OFL v1.1](http://scripts.sil.org/OFL)|
-[DS-Digital by Dusit Supasawat ](https://www.dafont.com/ds-digital.font) | [Shareware](../src/static/fonts/DS-DIGI/DIGITAL.txt)|
+[DS-Digital by Dusit Supasawat ](https://www.dafont.com/ds-digital.font) | [Shareware](../src/static/fonts/DS-DIGI/DIGITAL.TXT)|
 [Napoli by Vladimir Nikolic ](https://www.dafont.com/napoli.font) | Free for personal use |
 
 
@@ -17,11 +17,11 @@ This project uses various fonts and icons, each with specific licensing terms. B
 | <img src="../src/plugins/image_upload/icon.png" width="32" height="32"> | <a href="https://www.flaticon.com/free-icons/picture" title="picture icons">Picture icons created by Pixel perfect - Flaticon</a>|
 | <img src="../src/plugins/newspaper/icon.png" width="32" height="32"> | <a href="https://www.flaticon.com/free-icons/paper" title="paper icons">Paper icons created by Freepik - Flaticon</a>|
 | <img src="../src/plugins/weather/icon.png" width="32" height="32"> | <a href="https://www.flaticon.com/free-icons/sunny" title="sunny icons">Sunny icons created by kosonicon - Flaticon</a>|
-| <img src="../src/static/icons/display.png" width="32" height="32"> | <a href="https://www.flaticon.com/free-icons/music-and-multimedia" title="music and multimedia icons">Music and multimedia icons created by Archival - Flaticon</a>|
-| <img src="../src/static/icons/edit.png" width="32" height="32"> | <a href="https://www.flaticon.com/free-icons/modify" title="modify icons">Modify icons created by Freepik - Flaticon</a>|
-| <img src="../src/static/icons/playlist.png" width="32" height="32"> | <a href="https://www.flaticon.com/free-icons/picture" title="picture icons">Picture icons created by Pixel perfect - Flaticon</a>|
-| <img src="../src/static/icons/remove.png" width="32" height="32"> |<a href="https://www.flaticon.com/free-icons/delete" title="delete icons">Delete icons created by Pixel perfect - Flaticon</a>|
-| <img src="../src/static/icons/settings.png" width="32" height="32"> |<a href="https://www.flaticon.com/free-icons/settings" title="settings icons">Settings icons created by Phoenix Group - Flaticon</a>|
+| Legacy display icon (no longer bundled) | <a href="https://www.flaticon.com/free-icons/music-and-multimedia" title="music and multimedia icons">Music and multimedia icons created by Archival - Flaticon</a>|
+| Legacy edit icon (no longer bundled) | <a href="https://www.flaticon.com/free-icons/modify" title="modify icons">Modify icons created by Freepik - Flaticon</a>|
+| Legacy playlist icon (no longer bundled) | <a href="https://www.flaticon.com/free-icons/picture" title="picture icons">Picture icons created by Pixel perfect - Flaticon</a>|
+| Legacy remove icon (no longer bundled) |<a href="https://www.flaticon.com/free-icons/delete" title="delete icons">Delete icons created by Pixel perfect - Flaticon</a>|
+| Legacy settings icon (no longer bundled) |<a href="https://www.flaticon.com/free-icons/settings" title="settings icons">Settings icons created by Phoenix Group - Flaticon</a>|
 | <img src="../src/plugins/weather/icons/01d.png" width="32" height="32"> | <a href="https://www.flaticon.com/free-icons/gradient" title="gradient icons">Gradient icons created by jeremie ROBERRINI-NEVEU - Flaticon</a>|
 | <img src="../src/plugins/weather/icons/01n.png" width="32" height="32"> | <a href="https://www.flaticon.com/packs/weather-app-8" title="color fill">Color fill created by Arkinasi - Flaticon</a>|
 | <img src="../src/plugins/weather/icons/02d.png" width="32" height="32"> | <a href="https://www.flaticon.com/free-icons/cloudy" title="cloudy icons">Cloudy icons created by berkahicon - Flaticon</a><br><a href="https://www.flaticon.com/free-icons/gradient" title="gradient icons">Gradient icons created by jeremie ROBERRINI-NEVEU - Flaticon</a>|

@@ -7,7 +7,7 @@
 [![CI](https://github.com/jtn0123/InkyPi/actions/workflows/ci.yml/badge.svg)](https://github.com/jtn0123/InkyPi/actions/workflows/ci.yml)
 [![Quality Gate](https://sonarcloud.io/api/project_badges/measure?project=jtn0123_InkyPi&metric=alert_status)](https://sonarcloud.io/summary/overall?id=jtn0123_InkyPi)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/)
-[![License: GPL v3](https://img.shields.io/badge/license-GPL%20v3-green)](./LICENSE)
+[![License: GPL v3](https://img.shields.io/badge/license-GPL%20v3-green.svg)](./LICENSE)
 
 <br>
 
