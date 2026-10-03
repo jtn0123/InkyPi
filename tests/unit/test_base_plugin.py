@@ -394,3 +394,50 @@ def test_build_inline_css_extra_css_lookup_failure_raises_and_logs(
     assert any(
         "Failed to process extra CSS string" in r.getMessage() for r in caplog.records
     )
+
+
+def test_rendered_plugin_page_carries_restrictive_csp() -> None:
+    """Plugin pages render in a privileged local Chromium.
+
+    The base template must ship a CSP that cuts off network exfiltration
+    channels, and it must precede every resource-loading tag in <head>.
+    """
+    import re
+
+    from plugins.base_plugin.base_plugin import BasePlugin
+
+    plugin = BasePlugin({"id": "rss"})
+    html = plugin._render_template(
+        "rss.html",
+        {
+            "title": "Feed",
+            "items": [],
+            "plugin_settings": {},
+            "style_sheets": ["file:///tmp/x.css"],
+            "font_faces": [],
+        },
+    )
+
+    match = re.search(
+        r'<meta http-equiv="Content-Security-Policy" content="([^"]+)">', html
+    )
+    assert match, "plugin.html must declare a Content-Security-Policy"
+    directives = dict(
+        part.strip().split(" ", 1) for part in match.group(1).split(";") if part.strip()
+    )
+    for name in ("default-src", "connect-src", "form-action", "base-uri"):
+        assert directives[name] == "'none'", name
+    for name in ("object-src", "frame-src", "worker-src"):
+        assert directives[name] == "'none'", name
+    # Scripts: inline + local files + the SRI-pinned Chart.js CDN only.
+    assert directives["script-src"].split() == [
+        "'unsafe-inline'",
+        "file:",
+        "https://cdn.jsdelivr.net",
+    ]
+
+    head = html.split("</head>", 1)[0]
+    csp_at = head.index("Content-Security-Policy")
+    for tag in ("<link", "<style", "<script"):
+        if tag in head:
+            assert head.index(tag) > csp_at, f"{tag} precedes the CSP meta tag"

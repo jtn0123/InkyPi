@@ -167,6 +167,25 @@ def disable_plugin_process_isolation(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("INKYPI_PLUGIN_ISOLATION", "none")
 
 
+@pytest.fixture(scope="session")
+def _chromium_lock_dir(tmp_path_factory: pytest.TempPathFactory) -> str:
+    return str(tmp_path_factory.mktemp("chromium-lock"))
+
+
+@pytest.fixture(autouse=True)
+def isolate_chromium_slot(
+    _chromium_lock_dir: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Give each test process its own Chromium slot lock file.
+
+    In production the slot is deliberately machine-wide. Under pytest-xdist
+    that would make sibling workers contend for it, so a render in one worker
+    could stall (and add limiter log records to) an unrelated test in another.
+    Tests that exercise the limiter itself override this with their own dir.
+    """
+    monkeypatch.setenv("INKYPI_CHROMIUM_LOCK_DIR", _chromium_lock_dir)
+
+
 @pytest.fixture(autouse=True)
 def clear_managed_api_key_env(monkeypatch: pytest.MonkeyPatch) -> None:
     # Keep tests hermetic even when earlier tests or the parent shell export real

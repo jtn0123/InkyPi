@@ -339,3 +339,38 @@ def test_ai_text_google_success(
 
         mock_client.models.generate_content.assert_called_once()
         assert result is not None
+
+
+def test_ai_text_model_output_is_escaped_not_rendered_as_html(
+    device_config_dev: Any,
+) -> None:
+    """Model output is untrusted: markup in it must render as literal text.
+
+    The rendered page runs in a file://-privileged Chromium, so an unescaped
+    ``<script>`` in a model response would execute there.
+    """
+    from plugins.ai_text.ai_text import AIText
+
+    plugin = AIText({"id": "ai_text"})
+    payload = "Line one\n<script>fetch('http://evil.example/')</script>"
+    html = plugin._render_template(
+        "ai_text.html",
+        {"title": "<b>T</b>", "content": payload, "plugin_settings": {}},
+    )
+
+    assert "<script>fetch(" not in html
+    assert "&lt;script&gt;fetch(" in html
+    assert "<b>T</b>" not in html
+    # Newlines survive verbatim; ai_text.css renders them via white-space: pre-line.
+    assert "Line one\n&lt;script&gt;" in html
+
+
+def test_ai_text_css_preserves_model_newlines() -> None:
+    """Escaping relies on CSS, not <br> markup, to keep the model's line breaks."""
+    from pathlib import Path
+
+    css_path = (
+        Path(__file__).resolve().parents[2] / "src/plugins/ai_text/render/ai_text.css"
+    )
+    content_rule = css_path.read_text(encoding="utf-8").split(".content", 1)[1]
+    assert "white-space: pre-line" in content_rule.split("}", 1)[0]
