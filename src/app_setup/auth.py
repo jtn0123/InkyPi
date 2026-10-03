@@ -20,6 +20,7 @@ import hashlib
 import hmac
 import logging
 import os
+import posixpath
 import secrets
 from typing import TYPE_CHECKING
 
@@ -36,7 +37,16 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 # Paths that never require authentication
-_AUTH_SKIP_PREFIXES = ("/static/",)
+_STATIC_PREFIX = "/static/"
+# Only these top-level ``/static/`` subtrees are public. They hold shipped,
+# non-user application assets (CSS, JS, vendored libraries, build bundles,
+# fonts, icons) that the service worker precaches and that pages may need
+# before a session exists. Everything else under ``/static/`` -- notably
+# ``images/`` (current/processed display image, history, plugin renders and
+# uploaded photos) -- requires authentication like any other route.
+_PUBLIC_STATIC_DIRS = frozenset(
+    {"dist", "fonts", "icons", "scripts", "styles", "vendor"}
+)
 _AUTH_SKIP_EXACT = frozenset({"/login", "/logout", "/sw.js", "/api/health"})
 # Also skip Flask/Werkzeug internal health probes registered by health.py
 _AUTH_SKIP_HEALTH = frozenset({"/healthz", "/readyz"})
@@ -118,6 +128,22 @@ def _is_readonly_token_request(stored_hash: str) -> bool:
     return _verify_bearer_token(stored_hash)
 
 
+def _is_public_static_path(path: str) -> bool:
+    """Return True when *path* is a file inside a public ``/static/`` subtree.
+
+    The path is normalised first so ``/static/styles/../images/x.png`` or
+    ``/static/./images/x.png`` (which the static file handler resolves to
+    ``images/x.png``) cannot borrow a public prefix.
+    """
+    if not path.startswith(_STATIC_PREFIX):
+        return False
+    relative = posixpath.normpath(path[len(_STATIC_PREFIX) :])
+    if relative.startswith(("/", "..")):
+        return False
+    top, sep, _rest = relative.partition("/")
+    return bool(sep) and top in _PUBLIC_STATIC_DIRS
+
+
 def _should_skip_auth() -> bool:
     """Return True when the current request path is exempt from authentication."""
     path = request.path
@@ -125,7 +151,7 @@ def _should_skip_auth() -> bool:
         return True
     if path in _AUTH_SKIP_HEALTH:
         return True
-    return any(path.startswith(prefix) for prefix in _AUTH_SKIP_PREFIXES)
+    return _is_public_static_path(path)
 
 
 def init_auth(app: Flask, device_config: Config) -> None:

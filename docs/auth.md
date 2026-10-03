@@ -97,6 +97,22 @@ store. Treat its contents as visible to the browser; signing prevents edits,
 not disclosure. The persistent `SECRET_KEY` signs it; rotating the key
 invalidates existing sessions. `/logout` clears the session.
 
+Only these routes stay reachable without a session: `/login`, `/logout`,
+`/sw.js`, `/api/health`, `/healthz`, `/readyz`, and shipped application assets
+under `/static/dist/`, `/static/fonts/`, `/static/icons/`, `/static/scripts/`,
+`/static/styles/` and `/static/vendor/`. Every other `/static/` path requires
+login, in particular `/static/images/`, which holds the current and processed
+display image, render history, plugin images and uploaded photos
+(`/static/images/saved/`). Paths are normalised before the check, so `..` or
+`.` segments cannot reach `images/` through a public prefix. The service worker
+caches only the public asset subtrees, so display images are never kept in the
+browser's offline cache. Without a PIN, `/static/images/` remains open like the
+rest of the app.
+
+```bash
+curl -I http://inkypi.local/static/images/current_image.png  # 302 to /login
+```
+
 PIN comparisons use constant-time verification. Repeated failures are limited
 by session and client IP; after five session failures, the session is locked
 for 60 seconds. HTTPS protects PIN transmission; hashing alone does not.
@@ -124,6 +140,9 @@ Allowed methods are GET/HEAD/OPTIONS on these paths:
 ```bash
 curl -H 'Authorization: Bearer <your-token>' https://inkypi.example.com/api/uptime
 ```
+
+The token does not unlock `/static/images/`; fetch the current display through
+`/api/screenshot` instead.
 
 For trusted LAN HTTP, the production default is port 80
 (`http://inkypi.local/api/uptime`); development defaults to 8080. Use HTTPS when

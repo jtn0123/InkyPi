@@ -50,6 +50,8 @@ def test_server_teardown_releases_only_owned_streams(
     event_bus = EventBus()
     monkeypatch.setattr(event_module, "_event_bus", event_bus)
     monkeypatch.delenv("INKYPI_PROGRESS_SSE_MAX_CONNECTIONS", raising=False)
+    # Each app opens three streams; ownership, not the shared cap, is under test.
+    monkeypatch.setenv("INKYPI_SSE_MAX_STREAMS", "8")
     workers: dict[str, list[threading.Thread]] = {"first": [], "second": []}
 
     def app(name: str) -> Flask:
@@ -133,7 +135,9 @@ def test_progress_response_close_is_idempotent_before_and_after_iteration(
         current = _health._PROGRESS_STREAM_ACTIVE
         assert current == initial + 1
         if started:
-            chunk = next(iter(response.response))
+            chunks = iter(response.response)
+            assert next(chunks) == "retry: 3000\n\n"
+            chunk = next(chunks)
             assert isinstance(chunk, str)
             assert chunk.startswith("event: probe")
     finally:

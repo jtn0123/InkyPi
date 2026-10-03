@@ -179,6 +179,9 @@
   background: var(--surface);
   color: var(--text);
   text-decoration: none;
+  /* <a> (Download) and <button> (Display/Delete) must share one type scale. */
+  font-family: inherit;
+  font-size: var(--text-sm);
   font-weight: 600;
   transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.18s ease;
 }
@@ -205,14 +208,17 @@
 
 .history-actions .btn-danger,
 .hist-actions .btn-danger {
-  background: var(--error);
-  border-color: var(--error);
-  color: var(--on-accent);
+  /* A solid red Delete on every card outshouted the primary Display action.
+     Keep it quiet until hovered; the confirm modal guards the action. */
+  background: transparent;
+  border-color: var(--error-border);
+  color: var(--error-contrast, var(--error));
 }
 
 .history-actions .btn-danger:hover,
 .hist-actions .btn-danger:hover {
-  background: var(--danger-hover);
+  background: var(--error-bg);
+  border-color: var(--error);
 }
 
 /* Handoff parity: danger zones mirror `.card-danger` (see _card.css:61) —
@@ -280,7 +286,7 @@
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--error);
+  color: var(--error-contrast, var(--error));
   background: color-mix(in srgb, var(--error) 14%, transparent);
   border: 1px solid color-mix(in srgb, var(--error) 30%, transparent);
   padding: 2px 8px;

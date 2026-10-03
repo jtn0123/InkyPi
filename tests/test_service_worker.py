@@ -10,7 +10,17 @@ from flask.testing import FlaskClient
 
 
 @pytest.mark.parametrize(
-    "scenario", ["updated", "offline", "hashed", "error", "cross-origin", "non-get"]
+    "scenario",
+    [
+        "updated",
+        "offline",
+        "hashed",
+        "error",
+        "cross-origin",
+        "non-get",
+        "private-image",
+        "private-image-traversal",
+    ],
 )
 def test_worker_cache_policy(scenario: str) -> None:
     """Execute the shipped worker against a primed cache, not a source-pattern mock."""
@@ -45,12 +55,15 @@ vm.runInNewContext(fs.readFileSync(process.argv[2], "utf8"), {
     method: scenario === "non-get" ? "POST" : "GET",
     url: scenario === "cross-origin" ? "https://other.test/static/x.css" :
       scenario === "hashed" ? "https://inkypi.test/static/dist/common.bundle.a1b2c3d4.min.js" :
+      scenario === "private-image" ? "https://inkypi.test/static/images/current_image.png" :
+      scenario === "private-image-traversal" ? "https://inkypi.test/static/styles/../images/saved/me.jpg" :
       "https://inkypi.test/static/styles/main.css",
   };
   let pending;
   const waits = [];
   handlers.fetch({request, respondWith: p => pending = p, waitUntil: p => waits.push(p)});
-  if (scenario === "cross-origin" || scenario === "non-get") {
+  // Auth-gated /static/images/ responses must never enter the shared cache.
+  if (["cross-origin", "non-get", "private-image", "private-image-traversal"].includes(scenario)) {
     assert.equal(pending, undefined); assert.equal(requests, 0); return;
   }
   const result = await pending;
