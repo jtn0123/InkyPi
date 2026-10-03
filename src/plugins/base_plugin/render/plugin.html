@@ -51,6 +51,10 @@
 
         margin-top: {{ plugin_settings.topMargin or plugin_settings.margin or 5 }}px;
         margin-bottom: {{ plugin_settings.bottomMargin or plugin_settings.margin or 5 }}px;
+        {# Standards mode (the DOCTYPE) gives body an auto height, which collapses
+           every height: 100% / container-query layout below it. Fill the viewport
+           minus the vertical margins, as quirks mode used to. #}
+        height: calc(100vh - {{ plugin_settings.topMargin or plugin_settings.margin or 5 }}px - {{ plugin_settings.bottomMargin or plugin_settings.margin or 5 }}px);
         margin-left: {{ plugin_settings.leftMargin or plugin_settings.margin or 5 }}px;
         margin-right: {{ plugin_settings.rightMargin or plugin_settings.margin or 5 }}px;
     ">

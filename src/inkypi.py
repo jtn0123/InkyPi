@@ -65,6 +65,7 @@ from utils.app_utils import generate_startup_image, get_ip_address
 from utils.config_schema import ConfigValidationError
 from utils.i18n import init_i18n
 from utils.sri import init_sri
+from utils.sse import max_concurrent_streams, web_threads
 
 # Re-exported for tests/unit/test_inkypi.py monkey-patches.
 __all__ = [
@@ -100,7 +101,6 @@ logger = logging.getLogger(__name__)
 
 _TRUTHY = frozenset({"1", "true", "yes"})
 _DEFAULT_MAX_UPLOAD = 10 * 1024 * 1024
-_DEFAULT_WEB_THREADS = 2
 
 
 def _parse_refresh_datetime(iso_value: object) -> datetime | None:
@@ -170,22 +170,13 @@ def _format_sidebar_load_average() -> str | None:
 def _get_web_threads() -> int:
     """Return the waitress thread count, env-configurable via INKYPI_WEB_THREADS.
 
-    Defaults to 2 (suitable for Pi Zero 2 W's 425 MB RAM). Users with more
-    headroom can set INKYPI_WEB_THREADS=4 or higher via a systemd drop-in.
+    Defaults to 4. Each open SSE stream pins one thread for up to a minute,
+    so ``utils.sse`` caps concurrent streams at ``threads - 2`` to keep two
+    threads free for normal requests. Idle waitress threads cost little RSS
+    (their stacks are mostly untouched virtual memory), so this is safe on a
+    Pi Zero 2 W; INKYPI_WEB_THREADS overrides via a systemd drop-in.
     """
-    raw = os.environ.get("INKYPI_WEB_THREADS")
-    if raw is None or raw == "":
-        return _DEFAULT_WEB_THREADS
-    try:
-        value = int(raw)
-    except (ValueError, TypeError):
-        logger.warning(
-            "Invalid INKYPI_WEB_THREADS=%r, falling back to default (%d)",
-            raw,
-            _DEFAULT_WEB_THREADS,
-        )
-        return _DEFAULT_WEB_THREADS
-    return max(1, value)
+    return web_threads()
 
 
 def _env_bool(name: str, default: str = "") -> bool:
@@ -766,13 +757,21 @@ if __name__ == "__main__":
             if local_ip:
                 logger.info(f"Serving on http://{local_ip}:{PORT}")
 
-        web_threads = _get_web_threads()
-        logger.info(f"waitress threads: {web_threads}")
+        thread_count = _get_web_threads()
+        logger.info(
+            "waitress threads: %d (max concurrent SSE streams: %d)",
+            thread_count,
+            max_concurrent_streams(),
+        )
         serve(
             created_app,
             host="0.0.0.0",
             port=PORT,
-            threads=web_threads,
+            threads=thread_count,
+            # Keep reading each connection while its request runs so SSE
+            # streams can see `waitress.client_disconnected` and free their
+            # worker thread as soon as a tab closes.
+            channel_request_lookahead=1,
             # Scheme trust is enforced against the direct peer by our WSGI wrapper.
             clear_untrusted_proxy_headers=False,
         )
