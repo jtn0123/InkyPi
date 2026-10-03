@@ -207,7 +207,7 @@ class PluginHealthTracker:
         )
         # The early return above means any pause now is new, and a failed
         # write rolls the model back, so this reflects what was persisted.
-        if plugin_instance.paused:
+        if self._is_paused(plugin_instance):
             set_circuit_breaker_open(plugin_id, True)
             logger.error(
                 "plugin circuit_breaker: paused | plugin_id=%s instance=%s"
@@ -324,6 +324,12 @@ class PluginHealthTracker:
             or plugin_instance.consecutive_failure_count > 0
             or plugin_instance.disabled_reason is not None
         )
+
+    @staticmethod
+    def _is_paused(plugin_instance: PluginInstanceLike) -> bool:
+        # Read through a call: type checkers otherwise keep the "not paused"
+        # narrowing from on_failure's early return across the mutation.
+        return bool(plugin_instance.paused)
 
     @staticmethod
     def _clear_breaker(plugin_instance: PluginInstanceLike) -> None:
