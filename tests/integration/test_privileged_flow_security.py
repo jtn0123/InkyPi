@@ -397,3 +397,63 @@ def test_authenticated_session_can_import_plugins_with_csrf(
     imported = pm.find_plugin("clock", "Secure Import Clock")
     assert imported is not None
     assert imported.settings.get("time_format") == "12h"
+
+
+# Display images, history renders and uploaded photos live under
+# src/static/images/. inkypi.png is the tracked default preview, so it exists on
+# disk and proves the real static handler is reached once auth allows it.
+PRIVATE_STATIC_IMAGE = "/static/images/inkypi.png"
+PUBLIC_STATIC_ASSET = "/static/vendor/htmx.min.js"
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        PRIVATE_STATIC_IMAGE,
+        "/static/vendor/../images/inkypi.png",
+        "/static/images/current_image.png",
+        "/static/images/history/display_20260101_000000.png",
+        "/static/images/saved/holiday-photo.jpg",
+    ],
+)
+def test_static_images_require_login_when_pin_set(
+    privileged_client: Any, path: str
+) -> None:
+    resp = privileged_client.get(path)
+    assert resp.status_code == 302
+    assert "/login" in resp.headers["Location"]
+
+
+def test_readonly_token_does_not_unlock_static_images(privileged_client: Any) -> None:
+    resp = privileged_client.get(PRIVATE_STATIC_IMAGE, headers=_bearer_headers())
+    assert resp.status_code == 302
+    assert "/login" in resp.headers["Location"]
+
+
+def test_readonly_token_still_reaches_screenshot_endpoint(
+    privileged_client: Any,
+) -> None:
+    resp = privileged_client.get("/api/screenshot", headers=_bearer_headers())
+    assert resp.status_code != 302
+
+
+def test_authenticated_session_can_fetch_static_images(privileged_client: Any) -> None:
+    _seed_authed_session(privileged_client)
+    resp = privileged_client.get(PRIVATE_STATIC_IMAGE)
+    assert resp.status_code == 200
+    assert resp.mimetype == "image/png"
+
+
+def test_public_static_assets_served_without_login(privileged_client: Any) -> None:
+    resp = privileged_client.get(PUBLIC_STATIC_ASSET)
+    assert resp.status_code == 200
+
+
+def test_login_page_renders_without_session(privileged_client: Any) -> None:
+    resp = privileged_client.get("/login")
+    assert resp.status_code == 200
+
+
+def test_static_images_served_without_pin(client: FlaskClient) -> None:
+    resp = client.get(PRIVATE_STATIC_IMAGE)
+    assert resp.status_code == 200
