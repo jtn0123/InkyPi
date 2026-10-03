@@ -2,6 +2,25 @@
 
 <!-- version list -->
 
+## v1.4.15 (2026-10-03)
+
+### Bug Fixes
+
+- **plugins**: Render calendar/weather graph; refine e-ink plugin layouts
+  ([#685](https://github.com/jtn0123/InkyPi/pull/685),
+  [`e7c1724`](https://github.com/jtn0123/InkyPi/commit/e7c17242802df4ddab7a16a96acd5988040dde8f))
+
+- **security**: Validate every redirect hop and guard RSS and iCal fetches
+  ([#679](https://github.com/jtn0123/InkyPi/pull/679),
+  [`a6ccef9`](https://github.com/jtn0123/InkyPi/commit/a6ccef9ab4081a36149c4f477386ef369de7352f))
+
+### Code Style
+
+- **ui**: Refine type, spacing, buttons and contrast
+  ([#684](https://github.com/jtn0123/InkyPi/pull/684),
+  [`c61a02a`](https://github.com/jtn0123/InkyPi/commit/c61a02af269ee153dc1d68c39d93d69a28dd923c))
+
+
 ## v1.4.14 (2026-10-03)
 
 ### Bug Fixes
