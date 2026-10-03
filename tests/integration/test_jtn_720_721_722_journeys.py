@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import os
+import time
 from pathlib import Path
 from typing import Any
 
@@ -126,11 +127,17 @@ def test_jtn_720_first_run_setup_add_schedule_refresh_history(
     if toggle.is_visible():
         toggle.click()
     page.locator(".plugin-display-btn").first.click()
-    page.wait_for_timeout(1200)
     page.wait_for_url(f"{live_server}/playlist", timeout=10000)
 
-    navigate_and_wait(page, live_server, "/history")
-    body_text = page.locator("body").inner_text()
+    # The render runs in the background; under CI load it can take longer
+    # than any fixed sleep, so poll until the history entry is published.
+    deadline = time.monotonic() + 30
+    while True:
+        navigate_and_wait(page, live_server, "/history")
+        body_text = page.locator("body").inner_text()
+        if "No history yet." not in body_text or time.monotonic() > deadline:
+            break
+        page.wait_for_timeout(500)
     assert "No history yet." not in body_text
     assert "Source:" in body_text
     assert "clock" in body_text
