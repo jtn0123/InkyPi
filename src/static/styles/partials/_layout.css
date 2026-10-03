@@ -21,6 +21,13 @@
     margin-top: var(--spacing-lg);
 }
 
+/* .frame is a flex column with its own gap, and .pageheader already carries
+   margin-bottom, so the sibling margin above stacked into a ~54px dead band
+   under every page title. */
+.frame > .pageheader + * {
+    margin-top: 0;
+}
+
 /* Current image styling with improved hierarchy */
 .image-container {
     position: relative;

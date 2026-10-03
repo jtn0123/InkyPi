@@ -33,6 +33,11 @@ class ProgressEventBus:
                 return []
             return list(self._events)[-limit:]
 
+    def latest_seq(self) -> int:
+        """Return the sequence number of the most recently published event."""
+        with self._cond:
+            return self._seq
+
     def wait_for(self, last_seq: int, timeout_s: float = 15.0) -> list[dict[str, Any]]:
         with self._cond:
             if self._seq <= last_seq:
@@ -40,9 +45,13 @@ class ProgressEventBus:
             return [e for e in self._events if int(e.get("seq", 0)) > last_seq]
 
 
-def to_sse(event_type: str, payload: dict[str, Any]) -> str:
+def to_sse(
+    event_type: str, payload: dict[str, Any], event_id: int | None = None
+) -> str:
+    """Format an SSE frame; *event_id* becomes the client's Last-Event-ID."""
     data = json.dumps(payload, separators=(",", ":"))
-    return f"event: {event_type}\ndata: {data}\n\n"
+    id_line = f"id: {event_id}\n" if event_id is not None else ""
+    return f"event: {event_type}\ndata: {data}\n{id_line}\n"
 
 
 _progress_bus = ProgressEventBus()

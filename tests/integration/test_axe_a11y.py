@@ -43,19 +43,15 @@ _KNOWN_VIOLATIONS: dict[str, set[str]] = {
     # aria-dialog-name fires on the response modal and schedule modal when
     # aria-labelledby points to an empty <p>.  TODO(JTN-509): set modal title.
     #
-    # color-contrast fires on some status chips and placeholder text.
-    # TODO(JTN-510): audit contrast ratios.
     "home": {
         "landmark-one-main",
         "region",
-        "color-contrast",  # TODO(JTN-510)
     },
     "settings": {
         "landmark-one-main",
         "region",
         "landmark-banner-is-top-level",  # TODO(JTN-508)
         "aria-dialog-name",  # TODO(JTN-509)
-        "color-contrast",  # TODO(JTN-510)
     },
     "playlist": {
         "landmark-one-main",
@@ -63,7 +59,6 @@ _KNOWN_VIOLATIONS: dict[str, set[str]] = {
         "landmark-banner-is-top-level",  # TODO(JTN-508)
         "heading-order",  # TODO(JTN-508): h3 inside empty-state skips h2
         "aria-dialog-name",  # TODO(JTN-509)
-        "color-contrast",  # TODO(JTN-510)
     },
     "history": {
         "landmark-one-main",
@@ -71,7 +66,6 @@ _KNOWN_VIOLATIONS: dict[str, set[str]] = {
         "landmark-banner-is-top-level",  # TODO(JTN-508)
         "heading-order",  # TODO(JTN-508)
         "aria-dialog-name",  # TODO(JTN-509)
-        "color-contrast",  # TODO(JTN-510)
     },
     "api_keys": {
         "landmark-one-main",
@@ -79,13 +73,11 @@ _KNOWN_VIOLATIONS: dict[str, set[str]] = {
         "landmark-banner-is-top-level",  # TODO(JTN-508)
         "heading-order",  # TODO(JTN-508)
         "aria-dialog-name",  # TODO(JTN-509)
-        "color-contrast",  # TODO(JTN-510)
     },
     "plugin_clock": {
         "landmark-one-main",
         "region",
         "aria-dialog-name",  # TODO(JTN-509)
-        "color-contrast",  # TODO(JTN-510)
         "nested-interactive",  # TODO(JTN-511): collapsible button wraps interactive
         "aria-hidden-focus",  # TODO(JTN-511): hidden modal contains focusable elements
     },

@@ -48,6 +48,16 @@ body {
     /* Let content flow naturally; pages control their own centering */
 }
 
+/* Form controls don't inherit the page font by default, so every <button>
+   rendered in the UA font (Arial) while <a class="btn"> siblings used the
+   app stack. Sizes stay with the component classes. */
+button,
+input,
+select,
+textarea {
+    font-family: inherit;
+}
+
 /* Monospace utility — JetBrains Mono for refined labels and metrics */
 .mono,
 code,
