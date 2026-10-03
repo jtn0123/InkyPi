@@ -560,30 +560,30 @@ def _display_next_direct(
     except TypeError:
         display_manager.display_image(image, image_settings=image_settings)
 
-    # Persist playlist state so index is not lost on next refresh
-    device_config.write_config()
+    from model import RefreshInfo
 
-    # Update refresh_info
-    try:
-        from model import RefreshInfo
+    latest = RefreshInfo(
+        refresh_type="Playlist",
+        plugin_id=plugin_instance.plugin_id,
+        playlist=playlist.name,
+        plugin_instance=plugin_instance.name,
+        refresh_time=current_dt.isoformat(),
+        image_hash=None,
+        request_ms=None,
+        display_ms=None,
+        generate_ms=generate_ms,
+        preprocess_ms=None,
+        used_cached=False,
+        benchmark_id=benchmark_id,
+    )
 
-        device_config.refresh_info = RefreshInfo(
-            refresh_type="Playlist",
-            plugin_id=plugin_instance.plugin_id,
-            playlist=playlist.name,
-            plugin_instance=plugin_instance.name,
-            refresh_time=current_dt.isoformat(),
-            image_hash=None,
-            request_ms=None,
-            display_ms=None,
-            generate_ms=generate_ms,
-            preprocess_ms=None,
-            used_cached=False,
-            benchmark_id=benchmark_id,
-        )
-        device_config.write_config()
-    except Exception:
-        pass
+    def _record_display(_config: dict[str, Any]) -> None:
+        device_config.refresh_info = latest
+
+    # Persist the advanced playlist index and the new refresh_info in one
+    # locked transaction, so a concurrent update_atomic rollback in another
+    # thread cannot discard either.
+    device_config.update_atomic(_record_display)
 
     return generate_ms, None
 
@@ -666,12 +666,17 @@ def display_next() -> Any:
     # Determine current time
     current_dt = _current_dt(device_config)
 
-    # Pick next eligible and commit index change
-    playlist = playlist_manager.determine_active_playlist(current_dt)
+    # Pick next eligible and commit index change. The index advance is held
+    # under the config lock so it cannot interleave with the refresh thread
+    # or another request's update_atomic snapshot/rollback; it is persisted
+    # by the refresh-info write that follows the display update.
+    with device_config.locked():
+        playlist = playlist_manager.determine_active_playlist(current_dt)
+        plugin_instance = (
+            playlist.get_next_eligible_plugin(current_dt) if playlist else None
+        )
     if not playlist:
         return json_error("No active playlist", status=400)
-
-    plugin_instance = playlist.get_next_eligible_plugin(current_dt)
     if not plugin_instance:
         return json_error("No eligible plugin to display", status=400)
 

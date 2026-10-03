@@ -14,7 +14,7 @@ from typing import Any, Protocol, cast
 
 from PIL import Image
 
-from refresh_task.actions import RefreshAction
+from refresh_task.actions import RefreshAction, StateDelta
 from refresh_task.context import RefreshContext
 from refresh_task.recorder import RefreshRecorder
 from refresh_task.worker import (
@@ -101,6 +101,7 @@ class RefreshExecutor:
         proc: Any,
         plugin_id: str,
         attempt: int,
+        refresh_action: RefreshAction | None = None,
     ) -> tuple[Any, Any]:
         """Read and validate the result queue from a finished subprocess."""
         return self.handle_process_result_payload(
@@ -109,6 +110,7 @@ class RefreshExecutor:
             plugin_id,
             attempt,
             remote_exception_factory=self.remote_exception_factory,
+            refresh_action=refresh_action,
         )
 
     @staticmethod
@@ -118,8 +120,16 @@ class RefreshExecutor:
         plugin_id: str,
         attempt: int,
         remote_exception_factory: RemoteExceptionFactory = _remote_exception,
+        refresh_action: RefreshAction | None = None,
     ) -> tuple[Any, Any]:
-        """Read and validate the result queue from a finished subprocess."""
+        """Read and validate the result queue from a finished subprocess.
+
+        On success the worker's plugin-instance state delta is handed to
+        *refresh_action* so the parent can commit what the child changed on
+        its own copy.  ``(None, plugin_meta)`` means a control-only plugin
+        succeeded without producing an image; failures always carry an
+        exception in the second slot.
+        """
         try:
             payload = result_queue.get_nowait()
         except queue.Empty:
@@ -131,7 +141,18 @@ class RefreshExecutor:
                 )
             raise RuntimeError(f"Plugin '{plugin_id}' exited with code {proc.exitcode}")
         if payload.get("ok"):
-            image_path = payload["image_path"]
+            if refresh_action is not None:
+                refresh_action.adopt_state_delta(
+                    cast(StateDelta, payload.get("state_delta") or {})
+                )
+            image_path = payload.get("image_path")
+            if image_path is None:
+                logger.info(
+                    "plugin_lifecycle: attempt_success | plugin_id=%s attempt=%s no_image=true",
+                    plugin_id,
+                    attempt,
+                )
+                return None, payload.get("plugin_meta")
             try:
                 with Image.open(image_path) as image:
                     result_image = image.copy()
@@ -180,7 +201,9 @@ class RefreshExecutor:
             if proc.is_alive():
                 self.cleanup_subprocess(proc, plugin_id)
                 return None, TimeoutError(self.timeout_msg(plugin_id, timeout_s))
-            return self.handle_process_result(result_queue, proc, plugin_id, attempt)
+            return self.handle_process_result(
+                result_queue, proc, plugin_id, attempt, refresh_action
+            )
         except TimeoutError:
             return None, TimeoutError(self.timeout_msg(plugin_id, timeout_s))
         except Exception as exc:
@@ -233,7 +256,8 @@ class RefreshExecutor:
             image, exc_or_meta = self.run_subprocess_attempt(
                 refresh_action, plugin_config, current_dt, plugin_id, timeout_s, attempt
             )
-            if image is not None:
+            if not isinstance(exc_or_meta, BaseException):
+                # Success — possibly with no image from a control-only plugin.
                 return image, exc_or_meta
 
             last_exc = self._normalize_timeout(plugin_id, timeout_s, exc_or_meta)
@@ -438,13 +462,11 @@ class RefreshExecutor:
 
     @staticmethod
     def _normalize_timeout(
-        plugin_id: str, timeout_s: float, exc_or_meta: Any
+        plugin_id: str, timeout_s: float, exc: BaseException
     ) -> BaseException:
-        if isinstance(exc_or_meta, TimeoutError):
+        if isinstance(exc, TimeoutError):
             return TimeoutError(RefreshExecutor.timeout_msg(plugin_id, timeout_s))
-        if isinstance(exc_or_meta, BaseException):
-            return exc_or_meta
-        return RuntimeError(str(exc_or_meta))
+        return exc
 
     @staticmethod
     def _raise_if_permanent(

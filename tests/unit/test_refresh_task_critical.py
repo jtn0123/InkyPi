@@ -142,7 +142,15 @@ class TestExecuteRefreshAttemptWorker:
         img.close()
         os.unlink(payload["image_path"])
 
-    def test_none_image_puts_error(self, device_config_dev: Any) -> Any:
+    def test_none_image_puts_ok_payload_without_image(
+        self, device_config_dev: Any
+    ) -> Any:
+        """A control-only plugin's None is a completed refresh, not a failure.
+
+        The in-process path already treats it that way; reporting it as a
+        RuntimeError here made the same plugin fail — and trip the circuit
+        breaker — only under the default process isolation.
+        """
         from refresh_task import _execute_refresh_attempt_worker
 
         result_queue = queue.Queue()
@@ -171,9 +179,9 @@ class TestExecuteRefreshAttemptWorker:
             )
 
         payload = result_queue.get_nowait()
-        assert payload["ok"] is False
-        assert payload["error_type"] == "RuntimeError"
-        assert "None" in payload["error_message"]
+        assert payload["ok"] is True
+        assert payload["image_path"] is None
+        assert payload["state_delta"] == {}
 
     def test_exception_puts_error_payload(self, device_config_dev: Any) -> None:
         from refresh_task import _execute_refresh_attempt_worker

@@ -5,7 +5,8 @@ import os
 import shutil
 import tempfile
 import threading
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from copy import deepcopy
 from typing import Any, cast
 
@@ -609,6 +610,20 @@ class Config:
             except Exception:
                 self._restore_mutable_state(before)
                 raise
+
+    @contextmanager
+    def locked(self) -> Iterator[None]:
+        """Hold the config lock while mutating model objects without a write.
+
+        For bookkeeping that is persisted by a later write (e.g. the playlist
+        index advanced when the next plugin is picked). Holding the lock keeps
+        the mutation from landing between another thread's
+        :meth:`update_atomic` snapshot and its rollback, which would silently
+        discard it. Mutations that must be durable on their own should use
+        :meth:`update_atomic` instead.
+        """
+        with self._config_lock:
+            yield
 
     def get_env_file_path(self) -> str:
         """Return absolute path to the .env file used for secrets.

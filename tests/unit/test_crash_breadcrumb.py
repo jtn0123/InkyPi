@@ -133,6 +133,11 @@ class _FakeConfig:
     def write_config(self) -> None:
         self.writes += 1
 
+    def update_atomic(self, update_fn: Any) -> None:
+        # Mirrors Config.update_atomic: mutate, then a single write.
+        update_fn({})
+        self.write_config()
+
 
 class TestCrashQuarantine:
     def _tracker(self, instances: Any) -> Any:
