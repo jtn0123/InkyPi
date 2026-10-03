@@ -2,6 +2,20 @@
 
 <!-- version list -->
 
+## v1.4.13 (2026-10-03)
+
+### Bug Fixes
+
+- **render**: Restore full-height plugin layouts in standards mode
+  ([#683](https://github.com/jtn0123/InkyPi/pull/683),
+  [`c89029a`](https://github.com/jtn0123/InkyPi/commit/c89029a5ee2dd28451d247fd00788e27904f18d8))
+
+### Testing
+
+- Isolate display and hardware module doubles ([#676](https://github.com/jtn0123/InkyPi/pull/676),
+  [`464006b`](https://github.com/jtn0123/InkyPi/commit/464006bb95de328b4565cf06a69099bfef1d41c7))
+
+
 ## v1.4.12 (2026-10-01)
 
 ### Bug Fixes
