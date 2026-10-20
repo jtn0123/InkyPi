@@ -1,2 +1,2 @@
 # Optional low-memory resolver; pip remains the supported fallback.
-uv==0.12.21
+uv==0.13.4
