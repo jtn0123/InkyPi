@@ -510,13 +510,16 @@ class Clock(BasePlugin):
         end = (x2, y2)
 
         corners = Clock.calculate_rectangle_corners(start, end, hand_width)
+        # Radii are clamped at zero: on small panels (e.g. 250x122) hand_width
+        # bottoms out at 1px and a negative radius made PIL raise, so the
+        # whole clock failed to render.
         if round_corners:
-            draw.circle(start, hand_width - 0.6, fill=border_color)
-            draw.circle(end, hand_width - 0.8, fill=border_color)
+            draw.circle(start, max(hand_width - 0.6, 0), fill=border_color)
+            draw.circle(end, max(hand_width - 0.8, 0), fill=border_color)
         draw.polygon(corners, fill=hand_color, outline=border_color, width=border_width)
         if round_corners:
-            draw.circle(start, hand_width - 2, fill=hand_color)
-            draw.circle(end, hand_width - 2, fill=hand_color)
+            draw.circle(start, max(hand_width - 2, 0), fill=hand_color)
+            draw.circle(end, max(hand_width - 2, 0), fill=hand_color)
 
         return image
 
