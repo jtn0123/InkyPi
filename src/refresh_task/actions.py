@@ -3,7 +3,7 @@
 import logging
 import os
 import threading
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Protocol, TypedDict
@@ -137,6 +137,36 @@ class RefreshAction:
         Callers must hold the config lock (``Config.update_atomic``) so the
         change cannot interleave with a concurrent snapshot/rollback.
         """
+
+
+class DisplayCommand(RefreshAction):
+    """A display-only operation run on the refresh thread, bypassing plugins.
+
+    Blackout blanking and the boot self-test push frames that no plugin
+    renders. They still go through the refresh loop rather than calling the
+    display from the request thread, so they can never interleave with a
+    plugin's e-paper write or its config updates (the discipline the review
+    calls out for anything that drives the panel from outside the loop).
+
+    ``run`` receives the ``DisplayManager`` and returns optional metrics.
+    """
+
+    def __init__(
+        self, name: str, run: Callable[[object], Mapping[str, object] | None]
+    ) -> None:
+        self.name = name
+        self.run = run
+
+    def execute(
+        self, plugin: PluginLike, device_config: DeviceConfigLike, current_dt: datetime
+    ) -> Image.Image | None:
+        raise NotImplementedError("DisplayCommand runs via RefreshTask, not plugins")
+
+    def get_refresh_info(self) -> RefreshInfo:
+        return {"refresh_type": "System", "plugin_id": self.get_plugin_id()}
+
+    def get_plugin_id(self) -> str:
+        return f"_system:{self.name}"
 
 
 class ManualRefresh(RefreshAction):

@@ -104,6 +104,17 @@
                 </section>
 
                 <aside class="dashboard-overview">
+                    {% if blackout and blackout.active %}
+                    {# B12: blackout pauses refreshes and blanks the panel.
+                       Started from the bookmarkable /api/blackout URL; the
+                       Resume button lifts it (DELETE, CSRF-protected). #}
+                    <div class="info-banner" id="blackoutBanner" role="status">
+                        <div class="info-banner-text">
+                            <strong>Blackout on</strong>{% if blackout.since %} &middot; started {{ blackout.since | format_relative_time }}{% endif %}. Refreshes are paused and the panel is blank.
+                        </div>
+                        <button id="blackoutResumeBtn" type="button" class="header-button is-secondary" data-blackout-url="{{ url_for('blackout.api_blackout') }}" data-test-skip-click="true">Resume</button>
+                    </div>
+                    {% endif %}
                     <section class="dashboard-status-card kpi-card" id="todayKpiCard" aria-labelledby="todayKpiTitle">
                         <header class="kpi-card-head">
                             <h3 id="todayKpiTitle">Today</h3>

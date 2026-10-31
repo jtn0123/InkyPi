@@ -583,3 +583,55 @@ def test_is_private_address_classifier() -> None:
     assert diag._is_private_address("") is False
     assert diag._is_private_address(None) is False
     assert diag._is_private_address("not-an-ip") is False
+
+
+# ---------------------------------------------------------------------------
+# Boot checks (B9 / B10) and blackout (B12)
+# ---------------------------------------------------------------------------
+
+
+def test_asset_check_report_from_boot_is_surfaced(client: FlaskClient) -> None:
+    """create_app runs the asset check once; diagnostics returns its report."""
+    report = client.get("/api/diagnostics").get_json()["asset_check"]
+    assert isinstance(report, dict)
+    assert report["missing"] == []
+    assert report["ok"] is True
+    assert report["checked"] > 0
+
+
+def test_asset_check_lists_missing_assets(
+    client: FlaskClient, flask_app: Flask
+) -> None:
+    flask_app.config["ASSET_CHECK"] = {
+        "ok": False,
+        "checked": 3,
+        "missing": ["plugins/weather/icon.png"],
+        "missing_count": 1,
+        "degraded": [],
+        "checked_at": "2026-10-30T00:00:00+00:00",
+    }
+    report = client.get("/api/diagnostics").get_json()["asset_check"]
+    assert report["ok"] is False
+    assert report["missing"] == ["plugins/weather/icon.png"]
+
+
+def test_boot_self_test_record_is_surfaced(
+    client: FlaskClient, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from utils import boot_self_test
+
+    monkeypatch.delenv("INKYPI_LOCKFILE_DIR", raising=False)
+    monkeypatch.setenv("INKYPI_STATE_DIR", str(tmp_path / "state"))
+    assert client.get("/api/diagnostics").get_json()["boot_self_test"] is None
+
+    boot_self_test._record("9.9.9", "fail", error="OSError: SPI")
+    record = client.get("/api/diagnostics").get_json()["boot_self_test"]
+    assert record["version"] == "9.9.9"
+    assert record["status"] == "fail"
+    assert record["error"] == "OSError: SPI"
+    assert isinstance(record["ran_at"], str)
+
+
+def test_blackout_state_defaults_off(client: FlaskClient) -> None:
+    state = client.get("/api/diagnostics").get_json()["blackout"]
+    assert state == {"active": False, "since": None}

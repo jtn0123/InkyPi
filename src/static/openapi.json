@@ -1370,6 +1370,114 @@
           }
         }
       }
+    },
+    "/api/blackout": {
+      "get": {
+        "tags": [
+          "Display"
+        ],
+        "summary": "Blackout on/off (bookmarkable)",
+        "description": "Pauses scheduled and manual refreshes and blanks the panel to white; `?off=1` lifts it and restores the last frame. Persisted across restarts. Accepted only for same-origin or direct navigation (`Sec-Fetch-Site: none|same-origin`; without that header, a foreign Origin/Referer is refused). Browser navigations (Accept: text/html) are redirected to the dashboard with 303.",
+        "operationId": "getBlackout",
+        "parameters": [
+          {
+            "name": "off",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1",
+                "true",
+                "yes",
+                "on"
+              ]
+            },
+            "description": "Lift the blackout instead of starting it."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Blackout state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BlackoutResponse"
+                }
+              }
+            }
+          },
+          "303": {
+            "description": "Browser navigation: redirected to the dashboard"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Display"
+        ],
+        "summary": "Blackout on/off",
+        "description": "Same as GET but CSRF-protected; `?off=1` lifts the blackout.",
+        "operationId": "postBlackout",
+        "parameters": [
+          {
+            "name": "off",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1",
+                "true",
+                "yes",
+                "on"
+              ]
+            },
+            "description": "Lift the blackout instead of starting it."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Blackout state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BlackoutResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Display"
+        ],
+        "summary": "Lift blackout",
+        "description": "Resumes refreshes and restores the last frame. CSRF-protected.",
+        "operationId": "deleteBlackout",
+        "responses": {
+          "200": {
+            "description": "Blackout state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BlackoutResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -2481,6 +2589,27 @@
           },
           "recent_client_log_errors": {
             "$ref": "#/components/schemas/DiagnosticsClientLogErrors"
+          },
+          "asset_check": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DiagnosticsAssetCheck"
+              }
+            ],
+            "nullable": true,
+            "description": "Boot-time asset manifest check (fonts, plugin icons/templates, bundles). Null before the first check."
+          },
+          "boot_self_test": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DiagnosticsBootSelfTest"
+              }
+            ],
+            "nullable": true,
+            "description": "Outcome of the once-per-version panel self-test. Null if it has never run."
+          },
+          "blackout": {
+            "$ref": "#/components/schemas/BlackoutState"
           }
         }
       },
@@ -2511,6 +2640,124 @@
             "$ref": "#/components/schemas/JobStatusResult"
           },
           "error": {
+            "type": "string"
+          }
+        }
+      },
+      "DiagnosticsAssetCheck": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "nullable": true,
+            "description": "False when anything in `missing` would visibly break; null if the check failed to run."
+          },
+          "checked": {
+            "type": "integer"
+          },
+          "missing": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Missing asset paths relative to src/ (capped at 50)."
+          },
+          "missing_count": {
+            "type": "integer"
+          },
+          "degraded": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Assets with a designed fallback, e.g. no static/dist bundle."
+          },
+          "checked_at": {
+            "type": "string"
+          },
+          "error": {
+            "type": "string"
+          }
+        }
+      },
+      "DiagnosticsBootSelfTest": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pass",
+              "fail"
+            ]
+          },
+          "ran_at": {
+            "type": "string"
+          },
+          "error": {
+            "type": "string",
+            "nullable": true
+          },
+          "display_driver": {
+            "type": "string"
+          },
+          "display_ms": {
+            "type": "integer"
+          },
+          "restore_error": {
+            "type": "string"
+          }
+        }
+      },
+      "BlackoutState": {
+        "type": "object",
+        "required": [
+          "active",
+          "since"
+        ],
+        "properties": {
+          "active": {
+            "type": "boolean"
+          },
+          "since": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "BlackoutResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "since": {
+            "type": "string",
+            "nullable": true
+          },
+          "changed": {
+            "type": "boolean",
+            "description": "False when the request matched the current state (no-op)."
+          },
+          "display": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "done",
+              "failed",
+              "unchanged"
+            ],
+            "description": "What happened to the panel: the blank (or restore) frame was queued on the refresh thread, pushed inline, failed, or not needed."
+          },
+          "request_id": {
             "type": "string"
           }
         }

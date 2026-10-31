@@ -280,3 +280,33 @@ def clear_last_death() -> None:
         _last_death_path().unlink(missing_ok=True)
     except Exception:
         logger.debug("crash breadcrumb: could not clear last death", exc_info=True)
+
+
+# ---------------------------------------------------------------------------
+# Shared state-file helpers
+# ---------------------------------------------------------------------------
+#
+# Other small boot-time records (the B9 boot self-test) want exactly the same
+# guarantees as the death verdict: a reboot-surviving location shared with the
+# update/rollback state, atomic exclusive-temp-file writes, and failures that
+# are swallowed rather than raised. Exposing the hardened helpers keeps one
+# implementation of that discipline instead of a second, subtly different one.
+
+
+def read_state(name: str) -> dict[str, Any] | None:
+    """Read the JSON object stored as *name* in the persistent state dir."""
+    try:
+        return _read_json(_in_dir(_state_dir(), name))
+    except ValueError:
+        logger.debug("state file %r escapes the state dir", name, exc_info=True)
+        return None
+
+
+def write_state(name: str, payload: dict[str, Any]) -> None:
+    """Atomically write *payload* as *name* in the persistent state dir."""
+    try:
+        path = _in_dir(_state_dir(), name)
+    except ValueError:
+        logger.debug("state file %r escapes the state dir", name, exc_info=True)
+        return
+    _write_json(path, payload)

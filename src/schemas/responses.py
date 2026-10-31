@@ -403,6 +403,49 @@ class DiagnosticsClientLogErrors(TypedDict):
     window_seconds: int
 
 
+class DiagnosticsAssetCheck(TypedDict, total=False):
+    """``asset_check`` object in ``GET /api/diagnostics`` (B10)."""
+
+    ok: bool | None
+    checked: int
+    missing: list[str]
+    missing_count: int
+    degraded: list[str]
+    checked_at: str
+    error: str
+
+
+class DiagnosticsBootSelfTest(TypedDict, total=False):
+    """``boot_self_test`` object in ``GET /api/diagnostics`` (B9)."""
+
+    version: str
+    status: str
+    ran_at: str
+    error: str | None
+    display_driver: str
+    display_ms: int
+    restore_error: str
+
+
+class BlackoutState(TypedDict):
+    """Blackout flag as stored in the device config (B12)."""
+
+    active: bool
+    since: str | None
+
+
+class BlackoutResponse(TypedDict, total=False):
+    """Response body for ``/api/blackout`` (B12)."""
+
+    success: bool
+    request_id: str
+    message: str
+    active: bool
+    since: str | None
+    changed: bool
+    display: str
+
+
 class DiagnosticsResponse(TypedDict):
     """Response body for ``GET /api/diagnostics``."""
 
@@ -417,3 +460,6 @@ class DiagnosticsResponse(TypedDict):
     log_tail_100: list[str]
     last_update_failure: Any | None
     recent_client_log_errors: DiagnosticsClientLogErrors
+    asset_check: DiagnosticsAssetCheck | None
+    boot_self_test: DiagnosticsBootSelfTest | None
+    blackout: BlackoutState

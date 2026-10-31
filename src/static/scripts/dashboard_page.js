@@ -469,6 +469,26 @@
       }
     }
 
+    // B12: lift the blackout started from the bookmarkable /api/blackout URL.
+    async function resumeFromBlackout() {
+      const button = document.getElementById("blackoutResumeBtn");
+      if (!button) return;
+      button.disabled = true;
+      try {
+        const response = await fetch(button.dataset.blackoutUrl, { method: "DELETE" });
+        const result = await response.json();
+        if (!response.ok || !result.success) {
+          showResponseModal("failure", `Failed to resume: ${result.error || "Unknown error"}`);
+          button.disabled = false;
+          return;
+        }
+        globalThis.location.reload();
+      } catch (error) {
+        showResponseModal("failure", "Failed to resume");
+        button.disabled = false;
+      }
+    }
+
     function initPreviewInteractions() {
       const previewImg = document.getElementById("previewImage");
       const previewSkel = document.getElementById("previewSkeleton");
@@ -671,6 +691,7 @@
         button.addEventListener("click", handleQuickSwitchClick);
       });
       document.getElementById("displayNextBtn")?.addEventListener("click", displayNextNow);
+      document.getElementById("blackoutResumeBtn")?.addEventListener("click", resumeFromBlackout);
       document.getElementById("dashboardRefreshBtn")?.addEventListener("click", () => {
         // Manually re-fetch preview + refresh info + next-up; mirrors the
         // realtime SSE handler but triggered by user gesture.

@@ -95,6 +95,34 @@ The web server (waitress) runs a fixed pool of worker threads, and every open li
 
 Set these in `.env` or a systemd drop-in, then restart the service.
 
+## Blackout: pause refreshes and blank the panel
+
+Open `http://<your-pi>/api/blackout` (bookmark it) to pause all refreshes and
+blank the display to white. Open `http://<your-pi>/api/blackout?off=1`, or
+press **Resume** in the banner on the dashboard, to lift it; the last frame is
+put back and the normal cycle continues. `POST` and `DELETE /api/blackout` do
+the same from scripts (they need the CSRF token like every other mutating
+call). Blackout survives a restart, and while it is on "Display Next" and
+"Update Now" return `409`.
+
+With a PIN configured the URL asks you to log in first. A bookmark or typed
+URL works directly; a link to it from another website is refused (`403`), so
+a third-party page cannot black out your frame.
+
+## Boot checks in diagnostics
+
+`/api/diagnostics` includes two boot-time checks:
+
+- `asset_check` lists fonts, plugin icons, render templates and script bundles
+  that were missing when the service started. Anything in `missing` usually
+  means an incomplete install or update; re-run `install/update.sh`.
+- `boot_self_test` records the test pattern pushed to the panel on the first
+  boot after each install or update: `status` is `pass` when the display
+  driver accepted the frame, `fail` with an `error` otherwise. A `fail` here
+  points at the panel, cable or driver rather than at a plugin. Set
+  `INKYPI_SKIP_BOOT_SELF_TEST=1` (or `"boot_self_test": false` in
+  `device.json`) to skip it.
+
 ## Restart the InkyPi Service
 
 ```bash

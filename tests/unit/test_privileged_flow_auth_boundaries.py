@@ -23,6 +23,8 @@ _PRIVILEGED_GET_CASES = (
     pytest.param("/settings/export", id="settings-export"),
     pytest.param("/settings/api-keys", id="api-keys-page"),
     pytest.param("/settings/update_status", id="update-status"),
+    # B12: the bookmarkable blackout GET changes state, so it must be gated.
+    pytest.param("/api/blackout", id="blackout-get"),
 )
 
 _PRIVILEGED_POST_CASES = (
@@ -54,6 +56,7 @@ _PRIVILEGED_POST_CASES = (
     pytest.param("/settings/update", {}, id="start-update"),
     pytest.param("/settings/update/rollback", {}, id="start-rollback"),
     pytest.param("/shutdown", {"json": {}}, id="shutdown"),
+    pytest.param("/api/blackout", {}, id="blackout-post"),
 )
 
 

@@ -61,7 +61,9 @@ from config import Config
 from display.display_manager import DisplayManager
 from plugins.plugin_registry import load_plugins, pop_hot_reload_info
 from refresh_task import RefreshTask
+from utils import blackout, boot_self_test
 from utils.app_utils import generate_startup_image, get_ip_address
+from utils.asset_check import run_boot_check as run_asset_check
 from utils.config_schema import ConfigValidationError
 from utils.i18n import init_i18n
 from utils.sri import init_sri
@@ -584,6 +586,14 @@ def create_app() -> Flask:
 
     init_i18n(app)
     register_blueprints(app)
+    # B10: stat() the fonts, plugin icons/templates and bundles once so a
+    # broken install is reported in /api/diagnostics instead of surfacing as a
+    # plugin failure. Runs before setup_asset_helpers, which reads one of them.
+    app.config["ASSET_CHECK"] = run_asset_check(
+        plugin.get("id", "")
+        for plugin in device_config.get_plugins()
+        if isinstance(plugin, dict)
+    )
     setup_asset_helpers(app)
     init_sri(app)
     register_health_endpoints(app)
@@ -679,6 +689,68 @@ def run_once(created_app: Flask) -> int:
     return 0
 
 
+def run_boot_display_tasks(created_app: Flask) -> None:
+    """Run the one-off boot display work: self-test, then the startup image.
+
+    One sequence on one thread so the two never race for the panel:
+
+    1. B9 boot self-test, when due (first boot on a new version) and enabled.
+       It restores the previous frame afterwards unless the startup image is
+       about to replace it anyway.
+    2. The startup image, when ``startup`` is still set (first boot after an
+       install).
+
+    Both are skipped while blackout is active — the panel stays blank.
+    Never raises.
+    """
+    device_cfg = created_app.config.get("DEVICE_CONFIG")
+    if device_cfg is None:
+        return
+    if blackout.is_active(device_cfg):
+        logger.info("Blackout active: skipping boot self-test and startup image")
+        return
+    show_startup = device_cfg.get_config("startup") is True
+
+    refresh_task_obj = created_app.config.get("REFRESH_TASK")
+    if refresh_task_obj is not None:
+        try:
+            boot_self_test.maybe_run(
+                refresh_task_obj,
+                device_cfg,
+                created_app.config.get("APP_VERSION", "unknown"),
+                restore=not show_startup,
+            )
+        except Exception:
+            logger.exception("Boot self-test crashed")
+
+    if not show_startup:
+        return
+    try:
+        logger.info("Displaying startup image")
+        img = generate_startup_image(device_cfg.get_resolution())
+        display_manager_obj = created_app.config.get("DISPLAY_MANAGER")
+        if display_manager_obj is not None:
+            display_manager_obj.display_image(img)
+        device_cfg.update_value("startup", False, write=True)
+    except Exception:
+        logger.exception("Startup image failed")
+
+
+def start_boot_display_tasks(created_app: Flask) -> None:
+    """Run :func:`run_boot_display_tasks` off the main thread.
+
+    The panel write can take tens of seconds; the web server must not wait.
+    """
+    import threading
+
+    threading.Thread(
+        target=run_boot_display_tasks,
+        args=(created_app,),
+        daemon=True,
+        name="BootDisplay",
+    ).start()
+
+
 def _await_display_write(refresh_task_obj: object, timeout: float = 120.0) -> None:
     """Block until the refresh loop is idle again, or *timeout* elapses.
 
@@ -709,31 +781,8 @@ if __name__ == "__main__":
     else:
         logger.info("Web-only mode enabled: background refresh task will not start")
 
-    device_cfg = created_app.config.get("DEVICE_CONFIG")
-    if (
-        not WEB_ONLY
-        and device_cfg is not None
-        and device_cfg.get_config("startup") is True
-    ):
-        import threading
-
-        # Bound here rather than captured: the narrowing above cannot follow
-        # `device_cfg` into a closure that runs on another thread, because
-        # nothing stops the name being rebound in between.
-        startup_cfg = device_cfg
-
-        def _show_startup() -> None:
-            try:
-                logger.info("Displaying startup image")
-                img = generate_startup_image(startup_cfg.get_resolution())
-                display_manager_obj = created_app.config.get("DISPLAY_MANAGER")
-                if display_manager_obj is not None:
-                    display_manager_obj.display_image(img)
-                startup_cfg.update_value("startup", False, write=True)
-            except Exception:
-                logger.exception("Startup image failed")
-
-        threading.Thread(target=_show_startup, daemon=True, name="StartupImage").start()
+    if not WEB_ONLY:
+        start_boot_display_tasks(created_app)
 
     try:
         from cysystemd.daemon import Notification, notify

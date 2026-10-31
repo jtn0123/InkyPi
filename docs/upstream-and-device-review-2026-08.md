@@ -304,28 +304,46 @@ in full — every guard in it exists because of a specific incident.
       split. This is the most InkyPi-specific idea in the whole ESP set.
       *Medium.*
 
-- [ ] **B9 — Boot self-test.** halloween ROADMAP #26 sweeps R/G/B/W per zone at
+- [x] **B9 — Boot self-test.** halloween ROADMAP #26 sweeps R/G/B/W per zone at
       plug-in, so a dead channel is visible before showtime. Ours: after an
       install or update, push a known test pattern and record pass/fail in
       diagnostics — proving the panel and the driver work before a plugin gets
       blamed. *Medium.*
+      **Done:** [`utils/boot_self_test.py`](../src/utils/boot_self_test.py).
+      Triggered by `VERSION` differing from the version in
+      `/var/lib/inkypi/boot_self_test.json` (no install/update marker exists;
+      a fresh install has no record). Runs on a background thread through the
+      refresh loop, restores the previous frame, surfaces as
+      `boot_self_test` in `/api/diagnostics`. Skip with
+      `INKYPI_SKIP_BOOT_SELF_TEST=1` or `"boot_self_test": false`; never runs
+      on the mock display.
 
-- [ ] **B10 — Asset manifest check at boot.** halloween ROADMAP #29 `stat()`s
+- [x] **B10 — Asset manifest check at boot.** halloween ROADMAP #29 `stat()`s
       every scene file at boot and lists missing names in `/api/status`. We load
       `static/dist/manifest.json` with graceful degradation
       (`app_setup/asset_helpers.py`) but never *report* what's missing — fonts,
       plugin icons, render templates. Surface it in `/api/diagnostics`. *Medium.*
+      **Done:** [`utils/asset_check.py`](../src/utils/asset_check.py), run once
+      in `create_app`; `asset_check` in `/api/diagnostics`, WARNING log at boot
+      when anything is missing. A missing `static/dist` bundle is reported as
+      `degraded` (it has a designed fallback), not `missing`.
 
 - [ ] **B11 — QR code on the startup screen.** We render IP text
       (`generate_startup_image`). halloween #24 puts scene, uptime, SD free
       **and a QR to the web remote** on its eInk. A QR turns "read the IP, type
       it on your phone" into one scan. *Low — high polish-per-hour.*
 
-- [ ] **B12 — Blackout / kill switch endpoint.** halloween #25 has
+- [x] **B12 — Blackout / kill switch endpoint.** halloween #25 has
       `/api/blackout`, GET **and** POST so it's bookmarkable, that kills
       everything. Ours: a bookmarkable URL that pauses refreshes and blanks the
       display — useful for guests, photos, or a plugin misbehaving while you're
       out. *Low.*
+      **Done:** [`blueprints/blackout.py`](../src/blueprints/blackout.py).
+      `GET|POST /api/blackout` on, `?off=1` or `DELETE` off; persisted in
+      `device.json`; dashboard banner with Resume. The mutating GET is refused
+      unless `Sec-Fetch-Site` is `none`/`same-origin` (or, without it, the
+      Origin/Referer is this host). Blank/restore frames go through the
+      refresh loop (see the #686 note below).
 
 ## B13–B15. Longer shots
 
