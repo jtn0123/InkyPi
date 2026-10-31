@@ -112,7 +112,7 @@ original bug plus two more that upstream fixed in the same neighbourhood.
 > separately means touching the same function three times. **Fold JTN-769 (A0)
 > into the same change** — it's the same file and the same parse loop.
 
-- [ ] **A1d — Open-Meteo timestamps are parsed in the wrong timezone.**
+- [x] **A1d — Open-Meteo timestamps are parsed in the wrong timezone.**
       With `timezone=auto` the API returns offset-free *local* timestamps for
       the forecast location, but `weather_data.py` attaches the device timezone
       before converting. Anywhere the device and the forecast location differ,
