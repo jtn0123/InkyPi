@@ -4,7 +4,7 @@
 <div id="units-container" data-units="{{ units }}"></div>
 
 
-<div class="weather-dashboard">
+<div class="weather-dashboard{% if plugin_settings.displayRefreshTime == "true" %} has-refresh{% endif %}">
   {% if plugin_settings.displayRefreshTime == "true" %}
   <div class="last-refresh">Last refresh: {{ last_refresh_time }}</div>
   {% endif %}
@@ -71,7 +71,7 @@
         <div class="separator"></div>
         <div class="moon-phase-container">
         <img class="moon-phase-icon" src="{{day.moon_phase_icon}}" alt="Moon phase icon">
-        <span style="flex: 1;">{{day.moon_phase_pct}} %</span>
+        <span class="moon-phase-pct">{{day.moon_phase_pct}}&nbsp;%</span>
         </div>
         {% endif %}
       </div>
@@ -104,6 +104,10 @@
     const minTemp = Math.min(...temperatures);
     var maxTemp = Math.max(...temperatures);
 	
+    // Chart.js defaults to a fixed 12px font: right on an 800x480 panel but
+    // unreadable on 1448x1072. Scale it with the panel (12px at 480px tall).
+    Chart.defaults.font.size = Math.max(9, Math.min(24, Math.round(Math.min(window.innerWidth, window.innerHeight) * 0.025)));
+
     Chart.register({
       id: 'annotationRain',
       afterDatasetsDraw(chart, args, pluginOptions) {
@@ -113,6 +117,14 @@
 
         ctx.save();
         ctx.textAlign = 'center';
+        // Offsets were tuned for the default 12px font; keep them in step
+        // with the scaled font size.
+        const fontSize = Chart.defaults.font.size;
+        const k = fontSize / 12;
+        ctx.font = Math.round(10 * k) + 'px sans-serif';
+        // Adjacent wet hours on a narrow chart drew their amounts on top of
+        // each other; skip a label that would collide with the previous one.
+        let lastRight = -Infinity;
 
         meta.data.forEach((bar, i) => {
           const rainAmount = rainData[i];
@@ -121,18 +133,22 @@
             const y = bar.y;
 			const base = bar.base;
 			const height = base - y;
+			const label = rainAmount.toFixed(2);
+			const halfWidth = ctx.measureText(label).width / 2;
+			if (x - halfWidth < lastRight + 2 * k) return;
+			lastRight = x + halfWidth;
 			
 			let textY, unitY;
 			
-			if (height < 25) {
-			  textY = y - 10;
-			  unitY = y - 3;
+			if (height < 25 * k) {
+			  textY = y - 10 * k;
+			  unitY = y - 3 * k;
 			} else {
-			  textY = y + 13;
-			  unitY = y + 20;
+			  textY = y + 13 * k;
+			  unitY = y + 20 * k;
 			}
             ctx.fillStyle = "{{ plugin_settings.textColor }}";
-            ctx.fillText(rainAmount.toFixed(2), x, textY);
+            ctx.fillText(label, x, textY);
             ctx.fillText(unit, x, unitY); 
           }
         });
