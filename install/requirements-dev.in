@@ -54,7 +54,7 @@ python-dotenv>=1.0,<2
 requests>=2.32,<3
 urllib3>=2.0,<3
 werkzeug>=3.1,<4
-pillow>=11.0,<13
+pillow>=13.0,<14
 # pi-heif has wheels for all major platforms — no platform guard needed.
 pi-heif==1.4.0
 tzdata>=2024.1
