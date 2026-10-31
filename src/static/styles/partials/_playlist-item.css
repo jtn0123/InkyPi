@@ -481,8 +481,29 @@ a.pl-add-row:hover {
     width: 44px;
     height: 44px;
   }
-  .playlist-toolbar .run-next-btn,
-  .playlist-toolbar .playlist-secondary-button {
+  /* Playlist header actions: one row instead of three stacked full-width
+     buttons (~150px per card). Display next takes the free width; Edit and
+     Delete become 44px icon buttons (named via aria-label). Selectors are
+     prefixed with .playlist-header to beat the grid/1fr toolbar rules in
+     _responsive-mobile.css / _responsive-large.css. */
+  .playlist-header .playlist-toolbar {
+    display: flex;
+    flex-wrap: nowrap;
+    justify-content: flex-end;
+    gap: 6px;
+  }
+  .playlist-header .playlist-toolbar .run-next-btn {
+    flex: 1 1 auto;
     height: 44px;
+  }
+  .playlist-header .playlist-toolbar .playlist-secondary-button {
+    flex: 0 0 44px;
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
+    padding: 0;
+  }
+  .playlist-header .playlist-toolbar .playlist-secondary-button .action-button-label {
+    display: none;
   }
 }

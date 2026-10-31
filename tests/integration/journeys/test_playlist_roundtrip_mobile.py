@@ -388,6 +388,44 @@ def test_playlist_row_actions_do_not_cover_instance_name_on_mobile(
                     b["w"] >= _MOBILE_MIN_TOUCH and b["h"] >= _MOBILE_MIN_TOUCH
                 ), f"{label}: action button below 44px: {row}"
         _assert_no_horizontal_overflow(page, playlist_name, "row layout")
+
+        # Header actions (Display next / Edit / Delete) share one row instead
+        # of stacking three full-width buttons per playlist card.
+        header = page.evaluate(
+            """(pn) => {
+                const card = Array.from(document.querySelectorAll('.playlist-item'))
+                  .find(el => el.getAttribute('data-playlist-name') === pn);
+                return Array.from(
+                  card.querySelectorAll('.playlist-toolbar .header-button')
+                ).map(b => {
+                  const r = b.getBoundingClientRect();
+                  return {
+                    cls: b.className,
+                    label: b.getAttribute('aria-label') || b.textContent.trim(),
+                    w: r.width, h: r.height, top: r.top,
+                  };
+                });
+            }""",
+            playlist_name,
+        )
+        assert len(header) == 3, header
+        assert len({round(b["top"]) for b in header}) == 1, f"header wrapped: {header}"
+        for b in header:
+            assert (
+                b["w"] >= _MOBILE_MIN_TOUCH and b["h"] >= _MOBILE_MIN_TOUCH
+            ), f"header button below 44px: {b}"
+        by_cls = {
+            (
+                "edit"
+                if "edit-playlist-btn" in b["cls"]
+                else "delete" if "delete-playlist-btn" in b["cls"] else "next"
+            ): b
+            for b in header
+        }
+        assert by_cls["next"]["w"] > by_cls["edit"]["w"], header
+        assert by_cls["edit"]["label"] == f"Edit playlist {playlist_name}"
+        assert by_cls["delete"]["label"] == f"Delete playlist {playlist_name}"
+
         rc.assert_no_errors(str(tmp_path), "playlist_row_layout_mobile")
     finally:
         try:
