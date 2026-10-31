@@ -303,3 +303,116 @@ def test_display_preprocessed_image_clears_hash(
     assert (
         dm._last_image_hash is None
     ), "Hash was not cleared after display_preprocessed_image — next refresh would be skipped"
+
+
+# ---------------------------------------------------------------------------
+# System frames (blackout blank, boot self-test) — B9 / B12
+# ---------------------------------------------------------------------------
+
+
+class _RecordingDriver:
+    def __init__(self, fail: bool = False) -> None:
+        self.fail = fail
+        self.images: list[Image.Image] = []
+
+    def display_image(self, image: Image.Image, image_settings: Any = None) -> None:
+        if self.fail:
+            raise OSError("SPI write failed")
+        self.images.append(image)
+
+
+def _system_manager(device_config: Any, fail: bool = False) -> Any:
+    import os
+
+    from display.display_manager import DisplayManager
+
+    dm = DisplayManager(device_config)
+    # The mock display seeds preview files on init; start from a clean slate.
+    for path in (device_config.current_image_file, device_config.processed_image_file):
+        if os.path.exists(path):
+            os.remove(path)
+    driver = _RecordingDriver(fail=fail)
+    dm.display = driver
+    return dm, driver
+
+
+def _marked_frame() -> Image.Image:
+    """Black frame with one white pixel at the top-left, to detect rotation."""
+    img = make_image(800, 480, "black")
+    img.putpixel((0, 0), (255, 255, 255))
+    return img
+
+
+def test_show_system_image_pushes_to_driver_and_reports_metrics(
+    device_config_dev: Any,
+) -> None:
+    dm, driver = _system_manager(device_config_dev)
+    dm._last_image_hash = "stale"
+
+    metrics = dm.show_system_image(_marked_frame())
+
+    assert len(driver.images) == 1
+    assert driver.images[0].getpixel((0, 0)) == (255, 255, 255)
+    assert metrics["display_driver"] == "_RecordingDriver"
+    assert isinstance(metrics["display_ms"], int)
+    assert dm._last_image_hash is None
+
+
+def test_show_system_image_honours_inverted_unless_preprocessed(
+    device_config_dev: Any,
+) -> None:
+    device_config_dev.update_value("inverted_image", True)
+    dm, driver = _system_manager(device_config_dev)
+
+    dm.show_system_image(_marked_frame())
+    # Rotated 180: the marker moves to the bottom-right corner.
+    assert driver.images[0].getpixel((799, 479)) == (255, 255, 255)
+    assert driver.images[0].getpixel((0, 0)) == (0, 0, 0)
+
+    dm.show_system_image(_marked_frame(), preprocessed=True)
+    # Already through the pipeline: not inverted a second time.
+    assert driver.images[1].getpixel((0, 0)) == (255, 255, 255)
+
+
+def test_show_system_image_clears_hash_even_when_driver_raises(
+    device_config_dev: Any,
+) -> None:
+    dm, _ = _system_manager(device_config_dev, fail=True)
+    dm._last_image_hash = "stale"
+
+    with pytest.raises(OSError, match="SPI write failed"):
+        dm.show_system_image(_marked_frame())
+
+    assert dm._last_image_hash is None
+
+
+def test_show_system_image_skips_preview_files(device_config_dev: Any) -> None:
+    import os
+
+    dm, _ = _system_manager(device_config_dev)
+    dm.show_system_image(_marked_frame())
+
+    assert not os.path.exists(device_config_dev.current_image_file)
+    assert not os.path.exists(device_config_dev.processed_image_file)
+
+
+def test_restore_last_frame_without_saved_frame_is_noop(
+    device_config_dev: Any,
+) -> None:
+    dm, driver = _system_manager(device_config_dev)
+
+    assert dm.restore_last_frame() is None
+    assert driver.images == []
+
+
+def test_restore_last_frame_repushes_processed_image(device_config_dev: Any) -> None:
+    device_config_dev.update_value("inverted_image", True)
+    dm, driver = _system_manager(device_config_dev)
+    _marked_frame().save(device_config_dev.processed_image_file)
+
+    metrics = dm.restore_last_frame()
+
+    assert metrics is not None and metrics["display_driver"] == "_RecordingDriver"
+    assert len(driver.images) == 1
+    # The saved frame is already processed, so it is pushed as-is.
+    assert driver.images[0].getpixel((0, 0)) == (255, 255, 255)

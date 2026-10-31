@@ -69,13 +69,19 @@ def _cross_site_reason() -> str | None:
     if fetch_site is not None:
         if fetch_site.strip().lower() in _TRUSTED_FETCH_SITES:
             return None
-        return f"Sec-Fetch-Site: {fetch_site}"
+        # Fixed strings only: header values are client-controlled and must
+        # not reach the log (log injection).
+        return "Sec-Fetch-Site is not none/same-origin"
     for header in ("Origin", "Referer"):
         value = request.headers.get(header)
         if not value:
             continue
         if urlsplit(value).netloc.lower() != request.host.lower():
-            return f"{header} from another host"
+            return (
+                "Origin from another host"
+                if header == "Origin"
+                else "Referer from another host"
+            )
     return None
 
 
