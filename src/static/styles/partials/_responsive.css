@@ -148,10 +148,6 @@
     .apikey-row {
         grid-template-columns: 1fr;
     }
-
-    .history-actions {
-        grid-template-columns: 1fr;
-    }
 }
 
 /* ── Improved mobile layout ── */

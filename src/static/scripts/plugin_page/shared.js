@@ -111,10 +111,26 @@
     });
   }
 
+  // Compact "Oct 30, 10:43 PM" stamp for the preview status cards. The
+  // default toLocaleString() ("10/30/2026, 10:43:35 PM") wrapped onto three
+  // lines in the narrow status column; year and seconds add nothing there.
+  function formatPreviewTimestamp(value) {
+    if (!value) return "—";
+    const date = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(date.getTime())) return "—";
+    return date.toLocaleString([], {
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    });
+  }
+
   function setCurrentDisplayRefresh(value) {
     const currTime = document.getElementById("currentDisplayTime");
     if (!currTime) return;
-    currTime.textContent = value ? new Date(value).toLocaleString() : "—";
+    currTime.textContent = formatPreviewTimestamp(value);
+    if (value) currTime.title = new Date(value).toLocaleString();
   }
 
   function initScheduleFormState() {
@@ -180,6 +196,7 @@
     buildProgressKey,
     ensureInlineValidationMessages,
     fadeSkeleton,
+    formatPreviewTimestamp,
     initScheduleFormState,
     setCurrentDisplayRefresh,
     setHidden,

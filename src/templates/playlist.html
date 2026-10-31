@@ -160,7 +160,7 @@
                                     {{ icon('clock', 'action-icon') | safe }}
                                     <span class="sr-only">Edit schedule for {{ pi_label }}</span>
                                 </button>
-                                <a href="{{ url_for('plugin.plugin_page', plugin_id=plugin_instance.plugin_id) }}?instance={{ plugin_instance.name }}" class="header-button is-secondary edit-button playlist-row-icon-btn edit-plugin-link" title="Edit plugin {{ pi_label }}">
+                                <a href="{{ url_for('plugin.plugin_page', plugin_id=plugin_instance.plugin_id, instance=plugin_instance.name) }}" class="header-button is-secondary edit-button playlist-row-icon-btn edit-plugin-link" title="Edit plugin {{ pi_label }}">
                                     {{ icon('pencil-simple', 'action-icon') | safe }}
                                     <span class="sr-only">Edit plugin {{ pi_label }}</span>
                                 </a>

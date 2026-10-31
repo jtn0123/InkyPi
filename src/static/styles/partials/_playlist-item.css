@@ -449,11 +449,40 @@ a.pl-add-row:hover {
 
 /* stylelint-enable no-duplicate-selectors */
 
-/* Collapse thumb column on narrow viewports */
+/* Narrow viewports: drop the thumb and move the actions to their own row.
+   Display + three 44px icon buttons need ~200px; sharing a row with the
+   name left the name column ~30px wide and the wrapped buttons overlapped
+   the text. Selectors are doubled up so they beat the generic
+   `.plugin-item` / `.plugin-actions` / `.plugin-info` rules in
+   _responsive-mobile.css, which load later. */
 @media (max-width: 720px) {
-  .pl-item {
-    grid-template-columns: auto auto minmax(0, 1fr) auto;
-    grid-template-areas: "drag icon main actions";
+  .pl-item.plugin-item {
+    grid-template-columns: auto auto minmax(0, 1fr);
+    grid-template-areas:
+      "drag icon main"
+      "actions actions actions";
+    row-gap: 8px;
+    padding: 10px;
   }
+  .pl-item .pl-item-main.plugin-info { width: auto; }
   .pl-item-thumb { display: none; }
+  .pl-item .pl-item-name { white-space: normal; flex-wrap: wrap; row-gap: 2px; }
+  .pl-item .pl-item-actions.plugin-actions {
+    width: auto;
+    flex-wrap: nowrap;
+    gap: 6px;
+  }
+  .pl-item .pl-item-actions .playlist-row-display-btn {
+    flex: 1 1 auto;
+    justify-content: center;
+    height: 44px;
+  }
+  .pl-item .pl-item-actions .playlist-row-icon-btn {
+    width: 44px;
+    height: 44px;
+  }
+  .playlist-toolbar .run-next-btn,
+  .playlist-toolbar .playlist-secondary-button {
+    height: 44px;
+  }
 }

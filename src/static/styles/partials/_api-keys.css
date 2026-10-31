@@ -370,6 +370,39 @@
   display: none;
 }
 
+/* The native marker is hidden above, which left the summary looking like a
+   static label. Restore a disclosure chevron that rotates when open. */
+.api-keys-more summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.api-keys-more summary::after {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(45deg);
+  transition: transform 0.15s ease;
+  margin-right: 4px;
+}
+
+.api-keys-more[open] summary::after {
+  transform: rotate(-135deg);
+}
+
+.api-keys-more summary:hover {
+  color: var(--text);
+}
+
+.api-keys-more summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
 .api-keys-more-grid {
   display: grid;
   gap: 12px;

@@ -44,7 +44,7 @@ from utils.form_utils import (
     sanitize_log_field,
     validate_plugin_required_fields,
 )
-from utils.http_utils import json_error, json_success
+from utils.http_utils import content_disposition, json_error, json_success
 from utils.plugin_errors import (
     MANUAL_UPDATE_TIMEOUT_MSG,
     SCREENSHOT_BACKEND_UNAVAILABLE_MSG,
@@ -119,7 +119,7 @@ def _cacheable_send_file(path: str, ttl_env: str = "INKYPI_RENDER_CACHE_TTL_S") 
     ttl = max(0, ttl)
     resp.headers["Cache-Control"] = f"public, max-age={ttl}"
     basename = os.path.basename(safe_path)
-    resp.headers["Content-Disposition"] = f'inline; filename="{basename}"'
+    resp.headers["Content-Disposition"] = content_disposition("inline", basename)
     return resp
 
 
@@ -212,6 +212,12 @@ def plugin_page(plugin_id: str) -> Any:
                 )
             template_params["plugin_settings"] = plugin_instance.settings
             template_params["plugin_instance"] = plugin_instance_name
+            # "Last generated" on an instance page should be this instance's
+            # own refresh, not the newest render of any instance of the plugin.
+            if plugin_instance.latest_refresh_time:
+                template_params["plugin_instance_last_refresh"] = (
+                    plugin_instance.latest_refresh_time
+                )
         else:
             # Try to pre-populate from a saved settings instance on Default playlist
             default_playlist = playlist_manager.get_playlist("Default")
@@ -381,7 +387,9 @@ def image(plugin_id: str, filename: str) -> Any:
     except Exception:
         ttl = 300
     resp.headers["Cache-Control"] = f"public, max-age={max(0, ttl)}"
-    resp.headers["Content-Disposition"] = f'inline; filename="{resolved_parts[-1]}"'
+    resp.headers["Content-Disposition"] = content_disposition(
+        "inline", resolved_parts[-1]
+    )
     return resp
 
 
