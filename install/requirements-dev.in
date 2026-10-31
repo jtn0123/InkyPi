@@ -8,7 +8,7 @@
 # Use uv for committed lockfiles so platform/interpreter markers are preserved.
 
 # Core dev tooling
-uv==0.12.21
+uv==0.13.4
 pip-tools>=7.0,<8
 
 # Testing
