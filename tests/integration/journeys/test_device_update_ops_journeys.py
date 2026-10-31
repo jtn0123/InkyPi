@@ -351,3 +351,38 @@ def test_jtn_725_update_failure_recovery_journey(
     assert (status.get("last_failure") or {}).get("exit_code") == 97
 
     collector.assert_no_errors(name="jtn_725_update_failure_recovery")
+
+
+def test_preflight_abort_shows_banner_without_rollback(
+    live_server: str,
+    browser_page: Page,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    stable_version_check: Any,
+) -> None:
+    """A preflight abort leaves the device untouched, so offer no rollback."""
+    state_dir = tmp_path / "update_state"
+    state_dir.mkdir(parents=True, exist_ok=True)
+    (state_dir / ".last-update-failure").write_text(
+        json.dumps(
+            {
+                "timestamp": "2026-10-30T01:02:03Z",
+                "exit_code": 1,
+                "last_command": "preflight: only 120 MB free on /",
+                "recent_journal_lines": "",
+            }
+        ),
+        encoding="utf-8",
+    )
+    (state_dir / "prev_version").write_text("v1.2.2", encoding="utf-8")
+    monkeypatch.setenv("INKYPI_LOCKFILE_DIR", str(state_dir))
+
+    page = browser_page
+    _open_settings_page(page, live_server)
+    _open_updates_tab(page)
+
+    page.wait_for_function(
+        "() => !document.getElementById('updateFailureBanner')?.hidden", timeout=10000
+    )
+    assert "preflight" in page.locator("#updateFailureStep").inner_text()
+    assert page.locator("#rollbackUpdateBtn").is_hidden()

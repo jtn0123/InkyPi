@@ -171,8 +171,14 @@
   function renderRollbackButton(lastFailure, prevVersion) {
     const btn = document.getElementById("rollbackUpdateBtn");
     if (!btn) return;
+    // A preflight abort fails before anything is checked out, so the device
+    // is still on the version it was on — there is nothing to roll back.
+    const abortedInPreflight = String(lastFailure?.last_command || "").startsWith(
+      "preflight:"
+    );
     const canRollback =
       !!lastFailure &&
+      !abortedInPreflight &&
       typeof prevVersion === "string" &&
       prevVersion.length > 0;
     btn.hidden = !canRollback;
