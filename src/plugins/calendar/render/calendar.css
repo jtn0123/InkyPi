@@ -10,6 +10,23 @@
   height: 100%;
   font-family: "Jost", sans-serif;
   overflow: hidden;
+  /* FullCalendar sizes its text in em off this. A fixed 16px was ~1% of a
+     1448x1072 panel (unreadably small) and overran 250x122 panels; scale it
+     with the panel so 800x480 keeps 16px. */
+  font-size: clamp(9px, min(2vmax, 3.34vmin), 48px);
+  /* Grey fills (list day headers, the empty-list panel, other-month days)
+     dither into speckle on e-ink; keep everything on the page background. */
+  --fc-neutral-bg-color: transparent;
+  --fc-list-event-hover-bg-color: transparent;
+}
+
+.fc .fc-list-empty {
+  background-color: transparent;
+}
+
+.fc .fc-list-empty-cushion {
+  font-size: 1.4em;
+  font-style: italic;
 }
 
 .fc-toolbar.fc-header-toolbar {
