@@ -9,15 +9,29 @@
 
 .title {
   text-align: center;
-  font-size: calc(min(7.5dvw, 7.5dvh)* var(--font-scale));
+  font-size: max(10px, calc(min(7.5dvw, 7.5dvh)* var(--font-scale)));
   font-weight: 600;
-  margin-bottom: 0.5rem;
+  /* Spacing tracks the panel so it does not swamp 250x122-class screens;
+     the min() keeps 800x480 at the original rem values. */
+  margin-bottom: min(0.5rem, 1.7vmin);
+}
+
+/* Long titles are capped at two lines instead of eating the list area. */
+.title,
+.list .list-title {
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  flex-shrink: 0;
 }
 
 .lists-container {
   display: flex;
   flex: 1;
-  gap: 1rem;
+  gap: min(1rem, 3.4vmin);
   flex-direction: column;
   overflow: hidden;
 }
@@ -33,16 +47,16 @@
   display: flex;
   flex-direction: column;
   border: 1.5px solid;
-  border-radius: 10px;
-  padding: 1rem;
-  padding-bottom: 0.5rem;
+  border-radius: min(10px, 2.1vmin);
+  padding: min(1rem, 3.4vmin);
+  padding-bottom: min(0.5rem, 1.7vmin);
   overflow: hidden;
   container-type: size;
 }
 
 .list .list-title {
   font-weight: 600;
-  font-size: calc(min(10cqh, 8.5cqw)* var(--font-scale));
+  font-size: max(10px, calc(min(10cqh, 8.5cqw)* var(--font-scale)));
   padding-bottom: 0.4rem;
   line-height: 1.2;
 }
@@ -61,12 +75,37 @@
   border-top: 1px solid;
   line-height: 1.2;
   box-sizing: border-box;
-  font-size: calc(min(8cqh, 7cqw)* var(--font-scale));
+  overflow-wrap: anywhere;
+  font-size: max(9px, calc(min(8cqh, 7cqw)* var(--font-scale)));
+}
+
+/* Portrait stacks the lists, so each list box is short and items sized off
+   its height shrank to ~8px. Floor them off the panel width instead; the
+   truncation script turns the overflow into "And N more". */
+@media (max-aspect-ratio: 4/5) {
+  .list ul li {
+    font-size: max(9px, calc(max(min(8cqh, 7cqw), min(3.2dvw, 2.4dvh)) * var(--font-scale)));
+  }
 }
 
 
 .list ul li:last-child {
   margin-bottom: 0;
+}
+
+.empty-state {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-style: italic;
+  font-size: max(10px, calc(min(5dvw, 5dvh) * var(--font-scale)));
+}
+
+.list ul li.empty-item {
+  list-style: none;
+  border-top: none;
+  font-style: italic;
 }
 
 .more-item {

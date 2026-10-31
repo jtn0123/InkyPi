@@ -5,4 +5,41 @@
   <div class="title">{{ title }}</div>
   <div class="content">{{ content }}</div>
 </div>
+<script>
+  // Responses longer than the box used to be cut off mid-line. Shrink the
+  // body copy until it fits, down to a legibility floor; anything still too
+  // long is clamped to whole lines with an ellipsis.
+  (function () {
+    function fit() {
+      const el = document.querySelector('.content');
+      if (!el) return;
+      el.style.fontSize = '';
+      el.style.display = '';
+      el.style.webkitLineClamp = '';
+      const floor = 10;
+      let size = parseFloat(getComputedStyle(el).fontSize);
+      // scrollHeight runs a couple of px past clientHeight even when every
+      // line fits (glyph overhang), so only a real fraction of a line counts.
+      const overflows = () => el.scrollHeight - el.clientHeight > size * 0.25;
+      while (overflows() && size > floor) {
+        size = Math.max(floor, size * 0.92);
+        el.style.fontSize = size + 'px';
+      }
+      if (overflows()) {
+        const lineHeight = parseFloat(getComputedStyle(el).lineHeight) || size * 1.3;
+        el.style.display = '-webkit-box';
+        el.style.webkitBoxOrient = 'vertical';
+        el.style.webkitLineClamp = String(Math.max(1, Math.floor(el.clientHeight / lineHeight)));
+      }
+    }
+    // Fit synchronously on load (the renderer screenshots right after it),
+    // and again once web fonts settle in case metrics changed.
+    const run = () => {
+      fit();
+      if (document.fonts) document.fonts.ready.then(fit);
+    };
+    if (document.readyState === 'complete') run();
+    else window.addEventListener('load', run);
+  })();
+</script>
 {% endblock %}
