@@ -23,6 +23,8 @@ from werkzeug.exceptions import NotFound
 # werkzeug.utils, which does not list it in __all__.
 from werkzeug.security import safe_join
 
+from utils.http_utils import content_disposition
+
 # ---------------------------------------------------------------------------
 # Internal cache
 # ---------------------------------------------------------------------------
@@ -89,7 +91,7 @@ def maybe_serve_webp(
         # this is the recognized sanitization sink.
         resp = send_from_directory(root_str, filename, mimetype="image/png")
         resp.vary.add("Accept")
-        resp.headers["Content-Disposition"] = f'inline; filename="{filename}"'
+        resp.headers["Content-Disposition"] = content_disposition("inline", filename)
         return resp
 
     # For the WebP path we still need an absolute filesystem path. Re-use
@@ -111,7 +113,7 @@ def maybe_serve_webp(
     response.set_etag(etag)
     response.vary.add("Accept")
     response.headers["Cache-Control"] = "no-cache"
-    response.headers["Content-Disposition"] = f'inline; filename="{filename}"'
+    response.headers["Content-Disposition"] = content_disposition("inline", filename)
     response.make_conditional(request)
     return response
 

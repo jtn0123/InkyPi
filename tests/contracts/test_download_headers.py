@@ -181,3 +181,44 @@ class TestMaybeServeWebpHeaders:
 
         cd = resp.headers.get("Content-Disposition", "")
         assert 'filename="my-image.png"' in cd, f"Expected quoted filename in: {cd!r}"
+
+
+# ---------------------------------------------------------------------------
+# Non-ASCII filenames (instance names like "Weather – Brooklyn")
+# ---------------------------------------------------------------------------
+
+
+class TestNonAsciiFilenames:
+    """Header values must be latin-1 encodable or waitress turns the response
+    into a 500 (UnicodeEncodeError while writing headers). Werkzeug's test
+    client does not enforce that, so assert the encoding explicitly."""
+
+    def test_content_disposition_ascii_passthrough(self) -> None:
+        from utils.http_utils import content_disposition
+
+        assert content_disposition("inline", "clock_Kitchen_Clock.png") == (
+            'inline; filename="clock_Kitchen_Clock.png"'
+        )
+
+    def test_content_disposition_non_ascii_and_quotes(self) -> None:
+        from utils.http_utils import content_disposition
+
+        cd = content_disposition("attachment", 'Weather – "Brooklyn".png')
+        cd.encode("latin-1")  # must not raise
+        assert cd.startswith('attachment; filename="Weather _ _Brooklyn_.png"')
+        assert "filename*=UTF-8''Weather%20%E2%80%93%20%22Brooklyn%22.png" in cd
+
+    def test_instance_image_with_non_ascii_name(
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
+        name = "Weather – Brooklyn"
+        path = device_config_dev.get_plugin_image_path("weather", name)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        Image.new("RGB", (10, 10), "white").save(path)
+
+        resp = client.get(f"/instance_image/weather/{name}")
+        assert resp.status_code == 200
+        cd = resp.headers.get("Content-Disposition", "")
+        _assert_inline(cd)
+        cd.encode("latin-1")
+        assert "filename*=UTF-8''" in cd

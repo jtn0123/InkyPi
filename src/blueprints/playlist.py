@@ -989,10 +989,12 @@ def format_relative_time(iso_date_string: str) -> str:
         return "just now"
     if diff_minutes < 60:
         return f"{int(diff_minutes)} minutes ago"
-    # Use rolling windows to avoid midnight boundary flakiness across TZs
-    if diff_seconds < 60 * 60 * 24:
+    # Bucket by local calendar date, not elapsed time: a rolling 24h window
+    # labels 8 PM last night as "today at 8:00 PM" when viewed at 2 AM.
+    days_ago = (now.date() - dt_local.date()).days
+    if days_ago <= 0:
         return "today at " + dt_local.strftime(time_format).lstrip("0")
-    if diff_seconds < 60 * 60 * 48:
+    if days_ago == 1:
         return "yesterday at " + dt_local.strftime(time_format).lstrip("0")
     return dt_local.strftime(month_day_format).replace(
         " 0", " "

@@ -22,8 +22,12 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 MAX_ENTRIES = 100
-# Strict allowlist regex used at the API boundary; defense in depth.
-_VALID_NAME_RE = re.compile(r"\A[a-zA-Z0-9][a-zA-Z0-9_\-]{0,63}\Z")
+# Strict allowlist regex; defense in depth. Must accept everything the API
+# boundary (plugin_history_bp._VALID_NAME_RE) and the instance-name form
+# accept -- including spaces -- or record_change() silently drops history for
+# ordinary names like "Kitchen Clock". The on-disk filename is a hash, so the
+# space is never part of a path.
+_VALID_NAME_RE = re.compile(r"\A[a-zA-Z0-9][a-zA-Z0-9 _\-]{0,63}\Z")
 
 
 def _hashed_filename(instance_name: str) -> str:
