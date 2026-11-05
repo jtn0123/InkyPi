@@ -3,7 +3,7 @@
 Two investigations in one doc:
 
 - **Part A** — what `fatihak/InkyPi` (parent) has that we don't, since the
-  [April 2026 review](./upstream-review-2026-04.md).
+  [April 2026 review](./archive/upstream-review-2026-04.md).
 - **Part B** — operational patterns from the ESP projects
   (`jtn0123/ESP32-Garage-Fan`, `jtn0123/halloween_esp`) worth having on the Pi.
 

@@ -280,6 +280,7 @@ When installing, use `-W` with your model name (without `.py`): `sudo bash insta
 - [Testing](./docs/testing.md) — Test suite, sharding, browser tests, coverage
 - [Building Plugins](./docs/building_plugins.md) — Create custom plugins (includes hello-world)
 - [Troubleshooting](./docs/troubleshooting.md) — Common issues and fixes
+- [Roadmap](./docs/ROADMAP.md) — What is still open
 
 ---
 
