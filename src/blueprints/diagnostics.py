@@ -29,7 +29,7 @@ from typing import Any
 
 from flask import Blueprint, current_app, jsonify, request
 
-from utils import crash_breadcrumb
+from utils import blackout, boot_self_test, crash_breadcrumb
 from utils.http_utils import json_error
 
 logger = logging.getLogger(__name__)
@@ -362,6 +362,32 @@ def _recent_client_log_summary() -> dict[str, Any]:
 
 
 # ---------------------------------------------------------------------------
+# Boot checks (B9 / B10) and blackout (B12)
+# ---------------------------------------------------------------------------
+
+
+def _asset_check() -> dict[str, Any] | None:
+    """The boot-time asset manifest report stored by ``create_app``."""
+    report = current_app.config.get("ASSET_CHECK")
+    return report if isinstance(report, dict) else None
+
+
+def _boot_self_test() -> dict[str, Any] | None:
+    try:
+        return boot_self_test.last_result()
+    except Exception:
+        logger.exception("diagnostics: failed to read boot self-test record")
+        return None
+
+
+def _blackout_state() -> dict[str, Any]:
+    device_config = current_app.config.get("DEVICE_CONFIG")
+    if device_config is None:
+        return {"active": False, "since": None}
+    return blackout.get_state(device_config)
+
+
+# ---------------------------------------------------------------------------
 # Route
 # ---------------------------------------------------------------------------
 
@@ -392,7 +418,10 @@ def api_diagnostics() -> Any:
           "warn_count_5m": 0,
           "last_error_ts": null,
           "window_seconds": 300
-        }
+        },
+        "asset_check": {"ok": true, "checked": 80, "missing": [], "...": "..."},
+        "boot_self_test": {"version": "1.4.16", "status": "pass", "...": "..."},
+        "blackout": {"active": false, "since": null}
       }
     """
     allowed, reason = _access_allowed()
@@ -417,5 +446,11 @@ def api_diagnostics() -> Any:
         "last_death": crash_breadcrumb.last_death(),
         "death_count": crash_breadcrumb.death_count(),
         "recent_client_log_errors": _recent_client_log_summary(),
+        # B10: assets the app needs that were missing at boot.
+        "asset_check": _asset_check(),
+        # B9: outcome of the once-per-version panel self-test.
+        "boot_self_test": _boot_self_test(),
+        # B12: whether refreshes are paused and the panel blanked.
+        "blackout": _blackout_state(),
     }
     return jsonify(payload), 200

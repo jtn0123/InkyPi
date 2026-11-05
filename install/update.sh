@@ -464,6 +464,24 @@ if ! require_supported_python; then
   exit 1
 fi
 
+# Pre-flight gates (review item B4). Read-only checks — free disk, VERSION,
+# device config schema, display driver — run before the service is stopped or
+# anything is installed, so an abort leaves the running service untouched.
+# do_update.sh already ran these against the old checkout before `git
+# checkout`; running them again here validates the config against the *new*
+# schema and covers update.sh being invoked directly (settings UI, rollback).
+_current_step="preflight"
+_inkypi_maybe_inject_failure "preflight"
+if ! run_update_preflight "$VENV_PATH/bin/python" \
+    --repo-dir "$SCRIPT_DIR/.." \
+    --disk-path "$INSTALL_PATH" \
+    --version-file "$SCRIPT_DIR/../VERSION"; then
+  _current_step="preflight: $UPDATE_PREFLIGHT_REASON"
+  echo_error "ERROR: Update aborted by pre-flight checks: $UPDATE_PREFLIGHT_REASON"
+  echo "Nothing was installed and the service was not stopped." >&2
+  exit 1
+fi
+
 # JTN-666: Stop and disable the service BEFORE touching files or venv so
 # systemd cannot restart a half-installed service and thrash the Pi.
 _current_step="stop_service"

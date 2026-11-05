@@ -52,6 +52,7 @@ _FRONTEND_JSON_ROUTES = (
     ("POST", "/history/redisplay"),
     ("POST", "/history/delete"),
     ("POST", "/history/clear"),
+    ("DELETE", "/api/blackout"),
 )
 
 # OpenAPI route syntax.
@@ -89,6 +90,7 @@ _FRONTEND_OPENAPI_PATHS = (
     ("POST", "/history/redisplay"),
     ("POST", "/history/delete"),
     ("POST", "/history/clear"),
+    ("DELETE", "/api/blackout"),
 )
 
 _FRONTEND_OPENAPI_REQUEST_BODIES = (

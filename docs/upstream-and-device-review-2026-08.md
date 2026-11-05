@@ -3,7 +3,7 @@
 Two investigations in one doc:
 
 - **Part A** — what `fatihak/InkyPi` (parent) has that we don't, since the
-  [April 2026 review](./upstream-review-2026-04.md).
+  [April 2026 review](./archive/upstream-review-2026-04.md).
 - **Part B** — operational patterns from the ESP projects
   (`jtn0123/ESP32-Garage-Fan`, `jtn0123/halloween_esp`) worth having on the Pi.
 
@@ -112,7 +112,7 @@ original bug plus two more that upstream fixed in the same neighbourhood.
 > separately means touching the same function three times. **Fold JTN-769 (A0)
 > into the same change** — it's the same file and the same parse loop.
 
-- [ ] **A1d — Open-Meteo timestamps are parsed in the wrong timezone.**
+- [x] **A1d — Open-Meteo timestamps are parsed in the wrong timezone.**
       With `timezone=auto` the API returns offset-free *local* timestamps for
       the forecast location, but `weather_data.py` attaches the device timezone
       before converting. Anywhere the device and the forecast location differ,
@@ -139,7 +139,7 @@ Seventeen PRs opened after 2026-04-19. Triaged against our tree.
       so we advertise a panel we cannot drive. *Medium — affects one panel
       family; fix is ~20 lines.*
 
-- [ ] **[#728](https://github.com/fatihak/InkyPi/pull/728) — re-instantiate the EPD object after sleep.**
+- [x] **[#728](https://github.com/fatihak/InkyPi/pull/728) — re-instantiate the EPD object after sleep.**
       `display_image` ends with `self.epd_display.sleep()`, and the next
       refresh calls `self.epd_display_init()` on that same object — whose SPI
       handle `module_exit()` closed. Reporter hits
@@ -150,7 +150,8 @@ Seventeen PRs opened after 2026-04-19. Triaged against our tree.
       is driver-dependent and I could not reproduce it without hardware. Treat
       as defensive hardening, not a confirmed break. *Low-Medium.*
 
-- [ ] **[#740](https://github.com/fatihak/InkyPi/pull/740) — Inky 2.4.0 for newer hardware.**
+- [x] **[#740](https://github.com/fatihak/InkyPi/pull/740) — Inky 2.4.0 for newer hardware.**
+      — done: the lock already resolves `inky==2.5.0`.
       Our range `inky>=2.3,<3` already permits it; the lock pins `inky==2.3.0`.
       A lockfile bump plus a smoke test on real hardware. *Low — trivial.*
 
@@ -260,13 +261,15 @@ in full — every guard in it exists because of a specific incident.
       *High — this is the difference between "recovers on its own" and "needs a
       keyboard".*
 
-- [ ] **B4 — Pre-flight abort gates in the updater.** `deploy.sh` hard-aborts
+- [x] **B4 — Pre-flight abort gates in the updater.** `deploy.sh` hard-aborts
       when the built image has an empty WiFi SSID, with the comment: *"A
       warning scrolled past in build output is not a gate; this is."* They
       bricked a device that way on 2026-08-01. Our equivalents: free disk
       before checkout, device config passes schema validation, the display
       driver for the configured panel is present, `VERSION` is readable.
-      *Medium.*
+      *Medium.* Done: `install/_preflight.py`, run by `do_update.sh` before
+      checkout (target `VERSION` via `git show`) and by `update.sh` before the
+      service stops; floor 500 MB, `INKYPI_UPDATE_MIN_FREE_MB` overrides.
 
 - [x] **B5 — Report unconfirmed vs rolled-back vs dark.** Follows from B2/B3;
       surface the three-way outcome in the settings UI and in
@@ -304,28 +307,46 @@ in full — every guard in it exists because of a specific incident.
       split. This is the most InkyPi-specific idea in the whole ESP set.
       *Medium.*
 
-- [ ] **B9 — Boot self-test.** halloween ROADMAP #26 sweeps R/G/B/W per zone at
+- [x] **B9 — Boot self-test.** halloween ROADMAP #26 sweeps R/G/B/W per zone at
       plug-in, so a dead channel is visible before showtime. Ours: after an
       install or update, push a known test pattern and record pass/fail in
       diagnostics — proving the panel and the driver work before a plugin gets
       blamed. *Medium.*
+      **Done:** [`utils/boot_self_test.py`](../src/utils/boot_self_test.py).
+      Triggered by `VERSION` differing from the version in
+      `/var/lib/inkypi/boot_self_test.json` (no install/update marker exists;
+      a fresh install has no record). Runs on a background thread through the
+      refresh loop, restores the previous frame, surfaces as
+      `boot_self_test` in `/api/diagnostics`. Skip with
+      `INKYPI_SKIP_BOOT_SELF_TEST=1` or `"boot_self_test": false`; never runs
+      on the mock display.
 
-- [ ] **B10 — Asset manifest check at boot.** halloween ROADMAP #29 `stat()`s
+- [x] **B10 — Asset manifest check at boot.** halloween ROADMAP #29 `stat()`s
       every scene file at boot and lists missing names in `/api/status`. We load
       `static/dist/manifest.json` with graceful degradation
       (`app_setup/asset_helpers.py`) but never *report* what's missing — fonts,
       plugin icons, render templates. Surface it in `/api/diagnostics`. *Medium.*
+      **Done:** [`utils/asset_check.py`](../src/utils/asset_check.py), run once
+      in `create_app`; `asset_check` in `/api/diagnostics`, WARNING log at boot
+      when anything is missing. A missing `static/dist` bundle is reported as
+      `degraded` (it has a designed fallback), not `missing`.
 
 - [ ] **B11 — QR code on the startup screen.** We render IP text
       (`generate_startup_image`). halloween #24 puts scene, uptime, SD free
       **and a QR to the web remote** on its eInk. A QR turns "read the IP, type
       it on your phone" into one scan. *Low — high polish-per-hour.*
 
-- [ ] **B12 — Blackout / kill switch endpoint.** halloween #25 has
+- [x] **B12 — Blackout / kill switch endpoint.** halloween #25 has
       `/api/blackout`, GET **and** POST so it's bookmarkable, that kills
       everything. Ours: a bookmarkable URL that pauses refreshes and blanks the
       display — useful for guests, photos, or a plugin misbehaving while you're
       out. *Low.*
+      **Done:** [`blueprints/blackout.py`](../src/blueprints/blackout.py).
+      `GET|POST /api/blackout` on, `?off=1` or `DELETE` off; persisted in
+      `device.json`; dashboard banner with Resume. The mutating GET is refused
+      unless `Sec-Fetch-Site` is `none`/`same-origin` (or, without it, the
+      Origin/Referer is this host). Blank/restore frames go through the
+      refresh loop (see the #686 note below).
 
 ## B13–B15. Longer shots
 
