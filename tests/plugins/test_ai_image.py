@@ -1197,15 +1197,57 @@ def test_ai_image_schema_exposes_gpt_image_2_and_quality_presets() -> None:
 
     model_options = fields["imageModel"]["options_by_value"]["openai"]
     model_values = [o["value"] for o in model_options]
+    assert "gpt-image-2.6-sunburst" in model_values
     assert "gpt-image-2" in model_values
     assert "gpt-image-1.5" in model_values
-    # GPT Image 2 should be listed first (recommended/default).
-    assert model_values[0] == "gpt-image-2"
+    # GPT Image 2.6 Flare should be listed first (recommended/default).
+    assert model_values[0] == "gpt-image-2.6-flare"
+    assert fields["imageModel"]["default"] == "gpt-image-2.6-flare"
 
     quality_by_model = fields["quality"]["options_by_value"]
-    assert "gpt-image-2" in quality_by_model
-    gpt2_qualities = [o["value"] for o in quality_by_model["gpt-image-2"]]
-    assert set(gpt2_qualities) == {"high", "medium", "low"}
+    for model in ("gpt-image-2.6-flare", "gpt-image-2.6-sunburst", "gpt-image-2"):
+        qualities = [o["value"] for o in quality_by_model[model]]
+        assert set(qualities) == {"high", "medium", "low"}, model
+
+
+@pytest.mark.parametrize("model", ["gpt-image-2.6-flare", "gpt-image-2.6-sunburst"])
+def test_ai_image_gpt_image_2_6_models_reach_the_images_api(
+    device_config_dev: Any,
+    monkeypatch: pytest.MonkeyPatch,
+    mock_openai: Any,
+    model: str,
+) -> None:
+    from plugins.ai_image.ai_image import AIImage
+
+    monkeypatch.setenv("OPEN_AI_SECRET", "test")
+    plugin = AIImage({"id": "ai_image"})
+    settings = {
+        "textPrompt": "a lighthouse",
+        "provider": "openai",
+        "imageModel": model,
+        "quality": "high",
+    }
+
+    assert plugin.validate_settings(settings) is None
+    plugin.generate_image(settings, device_config_dev)
+
+    kwargs = mock_openai.return_value.images.generate.call_args.kwargs
+    assert kwargs["model"] == model
+    assert kwargs["quality"] == "high"
+
+
+def test_ai_image_defaults_to_gpt_image_2_6_flare(
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch, mock_openai: Any
+) -> None:
+    from plugins.ai_image.ai_image import AIImage
+
+    monkeypatch.setenv("OPEN_AI_SECRET", "test")
+    AIImage({"id": "ai_image"}).generate_image(
+        {"textPrompt": "a lighthouse", "provider": "openai"}, device_config_dev
+    )
+
+    kwargs = mock_openai.return_value.images.generate.call_args.kwargs
+    assert kwargs["model"] == "gpt-image-2.6-flare"
 
 
 def test_ai_image_google_randomize_end_to_end_falls_back(
