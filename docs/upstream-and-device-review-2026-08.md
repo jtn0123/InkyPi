@@ -139,7 +139,7 @@ Seventeen PRs opened after 2026-04-19. Triaged against our tree.
       so we advertise a panel we cannot drive. *Medium — affects one panel
       family; fix is ~20 lines.*
 
-- [ ] **[#728](https://github.com/fatihak/InkyPi/pull/728) — re-instantiate the EPD object after sleep.**
+- [x] **[#728](https://github.com/fatihak/InkyPi/pull/728) — re-instantiate the EPD object after sleep.**
       `display_image` ends with `self.epd_display.sleep()`, and the next
       refresh calls `self.epd_display_init()` on that same object — whose SPI
       handle `module_exit()` closed. Reporter hits
@@ -150,7 +150,8 @@ Seventeen PRs opened after 2026-04-19. Triaged against our tree.
       is driver-dependent and I could not reproduce it without hardware. Treat
       as defensive hardening, not a confirmed break. *Low-Medium.*
 
-- [ ] **[#740](https://github.com/fatihak/InkyPi/pull/740) — Inky 2.4.0 for newer hardware.**
+- [x] **[#740](https://github.com/fatihak/InkyPi/pull/740) — Inky 2.4.0 for newer hardware.**
+      — done: the lock already resolves `inky==2.5.0`.
       Our range `inky>=2.3,<3` already permits it; the lock pins `inky==2.3.0`.
       A lockfile bump plus a smoke test on real hardware. *Low — trivial.*
 

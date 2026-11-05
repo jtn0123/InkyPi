@@ -350,3 +350,41 @@ def test_fake_driver_module_restores_previous_registration() -> None:
             install_fake_epd_module(isolated, "epd7in3e", FakeMonoEPD)
             assert sys.modules[module_name] is not sentinel
         assert sys.modules[module_name] is sentinel
+
+
+class FakeClosedAfterSleepEPD(FakeMonoEPD):
+    """Driver whose ``Init`` cannot reopen SPI once ``sleep()`` closed it."""
+
+    instances = 0
+
+    def __init__(self) -> None:
+        super().__init__()
+        FakeClosedAfterSleepEPD.instances += 1
+
+    def Init(self) -> None:
+        if self.slept:
+            raise OSError(9, "Bad file descriptor")
+        self.inited = True
+
+
+def test_display_recreates_driver_when_init_fails_after_sleep(
+    monkeypatch: pytest.MonkeyPatch, device_config_dev: Any
+) -> None:
+    """Upstream fatihak#728: the second refresh hit EBADF on the slept object."""
+    device_config_dev.update_value("display_type", "epd7in3e")
+    FakeClosedAfterSleepEPD.instances = 0
+    install_fake_epd_module(monkeypatch, "epd7in3e", FakeClosedAfterSleepEPD)
+
+    from display.waveshare_display import WaveshareDisplay
+
+    driver = WaveshareDisplay(device_config_dev)
+    img = Image.new("RGB", (800, 480), "white")
+    driver.display_image(img)
+    first = driver.epd_display
+    assert first.slept
+
+    driver.display_image(img)
+
+    assert driver.epd_display is not first
+    assert driver.epd_display.displayed, "second refresh should still draw"
+    assert FakeClosedAfterSleepEPD.instances == 2

@@ -134,31 +134,8 @@ class WaveshareDisplay(AbstractDisplay):
             sys.path.insert(0, str(epd_dir))
 
         try:
-            epd_module = __import__(module_name, fromlist=["EPD"])
-            self.epd_display: Any = epd_module.EPD()
-            # Workaround for init functions with inconsistent casing
-            init_method = getattr(self.epd_display, "Init", None)
-            if not callable(init_method):
-                init_method = getattr(self.epd_display, "init", None)
-            if not callable(init_method):
-                raise AttributeError("No Init/init method found")
-
-            # Some drivers (epd3in7 and relatives) are mode-driven: init() and
-            # Clear() take a required mode argument and there is no generic
-            # display() — only display_1Gray/display_4Gray.  Calling them the
-            # usual way raises TypeError, which is not one of the errors caught
-            # below, so the panel failed with a confusing traceback despite
-            # being listed in the driver manifest.
-            self.grayscale_mode_display: bool = _requires_mode_argument(init_method)
-            if self.grayscale_mode_display:
-                mode_init = cast(Callable[[int], None], init_method)
-
-                def init_in_grayscale_mode() -> None:
-                    mode_init(_GRAYSCALE_MODE_1BIT)
-
-                self.epd_display_init: Callable[[], None] = init_in_grayscale_mode
-            else:
-                self.epd_display_init = cast(Callable[[], None], init_method)
+            self._epd_module: Any = __import__(module_name, fromlist=["EPD"])
+            self._bind_driver()
             self.epd_display_init()
 
             if self.grayscale_mode_display:
@@ -181,6 +158,54 @@ class WaveshareDisplay(AbstractDisplay):
             w, h = int(self.epd_display.width), int(self.epd_display.height)
             resolution = [w, h] if w >= h else [h, w]
             self.device_config.update_value("resolution", resolution, write=True)
+
+    def _bind_driver(self) -> None:
+        """Instantiate the EPD object and resolve how to wake it.
+
+        Raises:
+            AttributeError: If the driver has no ``Init``/``init`` method.
+        """
+        self.epd_display: Any = self._epd_module.EPD()
+        # Workaround for init functions with inconsistent casing
+        init_method = getattr(self.epd_display, "Init", None)
+        if not callable(init_method):
+            init_method = getattr(self.epd_display, "init", None)
+        if not callable(init_method):
+            raise AttributeError("No Init/init method found")
+
+        # Some drivers (epd3in7 and relatives) are mode-driven: init() and
+        # Clear() take a required mode argument and there is no generic
+        # display() — only display_1Gray/display_4Gray.  Calling them the
+        # usual way raises TypeError, which initialize_display does not
+        # catch, so the panel failed with a confusing traceback despite
+        # being listed in the driver manifest.
+        self.grayscale_mode_display: bool = _requires_mode_argument(init_method)
+        if self.grayscale_mode_display:
+            mode_init = cast(Callable[[int], None], init_method)
+
+            def init_in_grayscale_mode() -> None:
+                mode_init(_GRAYSCALE_MODE_1BIT)
+
+            self.epd_display_init: Callable[[], None] = init_in_grayscale_mode
+        else:
+            self.epd_display_init = cast(Callable[[], None], init_method)
+
+    def _wake_display(self) -> None:
+        """Re-initialise the panel after the previous refresh put it to sleep.
+
+        ``sleep()`` ends in ``module_exit()``, which closes the SPI handle.  Most
+        drivers reopen it at the top of ``init()``, but some do not, and the
+        next refresh then fails with ``OSError: [Errno 9] Bad file descriptor``
+        (upstream fatihak#728).  Rebuild the driver object once and retry.
+        """
+        try:
+            self.epd_display_init()
+        except OSError as exc:
+            logger.warning(
+                "Waveshare init failed after sleep (%s); re-creating the driver.", exc
+            )
+            self._bind_driver()
+            self.epd_display_init()
 
     def _clear_display(self) -> None:
         """Clear residual pixels, tolerating each driver's ``Clear`` signature.
@@ -236,7 +261,7 @@ class WaveshareDisplay(AbstractDisplay):
             raise ValueError("No image provided.")
 
         # Assume device was in sleep mode.
-        self.epd_display_init()
+        self._wake_display()
 
         # Clear residual pixels before updating the image.
         self._clear_display()
