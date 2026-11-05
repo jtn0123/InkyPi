@@ -20,7 +20,23 @@
     font-size: calc(min(7dvh, 6vw) * var(--font-scale));
     font-weight: bold;
     line-height: 1.1;
-    padding-bottom: 1.5dvh;
+    /* Margin, not padding: a clamped block clips at its padding box, so
+       bottom padding would let the first hidden line peek through. */
+    margin-bottom: 1.5dvh;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+}
+
+/* Long feed titles, headlines and summaries are capped (with an ellipsis)
+   so one verbose story cannot fill the panel on its own, and unbreakable
+   strings wrap instead of running off the right edge. */
+.title,
+.rss-item .item-title,
+.rss-item .item-description {
+    overflow-wrap: anywhere;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
 }
 
 .rss-item {
@@ -38,6 +54,8 @@
     font-weight: 600;
     padding-bottom: 0.6dvh;
     font-size: calc(min(4.6dvh, 4.2vw) * var(--font-scale));
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
 }
 
 .rss-item .item-image {
@@ -53,12 +71,28 @@
 
 .rss-item .item-description {
     font-size: calc(min(3.8dvh, 3.6vw) * var(--font-scale));
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+}
+
+.rss-item .item-description:empty {
+    display: none;
+}
+
+.empty-state {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    font-style: italic;
+    font-size: calc(min(5dvh, 4.5vw) * var(--font-scale));
 }
 
 .rss-item .text-container {
   display: flex;
   flex-direction: column;
   flex: 1;
+  min-width: 0;
   line-height: 1.2;
 }
 

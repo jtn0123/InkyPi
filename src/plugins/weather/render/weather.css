@@ -44,6 +44,20 @@
   font-weight: bold;
   line-height: 102%;
   height: 100%;
+  /* A long place name used to wrap to three lines, which spilled out of the
+     header over the date and the refresh stamp. Keep it on one line. */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Leave room for the absolutely positioned refresh stamp in the corner. In
+   portrait the header is tall enough that the title sits below the stamp. */
+@media (min-aspect-ratio: 1) {
+  .has-refresh .title {
+    /* The stamp is ~17em of its own font (min(2dvh, 2vw)) wide. */
+    padding-inline: calc(min(2dvh, 2vw) * 17);
+  }
 }
 
 .current-date {
@@ -259,9 +273,17 @@
   max-width: 4dvw;
 }
 
+/* "100 %" used to wrap in narrow forecast cards, orphaning the "%". Keep it
+   on one line and size it like the temperatures above so it fits the card. */
+.moon-phase-pct {
+  flex: 1;
+  white-space: nowrap;
+  font-size: min(3dvh, 2.5vw);
+}
+
 .moon-phase-container {
   display: flex;
-  gap: 10px;
+  gap: min(10px, 1vw);
   justify-content: center;
   align-items: center;
 }

@@ -48,5 +48,7 @@
   display: flex;
   justify-content: space-between;
   margin-top: 8px;
-  font-size: min(5dvh, 4vw);
+  /* Floor keeps the labels legible on small panels (250x122 rendered them
+     ~5px tall). */
+  font-size: max(10px, min(5dvh, 4vw));
 }

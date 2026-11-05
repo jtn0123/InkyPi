@@ -126,42 +126,55 @@ class Comic(BasePlugin):
         with img:
             background = Image.new("RGB", (width, height), "white")
             font_size = int(caption_font_size) if caption_font_size else 20
+            # The size setting is in pixels for an 800x480 panel; scale it up
+            # on bigger panels, where a fixed 20px caption was unreadable.
+            font_size = max(1, round(font_size * max(1.0, min(width, height) / 480)))
             font_loader = cast(Any, get_font)
             font = font_loader("Jost", font_size=font_size)
             draw = ImageDraw.Draw(background)
             top_padding, bottom_padding = 0, 0
+            # Captions used to run flush to the panel edges.
+            margin = max(2, min(width, height) // 60)
+            text_width = max(1, width - 2 * margin)
+            # Each text block may take at most a quarter of the panel, so the
+            # comic itself always keeps room. Uncapped, a long caption on a
+            # small panel left no height for the comic and PIL raised.
+            max_block_height = height // 4
 
             if is_caption:
                 if comic_panel["title"]:
-                    lines, wrapped_text = self._wrap_text(
-                        comic_panel["title"], font, width
+                    wrapped_text, block_height = self._fit_text_block(
+                        draw, comic_panel["title"], font, text_width, max_block_height
                     )
-                    draw.multiline_text(
-                        (width // 2, 0),
-                        wrapped_text,
-                        font=font,
-                        fill="black",
-                        anchor="ma",
-                    )
-                    top_padding = font.getbbox(wrapped_text)[3] * lines + 1
+                    if wrapped_text:
+                        draw.multiline_text(
+                            (width // 2, margin // 2),
+                            wrapped_text,
+                            font=font,
+                            fill="black",
+                            anchor="ma",
+                            align="center",
+                        )
+                        top_padding = block_height + margin
 
                 if comic_panel["caption"]:
-                    lines, wrapped_text = self._wrap_text(
-                        comic_panel["caption"], font, width
+                    wrapped_text, block_height = self._fit_text_block(
+                        draw, comic_panel["caption"], font, text_width, max_block_height
                     )
-                    draw.multiline_text(
-                        (width // 2, height),
-                        wrapped_text,
-                        font=font,
-                        fill="black",
-                        anchor="md",
-                    )
-                    bottom_padding = font.getbbox(wrapped_text)[3] * lines + 1
+                    if wrapped_text:
+                        draw.multiline_text(
+                            (width // 2, height - margin // 2),
+                            wrapped_text,
+                            font=font,
+                            fill="black",
+                            anchor="md",
+                            align="center",
+                        )
+                        bottom_padding = block_height + margin
 
-            scale = min(
-                width / img.width, (height - top_padding - bottom_padding) / img.height
-            )
-            new_size = (int(img.width * scale), int(img.height * scale))
+            available_height = max(1, height - top_padding - bottom_padding)
+            scale = min(width / img.width, available_height / img.height)
+            new_size = (max(1, int(img.width * scale)), max(1, int(img.height * scale)))
             img = img.resize(new_size, Image.Resampling.LANCZOS)
 
             y_middle = (height - img.height) // 2
@@ -174,6 +187,39 @@ class Comic(BasePlugin):
             background.paste(img, (x, y))
 
             return background
+
+    def _fit_text_block(
+        self,
+        draw: ImageDraw.ImageDraw,
+        text: str,
+        font: ImageFont,
+        width: int,
+        max_height: int,
+    ) -> tuple[str, int]:
+        """Wrap *text* to *width* and drop lines that exceed *max_height*.
+
+        Returns the wrapped text (the last kept line ends in an ellipsis when
+        lines were dropped) and its rendered height. The text is empty when
+        not even one line fits.
+        """
+        _, wrapped_text = self._wrap_text(text, font, width)
+        lines = wrapped_text.split("\n")
+
+        def block_height(candidate: list[str]) -> int:
+            bbox = draw.multiline_textbbox((0, 0), "\n".join(candidate), font=font)
+            return int(bbox[3] - min(bbox[1], 0))
+
+        kept = list(lines)
+        while kept and block_height(kept) > max_height:
+            kept.pop()
+        if not kept:
+            return "", 0
+        if len(kept) < len(lines):
+            last = kept[-1]
+            while last and font.getbbox(last + "…")[2] >= width:
+                last = last[:-1].rstrip()
+            kept[-1] = last + "…"
+        return "\n".join(kept), block_height(kept)
 
     def _wrap_text(self, text: str, font: ImageFont, width: int) -> tuple[int, str]:
         lines = []

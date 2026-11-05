@@ -15,10 +15,13 @@
 .title {
     font-size: min(8dvw, 8dvh);
     text-align: center;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: 0.2em;
+    max-width: 100%;
+    line-height: 1.2;
+    /* Long user/repo names wrap (balanced, breaking anywhere if they must)
+       with the logo inline before the first word. As a flex row the logo
+       shrank to a dot and was stranded at the far left of the wrapped name. */
+    text-wrap: balance;
+    overflow-wrap: anywhere;
 }
 
 .github-container {
@@ -31,6 +34,9 @@
 }
 
 .github-logo {
+    display: inline-block;
+    vertical-align: -0.2em;
+    margin-right: 0.2em;
     width: 1.1em;
     height: 1.1em;
     fill: currentColor; 
@@ -77,7 +83,9 @@
 }
 
 .stars {
-    font-size: 500%;
+    /* Was a fixed 500% (80px): tiny on 1448x1072, clipped on 250x122. */
+    font-size: min(22dvh, 13dvw);
+    line-height: 1;
     text-align: center;
     display: flex;
     justify-content: center;

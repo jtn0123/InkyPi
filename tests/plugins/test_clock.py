@@ -386,3 +386,15 @@ def test_generate_image_error_path(
             },
             cfg,
         )
+
+
+@pytest.mark.parametrize("dimensions", [(250, 122), (122, 250), (100, 60)])
+def test_conic_clock_renders_on_small_panels(dimensions: tuple[int, int]) -> None:
+    """The hand width bottoms out at 1px on 2.13" panels; the rounded hand
+    ends used to get a negative radius and PIL raised."""
+    from plugins.clock.clock import Clock
+
+    clock = Clock({"id": "clock"})
+    img = clock.draw_conic_clock(dimensions, _fixed_dt(10, 10, 0))
+    assert img is not None
+    assert img.size == dimensions

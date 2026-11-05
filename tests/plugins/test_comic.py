@@ -147,3 +147,65 @@ def test_generate_image_centering(
     assert img.getpixel((w - 1, 0)) == (255, 255, 255)
     assert img.getpixel((0, h - 1)) == (255, 255, 255)
     assert img.getpixel((w - 1, h - 1)) == (255, 255, 255)
+
+
+def _compose(
+    monkeypatch: pytest.MonkeyPatch,
+    plugin_config: Any,
+    size: tuple[int, int],
+    title: str,
+    caption: str,
+) -> Any:
+    from plugins.comic.comic import Comic
+
+    panel = Image.new("RGB", (740, 360), "black")
+    p = Comic(plugin_config)
+    monkeypatch.setattr(p.image_loader, "from_url", lambda *a, **kw: panel.copy())
+    return p._compose_image(
+        {"image_url": "http://img/x.png", "title": title, "caption": caption},
+        True,
+        "20",
+        size[0],
+        size[1],
+    )
+
+
+@pytest.mark.parametrize("size", [(250, 122), (122, 250), (800, 480), (1448, 1072)])
+def test_compose_image_long_caption_leaves_room_for_the_comic(
+    monkeypatch: pytest.MonkeyPatch, plugin_config: Any, size: tuple[int, int]
+) -> None:
+    """A long caption on a small panel used to leave no height for the comic,
+    and PIL raised "height and width must be > 0"."""
+    caption = (
+        "Her daughter is named Help I'm trapped in a driver's license factory. " * 4
+    )
+    img = _compose(monkeypatch, plugin_config, size, "Exploits of a Mom", caption)
+    assert img.size == size
+
+    # Title and caption are each capped at a quarter of the panel, so the
+    # (black) comic gets at least half the height unless the panel width
+    # limits it first.
+    gray = img.convert("L")
+    dark_rows = [
+        y
+        for y in range(size[1])
+        if sum(1 for x in range(size[0]) if gray.getpixel((x, y)) < 20) > size[0] // 4
+    ]
+    expected = min(size[1] // 2, size[0] * 360 // 740)
+    assert len(dark_rows) >= expected - 2
+
+
+def test_compose_image_caption_keeps_a_side_margin(
+    monkeypatch: pytest.MonkeyPatch, plugin_config: Any
+) -> None:
+    """Caption text used to run flush to the panel edges."""
+    size = (800, 480)
+    caption = (
+        "Her daughter is named Help I'm trapped in a driver's license factory. " * 4
+    )
+    img = _compose(monkeypatch, plugin_config, size, "", caption)
+    # Bottom 60px are caption only; the outermost 8px columns must be blank.
+    band = img.convert("L").crop((0, size[1] - 60, size[0], size[1]))
+    ink = band.point(lambda v: 255 if v < 128 else 0).getbbox()
+    assert ink is not None, "caption was not drawn"
+    assert ink[0] >= 8 and ink[2] <= size[0] - 8, ink
