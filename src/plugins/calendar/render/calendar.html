@@ -5,11 +5,11 @@
 <script src="{{static_dir}}/scripts/calendar.min.js" charset="UTF-8"></script>
 
 <div id="calendar" class="calendar" style="
---fc-page-bg-color: {{ plugin_settings.backgroundColor or white }};
+--fc-page-bg-color: {{ plugin_settings.backgroundColor or 'white' }};
 --fc-border-color: {{ plugin_settings.textColor }};
 --fc-today-bg-color: '';
---fc-now-indicator-color: {{ plugin_settings.nowIndicatorColor or red }};
---fc-event-border-color: {{ plugin_settings.textColor or white }};
+--fc-now-indicator-color: {{ plugin_settings.nowIndicatorColor or 'red' }};
+--fc-event-border-color: {{ plugin_settings.textColor or 'white' }};
 
 --fc-small-font-size: {{ 0.85 * font_scale }}em;
 --fc-title-font-size: {{ 1.75 * font_scale }}em;
@@ -49,6 +49,9 @@
             weekends:  {{ (plugin_settings.displayWeekends == "true") | tojson}},
             nowIndicator: {{ (plugin_settings.displayNowIndicator == "true") | tojson}},
             fixedWeekCount: false,
+            // Busy days used to spill events past the cell edge, clipping the
+            // last one mid-line; collapse the overflow into "+N more".
+            dayMaxEvents: true,
             {% if view == 'timeGrid' %}duration: {days : 7 },{% endif %}
             {% if view == 'dayGrid' %}duration: {weeks : "{{ plugin_settings.displayWeeks or 4}}" },{% endif %}
             headerToolbar: {
@@ -59,6 +62,13 @@
             slotDuration: "01:00:00"
         });
         calendar.render();
+        // FullCalendar fixes the grid height when it renders, before the Jost
+        // web font has loaded. The font makes the title taller, so the grid
+        // stayed too tall and its last row ran off the bottom of the panel.
+        // Measure again once the fonts are in.
+        if (document.fonts) {
+            document.fonts.ready.then(function () { calendar.updateSize(); });
+        }
     });
 </script>
 

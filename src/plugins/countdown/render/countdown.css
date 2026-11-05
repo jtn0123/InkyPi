@@ -16,7 +16,17 @@
   font-size: min(11dvw, 11dvh);
   font-weight: bold;
   letter-spacing: .3px;
-  line-height: 1;
+  line-height: 1.1;
+  /* A long title used to wrap onto five-plus lines and push the day count
+     and label off the panel; a single long word ran off the side. Cap it at
+     two balanced lines and break words that cannot fit. */
+  text-wrap: balance;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
 }
 .subtitle {
   margin: 0 0 4dvh;
