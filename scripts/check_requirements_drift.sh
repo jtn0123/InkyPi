@@ -4,7 +4,7 @@
 # JTN-616: migrated from pip-compile to `uv lock` + `uv export`. The universal
 # lockfile produced by uv resolves all supported platforms in a single file,
 # which eliminates the previous pain points around:
-#   - Python version mismatches (3.13 vs 3.12)
+#   - Python version mismatches (the project targets 3.13 only)
 #   - sys_platform-gated packages (cysystemd, gpiod)
 #   - Multi-arch wheel hash coverage (arm64/armv7l/aarch64)
 #
@@ -99,7 +99,7 @@ echo "==> Checking universal dev requirements match their source ..."
 # platform and interpreter-specific dependencies
 # (including Linux memray and libcst's Python 3.13 YAML backend).
 if ! uv --no-config pip compile \
-    --universal --python-version 3.11 --fork-strategy fewest \
+    --universal --python-version 3.13 --fork-strategy fewest \
     --prerelease disallow --generate-hashes \
     --constraints "${DEV_TXT}" --no-header --no-annotate \
     install/requirements-dev.in --output-file "${tmp_dev}" --quiet; then
@@ -138,7 +138,7 @@ fi
 for lock_name in bootstrap uv ws; do
     lock_txt="install/${lock_name}-requirements.txt"
     if ! uv --no-config pip compile \
-        --universal --python-version 3.11 --prerelease disallow \
+        --universal --python-version 3.13 --prerelease disallow \
         --generate-hashes --constraints "$lock_txt" --no-header --no-annotate \
         "install/${lock_name}-requirements.in" --output-file "$tmp_dev" --quiet; then
         echo "ERROR: ${lock_name} installer requirements do not resolve."

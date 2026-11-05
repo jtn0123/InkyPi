@@ -21,14 +21,14 @@
 #             where baseline RSS balloons past MemoryMax=350M).
 #
 # Usage:
-#   ./scripts/test_install_memcap.sh [trixie|bookworm|bullseye]
+#   ./scripts/test_install_memcap.sh [trixie]
 #   ./scripts/test_install_memcap.sh --help
 #
 # Defaults to trixie when no codename is supplied (matches the Dockerfile.sim-install
 # default used by the companion sim_install.sh tool).
 set -euo pipefail
 
-VALID_CODENAMES="trixie bookworm bullseye"
+VALID_CODENAMES="trixie"
 DEFAULT_CODENAME="trixie"
 POLL_INTERVAL=5
 POLL_MAX=180
@@ -36,7 +36,7 @@ LOG_DIR="${TMPDIR:-/tmp}/inkypi-smoke-logs"
 mkdir -p "${LOG_DIR}"
 
 usage() {
-    echo "Usage: $(basename "${0}") [--help] [trixie|bookworm|bullseye]"
+    echo "Usage: $(basename "${0}") [--help] [trixie]"
     echo ""
     echo "  Phase 2: pip install of requirements.txt under 512 MB cap."
     echo "           Exit 137 = OOM kill = JTN-528 regression."
@@ -113,7 +113,7 @@ if docker run \
     --memory=512m \
     --memory-swap=512m \
     -v "${REPO_ROOT}:/InkyPi:ro" \
-    python:3.12-slim \
+    python:3.13-slim-trixie \
     bash -c '
 set -euo pipefail
 echo "Architecture : $(uname -m)"
@@ -177,7 +177,7 @@ docker build \
     -f - \
     -t "${PHASE3_IMAGE}" \
     "${REPO_ROOT}" <<'DOCKERFILE'
-FROM python:3.12-slim
+FROM python:3.13-slim-trixie
 RUN apt-get update -qq \
     && apt-get install -y -qq gcc python3-dev libopenjp2-7-dev libfreetype6-dev libsystemd-dev libheif-dev swig 2>/dev/null \
     && rm -rf /var/lib/apt/lists/*

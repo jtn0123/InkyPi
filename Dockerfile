@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-FROM python:3.12-slim-bookworm
+FROM python:3.13-slim-trixie
 
 # Install system dependencies required by Pillow, OpenJPEG, and fonts
 RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \

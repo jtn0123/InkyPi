@@ -1,32 +1,29 @@
 # InkyPi dev/CI dependencies — loose constraints for universal uv compilation.
 # Edit this file to add/upgrade dependencies, then regenerate:
-#   uv --no-config pip compile --universal --python-version 3.11 --fork-strategy fewest \
+#   uv --no-config pip compile --universal --python-version 3.13 --fork-strategy fewest \
 #     --prerelease disallow --generate-hashes install/requirements-dev.in \
 #     -o install/requirements-dev.txt
 #
-# pip-tools remains available for targeted compatibility investigation.
 # Use uv for committed lockfiles so platform/interpreter markers are preserved.
 
 # Core dev tooling
 uv==0.13.4
-pip-tools>=7.0,<8
 
 # Testing
-pytest>=8.0,<10
-pytest-xdist>=3.0,<4
-pytest-cov>=5.0,<8
-pytest-benchmark>=4.0,<6
+pytest>=9.1,<10
+pytest-xdist>=3.8,<4
+pytest-cov>=7.1,<8
+pytest-benchmark>=5.3,<6
 # Flakiness retry + reporting for integration tests (JTN-705). Scoped to
 # tests/integration/ via tests/integration/conftest.py — unit tests must NOT
 # retry. 16.x is the first release with pytest 9 support.
-pytest-rerunfailures>=15.0,<17
+pytest-rerunfailures>=16.7,<17
 requests-mock>=1.12,<2
 freezegun>=1.5,<2
-pytest-flask>=1.3,<2
-hypothesis>=6.0,<7
+hypothesis>=6.168,<7
 
 # Type checking
-mypy>=2.0,<3
+mypy>=2.3,<3
 # Stub packages. Without types-PyYAML mypy aborts the entire tests/ run on
 # the four modules that import yaml, so it is a hard requirement for the
 # type-check job rather than a nicety.
@@ -37,51 +34,50 @@ types-requests==2.33.0.20260906
 
 # Linting / formatting
 black>=26.0,<27
-ruff>=0.6,<1
+ruff>=0.16,<1
 
 # Dev watch-mode rebuilds (JTN-713) — provides the `watchmedo` CLI used by
 # scripts/dev_watch.sh to auto-rebuild CSS/JS bundles on file changes.
 # Not pinned in the compiled lockfile on purpose: it is an optional developer
 # convenience, not a CI requirement.
-watchdog>=4.0,<7
+watchdog>=6.0,<7
 
 # Browser / E2E testing
-playwright>=1.55,<2
+playwright>=1.63,<2
 
 # Runtime deps duplicated here for dev installs (keep in sync with requirements.in)
 flask>=3.1,<4
-python-dotenv>=1.0,<2
-requests>=2.32,<3
-urllib3>=2.0,<3
+python-dotenv>=1.2,<2
+requests>=2.34,<3
+urllib3>=2.8,<3
 werkzeug>=3.1,<4
 pillow>=13.0,<14
 # pi-heif has wheels for all major platforms — no platform guard needed.
 pi-heif==1.4.0
-tzdata>=2024.1
-openai>=3.0,<4
-google-genai>=2.0,<3
-# numpy 2.5 requires Python 3.12+; keep in sync with the cap in pyproject.toml.
-numpy>=2.0,<2.5
-icalendar>=7.0,<8
-recurring-ical-events>=3.0,<4
-psutil>=7.0,<8
+tzdata>=2026.1
+openai>=3.22,<4
+google-genai>=2.25,<3
+numpy>=2.5,<3
+icalendar>=7.3,<8
+recurring-ical-events>=3.8,<4
+psutil>=7.2,<8
 feedparser>=6.0,<7
 waitress>=3.0,<4
-jsonschema>=4.0,<5
-astral>=3.0,<4
+jsonschema>=4.26,<5
+astral>=3.2,<4
 
 # Security — safe XML parsing (replaces stdlib xml.etree.ElementTree)
 defusedxml>=0.7,<1
 
 # Audit / compliance
-pip-audit>=2.0,<3
-cyclonedx-bom>=7.0,<8
-pre-commit>=4.0,<5
+pip-audit>=2.10,<3
+cyclonedx-bom>=7.5,<8
+pre-commit>=4.6,<5
 # Matches the pin in .github/workflows/release.yml.
 python-semantic-release==10.7.0
 # Patched floor for transitive python-semantic-release dependency.
 GitPython>=3.1.59,<4
-pip-licenses>=5.0,<6
+pip-licenses>=5.5,<6
 
 # Mutation testing (optional — slow; run with: mutmut run)
 mutmut>=3.8,<4
@@ -89,4 +85,4 @@ mutmut>=3.8,<4
 # Memory profiling for the per-PR memory diff comment (JTN-610). Linux-only
 # wheels; tracemalloc fallback is used on other platforms. Pinned to 1.x to
 # keep CLI flags stable.
-memray>=1.10,<2; sys_platform == "linux"
+memray>=1.20,<2; sys_platform == "linux"

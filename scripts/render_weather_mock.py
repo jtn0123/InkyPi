@@ -14,8 +14,7 @@ import argparse
 import os
 import sys
 from datetime import UTC, datetime
-
-import pytz
+from zoneinfo import ZoneInfo
 
 # Ensure src/ is on the import path
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -83,7 +82,7 @@ def _build_fake_owm_payload(now: datetime, tz_str: str) -> dict:
         )
 
     try:
-        local_hour = now.astimezone(pytz.timezone(tz_str)).hour
+        local_hour = now.astimezone(ZoneInfo(tz_str)).hour
     except Exception:
         local_hour = now.hour
     is_night_local = local_hour < 6 or local_hour >= 20

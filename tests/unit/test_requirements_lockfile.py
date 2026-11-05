@@ -60,7 +60,8 @@ def _active_pins(path: Path, environment: dict[str, str]) -> dict[str, Requireme
     return pins
 
 
-@pytest.mark.parametrize("python_version", ["3.11", "3.12", "3.13"])
+# Python 3.13 is the only supported interpreter (requires-python >=3.13,<3.14).
+@pytest.mark.parametrize("python_version", ["3.13"])
 @pytest.mark.parametrize("platform", ["linux", "darwin"])
 def test_universal_dev_lock_is_compatible(python_version: str, platform: str) -> None:
     environment = {key: str(value) for key, value in default_environment().items()}
@@ -75,7 +76,8 @@ def test_universal_dev_lock_is_compatible(python_version: str, platform: str) ->
         assert runtime[name].specifier == dev[name].specifier, name
 
     # libcst (used by mutmut 3) selects a separate YAML distribution on 3.13.
-    # A lock compiled only on 3.11 misses it and fails hash-checked installation.
+    # A lock compiled for another interpreter misses it and fails hash-checked
+    # installation.
     for dependency in requires("libcst") or []:
         requirement = Requirement(dependency)
         if requirement.marker is not None and not requirement.marker.evaluate(
@@ -124,7 +126,7 @@ class TestRequirementsLockfile:
         assert not missing, (
             f"The following packages in {REQUIREMENTS_DEV_TXT} have no --hash=sha256: entries:\n"
             + "\n".join(f"  {p}" for p in missing)
-            + "\nRegenerate with: uv pip compile --universal --python-version 3.11 --generate-hashes install/requirements-dev.in -o install/requirements-dev.txt"
+            + "\nRegenerate with: uv pip compile --universal --python-version 3.13 --generate-hashes install/requirements-dev.in -o install/requirements-dev.txt"
         )
 
     def test_requirements_txt_hash_count(self) -> None:

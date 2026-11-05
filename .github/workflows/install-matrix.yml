@@ -32,20 +32,17 @@ jobs:
     # Memory is capped at 512 MB to inherit the JTN-536 OOM regression gate so
     # this job also catches codename-specific OOMs during install.
     #
-    # JTN-615: bullseye (Debian 11) ships Python 3.9.2 but InkyPi's
-    # requirements.txt pins packages that require Python>=3.10 (anyio==4.13.0
-    # is the first to bomb the uv resolver; others follow). The project also
-    # declares `target-version = "py311"` in pyproject.toml's ruff + black
-    # config, so bullseye has never been a real install target. Keeping the PR
-    # gate on bookworm + trixie reflects reality; broader drift coverage still
-    # lives in the nightly matrix and the separate memcap smoke coverage.
+    # InkyPi requires Python 3.13, which only Trixie (Debian 13) ships, so
+    # Trixie is the sole supported codename. Bullseye (3.9, JTN-615) and
+    # Bookworm (3.11) were dropped; unpinned drift coverage lives in
+    # os-drift-nightly.yml.
     name: install.sh e2e (${{ matrix.codename }}, ${{ matrix.hardware }})
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
-        codename: [bookworm, trixie]
+        codename: [trixie]
         hardware: [inky, waveshare]
     steps:
       - name: Checkout

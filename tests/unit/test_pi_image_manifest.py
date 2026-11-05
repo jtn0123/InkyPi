@@ -15,7 +15,7 @@ def test_manifest_describes_actual_image(tmp_path: Path) -> None:
     entry = build_manifest(image, "v1.4.3")["os_list"]
     assert isinstance(entry, list)
     item = entry[0]
-    assert item["init_format"] == "systemd"
+    assert item["init_format"] == "cloudinit-rpi"
     assert item["devices"] == ["pi3-64bit"]
     assert set(item) >= {
         "name",

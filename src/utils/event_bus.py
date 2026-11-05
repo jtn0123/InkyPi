@@ -96,7 +96,7 @@ class EventBus:
         heartbeat_s: float = 15.0,
         max_lifetime_s: float | None = None,
         should_stop: Callable[[], bool] | None = None,
-    ) -> Generator[str, None, None]:
+    ) -> Generator[str]:
         """Yield SSE-formatted strings from *q* until the client disconnects.
 
         A comment heartbeat (`: ping`) is yielded every *heartbeat_s* seconds

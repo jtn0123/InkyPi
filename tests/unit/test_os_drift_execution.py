@@ -31,7 +31,7 @@ def test_container_shell_supports_pipefail(tmp_path: Path) -> None:
             **os.environ,
             "EVENT_NAME": "schedule",
             "SELECTED_CODENAME": "all",
-            "MATRIX_CODENAME": "bookworm",
+            "MATRIX_CODENAME": "trixie",
             "GITHUB_OUTPUT": str(tmp_path / "output"),
         },
     )

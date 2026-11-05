@@ -6,7 +6,7 @@
 
 [![CI](https://github.com/jtn0123/InkyPi/actions/workflows/ci.yml/badge.svg)](https://github.com/jtn0123/InkyPi/actions/workflows/ci.yml)
 [![Quality Gate](https://sonarcloud.io/api/project_badges/measure?project=jtn0123_InkyPi&metric=alert_status)](https://sonarcloud.io/summary/overall?id=jtn0123_InkyPi)
-[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/)
+[![Python 3.13](https://img.shields.io/badge/python-3.13-blue)](https://www.python.org/)
 [![License: GPL v3](https://img.shields.io/badge/license-GPL%20v3-green)](./LICENSE)
 
 <br>
@@ -148,7 +148,7 @@ This fork is **1,100+ commits** ahead of upstream, transforming InkyPi from a fu
 | Atomic Install | File-level atomicity with `flock` guard against concurrent installs |
 | Pre-Built Wheels | Release asset wheelhouse accelerates install on Pi |
 | uv Migration | Faster dependency resolution, lighter installs vs pip |
-| Install Matrix | CI tests across Bookworm, Bullseye, and Trixie (arm64) |
+| Install Matrix | CI tests `install.sh` end-to-end on Trixie (arm64) |
 | Waveshare Driver Pinning | Locked driver versions for stability |
 
 ### UI/UX
@@ -247,9 +247,7 @@ See [testing.md](./docs/testing.md) for coverage and CI details.
 ### Install Verification (Docker)
 
 ```bash
-./scripts/sim_install.sh trixie     # Debian Trixie (default)
-./scripts/sim_install.sh bookworm   # Debian Bookworm
-./scripts/sim_install.sh bullseye   # Debian Bullseye
+./scripts/sim_install.sh            # Debian Trixie (the only supported base)
 ```
 
 Builds an arm64 container capped at 512 MB RAM (matching Pi Zero 2 W) and runs `install.sh` end-to-end.

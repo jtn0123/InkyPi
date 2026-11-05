@@ -4,7 +4,7 @@ Thanks for your interest in contributing to InkyPi! This guide covers setup, tes
 
 ## Prerequisites
 
-- Python 3.11-3.13
+- Python 3.13 (the system Python on Raspberry Pi OS Trixie; 3.14+ is not yet supported)
 - A virtual environment (`.venv`)
 
 ## Dev Setup
@@ -225,7 +225,7 @@ Dev constraints live in `install/requirements-dev.in`. Regenerate their hashed,
 universal requirements file with:
 
 ```bash
-uv --no-config pip compile --universal --python-version 3.11 --fork-strategy fewest \
+uv --no-config pip compile --universal --python-version 3.13 --fork-strategy fewest \
     --prerelease disallow --upgrade --generate-hashes \
     install/requirements-dev.in -o install/requirements-dev.txt
 bash scripts/check_requirements_drift.sh

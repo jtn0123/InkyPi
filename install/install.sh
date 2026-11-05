@@ -159,6 +159,12 @@ _preflight_canonical_path() {
 preflight_checks() {
   echo "Running preflight sanity checks..."
 
+  # --- Python version ---
+  # Raspberry Pi OS Trixie (python3 = 3.13) is the only supported base.
+  if ! require_supported_python; then
+    exit 1
+  fi
+
   # --- Disk space ---
   # CodeRabbit review (#546): declare loop var `local` so it doesn't leak to
   # enclosing scope, and dedupe usr_local vs install_parent so the same
@@ -217,7 +223,7 @@ preflight_checks() {
   if [ ! -d "$systemd_dir" ]; then
     _preflight_fail \
       "systemd unit directory $systemd_dir does not exist" \
-      "ensure systemd is installed — this script targets Raspberry Pi OS (Bullseye/Bookworm/Trixie)"
+      "ensure systemd is installed — this script targets Raspberry Pi OS Trixie"
   fi
   if [ ! -w "$systemd_dir" ]; then
     _preflight_fail \
@@ -289,7 +295,7 @@ preflight_checks() {
       "install.sh must run from a git clone (not a downloaded tarball) so 'git describe' and waveshare pin verification work. Run: git clone https://github.com/fatihak/InkyPi.git"
   fi
 
-  echo_success "\tPreflight checks passed (free space, writable targets, git repo)"
+  echo_success "\tPreflight checks passed (Python version, free space, writable targets, git repo)"
 }
 
 # JTN-701: Download a single Waveshare driver file honoring the pin in
@@ -826,12 +832,12 @@ fi
 enable_interfaces
 wait_for_clock                # JTN-592: defer until NTP sync to avoid TLS failures
 install_debian_dependencies
-# Setup zramswap on any modern Pi OS that ships zram-tools (Bullseye/Bookworm/Trixie).
+# Setup zramswap on supported Pi OS releases that ship zram-tools (Trixie).
 # This is critical on low-RAM boards like the Pi Zero 2 W (512 MB) — without
 # zramswap, pip install of numpy/Pillow/playwright will OOM during the install step.
 os_version=$(get_os_version)
-if [[ "$os_version" =~ ^(11|12|13)$ ]] ; then
-  echo "OS version is $os_version (Bullseye/Bookworm/Trixie) - setting up zramswap"
+if [[ "$os_version" =~ ^(13)$ ]] ; then
+  echo "OS version is $os_version (Trixie) - setting up zramswap"
   setup_zramswap_service
 else
   echo "OS version is $os_version - skipping zramswap setup (zram-tools not available on this release)."

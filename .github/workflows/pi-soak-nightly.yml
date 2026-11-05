@@ -90,7 +90,7 @@ jobs:
           echo "Running soak: duration=$dur interval=$ivl host=$INKYPI_HOST"
 
       - name: Setup Python
-        # The self-hosted Pi image is expected to have Python 3.11+
+        # The self-hosted Pi image is expected to run Raspberry Pi OS Trixie (Python 3.13)
         # preinstalled. actions/setup-python does not ship arm64 Pi
         # binaries for all versions, so we deliberately fall back to the
         # system interpreter rather than cross-installing one here.

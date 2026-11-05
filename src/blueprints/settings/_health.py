@@ -81,7 +81,7 @@ def _iter_progress_events(
     last_seq: int,
     max_lifetime_s: float | None = None,
     should_stop: Callable[[], bool] | None = None,
-) -> Generator[str, None, None]:
+) -> Generator[str]:
     for ev in bus.recent(limit=100):
         seq = int(ev.get("seq", 0))
         if seq > last_seq:

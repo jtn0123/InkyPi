@@ -2,35 +2,32 @@
 name = "inkypi"
 version = "1.4.17"
 description = "InkyPi — e-ink dashboard for Raspberry Pi"
-requires-python = ">=3.11,<3.14"
+requires-python = ">=3.13,<3.14"
 # Runtime dependencies mirror install/requirements.in during the uv-lock migration
 # window (JTN-616). The source of truth is this pyproject.toml + uv.lock; the
 # install/requirements.txt file is regenerated from uv.lock via `uv export`.
 dependencies = [
   "flask>=3.1,<4",
-  "python-dotenv>=1.0,<2",
-  "inky>=2.3,<3; sys_platform == 'linux'",
-  "requests>=2.32,<3",
-  "urllib3>=2.0,<3",
+  "python-dotenv>=1.2,<2",
+  "inky>=2.5,<3; sys_platform == 'linux'",
+  "requests>=2.34,<3",
+  "urllib3>=2.8,<3",
   "werkzeug>=3.1,<4",
   "pillow>=13.0,<14",
   "pi-heif==1.4.0",
-  "tzdata>=2024.1",
-  "openai>=3.0,<4",
-  "google-genai>=2.0,<3",
-  # numpy 2.5 requires Python 3.12+. Capped so uv.lock resolves one version for
-  # every supported Python; a split breaks CI, which co-installs this export with
-  # the pip-compiled dev lock. Lift the cap when 3.11 support is dropped.
-  "numpy>=2.0,<2.5",
-  "icalendar>=7.0,<8",
-  "recurring-ical-events>=3.0,<4",
-  "psutil>=7.0,<8",
+  "tzdata>=2026.1",
+  "openai>=3.22,<4",
+  "google-genai>=2.25,<3",
+  "numpy>=2.5,<3",
+  "icalendar>=7.3,<8",
+  "recurring-ical-events>=3.8,<4",
+  "psutil>=7.2,<8",
   "cysystemd>=2.0,<3; sys_platform == 'linux'",
   "waitress>=3.0,<4",
   "feedparser>=6.0,<7",
-  "jsonschema>=4.0,<5",
-  "astral>=3.0,<4",
-  "prometheus-client>=0.21,<1",
+  "jsonschema>=4.26,<5",
+  "astral>=3.2,<4",
+  "prometheus-client>=0.26,<1",
 ]
 
 [tool.uv]
@@ -51,7 +48,7 @@ packages = []
 
 [tool.black]
 line-length = 88
-target-version = ["py311"]
+target-version = ["py313"]
 extend-exclude = """
 (
   mock_display_output
@@ -60,7 +57,7 @@ extend-exclude = """
 
 [tool.ruff]
 line-length = 88
-target-version = "py311"
+target-version = "py313"
 src = ["src", "tests", "scripts"]
 exclude = [
   ".git",

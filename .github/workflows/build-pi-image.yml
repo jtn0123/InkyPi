@@ -67,9 +67,9 @@ concurrency:
 # and paste both fields below in the same commit.
 # =============================================================================
 env:
-  PI_OS_IMAGE_URL: https://downloads.raspberrypi.org/raspios_lite_arm64/images/raspios_lite_arm64-2025-05-13/2025-05-13-raspios-bookworm-arm64-lite.img.xz
-  PI_OS_IMAGE_SHA256: 62d025b9bc7ca0e1facfec74ae56ac13978b6745c58177f081d39fbb8041ed45
-  PI_OS_IMAGE_FILENAME: 2025-05-13-raspios-bookworm-arm64-lite.img.xz
+  PI_OS_IMAGE_URL: https://downloads.raspberrypi.org/raspios_lite_arm64/images/raspios_lite_arm64-2026-10-06/2026-10-06-raspios-trixie-arm64-lite.img.xz
+  PI_OS_IMAGE_SHA256: 483db18a48da399b5b7022ffae9a07bc6d99daab30e593aedac09b69ff422843
+  PI_OS_IMAGE_FILENAME: 2026-10-06-raspios-trixie-arm64-lite.img.xz
   # pishrink.sh pinned by commit SHA — upstream has no tagged releases.
   # https://github.com/Drewsif/PiShrink
   PISHRINK_COMMIT: 5f358d03eed4b7334657ee93867826a2b42f112a
@@ -240,10 +240,11 @@ jobs:
               bash ./install.sh
             "
 
-      - name: Document Bookworm first-boot customization
-        # This pinned Bookworm image uses Imager systemd/firstrun.sh, not
-        # Trixie cloud-init. The accompanying OS manifest enables Imager 2.x
-        # customization for this custom image without shipping credentials.
+      - name: Document Trixie first-boot customization
+        # This pinned Trixie image applies Imager customization through
+        # cloud-init (/boot/firmware/user-data). The accompanying OS manifest
+        # (init_format cloudinit-rpi) enables Imager 2.x customization for
+        # this custom image without shipping credentials.
         run: |
           set -euo pipefail
           sudo bash -c 'cat > /mnt/pi-root/boot/firmware/inkypi-readme.txt' <<'NOTE'
@@ -254,7 +255,7 @@ jobs:
             * Set your Wi-Fi / hostname / SSH credentials in Pi Imager's
               customization options BEFORE flashing. With Imager 2.x, load
               the release OS manifest using --repo <manifest URL>. This image
-              uses Bookworm systemd/firstrun.sh customization, not cloud-init.
+              uses Trixie cloud-init customization (/boot/firmware/user-data).
             * Once the Pi joins your network, visit:
                 http://<hostname>.local/
               in a browser on the same LAN — the InkyPi web UI will be up.
@@ -403,7 +404,7 @@ jobs:
       - name: Prepare generic ARM kernel and initramfs for rootfs verification
         run: |
           set -euo pipefail
-          docker run --rm --platform linux/arm64 -v "$PWD/build:/output" debian:bookworm bash -euc '
+          docker run --rm --platform linux/arm64 -v "$PWD/build:/output" debian:trixie bash -euc '
             apt-get update
             apt-get install -y --no-install-recommends linux-image-arm64 initramfs-tools
             # The guest carries Pi kernel modules, so preload the generic

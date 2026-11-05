@@ -61,8 +61,8 @@ regenerates the file is different.
 ## Dev Requirements
 
 `install/requirements-dev.in` remains the source for dev/CI dependencies. It is
-compiled with `uv --no-config pip compile --universal --python-version 3.11` rather than
+compiled with `uv --no-config pip compile --universal --python-version 3.13` rather than
 platform-specific pip-compile. This preserves conditional dependencies across
-Linux/macOS and Python 3.11–3.13, including Linux-only memray and libcst's
+Linux/macOS on Python 3.13 (the only supported interpreter), including Linux-only memray and libcst's
 Python 3.13 YAML backend. See [Dependency Management](dependencies.md) for the
 full command. The drift check validates both runtime and dev outputs.
