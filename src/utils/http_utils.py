@@ -52,6 +52,7 @@ from contextlib import contextmanager
 from html import escape
 from time import perf_counter
 from typing import TYPE_CHECKING, Any, cast
+from urllib.parse import quote
 
 from flask import Request, g, jsonify, request
 from flask.wrappers import Response as FlaskResponse
@@ -279,6 +280,25 @@ def wants_json(req: Request | None = None) -> bool:
         return bool(accept_json or is_api_path or has_json)
     except Exception:
         return False
+
+
+def content_disposition(disposition: str, filename: str) -> str:
+    """Build a ``Content-Disposition`` value that is safe for any filename.
+
+    HTTP headers must be latin-1; WSGI servers (waitress) raise
+    ``UnicodeEncodeError`` -> 500 when a header contains e.g. an en dash from a
+    user-chosen plugin instance name. Emit an ASCII ``filename="..."`` fallback
+    (non-ASCII, quotes, backslashes and control chars replaced with ``_``) and,
+    when the name is not plain ASCII, an RFC 5987 ``filename*`` with the
+    original UTF-8 name so browsers still show it correctly.
+    """
+    ascii_name = "".join(
+        ch if 0x20 <= ord(ch) < 0x7F and ch not in '"\\' else "_" for ch in filename
+    )
+    value = f'{disposition}; filename="{ascii_name}"'
+    if ascii_name != filename:
+        value += f"; filename*=UTF-8''{quote(filename, safe='')}"
+    return value
 
 
 # ---- HTTP client helpers ----------------------------------------------------

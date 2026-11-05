@@ -23,10 +23,6 @@
         grid-template-columns: 1fr;
     }
 
-    .history-thumb {
-        aspect-ratio: 4 / 3;
-    }
-
     .plugins-container {
         grid-template-columns: 1fr 1fr;
     }

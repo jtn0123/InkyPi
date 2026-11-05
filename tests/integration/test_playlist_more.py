@@ -1,5 +1,5 @@
 import json
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta, tzinfo
 from typing import Any
 
 import pytest
@@ -235,10 +235,30 @@ def test_eta_endpoint_and_request_ids(
     assert isinstance(j2.get("request_id"), str) and len(j2["request_id"]) > 0
 
 
-def test_format_relative_time_filter_cases() -> None:
+class _FrozenDatetime(datetime):
+    """``datetime`` whose ``now()`` is pinned, so calendar-day buckets are
+    deterministic no matter what hour the suite runs at."""
+
+    frozen: datetime
+
+    @classmethod
+    def now(cls, tz: tzinfo | None = None) -> datetime:  # type: ignore[override]
+        return cls.frozen if tz is None else cls.frozen.astimezone(tz)
+
+
+def _freeze_playlist_now(monkeypatch: pytest.MonkeyPatch, frozen: datetime) -> None:
+    import blueprints.playlist as playlist_mod
+
+    _FrozenDatetime.frozen = frozen
+    monkeypatch.setattr(playlist_mod, "datetime", _FrozenDatetime)
+
+
+def test_format_relative_time_filter_cases(monkeypatch: pytest.MonkeyPatch) -> None:
     from blueprints.playlist import format_relative_time
 
-    now = datetime.now().astimezone()
+    now = datetime(2026, 3, 10, 15, 0, tzinfo=UTC)
+    _freeze_playlist_now(monkeypatch, now)
+
     # just now
     assert format_relative_time(now.isoformat()) == "just now"
 
@@ -249,19 +269,33 @@ def test_format_relative_time_filter_cases() -> None:
 
     # today at
     earlier_today = (now - timedelta(hours=2)).isoformat()
-    out2 = format_relative_time(earlier_today)
-    assert "today at " in out2
+    assert format_relative_time(earlier_today) == "today at 1:00 PM"
 
     # yesterday at
     yesterday = (now - timedelta(days=1, hours=1)).isoformat()
-    out3 = format_relative_time(yesterday)
-    assert "yesterday at " in out3
+    assert format_relative_time(yesterday) == "yesterday at 2:00 PM"
 
     # older date formatted with month abbrev
     older = (now - timedelta(days=10)).isoformat()
-    out4 = format_relative_time(older)
-    # Expect like "Jan 02 at 3:04 PM"; check month abbrev presence by split space
-    assert " at " in out4
+    assert format_relative_time(older) == "Feb 28 at 3:00 PM"
+
+
+def test_format_relative_time_buckets_by_calendar_day(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """At 2 AM, a refresh at 8:55 PM the previous evening is "yesterday",
+    not "today" (regression: rolling 24h window mislabelled it)."""
+    from blueprints.playlist import format_relative_time
+
+    now = datetime(2026, 3, 10, 2, 0, tzinfo=UTC)
+    _freeze_playlist_now(monkeypatch, now)
+
+    last_evening = datetime(2026, 3, 9, 20, 55, tzinfo=UTC).isoformat()
+    assert format_relative_time(last_evening) == "yesterday at 8:55 PM"
+
+    # 26h ago crosses two midnights -> dated label, not "yesterday".
+    two_days = datetime(2026, 3, 8, 23, 59, tzinfo=UTC).isoformat()
+    assert format_relative_time(two_days) == "Mar 8 at 11:59 PM"
 
 
 def test_add_plugin_missing_playlist_name(client: FlaskClient) -> None:
@@ -463,3 +497,30 @@ def test_delete_playlist_missing_name(client: FlaskClient) -> None:
     resp = client.delete("/delete_playlist/")
     assert resp.status_code == 404  # Flask routing gives 404 for missing path parameter
     # The validation happens at the route level
+
+
+def test_playlist_edit_plugin_link_encodes_instance_name(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
+    """The row's "Edit plugin" link interpolated the raw instance name into the
+    query string, so "Groceries & errands" opened ?instance=Groceries%20 and
+    404'd. It must go through url_for so the name is query-encoded."""
+    pm = device_config_dev.get_playlist_manager()
+    if not pm.get_playlist("Default"):
+        pm.add_playlist("Default", "00:00", "24:00")
+    pm.get_playlist("Default").add_plugin(
+        {
+            "plugin_id": "clock",
+            "name": "Groceries & errands",
+            "plugin_settings": {},
+            "refresh": {"interval": 300},
+        }
+    )
+    device_config_dev.write_config()
+
+    body = client.get("/playlist").get_data(as_text=True)
+    assert "/plugin/clock?instance=Groceries+%26+errands" in body
+    assert "?instance=Groceries &amp; errands" not in body
+
+    resp = client.get("/plugin/clock?instance=Groceries+%26+errands")
+    assert resp.status_code == 200

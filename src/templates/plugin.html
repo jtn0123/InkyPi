@@ -80,7 +80,15 @@
                 </div>
             </div>
             {% set api_key_missing = api_key is defined and api_key and api_key.required and not api_key.present %}
+            {# A named playlist instance is saved via "Update instance". The
+               HTMX "Save settings" button writes the plugin's
+               `<plugin>_saved_settings` defaults entry in the Default playlist,
+               so offering it on an instance page silently added a second,
+               rotating copy of the plugin to Default instead of saving the
+               instance being edited. #}
+            {% set is_named_instance = plugin_instance and not plugin_instance.endswith('_saved_settings') %}
             <div class="pageheader-actions">
+                {% if not is_named_instance %}
                 <button type="button"
                         id="savePluginSettingsBtn"
                         class="header-button is-secondary"
@@ -92,6 +100,7 @@
                         hx-target="#plugin-form-errors"
                         hx-swap="innerHTML"
                         hx-disabled-elt="this">Save settings</button>
+                {% endif %}
                 {% if plugin_instance %}
                 <button type="button" data-plugin-action="update_instance" data-test-skip-click="true" class="header-button is-secondary" aria-describedby="update-instance-help" {% if api_key_missing %}disabled title="Configure {{ api_key.service }} API key first"{% endif %}>Update instance</button>
                 {% else %}

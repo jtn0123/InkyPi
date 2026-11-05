@@ -114,15 +114,6 @@
         gap: 10px;
     }
 
-    .plugins-container .plugin-item {
-        padding: 16px 10px 14px;
-        min-height: 120px;
-    }
-
-    .plugin-name {
-        min-height: 2.7em;
-    }
-
     .settings-grid {
         gap: 14px;
     }
@@ -285,7 +276,9 @@
     }
 
     .playlist-secondary-button {
-        border-radius: 999px;
+        /* Match the sibling "Display next" button (.header-button radius);
+           a pill here made Edit/Delete look like a different control set. */
+        border-radius: var(--border-radius-md);
         border: 1px solid var(--panel-border);
         background: var(--surface);
         color: var(--text);
@@ -360,14 +353,12 @@
         min-height: 44px;
     }
 
-    .history-actions {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 8px;
+    .history-actions .btn {
+        min-height: 44px;
     }
 
-    .history-actions .btn:first-child {
-        grid-column: 1 / -1;
+    .history-actions .btn.btn-icon-only {
+        width: 44px;
     }
 
     .metric-strip {
@@ -378,10 +369,6 @@
         grid-template-columns: 104px minmax(0, 1fr);
         align-items: start;
         gap: 12px;
-    }
-
-    .history-thumb {
-        aspect-ratio: 1 / 1.2;
     }
 
     .history-name {

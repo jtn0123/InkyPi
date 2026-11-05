@@ -49,6 +49,7 @@ async function main() {
   } else {
     sandbox.InkyPiPluginPageShared = {
       setHidden() {}, validateAddToPlaylistAction: () => true,
+      formatPreviewTimestamp: value => (value ? String(value) : "\u2014"),
       setCurrentDisplayRefresh() {throw new Error("preview renderer unavailable");},
     };
     sandbox.InkyPiPluginPageProgress = {createProgressController: () => ({saveLastProgressSnapshot() {}})};

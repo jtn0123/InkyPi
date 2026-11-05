@@ -60,10 +60,29 @@
     return true;
   }
 
+  // A section whose every field is conditionally hidden (e.g. Weather's
+  // "Title" section under the Open-Meteo provider) would otherwise render as
+  // an empty card with only a heading. Hide the card until something in it
+  // becomes visible again.
+  function syncSectionVisibility(root) {
+    root.querySelectorAll(".schema-section").forEach((section) => {
+      const items = section.querySelectorAll(
+        ".schema-field, .schema-widget, .settings-callout"
+      );
+      if (!items.length) return;
+      const anyVisible = Array.from(items).some((item) => {
+        const hiddenAncestor = item.closest("[hidden]");
+        return !hiddenAncestor || !section.contains(hiddenAncestor) || hiddenAncestor === section;
+      });
+      section.hidden = !anyVisible;
+    });
+  }
+
   function applyVisibility(root) {
     root.querySelectorAll("[data-visible-if-field]").forEach((node) => {
       setHiddenState(node, !matchesVisibility(node, root));
     });
+    syncSectionVisibility(root);
   }
 
   function replaceOptions(select, options, currentValue) {

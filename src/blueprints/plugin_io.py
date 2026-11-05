@@ -18,7 +18,7 @@ from flask import Blueprint, Response, current_app, jsonify, request
 
 from services.playlist_workflows import validate_plugin_settings_security
 from utils.form_utils import sanitize_log_field
-from utils.http_utils import JsonResponse, json_error
+from utils.http_utils import JsonResponse, content_disposition, json_error
 
 logger = logging.getLogger(__name__)
 
@@ -72,7 +72,7 @@ def _make_json_attachment(payload: dict[str, Any], filename: str) -> Response:
         status=200,
         mimetype="application/json",
     )
-    resp.headers["Content-Disposition"] = f'attachment; filename="{filename}"'
+    resp.headers["Content-Disposition"] = content_disposition("attachment", filename)
     return resp
 
 

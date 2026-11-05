@@ -46,6 +46,24 @@ def test_record_change_creates_file(config_dir: Any) -> None:
     assert "ts" in entry
 
 
+def test_record_change_accepts_names_with_spaces(config_dir: Any) -> None:
+    """Instance names with spaces ("Kitchen Clock") are what the UI creates;
+    history must be recorded for them, not silently dropped."""
+    from utils.plugin_history import get_history, record_change
+
+    assert record_change(config_dir, "Kitchen Clock", {"a": 1}, {"a": 2}) is True
+    assert os.path.isfile(_hist_file_for(config_dir, "Kitchen Clock"))
+    assert get_history(config_dir, "Kitchen Clock")[0]["after"] == {"a": 2}
+
+
+@pytest.mark.parametrize("bad_name", [" leading-space", "../etc", "a/b", ""])
+def test_hashed_filename_rejects_unsafe_names(bad_name: str) -> None:
+    from utils.plugin_history import _hashed_filename
+
+    with pytest.raises(ValueError):
+        _hashed_filename(bad_name)
+
+
 def test_record_change_appends(config_dir: Any) -> None:
     from utils.plugin_history import record_change
 
