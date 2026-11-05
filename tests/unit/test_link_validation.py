@@ -1,4 +1,4 @@
-"""The alternate client must fetch the URL successfully, never accept a 429."""
+"""The alternate client must fetch the URL successfully, never accept a 429/503."""
 
 import importlib.util
 import json
@@ -32,8 +32,12 @@ def error_report(url: str, status: int = 429) -> dict[str, Any]:
     }
 
 
+@pytest.mark.parametrize("reported", [429, 503])
 @pytest.mark.parametrize("status", [200, 204, 302, 404, 429, 500])
-def test_real_get_must_succeed(checker: ModuleType, status: int) -> None:
+def test_real_get_must_succeed(
+    checker: ModuleType, status: int, reported: int, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(checker, "CURL_RETRIES", 0)
     requests = []
 
     class Handler(BaseHTTPRequestHandler):
@@ -50,7 +54,7 @@ def test_real_get_must_succeed(checker: ModuleType, status: int) -> None:
     thread.start()
     try:
         url = f"http://127.0.0.1:{server.server_port}/resource"
-        failures = checker.check_report(error_report(url))
+        failures = checker.check_report(error_report(url, reported))
         assert bool(failures) == (not 200 <= status < 300)
         assert requests == ["/resource"]
     finally:
@@ -59,13 +63,42 @@ def test_real_get_must_succeed(checker: ModuleType, status: int) -> None:
         thread.join(timeout=1)
 
 
+def test_transient_503_is_retried_until_success(
+    checker: ModuleType, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(checker, "CURL_RETRIES", 1)
+    monkeypatch.setattr(checker, "CURL_RETRY_DELAY_S", 1)
+    statuses = [503, 200]
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self) -> None:
+            self.send_response(statuses.pop(0))
+            self.end_headers()
+
+        def log_message(self, format: str, *args: Any) -> None:
+            pass
+
+    server = HTTPServer(("127.0.0.1", 0), Handler)
+    thread = Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        url = f"http://127.0.0.1:{server.server_port}/flaky"
+        assert checker.check_report(error_report(url, 503)) == []
+        assert statuses == []
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=1)
+
+
 def test_other_errors_cannot_be_overridden(checker: ModuleType) -> None:
     def unexpected_fetch(url: str) -> int:
-        pytest.fail("Only HTTP 429 results may use the independent GET")
+        pytest.fail("Only HTTP 429/503 results may use the independent GET")
 
-    assert checker.check_report(
-        error_report("https://example.test/missing", 404), unexpected_fetch
-    )
+    for status in (404, 500, 502):
+        assert checker.check_report(
+            error_report("https://example.test/missing", status), unexpected_fetch
+        )
 
 
 def test_duplicate_urls_are_fetched_once(checker: ModuleType) -> None:
