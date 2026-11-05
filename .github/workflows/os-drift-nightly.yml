@@ -1,9 +1,9 @@
 name: OS drift nightly
 
 # Drift detector for the install path (JTN-535). Re-runs the install
-# simulator against the LATEST unpinned debian:trixie, debian:bookworm, and
-# debian:bullseye images so any upstream package rename, GPG-signature
-# tightening, or repo change breaks a nightly job instead of a user's Pi.
+# simulator against the LATEST unpinned debian:trixie image (the only
+# supported base; InkyPi requires Python 3.13) so any upstream package
+# rename, GPG-signature tightening, or repo change breaks a nightly job instead of a user's Pi.
 #
 # This is the UNPINNED complement to the PR-gating install matrix (JTN-530).
 # On the day job, pinned images catch regressions introduced by our code.
@@ -29,8 +29,6 @@ on:
         options:
           - all
           - trixie
-          - bookworm
-          - bullseye
 
 permissions:
   contents: read
@@ -50,9 +48,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Stock Bullseye has Python 3.9; current InkyPi requires 3.11+.
-        # Keep an explicit manual legacy probe, outside supported defaults.
-        codename: ${{ fromJSON(github.event.inputs.codename == 'bullseye' && '["bullseye"]' || '["trixie", "bookworm"]') }}
+        # InkyPi requires Python 3.13, which only Trixie (Debian 13) ships.
+        # Bookworm (3.11) and Bullseye (3.9) are no longer supported bases.
+        codename: [trixie]
     # Run all steps directly inside the unpinned debian:${codename} image so
     # the apt-cache and pip resolution checks exercise the same package set
     # install.sh would see on that OS base. The :latest tag is intentional —
@@ -179,7 +177,7 @@ jobs:
           python3 -m venv /tmp/drift-venv
           # shellcheck disable=SC1091
           . /tmp/drift-venv/bin/activate
-          python -c 'import sys; assert sys.version_info >= (3, 11), "Current InkyPi requires Python 3.11+; stock Bullseye is a legacy probe, not a supported install"'
+          python -c 'import sys; assert sys.version_info >= (3, 13), "Current InkyPi requires Python 3.13+ (Raspberry Pi OS Trixie)"'
           python -m pip install --upgrade pip wheel
 
           set +e
@@ -222,9 +220,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Stock Bullseye has Python 3.9; current InkyPi requires 3.11+.
-        # Keep an explicit manual legacy probe, outside supported defaults.
-        codename: ${{ fromJSON(github.event.inputs.codename == 'bullseye' && '["bullseye"]' || '["trixie", "bookworm"]') }}
+        # InkyPi requires Python 3.13, which only Trixie (Debian 13) ships.
+        # Bookworm (3.11) and Bullseye (3.9) are no longer supported bases.
+        codename: [trixie]
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -329,13 +327,13 @@ jobs:
             const body = [
               `The nightly OS drift detector failed. See [run log](${runUrl}) for full details.`,
               ``,
-              `This workflow re-runs the install sim against **unpinned** \`debian:trixie\`, \`debian:bookworm\`, and \`debian:bullseye\` images. A failure means either:`,
+              `This workflow re-runs the install sim against the **unpinned** \`debian:trixie\` image. A failure means either:`,
               ``,
               `- An apt package in \`install/debian-requirements.txt\` was renamed/removed in Debian`,
               `- A pinned pip dependency in \`install/requirements.txt\` no longer resolves`,
               `- \`install/install.sh\` broke end-to-end under the latest OS base`,
               ``,
-              `**Triage:** compare which matrix legs failed (trixie / bookworm / bullseye) — a single-leg failure usually means an upstream package change specific to that release; a multi-leg failure usually means our repo changed.`,
+              `**Triage:** check whether the failure reproduces on a pinned Trixie image (install matrix) — if it does, our repo changed; if not, Debian shipped an upstream package change.`,
               ``,
               `---`,
               ``,

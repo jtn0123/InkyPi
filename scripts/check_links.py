@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Validate Lychee results, independently fetching HTTP 429 URLs with curl.
+"""Validate Lychee results, independently refetching throttled URLs with curl.
 
-Some storefronts reject Lychee's requests while the same-runner curl GET
-succeeds. A 429 is never accepted: curl must fetch that exact URL with valid
-TLS and finish with HTTP 2xx. All other errors remain failures.
+Some storefronts reject Lychee's requests (HTTP 429) or shed load with a
+transient 503 while the same-runner curl GET succeeds. Neither status is ever
+accepted: curl must fetch that exact URL with valid TLS and finish with HTTP
+2xx. All other errors remain failures.
 """
 
 from __future__ import annotations
@@ -15,6 +16,12 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
+
+# Statuses that signal "try again later" rather than a broken link.
+RECHECK_STATUSES = frozenset({429, 503})
+# curl itself retries 429/5xx responses before giving up on a URL.
+CURL_RETRIES = 2
+CURL_RETRY_DELAY_S = 5
 
 
 def curl_status(url: str) -> int:
@@ -32,6 +39,10 @@ def curl_status(url: str) -> int:
                 "10",
                 "--max-time",
                 "25",
+                "--retry",
+                str(CURL_RETRIES),
+                "--retry-delay",
+                str(CURL_RETRY_DELAY_S),
                 "--proto",
                 "=http,https",
                 "--proto-redir",
@@ -45,7 +56,7 @@ def curl_status(url: str) -> int:
             ],
             capture_output=True,
             text=True,
-            timeout=30,
+            timeout=100,
             check=False,
         )
     except (OSError, subprocess.TimeoutExpired):
@@ -87,7 +98,7 @@ def check_report(
         if not isinstance(url, str) or not isinstance(status, dict):
             failures.append("Malformed link error entry.")
             continue
-        if status.get("code") == 429:
+        if status.get("code") in RECHECK_STATUSES:
             if url not in verified:
                 verified[url] = fetch_status(url)
             if 200 <= verified[url] < 300:

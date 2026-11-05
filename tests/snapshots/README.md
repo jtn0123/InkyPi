@@ -69,8 +69,8 @@ system fonts — when in doubt, regenerate via the docker command below.
 
 Because baselines are sensitive to Chromium's system-font fallback, regenerate
 them **inside an `ubuntu:24.04` docker container** — the same base image that
-GitHub Actions' `ubuntu-latest` currently resolves to.  Debian-bookworm or
-`python:3.12-slim-*` images have different default fonts and will produce
+GitHub Actions' `ubuntu-latest` currently resolves to.  Debian-based or
+`python:3.13-slim-*` images have different default fonts and will produce
 baselines that fail on CI.  From the project root:
 
 ```bash

@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.6
 #
 # Dockerfile.install-matrix — CI-only image that runs install/install.sh
-# end-to-end against a Pi OS codename (bullseye / bookworm / trixie) inside an
+# end-to-end against a Pi OS codename (trixie — the only supported base) inside an
 # arm64 container.
 #
 # This file is used by the `install-matrix` job in .github/workflows/ci.yml
@@ -42,7 +42,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 #
 # JTN-615: pre-install python3-venv + python3-pip here rather than relying on
 # install.sh's apt step to pull them via debian-requirements.txt. That step
-# can fail silently on bullseye (Pi OS repo indexing quirks) — leaving
+# can fail silently on some bases (Pi OS repo indexing quirks) — leaving
 # create_venv to crash with "ensurepip is not available" deep inside the pip
 # fallback path. Doing the venv bootstrap up front keeps it reproducible.
 #
@@ -101,7 +101,7 @@ RUN printf '#!/bin/sh\n# CI-only no-op raspi-config shim (JTN-530)\nexit 0\n' \
 #
 # install.sh uses `/usr/bin/systemctl` explicitly in a couple of places (see
 # JTN-600's stop_service hardening) and `systemctl` via PATH elsewhere. On
-# bullseye / bookworm / trixie `/bin` is a usrmerge symlink to `/usr/bin`, so
+# trixie `/bin` is a usrmerge symlink to `/usr/bin`, so
 # overwriting `/usr/bin/systemctl` also covers `/bin/systemctl` (they are the
 # same inode). No extra `ln` is needed — attempting one fails with "same
 # file" on usrmerge layouts.

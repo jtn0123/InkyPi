@@ -14,7 +14,7 @@ Every tagged GitHub release ships a pre-installed `.img.xz` built by
 with InkyPi already installed, enabled as a systemd service, and ready to
 serve the web UI on first boot.
 
-**What the image is:** Pi OS Lite arm64 + InkyPi at the matching release tag,
+**What the image is:** Pi OS Lite (Trixie) arm64 + InkyPi at the matching release tag,
 built inside a chroot with `qemu-aarch64-static`, shrunk with `pishrink.sh`,
 and boot-verified in `qemu-system-aarch64` before it ships. Nothing personal
 (no hostname, no Wi-Fi, no SSH credentials) is baked into the image — Pi
@@ -121,17 +121,17 @@ The Pi Zero 2 W is the cheapest officially-supported InkyPi target board, but it
 
 ### OS choice
 
-As of `2025-12-04`, the **default Pi OS image is now Trixie (Debian 13)**. InkyPi v0.28.1+ supports it natively — earlier versions had a regression where `zramswap` was silently skipped on Trixie, causing OOMs during pip install on a Pi Zero 2 W (see JTN-528).
+InkyPi requires **Raspberry Pi OS Trixie (Debian 13)**, whose system `python3` is 3.13 — the only Python version InkyPi supports. Trixie has been the default Pi OS image since `2025-12-04`. `install.sh` and `update.sh` refuse to run on an older `python3` (for example Bookworm's 3.11) and tell you to upgrade.
 
-If you're flashing a Bookworm image instead (e.g. for compatibility with an older e-ink driver), use the `Raspberry Pi OS (Legacy, 64-bit) Lite` option in Imager — that's the renamed Bookworm channel since the Trixie cutover.
+Bookworm (now the `Raspberry Pi OS (Legacy)` channel in Imager) and Bullseye are no longer supported. Reflash with a current Trixie image rather than attempting an in-place `dist-upgrade`.
 
 ### `arm_64bit=1` requirement
 
-The 2025-12-04 Trixie image sets `arm_64bit=1` explicitly in `/boot/firmware/config.txt`. Older Bookworm images may not. If you're upgrading an existing Pi from Bullseye/Bookworm and using a 64-bit kernel, double-check this line is present — without it, the 64-bit `kernel8.img` won't boot on the Zero 2 W.
+Trixie images set `arm_64bit=1` explicitly in `/boot/firmware/config.txt`. If you carried a `config.txt` over from an older install and use a 64-bit kernel, double-check this line is present — without it, the 64-bit `kernel8.img` won't boot on the Zero 2 W.
 
 ### First-boot install time
 
-A fresh `install.sh` run on a Pi Zero 2 W takes **roughly 15 minutes** end-to-end. The bottleneck is `pip install` building wheels for `numpy`, `Pillow`, and `playwright` on a single Cortex-A53 core. Don't kill the install or assume it's hung — `htop` will show `pip` consuming one core. zramswap (auto-enabled by `install.sh` on Bullseye/Bookworm/Trixie) is critical here; without it the build OOMs.
+A fresh `install.sh` run on a Pi Zero 2 W takes **roughly 15 minutes** end-to-end. The bottleneck is `pip install` building wheels for `numpy`, `Pillow`, and `playwright` on a single Cortex-A53 core. Don't kill the install or assume it's hung — `htop` will show `pip` consuming one core. zramswap (auto-enabled by `install.sh` on Trixie) is critical here; without it the build OOMs.
 
 ### Pre-built wheelhouse (faster first boot — JTN-604)
 

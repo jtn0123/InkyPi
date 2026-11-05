@@ -25,12 +25,12 @@ append packages or hashes manually to the generated requirements file.
 
 ## Updating dev dependencies
 
-Edit `install/requirements-dev.in`, then resolve universally from Python 3.11,
-the oldest supported interpreter. Universal mode preserves Linux-only `memray`
+Edit `install/requirements-dev.in`, then resolve universally for Python 3.13,
+the only supported interpreter. Universal mode preserves Linux-only `memray`
 and libcst's Python 3.13-specific YAML backend even when run on a Mac:
 
 ```bash
-uv --no-config pip compile --universal --python-version 3.11 --fork-strategy fewest \
+uv --no-config pip compile --universal --python-version 3.13 --fork-strategy fewest \
     --prerelease disallow --upgrade --generate-hashes \
     install/requirements-dev.in -o install/requirements-dev.txt
 ```
@@ -49,8 +49,6 @@ together, run `pip check`, and run the test and strict mypy gates.
 
 ## Compatibility constraints
 
-- NumPy is capped below 2.5 because 2.5 requires Python 3.12. Runtime and dev
-  installs share one version while Python 3.11 is supported.
 - `pydantic-core` follows Pydantic's exact pin. Google GenAI currently caps
   `websockets` below 17. Upgrade through their parent libraries.
 - Requests type stubs are explicitly pinned to a version validated by mypy.

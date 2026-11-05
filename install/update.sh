@@ -457,6 +457,13 @@ if [ -n "${INKYPI_UPDATE_TEST_SUCCESS_FAST:-}" ]; then
   exit 0
 fi
 
+# Refuse to update on an unsupported OS (e.g. Bookworm's Python 3.11) before
+# the service is stopped, so a too-old Pi keeps running its current version.
+_current_step="python_version"
+if ! require_supported_python; then
+  exit 1
+fi
+
 # Pre-flight gates (review item B4). Read-only checks — free disk, VERSION,
 # device config schema, display driver — run before the service is stopped or
 # anything is installed, so an abort leaves the running service untouched.
@@ -517,12 +524,12 @@ else
   exit 1
 fi
 
-# Setup zramswap on any modern Pi OS that ships zram-tools (Bullseye/Bookworm/Trixie).
+# Setup zramswap on supported Pi OS releases that ship zram-tools (Trixie).
 # This is critical on low-RAM boards like the Pi Zero 2 W (512 MB) — without
 # zramswap, pip install of numpy/Pillow/playwright will OOM during the update step.
 os_version=$(get_os_version)
-if [[ "$os_version" =~ ^(11|12|13)$ ]] ; then
-  echo "OS version is $os_version (Bullseye/Bookworm/Trixie) - setting up zramswap"
+if [[ "$os_version" =~ ^(13)$ ]] ; then
+  echo "OS version is $os_version (Trixie) - setting up zramswap"
   setup_zramswap_service
 else
   echo "OS version is $os_version - skipping zramswap setup (zram-tools not available on this release)."

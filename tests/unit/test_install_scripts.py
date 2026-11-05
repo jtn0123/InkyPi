@@ -2,6 +2,7 @@
 """Structural validation of install/setup scripts — no shell execution."""
 
 import re
+import sys
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
@@ -275,12 +276,12 @@ class TestInstallScript:
         apt_pos = self.combined.index(apt_install, fn_start)
         assert guard_pos < return_pos < apt_pos
 
-    def test_install_enables_zramswap_on_bookworm_and_trixie(self) -> None:
-        # JTN-528: zramswap must be enabled on Bullseye/Bookworm/Trixie so the
-        # Pi Zero 2 W (512 MB RAM) doesn't OOM during pip install. The previous
-        # check only matched Bookworm (12) -> None -> None exactly, leaving Trixie users broken.
+    def test_install_enables_zramswap_on_trixie(self) -> None:
+        # JTN-528: zramswap must be enabled on supported releases so the
+        # Pi Zero 2 W (512 MB RAM) doesn't OOM during pip install. Trixie (13)
+        # is the only supported release now that Python 3.13 is required.
         assert "os_version=$(get_os_version)" in self.content
-        assert '[[ "$os_version" =~ ^(11|12|13)$ ]]' in self.content
+        assert '[[ "$os_version" =~ ^(13)$ ]]' in self.content
         assert "setup_zramswap_service" in self.content
         # The skip branch should still exist for unknown future releases.
         assert "skipping zramswap setup" in self.content
@@ -339,12 +340,11 @@ class TestInstallScript:
         assert "return 0" in func_body
 
     def test_install_os_version_comment_lists_correct_codenames(self) -> None:
-        # The comment near get_os_version should list 11/12/13 with correct
-        # codenames — including the 'Trixie' typo fix from JTN-528.
-        # JTN-674: get_os_version() -> None -> None now lives in _common.sh — check combined.
-        assert "11=Bullseye" in self.combined
-        assert "12=Bookworm" in self.combined
+        # The comment near get_os_version should list the supported release
+        # with its correct codename — including the 'Trixie' typo fix from
+        # JTN-528. JTN-674: get_os_version() now lives in _common.sh.
         assert "13=Trixie" in self.combined
+        assert "12=Bookworm" not in self.combined
         assert "Trixe" not in self.combined  # typo guard
 
     def test_zramswap_regex_matches_codename_comment_parity(self) -> None:
@@ -354,7 +354,7 @@ class TestInstallScript:
         # will catch it.
         # JTN-674: get_os_version() now lives in _common.sh — check combined.
 
-        # Parse "# Get OS release number, e.g. 11=Bullseye, 12=Bookworm, 13=Trixie"
+        # Parse "# Get OS release number, e.g. 13=Trixie"
         # Capture every "<digit(s)>=<Codename>" pair from the comment line
         # immediately above the get_os_version() -> None -> None function definition.
         comment_versions = set()
@@ -369,7 +369,7 @@ class TestInstallScript:
                             comment_versions.add(int(m.group(1)))
 
         # Parse the regex alternation in the zramswap if-branch:
-        # [[ "$os_version" =~ ^(11|12|13)$ ]]
+        # [[ "$os_version" =~ ^(13)$ ]]
         # JTN-674: the regex lives in install.sh main body; check combined.
         regex_versions = set()
         for line in self.combined.splitlines():
@@ -1874,12 +1874,11 @@ class TestUpdateScript:
     def test_update_upgrades_pip_deps(self) -> None:
         assert "pip install" in self.content
 
-    def test_update_enables_zramswap_on_bullseye_bookworm_trixie(self) -> None:
-        # JTN-667: update.sh must use the same multi-release zramswap guard as
-        # install.sh — previously it only matched Bookworm (12) so Trixie (13)
-        # and Bullseye (11) -> None -> None users would OOM during pip install on update.
+    def test_update_enables_zramswap_on_trixie(self) -> None:
+        # JTN-667: update.sh must use the same zramswap release guard as
+        # install.sh so Pi Zero 2 W users don't OOM during pip install on update.
         assert "os_version=$(get_os_version)" in self.content
-        assert '[[ "$os_version" =~ ^(11|12|13)$ ]]' in self.content
+        assert '[[ "$os_version" =~ ^(13)$ ]]' in self.content
         assert "setup_zramswap_service" in self.content
         # The skip branch should still exist for unknown future releases.
         assert "skipping zramswap setup" in self.content
@@ -2619,20 +2618,14 @@ class TestInstallMatrixWorkflow:
         assert job.get("uses") == "./.github/workflows/install-matrix.yml"
 
     def test_install_matrix_references_supported_os_bases(self) -> None:
-        # JTN-615: bullseye was removed from the install-matrix because
-        # Debian 11 ships Python 3.9.2 while InkyPi's requirements pin
-        # packages that need Python>=3.10 (anyio==4.13.0 is the first to
-        # bomb the uv resolver). pyproject.toml also targets py311. The
-        # standalone Install matrix (arm64 e2e) -> None -> None workflow still exercises
-        # bullseye via test_install_memcap.sh because that path uses a
-        # python:3.12-slim base image and therefore isn't blocked by the
-        # codename's own interpreter version.
+        # InkyPi requires Python 3.13, which only Trixie ships. Bullseye
+        # (Python 3.9, JTN-615) and Bookworm (Python 3.11) were dropped.
         import yaml
 
         data = yaml.safe_load(self.install_matrix_yaml)
         job = data["jobs"]["install-matrix"]
         codenames = job["strategy"]["matrix"]["codename"]
-        assert set(codenames) == {"bookworm", "trixie"}
+        assert set(codenames) == {"trixie"}
 
     def test_install_matrix_runs_on_arm64(self) -> None:
         assert "linux/arm64" in self.install_matrix_yaml
@@ -2745,8 +2738,8 @@ class TestOsDriftNightlyWorkflow:
             ("schedule", "", False),
             ("workflow_dispatch", "", False),
             ("workflow_dispatch", "all", False),
-            ("workflow_dispatch", "bookworm", False),
-            ("workflow_dispatch", "trixie", True),
+            ("workflow_dispatch", "trixie", False),
+            ("workflow_dispatch", "forky", True),
         ],
     )
     def test_codename_selection_runs_expected_legs(
@@ -2769,7 +2762,7 @@ class TestOsDriftNightlyWorkflow:
                         **os.environ,
                         "EVENT_NAME": event,
                         "SELECTED_CODENAME": selected,
-                        "MATRIX_CODENAME": "bookworm",
+                        "MATRIX_CODENAME": "trixie",
                         "GITHUB_OUTPUT": str(output),
                     },
                 )
@@ -2780,9 +2773,11 @@ class TestOsDriftNightlyWorkflow:
     def test_is_not_a_pr_gate(self) -> None:
         assert "pull_request:" not in self.content
 
-    def test_matrix_covers_all_three_codenames(self) -> None:
-        for codename in ("trixie", "bookworm", "bullseye"):
-            assert codename in self.content
+    def test_matrix_covers_only_supported_codename(self) -> None:
+        assert "trixie" in self.content
+        for codename in ("bookworm", "bullseye"):
+            assert f"debian:{codename}" not in self.content
+            assert f"- {codename}" not in self.content
 
     def test_uses_unpinned_debian_images(self) -> None:
         assert re.search(
@@ -2817,12 +2812,8 @@ class TestOsDriftNightlyWorkflow:
         assert isinstance(jobs, dict)
         matrix = jobs["drift-check"]["strategy"]["matrix"]
         assert isinstance(matrix, dict)
-        # Supported defaults are Bookworm/Trixie; Bullseye is manual legacy.
-        codenames = matrix["codename"]
-        assert isinstance(codenames, str)
-        assert "fromJSON" in codenames
-        assert '["trixie", "bookworm"]' in codenames
-        assert "codename == 'bullseye'" in codenames
+        # Trixie is the only supported base (Python 3.13 is required).
+        assert matrix["codename"] == ["trixie"]
 
 
 # ---- memory-diff workflow ----
@@ -3199,6 +3190,9 @@ class TestInstallPreflight:
             "INKYPI_PREFLIGHT_SYSTEMD_DIR": str(systemd_dir),
             "INKYPI_PREFLIGHT_STATE_DIR": str(state_dir),
             "INKYPI_PREFLIGHT_SRC_PATH": str(src_path),
+            # Probe the test interpreter (3.13) rather than whatever python3
+            # the host has on PATH, so the version check is deterministic.
+            "INKYPI_PYTHON_BIN": sys.executable,
         }
 
     def _run(self, env_overrides: Any) -> Any:
@@ -3238,6 +3232,35 @@ class TestInstallPreflight:
         assert (
             "Preflight checks passed" in combined
         ), f"preflight must announce success; output: {combined!r}"
+
+    # --- Python version ----------------------------------------------------
+
+    def test_preflight_fails_on_python_older_than_313(self, tmp_path: Path) -> None:
+        """Bookworm ships Python 3.11. The installer must refuse it up front
+        and point the user at Raspberry Pi OS Trixie."""
+        fake = tmp_path / "python3.11"
+        fake.write_text(
+            "#!/bin/sh\n" 'case "$2" in *print*) echo 3.11 ;; *) exit 1 ;; esac\n'
+        )
+        fake.chmod(0o755)
+        env = self._base_env(tmp_path)
+        env["INKYPI_PYTHON_BIN"] = str(fake)
+        proc = self._run(env)
+        assert proc.returncode != 0, "preflight must fail on Python 3.11"
+        combined = proc.stdout + proc.stderr
+        assert "3.11" in combined
+        assert "requires Python 3.13" in combined
+        assert "Trixie" in combined
+        assert "Preflight checks passed" not in combined
+
+    def test_preflight_fails_when_python_missing(self, tmp_path: Path) -> None:
+        env = self._base_env(tmp_path)
+        env["INKYPI_PYTHON_BIN"] = str(tmp_path / "no-such-python")
+        proc = self._run(env)
+        assert proc.returncode != 0
+        combined = proc.stdout + proc.stderr
+        assert "was not found" in combined
+        assert "Trixie" in combined
 
     # --- Disk-space failures ------------------------------------------------
 

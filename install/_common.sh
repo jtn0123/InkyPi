@@ -67,9 +67,32 @@ show_loader() {
 # OS helpers
 # ---------------------------------------------------------------------------
 
-# Get OS release number, e.g. 11=Bullseye, 12=Bookworm, 13=Trixie
+# Get OS release number, e.g. 13=Trixie
 get_os_version() {
   lsb_release -sr
+}
+
+# InkyPi's lockfiles are resolved for Python 3.13 only, which Raspberry Pi OS
+# Trixie (Debian 13) ships as the system python3. Bookworm (3.11) and older
+# are no longer supported. Fail fast, before any apt/pip/service work, with
+# an actionable message instead of a confusing pip resolver error later.
+#
+# INKYPI_PYTHON_BIN overrides the interpreter probed (tests only).
+INKYPI_MIN_PYTHON="3.13"
+
+require_supported_python() {
+  local py="${INKYPI_PYTHON_BIN:-python3}"
+  local found
+  if ! command -v "$py" >/dev/null 2>&1; then
+    echo_error "ERROR: $py was not found. InkyPi requires Python ${INKYPI_MIN_PYTHON}+ — please upgrade to Raspberry Pi OS Trixie (Debian 13)." >&2
+    return 1
+  fi
+  found=$("$py" -c 'import sys; print("%d.%d" % sys.version_info[:2])' 2>/dev/null || echo "unknown")
+  if ! "$py" -c 'import sys; sys.exit(0 if sys.version_info[:2] >= (3, 13) else 1)' >/dev/null 2>&1; then
+    echo_error "ERROR: system python3 is ${found}, but InkyPi requires Python ${INKYPI_MIN_PYTHON}+. Please upgrade to Raspberry Pi OS Trixie (Debian 13), which ships Python 3.13." >&2
+    return 1
+  fi
+  echo_success "\tPython ${found} meets the ${INKYPI_MIN_PYTHON}+ requirement"
 }
 
 # ---------------------------------------------------------------------------

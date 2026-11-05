@@ -11,11 +11,11 @@ def test_format_comment_groups_allocator_noise_by_package() -> None:
         "allocator_sample_limit": 500,
         "allocators": [
             {
-                "location": "/opt/python/lib/python3.12/site-packages/lark/tree.py:67",
+                "location": "/opt/python/lib/python3.13/site-packages/lark/tree.py:67",
                 "bytes": 2 * 1024 * 1024,
             },
             {
-                "location": "/opt/python/lib/python3.12/site-packages/lark/lexer.py:215",
+                "location": "/opt/python/lib/python3.13/site-packages/lark/lexer.py:215",
                 "bytes": 1 * 1024 * 1024,
             },
         ],
@@ -27,11 +27,11 @@ def test_format_comment_groups_allocator_noise_by_package() -> None:
         "allocator_sample_limit": 500,
         "allocators": [
             {
-                "location": "/opt/python/lib/python3.12/site-packages/lark/tree.py:67",
+                "location": "/opt/python/lib/python3.13/site-packages/lark/tree.py:67",
                 "bytes": 4 * 1024 * 1024,
             },
             {
-                "location": "/opt/python/lib/python3.12/site-packages/lark/lexer.py:215",
+                "location": "/opt/python/lib/python3.13/site-packages/lark/lexer.py:215",
                 "bytes": 2 * 1024 * 1024,
             },
         ],
@@ -52,7 +52,7 @@ def test_format_comment_does_not_invent_zero_for_sampled_shared_location() -> No
         "allocator_sample_limit": 500,
         "allocators": [
             {
-                "location": "/opt/python/lib/python3.12/site-packages/werkzeug/http.py:1",
+                "location": "/opt/python/lib/python3.13/site-packages/werkzeug/http.py:1",
                 "bytes": 512 * 1024,
             }
         ],
@@ -64,7 +64,7 @@ def test_format_comment_does_not_invent_zero_for_sampled_shared_location() -> No
         "allocator_sample_limit": 500,
         "allocators": [
             {
-                "location": "/opt/python/lib/python3.12/site-packages/werkzeug/http.py:1",
+                "location": "/opt/python/lib/python3.13/site-packages/werkzeug/http.py:1",
                 "bytes": 768 * 1024,
             }
         ],

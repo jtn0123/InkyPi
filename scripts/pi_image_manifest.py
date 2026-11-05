@@ -1,4 +1,4 @@
-"""Produce Raspberry Pi Imager metadata for the pinned Bookworm image."""
+"""Produce Raspberry Pi Imager metadata for the pinned Trixie image."""
 
 import argparse
 import hashlib
@@ -25,13 +25,13 @@ def build_manifest(image: Path, tag: str) -> dict[str, object]:
         "os_list": [
             {
                 "name": f"InkyPi {tag} (Pi Zero 2 W)",
-                "description": "Pre-installed InkyPi on Raspberry Pi OS Lite Bookworm arm64",
+                "description": "Pre-installed InkyPi on Raspberry Pi OS Lite Trixie arm64",
                 "url": f"https://github.com/jtn0123/InkyPi/releases/download/{tag}/{expected}",
                 "website": "https://github.com/jtn0123/InkyPi",
                 "icon": "https://raw.githubusercontent.com/jtn0123/InkyPi/main/src/static/images/inkypi.png",
                 "release_date": datetime.now(UTC).date().isoformat(),
                 "devices": ["pi3-64bit"],
-                "init_format": "systemd",
+                "init_format": "cloudinit-rpi",
                 "image_download_size": image.stat().st_size,
                 "extract_size": size,
                 "extract_sha256": digest.hexdigest(),

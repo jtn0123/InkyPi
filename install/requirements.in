@@ -1,31 +1,31 @@
-# InkyPi runtime dependencies — loose constraints for pip-compile.
-# Edit this file to add/upgrade dependencies, then regenerate:
-#   pip-compile --generate-hashes install/requirements.in -o install/requirements.txt
+# InkyPi runtime dependencies — LEGACY REFERENCE ONLY (JTN-616).
+# The source of truth is pyproject.toml [project.dependencies] + uv.lock;
+# install/requirements.txt is exported from uv.lock (see
+# docs/dependency_locking.md). Keep this list mirrored with pyproject.toml.
 #
 # Packages with sys_platform guards are only installed on Linux (Pi).
 
 flask>=3.1,<4
-python-dotenv>=1.0,<2
+python-dotenv>=1.2,<2
 # inky display driver — only needed on Pi hardware
-inky>=2.3,<3; sys_platform == "linux"
-requests>=2.32,<3
-urllib3>=2.0,<3
+inky>=2.5,<3; sys_platform == "linux"
+requests>=2.34,<3
+urllib3>=2.8,<3
 werkzeug>=3.1,<4
 pillow>=13.0,<14
 # pi-heif has wheels for all major platforms (Linux, macOS, Windows) — no platform guard.
 pi-heif==1.4.0
-tzdata>=2024.1
-openai>=3.0,<4
-google-genai>=2.0,<3
-# numpy 2.5 requires Python 3.12+; keep in sync with the cap in pyproject.toml.
-numpy>=2.0,<2.5
-icalendar>=7.0,<8
-recurring-ical-events>=3.0,<4
-psutil>=7.0,<8
+tzdata>=2026.1
+openai>=3.22,<4
+google-genai>=2.25,<3
+numpy>=2.5,<3
+icalendar>=7.3,<8
+recurring-ical-events>=3.8,<4
+psutil>=7.2,<8
 # cysystemd — only available on Linux; provides journald integration
 cysystemd>=2.0,<3; sys_platform == "linux"
 waitress>=3.0,<4
 feedparser>=6.0,<7
-jsonschema>=4.0,<5
-astral>=3.0,<4
-prometheus-client>=0.21,<1
+jsonschema>=4.26,<5
+astral>=3.2,<4
+prometheus-client>=0.26,<1
