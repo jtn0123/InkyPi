@@ -2,6 +2,15 @@
 
 <!-- version list -->
 
+## v1.7.0 (2026-11-05)
+
+### Features
+
+- Require Python 3.13 and Raspberry Pi OS Trixie
+  ([#697](https://github.com/jtn0123/InkyPi/pull/697),
+  [`ef34be6`](https://github.com/jtn0123/InkyPi/commit/ef34be6c645b142c6051dc76c6a69b5d2f90e5bc))
+
+
 ## v1.6.1 (2026-11-05)
 
 ### Bug Fixes
