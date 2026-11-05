@@ -607,3 +607,69 @@ class TestOpenMeteoDataPointsUseTheNormalisedCurrentBlock:
 
     def test_absent_current_data_degrades_to_zero_rather_than_raising(self) -> None:
         assert self._wind({"daily": {}, "hourly": {}})["measurement"] == 0
+
+
+class TestOpenMeteoTimestampsUseTheForecastLocationZone:
+    """With ``timezone=auto`` Open-Meteo returns naive *location-local* times.
+
+    They were read as the host's (or device's) local time, so sunrise, sunset
+    and the hourly strip shifted whenever the device and the forecast location
+    sit in different zones (review A1d).
+    """
+
+    _LA_RESPONSE: dict[str, Any] = {
+        "timezone": "Pacific/Chatham",
+        "utc_offset_seconds": 45900,
+        "current": {"time": "2026-08-15T12:00", "temperature_2m": 20},
+        "daily": {
+            "time": ["2026-08-15"],
+            "sunrise": ["2026-08-15T06:15"],
+            "sunset": ["2026-08-15T19:45"],
+        },
+        "hourly": {"time": ["2026-08-15T12:00", "2026-08-15T13:00"]},
+    }
+
+    def test_sunrise_is_converted_from_location_to_device_zone(self) -> None:
+        from zoneinfo import ZoneInfo
+
+        from plugins.weather.weather_data import parse_open_meteo_data_points
+
+        points = parse_open_meteo_data_points(
+            self._LA_RESPONSE,
+            {},
+            ZoneInfo("UTC"),
+            "metric",
+            "24h",
+            "/plugins/weather",
+        )
+        sunrise = next(p for p in points if p["label"] == "Sunrise")
+        sunset = next(p for p in points if p["label"] == "Sunset")
+        # Chatham is +12:45 in August, an offset no CI host or dev machine
+        # uses, so a naive read cannot land on the right answer by accident.
+        assert sunrise["measurement"] == "17:30"
+        assert sunset["measurement"] == "07:00"
+
+    def test_localize_attaches_offset_and_leaves_dates_alone(self) -> None:
+        from plugins.weather.weather_data import localize_open_meteo
+
+        out = localize_open_meteo(self._LA_RESPONSE)
+        assert out["hourly"]["time"][0] == "2026-08-15T12:00:00+12:45"
+        assert out["daily"]["sunrise"][0] == "2026-08-15T06:15:00+12:45"
+        assert out["current"]["time"] == "2026-08-15T12:00:00+12:45"
+        assert out["daily"]["time"] == ["2026-08-15"]
+        # Idempotent, and the caller's response is not mutated.
+        assert localize_open_meteo(out) == out
+        assert self._LA_RESPONSE["hourly"]["time"][0] == "2026-08-15T12:00"
+
+    def test_falls_back_to_utc_offset_then_to_unchanged(self) -> None:
+        from plugins.weather.weather_data import localize_open_meteo
+
+        offset_only = {
+            "utc_offset_seconds": 3600,
+            "hourly": {"time": ["2026-01-01T00:00"]},
+        }
+        assert localize_open_meteo(offset_only)["hourly"]["time"] == [
+            "2026-01-01T00:00:00+01:00"
+        ]
+        bare = {"hourly": {"time": ["2026-01-01T00:00"]}}
+        assert localize_open_meteo(bare) is bare

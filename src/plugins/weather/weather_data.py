@@ -2,7 +2,7 @@ import logging
 import math
 import os
 from collections.abc import Mapping, Sequence
-from datetime import UTC, date, datetime, tzinfo
+from datetime import UTC, date, datetime, timedelta, timezone, tzinfo
 from typing import Any
 from zoneinfo import ZoneInfo
 
@@ -718,6 +718,8 @@ def parse_open_meteo_data_points(
     plugin_dir: str,
 ) -> list[dict[str, Any]]:
     """Parses current data points from Open-Meteo API response."""
+    weather_data = localize_open_meteo(weather_data)
+    aqi_data = localize_open_meteo(aqi_data)
     data_points = []
     daily_data = weather_data.get("daily", {})
     # Go through the normaliser: the request now asks for the modern `current=`
@@ -901,6 +903,73 @@ def parse_weather_data(
     return data
 
 
+def _open_meteo_source_tz(response: Mapping[str, Any]) -> tzinfo | None:
+    """Return the zone Open-Meteo's naive timestamps are expressed in.
+
+    ``timezone=auto`` makes every timestamp offset-free *forecast-location*
+    local time, and the response names that zone.  Prefer the IANA name (DST
+    aware), fall back to the fixed ``utc_offset_seconds``, else ``None``.
+    """
+    name = response.get("timezone")
+    if isinstance(name, str) and name:
+        try:
+            return ZoneInfo(name)
+        except (ValueError, KeyError):
+            logger.warning("Unknown Open-Meteo timezone %r", name)
+    offset = response.get("utc_offset_seconds")
+    if isinstance(offset, int | float) and not isinstance(offset, bool):
+        return timezone(timedelta(seconds=offset))
+    return None
+
+
+def _aware_iso(value: Any, source_tz: tzinfo) -> Any:
+    if not isinstance(value, str):
+        return value
+    try:
+        dt = datetime.fromisoformat(value)
+    except ValueError:
+        return value
+    if dt.tzinfo is not None:
+        return value
+    return dt.replace(tzinfo=source_tz).isoformat()
+
+
+def localize_open_meteo(response: Mapping[str, Any]) -> Mapping[str, Any]:
+    """Attach the forecast location's offset to Open-Meteo's naive timestamps.
+
+    The parsers call ``fromisoformat(...).astimezone(tz)``, which reads a naive
+    value as the *host's* local time; attaching the device timezone instead was
+    equally wrong.  Either way every time shifted whenever the device and the
+    forecast location sit in different zones.  Rewriting the strings once here
+    lets the downstream parsers stay unchanged.  Daily ``time`` entries are bare
+    dates and are left alone.  Idempotent; returns *response* untouched when no
+    source zone is known.
+    """
+    source_tz = _open_meteo_source_tz(response)
+    if source_tz is None:
+        return response
+
+    localized = dict(response)
+    for block, keys in (
+        ("hourly", ("time",)),
+        ("daily", ("sunrise", "sunset")),
+        ("current", ("time",)),
+        ("current_weather", ("time",)),
+    ):
+        section = response.get(block)
+        if not isinstance(section, Mapping):
+            continue
+        section_copy = dict(section)
+        for key in keys:
+            value = section_copy.get(key)
+            if isinstance(value, list):
+                section_copy[key] = [_aware_iso(v, source_tz) for v in value]
+            elif value is not None:
+                section_copy[key] = _aware_iso(value, source_tz)
+        localized[block] = section_copy
+    return localized
+
+
 def parse_open_meteo_data(
     weather_data: Mapping[str, Any],
     aqi_data: Mapping[str, Any],
@@ -910,6 +979,8 @@ def parse_open_meteo_data(
     lat: float,
     plugin_dir: str,
 ) -> dict[str, Any]:
+    weather_data = localize_open_meteo(weather_data)
+    aqi_data = localize_open_meteo(aqi_data)
     current = _open_meteo_current(weather_data)
     current_time = current.get("time")
     dt = (
