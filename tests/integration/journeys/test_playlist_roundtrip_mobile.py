@@ -303,3 +303,132 @@ def test_playlist_roundtrip_mobile_create_reorder_delete_persist(
             client.delete(f"/delete_playlist/{playlist_name}")
         except Exception:
             pass
+
+
+def test_playlist_row_actions_do_not_cover_instance_name_on_mobile(
+    live_server: str,
+    device_config_dev: Any,
+    flask_app: Flask,
+    mobile_page: Page,
+    tmp_path: Path,
+) -> None:
+    """Regression: on phones the row's Display + three icon buttons shared a
+    grid row with the instance name, squeezing the name column to ~30px and
+    wrapping the buttons on top of the text. The actions must sit on their own
+    row, leave the name readable, and keep 44px touch targets."""
+    client = flask_app.test_client()
+    playlist_name = f"journey-m-{uuid.uuid4().hex[:8]}"
+    long_name = "Groceries and errands with a long name"
+    try:
+        resp = client.post(
+            "/create_playlist",
+            data=json.dumps(
+                {
+                    "playlist_name": playlist_name,
+                    "start_time": "00:00",
+                    "end_time": "23:59",
+                }
+            ),
+            content_type="application/json",
+        )
+        assert resp.status_code == 200, resp.data
+        _seed_plugins(
+            device_config_dev,
+            playlist_name,
+            [("clock", "Step1 Clock"), ("clock", long_name)],
+        )
+
+        page = mobile_page
+        rc = navigate_and_wait(page, live_server, "/playlist")
+        toggle = page.locator(
+            f".playlist-item[data-playlist-name='{playlist_name}'] "
+            "[data-playlist-toggle]"
+        )
+        toggle.wait_for(state="visible", timeout=5000)
+        if toggle.get_attribute("aria-expanded") != "true":
+            toggle.click()
+            page.wait_for_timeout(200)
+
+        rows = page.evaluate(
+            """(pn) => {
+                const card = Array.from(document.querySelectorAll('.playlist-item'))
+                  .find(el => el.getAttribute('data-playlist-name') === pn);
+                return Array.from(card.querySelectorAll('.pl-item')).map(row => {
+                  const r = (sel) => row.querySelector(sel).getBoundingClientRect();
+                  const name = r('.pl-item-name');
+                  const actions = r('.pl-item-actions');
+                  const buttons = Array.from(
+                    row.querySelectorAll('.pl-item-actions .header-button')
+                  ).map(b => {
+                    const br = b.getBoundingClientRect();
+                    return {w: br.width, h: br.height, top: br.top};
+                  });
+                  return {
+                    instance: row.dataset.instanceName,
+                    nameWidth: name.width,
+                    nameBottom: name.bottom,
+                    actionsTop: actions.top,
+                    buttons,
+                  };
+                });
+            }""",
+            playlist_name,
+        )
+        assert len(rows) == 2, rows
+        for row in rows:
+            label = row["instance"]
+            assert row["nameWidth"] >= 150, f"{label}: name squeezed to {row}"
+            assert (
+                row["actionsTop"] >= row["nameBottom"]
+            ), f"{label}: actions overlap the name: {row}"
+            tops = {round(b["top"]) for b in row["buttons"]}
+            assert len(tops) == 1, f"{label}: action buttons wrapped: {row}"
+            for b in row["buttons"]:
+                assert (
+                    b["w"] >= _MOBILE_MIN_TOUCH and b["h"] >= _MOBILE_MIN_TOUCH
+                ), f"{label}: action button below 44px: {row}"
+        _assert_no_horizontal_overflow(page, playlist_name, "row layout")
+
+        # Header actions (Display next / Edit / Delete) share one row instead
+        # of stacking three full-width buttons per playlist card.
+        header = page.evaluate(
+            """(pn) => {
+                const card = Array.from(document.querySelectorAll('.playlist-item'))
+                  .find(el => el.getAttribute('data-playlist-name') === pn);
+                return Array.from(
+                  card.querySelectorAll('.playlist-toolbar .header-button')
+                ).map(b => {
+                  const r = b.getBoundingClientRect();
+                  return {
+                    cls: b.className,
+                    label: b.getAttribute('aria-label') || b.textContent.trim(),
+                    w: r.width, h: r.height, top: r.top,
+                  };
+                });
+            }""",
+            playlist_name,
+        )
+        assert len(header) == 3, header
+        assert len({round(b["top"]) for b in header}) == 1, f"header wrapped: {header}"
+        for b in header:
+            assert (
+                b["w"] >= _MOBILE_MIN_TOUCH and b["h"] >= _MOBILE_MIN_TOUCH
+            ), f"header button below 44px: {b}"
+        by_cls = {
+            (
+                "edit"
+                if "edit-playlist-btn" in b["cls"]
+                else "delete" if "delete-playlist-btn" in b["cls"] else "next"
+            ): b
+            for b in header
+        }
+        assert by_cls["next"]["w"] > by_cls["edit"]["w"], header
+        assert by_cls["edit"]["label"] == f"Edit playlist {playlist_name}"
+        assert by_cls["delete"]["label"] == f"Delete playlist {playlist_name}"
+
+        rc.assert_no_errors(str(tmp_path), "playlist_row_layout_mobile")
+    finally:
+        try:
+            client.delete(f"/delete_playlist/{playlist_name}")
+        except Exception:
+            pass

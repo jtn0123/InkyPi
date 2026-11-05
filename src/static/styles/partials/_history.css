@@ -161,11 +161,27 @@
   line-height: 1.4;
 }
 
+/* Display is the primary action and takes the free width; Download and
+   Delete are 40px icon buttons (labelled via aria-label/title). Three equal
+   text buttons did not fit a 230-260px card: "Download" filled its button
+   edge to edge with zero padding. */
 .history-actions,
 .hist-actions {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr) auto auto;
   gap: 8px;
+}
+
+.history-actions .btn.btn-icon-only,
+.hist-actions .btn.btn-icon-only {
+  width: 40px;
+  padding: 0;
+}
+
+.history-actions .btn .btn-icon,
+.hist-actions .btn .btn-icon {
+  width: 18px;
+  height: 18px;
 }
 
 .history-actions .btn,

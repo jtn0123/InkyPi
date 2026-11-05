@@ -5045,12 +5045,12 @@ a.quick-row-link:hover {
     /* Wrap to a second line rather than truncating on the first.
      *
      * `white-space: nowrap` clipped the plugin's *name* — "NASA Astronom…",
-     * "Wikipedia:Pictur…", "Today's Newspa…" — and the name is the only thing
+     * "Wikipedia: Pictur…", "Today's Newspa…" — and the name is the only thing
      * distinguishing one tile from another in a 20-item grid. The description
      * below may still truncate; that is what descriptions are for.
      *
      * Two lines resolves every shipped name except the two longest
-     * ("Wikipedia:Picture of the day", "NASA Astronomy Picture of the Day"),
+     * ("Wikipedia: Picture of the Day", "NASA Astronomy Picture of the Day"),
      * which still end in an ellipsis but now show enough to tell them apart.
      * A third line would fix those too at the cost of taller tiles across the
      * whole grid; the trade is not worth it for two plugins. */
@@ -6343,13 +6343,63 @@ a.pl-add-row:hover {
 
 /* stylelint-enable no-duplicate-selectors */
 
-/* Collapse thumb column on narrow viewports */
+/* Narrow viewports: drop the thumb and move the actions to their own row.
+   Display + three 44px icon buttons need ~200px; sharing a row with the
+   name left the name column ~30px wide and the wrapped buttons overlapped
+   the text. Selectors are doubled up so they beat the generic
+   `.plugin-item` / `.plugin-actions` / `.plugin-info` rules in
+   _responsive-mobile.css, which load later. */
 @media (max-width: 720px) {
-  .pl-item {
-    grid-template-columns: auto auto minmax(0, 1fr) auto;
-    grid-template-areas: "drag icon main actions";
+  .pl-item.plugin-item {
+    grid-template-columns: auto auto minmax(0, 1fr);
+    grid-template-areas:
+      "drag icon main"
+      "actions actions actions";
+    row-gap: 8px;
+    padding: 10px;
   }
+  .pl-item .pl-item-main.plugin-info { width: auto; }
   .pl-item-thumb { display: none; }
+  .pl-item .pl-item-name { white-space: normal; flex-wrap: wrap; row-gap: 2px; }
+  .pl-item .pl-item-actions.plugin-actions {
+    width: auto;
+    flex-wrap: nowrap;
+    gap: 6px;
+  }
+  .pl-item .pl-item-actions .playlist-row-display-btn {
+    flex: 1 1 auto;
+    justify-content: center;
+    height: 44px;
+  }
+  .pl-item .pl-item-actions .playlist-row-icon-btn {
+    width: 44px;
+    height: 44px;
+  }
+  /* Playlist header actions: one row instead of three stacked full-width
+     buttons (~150px per card). Display next takes the free width; Edit and
+     Delete become 44px icon buttons (named via aria-label). Selectors are
+     prefixed with .playlist-header to beat the grid/1fr toolbar rules in
+     _responsive-mobile.css / _responsive-large.css. */
+  .playlist-header .playlist-toolbar {
+    display: flex;
+    flex-wrap: nowrap;
+    justify-content: flex-end;
+    gap: 6px;
+  }
+  .playlist-header .playlist-toolbar .run-next-btn {
+    flex: 1 1 auto;
+    height: 44px;
+  }
+  .playlist-header .playlist-toolbar .playlist-secondary-button {
+    flex: 0 0 44px;
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
+    padding: 0;
+  }
+  .playlist-header .playlist-toolbar .playlist-secondary-button .action-button-label {
+    display: none;
+  }
 }
 
 /* Compact grid for groups of options */
@@ -7660,6 +7710,39 @@ body[data-page="settings"] .settings-device-name {
   display: none;
 }
 
+/* The native marker is hidden above, which left the summary looking like a
+   static label. Restore a disclosure chevron that rotates when open. */
+.api-keys-more summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.api-keys-more summary::after {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(45deg);
+  transition: transform 0.15s ease;
+  margin-right: 4px;
+}
+
+.api-keys-more[open] summary::after {
+  transform: rotate(-135deg);
+}
+
+.api-keys-more summary:hover {
+  color: var(--text);
+}
+
+.api-keys-more summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
 .api-keys-more-grid {
   display: grid;
   gap: 12px;
@@ -7967,11 +8050,27 @@ body[data-page="settings"] .settings-device-name {
   line-height: 1.4;
 }
 
+/* Display is the primary action and takes the free width; Download and
+   Delete are 40px icon buttons (labelled via aria-label/title). Three equal
+   text buttons did not fit a 230-260px card: "Download" filled its button
+   edge to edge with zero padding. */
 .history-actions,
 .hist-actions {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr) auto auto;
   gap: 8px;
+}
+
+.history-actions .btn.btn-icon-only,
+.hist-actions .btn.btn-icon-only {
+  width: 40px;
+  padding: 0;
+}
+
+.history-actions .btn .btn-icon,
+.hist-actions .btn .btn-icon {
+  width: 18px;
+  height: 18px;
 }
 
 .history-actions .btn,
@@ -10454,10 +10553,6 @@ body[data-page="api-keys"] .status-popover {
     .apikey-row {
         grid-template-columns: 1fr;
     }
-
-    .history-actions {
-        grid-template-columns: 1fr;
-    }
 }
 
 /* ── Improved mobile layout ── */
@@ -10785,15 +10880,6 @@ body[data-page="api-keys"] .status-popover {
         gap: 10px;
     }
 
-    .plugins-container .plugin-item {
-        padding: 16px 10px 14px;
-        min-height: 120px;
-    }
-
-    .plugin-name {
-        min-height: 2.7em;
-    }
-
     .settings-grid {
         gap: 14px;
     }
@@ -10956,7 +11042,9 @@ body[data-page="api-keys"] .status-popover {
     }
 
     .playlist-secondary-button {
-        border-radius: 999px;
+        /* Match the sibling "Display next" button (.header-button radius);
+           a pill here made Edit/Delete look like a different control set. */
+        border-radius: var(--border-radius-md);
         border: 1px solid var(--panel-border);
         background: var(--surface);
         color: var(--text);
@@ -11031,14 +11119,12 @@ body[data-page="api-keys"] .status-popover {
         min-height: 44px;
     }
 
-    .history-actions {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 8px;
+    .history-actions .btn {
+        min-height: 44px;
     }
 
-    .history-actions .btn:first-child {
-        grid-column: 1 / -1;
+    .history-actions .btn.btn-icon-only {
+        width: 44px;
     }
 
     .metric-strip {
@@ -11049,10 +11135,6 @@ body[data-page="api-keys"] .status-popover {
         grid-template-columns: 104px minmax(0, 1fr);
         align-items: start;
         gap: 12px;
-    }
-
-    .history-thumb {
-        aspect-ratio: 1 / 1.2;
     }
 
     .history-name {
@@ -11154,10 +11236,6 @@ body[data-page="api-keys"] .status-popover {
 
     .history-card {
         grid-template-columns: 1fr;
-    }
-
-    .history-thumb {
-        aspect-ratio: 4 / 3;
     }
 
     .plugins-container {

@@ -449,11 +449,61 @@ a.pl-add-row:hover {
 
 /* stylelint-enable no-duplicate-selectors */
 
-/* Collapse thumb column on narrow viewports */
+/* Narrow viewports: drop the thumb and move the actions to their own row.
+   Display + three 44px icon buttons need ~200px; sharing a row with the
+   name left the name column ~30px wide and the wrapped buttons overlapped
+   the text. Selectors are doubled up so they beat the generic
+   `.plugin-item` / `.plugin-actions` / `.plugin-info` rules in
+   _responsive-mobile.css, which load later. */
 @media (max-width: 720px) {
-  .pl-item {
-    grid-template-columns: auto auto minmax(0, 1fr) auto;
-    grid-template-areas: "drag icon main actions";
+  .pl-item.plugin-item {
+    grid-template-columns: auto auto minmax(0, 1fr);
+    grid-template-areas:
+      "drag icon main"
+      "actions actions actions";
+    row-gap: 8px;
+    padding: 10px;
   }
+  .pl-item .pl-item-main.plugin-info { width: auto; }
   .pl-item-thumb { display: none; }
+  .pl-item .pl-item-name { white-space: normal; flex-wrap: wrap; row-gap: 2px; }
+  .pl-item .pl-item-actions.plugin-actions {
+    width: auto;
+    flex-wrap: nowrap;
+    gap: 6px;
+  }
+  .pl-item .pl-item-actions .playlist-row-display-btn {
+    flex: 1 1 auto;
+    justify-content: center;
+    height: 44px;
+  }
+  .pl-item .pl-item-actions .playlist-row-icon-btn {
+    width: 44px;
+    height: 44px;
+  }
+  /* Playlist header actions: one row instead of three stacked full-width
+     buttons (~150px per card). Display next takes the free width; Edit and
+     Delete become 44px icon buttons (named via aria-label). Selectors are
+     prefixed with .playlist-header to beat the grid/1fr toolbar rules in
+     _responsive-mobile.css / _responsive-large.css. */
+  .playlist-header .playlist-toolbar {
+    display: flex;
+    flex-wrap: nowrap;
+    justify-content: flex-end;
+    gap: 6px;
+  }
+  .playlist-header .playlist-toolbar .run-next-btn {
+    flex: 1 1 auto;
+    height: 44px;
+  }
+  .playlist-header .playlist-toolbar .playlist-secondary-button {
+    flex: 0 0 44px;
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
+    padding: 0;
+  }
+  .playlist-header .playlist-toolbar .playlist-secondary-button .action-button-label {
+    display: none;
+  }
 }

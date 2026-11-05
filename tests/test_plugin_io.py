@@ -62,6 +62,22 @@ class TestExportSingleInstance:
         assert inst["name"] == "Living Room"
         assert "settings" in inst
 
+    def test_export_non_ascii_instance_name_header_is_latin1(
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
+        """An en dash in the instance name used to reach the raw
+        Content-Disposition header, which waitress cannot encode (500)."""
+        _add_plugin_instance(device_config_dev, name="Café – Kitchen")
+
+        resp = client.get(
+            "/api/plugins/export", query_string={"instance": "Café – Kitchen"}
+        )
+        assert resp.status_code == 200
+        cd = resp.headers.get("Content-Disposition", "")
+        cd.encode("latin-1")
+        assert cd.startswith("attachment;")
+        assert "filename*=UTF-8''inkypi_plugin_Caf%C3%A9_%E2%80%93_Kitchen.json" in cd
+
     def test_export_nonexistent_instance_returns_404(
         self, client: FlaskClient, device_config_dev: Any
     ) -> None:

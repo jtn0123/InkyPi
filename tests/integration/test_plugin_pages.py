@@ -547,3 +547,51 @@ def test_wizard_ids_not_duplicated_in_static_html(client: FlaskClient) -> None:
     assert (
         body.count('id="wizardNext"') <= 1
     ), "Duplicate id='wizardNext' found in rendered HTML for /plugin/calendar"
+
+
+def _seed_named_clock_instance(
+    device_config_dev: Any, latest_refresh_time: str | None = None
+) -> None:
+    pm = device_config_dev.get_playlist_manager()
+    if not pm.get_playlist("Morning"):
+        pm.add_playlist("Morning", "06:00", "12:00")
+    pm.get_playlist("Morning").add_plugin(
+        {
+            "plugin_id": "clock",
+            "name": "Kitchen Clock",
+            "plugin_settings": {},
+            "refresh": {"interval": 300},
+            "latest_refresh_time": latest_refresh_time,
+        }
+    )
+    device_config_dev.write_config()
+
+
+def test_named_instance_page_has_no_default_save_button(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
+    """On an instance page "Save settings" posted to save_plugin_settings,
+    which writes ``clock_saved_settings`` into the Default playlist -- a second,
+    rotating copy -- instead of saving the instance. Only "Update instance"
+    should be offered there; the plain plugin page keeps "Save settings"."""
+    _seed_named_clock_instance(device_config_dev)
+
+    body = client.get("/plugin/clock?instance=Kitchen Clock").get_data(as_text=True)
+    assert 'data-plugin-action="update_instance"' in body
+    assert 'id="savePluginSettingsBtn"' not in body
+
+    body = client.get("/plugin/clock").get_data(as_text=True)
+    assert 'id="savePluginSettingsBtn"' in body
+
+
+def test_named_instance_page_last_refresh_is_instance_specific(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
+    """The "Last generated" stamp on an instance page comes from the
+    instance's own latest_refresh_time (the template's
+    ``plugin_instance_last_refresh`` was never populated)."""
+    stamp = "2026-03-09T20:55:00+00:00"
+    _seed_named_clock_instance(device_config_dev, latest_refresh_time=stamp)
+
+    body = client.get("/plugin/clock?instance=Kitchen Clock").get_data(as_text=True)
+    assert f'lastRefresh: "{stamp}"' in body

@@ -9,6 +9,7 @@
     buildProgressKey,
     ensureInlineValidationMessages,
     fadeSkeleton,
+    formatPreviewTimestamp,
     initScheduleFormState,
     setCurrentDisplayRefresh,
     setHidden,
@@ -44,7 +45,7 @@
       if (!value) return;
       config.lastRefresh = value;
       const instTimeEl = document.getElementById("instanceLastTime");
-      if (instTimeEl) instTimeEl.textContent = new Date(value).toLocaleString();
+      if (instTimeEl) instTimeEl.textContent = formatPreviewTimestamp(value);
     }
 
     function renderMetaBlock(metaDiv, metaContent, info) {
@@ -232,9 +233,8 @@
       try {
         const res = await fetch(config.refreshInfoUrl);
         const info = await res.json();
-        const ts = info?.refresh_time ? new Date(info.refresh_time) : null;
         const currTime = document.getElementById("currentDisplayTime");
-        if (currTime) currTime.textContent = ts ? ts.toLocaleString() : "—";
+        if (currTime) currTime.textContent = formatPreviewTimestamp(info?.refresh_time);
         const pluginRefreshTime =
           info?.plugin_id === config.pluginId ? info.refresh_time : null;
         if (pluginRefreshTime) {
@@ -451,9 +451,7 @@
     function initStatusBar() {
       const instTimeEl = document.getElementById("instanceLastTime");
       if (instTimeEl) {
-        instTimeEl.textContent = config.lastRefresh
-          ? new Date(config.lastRefresh).toLocaleString()
-          : "—";
+        instTimeEl.textContent = formatPreviewTimestamp(config.lastRefresh);
       }
       refreshPreviewImage();
       refreshInstancePreview();
