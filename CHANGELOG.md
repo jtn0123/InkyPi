@@ -2,6 +2,21 @@
 
 <!-- version list -->
 
+## v1.6.0 (2026-11-05)
+
+### Bug Fixes
+
+- **render**: Polish e-ink output across panel sizes
+  ([#692](https://github.com/jtn0123/InkyPi/pull/692),
+  [`9075613`](https://github.com/jtn0123/InkyPi/commit/907561398f31603ef7c1428e7599635fcd744afd))
+
+### Features
+
+- **ai_image**: Add GPT Image 2.6 Flare and Sunburst, default to Flare
+  ([#696](https://github.com/jtn0123/InkyPi/pull/696),
+  [`3ad1f1b`](https://github.com/jtn0123/InkyPi/commit/3ad1f1bdc1fb1ee78ef02f8293cb044f522a81bd))
+
+
 ## v1.5.0 (2026-11-05)
 
 ### Bug Fixes
