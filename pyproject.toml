@@ -13,7 +13,7 @@ dependencies = [
   "requests>=2.32,<3",
   "urllib3>=2.0,<3",
   "werkzeug>=3.1,<4",
-  "pillow>=11.0,<13",
+  "pillow>=13.0,<14",
   "pi-heif==1.4.0",
   "tzdata>=2024.1",
   "openai>=3.0,<4",
