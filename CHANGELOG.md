@@ -2,6 +2,35 @@
 
 <!-- version list -->
 
+## v1.5.0 (2026-11-05)
+
+### Bug Fixes
+
+- **display**: Re-create the Waveshare driver when init fails after sleep
+  ([#689](https://github.com/jtn0123/InkyPi/pull/689),
+  [`7abc307`](https://github.com/jtn0123/InkyPi/commit/7abc307e3c1c83ebb9f3c5db2f051ad3d26f9524))
+
+- **weather**: Read Open-Meteo timestamps in the forecast location's zone
+  ([#688](https://github.com/jtn0123/InkyPi/pull/688),
+  [`9266f31`](https://github.com/jtn0123/InkyPi/commit/9266f319b538e217f8cbbf28fb036946c3d73307))
+
+### Documentation
+
+- Add ROADMAP and archive superseded planning docs
+  ([#693](https://github.com/jtn0123/InkyPi/pull/693),
+  [`dba649c`](https://github.com/jtn0123/InkyPi/commit/dba649c3231be0d07472d6ecf1b7a7d43b9620ab))
+
+### Features
+
+- Boot asset check, boot self-test and blackout kill switch (B9, B10, B12)
+  ([#691](https://github.com/jtn0123/InkyPi/pull/691),
+  [`8e024a8`](https://github.com/jtn0123/InkyPi/commit/8e024a8d3b8fb2d71bfc87d99d71c6644fbe4dea))
+
+- **update**: Pre-flight abort gates before the updater changes anything
+  ([#690](https://github.com/jtn0123/InkyPi/pull/690),
+  [`645b4c8`](https://github.com/jtn0123/InkyPi/commit/645b4c8f4a45ff7224d297578cfa4f323341c9bd))
+
+
 ## v1.4.17 (2026-11-05)
 
 ### Bug Fixes
