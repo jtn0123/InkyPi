@@ -2,6 +2,15 @@
 
 <!-- version list -->
 
+## v1.6.1 (2026-11-05)
+
+### Bug Fixes
+
+- **ui**: Dogfood polish with real data — mobile playlist rows, history actions, instance pages,
+  header encoding ([#695](https://github.com/jtn0123/InkyPi/pull/695),
+  [`236619c`](https://github.com/jtn0123/InkyPi/commit/236619c60f8066fdb5cad2c4ff372c83fe4aee04))
+
+
 ## v1.6.0 (2026-11-05)
 
 ### Bug Fixes
