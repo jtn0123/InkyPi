@@ -2,6 +2,21 @@
 
 <!-- version list -->
 
+## v1.4.17 (2026-11-05)
+
+### Bug Fixes
+
+- **deps**: Bump Pillow to 13 and patch vulnerable dependencies
+  ([#694](https://github.com/jtn0123/InkyPi/pull/694),
+  [`e825a20`](https://github.com/jtn0123/InkyPi/commit/e825a20b7e7367915f744b09c39d53944814ef2d))
+
+### Continuous Integration
+
+- Run browser journeys and a11y suites and fix nightly jobs
+  ([#682](https://github.com/jtn0123/InkyPi/pull/682),
+  [`690e2e4`](https://github.com/jtn0123/InkyPi/commit/690e2e46381af9e02910ea57e8f2bafc684bcead))
+
+
 ## v1.4.16 (2026-10-03)
 
 ### Bug Fixes
