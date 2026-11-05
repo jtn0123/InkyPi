@@ -73,4 +73,4 @@ The JSON body will appear in the notification body.
 
 Use a Slack incoming webhook URL.  Note that Slack expects a `text` field;
 you may need a small intermediary (e.g. a free-tier serverless function or
-[Make](https://make.com)) to transform the InkyPi payload into Slack's format.
+[Make webhooks](https://help.make.com/webhooks)) to transform the InkyPi payload into Slack's format.

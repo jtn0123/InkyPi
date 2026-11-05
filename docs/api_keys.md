@@ -63,7 +63,7 @@ Required for the APOD Plugin
 Required for the Unsplash Plugin
  
 - Register an account from https://unsplash.com/developers 
-- Go to https://unsplash.com/oauth/applications 
+- Go to the public [Unsplash developer portal](https://unsplash.com/developers), sign in, and open your applications 
 - Create an app and open it
 - Your KEY is listed as `Access Key`
 - Store your api key in the .env file with the key `UNSPLASH_ACCESS_KEY`
