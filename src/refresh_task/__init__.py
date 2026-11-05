@@ -5,6 +5,7 @@ continue to work without changes.
 """
 
 from refresh_task.actions import (
+    DisplayCommand,
     ManualRefresh,
     ManualUpdateRequest,
     PlaylistRefresh,
@@ -24,6 +25,7 @@ __all__ = [
     "RefreshContext",
     "RefreshTask",
     "RefreshAction",
+    "DisplayCommand",
     "ManualRefresh",
     "PlaylistRefresh",
     "ManualUpdateRequest",

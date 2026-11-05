@@ -17,6 +17,7 @@ from flask import (
     send_from_directory,
 )
 
+from utils import blackout
 from utils.display_names import (
     friendly_instance_label,
     instance_suffix_label,
@@ -217,6 +218,7 @@ def main_page() -> Any:
         playlists=playlist_manager.playlists,
         active_playlist_name=playlist_manager.active_playlist,
         device_cycle_minutes=device_cycle_minutes,
+        blackout=blackout.get_state(device_config),
         active_nav="dashboard",
     )
 

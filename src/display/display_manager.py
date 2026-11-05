@@ -320,6 +320,52 @@ class DisplayManager:
             "display_driver": self.display.__class__.__name__,
         }
 
+    def show_system_image(
+        self, image: Image.Image, *, preprocessed: bool = False
+    ) -> dict[str, int | str]:
+        """Push a system frame (blackout blank, self-test pattern) to the panel.
+
+        Unlike :meth:`display_image` this skips the preview files and the
+        history: a white blackout frame or a test pattern is not "what the
+        display is showing" in any sense the dashboard or history should
+        remember. *image* must already be at the panel resolution; pass
+        ``preprocessed=True`` for a frame that already went through the normal
+        pipeline (the saved processed image), so it is not inverted twice.
+
+        The dedup hash is cleared afterwards so the next real refresh is never
+        skipped as "unchanged" just because it matches the frame from before
+        the system image.
+
+        Raises whatever the display driver raises.
+        """
+        if not preprocessed and self.device_config.get_config("inverted_image"):
+            image = image.rotate(180)
+        display_t0 = perf_counter()
+        try:
+            self.display.display_image(image, [])
+        finally:
+            with self._hash_lock:
+                self._last_image_hash = None
+        return {
+            "display_ms": int((perf_counter() - display_t0) * 1000),
+            "display_driver": self.display.__class__.__name__,
+        }
+
+    def restore_last_frame(self) -> dict[str, int | str] | None:
+        """Re-push the last processed frame after a system image covered it.
+
+        Returns ``None`` when there is no saved frame to restore (fresh
+        install), leaving the panel as it is until the next refresh.
+        """
+        from PIL import Image
+
+        path = getattr(self.device_config, "processed_image_file", None)
+        if not isinstance(path, str) or not os.path.isfile(path):
+            return None
+        with Image.open(path) as img:
+            frame = img.copy()
+        return self.show_system_image(frame, preprocessed=True)
+
     def display_preprocessed_image(self, image_path: str) -> dict[str, int | str]:
         """Display an already-processed image file without applying transforms again."""
         from PIL import Image

@@ -13,7 +13,12 @@ from uuid import uuid4
 from model import PlaylistManager, RefreshInfo
 from plugins.plugin_registry import get_plugin_instance
 from refresh_task import recorder as refresh_recorder
-from refresh_task.actions import ManualUpdateRequest, PlaylistRefresh, RefreshAction
+from refresh_task.actions import (
+    DisplayCommand,
+    ManualUpdateRequest,
+    PlaylistRefresh,
+    RefreshAction,
+)
 from refresh_task.context import RefreshContext
 from refresh_task.display_pipeline import DisplayPipeline
 from refresh_task.executor import RefreshExecutor
@@ -24,7 +29,7 @@ from refresh_task.worker import (
     _get_mp_context,
     sweep_orphan_render_tempfiles,
 )
-from utils import crash_breadcrumb
+from utils import blackout, crash_breadcrumb
 from utils.image_utils import compute_image_hash
 from utils.output_validator import OutputDimensionMismatch, validate_image_dimensions
 from utils.progress import ProgressTracker, track_progress
@@ -357,6 +362,11 @@ class RefreshTask:
                     break
 
                 playlist_manager, latest_refresh, current_dt, manual_request = result
+                if self._handle_special_request(manual_request):
+                    continue
+                if manual_request is None and blackout.is_active(self.device_config):
+                    logger.info("Blackout active; skipping scheduled refresh")
+                    continue
                 refresh_action, request_id = self._select_refresh_action(
                     playlist_manager, latest_refresh, current_dt, manual_request
                 )
@@ -400,6 +410,103 @@ class RefreshTask:
                 logger.exception("Exception during refresh")
                 if result is not None:
                     self._complete_manual_request(result[-1], exception=e)
+
+    # ------------------------------------------------------------------
+    # Display commands and blackout
+    # ------------------------------------------------------------------
+
+    def _handle_special_request(
+        self, manual_request: ManualUpdateRequest | None
+    ) -> bool:
+        """Run a display command, or refuse a refresh during blackout.
+
+        Returns True when *manual_request* was fully handled here and the loop
+        should go back to waiting.
+        """
+        if manual_request is None:
+            return False
+        action = manual_request.refresh_action
+        if isinstance(action, DisplayCommand):
+            self._run_display_command_request(manual_request, action)
+            return True
+        if blackout.is_active(self.device_config):
+            # Queued before blackout began; refuse rather than paint over it.
+            self._complete_manual_request(
+                manual_request, exception=blackout.BlackoutActiveError()
+            )
+            return True
+        return False
+
+    def _run_display_command_request(
+        self, manual_request: ManualUpdateRequest, command: DisplayCommand
+    ) -> None:
+        """Execute *command* on this (the refresh) thread and complete it."""
+        self._work_started_at = monotonic()
+        try:
+            with crash_breadcrumb.trail("display_command", command=command.name):
+                result = command.run(self.display_manager)
+        except Exception as exc:  # noqa: BLE001 — reported to the caller
+            logger.warning(
+                "Display command %s failed: %s", command.name, exc, exc_info=True
+            )
+            self._complete_manual_request(manual_request, exception=exc)
+        else:
+            self._complete_manual_request(
+                manual_request, metrics=dict(result) if result else {}
+            )
+        finally:
+            self._work_started_at = None
+            self._watchdog_stall_logged = False
+
+    def run_display_command(
+        self,
+        name: str,
+        run: Callable[[Any], Mapping[str, object] | None],
+        timeout: float = 180.0,
+        wait: bool = True,
+    ) -> dict[str, Any]:
+        """Run *run(display_manager)* on the refresh thread and wait for it.
+
+        Serialising through the loop keeps system frames (blackout blank,
+        self-test pattern) from interleaving with a plugin's display write.
+        When the loop is not running (web-only mode, run-once) nothing else
+        can be driving the panel, so the command runs inline.
+
+        With ``wait=False`` the command is queued and this returns ``{}`` at
+        once; a failure is then only logged (by the loop). That suits request
+        handlers, which should not sit on a ~30 s e-paper write.
+
+        Raises:
+            Whatever *run* raised, or ``TimeoutError`` if the loop did not get
+            to the command within *timeout* seconds.
+        """
+        if not self.running:
+            result = run(self.display_manager)
+            return dict(result) if result else {}
+
+        command = DisplayCommand(name, run)
+        request = ManualUpdateRequest(str(uuid4()), command)
+        with self.condition:
+            queue = self.manual_update_requests
+            if queue.maxlen is not None and len(queue) >= queue.maxlen:
+                # A full deque would silently evict the oldest waiter.
+                raise RuntimeError("Refresh queue is full; try again shortly")
+            queue.append(request)
+            self.condition.notify_all()
+        if not wait:
+            return {}
+        if not request.done.wait(timeout=max(0.0, timeout)):
+            with self.condition:
+                try:
+                    self.manual_update_requests.remove(request)
+                except ValueError:
+                    pass  # already picked up; it will finish on its own
+            raise TimeoutError(
+                f"Display command '{name}' did not complete within {timeout:.0f}s"
+            )
+        if request.exception is not None:
+            raise request.exception
+        return dict(request.metrics or {})
 
     # ------------------------------------------------------------------
     # History cleanup
@@ -1117,6 +1224,8 @@ class RefreshTask:
                 "Background refresh task is not running, unable to do a manual update"
             )
             return None
+        if blackout.is_active(self.device_config):
+            raise blackout.BlackoutActiveError
 
         request = self._enqueue_manual_request(refresh_action)
 
