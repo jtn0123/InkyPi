@@ -57,6 +57,10 @@ jobs:
         with:
           path: /tmp/bench-baseline.json
           key: benchmark-baseline-${{ runner.os }}-py3.13
+          # Fall back to the previous interpreter's baseline until main
+          # records a py3.13 one; the committed baseline is from faster hardware.
+          restore-keys: |
+            benchmark-baseline-${{ runner.os }}-
       - name: Run perf benchmarks
         env:
           SKIP_BROWSER: '1'
