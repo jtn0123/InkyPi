@@ -38,7 +38,7 @@ uv --no-config pip compile --universal --python-version 3.11 --fork-strategy few
 Use `--upgrade-package <name>` instead of `--upgrade` for a targeted refresh.
 `--no-config` keeps dev compilation independent of the runtime ARM32 Pi wheel
 requirements in `pyproject.toml`: Playwright only supports desktop/64-bit Linux
-developer hosts. Runtime resolution retains all Pi targets. uv 0.12.21 is pinned
+developer hosts. Runtime resolution retains all Pi targets. uv 0.13.4 is pinned
 in the dev input and CI/release compiler steps for consistent resolution.
 
 A platform-specific pip-compile run omits conditional dependencies and must not
