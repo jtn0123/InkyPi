@@ -530,3 +530,56 @@ cleanup_wheelhouse() {
     WHEELHOUSE_DIR=""
   fi
 }
+
+# ---------------------------------------------------------------------------
+# Update pre-flight gates (review item B4)
+#
+# run_update_preflight <python> <_preflight.py args...>
+#
+# Runs install/_preflight.py, which checks free disk, VERSION, device config
+# schema validity and the configured display driver — all read-only. Called by
+# do_update.sh before `git checkout` and by update.sh before the service is
+# stopped, so an abort leaves the device untouched.
+#
+# <python> is the app venv's interpreter (so `inky` / `jsonschema` resolve the
+# way they will at runtime); falls back to python3 when it is not executable.
+# On failure returns 1 and sets UPDATE_PREFLIGHT_REASON to the first reason,
+# which the caller folds into _current_step so the EXIT trap records it in
+# .last-update-failure and the settings UI shows it.
+# ---------------------------------------------------------------------------
+run_update_preflight() {
+  local python_bin="$1"
+  shift
+  local helper
+  helper="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/_preflight.py"
+  UPDATE_PREFLIGHT_REASON=""
+
+  if [ ! -x "$python_bin" ]; then
+    python_bin=$(command -v python3 2>/dev/null || true)
+  fi
+  if [ -z "$python_bin" ]; then
+    UPDATE_PREFLIGHT_REASON="no Python interpreter available to run pre-flight checks"
+    echo "PREFLIGHT FAIL: $UPDATE_PREFLIGHT_REASON" >&2
+    return 1
+  fi
+  if [ ! -f "$helper" ]; then
+    UPDATE_PREFLIGHT_REASON="pre-flight helper missing at $helper"
+    echo "PREFLIGHT FAIL: $UPDATE_PREFLIGHT_REASON" >&2
+    return 1
+  fi
+
+  echo "Running update pre-flight checks..."
+  local output rc=0
+  output=$("$python_bin" "$helper" "$@" 2>&1) || rc=$?
+  if [ "$rc" -eq 0 ]; then
+    printf '%s\n' "$output"
+    return 0
+  fi
+  printf '%s\n' "$output" >&2
+  UPDATE_PREFLIGHT_REASON=$(printf '%s\n' "$output" \
+    | sed -n 's/^PREFLIGHT FAIL: //p' | sed -n '1p')
+  if [ -z "$UPDATE_PREFLIGHT_REASON" ]; then
+    UPDATE_PREFLIGHT_REASON="pre-flight helper exited $rc"
+  fi
+  return 1
+}

@@ -261,13 +261,15 @@ in full — every guard in it exists because of a specific incident.
       *High — this is the difference between "recovers on its own" and "needs a
       keyboard".*
 
-- [ ] **B4 — Pre-flight abort gates in the updater.** `deploy.sh` hard-aborts
+- [x] **B4 — Pre-flight abort gates in the updater.** `deploy.sh` hard-aborts
       when the built image has an empty WiFi SSID, with the comment: *"A
       warning scrolled past in build output is not a gate; this is."* They
       bricked a device that way on 2026-08-01. Our equivalents: free disk
       before checkout, device config passes schema validation, the display
       driver for the configured panel is present, `VERSION` is readable.
-      *Medium.*
+      *Medium.* Done: `install/_preflight.py`, run by `do_update.sh` before
+      checkout (target `VERSION` via `git show`) and by `update.sh` before the
+      service stops; floor 500 MB, `INKYPI_UPDATE_MIN_FREE_MB` overrides.
 
 - [x] **B5 — Report unconfirmed vs rolled-back vs dark.** Follows from B2/B3;
       surface the three-way outcome in the settings UI and in

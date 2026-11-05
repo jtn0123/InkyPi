@@ -148,6 +148,9 @@ class TestDirtyGeneratedCssDoesNotBlockCheckout:
         css_dir.mkdir(parents=True)
         css_file = css_dir / "main.css"
         css_file.write_text("/* v1 css */\n")
+        # Every release tag carries a VERSION file; do_update.sh's pre-flight
+        # gate (B4) refuses a target tag without one.
+        (root / "VERSION").write_text("0.0.1\n")
         # Minimal install/update.sh that exits 0 so the exec at the end of
         # do_update.sh does not explode (we only care about the checkout
         # phase for this test).
@@ -276,6 +279,8 @@ class TestK2SafeDirectoryAndAutoStash:
         css_dir = root / "src" / "static" / "styles"
         css_dir.mkdir(parents=True)
         (css_dir / "main.css").write_text("/* v1 css */\n")
+        # Release tags carry a VERSION file (required by the B4 pre-flight).
+        (root / "VERSION").write_text("0.0.1\n")
         # Stub update.sh that exits 0 so do_update.sh's final exec is a no-op.
         install_dir = root / "install"
         install_dir.mkdir()

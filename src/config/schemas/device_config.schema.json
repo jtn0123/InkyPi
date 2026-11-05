@@ -6,7 +6,13 @@
   "additionalProperties": true,
   "properties": {
     "name": { "type": "string" },
-    "display_type": { "type": "string", "enum": ["mock", "inky", "waveshare"] },
+    "display_type": {
+      "type": "string",
+      "anyOf": [
+        { "enum": ["mock", "inky"] },
+        { "pattern": "^epd[A-Za-z0-9_]*in[A-Za-z0-9_]*$" }
+      ]
+    },
     "resolution": {
       "type": "array",
       "minItems": 2,
