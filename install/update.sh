@@ -584,6 +584,7 @@ if fetch_wheelhouse; then
   # already ensures binary wheels are preferred. We omit --only-binary=:all:
   # to avoid blocking packages that only exist as sdists in the wheelhouse.
   uv_extra_args+=(--find-links "$WHEELHOUSE_DIR")
+  PIP_REQUIREMENTS_FILE=$(wheelhouse_requirements "$PIP_REQUIREMENTS_FILE")
 fi
 
 # JTN-670 / JTN-605 parity: Install uv (Rust-based pip replacement) into the
