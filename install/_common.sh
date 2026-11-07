@@ -542,8 +542,41 @@ fetch_wheelhouse() {
   fi
 
   WHEELHOUSE_DIR="$extract_dir"
+  # Only a manifest that just verified every wheel may vouch for wheel hashes
+  # (see wheelhouse_requirements).
+  WHEELHOUSE_MANIFEST=""
+  if [ "$have_manifest" = "1" ]; then
+    WHEELHOUSE_MANIFEST="$tmp_manifest"
+  fi
   echo_success "  Pre-built wheelhouse ready at $WHEELHOUSE_DIR"
   return 0
+}
+
+# wheelhouse_requirements <requirements.txt>
+#
+# Prints the requirements file the installer should use. requirements.txt pins
+# PyPI's hashes, so under --require-hashes the wheels CI built for the Pi
+# (numpy/Pillow/cffi linux_armv7l, which PyPI doesn't publish) were rejected and
+# everything compiled from source — enough to exhaust a Pi Zero 2 W and trip the
+# hardware watchdog mid-update. When fetch_wheelhouse verified a manifest, this
+# writes a copy that also accepts those manifest hashes; otherwise it prints the
+# original path unchanged. Hash enforcement stays on either way.
+wheelhouse_requirements() {
+  local req="$1"
+  if [ -z "${WHEELHOUSE_MANIFEST:-}" ] || [ ! -s "$WHEELHOUSE_MANIFEST" ] \
+      || [ -z "${WHEELHOUSE_DIR:-}" ]; then
+    printf '%s\n' "$req"
+    return 0
+  fi
+  local out count
+  out="$(dirname "$WHEELHOUSE_DIR")/$(basename "$req" .txt).wheelhouse.txt"
+  if count=$(python3 "$SCRIPT_DIR/_wheelhouse_hashes.py" "$req" "$WHEELHOUSE_MANIFEST" "$out" 2>/dev/null); then
+    echo "  Wheelhouse hashes accepted for ${count} pinned packages." >&2
+    printf '%s\n' "$out"
+  else
+    echo "  Could not merge wheelhouse hashes — using PyPI hashes only." >&2
+    printf '%s\n' "$req"
+  fi
 }
 
 cleanup_wheelhouse() {
@@ -551,6 +584,7 @@ cleanup_wheelhouse() {
     # Remove the parent mktemp dir (contains wheelhouse + tarball + sha).
     rm -rf "$(dirname "$WHEELHOUSE_DIR")"
     WHEELHOUSE_DIR=""
+    WHEELHOUSE_MANIFEST=""
   fi
 }
 

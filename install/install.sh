@@ -499,6 +499,11 @@ create_venv(){
     # pip's --prefer-binary but stricter — uv resolves from a static mapping).
     uv_extra_args+=(--find-links "$WHEELHOUSE_DIR")
   fi
+  # Shadow the global for this function only: the verified wheelhouse may add
+  # its wheel hashes (see wheelhouse_requirements in _common.sh).
+  local wheelhouse_req
+  wheelhouse_req=$(wheelhouse_requirements "$PIP_REQUIREMENTS_FILE")
+  local PIP_REQUIREMENTS_FILE="$wheelhouse_req"
 
   # JTN-605: Install uv (Rust-based pip replacement from the ruff team) into the
   # venv. uv's resolver uses ~10-20 MB peak vs pip's ~100-150 MB, and installs
