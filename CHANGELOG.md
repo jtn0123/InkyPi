@@ -2,6 +2,21 @@
 
 <!-- version list -->
 
+## v1.7.1 (2026-11-07)
+
+### Bug Fixes
+
+- **install**: Accept verified wheelhouse wheels under --require-hashes
+  ([#698](https://github.com/jtn0123/InkyPi/pull/698),
+  [`5a86de5`](https://github.com/jtn0123/InkyPi/commit/5a86de5e620b6762dfab3ad60109a77b3784f051))
+
+### Continuous Integration
+
+- **bench**: Don't enforce relative timings across different runner CPUs
+  ([#699](https://github.com/jtn0123/InkyPi/pull/699),
+  [`4a9917f`](https://github.com/jtn0123/InkyPi/commit/4a9917f121d81b8088af00f873fe2ced80bd58ac))
+
+
 ## v1.7.0 (2026-11-05)
 
 ### Features
