@@ -4,6 +4,13 @@
 Exit 0 if all benchmarks are within the allowed regression threshold.
 Exit 1 if any benchmark regressed beyond the threshold.
 
+Timings are only comparable on the same CPU. GitHub's hosted runners mix
+Intel Xeon and several AMD EPYC models, and a cached baseline from one model
+made unrelated PRs fail by 40-140% on another. When both files record a CPU
+model and they differ, the timing comparison is reported but not enforced
+(a benchmark missing from the current run still fails); the absolute budgets
+in ``scripts/perf_budget_gate.py`` keep guarding real regressions.
+
 Usage:
     python scripts/benchmark_compare.py \
         --baseline tests/benchmarks/baseline.json \
@@ -27,6 +34,15 @@ def load_benchmarks(path: str) -> dict[str, float]:
     with open(path) as f:
         data = json.load(f)
     return {b["name"]: b["stats"]["median"] for b in data["benchmarks"]}
+
+
+def cpu_model(path: str) -> str | None:
+    """Return the CPU model pytest-benchmark recorded, if any."""
+    with open(path) as f:
+        data = json.load(f)
+    cpu = data.get("machine_info", {}).get("cpu", {})
+    model = cpu.get("brand_raw") if isinstance(cpu, dict) else None
+    return model.strip() if isinstance(model, str) and model.strip() else None
 
 
 def compare(
@@ -97,6 +113,18 @@ def main() -> int:
         return 1
 
     failures = compare(baseline, current, threshold)
+
+    base_cpu, cur_cpu = cpu_model(args.baseline), cpu_model(args.current)
+    if base_cpu and cur_cpu and base_cpu != cur_cpu:
+        missing = [f for f in failures if "missing in current run" in f]
+        print()
+        print(f"NOTE: runner CPU differs from the baseline ({base_cpu} -> {cur_cpu});")
+        print("      timings are not comparable, so regressions are not enforced.")
+        if missing:
+            print(f"FAILED: {len(missing)} benchmark(s) missing from the current run")
+            return 1
+        print("SKIPPED: relative regression check (different CPU)")
+        return 0
 
     print()
     if failures:
