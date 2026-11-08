@@ -465,6 +465,8 @@ def test_rendered_plugin_page_carries_restrictive_csp() -> None:
         assert directives[name] == "'none'", name
     for name in ("object-src", "frame-src", "worker-src"):
         assert directives[name] == "'none'", name
+    # No remote images: RSS thumbnails are fetched server-side (E2).
+    assert directives["img-src"].split() == ["file:", "data:", "blob:"]
     # Scripts: inline + local files + the SRI-pinned Chart.js CDN only.
     assert directives["script-src"].split() == [
         "'unsafe-inline'",

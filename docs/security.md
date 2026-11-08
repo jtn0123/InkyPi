@@ -1,5 +1,43 @@
 # Security
 
+## Allowed Host names (DNS-rebinding protection)
+
+Every request must name this device in its `Host` header, otherwise InkyPi
+answers `400 Invalid host`. This stops DNS rebinding, where a web page you
+visit points its own domain at the Pi's LAN address so it can read and post to
+the InkyPi UI as if it were the same site. The check is always on, with or
+without a PIN and the HTTPS profile.
+
+Accepted without configuration (case-insensitive, any port):
+
+- any IPv4 or IPv6 address literal, such as `192.168.1.42`, `127.0.0.1` or
+  `[::1]:8080`
+- `localhost`, `inkypi` and `inkypi.local`
+- the Pi's own hostname from `hostname`, bare and with `.local` (for a Pi
+  named `kitchen`, `kitchen` and `kitchen.local`)
+
+Any other name you use to reach the Pi, such as a DNS name on your router, a
+reverse-proxy hostname or a Tailscale MagicDNS name, must be added to
+`INKYPI_ALLOWED_HOSTS` in the service environment file described in
+[auth.md](auth.md). The value is a comma-separated list, without ports, and
+adds to the defaults above:
+
+```ini
+INKYPI_ALLOWED_HOSTS=inkypi.home.arpa,frame.example.com
+```
+
+Restart the service after changing it. The same list decides which hosts the
+HTTPS profile redirects (see [auth.md](auth.md)).
+
+## Sessions
+
+With a PIN configured, a login lasts at most 30 days and ends as soon as the
+PIN changes, even if the browser keeps its cookie. Restarting InkyPi with the
+same PIN and `SECRET_KEY` keeps existing logins. Set
+`INKYPI_SESSION_MAX_AGE_DAYS` (a positive number, fractions allowed) to change
+the lifetime. Webhook notifications log only the scheme and host of each
+webhook URL, never the path or query that carries its token.
+
 ## Remote-page rendering
 
 The Screenshot plugin accepts public HTTP/HTTPS websites. Its Chromium process
@@ -46,6 +84,17 @@ host.
 RSS and Calendar downloads are streamed with a size cap: 5 MB for a feed and
 10 MB for an `.ics` file. Larger responses fail the refresh and nothing is
 rendered from them.
+
+RSS item images (`media:content`, `media:thumbnail`, enclosures) are fetched
+by InkyPi through the same guard, never by the rendering browser. Only the
+items that are rendered (at most 10) are fetched, each capped at 2 MB and
+25 megapixels within a 20-second total budget. Each image is re-encoded
+as a small JPEG and embedded in the page. An image that fails the guard,
+times out or does not decode is left out; the story still renders. The local
+template renderer's Content-Security-Policy allows only `file:`, `data:` and
+`blob:` images, so a template cannot make Chromium load a remote image.
+Third-party plugin templates that referenced remote `<img>` URLs must fetch
+them in Python the same way.
 
 ### Feeds on your local network (opt-in)
 

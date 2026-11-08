@@ -85,6 +85,20 @@ def test_csp_nonce_present_and_unique_per_request(
     ), "CSP nonce must be unique per request"
 
 
+def test_default_csp_blocks_base_object_and_foreign_framing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Grade report E4: base-uri, object-src and frame-ancestors are pinned."""
+    mod = _reload_inkypi(monkeypatch, env={"INKYPI_CSP_REPORT_ONLY": "0"})
+    client = mod.app.test_client()
+    csp = client.get("/healthz").headers.get("Content-Security-Policy", "")
+    directives = {d.strip().split(" ", 1)[0]: d.strip() for d in csp.split(";")}
+    assert directives["base-uri"] == "base-uri 'none'"
+    assert directives["object-src"] == "object-src 'none'"
+    assert directives["frame-ancestors"] == "frame-ancestors 'self'"
+    assert directives["report-uri"] == "report-uri /api/csp-report"
+
+
 def test_csp_nonce_not_injected_when_custom_csp_set(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
