@@ -91,7 +91,7 @@ def _skip_reason(
             return reason
 
     monkeypatch.setattr(
-        "refresh_task.task.get_plugin_instance", lambda _cfg: FakePlugin()
+        "refresh_task.plugin_lookup.get_plugin_instance", lambda _cfg: FakePlugin()
     )
     if action is None:
         action = PlaylistRefresh(_FakePlaylist(), _FakeInstance(settings))
@@ -191,7 +191,7 @@ class TestSkipDecision:
                 seen.update(settings)
 
         monkeypatch.setattr(
-            "refresh_task.task.get_plugin_instance", lambda _cfg: FakePlugin()
+            "refresh_task.plugin_lookup.get_plugin_instance", lambda _cfg: FakePlugin()
         )
         action = PlaylistRefresh(_FakePlaylist(), _FakeInstance({"team": "ABC"}))
         task._skip_display_reason(action, {"id": "demo"}, datetime.now(UTC))

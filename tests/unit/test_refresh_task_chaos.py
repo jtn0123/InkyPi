@@ -144,7 +144,7 @@ class TestSubprocessHangTimeout:
                 return None
 
         monkeypatch.setattr(
-            "refresh_task.task.get_plugin_instance",
+            "refresh_task.plugin_lookup.get_plugin_instance",
             lambda cfg: HangingPlugin(),
         )
 
@@ -184,7 +184,7 @@ class TestSubprocessHangTimeout:
                 return None
 
         monkeypatch.setattr(
-            "refresh_task.task.get_plugin_instance",
+            "refresh_task.plugin_lookup.get_plugin_instance",
             lambda cfg: HangingPlugin(),
         )
 
@@ -290,7 +290,7 @@ class TestDisplayManagerFailure:
                 return None
 
         monkeypatch.setattr(
-            "refresh_task.task.get_plugin_instance",
+            "refresh_task.plugin_lookup.get_plugin_instance",
             lambda cfg: GoodPlugin(),
         )
 
@@ -327,7 +327,7 @@ class TestDisplayManagerFailure:
                 return None
 
         monkeypatch.setattr(
-            "refresh_task.task.get_plugin_instance",
+            "refresh_task.plugin_lookup.get_plugin_instance",
             lambda cfg: GoodPlugin(),
         )
 
@@ -376,7 +376,7 @@ class TestDisplayManagerFailure:
                 return None
 
         monkeypatch.setattr(
-            "refresh_task.task.get_plugin_instance",
+            "refresh_task.plugin_lookup.get_plugin_instance",
             lambda cfg: GoodPlugin(),
         )
 
@@ -440,7 +440,7 @@ class TestConfigReloadMidRefresh:
                 return None
 
         monkeypatch.setattr(
-            "refresh_task.task.get_plugin_instance",
+            "refresh_task.plugin_lookup.get_plugin_instance",
             lambda cfg: ReloadingPlugin(),
         )
 
@@ -487,7 +487,7 @@ class TestConfigReloadMidRefresh:
                 return None
 
         monkeypatch.setattr(
-            "refresh_task.task.get_plugin_instance",
+            "refresh_task.plugin_lookup.get_plugin_instance",
             lambda cfg: WriteRacingPlugin(),
         )
 

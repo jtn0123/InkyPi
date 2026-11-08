@@ -95,7 +95,9 @@ def test_single_plugin_failure_doesnt_crash_task(
 
     monkeypatch.setattr(device_config_dev, "get_plugin", get_plugin)
     monkeypatch.setattr(
-        "refresh_task.task.get_plugin_instance", get_plugin_instance, raising=True
+        "refresh_task.plugin_lookup.get_plugin_instance",
+        get_plugin_instance,
+        raising=True,
     )
 
     try:
@@ -148,7 +150,9 @@ def test_multiple_plugins_concurrent_execution_with_failures(
 
     monkeypatch.setattr(device_config_dev, "get_plugin", get_plugin)
     monkeypatch.setattr(
-        "refresh_task.task.get_plugin_instance", get_plugin_instance, raising=True
+        "refresh_task.plugin_lookup.get_plugin_instance",
+        get_plugin_instance,
+        raising=True,
     )
 
     try:
@@ -226,7 +230,9 @@ def test_plugin_failure_doesnt_affect_subsequent_plugins(
 
     monkeypatch.setattr(device_config_dev, "get_plugin", get_plugin)
     monkeypatch.setattr(
-        "refresh_task.task.get_plugin_instance", get_plugin_instance, raising=True
+        "refresh_task.plugin_lookup.get_plugin_instance",
+        get_plugin_instance,
+        raising=True,
     )
 
     try:
@@ -272,7 +278,9 @@ def test_plugin_timeout_isolation(
 
     monkeypatch.setattr(device_config_dev, "get_plugin", get_plugin)
     monkeypatch.setattr(
-        "refresh_task.task.get_plugin_instance", get_plugin_instance, raising=True
+        "refresh_task.plugin_lookup.get_plugin_instance",
+        get_plugin_instance,
+        raising=True,
     )
 
     try:
@@ -333,7 +341,9 @@ def test_plugin_exception_message_is_preserved(
 
     monkeypatch.setattr(device_config_dev, "get_plugin", lambda pid: dummy_cfg)
     monkeypatch.setattr(
-        "refresh_task.task.get_plugin_instance", lambda cfg: custom_plugin, raising=True
+        "refresh_task.plugin_lookup.get_plugin_instance",
+        lambda cfg: custom_plugin,
+        raising=True,
     )
 
     try:
@@ -373,7 +383,9 @@ def test_plugin_state_isolation(
 
     monkeypatch.setattr(device_config_dev, "get_plugin", get_plugin)
     monkeypatch.setattr(
-        "refresh_task.task.get_plugin_instance", get_plugin_instance, raising=True
+        "refresh_task.plugin_lookup.get_plugin_instance",
+        get_plugin_instance,
+        raising=True,
     )
 
     dm = DisplayManager(device_config_dev)
@@ -434,7 +446,7 @@ def test_plugin_resource_cleanup_on_failure(
 
     monkeypatch.setattr(device_config_dev, "get_plugin", lambda pid: dummy_cfg)
     monkeypatch.setattr(
-        "refresh_task.task.get_plugin_instance",
+        "refresh_task.plugin_lookup.get_plugin_instance",
         lambda cfg: tracking_plugin,
         raising=True,
     )
@@ -469,7 +481,9 @@ def test_concurrent_plugin_calls_dont_interfere(
     dummy_cfg = {"id": "good", "class": "Good"}
     monkeypatch.setattr(device_config_dev, "get_plugin", lambda pid: dummy_cfg)
     monkeypatch.setattr(
-        "refresh_task.task.get_plugin_instance", lambda cfg: good_plugin, raising=True
+        "refresh_task.plugin_lookup.get_plugin_instance",
+        lambda cfg: good_plugin,
+        raising=True,
     )
 
     try:

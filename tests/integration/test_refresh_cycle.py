@@ -169,7 +169,7 @@ def test_refresh_cycle_handles_plugin_failure(
         raise RuntimeError("Simulated plugin crash")
 
     monkeypatch.setattr(
-        "refresh_task.task.get_plugin_instance",
+        "refresh_task.plugin_lookup.get_plugin_instance",
         lambda cfg: type(
             "BadPlugin",
             (),
@@ -248,7 +248,7 @@ def test_refresh_cycle_advances_playlist(
 
     # Route get_plugin_instance to our fake plugin factory
     monkeypatch.setattr(
-        "refresh_task.task.get_plugin_instance",
+        "refresh_task.plugin_lookup.get_plugin_instance",
         lambda cfg: _make_fake_plugin(cfg["id"]),
         raising=True,
     )

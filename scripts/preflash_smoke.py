@@ -529,9 +529,9 @@ def run_soak_smoke() -> None:
         refresh_task = RefreshTask(device_config, display_manager)
         _force_inprocess_execution(refresh_task)
 
-        # The in-process executor resolves plugins through the name bound in
-        # refresh_task.task (refresh_task became a package), so patch it there.
-        import refresh_task.task as refresh_task_mod
+        # RefreshTask resolves plugins through refresh_task.plugin_lookup at
+        # call time, so patch the name there.
+        import refresh_task.plugin_lookup as refresh_task_mod
 
         plugin = SoakPlugin()
         original_get_plugin_instance = refresh_task_mod.get_plugin_instance

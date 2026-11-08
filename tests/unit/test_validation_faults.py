@@ -31,7 +31,7 @@ def test_benchmark_lock_does_not_wedge_manual_update(
         lambda plugin_id: {"id": plugin_id, "class": "Good"},
     )
     monkeypatch.setattr(
-        "refresh_task.task.get_plugin_instance",
+        "refresh_task.plugin_lookup.get_plugin_instance",
         lambda cfg: GoodPlugin(),
         raising=True,
     )
@@ -76,7 +76,7 @@ def test_plugin_failure_remains_actionable_and_task_recovers(
     current_plugin = {"instance": BrokenPlugin()}
 
     monkeypatch.setattr(
-        "refresh_task.task.get_plugin_instance",
+        "refresh_task.plugin_lookup.get_plugin_instance",
         lambda cfg: current_plugin["instance"],
         raising=True,
     )
