@@ -61,8 +61,10 @@ def test_eta_math_renders_expected(
 ) -> None:
     """Test ETA calculation via backend API endpoint (UI rendering was removed in upstream)."""
     monkeypatch.setattr("utils.time_utils.now_device_tz", _fixed_now, raising=True)
-    # Patch the imported alias used inside blueprints.playlist
-    monkeypatch.setattr("blueprints.playlist.now_device_tz", _fixed_now, raising=True)
+    # Patch the imported alias used by /playlist/eta (blueprints.playlist._display)
+    monkeypatch.setattr(
+        "blueprints.playlist._display.now_device_tz", _fixed_now, raising=True
+    )
     _prepare_playlist_state(device_config_dev)
 
     # Test the backend API endpoint instead of HTML rendering

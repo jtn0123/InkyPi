@@ -59,7 +59,7 @@ def _add_plugin_to_playlist(
 def test_safe_now_device_tz_falls_back_to_aware_utc(
     monkeypatch: pytest.MonkeyPatch,
 ) -> Any:
-    import blueprints.playlist as playlist_mod
+    import blueprints.playlist._display as playlist_mod
 
     class _FallbackDateTime:
         @staticmethod
@@ -1203,7 +1203,7 @@ class TestEtaCacheThreadSafety:
 
     def test_eta_cache_lock_exists(self) -> None:
         """Verify the lock is present at module level."""
-        import blueprints.playlist as pl_mod
+        import blueprints.playlist._display as pl_mod
 
         assert hasattr(pl_mod, "_eta_cache_lock")
         assert isinstance(pl_mod._eta_cache_lock, type(threading.Lock()))
@@ -1216,11 +1216,11 @@ class TestEtaCacheThreadSafety:
 
 class TestDefaultOverlapWarning:
     def test_returns_warning_when_overlapping_default(self) -> None:
-        from blueprints.playlist import _default_overlap_warning
+        from blueprints.playlist._schedule import _default_overlap_warning
         from model import Playlist
 
         playlists = [Playlist("Default", "00:00", "24:00")]
-        from blueprints.playlist import _to_minutes
+        from blueprints.playlist._schedule import _to_minutes
 
         result = _default_overlap_warning(
             _to_minutes("09:00"), _to_minutes("17:00"), playlists
@@ -1230,7 +1230,7 @@ class TestDefaultOverlapWarning:
         assert "priority" in result
 
     def test_returns_none_when_no_default(self) -> None:
-        from blueprints.playlist import _default_overlap_warning, _to_minutes
+        from blueprints.playlist._schedule import _default_overlap_warning, _to_minutes
         from model import Playlist
 
         playlists = [Playlist("Work", "09:00", "17:00")]
@@ -1240,7 +1240,7 @@ class TestDefaultOverlapWarning:
         assert result is None
 
     def test_returns_none_when_no_overlap(self) -> None:
-        from blueprints.playlist import _default_overlap_warning, _to_minutes
+        from blueprints.playlist._schedule import _default_overlap_warning, _to_minutes
         from model import Playlist
 
         playlists = [Playlist("Default", "09:00", "17:00")]

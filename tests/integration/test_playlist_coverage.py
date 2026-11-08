@@ -390,7 +390,7 @@ def test_playlist_eta_caching(client: FlaskClient, flask_app: Flask) -> None:
 
 def test_format_relative_time_no_timezone_assumes_utc() -> None:
     """Bug 13: Naive datetime without timezone should assume UTC, not raise."""
-    from blueprints.playlist import format_relative_time
+    from blueprints.playlist._pages import format_relative_time
 
     result = format_relative_time("2024-01-15T10:00:00")  # naive - no TZ
     assert isinstance(result, str)
@@ -399,7 +399,7 @@ def test_format_relative_time_no_timezone_assumes_utc() -> None:
 
 def test_format_relative_time_edge_boundaries() -> None:
     """Test boundary conditions for relative time formatting."""
-    from blueprints.playlist import format_relative_time
+    from blueprints.playlist._pages import format_relative_time
 
     now = datetime.now().astimezone()
 
