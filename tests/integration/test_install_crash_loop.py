@@ -83,6 +83,10 @@ REQUIRE_CRASH_LOOP_TEST = os.getenv("REQUIRE_INSTALL_CRASH_LOOP_TEST", "").lower
 
 pytestmark = [
     pytest.mark.container,
+    # The module fixture builds a systemd image (up to 300s) and the boot loop
+    # waits up to 180s; pytest-timeout counts fixture setup, so the global
+    # 120s limit in pytest.ini would cut legitimate runs short.
+    pytest.mark.timeout(900),
     pytest.mark.skipif(
         not REQUIRE_CRASH_LOOP_TEST and not _docker_available(),
         reason=(

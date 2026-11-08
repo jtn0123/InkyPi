@@ -3,16 +3,6 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="${SCRIPT_DIR}/.."
-cd "${REPO_ROOT}" || exit 1
-
-if [[ ! -f ".venv/bin/activate" || ! -x ".venv/bin/python" ]]; then
-    echo "FAIL venv      .venv is required; run 'scripts/venv.sh' first" >&2
-    exit 1
-fi
-
-# shellcheck source=/dev/null
-source ".venv/bin/activate"
-export PYTHONPATH="src${PYTHONPATH:+:$PYTHONPATH}"
 
 is_truthy() {
     case "${1:-}" in
@@ -35,13 +25,30 @@ status_skip() {
     printf 'SKIP %-10s %s\n' "$1" "$2"
 }
 
+# Run one phase in its own subshell with errexit enabled.
+#
+# Calling the phase as `if "$@"; then` (the old form) runs it in a context
+# where bash ignores `set -e` for every command inside it, even if the
+# function re-enables it, so a multi-command suite reported only the status
+# of its LAST command: a failing pytest run followed by a passing coverage
+# gate printed PASS. The subshell is started outside any conditional context
+# so its own `set -euo pipefail` applies, and it keeps phase-local exports
+# (e.g. INKYPI_PLUGIN_TIMEOUT_S) from leaking into later phases.
 run_phase() {
     local phase="$1"
     shift
-    if "$@"; then
+    local rc=0
+    set +e
+    (
+        set -euo pipefail
+        "$@"
+    )
+    rc=$?
+    set -e
+    if [[ "${rc}" -eq 0 ]]; then
         status_ok "${phase}" "ok"
     else
-        status_fail "${phase}" "failed"
+        status_fail "${phase}" "failed (exit ${rc})"
         return 1
     fi
 }
@@ -56,7 +63,9 @@ import_smoke_check() {
     local temp_dir
     local venv_python
     temp_dir="$(mktemp -d "${TMPDIR:-/tmp}/inkypi-import-smoke.XXXXXX")"
-    trap 'rm -rf "${temp_dir:-}"' RETURN
+    # EXIT, not RETURN: run_phase runs this in a subshell with errexit, so a
+    # failing command exits the subshell without ever returning.
+    trap 'rm -rf "${temp_dir:-}"' EXIT
 
     python3 -m venv "${temp_dir}/venv"
     venv_python="${temp_dir}/venv/bin/python"
@@ -118,10 +127,15 @@ coverage_suite() {
     rm -f coverage.xml
     export INKYPI_PLUGIN_ISOLATION=none
     export INKYPI_NO_HOT_RELOAD=1
+    # --cov-fail-under=0: this is a 14-file subset, so the global
+    # .coveragerc fail_under (sized for the full suite) would always fail it.
+    # scripts/coverage_gate.py below is the real per-file gate; genuine test
+    # failures in this run still fail the phase.
     python -m pytest \
         -q \
         --cov=src \
         --cov-branch \
+        --cov-fail-under=0 \
         --cov-report=xml:coverage.xml \
         tests/unit/test_display_manager.py \
         tests/unit/test_display_manager_coverage.py \
@@ -204,150 +218,169 @@ mutation_suite() {
     python scripts/mutation_check.py
 }
 
-run_phase "syntax" syntax_check
+main() {
+    cd "${REPO_ROOT}" || exit 1
 
-run_phase \
-    "pytest" \
-    python -m pytest -q \
-    tests/unit/test_display_manager.py \
-    tests/unit/test_config_resolution.py \
-    tests/unit/test_inkypi.py \
-    tests/unit/test_epdconfig.py
-
-run_phase "app-smoke" python scripts/preflash_smoke.py app
-run_phase "render-smoke" python scripts/preflash_smoke.py render
-
-if [[ "${INKYPI_VALIDATE_INSTALL:-0}" == "1" ]]; then
-    run_phase "imports" import_smoke_check
-else
-    status_skip "imports" "set INKYPI_VALIDATE_INSTALL=1 to run import smoke"
-fi
-
-if is_truthy "${INKYPI_VALIDATE_PI_RUNTIME:-0}"; then
-    if [[ "$(uname -s)" == "Linux" ]]; then
-        run_phase "pi-runtime" python scripts/preflash_smoke.py pi-runtime
-    else
-        status_skip "pi-runtime" "Linux-only runtime smoke"
+    if [[ ! -f ".venv/bin/activate" || ! -x ".venv/bin/python" ]]; then
+        echo "FAIL venv      .venv is required; run 'scripts/venv.sh' first" >&2
+        exit 1
     fi
-else
-    status_skip "pi-runtime" "set INKYPI_VALIDATE_PI_RUNTIME=1 to run Pi-like runtime smoke"
-fi
 
-if is_truthy "${INKYPI_VALIDATE_STRESS:-0}"; then
-    run_phase "stress" stress_suite
-else
-    status_skip "stress" "set INKYPI_VALIDATE_STRESS=1 to run low-memory stress lane"
-fi
+    # shellcheck source=/dev/null
+    source ".venv/bin/activate"
+    export PYTHONPATH="src${PYTHONPATH:+:$PYTHONPATH}"
 
-if is_truthy "${INKYPI_VALIDATE_HEAVY_PLUGINS:-0}"; then
-    run_phase "heavy" heavy_plugin_suite
-else
-    status_skip "heavy" "set INKYPI_VALIDATE_HEAVY_PLUGINS=1 to run heavy plugin lane"
-fi
+    run_phase "syntax" syntax_check
 
-if is_truthy "${INKYPI_VALIDATE_BENCH_THRESHOLDS:-0}"; then
-    run_phase "benchmarks" python scripts/preflash_smoke.py benchmarks
-else
-    status_skip "benchmarks" "set INKYPI_VALIDATE_BENCH_THRESHOLDS=1 to run benchmark assertions"
-fi
+    run_phase \
+        "pytest" \
+        python -m pytest -q \
+        tests/unit/test_display_manager.py \
+        tests/unit/test_config_resolution.py \
+        tests/unit/test_inkypi.py \
+        tests/unit/test_epdconfig.py
 
-if is_truthy "${INKYPI_VALIDATE_COLD_BOOT:-0}"; then
-    run_phase "cold-boot" python scripts/preflash_smoke.py cold-boot
-else
-    status_skip "cold-boot" "set INKYPI_VALIDATE_COLD_BOOT=1 to run cold-boot smoke"
-fi
+    run_phase "app-smoke" python scripts/preflash_smoke.py app
+    run_phase "render-smoke" python scripts/preflash_smoke.py render
 
-if is_truthy "${INKYPI_VALIDATE_CACHE:-0}"; then
-    run_phase "cache" python scripts/preflash_smoke.py cache
-else
-    status_skip "cache" "set INKYPI_VALIDATE_CACHE=1 to run cache correctness lane"
-fi
-
-if is_truthy "${INKYPI_VALIDATE_ISOLATION:-0}"; then
-    run_phase "isolation" isolation_suite
-else
-    status_skip "isolation" "set INKYPI_VALIDATE_ISOLATION=1 to run isolation lane"
-fi
-
-if is_truthy "${INKYPI_VALIDATE_BROWSER_RENDER:-0}"; then
-    if [[ "$(uname -s)" == "Linux" ]]; then
-        run_phase "browser" python scripts/preflash_smoke.py browser-render
+    if [[ "${INKYPI_VALIDATE_INSTALL:-0}" == "1" ]]; then
+        run_phase "imports" import_smoke_check
     else
-        status_skip "browser" "Linux-only browser render smoke"
+        status_skip "imports" "set INKYPI_VALIDATE_INSTALL=1 to run import smoke"
     fi
-else
-    status_skip "browser" "set INKYPI_VALIDATE_BROWSER_RENDER=1 to run browser/render smoke"
-fi
 
-if is_truthy "${INKYPI_VALIDATE_INSTALL_IDEMPOTENCY:-0}"; then
-    if [[ "$(uname -s)" == "Linux" ]]; then
-        run_phase "install-idem" python scripts/preflash_smoke.py install-idempotency
-        run_phase "install-tests" python -m pytest -q tests/unit/test_install_scripts.py
+    if is_truthy "${INKYPI_VALIDATE_PI_RUNTIME:-0}"; then
+        if [[ "$(uname -s)" == "Linux" ]]; then
+            run_phase "pi-runtime" python scripts/preflash_smoke.py pi-runtime
+        else
+            status_skip "pi-runtime" "Linux-only runtime smoke"
+        fi
     else
-        status_skip "install-idem" "Linux-only install/update idempotency lane"
+        status_skip "pi-runtime" "set INKYPI_VALIDATE_PI_RUNTIME=1 to run Pi-like runtime smoke"
     fi
-else
-    status_skip "install-idem" "set INKYPI_VALIDATE_INSTALL_IDEMPOTENCY=1 to run install/update idempotency lane"
-fi
 
-if is_truthy "${INKYPI_VALIDATE_FAULTS:-0}"; then
-    run_phase "faults" fault_suite
-else
-    status_skip "faults" "set INKYPI_VALIDATE_FAULTS=1 to run fault-injection lane"
-fi
+    if is_truthy "${INKYPI_VALIDATE_STRESS:-0}"; then
+        run_phase "stress" stress_suite
+    else
+        status_skip "stress" "set INKYPI_VALIDATE_STRESS=1 to run low-memory stress lane"
+    fi
 
-if is_truthy "${INKYPI_VALIDATE_UPGRADE_COMPAT:-0}"; then
-    run_phase "upgrade" upgrade_compat_suite
-else
-    status_skip "upgrade" "set INKYPI_VALIDATE_UPGRADE_COMPAT=1 to run upgrade compatibility lane"
-fi
+    if is_truthy "${INKYPI_VALIDATE_HEAVY_PLUGINS:-0}"; then
+        run_phase "heavy" heavy_plugin_suite
+    else
+        status_skip "heavy" "set INKYPI_VALIDATE_HEAVY_PLUGINS=1 to run heavy plugin lane"
+    fi
 
-if is_truthy "${INKYPI_VALIDATE_COVERAGE:-0}"; then
-    run_phase "coverage" coverage_suite
-else
-    status_skip "coverage" "set INKYPI_VALIDATE_COVERAGE=1 to run critical-path coverage gate"
-fi
+    if is_truthy "${INKYPI_VALIDATE_BENCH_THRESHOLDS:-0}"; then
+        run_phase "benchmarks" python scripts/preflash_smoke.py benchmarks
+    else
+        status_skip "benchmarks" "set INKYPI_VALIDATE_BENCH_THRESHOLDS=1 to run benchmark assertions"
+    fi
 
-if is_truthy "${INKYPI_VALIDATE_SECURITY:-0}"; then
-    run_phase "security" security_suite
-else
-    status_skip "security" "set INKYPI_VALIDATE_SECURITY=1 to run security and SBOM checks"
-fi
+    if is_truthy "${INKYPI_VALIDATE_COLD_BOOT:-0}"; then
+        run_phase "cold-boot" python scripts/preflash_smoke.py cold-boot
+    else
+        status_skip "cold-boot" "set INKYPI_VALIDATE_COLD_BOOT=1 to run cold-boot smoke"
+    fi
 
-if is_truthy "${INKYPI_VALIDATE_FLAKE:-0}"; then
-    run_phase "flake" flake_suite
-else
-    status_skip "flake" "set INKYPI_VALIDATE_FLAKE=1 to run flaky-test detection"
-fi
+    if is_truthy "${INKYPI_VALIDATE_CACHE:-0}"; then
+        run_phase "cache" python scripts/preflash_smoke.py cache
+    else
+        status_skip "cache" "set INKYPI_VALIDATE_CACHE=1 to run cache correctness lane"
+    fi
 
-if is_truthy "${INKYPI_VALIDATE_FS_PERMS:-0}"; then
-    run_phase "fs-perms" fs_permissions_suite
-else
-    status_skip "fs-perms" "set INKYPI_VALIDATE_FS_PERMS=1 to run filesystem-permission checks"
-fi
+    if is_truthy "${INKYPI_VALIDATE_ISOLATION:-0}"; then
+        run_phase "isolation" isolation_suite
+    else
+        status_skip "isolation" "set INKYPI_VALIDATE_ISOLATION=1 to run isolation lane"
+    fi
 
-if is_truthy "${INKYPI_VALIDATE_SOAK:-0}"; then
-    run_phase "soak" soak_suite
-else
-    status_skip "soak" "set INKYPI_VALIDATE_SOAK=1 to run soak validation"
-fi
+    if is_truthy "${INKYPI_VALIDATE_BROWSER_RENDER:-0}"; then
+        if [[ "$(uname -s)" == "Linux" ]]; then
+            run_phase "browser" python scripts/preflash_smoke.py browser-render
+        else
+            status_skip "browser" "Linux-only browser render smoke"
+        fi
+    else
+        status_skip "browser" "set INKYPI_VALIDATE_BROWSER_RENDER=1 to run browser/render smoke"
+    fi
 
-if is_truthy "${INKYPI_VALIDATE_RECOVERY:-0}"; then
-    run_phase "recovery" recovery_suite
-else
-    status_skip "recovery" "set INKYPI_VALIDATE_RECOVERY=1 to run startup-recovery checks"
-fi
+    if is_truthy "${INKYPI_VALIDATE_INSTALL_IDEMPOTENCY:-0}"; then
+        if [[ "$(uname -s)" == "Linux" ]]; then
+            run_phase "install-idem" python scripts/preflash_smoke.py install-idempotency
+            run_phase "install-tests" python -m pytest -q tests/unit/test_install_scripts.py
+        else
+            status_skip "install-idem" "Linux-only install/update idempotency lane"
+        fi
+    else
+        status_skip "install-idem" "set INKYPI_VALIDATE_INSTALL_IDEMPOTENCY=1 to run install/update idempotency lane"
+    fi
 
-if is_truthy "${INKYPI_VALIDATE_API_CONTRACT:-0}"; then
-    run_phase "api" api_contract_suite
-else
-    status_skip "api" "set INKYPI_VALIDATE_API_CONTRACT=1 to run API contract checks"
-fi
+    if is_truthy "${INKYPI_VALIDATE_FAULTS:-0}"; then
+        run_phase "faults" fault_suite
+    else
+        status_skip "faults" "set INKYPI_VALIDATE_FAULTS=1 to run fault-injection lane"
+    fi
 
-if is_truthy "${INKYPI_VALIDATE_MUTATION:-0}"; then
-    run_phase "mutation" mutation_suite
-else
-    status_skip "mutation" "set INKYPI_VALIDATE_MUTATION=1 to run narrow mutation validation"
-fi
+    if is_truthy "${INKYPI_VALIDATE_UPGRADE_COMPAT:-0}"; then
+        run_phase "upgrade" upgrade_compat_suite
+    else
+        status_skip "upgrade" "set INKYPI_VALIDATE_UPGRADE_COMPAT=1 to run upgrade compatibility lane"
+    fi
 
-printf 'PASS %-10s %s\n' "summary" "pre-flash validation complete"
+    if is_truthy "${INKYPI_VALIDATE_COVERAGE:-0}"; then
+        run_phase "coverage" coverage_suite
+    else
+        status_skip "coverage" "set INKYPI_VALIDATE_COVERAGE=1 to run critical-path coverage gate"
+    fi
+
+    if is_truthy "${INKYPI_VALIDATE_SECURITY:-0}"; then
+        run_phase "security" security_suite
+    else
+        status_skip "security" "set INKYPI_VALIDATE_SECURITY=1 to run security and SBOM checks"
+    fi
+
+    if is_truthy "${INKYPI_VALIDATE_FLAKE:-0}"; then
+        run_phase "flake" flake_suite
+    else
+        status_skip "flake" "set INKYPI_VALIDATE_FLAKE=1 to run flaky-test detection"
+    fi
+
+    if is_truthy "${INKYPI_VALIDATE_FS_PERMS:-0}"; then
+        run_phase "fs-perms" fs_permissions_suite
+    else
+        status_skip "fs-perms" "set INKYPI_VALIDATE_FS_PERMS=1 to run filesystem-permission checks"
+    fi
+
+    if is_truthy "${INKYPI_VALIDATE_SOAK:-0}"; then
+        run_phase "soak" soak_suite
+    else
+        status_skip "soak" "set INKYPI_VALIDATE_SOAK=1 to run soak validation"
+    fi
+
+    if is_truthy "${INKYPI_VALIDATE_RECOVERY:-0}"; then
+        run_phase "recovery" recovery_suite
+    else
+        status_skip "recovery" "set INKYPI_VALIDATE_RECOVERY=1 to run startup-recovery checks"
+    fi
+
+    if is_truthy "${INKYPI_VALIDATE_API_CONTRACT:-0}"; then
+        run_phase "api" api_contract_suite
+    else
+        status_skip "api" "set INKYPI_VALIDATE_API_CONTRACT=1 to run API contract checks"
+    fi
+
+    if is_truthy "${INKYPI_VALIDATE_MUTATION:-0}"; then
+        run_phase "mutation" mutation_suite
+    else
+        status_skip "mutation" "set INKYPI_VALIDATE_MUTATION=1 to run narrow mutation validation"
+    fi
+
+    printf 'PASS %-10s %s\n' "summary" "pre-flash validation complete"
+}
+
+# Sourcing the script (tests/unit/test_preflash_validate.py does) only defines
+# the helpers and suites; executing it runs the validation.
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+    main "$@"
+fi

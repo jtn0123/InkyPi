@@ -32,6 +32,9 @@ INSTALL_DIR = REPO_ROOT / "install"
 
 pytestmark = [
     pytest.mark.container,
+    # Image build alone may take up to 900s; pytest-timeout counts fixture
+    # setup, so override the global 120s limit from pytest.ini.
+    pytest.mark.timeout(1200),
     pytest.mark.skipif(
         shutil.which("docker") is None
         or subprocess.run(
