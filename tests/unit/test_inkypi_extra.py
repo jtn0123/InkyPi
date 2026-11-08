@@ -120,36 +120,57 @@ def test_fast_dev_mode_config_exception_handling(
 
 
 def test_error_handlers_api_error(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Test APIError handler code path is covered."""
+    """APIError is rendered as structured JSON even for HTML clients."""
     mod = _reload_inkypi(monkeypatch, argv=["inkypi.py"], env={})
     app = getattr(mod, "app", None)
     assert app is not None
 
     from utils.http_utils import APIError
 
-    # Test that the error handler function exists and can be called
-    with app.test_request_context("/"):
-        with monkeypatch.context() as m:
-            m.setattr("utils.http_utils.wants_json", lambda: True)
+    def _raise_api_error() -> None:
+        raise APIError(
+            "Test error", status=409, code="TEST_ERROR", details={"key": "value"}
+        )
 
-            # Get the error handler function from the app's error handlers
-            handler_func = None
-            for code, handlers in app.error_handler_spec[None].items():
-                if code == APIError:
-                    handler_func = handlers[0]
-                    break
+    app.add_url_rule("/__test_api_error", view_func=_raise_api_error)
 
-            # If not found in spec, try to find it by calling the handler directly
-            if handler_func is None:
-                # Just test that we can import and create the error - this covers the import
-                error = APIError(
-                    "Test error",
-                    status=400,
-                    code="TEST_ERROR",
-                    details={"key": "value"},
-                )
-                assert error.message == "Test error"
-                assert error.status == 400
+    resp = app.test_client().get("/__test_api_error", headers={"Accept": "text/html"})
+    assert resp.status_code == 409
+    assert resp.is_json
+    body = resp.get_json()
+    assert body["success"] is False
+    assert body["error"] == "Test error"
+    assert body["code"] == "TEST_ERROR"
+    assert body["details"] == {"key": "value"}
+
+
+@pytest.mark.parametrize("force_json", [True, False])
+def test_error_handlers_consult_wants_json(
+    monkeypatch: pytest.MonkeyPatch, force_json: bool
+) -> None:
+    """The 404 handler's JSON/HTML choice follows ``wants_json``.
+
+    ``wants_json`` is patched where the handlers look it up
+    (``app_setup.error_handlers``), and the Accept header is set to the
+    opposite preference so the patched value is what decides the outcome.
+    """
+    mod = _reload_inkypi(monkeypatch, argv=["inkypi.py"], env={})
+    app = getattr(mod, "app", None)
+    assert app is not None
+
+    monkeypatch.setattr(
+        "app_setup.error_handlers.wants_json", lambda: force_json, raising=True
+    )
+    accept = "text/html" if force_json else "application/json"
+    resp = app.test_client().get("/__definitely_missing", headers={"Accept": accept})
+
+    assert resp.status_code == 404
+    if force_json:
+        assert resp.is_json
+        assert resp.get_json()["error"] == "Not found"
+    else:
+        assert not resp.is_json
+        assert resp.mimetype == "text/html"
 
 
 def test_error_handlers_coverage(monkeypatch: pytest.MonkeyPatch) -> None:

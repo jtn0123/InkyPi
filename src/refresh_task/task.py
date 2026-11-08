@@ -36,12 +36,11 @@ from refresh_task.worker import (
 )
 from utils import blackout, crash_breadcrumb
 
-# ``_DEFAULT_REFRESH_STALL_TIMEOUT`` and ``save_refresh_event`` are kept as
-# module attributes for callers that still reach them through this module.
-__all__ = ["RefreshTask", "_DEFAULT_REFRESH_STALL_TIMEOUT", "save_refresh_event"]
+# ``_DEFAULT_REFRESH_STALL_TIMEOUT`` is kept as a module attribute for callers
+# that still reach it through this module.
+__all__ = ["RefreshTask", "_DEFAULT_REFRESH_STALL_TIMEOUT"]
 
 _sd_notify: Callable[[str], None] | None
-save_refresh_event = refresh_recorder.save_refresh_event
 try:
     from cysystemd.daemon import (
         Notification as _sd_Notification,
