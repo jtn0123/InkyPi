@@ -413,13 +413,13 @@ def _wait(event: threading.Event, what: str) -> None:
 
 
 def _saved_resolver() -> object:
-    from utils import http_utils
+    from utils import dns_pinning
 
-    return http_utils._dns_pin_saved
+    return dns_pinning._dns_pin_saved
 
 
 def test_pinned_dns_restores_resolver_when_threads_exit_out_of_order() -> None:
-    from utils import http_utils
+    from utils import dns_pinning, http_utils
 
     original = socket.getaddrinfo
     a_entered, b_entered, a_exited = (threading.Event() for _ in range(3))
@@ -452,7 +452,7 @@ def test_pinned_dns_restores_resolver_when_threads_exit_out_of_order() -> None:
 
     assert not errors
     assert socket.getaddrinfo is original, "pin wrapper leaked after last exit"
-    assert http_utils._dns_pin_depth == 0
+    assert dns_pinning._dns_pin_depth == 0
     assert _saved_resolver() is None
 
     # A later pin must wrap the original resolver, not a leaked wrapper.

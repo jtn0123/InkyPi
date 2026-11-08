@@ -232,6 +232,10 @@ echo "Running mypy strict check (blocking — strict subset only)..."
 # See docs/typing.md for how to add more modules to this list.
 mypy --strict \
     src/utils/http_utils.py \
+    src/utils/api_responses.py \
+    src/utils/http_transport.py \
+    src/utils/dns_pinning.py \
+    src/utils/safe_fetch.py \
     src/utils/plugin_errors.py \
     src/utils/security_utils.py \
     src/utils/client_endpoint.py \

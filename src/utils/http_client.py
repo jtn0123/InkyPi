@@ -2,7 +2,7 @@
 HTTP Client with Connection Pooling for InkyPi
 
 Provides a shared requests.Session() instance for all plugins to use.
-The session wiring is shared with ``utils.http_utils`` so pooling, retries,
+The session wiring is shared with ``utils.http_transport`` so pooling, retries,
 and default headers stay aligned across the two public HTTP entry points.
 
 Usage:
@@ -18,7 +18,7 @@ import threading
 
 import requests
 
-from utils.http_utils import DEFAULT_HEADERS, _build_retry, _build_session
+from utils.http_transport import DEFAULT_HEADERS, _build_retry, _build_session
 
 logger = logging.getLogger(__name__)
 
