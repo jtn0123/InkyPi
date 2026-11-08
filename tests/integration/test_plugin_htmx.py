@@ -129,7 +129,7 @@ def test_save_plugin_settings_htmx_error_never_leaks_exception_text(
 
 def test_is_htmx_request_returns_false_outside_request_context() -> None:
     """_is_htmx_request handles the no-request-context case (JTN-506)."""
-    from blueprints.plugin import _is_htmx_request
+    from blueprints.plugin._settings_save import _is_htmx_request
 
     # Called from a plain Python context, not inside a Flask request — hits the
     # RuntimeError branch that's otherwise only reachable from background tasks.
