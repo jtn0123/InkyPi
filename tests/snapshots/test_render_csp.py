@@ -4,8 +4,8 @@
 Plugin pages are rendered from ``file://`` with ``--disable-web-security``.
 That flag relaxes same-origin checks but not CSP, so the meta policy in
 ``base_plugin/render/plugin.html`` must still stop a rendered page from
-talking to the network while leaving inline scripts and remote images (RSS
-thumbnails) working.
+talking to the network, remote images included (RSS thumbnails are fetched
+server-side and inlined as data: URIs), while leaving inline scripts working.
 """
 
 from __future__ import annotations
@@ -90,6 +90,5 @@ def test_render_csp_blocks_network_exfiltration(
 
     # The inline script ran (CSP allows inline scripts for chart/calendar code)...
     assert image.convert("RGB").getpixel((100, 60)) == (0, 0, 255)
-    # ...remote images still load, but every scripted network channel is blocked.
-    assert "/img" in hits
-    assert not {"/fetch", "/beacon", "/ws"} & set(hits), hits
+    # ...but every network channel, remote <img> included, is blocked.
+    assert not {"/img", "/fetch", "/beacon", "/ws"} & set(hits), hits

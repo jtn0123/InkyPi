@@ -156,6 +156,9 @@ def test_x_forwarded_proto_https_bypass_still_works(
             "INKYPI_FORCE_HTTPS": "1",
             "INKYPI_ENV": "production",
             "INKYPI_TRUSTED_PROXIES": "127.0.0.1",
+            # A proxy preserves the public Host; it must be allow-listed
+            # because the Host check is always on (grade report E1).
+            "INKYPI_ALLOWED_HOSTS": "whatever.example",
         },
     )
     app = mod.app

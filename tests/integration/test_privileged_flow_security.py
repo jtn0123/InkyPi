@@ -19,6 +19,8 @@ from typing import Any
 import pytest
 from flask.testing import FlaskClient
 
+from app_setup.auth import mark_session_authenticated
+
 PIN = "246810"
 READONLY_TOKEN = "readonly-monitor-token"
 VALID_CSRF = "privileged-flow-csrf-token"
@@ -103,7 +105,7 @@ def _seed_authed_session(
     client: FlaskClient, *, csrf_token: str | None = VALID_CSRF
 ) -> None:
     with client.session_transaction() as sess:
-        sess["authed"] = True
+        mark_session_authenticated(sess, client.application)
         if csrf_token is not None:
             sess["_csrf_token"] = csrf_token
 

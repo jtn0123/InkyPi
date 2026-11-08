@@ -22,6 +22,8 @@ from flask import Flask
 from flask.testing import FlaskClient
 from jinja2 import ChoiceLoader, FileSystemLoader
 
+from app_setup.auth import mark_session_authenticated
+
 SRC_ABS = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src"))
 
 TOKEN = "super-secret-monitoring-token-abc123"
@@ -147,7 +149,7 @@ class TestTokenUnset:
 
     def test_pin_session_still_grants_access(self, client: FlaskClient) -> None:
         with client.session_transaction() as sess:
-            sess["authed"] = True
+            mark_session_authenticated(sess, client.application)
         resp = client.get("/api/version/info")
         assert resp.status_code == 200
 
@@ -237,7 +239,7 @@ class TestTokenSet:
     ) -> None:
         """Enabling the token doesn't break existing PIN session auth."""
         with client.session_transaction() as sess:
-            sess["authed"] = True
+            mark_session_authenticated(sess, client.application)
         resp = client.get("/")
         assert resp.status_code == 200
 

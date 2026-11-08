@@ -43,6 +43,7 @@ from app_setup.security_middleware import (
     setup_csp_nonce as _setup_csp_nonce,
     setup_csrf_protection,
     setup_csrf_protection as _setup_csrf_protection,
+    setup_host_validation,
     setup_https_redirect,
     setup_https_redirect as _setup_https_redirect,
     setup_rate_limiting,
@@ -603,6 +604,9 @@ def create_app() -> Flask:
 
     _register_before_request_hooks(app)
     setup_https_redirect(app, dev_mode=DEV_MODE)
+    # E1: always-on Host allow-list (DNS-rebinding defence). Registered after
+    # the HTTPS redirect so it lands first in the before_request chain.
+    setup_host_validation(app)
     setup_csp_nonce(app)
     setup_csrf_protection(app)
     setup_rate_limiting(app)

@@ -113,6 +113,41 @@ class TestSendFailureWebhook:
             )
         assert any("failed" in r.message for r in caplog.records)
 
+    def test_logs_never_contain_webhook_secret(
+        self, requests_mock: Any, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        ok = "https://hooks.slack.com/services/T000/B000/SECRETTOKEN1"
+        bad = "https://user:pw@discord.com:8443/api/webhooks/123/SECRETTOKEN2?x=1"
+        requests_mock.post(ok, status_code=200)
+        requests_mock.post(
+            bad,
+            exc=requests.exceptions.ConnectionError(f"Max retries with url: {bad}"),
+        )
+        with caplog.at_level(logging.INFO, logger="utils.webhooks"):
+            send_failure_webhook([ok, bad], {"event": "plugin_failure"})
+        text = "\n".join(
+            r.getMessage() + (str(r.exc_info) if r.exc_info else "")
+            for r in caplog.records
+        )
+        assert "SECRETTOKEN" not in text
+        assert "pw" not in text
+        assert "target=https://hooks.slack.com status=200" in text
+        assert "target=https://discord.com:8443 error=ConnectionError" in text
+
+    @pytest.mark.parametrize(
+        ("url", "expected"),
+        [
+            ("https://ntfy.sh/my-secret-topic", "https://ntfy.sh"),
+            ("http://[fe80::1]:9000/hook", "http://[fe80::1]:9000"),
+            ("not a url", "<invalid-url>"),
+            ("http://host:99999/x", "<invalid-url>"),
+        ],
+    )
+    def test_redact_webhook_url(self, url: str, expected: str) -> None:
+        from utils.webhooks import _redact_webhook_url
+
+        assert _redact_webhook_url(url) == expected
+
     def test_second_url_is_still_called_after_first_fails(
         self, requests_mock: Any
     ) -> None:

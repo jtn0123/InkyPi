@@ -24,7 +24,11 @@ from flask import (
 # typed as something it is not.
 from werkzeug.wrappers import Response as WerkzeugResponse
 
-from app_setup.auth import _verify_pin
+from app_setup.auth import (
+    _verify_pin,
+    is_session_authenticated,
+    mark_session_authenticated,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -120,7 +124,7 @@ def _record_failed_attempt() -> None:
 @auth_bp.route("/login", methods=["GET"])
 def login_get() -> str | Response | WerkzeugResponse:
     next_url = _safe_next_url(request.args.get("next"))
-    if session.get("authed") is True:
+    if is_session_authenticated(session, current_app):
         return redirect(next_url)
     return render_template(_LOGIN_TEMPLATE, error=None, next=next_url)
 
@@ -145,7 +149,7 @@ def login_post() -> str | Response | WerkzeugResponse:
 
     submitted = request.form.get("pin", "")
     if _verify_pin(submitted, pin_hash):
-        session["authed"] = True
+        mark_session_authenticated(session, current_app)
         session.pop("login_failed_count", None)
         session.pop("login_lockout_until", None)
         return redirect(next_url)

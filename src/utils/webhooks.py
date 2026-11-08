@@ -7,6 +7,7 @@ must never block or raise so that it cannot interfere with the refresh cycle.
 
 import logging
 from typing import Any
+from urllib.parse import urlsplit
 
 # ``requests`` is imported lazily via ``__getattr__`` to keep it off the
 # startup path (JTN-606).  Webhooks are only fired when a plugin refresh
@@ -55,16 +56,39 @@ def send_failure_webhook(
     requests_mod = _self.requests
 
     for url in urls:
+        target = _redact_webhook_url(url)
         try:
             response = requests_mod.post(url, json=payload, timeout=timeout)
             logger.info(
-                "webhook: sent | url=%s status=%s",
-                url,
+                "webhook: sent | target=%s status=%s",
+                target,
                 response.status_code,
             )
-        except Exception:
+        except Exception as exc:
+            # No traceback / str(exc): requests embeds the full URL (and so
+            # the token) in its exception messages.
             logger.warning(
-                "webhook: failed | url=%s",
-                url,
-                exc_info=True,
+                "webhook: failed | target=%s error=%s",
+                target,
+                type(exc).__name__,
             )
+
+
+def _redact_webhook_url(url: object) -> str:
+    """Return only ``scheme://host[:port]`` of *url* for logging.
+
+    Slack/Discord/ntfy webhook URLs carry their secret in the path or query,
+    and logs are readable through ``/api/logs``, so nothing past the
+    authority (nor any ``user:pass@`` userinfo) is ever logged.
+    """
+    try:
+        parsed = urlsplit(str(url))
+        host = parsed.hostname or ""
+        port = parsed.port
+    except ValueError:
+        return "<invalid-url>"
+    if not parsed.scheme or not host:
+        return "<invalid-url>"
+    if ":" in host:
+        host = f"[{host}]"
+    return f"{parsed.scheme}://{host}" + (f":{port}" if port else "")

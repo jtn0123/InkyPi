@@ -11,6 +11,8 @@ import pytest
 from flask import Flask
 from playwright.sync_api import Page
 
+from app_setup.auth import mark_session_authenticated
+
 CRITICAL_RESPONSE_TYPES = {"document", "script", "stylesheet", "xhr", "fetch"}
 
 
@@ -206,7 +208,7 @@ def _session_cookie_for_authed_user(flask_app: Flask) -> tuple[str, str]:
     cookie_name = flask_app.config.get("SESSION_COOKIE_NAME", "session")
     client = flask_app.test_client()
     with client.session_transaction() as sess:
-        sess["authed"] = True
+        mark_session_authenticated(sess, flask_app)
     # Flask's test client keeps cookies on ``client.get`` responses; the
     # session_transaction commit above stamps the signed cookie into the
     # client's cookie jar. Pull it out directly. ``client`` exposes a
