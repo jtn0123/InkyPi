@@ -23,7 +23,6 @@ playlist_bp = Blueprint("playlist", "blueprints.playlist")
 # Shared string constants to avoid duplication
 _CODE_VALIDATION = CODE_VALIDATION
 _MSG_TIME_OVERLAP = "Playlist time range overlaps with existing playlist"
-_MSG_INVALID_PLAYLIST_REQUEST = "Invalid playlist request"
 _MSG_PLAYLIST_NOT_FOUND = "Playlist not found"
 
 # JTN-781: the "Default" playlist is the canonical fallback shipped with the

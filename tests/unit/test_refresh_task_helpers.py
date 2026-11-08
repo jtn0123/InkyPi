@@ -1,6 +1,6 @@
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import pytest
 from PIL import Image
@@ -8,7 +8,7 @@ from PIL import Image
 
 def _dummy_plugin(device_config: Any) -> Any:
     class DummyPlugin:
-        config = {"image_settings": []}
+        config: dict[str, list[Any]] = {"image_settings": []}
 
         def generate_image(self, settings: Any, cfg: Any) -> Any:
             return Image.new("RGB", cfg.get_resolution(), "white")
@@ -33,7 +33,9 @@ def test_wait_for_trigger_returns_manual_refresh(
     manual = ManualRefresh("dummy", {})
     request = ManualUpdateRequest("req-1", manual)
     task.manual_update_requests.append(request)
-    pm, latest, dt, queued = task._wait_for_trigger()
+    trigger = task._wait_for_trigger()
+    assert trigger is not None
+    pm, latest, dt, queued = trigger
     assert queued is request
     assert not task.manual_update_requests
 
@@ -53,7 +55,7 @@ def test_select_refresh_action_playlist(
     class FakePlugin:
         plugin_id = "dummy"
         name = "inst"
-        settings = {}
+        settings: dict[str, Any] = {}
 
         def get_image_path(self) -> Any:
             return "dummy.png"
@@ -64,7 +66,7 @@ def test_select_refresh_action_playlist(
     fake_playlist = FakePlaylist()
     fake_plugin = FakePlugin()
 
-    def fake_determine(self, pm: Any, latest: Any, current_dt: Any) -> Any:
+    def fake_determine(self: Any, pm: Any, latest: Any, current_dt: Any) -> Any:
         return fake_playlist, fake_plugin
 
     monkeypatch.setattr(
@@ -76,7 +78,63 @@ def test_select_refresh_action_playlist(
     assert request_id is None
     assert isinstance(action, PlaylistRefresh)
     assert action.playlist is fake_playlist
-    assert action.plugin_instance is fake_plugin
+    assert action.plugin_instance is cast(Any, fake_plugin)
+
+
+@pytest.mark.parametrize(
+    "next_plugin", [(None, None), ("playlist-without-due-plugin", None)]
+)
+def test_select_refresh_action_nothing_due(
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch, next_plugin: Any
+) -> None:
+    """A scheduled check with no eligible playlist/plugin selects no action."""
+    from display.display_manager import DisplayManager
+    from refresh_task import RefreshTask
+
+    task = RefreshTask(device_config_dev, DisplayManager(device_config_dev))
+    monkeypatch.setattr(
+        task, "_determine_next_plugin", lambda pm, latest, current_dt: next_plugin
+    )
+
+    action, request_id = task._select_refresh_action(
+        None, None, task._get_current_datetime(), None
+    )
+
+    assert action is None
+    assert request_id is None
+
+
+def test_run_scheduled_tick_with_nothing_due_skips_refresh(
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """When no plugin is due, the loop still ticks but never renders."""
+    from display.display_manager import DisplayManager
+    from refresh_task import RefreshTask
+
+    task = RefreshTask(device_config_dev, DisplayManager(device_config_dev))
+    triggers = iter([("pm", "latest", task._get_current_datetime(), None), None])
+    monkeypatch.setattr(task, "_wait_for_trigger", lambda: next(triggers))
+    monkeypatch.setattr(
+        task, "_determine_next_plugin", lambda pm, latest, current_dt: (None, None)
+    )
+
+    def _unexpected_refresh(*args: Any, **kwargs: Any) -> Any:
+        raise AssertionError("no refresh should run when nothing is due")
+
+    monkeypatch.setattr(task, "_perform_refresh", _unexpected_refresh)
+    monkeypatch.setattr(task, "_update_refresh_info", _unexpected_refresh)
+    cleanup_ticks: list[int] = []
+    monkeypatch.setattr(
+        task,
+        "_maybe_run_history_cleanup",
+        lambda: cleanup_ticks.append(task._tick_count),
+    )
+
+    task._run()  # returns once _wait_for_trigger yields None
+
+    assert task._tick_count == 1
+    assert cleanup_ticks == [1]
+    assert task._work_started_at is None
 
 
 def test_select_refresh_action_manual(device_config_dev: Any) -> None:
@@ -131,6 +189,7 @@ def test_perform_refresh_skips_when_cached(
     )
     assert used_cached is True
     assert not called["val"]
+    assert info is not None
     assert info["image_hash"] == "same"
 
 

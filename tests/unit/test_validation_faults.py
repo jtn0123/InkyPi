@@ -1,3 +1,4 @@
+import logging
 import sqlite3
 from typing import Any
 
@@ -10,14 +11,16 @@ from refresh_task import ManualRefresh, RefreshTask
 
 
 class GoodPlugin:
-    config = {"image_settings": []}
+    config: dict[str, list[Any]] = {"image_settings": []}
 
     def generate_image(self, settings: Any, device_config: Any) -> Any:
         return Image.new("RGB", device_config.get_resolution(), "white")
 
 
 def test_benchmark_lock_does_not_wedge_manual_update(
-    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+    device_config_dev: Any,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
     monkeypatch.setenv("INKYPI_PLUGIN_RETRY_MAX", "0")
     device_config_dev.update_value("enable_benchmarks", True)
@@ -35,20 +38,41 @@ def test_benchmark_lock_does_not_wedge_manual_update(
         lambda cfg: GoodPlugin(),
         raising=True,
     )
+    lock_calls: list[dict[str, Any]] = []
+
+    def locked_save_refresh_event(_cfg: Any, refresh_event: dict[str, Any]) -> None:
+        lock_calls.append(refresh_event)
+        raise sqlite3.OperationalError("database is locked")
+
+    # Patch the name where RefreshRecorder.save_refresh actually looks it up.
     monkeypatch.setattr(
-        "refresh_task.task.save_refresh_event",
-        lambda *args, **kwargs: (_ for _ in ()).throw(
-            sqlite3.OperationalError("database is locked")
-        ),
+        "refresh_task.recorder.save_refresh_event",
+        locked_save_refresh_event,
         raising=True,
     )
 
     refresh_task.start()
     try:
-        metrics = refresh_task.manual_update(ManualRefresh("good", {}))
+        with caplog.at_level(logging.DEBUG, logger="refresh_task.recorder"):
+            metrics = refresh_task.manual_update(ManualRefresh("good", {}))
         assert metrics is not None
+        # The locked write was really attempted for this refresh ...
+        assert len(lock_calls) == 1
+        assert lock_calls[0]["plugin_id"] == "good"
+        # ... and the failure was logged rather than propagated.
+        assert any(
+            "Failed to save refresh benchmark event" in rec.getMessage()
+            and rec.exc_info is not None
+            and isinstance(rec.exc_info[1], sqlite3.OperationalError)
+            for rec in caplog.records
+        )
         assert refresh_task.running is True
+        assert refresh_task.thread is not None
         assert refresh_task.thread.is_alive()
+
+        # The worker is not wedged: a second refresh still completes.
+        assert refresh_task.manual_update(ManualRefresh("good", {})) is not None
+        assert len(lock_calls) == 2
     finally:
         refresh_task.stop()
 
@@ -68,12 +92,12 @@ def test_plugin_failure_remains_actionable_and_task_recovers(
     )
 
     class BrokenPlugin:
-        config = {"image_settings": []}
+        config: dict[str, list[Any]] = {"image_settings": []}
 
         def generate_image(self, settings: Any, device_config: Any) -> None:
             raise OSError("broken PNG stream")
 
-    current_plugin = {"instance": BrokenPlugin()}
+    current_plugin: dict[str, Any] = {"instance": BrokenPlugin()}
 
     monkeypatch.setattr(
         "refresh_task.plugin_lookup.get_plugin_instance",
@@ -89,6 +113,7 @@ def test_plugin_failure_remains_actionable_and_task_recovers(
             refresh_task.manual_update(ManualRefresh("faulty", {}))
 
         assert refresh_task.running is True
+        assert refresh_task.thread is not None
         assert refresh_task.thread.is_alive()
 
         # Verify failure was recorded

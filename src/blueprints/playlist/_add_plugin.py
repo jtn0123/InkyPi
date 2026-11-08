@@ -1,67 +1,21 @@
 """``/add_plugin``: add a plugin instance to a playlist.
 
-Also holds the add-plugin form parsing and instance/refresh validation
-helpers.
+Also holds the add-plugin form parsing helpers; instance-name, refresh and
+plugin-settings validation live in :mod:`services.playlist_workflows`.
 """
 
 import json
-import re
 from collections.abc import Mapping
 from typing import Any, cast
 
 from flask import current_app, request
 
-from services.playlist_workflows import (
-    prepare_add_plugin_workflow,
-    validate_plugin_refresh_settings as validate_refresh,
-)
+from services.playlist_workflows import prepare_add_plugin_workflow
 from utils.app_utils import handle_request_files, parse_form
 from utils.backend_errors import OperationFailedError, route_error_boundary
 from utils.http_utils import json_error, json_success
 
 from ._common import _CODE_VALIDATION, logger, playlist_bp
-
-_INSTANCE_NAME_RE = re.compile(r"^[A-Za-z0-9 _-]+$")
-
-
-def validate_plugin_refresh_settings(
-    refresh_settings: Mapping[str, Any],
-) -> tuple[dict[str, int | str] | None, Any]:
-    """Adapt the shared pure refresh validator to the legacy JSON response."""
-    config, error = validate_refresh(dict(refresh_settings))
-    if error is not None:
-        return None, json_error(error.message, **error.as_json_kwargs())
-    return cast(dict[str, int | str] | None, config), None
-
-
-def _validate_instance_name(raw_name: Any) -> tuple[str | None, Any]:
-    """Validate and normalise an instance name.
-
-    Returns ``(name, error_response)``.  Exactly one will be non-None.
-    """
-    name = raw_name.strip() if raw_name else ""
-    if not name:
-        return None, json_error(
-            "Instance name is required",
-            status=422,
-            code=_CODE_VALIDATION,
-            details={"field": "instance_name"},
-        )
-    if len(name) > 64:
-        return None, json_error(
-            "Instance name must be 64 characters or fewer",
-            status=422,
-            code=_CODE_VALIDATION,
-            details={"field": "instance_name"},
-        )
-    if not _INSTANCE_NAME_RE.match(name):
-        return None, json_error(
-            "Instance name can only contain letters, numbers, spaces, underscores, and hyphens",
-            status=422,
-            code=_CODE_VALIDATION,
-            details={"field": "instance_name"},
-        )
-    return name, None
 
 
 def _form_parse_error(
@@ -117,31 +71,6 @@ def _parse_add_plugin_form(
     if refresh_settings is None:
         return _form_parse_error("refresh_settings is required")
     return plugin_id, plugin_settings, refresh_settings, None
-
-
-def _validate_plugin_settings_security(
-    device_config: Any, plugin_id: str, plugin_settings: Any
-) -> Any | None:
-    """JTN-451: Run plugin-specific validation (e.g. URL scheme checks).
-
-    Returns an error response if validation fails, or None on success.
-    Only validates when the settings dict has actual user values.
-    """
-    if not plugin_settings:
-        return None
-    plugin_config = device_config.get_plugin(plugin_id)
-    if not plugin_config:
-        return None
-    try:
-        from plugins.plugin_registry import get_plugin_instance as _get_pi
-
-        plugin_obj = _get_pi(plugin_config)
-        settings_error = plugin_obj.validate_settings(plugin_settings)
-        if settings_error:
-            return json_error(settings_error, status=400)
-    except Exception:
-        logger.debug("Could not validate plugin schema for %s", plugin_id)
-    return None
 
 
 @playlist_bp.route("/add_plugin", methods=["POST"])
