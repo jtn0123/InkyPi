@@ -834,7 +834,11 @@ def display_next_in_playlist() -> Any:
         # Determine current time and next eligible
         current_dt = _safe_now_device_tz(device_config)
 
-        plugin_instance = playlist.get_next_eligible_plugin(current_dt)
+        # The index advance mutates shared config state; hold the config lock
+        # (as /display-next does) so it cannot interleave with the refresh
+        # thread or another request's update_atomic snapshot/rollback.
+        with device_config.locked():
+            plugin_instance = playlist.get_next_eligible_plugin(current_dt)
         if not plugin_instance:
             raise ClientInputError(
                 "No eligible instance in playlist",

@@ -138,8 +138,9 @@ def health_plugins() -> tuple[Any, int] | Response:
             window_min = 1440
         health = _filter_health_by_window(health, window_min)
         return json_success(items=health)
-    except Exception as e:
-        return json_internal_error("health plugins", details={"error": str(e)})
+    except Exception:
+        logger.exception("health plugins failed")
+        return json_internal_error("health plugins")
 
 
 @_mod.settings_bp.route("/api/health/system", methods=["GET"])
@@ -165,8 +166,9 @@ def health_system() -> tuple[Any, int] | Response:
             data["disk_total_gb"] = None
             data["uptime_seconds"] = None
         return json_success(**data)
-    except Exception as e:
-        return json_internal_error("health system", details={"error": str(e)})
+    except Exception:
+        logger.exception("health system failed")
+        return json_internal_error("health system")
 
 
 @_mod.settings_bp.route("/api/progress/stream", methods=["GET"])

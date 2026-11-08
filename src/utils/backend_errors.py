@@ -99,6 +99,21 @@ class UnsupportedMediaTypeRouteError(BackendRouteError):
         super().__init__(message, status=415, code=code, details=details)
 
 
+class RefreshTaskUnavailable(BackendRouteError):
+    """The background refresh task is not running, so nothing can be displayed."""
+
+    category = "unavailable"
+
+    def __init__(
+        self,
+        message: str = "Display refresh service is not running",
+        *,
+        code: int | str | None = "refresh_task_unavailable",
+        details: dict[str, Any] | None = None,
+    ) -> None:
+        super().__init__(message, status=503, code=code, details=details)
+
+
 class OperationFailedError(BackendRouteError):
     """Backend operation reported failure without throwing."""
 

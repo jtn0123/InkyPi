@@ -44,15 +44,21 @@ def test_failing_plugin_does_not_block_successful_plugin(
         ai_text_mod.AIText, "generate_image", staticmethod(boom), raising=True
     )
 
-    # Trigger display of the OK plugin explicitly to simulate cycle behavior
-    resp = client.post(
-        "/display_plugin_instance",
-        json={
-            "playlist_name": playlist.name,
-            "plugin_id": "clock",
-            "plugin_instance": "OK",
-        },
-    )
+    # Trigger display of the OK plugin explicitly to simulate cycle behavior.
+    # The route needs a running refresh loop (it returns 503 otherwise).
+    refresh_task = app.config["REFRESH_TASK"]
+    refresh_task.start()
+    try:
+        resp = client.post(
+            "/display_plugin_instance",
+            json={
+                "playlist_name": playlist.name,
+                "plugin_id": "clock",
+                "plugin_instance": "OK",
+            },
+        )
+    finally:
+        refresh_task.stop()
     # The success path should still work despite the other plugin being broken
     assert resp.status_code == 200
     data = resp.get_json()

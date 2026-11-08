@@ -59,6 +59,13 @@ class DisplayManager:
 
         self._last_image_hash: str | None = None
         self._hash_lock = threading.Lock()
+        # Serialises driver writes. Callers are meant to go through the
+        # refresh loop (RefreshTask.run_display_command), but a panel write
+        # takes ~30 s on SPI and two overlapping ones garble the frame, so
+        # this is the backstop. It is only ever taken around the driver call
+        # and no other lock is acquired while holding it, so it cannot
+        # deadlock with the config lock or the refresh-loop condition.
+        self._panel_lock = threading.Lock()
         self.device_config = device_config
         self.display: _DisplayLike
 
@@ -216,6 +223,11 @@ class DisplayManager:
             logger.exception("Failed to persist history metadata for %s", base_name)
         self._prune_history(history_dir)
 
+    def _write_panel(self, image: Image.Image, image_settings: list[object]) -> None:
+        """Push *image* to the driver, one write at a time."""
+        with self._panel_lock:
+            self.display.display_image(image, image_settings)
+
     def display_image(
         self,
         image: Image.Image,
@@ -305,7 +317,7 @@ class DisplayManager:
 
             # Pass to the concrete instance to render to the device.
             display_t0 = perf_counter()
-            self.display.display_image(image, image_settings)
+            self._write_panel(image, image_settings)
             display_ms = int((perf_counter() - display_t0) * 1000)
         except Exception:
             # Restore the previous hash so the same image can be retried on the
@@ -342,7 +354,7 @@ class DisplayManager:
             image = image.rotate(180)
         display_t0 = perf_counter()
         try:
-            self.display.display_image(image, [])
+            self._write_panel(image, [])
         finally:
             with self._hash_lock:
                 self._last_image_hash = None
@@ -377,7 +389,7 @@ class DisplayManager:
         image.save(self.device_config.processed_image_file, optimize=True)
         preprocess_ms = int((perf_counter() - preprocess_t0) * 1000)
         display_t0 = perf_counter()
-        self.display.display_image(image, [])
+        self._write_panel(image, [])
         display_ms = int((perf_counter() - display_t0) * 1000)
         # Clear the dedup hash so the next regular refresh is not skipped
         # because it still matches the pre-history image hash (JTN-236).
