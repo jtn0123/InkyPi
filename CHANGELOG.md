@@ -2,6 +2,21 @@
 
 <!-- version list -->
 
+## v1.7.2 (2026-11-08)
+
+### Bug Fixes
+
+- **security**: Host allow-list, server-side RSS images, session expiry
+  ([#701](https://github.com/jtn0123/InkyPi/pull/701),
+  [`b7e7271`](https://github.com/jtn0123/InkyPi/commit/b7e7271761168d3a61063f0e205d85a06a205452))
+
+### Continuous Integration
+
+- Harden preflash phases, nightly gate and pytest strictness
+  ([#700](https://github.com/jtn0123/InkyPi/pull/700),
+  [`d2267f7`](https://github.com/jtn0123/InkyPi/commit/d2267f70b2a42d354efde05a0858d87ba801d72d))
+
+
 ## v1.7.1 (2026-11-07)
 
 ### Bug Fixes
