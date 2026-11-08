@@ -348,7 +348,7 @@ class TestPluginValidateSettingsException:
         Image.new("RGB", (4, 4), "white").save(folder / "a.png")
 
         with patch(
-            "blueprints.plugin.get_plugin_instance",
+            "blueprints.plugin._settings_save.get_plugin_instance",
             side_effect=RuntimeError("boom"),
         ):
             resp = client.post(
@@ -374,7 +374,7 @@ class TestPluginValidateSettingsException:
         Image.new("RGB", (4, 4), "white").save(folder / "a.png")
 
         with patch(
-            "blueprints.plugin.validate_plugin_required_fields",
+            "blueprints.plugin._settings_save.validate_plugin_required_fields",
             side_effect=RuntimeError("boom"),
         ):
             resp = client.post(
@@ -490,7 +490,7 @@ class TestUpdatePluginInstanceValidation:
             flask_app, "image_folder", "if_test_loaderfail", {"folder_path": ""}
         )
         with patch(
-            "blueprints.plugin.get_plugin_instance",
+            "blueprints.plugin._instances.get_plugin_instance",
             side_effect=RuntimeError("cannot load"),
         ):
             resp = client.put(

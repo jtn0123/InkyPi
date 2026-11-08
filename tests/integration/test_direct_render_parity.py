@@ -32,7 +32,7 @@ def test_direct_request_and_queued_job_match(
     status: int,
     code: str | None,
 ) -> None:
-    import blueprints.plugin as blueprint
+    import blueprints.plugin._update_now as blueprint
 
     flask_app.config["REFRESH_TASK"].running = False
     displayed: list[object] = []
