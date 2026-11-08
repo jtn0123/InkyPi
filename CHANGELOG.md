@@ -2,6 +2,15 @@
 
 <!-- version list -->
 
+## v1.7.4 (2026-11-08)
+
+### Bug Fixes
+
+- **display**: Atomic image writes and coverage floors
+  ([#703](https://github.com/jtn0123/InkyPi/pull/703),
+  [`849af2a`](https://github.com/jtn0123/InkyPi/commit/849af2a409c958925feccfcc3b121b54ed89583b))
+
+
 ## v1.7.3 (2026-11-08)
 
 ### Bug Fixes
