@@ -82,9 +82,9 @@ def _check_type(value: Any, tp: Any, path: str) -> list[str]:
 
     if origin is typing.Union or origin is types.UnionType:
         return _check_union(value, tp, path)
-    if origin in (list, typing.List):  # noqa: UP006
+    if origin is list:
         return _check_list(value, tp, path)
-    if origin in (dict, typing.Dict):  # noqa: UP006
+    if origin is dict:
         return _check_dict(value, tp, path)
 
     # Nested TypedDict
@@ -107,12 +107,6 @@ def validate_typeddict(payload: Any, schema: Any, *, path: str = "$") -> list[st
     hints = typing.get_type_hints(schema)
     required_keys = set(getattr(schema, "__required_keys__", set()))
     optional_keys = set(getattr(schema, "__optional_keys__", set()))
-    # Older Pythons: fall back to __total__
-    if not required_keys and not optional_keys:
-        if getattr(schema, "__total__", True):
-            required_keys = set(hints.keys())
-        else:
-            optional_keys = set(hints.keys())
 
     errors: list[str] = []
     for key in required_keys:
