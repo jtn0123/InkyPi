@@ -45,8 +45,9 @@ def test_refresh_task_plugin_exception_isolated(
 
     # Trigger a manual update path when not running to exercise isolation logic
     from refresh_task import ManualRefresh
+    from utils.backend_errors import RefreshTaskUnavailable
 
-    metrics = rt.manual_update(ManualRefresh("ai_text", {"text": "x"}))
-    # When not running, manual_update returns any captured metrics (possibly None)
-    # The primary assertion is that no exception propagates
-    assert metrics is None or isinstance(metrics, dict)
+    # When not running, manual_update refuses with the typed 503 error; the
+    # plugin is never invoked, so its RuntimeError must not be what escapes.
+    with pytest.raises(RefreshTaskUnavailable):
+        rt.manual_update(ManualRefresh("ai_text", {"text": "x"}))

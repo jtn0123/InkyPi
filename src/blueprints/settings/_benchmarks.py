@@ -70,8 +70,9 @@ def benchmarks_summary() -> tuple[object, int] | Response:
                 },
             },
         )
-    except Exception as e:
-        return json_internal_error("benchmarks summary", details={"error": str(e)})
+    except Exception:
+        _mod.logger.exception("benchmarks summary failed")
+        return json_internal_error("benchmarks summary")
     finally:
         if conn:
             conn.close()
@@ -118,8 +119,9 @@ def benchmarks_refreshes() -> tuple[object, int] | Response:
             items=[dict(r) for r in rows],
             next_cursor=next_cursor,
         )
-    except Exception as e:
-        return json_internal_error("benchmarks refreshes", details={"error": str(e)})
+    except Exception:
+        _mod.logger.exception("benchmarks refreshes failed")
+        return json_internal_error("benchmarks refreshes")
     finally:
         if conn:
             conn.close()
@@ -172,8 +174,9 @@ def benchmarks_plugins() -> tuple[object, int] | Response:
             for r in rows
         ]
         return json_success(items=items)
-    except Exception as e:
-        return json_internal_error("benchmarks plugins", details={"error": str(e)})
+    except Exception:
+        _mod.logger.exception("benchmarks plugins failed")
+        return json_internal_error("benchmarks plugins")
     finally:
         if conn:
             conn.close()
@@ -206,8 +209,9 @@ def benchmarks_stages() -> tuple[object, int] | Response:
             (refresh_id,),
         ).fetchall()
         return json_success(items=[dict(r) for r in rows])
-    except Exception as e:
-        return json_internal_error("benchmarks stages", details={"error": str(e)})
+    except Exception:
+        _mod.logger.exception("benchmarks stages failed")
+        return json_internal_error("benchmarks stages")
     finally:
         if conn:
             conn.close()

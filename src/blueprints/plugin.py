@@ -34,6 +34,7 @@ from services.plugin_workflows import (
 from utils.app_utils import handle_request_files, parse_form, resolve_path
 from utils.backend_errors import (
     ClientInputError,
+    RefreshTaskUnavailable,
     ResourceLookupError,
     UnsupportedMediaTypeRouteError,
     route_error_boundary,
@@ -1034,7 +1035,7 @@ def update_now() -> Any:
             status=400,
             code="provider_rejected",
         )
-    except ClientInputError as e:
+    except (ClientInputError, RefreshTaskUnavailable) as e:
         return json_error(
             e.message,
             status=e.status,

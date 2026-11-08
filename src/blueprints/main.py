@@ -18,6 +18,7 @@ from flask import (
 )
 
 from utils import blackout
+from utils.backend_errors import RefreshTaskUnavailable
 from utils.display_names import (
     friendly_instance_label,
     instance_suffix_label,
@@ -684,8 +685,9 @@ def display_next() -> Any:
 
     generate_ms = None
     benchmark_id = str(uuid4())
+    via_refresh_task = bool(getattr(refresh_task, "running", False))
     try:
-        if getattr(refresh_task, "running", False):
+        if via_refresh_task:
             from refresh_task import PlaylistRefresh
 
             try:
@@ -706,6 +708,9 @@ def display_next() -> Any:
             )
             if err:
                 return err
+    except RefreshTaskUnavailable as exc:
+        # The loop stopped between the ``running`` check and the enqueue.
+        return json_error(exc.message, status=exc.status, code=exc.code)
     except Exception:
         logger.exception("display_next failed")
         return json_error("An internal error occurred", status=500)
@@ -713,9 +718,12 @@ def display_next() -> Any:
     _display_next_limiter.record()
 
     metrics = _gather_display_metrics(device_config, generate_ms)
-    _persist_dev_refresh_event(
-        device_config, benchmark_id, plugin_instance, playlist, metrics
-    )
+    if not via_refresh_task:
+        # The refresh loop records its own benchmark row (``_save_benchmark``);
+        # only the direct path has nobody else to do it.
+        _persist_dev_refresh_event(
+            device_config, benchmark_id, plugin_instance, playlist, metrics
+        )
     request_ms, display_ms, generate_ms, preprocess_ms = metrics
 
     return json_success(

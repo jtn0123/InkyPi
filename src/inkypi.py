@@ -64,6 +64,7 @@ from refresh_task import RefreshTask
 from utils import blackout, boot_self_test
 from utils.app_utils import generate_startup_image, get_ip_address
 from utils.asset_check import run_boot_check as run_asset_check
+from utils.backend_errors import RefreshTaskUnavailable
 from utils.config_schema import ConfigValidationError
 from utils.i18n import init_i18n
 from utils.sri import init_sri
@@ -669,11 +670,15 @@ def run_once(created_app: Flask) -> int:
             PlaylistRefresh(playlist, plugin_instance, force=True)
         )
         if result is None:
-            # manual_update returns None when the refresh task is not running,
-            # so nothing was rendered. Reporting success here would tell cron
-            # the frame updated when it did not.
-            logger.error("run-once: refresh did not run (task not running)")
+            # The loop finished the request without reporting any metrics, so
+            # there is no evidence a frame was rendered. Reporting success
+            # here would tell cron the frame updated when it may not have.
+            logger.error("run-once: refresh completed without metrics")
             return 1
+    except RefreshTaskUnavailable:
+        # Nothing was rendered; the loop never picked the request up.
+        logger.error("run-once: refresh did not run (task not running)")
+        return 1
     except Exception:
         logger.exception("run-once: refresh failed")
         return 1
@@ -728,9 +733,17 @@ def run_boot_display_tasks(created_app: Flask) -> None:
     try:
         logger.info("Displaying startup image")
         img = generate_startup_image(device_cfg.get_resolution())
-        display_manager_obj = created_app.config.get("DISPLAY_MANAGER")
-        if display_manager_obj is not None:
-            display_manager_obj.display_image(img)
+        if refresh_task_obj is not None:
+            # Serialise through the refresh loop (like blackout and the boot
+            # self-test) so this write cannot overlap a scheduled refresh that
+            # the loop started a moment ago.
+            refresh_task_obj.run_display_command(
+                "startup_image", lambda dm: dm.display_image(img)
+            )
+        else:
+            display_manager_obj = created_app.config.get("DISPLAY_MANAGER")
+            if display_manager_obj is not None:
+                display_manager_obj.display_image(img)
         device_cfg.update_value("startup", False, write=True)
     except Exception:
         logger.exception("Startup image failed")

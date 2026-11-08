@@ -487,6 +487,7 @@ def history_image(filename: str) -> Response | JsonResponse:
 def history_redisplay() -> tuple[dict[str, Any], int] | Any:
     device_config = current_app.config[_CONFIG_KEY]
     display_manager = current_app.config["DISPLAY_MANAGER"]
+    refresh_task = current_app.config.get("REFRESH_TASK")
     history_dir = device_config.history_image_dir
 
     try:
@@ -501,7 +502,15 @@ def history_redisplay() -> tuple[dict[str, Any], int] | Any:
             return _filename_error_response(err_code)
 
         safe_path = cast(str, _safe_path)
-        display_manager.display_preprocessed_image(safe_path)
+        if refresh_task is not None:
+            # Serialise through the refresh loop so this panel write cannot
+            # overlap a refresh the loop is already pushing to the display.
+            refresh_task.run_display_command(
+                "history_redisplay",
+                lambda dm: dm.display_preprocessed_image(safe_path),
+            )
+        else:
+            display_manager.display_preprocessed_image(safe_path)
         return json_success("Display updated")
     except Exception:
         logger.exception("Error redisplaying history image")

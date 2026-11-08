@@ -94,8 +94,8 @@ def shutdown() -> tuple[object, int] | Response:
         # Refresh the cooldown timestamp to the actual success time
         _mod._shutdown_limiter.record()
         return json_success()
-    except subprocess.CalledProcessError as e:
+    except subprocess.CalledProcessError:
         # Roll back so the cooldown isn't consumed by a failed attempt
         _mod._shutdown_limiter.reset()
         _mod.logger.exception("Failed to execute shutdown command")
-        return json_internal_error("shutdown", details={"error": str(e)})
+        return json_internal_error("shutdown")

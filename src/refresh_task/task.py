@@ -30,6 +30,7 @@ from refresh_task.worker import (
     sweep_orphan_render_tempfiles,
 )
 from utils import blackout, crash_breadcrumb
+from utils.backend_errors import RefreshTaskUnavailable
 from utils.image_utils import compute_image_hash
 from utils.output_validator import OutputDimensionMismatch, validate_image_dimensions
 from utils.progress import ProgressTracker, track_progress
@@ -1218,12 +1219,19 @@ class RefreshTask:
         )
 
     def manual_update(self, refresh_action: RefreshAction) -> dict[str, Any] | None:
-        """Manually triggers an update for the specified plugin id and plugin settings by notifying the background process."""
+        """Manually trigger an update by notifying the background refresh loop.
+
+        Raises:
+            RefreshTaskUnavailable: the loop is not running, so nothing would
+                pick the request up. Routes map it to HTTP 503 rather than
+                reporting a display that never happened.
+            BlackoutActiveError: blackout is active.
+        """
         if not self.running:
             logger.warning(
                 "Background refresh task is not running, unable to do a manual update"
             )
-            return None
+            raise RefreshTaskUnavailable
         if blackout.is_active(self.device_config):
             raise blackout.BlackoutActiveError
 

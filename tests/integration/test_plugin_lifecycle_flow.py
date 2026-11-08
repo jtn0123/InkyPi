@@ -20,15 +20,21 @@ def test_plugin_add_config_render_remove_flow(client: FlaskClient) -> None:
     )
     assert added is True
 
-    # Render the instance
-    r = client.post(
-        "/display_plugin_instance",
-        json={
-            "playlist_name": playlist_name,
-            "plugin_id": "clock",
-            "plugin_instance": "Lifecycle",
-        },
-    )
+    # Render the instance. The route needs a running refresh loop (it returns
+    # 503 otherwise), so start the app's real one for this step.
+    refresh_task = app.config["REFRESH_TASK"]
+    refresh_task.start()
+    try:
+        r = client.post(
+            "/display_plugin_instance",
+            json={
+                "playlist_name": playlist_name,
+                "plugin_id": "clock",
+                "plugin_instance": "Lifecycle",
+            },
+        )
+    finally:
+        refresh_task.stop()
     assert r.status_code == 200
     data = r.get_json()
     assert data.get("success") is True
