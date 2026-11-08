@@ -256,7 +256,7 @@ class TestNonUrlFailuresStillOpaque:
 
         # Monkey-patch the blueprint's imported symbol so _update_now_direct
         # (and _run_update_now) both see the wrapped factory.
-        import blueprints.plugin as plugin_bp_mod
+        import blueprints.plugin._update_now as plugin_bp_mod
 
         monkeypatch.setattr(plugin_bp_mod, "get_plugin_instance", _boom)
 

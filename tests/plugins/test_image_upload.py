@@ -94,7 +94,7 @@ def test_image_upload_success(
             MultiDict([("imageFiles[]", upload)]), form_data
         )
 
-    import blueprints.plugin as plugin_bp_mod
+    import blueprints.plugin._common as plugin_bp_mod
 
     monkeypatch.setattr(
         plugin_bp_mod, "handle_request_files", fake_handle_request_files, raising=True
@@ -121,7 +121,7 @@ def test_image_upload_rejects_non_image(
             MultiDict([("imageFiles[]", upload)]), form_data
         )
 
-    import blueprints.plugin as plugin_bp_mod
+    import blueprints.plugin._common as plugin_bp_mod
 
     monkeypatch.setattr(
         plugin_bp_mod, "handle_request_files", fake_handle_request_files, raising=True
@@ -151,7 +151,7 @@ def test_image_upload_rejects_oversize(
             MultiDict([("imageFiles[]", upload)]), form_data
         )
 
-    import blueprints.plugin as plugin_bp_mod
+    import blueprints.plugin._common as plugin_bp_mod
 
     monkeypatch.setattr(
         plugin_bp_mod, "handle_request_files", fake_handle_request_files, raising=True
@@ -178,7 +178,7 @@ def test_image_upload_rejects_decode_error(
             MultiDict([("imageFiles[]", upload)]), form_data
         )
 
-    import blueprints.plugin as plugin_bp_mod
+    import blueprints.plugin._common as plugin_bp_mod
 
     monkeypatch.setattr(
         plugin_bp_mod, "handle_request_files", fake_handle_request_files, raising=True

@@ -401,7 +401,7 @@ class TestDeletePluginInstanceCleanup:
             return mock_plugin
 
         monkeypatch.setattr(
-            "blueprints.plugin.get_plugin_instance",
+            "blueprints.plugin._instances.get_plugin_instance",
             tracking_get_plugin_instance,
         )
 
