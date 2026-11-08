@@ -20,6 +20,10 @@ ongoing feature work.
 | Module | Added |
 |---|---|
 | `src/utils/http_utils.py` | JTN-525 |
+| `src/utils/api_responses.py` | JTN-525 (split from `http_utils.py`) |
+| `src/utils/http_transport.py` | JTN-525 (split from `http_utils.py`) |
+| `src/utils/dns_pinning.py` | JTN-525 (split from `http_utils.py`) |
+| `src/utils/safe_fetch.py` | JTN-525 (split from `http_utils.py`) |
 | `src/utils/security_utils.py` | JTN-525 |
 | `src/utils/client_endpoint.py` | Quality guards PR |
 | `src/utils/display_names.py` | Quality guards PR |
