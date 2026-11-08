@@ -117,6 +117,18 @@ pass. Browser and container tests have their own CI jobs. Run without
 Results are uploaded as `mutmut-cache-<shard>` artifacts containing `mutants/`
 and can be downloaded from the GitHub Actions run summary.
 
+Each shard stops mutmut after 100 minutes (inside the job's 120-minute cap) and
+keeps the partial results, with a `Mutation budget reached` notice in the run
+summary. Surviving mutants do not fail the job; it fails only if mutmut
+itself fails, most often because its clean-test run broke. Scheduled runs
+include the shards in the `ci-gate` result, so a broken mutation setup turns
+the nightly red.
+
+mutmut runs several pytest sessions in one interpreter and runs the clean
+tests as a sorted subset. As a result, a test that changes a module global
+without restoring it (assigning directly instead of using `monkeypatch`) can
+break unrelated tests here even when the normal suite passes.
+
 ## Narrow PR Mutation Gate
 
 The full `mutmut` pass is intentionally advisory because it is slow. For PR and
