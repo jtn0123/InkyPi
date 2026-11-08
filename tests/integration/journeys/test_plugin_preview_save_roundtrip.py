@@ -21,7 +21,7 @@ offline today (clock, year_progress, todo_list, countdown) -- see
 ``tests/integration/fixtures/plugin_inputs.py`` for the input dicts.
 
 **Teardown:** the saved plugin instance lives on the Default playlist as
-``<plugin_id>_saved_settings`` (see :func:`blueprints.plugin._save_plugin_settings_common`).
+``<plugin_id>_saved_settings`` (see :func:`blueprints.plugin._settings_save._save_plugin_settings_common`).
 We delete it after the test to avoid leaking state into sibling tests
 that assume a clean Default playlist.
 

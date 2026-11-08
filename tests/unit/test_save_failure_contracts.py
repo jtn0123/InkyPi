@@ -160,8 +160,15 @@ def test_route_response_matches_persisted_state(
     def fail(*args: Any, **kwargs: Any) -> None:
         raise OSError("injected failure")
 
+    # The two routes live in different modules of the blueprint package;
+    # patch the names where the exercised route looks them up.
+    route_module = (
+        "blueprints.plugin._settings_save"
+        if route == "save"
+        else "blueprints.plugin._instances"
+    )
     monkeypatch.setattr(
-        "blueprints.plugin.get_plugin_instance",
+        f"{route_module}.get_plugin_instance",
         fail if failure == "validation" else lambda _: ValidPlugin(),
     )
     if failure == "history":
@@ -171,7 +178,7 @@ def test_route_response_matches_persisted_state(
                 patch.setattr("utils.plugin_history.tempfile.mkstemp", fail)
                 return record_change(*args)
 
-        monkeypatch.setattr("blueprints.plugin._record_plugin_change", failed_history)
+        monkeypatch.setattr(f"{route_module}._record_plugin_change", failed_history)
     if failure == "replacement":
         monkeypatch.setattr("config.os.replace", fail)
     client = app.test_client()

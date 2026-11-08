@@ -48,7 +48,7 @@ class TestUpdateNowTimeoutDirect:
             inst.generate_image = _raise  # type: ignore[method-assign]
             return inst
 
-        import blueprints.plugin as plugin_bp_mod
+        import blueprints.plugin._update_now as plugin_bp_mod
 
         monkeypatch.setattr(plugin_bp_mod, "get_plugin_instance", _boom)
 

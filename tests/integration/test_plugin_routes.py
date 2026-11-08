@@ -432,7 +432,7 @@ def test_update_now_exception_handling(
     client: FlaskClient, flask_app: Flask, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Sync path: exceptions yield 500."""
-    import blueprints.plugin as plugin_mod
+    import blueprints.plugin._update_now as plugin_mod
 
     monkeypatch.setattr(
         plugin_mod,
@@ -598,7 +598,9 @@ def test_instance_image_generated_from_settings(
             return Image.new("RGB", (10, 10), "blue")
 
     monkeypatch.setattr(
-        "blueprints.plugin.get_plugin_instance", lambda cfg: _StubPlugin(), raising=True
+        "blueprints.plugin._images.get_plugin_instance",
+        lambda cfg: _StubPlugin(),
+        raising=True,
     )
 
     resp = client.get("/instance_image/ai_text/Inst One")
@@ -637,7 +639,9 @@ def test_instance_image_served_from_history_on_generation_failure(
             raise RuntimeError("fail")
 
     monkeypatch.setattr(
-        "blueprints.plugin.get_plugin_instance", lambda cfg: _StubPlugin(), raising=True
+        "blueprints.plugin._images.get_plugin_instance",
+        lambda cfg: _StubPlugin(),
+        raising=True,
     )
 
     resp = client.get("/instance_image/ai_text/Inst One")
@@ -680,7 +684,9 @@ def test_instance_image_uses_latest_matching_history_entry(
             raise RuntimeError("fail")
 
     monkeypatch.setattr(
-        "blueprints.plugin.get_plugin_instance", lambda cfg: _StubPlugin(), raising=True
+        "blueprints.plugin._images.get_plugin_instance",
+        lambda cfg: _StubPlugin(),
+        raising=True,
     )
 
     resp = client.get("/instance_image/ai_text/Inst One")
@@ -736,7 +742,7 @@ def test_instance_image_busy_renderer_serves_history_without_waiting(
                 return Image.new("RGB", (10, 10), "blue")
 
     monkeypatch.setattr(
-        "blueprints.plugin.get_plugin_instance",
+        "blueprints.plugin._images.get_plugin_instance",
         lambda cfg: _ChromiumPlugin(),
         raising=True,
     )
@@ -810,7 +816,9 @@ def test_delete_plugin_instance_calls_plugin_cleanup(
             cleanup_called["settings"] = settings
 
     monkeypatch.setattr(
-        "blueprints.plugin.get_plugin_instance", lambda pid: _StubPlugin(), raising=True
+        "blueprints.plugin._instances.get_plugin_instance",
+        lambda pid: _StubPlugin(),
+        raising=True,
     )
 
     resp = client.post(
