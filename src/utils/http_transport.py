@@ -152,7 +152,10 @@ def _build_session(*, headers: dict[str, str], retry: Retry) -> requests.Session
         pool_block=HTTP_POOL_BLOCK,
     )
     s.headers.update(headers)
-    s.mount("http://", adapter)
+    # Pooling/retry adapter for plain-HTTP URLs (user-configured feeds, LAN
+    # devices). This does not downgrade anything: callers choose the scheme and
+    # remote fetches go through the SSRF guard in utils.safe_fetch.
+    s.mount("http://", adapter)  # NOSONAR python:S5332
     s.mount("https://", adapter)
     return s
 
