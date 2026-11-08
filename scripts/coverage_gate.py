@@ -11,8 +11,8 @@ Two profiles, because they read different reports:
   job. Floors sit ~1-2 points under the measured numbers so they ratchet
   without flaking.
 * ``preflash`` - the 14-file subset run by ``scripts/preflash_validate.sh``
-  (``INKYPI_VALIDATE_COVERAGE=1``). That subset only exercises three files,
-  so it keeps its own, lower floors.
+  (``INKYPI_VALIDATE_COVERAGE=1``). That subset only exercises the refresh
+  task, the display manager and config, so it keeps its own, lower floors.
 
 A key ending in ``/`` is a package: its lines and branches are summed across
 every file under that prefix (subpackages included). Floors are fractions:
@@ -42,7 +42,13 @@ FULL_THRESHOLDS: dict[str, tuple[float, float]] = {
     "blueprints/": (0.89, 0.83),  # 90.7 / 85.1
     "app_setup/": (0.91, 0.84),  # 92.8 / 85.6
     # Files
-    "refresh_task/task.py": (0.91, 0.85),  # 92.6 / 86.7
+    # task.py was split into task.py + mixin modules after the run above.
+    # These four were measured by a local run of every refresh-task-related
+    # test file (a strict subset of the full suite, so a lower bound on it).
+    "refresh_task/task.py": (0.91, 0.85),  # 92.5 / 86.7 (subset)
+    "refresh_task/refresh_cycle.py": (0.91, 0.83),  # 92.3 / 84.6 (subset)
+    "refresh_task/command_queue.py": (0.91, 0.86),  # 92.5 / 88.1 (subset)
+    "refresh_task/loop_scheduling.py": (0.94, 0.90),  # 95.5 / 92.3 (subset)
     "display/display_manager.py": (0.94, 0.89),  # 95.9 / 91.3
     "config.py": (0.88, 0.82),  # 89.8 / 84.4
     "app_setup/auth.py": (0.94, 0.86),  # 95.7 / 88.5
@@ -54,10 +60,15 @@ FULL_THRESHOLDS: dict[str, tuple[float, float]] = {
     "utils/asset_check.py": (0.87, 0.90),  # 88.9 / 92.9
 }
 
-# The preflash subset (coverage-gate job artifact, same run): task.py
-# 70.5 / 54.7, display_manager.py 82.6 / 71.7, config.py 73.4 / 65.6.
+# The preflash subset (coverage-gate job artifact, same run):
+# display_manager.py 82.6 / 71.7, config.py 73.4 / 65.6. The refresh_task
+# entries replace the old single task.py floor (70.5 / 54.7) after task.py was
+# split into mixin modules; measured with a local run of the same 14 files.
 PREFLASH_THRESHOLDS: dict[str, tuple[float, float]] = {
-    "refresh_task/task.py": (0.69, 0.53),
+    "refresh_task/task.py": (0.81, 0.50),  # 83.1 / 53.3
+    "refresh_task/refresh_cycle.py": (0.71, 0.50),  # 73.1 / 53.8
+    "refresh_task/command_queue.py": (0.60, 0.57),  # 61.9 / 59.5
+    "refresh_task/loop_scheduling.py": (0.50, 0.32),  # 52.3 / 34.6
     "display/display_manager.py": (0.80, 0.70),
     "config.py": (0.72, 0.64),
 }

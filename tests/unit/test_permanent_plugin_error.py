@@ -93,7 +93,9 @@ class TestPermanentPluginErrorInProcess:
         caplog.set_level("INFO")
 
         with (
-            patch("refresh_task.task.get_plugin_instance", return_value=plugin),
+            patch(
+                "refresh_task.plugin_lookup.get_plugin_instance", return_value=plugin
+            ),
             patch.dict(
                 os.environ,
                 {
@@ -129,7 +131,9 @@ class TestPermanentPluginErrorInProcess:
         action.execute.side_effect = lambda p, cfg, dt: p.generate_image(None, cfg)
 
         with (
-            patch("refresh_task.task.get_plugin_instance", return_value=plugin),
+            patch(
+                "refresh_task.plugin_lookup.get_plugin_instance", return_value=plugin
+            ),
             patch.dict(
                 os.environ,
                 {
@@ -158,7 +162,9 @@ class TestPermanentPluginErrorInProcess:
         action.execute.side_effect = lambda p, cfg, dt: p.generate_image(None, cfg)
 
         with (
-            patch("refresh_task.task.get_plugin_instance", return_value=plugin),
+            patch(
+                "refresh_task.plugin_lookup.get_plugin_instance", return_value=plugin
+            ),
             patch.dict(
                 os.environ,
                 {

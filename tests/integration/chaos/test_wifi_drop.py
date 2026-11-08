@@ -58,7 +58,7 @@ def test_wifi_drop_mid_refresh_then_retry_succeeds(
         raising=True,
     )
     monkeypatch.setattr(
-        "refresh_task.task.get_plugin_instance",
+        "refresh_task.plugin_lookup.get_plugin_instance",
         lambda _cfg: plugin,
         raising=True,
     )

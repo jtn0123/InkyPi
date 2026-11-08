@@ -328,7 +328,7 @@ class TestLoggingKeepsRawDetail:
                 return None
 
         monkeypatch.setattr(
-            "refresh_task.task.get_plugin_instance",
+            "refresh_task.plugin_lookup.get_plugin_instance",
             lambda cfg: AlwaysRaisesPlugin(),
         )
 

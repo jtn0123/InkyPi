@@ -79,5 +79,5 @@ flowchart TD
 
 - New to the codebase? Start with `src/inkypi.py` (~200 lines after JTN-289 split) to see the wiring.
 - Building a plugin? See [building_plugins.md](building_plugins.md) — there's a hello-world walkthrough at the bottom.
-- Understanding the refresh loop? Read `src/refresh_task/task.py` — `_determine_next_plugin` and `_update_plugin_health` are the key methods.
+- Understanding the refresh loop? Start at `RefreshTask._run` in `src/refresh_task/task.py`; next-plugin selection (`_determine_next_plugin`) is in `loop_scheduling.py`, one refresh (`_perform_refresh`) in `refresh_cycle.py`, manual updates in `command_queue.py` and `_update_plugin_health` in `health_hooks.py`.
 - Display drivers? `src/display/` — `DisplayManager` selects the driver based on `device.json`.

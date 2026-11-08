@@ -109,12 +109,14 @@ def test_perform_refresh_skips_when_cached(
     dummy_cfg = {"id": "dummy", "class": "Dummy"}
     monkeypatch.setattr(device_config_dev, "get_plugin", lambda pid: dummy_cfg)
     monkeypatch.setattr(
-        "refresh_task.task.get_plugin_instance",
+        "refresh_task.plugin_lookup.get_plugin_instance",
         lambda cfg: _dummy_plugin(device_config_dev),
         raising=True,
     )
     monkeypatch.setattr(
-        "refresh_task.task.compute_image_hash", lambda img: "same", raising=True
+        "refresh_task.refresh_cycle.compute_image_hash",
+        lambda img: "same",
+        raising=True,
     )
 
     called = {"val": False}

@@ -203,7 +203,7 @@ class TestCbOnFailureWebhookIntegration:
 
         device_config_dev.get_config = patched_get_config
 
-        with patch("refresh_task.task.send_failure_webhook") as mock_send:
+        with patch("refresh_task.health_hooks.send_failure_webhook") as mock_send:
             task._update_plugin_health(
                 plugin_id="weather",
                 instance="my_weather",
@@ -231,7 +231,7 @@ class TestCbOnFailureWebhookIntegration:
         pi = _make_plugin_instance()
         _add_plugin_to_pm(device_config_dev, pi)
 
-        with patch("refresh_task.task.send_failure_webhook") as mock_send:
+        with patch("refresh_task.health_hooks.send_failure_webhook") as mock_send:
             task._update_plugin_health(
                 plugin_id="weather",
                 instance="my_weather",
@@ -267,7 +267,9 @@ class TestCbOnFailureWebhookIntegration:
             nonlocal call_count
             call_count += 1
 
-        with patch("refresh_task.task.send_failure_webhook", side_effect=counting_send):
+        with patch(
+            "refresh_task.health_hooks.send_failure_webhook", side_effect=counting_send
+        ):
             # First failure — counter = 1, not yet paused
             task._update_plugin_health(
                 plugin_id="weather",

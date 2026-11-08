@@ -147,7 +147,9 @@ def test_plugin_execution_no_memory_leak(
     dummy_cfg = {"id": "simple", "class": "Simple"}
     monkeypatch.setattr(device_config_dev, "get_plugin", lambda pid: dummy_cfg)
     monkeypatch.setattr(
-        "refresh_task.task.get_plugin_instance", lambda cfg: simple_plugin, raising=True
+        "refresh_task.plugin_lookup.get_plugin_instance",
+        lambda cfg: simple_plugin,
+        raising=True,
     )
 
     dm = DisplayManager(device_config_dev)
@@ -265,7 +267,7 @@ def test_long_running_refresh_task(
     dummy_cfg = {"id": "cycling", "class": "Cycling"}
     monkeypatch.setattr(device_config_dev, "get_plugin", lambda pid: dummy_cfg)
     monkeypatch.setattr(
-        "refresh_task.task.get_plugin_instance",
+        "refresh_task.plugin_lookup.get_plugin_instance",
         lambda cfg: cycling_plugin,
         raising=True,
     )

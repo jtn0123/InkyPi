@@ -63,7 +63,9 @@ def test_plugin_timeout_policy(
         device_config_dev, "get_plugin", lambda pid: {"id": "slow", "class": "Slow"}
     )
     monkeypatch.setattr(
-        "refresh_task.task.get_plugin_instance", lambda cfg: SlowPlugin(), raising=True
+        "refresh_task.plugin_lookup.get_plugin_instance",
+        lambda cfg: SlowPlugin(),
+        raising=True,
     )
 
     task.start()
@@ -95,7 +97,7 @@ def test_plugin_retry_policy(
         },
     )
     monkeypatch.setattr(
-        "refresh_task.task.get_plugin_instance",
+        "refresh_task.plugin_lookup.get_plugin_instance",
         lambda cfg: FileBackedFlakyPlugin(cfg),
         raising=True,
     )
