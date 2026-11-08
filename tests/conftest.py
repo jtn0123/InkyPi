@@ -287,10 +287,10 @@ def clear_managed_api_key_env(monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.delenv(env_var, raising=False)
 
     try:
-        import blueprints.playlist as playlist_mod
+        import blueprints.playlist._display as playlist_display_mod
         import blueprints.settings as settings_mod
 
-        playlist_mod._eta_cache.clear()
+        playlist_display_mod._eta_cache.clear()
         settings_mod._logs_limiter._requests.clear()
         # Reset the shutdown rate limiter so tests are independent
         settings_mod._shutdown_limiter.reset()

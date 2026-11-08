@@ -403,7 +403,7 @@ def test_plugin_order_rejects_duplicate_ids(client: FlaskClient) -> None:
 
 def test_eta_cache_max_size_defined() -> None:
     """_ETA_CACHE_MAX_SIZE is defined and reasonable."""
-    import blueprints.playlist as playlist_mod
+    import blueprints.playlist._display as playlist_mod
 
     max_size = playlist_mod._ETA_CACHE_MAX_SIZE
     assert max_size == 64, f"Expected _ETA_CACHE_MAX_SIZE=64, got {max_size}"

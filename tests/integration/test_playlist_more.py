@@ -247,14 +247,14 @@ class _FrozenDatetime(datetime):
 
 
 def _freeze_playlist_now(monkeypatch: pytest.MonkeyPatch, frozen: datetime) -> None:
-    import blueprints.playlist as playlist_mod
+    import blueprints.playlist._pages as playlist_mod
 
     _FrozenDatetime.frozen = frozen
     monkeypatch.setattr(playlist_mod, "datetime", _FrozenDatetime)
 
 
 def test_format_relative_time_filter_cases(monkeypatch: pytest.MonkeyPatch) -> None:
-    from blueprints.playlist import format_relative_time
+    from blueprints.playlist._pages import format_relative_time
 
     now = datetime(2026, 3, 10, 15, 0, tzinfo=UTC)
     _freeze_playlist_now(monkeypatch, now)
@@ -285,7 +285,7 @@ def test_format_relative_time_buckets_by_calendar_day(
 ) -> None:
     """At 2 AM, a refresh at 8:55 PM the previous evening is "yesterday",
     not "today" (regression: rolling 24h window mislabelled it)."""
-    from blueprints.playlist import format_relative_time
+    from blueprints.playlist._pages import format_relative_time
 
     now = datetime(2026, 3, 10, 2, 0, tzinfo=UTC)
     _freeze_playlist_now(monkeypatch, now)
