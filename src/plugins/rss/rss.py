@@ -1,11 +1,15 @@
+import base64
 import html
 import logging
 import re
 from collections.abc import Mapping
+from io import BytesIO
+from time import monotonic
 from typing import Any
 from urllib.parse import urlparse
 
 import feedparser
+from PIL import Image
 from PIL.Image import Image as ImageType
 
 from plugins.base_plugin.base_plugin import BasePlugin
@@ -18,7 +22,11 @@ from plugins.base_plugin.settings_schema import (
     section,
 )
 from utils.http_client import get_http_session
-from utils.http_utils import fetch_feed_bytes
+from utils.http_utils import (
+    fetch_feed_bytes,
+    private_feeds_allowed,
+    safe_fetch_bytes,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +34,17 @@ logger = logging.getLogger(__name__)
 #: hundreds of KB; the cap stops a hostile or broken server from exhausting
 #: memory on a Pi Zero.
 MAX_FEED_BYTES = 5 * 1024 * 1024
+
+#: Item images are fetched server-side through the SSRF guard and inlined as
+#: ``data:`` URIs, so the render Chromium never makes a network request
+#: (grade report E2). These caps bound what one feed can make the Pi download.
+MAX_RENDERED_ITEMS = 10
+MAX_ITEM_IMAGE_BYTES = 2 * 1024 * 1024
+MAX_ITEM_IMAGE_PIXELS = 25_000_000
+ITEM_IMAGE_TIMEOUT = (3.0, 5.0)
+ITEM_IMAGE_BUDGET_SECONDS = 20.0
+#: Re-encoded thumbnail bound; the template shows images at a few hundred px.
+ITEM_IMAGE_MAX_SIDE = 400
 
 FONT_SIZES = {"x-small": 0.7, "small": 0.9, "normal": 1, "large": 1.1, "x-large": 1.3}
 
@@ -120,19 +139,90 @@ class Rss(BasePlugin):
         font_size = settings.get("fontSize", "normal")
         font_scale = FONT_SIZES.get(font_size, 1) if isinstance(font_size, str) else 1
 
-        items = self.parse_rss_feed(feed_url)
+        items = self.parse_rss_feed(feed_url)[:MAX_RENDERED_ITEMS]
+        include_images = settings.get("includeImages") == "true"
+        if include_images:
+            self._inline_item_images(items)
+        else:
+            for item in items:
+                item["image"] = None
 
         dimensions = self.get_oriented_dimensions(device_config)
 
         template_params = {
             "title": title,
-            "include_images": settings.get("includeImages") == "true",
-            "items": items[:10],
+            "include_images": include_images,
+            "items": items,
             "font_scale": font_scale,
             "plugin_settings": settings,
         }
 
         return self.render_image(dimensions, "rss.html", "rss.css", template_params)
+
+    @staticmethod
+    def _inline_item_images(items: list[dict[str, str | None]]) -> None:
+        """Replace each item's feed-supplied image URL with a ``data:`` URI.
+
+        Only the items about to be rendered are passed in. Every fetch goes
+        through :func:`utils.http_utils.safe_fetch_bytes` (scheme check,
+        private/loopback/link-local rejection with per-hop DNS pinning, size
+        cap). Images that fail the guard, time out, exceed a cap or do not
+        decode are dropped. Once the overall time budget is spent the
+        remaining images are dropped too.
+        """
+        deadline = monotonic() + ITEM_IMAGE_BUDGET_SECONDS
+        for item in items:
+            url = item.get("image")
+            item["image"] = None
+            if not url or monotonic() >= deadline:
+                continue
+            item["image"] = Rss._fetch_item_image(url)
+
+    @staticmethod
+    def _fetch_item_image(url: str) -> str | None:
+        """Fetch *url* through the SSRF guard and return a re-encoded data URI."""
+        try:
+            content = safe_fetch_bytes(
+                url,
+                max_bytes=MAX_ITEM_IMAGE_BYTES,
+                timeout=ITEM_IMAGE_TIMEOUT,
+                headers={"User-Agent": "Mozilla/5.0"},
+                allow_lan=private_feeds_allowed(),
+                session=get_http_session(),
+            )
+        except Exception as exc:
+            logger.info("RSS item image dropped | reason=%s", type(exc).__name__)
+            return None
+        try:
+            return Rss._to_data_uri(content)
+        except Exception as exc:
+            logger.info("RSS item image undecodable | reason=%s", type(exc).__name__)
+            return None
+
+    @staticmethod
+    def _to_data_uri(content: bytes) -> str | None:
+        """Decode *content* with Pillow and re-encode a bounded JPEG data URI.
+
+        Re-encoding means Chromium only ever decodes bytes Pillow produced,
+        never attacker-supplied image data.
+        """
+        with Image.open(BytesIO(content)) as img:
+            width, height = img.size
+            if width * height > MAX_ITEM_IMAGE_PIXELS:
+                return None
+            img.draft("RGB", (ITEM_IMAGE_MAX_SIDE, ITEM_IMAGE_MAX_SIDE))
+            img.thumbnail((ITEM_IMAGE_MAX_SIDE, ITEM_IMAGE_MAX_SIDE))
+            if img.mode in ("RGBA", "LA", "P"):
+                rgba = img.convert("RGBA")
+                flat = Image.new("RGB", rgba.size, (255, 255, 255))
+                flat.paste(rgba, mask=rgba.getchannel("A"))
+            else:
+                flat = img.convert("RGB")
+        out = BytesIO()
+        flat.save(out, format="JPEG", quality=85)
+        return "data:image/jpeg;base64," + base64.b64encode(out.getvalue()).decode(
+            "ascii"
+        )
 
     @staticmethod
     def _sanitize_text(raw: str) -> str:

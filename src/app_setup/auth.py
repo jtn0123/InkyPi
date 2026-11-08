@@ -22,7 +22,9 @@ import logging
 import os
 import posixpath
 import secrets
-from typing import TYPE_CHECKING
+import time
+from collections.abc import MutableMapping
+from typing import TYPE_CHECKING, Any
 
 from flask import Flask, Response, redirect, request, session, url_for
 
@@ -93,6 +95,78 @@ def _verify_pin(candidate: str, stored_hash: bytes) -> bool:
     """Constant-time comparison of candidate PIN against stored hash."""
     candidate_hash = _hash_pin(candidate)
     return hmac.compare_digest(candidate_hash, stored_hash)
+
+
+#: Max age of an authenticated session, in days (grade report E4).
+_SESSION_MAX_AGE_ENV = "INKYPI_SESSION_MAX_AGE_DAYS"
+_DEFAULT_SESSION_MAX_AGE_DAYS = 30.0
+_SESSION_AUTH_KEYS = ("authed", "auth_at", "auth_pin")
+
+
+def _session_max_age_seconds() -> float:
+    """Return the configured session lifetime in seconds (env, default 30 d)."""
+    raw = os.environ.get(_SESSION_MAX_AGE_ENV, "").strip()
+    days = _DEFAULT_SESSION_MAX_AGE_DAYS
+    if raw:
+        try:
+            parsed = float(raw)
+        except ValueError:
+            logger.warning("Ignoring invalid %s=%r", _SESSION_MAX_AGE_ENV, raw)
+        else:
+            if parsed > 0:
+                days = parsed
+            else:
+                logger.warning("Ignoring non-positive %s=%r", _SESSION_MAX_AGE_ENV, raw)
+    return days * 86_400
+
+
+def _pin_fingerprint(pin: str, secret_key: object) -> str:
+    """Return a short, stable fingerprint of *pin* to bind sessions to it.
+
+    Keyed with the app ``SECRET_KEY`` so it is stable across restarts (the
+    scrypt salt is per-process) and reveals nothing about the PIN to someone
+    who decodes the (signed, not encrypted) session cookie. Changing the PIN
+    changes the fingerprint and invalidates every existing session.
+    """
+    if isinstance(secret_key, str):
+        key = secret_key.encode()
+    elif isinstance(secret_key, bytes):
+        key = secret_key
+    else:
+        key = _SCRYPT_SALT
+    return hmac.new(key, b"inkypi-pin:" + pin.encode(), hashlib.sha256).hexdigest()[:16]
+
+
+def mark_session_authenticated(sess: MutableMapping[str, Any], app: Flask) -> None:
+    """Record a successful login in *sess* (timestamp + PIN fingerprint)."""
+    sess["authed"] = True
+    sess["auth_at"] = time.time()
+    fingerprint = app.config.get("AUTH_PIN_FINGERPRINT")
+    if isinstance(fingerprint, str):
+        sess["auth_pin"] = fingerprint
+
+
+def is_session_authenticated(sess: MutableMapping[str, Any], app: Flask) -> bool:
+    """Return True when *sess* holds a current, unexpired login.
+
+    Rejects sessions without a login timestamp, older than
+    ``INKYPI_SESSION_MAX_AGE_DAYS`` (or stamped in the future), and sessions
+    whose PIN fingerprint does not match the PIN currently configured.
+    """
+    if sess.get("authed") is not True:
+        return False
+    auth_at = sess.get("auth_at")
+    if not isinstance(auth_at, int | float) or isinstance(auth_at, bool):
+        return False
+    age = time.time() - float(auth_at)
+    if age < -60 or age > _session_max_age_seconds():
+        return False
+    expected = app.config.get("AUTH_PIN_FINGERPRINT")
+    if isinstance(expected, str):
+        stored = sess.get("auth_pin")
+        if not isinstance(stored, str) or not hmac.compare_digest(stored, expected):
+            return False
+    return True
 
 
 def _hash_token(token: str) -> str:
@@ -184,14 +258,19 @@ def init_auth(app: Flask, device_config: Config) -> None:
     pin_hash = _hash_pin(pin)
     app.config["AUTH_ENABLED"] = True
     app.config["AUTH_PIN_HASH"] = pin_hash
+    app.config["AUTH_PIN_FINGERPRINT"] = _pin_fingerprint(pin, app.secret_key)
     logger.info("PIN auth enabled")
 
     @app.before_request
     def _require_auth() -> Response | WerkzeugResponse | None:
         if _should_skip_auth():
             return None
-        if session.get("authed") is True:
+        if is_session_authenticated(session, app):
             return None
+        if "authed" in session:
+            # Expired, pre-upgrade or issued under a different PIN.
+            for key in _SESSION_AUTH_KEYS:
+                session.pop(key, None)
         # Allow valid read-only bearer token on the allowlist (safe methods only)
         token_hash = app.config.get("READONLY_TOKEN_HASH")
         if token_hash and _is_readonly_token_request(token_hash):

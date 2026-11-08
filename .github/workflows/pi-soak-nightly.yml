@@ -11,18 +11,22 @@ name: Pi soak nightly
 # beyond what the per-PR CI can see.
 #
 # The workflow assumes a self-hosted runner labeled `self-hosted` +
-# `pi-zero-2w` is available. Until such a runner exists, the workflow will
-# simply queue and no-op (no GitHub-hosted fallback is provided on purpose
+# `pi-zero-2w` is available (no GitHub-hosted fallback is provided on purpose
 # — a x86 ubuntu-latest run would not be a meaningful soak signal).
 #
-# To trigger a short manual run (e.g. a smoke test of the script itself),
-# use workflow_dispatch with a `duration` input like `10m`.
+# There is no `schedule:` trigger because no such runner is registered yet
+# (`gh api repos/jtn0123/InkyPi/actions/runners` reports zero runners). With
+# the old daily cron every run sat queued for ~28h until GitHub cancelled it,
+# so the nightly history was a wall of "cancelled" with no signal. Restore the
+# cron below once the Pi runner is online:
+#
+#   schedule:
+#     - cron: '0 3 * * *'   # 03:00 UTC; 24h soak ends before the next run
+#
+# To trigger a run (e.g. a short smoke test of the script itself), use
+# workflow_dispatch with a `duration` input like `10m`.
 
 on:
-  schedule:
-    # 03:00 UTC daily. Off-peak for most timezones; lines up so the 24h soak
-    # finishes before the following night's run starts.
-    - cron: '0 3 * * *'
   workflow_dispatch:
     inputs:
       duration:

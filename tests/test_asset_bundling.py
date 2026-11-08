@@ -11,14 +11,34 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
+from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
+import pytest
 from flask import Flask
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 BUILD_SCRIPT = REPO_ROOT / "scripts" / "build_assets.py"
 SRC_ROOT = REPO_ROOT / "src"
+
+
+@pytest.fixture(autouse=True)
+def _restore_manifest_path() -> Iterator[None]:
+    """Undo ``_override_manifest_path_for_tests`` after every test.
+
+    The override rebinds a module global. Without this, a test that points it
+    at a complete tmp manifest leaves bundling "enabled" for every later app
+    in the same interpreter, so base.html stops emitting the per-file script
+    tags and tests/static/test_debug_console.py fails. mutmut runs several
+    pytest sessions in one process with a reordered test subset, which is
+    how the nightly mutation job kept hitting it.
+    """
+    import app_setup.asset_helpers as ah
+
+    original = ah._MANIFEST_PATH
+    yield
+    ah._override_manifest_path_for_tests(original)
 
 
 # ---------------------------------------------------------------------------

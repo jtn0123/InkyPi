@@ -344,7 +344,12 @@ class TestBatchRateLimit:
         """JTN-711: the bucket now holds 60 tokens (up from 10)."""
         cl_mod, app = _fresh_module(monkeypatch)
 
-        cl_mod._rate_limiter = cl_mod.TokenBucket(capacity=60, refill_rate=0)
+        # monkeypatch, not plain assignment: a drained refill_rate=0 bucket
+        # left on the module 429s every later client-log test in the process
+        # (seen as `assert 429 == 400` in the mutation nightly).
+        monkeypatch.setattr(
+            cl_mod, "_rate_limiter", cl_mod.TokenBucket(capacity=60, refill_rate=0)
+        )
         client = app.test_client()
 
         for i in range(60):
@@ -360,7 +365,9 @@ class TestBatchRateLimit:
         """Request-based limiting should allow 60 ten-entry batches."""
         cl_mod, app = _fresh_module(monkeypatch, capture=True)
 
-        cl_mod._rate_limiter = cl_mod.TokenBucket(capacity=60, refill_rate=0)
+        monkeypatch.setattr(
+            cl_mod, "_rate_limiter", cl_mod.TokenBucket(capacity=60, refill_rate=0)
+        )
         client = app.test_client()
         per_batch = 10
         batches = 60

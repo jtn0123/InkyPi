@@ -23,6 +23,8 @@ from flask import Flask
 from flask.testing import FlaskClient
 from jinja2 import ChoiceLoader, FileSystemLoader
 
+from app_setup.auth import mark_session_authenticated
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -211,7 +213,7 @@ class TestAuthEnabled:
 
     def test_authenticated_home_accessible(self, client: FlaskClient) -> None:
         with client.session_transaction() as sess:
-            sess["authed"] = True
+            mark_session_authenticated(sess, client.application)
         resp = client.get("/")
         assert resp.status_code == 200
 
@@ -250,7 +252,7 @@ class TestAuthEnabled:
         self, client: FlaskClient, path: str
     ) -> None:
         with client.session_transaction() as sess:
-            sess["authed"] = True
+            mark_session_authenticated(sess, client.application)
         resp = client.get(path)
         assert resp.status_code == 200
 
@@ -339,7 +341,7 @@ class TestAuthEnabled:
 
     def test_logout_clears_session(self, client: FlaskClient) -> None:
         with client.session_transaction() as sess:
-            sess["authed"] = True
+            mark_session_authenticated(sess, client.application)
 
         resp = client.get("/logout")
         assert resp.status_code == 302
@@ -347,6 +349,114 @@ class TestAuthEnabled:
 
         with client.session_transaction() as sess:
             assert sess.get("authed") is not True
+
+
+# ---------------------------------------------------------------------------
+# Tests — session lifetime and PIN binding (grade report E4)
+# ---------------------------------------------------------------------------
+
+
+class TestSessionLifetime:
+    PIN = "s3cr3t"
+
+    @pytest.fixture()
+    def app(self, monkeypatch: pytest.MonkeyPatch) -> Any:
+        monkeypatch.delenv("INKYPI_SESSION_MAX_AGE_DAYS", raising=False)
+        return _make_auth_app(pin=self.PIN, monkeypatch=monkeypatch)
+
+    @pytest.fixture()
+    def client(self, app: Flask) -> Any:
+        return app.test_client()
+
+    def _login(self, client: FlaskClient) -> None:
+        csrf = _get_csrf(client)
+        resp = client.post(
+            "/login", data={"pin": self.PIN, "next": "/", "csrf_token": csrf}
+        )
+        assert resp.status_code == 302
+
+    def test_login_stores_timestamp_and_fingerprint(
+        self, client: FlaskClient, app: Flask
+    ) -> None:
+        self._login(client)
+        with client.session_transaction() as sess:
+            assert abs(sess["auth_at"] - time.time()) < 60
+            assert sess["auth_pin"] == app.config["AUTH_PIN_FINGERPRINT"]
+            # Short fingerprint, never the PIN itself.
+            assert len(sess["auth_pin"]) == 16
+            assert self.PIN not in sess["auth_pin"]
+        assert client.get("/").status_code == 200
+
+    def test_legacy_authed_flag_alone_is_rejected(self, client: FlaskClient) -> None:
+        with client.session_transaction() as sess:
+            sess["authed"] = True
+        resp = client.get("/")
+        assert resp.status_code == 302
+        assert "/login" in resp.headers["Location"]
+        with client.session_transaction() as sess:
+            assert "authed" not in sess
+
+    def test_session_older_than_max_age_is_rejected(
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        self._login(client)
+        assert client.get("/").status_code == 200
+        real_time = time.time
+        monkeypatch.setattr(time, "time", lambda: real_time() + 31 * 86_400)
+        resp = client.get("/")
+        assert resp.status_code == 302
+        assert "/login" in resp.headers["Location"]
+        # Login page must not bounce an expired session back to "/".
+        assert client.get("/login").status_code == 200
+
+    def test_max_age_is_configurable(
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        self._login(client)
+        monkeypatch.setenv("INKYPI_SESSION_MAX_AGE_DAYS", "1")
+        real_time = time.time
+        monkeypatch.setattr(time, "time", lambda: real_time() + 2 * 86_400)
+        assert client.get("/").status_code == 302
+
+    @pytest.mark.parametrize("raw", ["abc", "0", "-3"])
+    def test_invalid_max_age_falls_back_to_default(
+        self, monkeypatch: pytest.MonkeyPatch, raw: str
+    ) -> None:
+        import app_setup.auth as auth_mod
+
+        monkeypatch.setenv("INKYPI_SESSION_MAX_AGE_DAYS", raw)
+        assert auth_mod._session_max_age_seconds() == 30 * 86_400
+
+    def test_pin_change_invalidates_existing_session(
+        self, client: FlaskClient, app: Flask, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        self._login(client)
+        cookie = client.get_cookie("session")
+        assert cookie is not None
+
+        # Same SECRET_KEY, new PIN: simulates restarting with a changed PIN.
+        new_app = _make_auth_app(pin="n3w-pin", monkeypatch=monkeypatch)
+        assert (
+            new_app.config["AUTH_PIN_FINGERPRINT"] != app.config["AUTH_PIN_FINGERPRINT"]
+        )
+        new_client = new_app.test_client()
+        new_client.set_cookie("session", cookie.value)
+        resp = new_client.get("/")
+        assert resp.status_code == 302
+        assert "/login" in resp.headers["Location"]
+
+    def test_same_pin_session_survives_restart(
+        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        self._login(client)
+        cookie = client.get_cookie("session")
+        assert cookie is not None
+        # Reload reseeds the per-process scrypt salt; the fingerprint is keyed
+        # on SECRET_KEY so the session must still be valid.
+        new_app = _make_auth_app(pin=self.PIN, monkeypatch=monkeypatch)
+        new_client = new_app.test_client()
+        new_client.set_cookie("session", cookie.value)
+        assert new_client.get("/").status_code == 200
 
 
 # ---------------------------------------------------------------------------

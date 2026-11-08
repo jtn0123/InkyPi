@@ -69,8 +69,10 @@ your proxy/firewall configuration.
 
 The HTTPS profile enables **Secure, HttpOnly, SameSite=Lax session cookies**.
 HSTS is emitted only for HTTPS or the accepted proxy scheme. An arbitrary
-client's `X-Forwarded-Proto: https` cannot bypass the redirect. Unknown redirect
-hosts receive 400; configure every intended hostname in `INKYPI_ALLOWED_HOSTS`.
+client's `X-Forwarded-Proto: https` cannot bypass the redirect. Requests for
+unknown hosts receive 400 whether or not HTTPS is forced; add the proxy's public
+hostname to `INKYPI_ALLOWED_HOSTS` (see
+[security.md](security.md#allowed-host-names-dns-rebinding-protection)).
 `INKYPI_SECURE_COOKIES=1` can enable Secure cookies independently when TLS is
 already enforced elsewhere. Dev mode skips the forced redirect; normal LAN
 HTTP remains available when the HTTPS profile is disabled.
@@ -96,6 +98,12 @@ uses a signed **client-side Flask session cookie**, not a server-side session
 store. Treat its contents as visible to the browser; signing prevents edits,
 not disclosure. The persistent `SECRET_KEY` signs it; rotating the key
 invalidates existing sessions. `/logout` clears the session.
+
+A login records when it happened and a short keyed fingerprint of the PIN
+(never the PIN or its hash). A session expires after 30 days, or after
+`INKYPI_SESSION_MAX_AGE_DAYS` if set, and stops working as soon as the
+configured PIN changes. Sessions created before this check existed must log in
+again once.
 
 Only these routes stay reachable without a session: `/login`, `/logout`,
 `/sw.js`, `/api/health`, `/healthz`, `/readyz`, and shipped application assets

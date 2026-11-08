@@ -10,9 +10,11 @@ Single auditable home for:
 
 from __future__ import annotations
 
+import ipaddress
 import logging
 import os
 import secrets
+import socket
 from collections.abc import Callable
 from time import perf_counter
 from typing import TYPE_CHECKING, Any, Protocol, cast
@@ -66,30 +68,126 @@ _MUTATE_MAX = 60  # requests per IP per window
 
 _TRUTHY = frozenset({"1", "true", "yes"})
 
-#: Default allow-list of hostnames that may appear in a redirect ``Location``
-#: header when upgrading HTTP to HTTPS. Operators can override this via the
-#: ``INKYPI_ALLOWED_HOSTS`` env var (comma-separated). Only requests whose
-#: ``Host`` header matches one of these entries are eligible for the HTTPS
-#: upgrade redirect — everything else is rejected with a 400 to prevent
-#: open-redirect attacks via spoofed ``Host`` headers (JTN-317, CodeQL
+#: Hostnames always accepted in the ``Host`` header, in addition to IP
+#: literals, the machine's own hostname (bare and ``.local``) and any entries
+#: from ``INKYPI_ALLOWED_HOSTS``. ``inkypi`` is the installer's default Pi
+#: hostname. The same rules gate every request (DNS-rebinding defence) and the
+#: HTTPS upgrade redirect (open-redirect defence, JTN-317 / CodeQL
 #: ``py/url-redirection`` alert #52).
-_DEFAULT_ALLOWED_HOSTS = "inkypi.local,localhost,127.0.0.1"
+_DEFAULT_ALLOWED_HOSTS = frozenset({"inkypi", "inkypi.local", "localhost"})
 
 
 def _env_bool(name: str, default: str = "") -> bool:
     return os.getenv(name, default).strip().lower() in _TRUTHY
 
 
-def _load_allowed_hosts() -> frozenset[str]:
-    """Parse ``INKYPI_ALLOWED_HOSTS`` into a lowercase frozenset.
+def _normalise_host_name(name: str) -> str:
+    """Lowercase *name* and drop one trailing dot (``inkypi.local.``)."""
+    name = name.strip().lower()
+    return name[:-1] if name.endswith(".") else name
 
-    Read at request time (not import time) so tests and operators can
-    override the allow-list via environment variables without having to
-    reload the module. Hostnames are compared case-insensitively and
-    without any port suffix.
+
+def _load_allowed_hosts() -> frozenset[str]:
+    """Return the hostnames accepted in the ``Host`` header.
+
+    The set is the built-in defaults, ``socket.gethostname()`` with its short
+    label and ``<short>.local`` mDNS form, plus the comma-separated
+    ``INKYPI_ALLOWED_HOSTS`` env var (additive). Read at request time (not
+    import time) so tests and operators can change the allow-list without
+    reloading the module. Names are compared case-insensitively and without
+    any port suffix. IP literals are accepted separately by
+    :func:`_is_allowed_host`.
     """
-    raw = os.getenv("INKYPI_ALLOWED_HOSTS") or _DEFAULT_ALLOWED_HOSTS
-    return frozenset(h.strip().lower() for h in raw.split(",") if h.strip())
+    hosts = set(_DEFAULT_ALLOWED_HOSTS)
+    try:
+        machine = _normalise_host_name(socket.gethostname())
+    except OSError:
+        machine = ""
+    if machine:
+        # ``gethostname()`` may already be qualified (``inkypi.lan``); the
+        # short label gets the mDNS ``.local`` alias.
+        short = machine.split(".", 1)[0]
+        hosts.update({machine, short, f"{short}.local"})
+    raw = os.getenv("INKYPI_ALLOWED_HOSTS") or ""
+    hosts.update(_normalise_host_name(h) for h in raw.split(","))
+    hosts.discard("")
+    return frozenset(hosts)
+
+
+def _split_host_header(raw_host: str) -> tuple[str, str]:
+    """Split a ``Host`` header value into ``(name, port)``.
+
+    Handles bracketed IPv6 (``[::1]:5000``). The returned name is lowercased
+    with brackets and one trailing dot removed; *port* is ``""`` when absent.
+    """
+    raw_host = raw_host.strip()
+    if raw_host.startswith("["):
+        end = raw_host.find("]")
+        if end == -1:
+            return "", ""
+        rest = raw_host[end + 1 :]
+        if rest and not rest.startswith(":"):
+            return "", ""
+        return raw_host[1:end].lower(), rest[1:]
+    if raw_host.count(":") > 1:
+        # Unbracketed IPv6 literal; there is no unambiguous port.
+        return raw_host.lower(), ""
+    name, _sep, port = raw_host.partition(":")
+    return _normalise_host_name(name), port
+
+
+def _is_ip_literal(name: str) -> bool:
+    try:
+        ipaddress.ip_address(name)
+    except ValueError:
+        return False
+    return True
+
+
+def _is_allowed_host(raw_host: str) -> bool:
+    """Return True when *raw_host* (a ``Host`` header value) names this device.
+
+    DNS-rebinding defence (grade report E1): a page on an attacker's domain
+    that rebinds to the Pi's LAN address still sends its own domain in the
+    ``Host`` header, so only names that genuinely refer to this device are
+    accepted. IP literals cannot be rebound and are always allowed.
+    """
+    name, port = _split_host_header(raw_host)
+    if not name or (port and not port.isdigit()):
+        return False
+    if _is_ip_literal(name):
+        return True
+    return name in _load_allowed_hosts()
+
+
+# ---------------------------------------------------------------------------
+# Host header validation
+# ---------------------------------------------------------------------------
+
+
+def setup_host_validation(app: Flask) -> None:
+    """Reject requests whose ``Host`` header does not name this device.
+
+    Always on, independent of PIN auth and the HTTPS profile. Registered as
+    the first ``before_request`` hook so a rebinding page cannot reach any
+    route (login, CSRF token issuance, the HTTPS redirect, health probes).
+    Accepted: any IPv4/IPv6 literal, ``localhost``, ``inkypi``,
+    ``inkypi.local``, ``socket.gethostname()`` and ``<hostname>.local``, plus
+    ``INKYPI_ALLOWED_HOSTS``. Everything else gets a 400.
+    """
+
+    @app.before_request
+    def _validate_host() -> None:
+        if not _is_allowed_host(request.host or ""):
+            logger.warning(
+                "Rejected request with disallowed Host header (path=%s)",
+                request.path,
+            )
+            abort(400, description="Invalid host")
+
+    hooks = app.before_request_funcs[None]
+    hooks.remove(_validate_host)
+    hooks.insert(0, _validate_host)
 
 
 # ---------------------------------------------------------------------------
@@ -158,20 +256,17 @@ def setup_https_redirect(app: Flask, *, dev_mode: bool) -> None:
         #      bytes flow through verbatim.
         #   4. Assemble the final URL with ``urlunsplit`` using a hard-
         #      coded ``https`` scheme literal.
-        allowed_hosts = _load_allowed_hosts()
         raw_host = request.host or ""
-        host_name, _sep, host_port = raw_host.partition(":")
-        host_name = host_name.lower()
-        if host_name not in allowed_hosts:
+        if not _is_allowed_host(raw_host):
             abort(400, description="Invalid host")
-        # Rebuild the authority from the allow-listed host. Preserving
+        host_name, host_port = _split_host_header(raw_host)
+        # Rebuild the authority from the validated host. Preserving
         # the port lets ``localhost:5000`` → ``https://localhost:5000``
         # still work for local development.
-        safe_authority = host_name
-        # ``request.host`` already ran through Werkzeug parsing, so
-        # the port (if present) is digits-only; still, guard it.
+        safe_authority = f"[{host_name}]" if ":" in host_name else host_name
+        # ``_is_allowed_host`` already rejected non-digit ports; still guard.
         if host_port and host_port.isdigit():
-            safe_authority = f"{host_name}:{host_port}"
+            safe_authority = f"{safe_authority}:{host_port}"
         # Re-encode path and query from validated request components.
         # ``request.path`` is already URL-decoded by Werkzeug; re-quote
         # it (keeping ``/``) so the Location header is well-formed and
@@ -412,7 +507,10 @@ _STATIC_ASSET_EXTS = (
 _DEFAULT_CSP_TEMPLATE = (
     "default-src 'self'; img-src 'self' data: https:; "
     "style-src 'self' 'unsafe-inline'; "
-    "script-src 'self' 'nonce-{nonce}'; font-src 'self' data: https:"
+    "script-src 'self' 'nonce-{nonce}'; font-src 'self' data: https:; "
+    # E4: no <base> rewrites, no plugin content, and only same-origin framing
+    # (matches X-Frame-Options: SAMEORIGIN for browsers that prefer CSP).
+    "base-uri 'none'; object-src 'none'; frame-ancestors 'self'"
 )
 
 
