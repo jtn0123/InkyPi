@@ -19,7 +19,7 @@ from typing import Any
 
 import pytest
 from flask import Flask
-from playwright.sync_api import Page
+from playwright.sync_api import Page, expect
 
 pytestmark = [
     pytest.mark.journey,
@@ -56,6 +56,17 @@ def _seed_plugins(device_config: Any, playlist_name: Any, instances: Any) -> Non
             }
         ), f"Failed to seed {plugin_id}/{name}"
     device_config.write_config()
+
+
+def _expand_card(toggle: Any) -> None:
+    """Expand a collapsed mobile playlist card and wait until it is open.
+
+    ``setPlaylistExpanded`` flips ``aria-expanded`` and un-hides the body in
+    the same tick, so waiting on the attribute is the deterministic signal.
+    """
+    if toggle.get_attribute("aria-expanded") != "true":
+        toggle.click()
+    expect(toggle).to_have_attribute("aria-expanded", "true")
 
 
 def _dom_instance_names(page: Page, playlist_name: Any) -> Any:
@@ -175,9 +186,7 @@ def test_playlist_roundtrip_mobile_create_reorder_delete_persist(
         )
         toggle.wait_for(state="visible", timeout=5000)
         _assert_touch_target(toggle, "playlist-toggle-button")
-        if toggle.get_attribute("aria-expanded") != "true":
-            toggle.click()
-            page.wait_for_timeout(200)
+        _expand_card(toggle)
 
         dom_initial = _dom_instance_names(page, playlist_name)
         assert (
@@ -194,10 +203,14 @@ def test_playlist_roundtrip_mobile_create_reorder_delete_persist(
         third_item.scroll_into_view_if_needed()
         _assert_touch_target(third_item, "plugin-item (reorder target)")
         third_item.focus()
-        third_item.press("ArrowUp")
-        page.wait_for_timeout(300)
-        third_item.press("ArrowUp")
-        page.wait_for_timeout(500)
+        # Each ArrowUp fires its own POST /reorder_plugins. Wait for each
+        # response before the next keypress so the two writes cannot reach
+        # the server out of order (a fixed sleep did not guarantee that).
+        for _ in range(2):
+            with page.expect_response(
+                lambda r: "/reorder_plugins" in r.url and r.status == 200
+            ):
+                third_item.press("ArrowUp")
 
         expected_reordered = [
             expected_initial[2],
@@ -234,37 +247,25 @@ def test_playlist_roundtrip_mobile_create_reorder_delete_persist(
         delete_btn.scroll_into_view_if_needed()
         _assert_touch_target(delete_btn, "delete-instance-btn")
 
-        page.evaluate("() => { window.location.reload = function() {}; }")
-
         delete_btn.click()
         confirm_modal = page.locator("#deleteInstanceModal")
         confirm_modal.wait_for(state="visible", timeout=3000)
         confirm_btn = page.locator("#confirmDeleteInstanceBtn")
         _assert_touch_target(confirm_btn, "confirmDeleteInstanceBtn")
-        with page.expect_response(
-            lambda r: "/delete_plugin_instance" in r.url and r.status == 200,
-            timeout=5000,
-        ):
-            confirm_btn.click()
+        # On success the delete handler calls location.reload(). That reload
+        # cannot be stubbed (Location.reload is [LegacyUnforgeable], so
+        # assigning to it is a silent no-op), and previously the test's own
+        # page.goto() raced it: "Navigation ... is interrupted by another
+        # navigation", net::ERR_ABORTED, or a 30s goto timeout. Wait for the
+        # app's reload to finish loading instead; that fresh server render
+        # is the persistence check.
+        with page.expect_navigation(wait_until="load"):
+            with page.expect_response(
+                lambda r: "/delete_plugin_instance" in r.url and r.status == 200
+            ):
+                confirm_btn.click()
 
         expected_after_delete = [expected_reordered[0], expected_reordered[2]]
-        for _ in range(30):
-            # The delete handler calls location.reload(); the stub swallows it
-            # but execution context may still churn briefly — ignore transient
-            # evaluate failures and rely on the backend check.
-            try:
-                dom_after_delete = _dom_instance_names(page, playlist_name)
-                if dom_after_delete == expected_after_delete:
-                    break
-            except Exception:
-                pass
-            if (
-                _backend_instance_names(device_config_dev, playlist_name)
-                == expected_after_delete
-            ):
-                break
-            page.wait_for_timeout(100)
-
         assert (
             _backend_instance_names(device_config_dev, playlist_name)
             == expected_after_delete
@@ -274,20 +275,15 @@ def test_playlist_roundtrip_mobile_create_reorder_delete_persist(
             f"{expected_after_delete!r}"
         )
 
-        # Step 6/7: reload and assert persisted order.
-        page.goto(f"{live_server}/playlist", wait_until="domcontentloaded")
+        # Step 6/7: the page has reloaded from the server; assert persisted
+        # order. Re-expand the test card on mobile after reload.
         page.wait_for_selector("[data-page-shell]", timeout=10000)
-        page.wait_for_timeout(300)
-
-        # Re-expand the test card on mobile after reload.
         toggle_reload = page.locator(
             f".playlist-item[data-playlist-name='{playlist_name}'] "
             "[data-playlist-toggle]"
         )
         toggle_reload.wait_for(state="visible", timeout=5000)
-        if toggle_reload.get_attribute("aria-expanded") != "true":
-            toggle_reload.click()
-            page.wait_for_timeout(200)
+        _expand_card(toggle_reload)
 
         dom_after_reload = _dom_instance_names(page, playlist_name)
         assert dom_after_reload == expected_after_delete, (
@@ -345,9 +341,7 @@ def test_playlist_row_actions_do_not_cover_instance_name_on_mobile(
             "[data-playlist-toggle]"
         )
         toggle.wait_for(state="visible", timeout=5000)
-        if toggle.get_attribute("aria-expanded") != "true":
-            toggle.click()
-            page.wait_for_timeout(200)
+        _expand_card(toggle)
 
         rows = page.evaluate(
             """(pn) => {
