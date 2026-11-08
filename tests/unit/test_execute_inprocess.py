@@ -69,7 +69,10 @@ class TestExecuteInprocessSuccess:
         action.execute.return_value = expected_img
 
         with (
-            patch("refresh_task.task.get_plugin_instance", return_value=FakePlugin()),
+            patch(
+                "refresh_task.plugin_lookup.get_plugin_instance",
+                return_value=FakePlugin(),
+            ),
             patch.dict(os.environ, {"INKYPI_PLUGIN_ISOLATION": "none"}),
         ):
             img, meta = task._execute_inprocess(action, {"id": "p"}, datetime.now(UTC))
@@ -94,7 +97,9 @@ class TestExecuteInprocessSuccess:
         action.execute.return_value = expected_img
         before = RefreshTask._zombie_thread_count
 
-        with patch("refresh_task.task.get_plugin_instance", return_value=FakePlugin()):
+        with patch(
+            "refresh_task.plugin_lookup.get_plugin_instance", return_value=FakePlugin()
+        ):
             task._execute_inprocess(action, {"id": "p"}, datetime.now(UTC))
 
         assert RefreshTask._zombie_thread_count == before
@@ -125,7 +130,10 @@ class TestExecuteInprocessTimeout:
         )
 
         with (
-            patch("refresh_task.task.get_plugin_instance", return_value=SlowPlugin()),
+            patch(
+                "refresh_task.plugin_lookup.get_plugin_instance",
+                return_value=SlowPlugin(),
+            ),
             patch.dict(
                 os.environ,
                 {
@@ -164,7 +172,7 @@ class TestExecuteInprocessTimeout:
 
         with (
             patch(
-                "refresh_task.task.get_plugin_instance",
+                "refresh_task.plugin_lookup.get_plugin_instance",
                 return_value=ReleasablePlugin(),
             ),
             patch.dict(
@@ -221,7 +229,8 @@ class TestExecuteInprocessTimeout:
 
         with (
             patch(
-                "refresh_task.task.get_plugin_instance", return_value=BlockedPlugin()
+                "refresh_task.plugin_lookup.get_plugin_instance",
+                return_value=BlockedPlugin(),
             ),
             patch.dict(
                 os.environ,
@@ -250,7 +259,10 @@ class TestExecuteInprocessTimeout:
         before = RefreshTask._zombie_thread_count
 
         with (
-            patch("refresh_task.task.get_plugin_instance", return_value=SlowPlugin()),
+            patch(
+                "refresh_task.plugin_lookup.get_plugin_instance",
+                return_value=SlowPlugin(),
+            ),
             patch.dict(
                 os.environ,
                 {
@@ -289,7 +301,7 @@ class TestExecuteInprocessTimeout:
 
         with (
             patch(
-                "refresh_task.task.get_plugin_instance",
+                "refresh_task.plugin_lookup.get_plugin_instance",
                 return_value=ReleasablePlugin(),
             ),
             patch.dict(
@@ -350,7 +362,7 @@ class TestCancelEventCooperative:
 
         with (
             patch(
-                "refresh_task.task.get_plugin_instance",
+                "refresh_task.plugin_lookup.get_plugin_instance",
                 return_value=CooperativePlugin(),
             ),
             patch.dict(
@@ -393,7 +405,10 @@ class TestExecuteInprocessError:
         )
 
         with (
-            patch("refresh_task.task.get_plugin_instance", return_value=BrokenPlugin()),
+            patch(
+                "refresh_task.plugin_lookup.get_plugin_instance",
+                return_value=BrokenPlugin(),
+            ),
             patch.dict(
                 os.environ,
                 {
@@ -424,7 +439,10 @@ class TestExecuteInprocessError:
         before = RefreshTask._zombie_thread_count
 
         with (
-            patch("refresh_task.task.get_plugin_instance", return_value=BrokenPlugin()),
+            patch(
+                "refresh_task.plugin_lookup.get_plugin_instance",
+                return_value=BrokenPlugin(),
+            ),
             patch.dict(
                 os.environ,
                 {

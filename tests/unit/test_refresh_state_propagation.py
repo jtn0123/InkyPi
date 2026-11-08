@@ -25,6 +25,7 @@ from unittest.mock import MagicMock
 import pytest
 from PIL import Image
 
+import refresh_task.plugin_lookup as plugin_lookup_mod
 import refresh_task.task as task_mod
 import refresh_task.worker as worker_mod
 from model import PluginInstance, RefreshInfo
@@ -85,7 +86,7 @@ def _setup(
     plugin_factory = lambda _cfg: _CountingPlugin(produce_image)  # noqa: E731
     monkeypatch.setattr(worker_mod, "get_plugin_instance", plugin_factory)
     monkeypatch.setattr(worker_mod, "load_plugins", lambda _plugins: None)
-    monkeypatch.setattr(task_mod, "get_plugin_instance", plugin_factory)
+    monkeypatch.setattr(plugin_lookup_mod, "get_plugin_instance", plugin_factory)
     plugin_config = {"id": _PLUGIN_ID, "class": "Counting", "image_settings": []}
     monkeypatch.setattr(
         device_config_dev,

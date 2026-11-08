@@ -99,6 +99,9 @@ def test_main_profiles_and_exit_codes(
         tmp_path,
         {
             "refresh_task/task.py": lines,
+            "refresh_task/refresh_cycle.py": lines,
+            "refresh_task/command_queue.py": lines,
+            "refresh_task/loop_scheduling.py": lines,
             "display/display_manager.py": lines,
             "config.py": lines,
         },

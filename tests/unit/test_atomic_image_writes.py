@@ -195,7 +195,7 @@ def test_refresh_hashes_image_once(
         device_config_dev, "get_plugin", lambda pid: {"id": "dummy", "class": "D"}
     )
     monkeypatch.setattr(
-        "refresh_task.task.get_plugin_instance", lambda cfg: DummyPlugin()
+        "refresh_task.plugin_lookup.get_plugin_instance", lambda cfg: DummyPlugin()
     )
 
     real_hash = image_utils.compute_image_hash
@@ -205,7 +205,7 @@ def test_refresh_hashes_image_once(
         calls["n"] += 1
         return real_hash(image)
 
-    monkeypatch.setattr("refresh_task.task.compute_image_hash", counting_hash)
+    monkeypatch.setattr("refresh_task.refresh_cycle.compute_image_hash", counting_hash)
     monkeypatch.setattr(image_utils, "compute_image_hash", counting_hash)
 
     latest = RefreshInfo("Manual Update", "dummy", "2020-01-01T00:00:00", "stale")

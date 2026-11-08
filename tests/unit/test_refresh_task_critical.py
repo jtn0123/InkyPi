@@ -610,8 +610,8 @@ class TestWorkerSessionLeaderCleanup:
             killpg_calls.append((pgid, sig))
             events.append("killpg")
 
-        monkeypatch.setattr("refresh_task.task.os.getpgid", fake_getpgid)
-        monkeypatch.setattr("refresh_task.task.os.killpg", fake_killpg)
+        monkeypatch.setattr("refresh_task.executor.os.getpgid", fake_getpgid)
+        monkeypatch.setattr("refresh_task.executor.os.killpg", fake_killpg)
 
         # Worker that exits gracefully on terminate() (the case that
         # used to bypass the killpg branch).

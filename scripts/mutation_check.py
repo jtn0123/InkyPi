@@ -26,7 +26,7 @@ PYTHON = Path(sys.executable)
 MUTANTS: tuple[Mutant, ...] = (
     Mutant(
         name="cache-hit-inverted",
-        file="src/refresh_task/task.py",
+        file="src/refresh_task/refresh_cycle.py",
         old="        used_cached = image_hash == latest_refresh.image_hash\n",
         new="        used_cached = image_hash != latest_refresh.image_hash\n",
         commands=(
