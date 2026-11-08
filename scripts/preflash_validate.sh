@@ -151,7 +151,7 @@ coverage_suite() {
         tests/unit/test_upgrade_compatibility.py \
         tests/unit/test_install_scripts.py \
         tests/unit/test_config_mtime_cache.py
-    python scripts/coverage_gate.py coverage.xml
+    python scripts/coverage_gate.py --profile preflash coverage.xml
 }
 
 security_suite() {

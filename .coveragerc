@@ -6,7 +6,11 @@ omit =
 
 [report]
 show_missing = true
-fail_under = 85
+# Full CI suite (tests job, SKIP_BROWSER=1, no container tests) measured
+# 91.27% on main @ 38c08e10 (CI run 42440236419). Keep this ~1 point under
+# the measured total so it ratchets without flaking; per-module floors live
+# in scripts/coverage_gate.py.
+fail_under = 90
 exclude_lines =
     pragma: no cover
     if TYPE_CHECKING:

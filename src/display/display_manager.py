@@ -12,7 +12,13 @@ from PIL import Image
 
 from display.abstract_display import AbstractDisplay, DeviceConfigLike
 from display.mock_display import MockDisplay
-from utils.image_utils import apply_image_enhancement, change_orientation, resize_image
+from utils.image_utils import (
+    FAST_PNG_COMPRESS_LEVEL,
+    apply_image_enhancement,
+    change_orientation,
+    resize_image,
+    save_image_atomic,
+)
 from utils.time_utils import now_device_tz
 
 logger = logging.getLogger(__name__)
@@ -223,6 +229,19 @@ class DisplayManager:
             logger.exception("Failed to persist history metadata for %s", base_name)
         self._prune_history(history_dir)
 
+    @staticmethod
+    def _save_preview(image: Image.Image, path: str) -> None:
+        """Atomically rewrite a current/processed preview PNG.
+
+        These files are rewritten on every refresh and read back by
+        ``/preview``, ``/api/screenshot`` and ``restore_last_frame`` after a
+        reboot, so a torn write must never replace the previous frame. They
+        are local working copies, so fast compression beats a smaller file.
+        """
+        save_image_atomic(
+            image, path, format="PNG", compress_level=FAST_PNG_COMPRESS_LEVEL
+        )
+
     def _write_panel(self, image: Image.Image, image_settings: list[object]) -> None:
         """Push *image* to the driver, one write at a time."""
         with self._panel_lock:
@@ -234,6 +253,7 @@ class DisplayManager:
         image_settings: list[object] | None = None,
         history_meta: Mapping[str, object] | None = None,
         on_image_saved: Callable[[dict[str, int]], object] | None = None,
+        image_hash: str | None = None,
     ) -> dict[str, int | str]:
         """
         Delegates image rendering to the appropriate display instance.
@@ -249,6 +269,9 @@ class DisplayManager:
                 API caller without waiting for the SPI write to finish.
                 Receives a metrics dict ``{"preprocess_ms": int}``.  Exceptions
                 raised by the callback are logged but never propagated.
+            image_hash (str, optional): ``compute_image_hash(image)`` when the
+                caller already has it (the refresh task hashes every render for
+                its cache check), so the image is not hashed twice per refresh.
 
         Raises:
             ValueError: If no valid display instance is found.
@@ -259,9 +282,10 @@ class DisplayManager:
         if not hasattr(self, "display"):
             raise ValueError("No valid display instance initialized.")
 
-        from utils.image_utils import compute_image_hash
+        if image_hash is None:
+            from utils.image_utils import compute_image_hash
 
-        image_hash = cast(Any, compute_image_hash)(image)
+            image_hash = cast(Any, compute_image_hash)(image)
         with self._hash_lock:
             if image_hash == self._last_image_hash:
                 logger.info("Image unchanged, skipping display writes")
@@ -278,7 +302,7 @@ class DisplayManager:
             # Save the raw image
             logger.info(f"Saving image to {self.device_config.current_image_file}")
             try:
-                image.save(self.device_config.current_image_file, optimize=True)
+                self._save_preview(image, self.device_config.current_image_file)
             except (OSError, ValueError, RuntimeError):
                 logger.exception("Failed to save current image preview")
 
@@ -296,7 +320,7 @@ class DisplayManager:
                 image, self.device_config.get_config("image_settings")
             )
             try:
-                image.save(self.device_config.processed_image_file, optimize=True)
+                self._save_preview(image, self.device_config.processed_image_file)
             except (OSError, ValueError, RuntimeError):
                 logger.exception("Failed to save processed image preview")
             self._save_history_entry(image, history_meta=history_meta)
@@ -385,8 +409,8 @@ class DisplayManager:
         with Image.open(image_path) as img:
             image = img.copy()
         preprocess_t0 = perf_counter()
-        image.save(self.device_config.current_image_file, optimize=True)
-        image.save(self.device_config.processed_image_file, optimize=True)
+        self._save_preview(image, self.device_config.current_image_file)
+        self._save_preview(image, self.device_config.processed_image_file)
         preprocess_ms = int((perf_counter() - preprocess_t0) * 1000)
         display_t0 = perf_counter()
         self._write_panel(image, [])
