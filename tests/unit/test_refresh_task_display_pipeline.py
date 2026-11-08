@@ -28,6 +28,7 @@ class _DisplayManager:
         image_settings: object = None,
         history_meta: dict[str, str | None] | None = None,
         on_image_saved: Any = None,
+        image_hash: str | None = None,
     ) -> object:
         self.calls.append(
             {
@@ -35,6 +36,7 @@ class _DisplayManager:
                 "image_settings": image_settings,
                 "history_meta": history_meta,
                 "on_image_saved": on_image_saved,
+                "image_hash": image_hash,
             }
         )
         if on_image_saved is not None:
@@ -119,6 +121,8 @@ def test_display_pipeline_success_records_metrics_and_stage(
 
     assert (display_ms, preprocess_ms) == (21, 8)
     assert display_manager.calls[0]["history_meta"]["plugin_id"] == "clock"
+    # No hash in refresh_info -> display manager computes it itself.
+    assert display_manager.calls[0]["image_hash"] is None
     assert stages == [
         ("refresh-1", "display_pipeline", 21, None),
         ("refresh-1", "display_driver", 21, {"driver": "mock"}),
@@ -130,6 +134,29 @@ def test_display_pipeline_success_records_metrics_and_stage(
         "Image saved; writing to display",
         "Display complete",
     ]
+
+
+def test_display_pipeline_forwards_refresh_image_hash(
+    device_config_dev: Any,
+) -> None:
+    """The hash RefreshTask computed is reused, not recomputed (G2)."""
+    display_manager = _DisplayManager()
+    pipeline, *_ = _make_pipeline(device_config_dev, display_manager)
+    action = ManualRefresh("clock", {})
+    image = Image.new("RGB", device_config_dev.get_resolution(), "white")
+
+    pipeline.push_to_display(
+        image=image,
+        plugin_config={},
+        refresh_action=action,
+        refresh_info={**action.get_refresh_info(), "image_hash": "abc123"},
+        benchmark_id="refresh-1",
+        plugin_id="clock",
+        instance_name=None,
+        request_id="request-1",
+    )
+
+    assert display_manager.calls[0]["image_hash"] == "abc123"
 
 
 def test_display_pipeline_cached_path_releases_manual_waiter(

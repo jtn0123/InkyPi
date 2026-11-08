@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING, Protocol, TypedDict, cast
 from plugins.plugin_registry import get_plugin_instance, load_plugins
 from refresh_task.actions import PluginLike, RefreshAction, StateDelta
 from refresh_task.context import RefreshContext, SupportsRefreshConfig
+from utils.image_utils import FAST_PNG_COMPRESS_LEVEL
 from utils.plugin_errors import (
     PermanentPluginError,
     ProviderReportedPluginError,
@@ -330,7 +331,9 @@ def _execute_refresh_attempt_worker(
             prefix=_RENDER_TEMPFILE_PREFIX,
             delete=False,
         ) as png_file:
-            image.save(png_file, format="PNG")
+            # Throwaway hand-off file the parent deletes right after reading:
+            # fastest zlib level, size is irrelevant.
+            image.save(png_file, format="PNG", compress_level=FAST_PNG_COMPRESS_LEVEL)
             image_path = png_file.name
         result_queue.put(
             {

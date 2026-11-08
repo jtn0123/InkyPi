@@ -25,6 +25,7 @@ class SupportsDisplayPipeline(Protocol):
         image_settings: object = ...,
         history_meta: dict[str, str | None] | None = ...,
         on_image_saved: Callable[[Mapping[str, Any]], None] | None = ...,
+        image_hash: str | None = ...,
     ) -> object: ...
 
 
@@ -140,6 +141,9 @@ class DisplayPipeline:
                 image_settings=plugin_config.get("image_settings", []),
                 history_meta=history_meta,
                 on_image_saved=on_image_saved,
+                # RefreshTask already hashed this exact image for its cache
+                # check; reuse it instead of hashing the frame again.
+                image_hash=refresh_info.get("image_hash"),
             )
             if isinstance(display_metrics, dict):
                 preprocess_ms = display_metrics.get("preprocess_ms")

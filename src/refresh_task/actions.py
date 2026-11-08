@@ -10,7 +10,11 @@ from typing import Protocol, TypedDict
 
 from PIL import Image
 
-from utils.image_utils import load_image_from_path
+from utils.image_utils import (
+    FAST_PNG_COMPRESS_LEVEL,
+    load_image_from_path,
+    save_image_atomic,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -291,7 +295,14 @@ class PlaylistRefresh(RefreshAction):
                 # every cycle. RefreshTask handles the None from here.
                 self._record_refresh(current_dt, settings_before)
                 return None
-            image.save(plugin_image_path)
+            # Atomic: a torn cache file would be loaded back on the next
+            # not-due cycle (``load_image_from_path`` below) and fail it.
+            save_image_atomic(
+                image,
+                plugin_image_path,
+                format="PNG",
+                compress_level=FAST_PNG_COMPRESS_LEVEL,
+            )
             self._record_refresh(current_dt, settings_before)
         else:
             logger.info(

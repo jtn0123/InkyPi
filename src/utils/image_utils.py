@@ -1,3 +1,4 @@
+import contextlib
 import hashlib
 import logging
 import os
@@ -426,6 +427,53 @@ def compute_image_hash(image: Image.Image) -> str:
     image = image.convert("RGB")
     img_bytes = image.tobytes()
     return hashlib.sha256(img_bytes).hexdigest()
+
+
+# zlib level for PNGs that are rewritten on every refresh and only read back
+# locally (current/processed preview, per-plugin cache, worker hand-off).
+# ``optimize=True`` (level 9 plus filter search) costs seconds of CPU on a
+# Pi Zero 2 W's Cortex-A53 for a few KB saved; level 1 is several times faster.
+# Persisted, user-downloadable PNGs (history snapshots) keep ``optimize=True``.
+FAST_PNG_COMPRESS_LEVEL = 1
+
+
+def save_image_atomic(
+    image: Image.Image, path: str, *, format: str = "PNG", **save_kwargs: Any
+) -> None:
+    """Save *image* to *path* so readers never see a partial file.
+
+    The image is encoded into a uniquely named temp file in the destination
+    directory, flushed to disk, then renamed over *path* with ``os.replace``.
+    A crash, power cut or encoder error mid-save leaves the previous file
+    intact and removes the temp file. The destination's existing permission
+    bits are preserved (``mkstemp`` creates files as 0600); a new file gets
+    0644.
+
+    Raises whatever the encoder or filesystem raises.
+    """
+    directory = os.path.dirname(os.path.abspath(path))
+    try:
+        mode = os.stat(path).st_mode & 0o777
+    except OSError:
+        mode = 0o644
+    fd, tmp_path = tempfile.mkstemp(
+        dir=directory, prefix=f".{os.path.basename(path)}.", suffix=".tmp"
+    )
+    try:
+        os.fchmod(fd, mode)
+        with os.fdopen(fd, "wb") as fh:
+            fd = -1  # the file object owns (and closes) the descriptor now
+            image.save(fh, format=format, **save_kwargs)
+            fh.flush()
+            os.fsync(fh.fileno())
+        os.replace(tmp_path, path)
+    except BaseException:
+        if fd != -1:
+            with contextlib.suppress(OSError):
+                os.close(fd)
+        with contextlib.suppress(OSError):
+            os.unlink(tmp_path)
+        raise
 
 
 def _playwright_screenshot_html(
