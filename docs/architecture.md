@@ -20,7 +20,7 @@ flowchart TD
 
     BP --> MainBP[main.py — dashboard]
     BP --> PluginBP[plugin.py — plugin config]
-    BP --> PlaylistBP[playlist.py — playlist mgmt]
+    BP --> PlaylistBP[playlist/ — playlist mgmt]
     BP --> SettingsBP[settings.py — device settings]
     BP --> APIKeysBP[apikeys.py — API key vault]
     BP --> HistoryBP[history.py — history view]
