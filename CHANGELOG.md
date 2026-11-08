@@ -2,6 +2,15 @@
 
 <!-- version list -->
 
+## v1.7.3 (2026-11-08)
+
+### Bug Fixes
+
+- **backend**: Serialise panel writes, 503 when refresh task is down, lock playlist advance
+  ([#702](https://github.com/jtn0123/InkyPi/pull/702),
+  [`38c08e1`](https://github.com/jtn0123/InkyPi/commit/38c08e10c691e344c241623c37be1fe1f0ee6c36))
+
+
 ## v1.7.2 (2026-11-08)
 
 ### Bug Fixes
