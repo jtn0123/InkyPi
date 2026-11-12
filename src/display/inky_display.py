@@ -7,7 +7,7 @@ import numpy as np
 from PIL import Image
 
 from display.abstract_display import AbstractDisplay
-from display.crisp import crisp_image
+from display.crisp import crisp_image, gradient_dominated
 
 logger = logging.getLogger(__name__)
 
@@ -117,11 +117,15 @@ class InkyDisplay(AbstractDisplay):
     def crisp_frame(self, image: Image.Image) -> Image.Image | None:
         """Convert rendered UI to this panel's pure colours without dithering.
 
-        Returns None when the driver has no verified undithered path, so the
-        caller keeps the normal (dithered) frame.
+        Returns None when the driver has no verified undithered path, or when
+        the frame is mostly smooth gradient (which crisp snapping would cut
+        into flat bands), so the caller keeps the normal (dithered) frame.
         """
         handoff = self._handoff()
         if handoff is None:
+            return None
+        if gradient_dominated(image):
+            logger.info("Inky: frame is mostly gradient; leaving it dithered")
             return None
         # Photo regions inside the frame are dithered against the same blend
         # of pure and measured colours the driver itself would use.

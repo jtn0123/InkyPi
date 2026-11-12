@@ -168,6 +168,40 @@ def test_small_busy_patches_are_not_photos() -> None:
     assert photo_regions(packed[:4, :4]) == []
 
 
+def _gradient_face(size: tuple[int, int] = (800, 480)) -> Image.Image:
+    """A full-frame red/black gradient with a clock hand, like the gradient face."""
+    w, h = size
+    ys, xs = np.mgrid[0:h, 0:w]
+    rgb = np.zeros((h, w, 3), dtype=np.uint8)
+    rgb[..., 0] = (255 * xs / w).astype(np.uint8)
+    rgb[..., 2] = (120 * ys / h).astype(np.uint8)
+    img = Image.fromarray(rgb, "RGB")
+    ImageDraw.Draw(img).line((400, 240, 600, 260), fill="white", width=8)  # hand
+    return img
+
+
+def test_gradient_dominated_frame_is_detected() -> None:
+    assert crisp.gradient_dominated(_gradient_face())
+
+
+def test_dashboard_with_small_gradient_stays_crisp() -> None:
+    img = _dashboard()
+    # A decorative vertical gradient (a sun or chart fill), ~5% of the frame.
+    ramp = np.linspace(180, 255, 120).astype(np.uint8)
+    fill = np.zeros((120, 160, 3), dtype=np.uint8)
+    fill[..., 0] = 255
+    fill[..., 1] = ramp[:, None]
+    img.paste(Image.fromarray(fill, "RGB"), (40, 200))
+    assert not crisp.gradient_dominated(img)
+
+    idx = crisp_indices(img, SPECTRA6, BLEND)
+    assert (idx[205:315, 45:195] == YELLOW).all()  # flattened, no speckle
+    assert (idx[120:160, 320:360] == BLUE).all()
+    # Text with anti-aliasing is not gradient either.
+    assert not crisp.gradient_dominated(_dashboard())
+    assert not crisp.gradient_dominated(Image.new("RGB", (4, 4)))
+
+
 def test_dither_palette_defaults_to_pure_palette() -> None:
     img = _photo((96, 96))
     idx = crisp_indices(img, SPECTRA6)

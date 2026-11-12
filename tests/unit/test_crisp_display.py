@@ -362,6 +362,24 @@ def test_manager_crisps_flagged_frames_and_saves_crisp_preview(
     assert current.getpixel((140, 140))[:3] == (144, 202, 249)
 
 
+def test_manager_leaves_gradient_dominated_flagged_frame_dithered(
+    monkeypatch: pytest.MonkeyPatch, device_config_dev: Any
+) -> None:
+    driver = _FakeE673()
+    dm = _manager(monkeypatch, device_config_dev, driver)
+    ys, xs = np.mgrid[0:480, 0:800]
+    rgb = np.zeros((480, 800, 3), dtype=np.uint8)
+    rgb[..., 0] = (255 * xs / 800).astype(np.uint8)
+    rgb[..., 2] = (255 * ys / 480).astype(np.uint8)
+    frame = Image.fromarray(rgb, "RGB")
+    assert dm.display.crisp_frame(frame) is None
+
+    dm.display_image(frame, image_settings=[CRISP_IMAGE_SETTING])
+    assert driver.dithered == [True]
+    preview = Image.open(device_config_dev.processed_image_file).convert("RGB")
+    assert len(preview.getcolors(1 << 16) or []) > 6  # not posterised
+
+
 def test_manager_leaves_unflagged_frames_dithered(
     monkeypatch: pytest.MonkeyPatch, device_config_dev: Any
 ) -> None:

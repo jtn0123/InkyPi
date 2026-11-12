@@ -23,6 +23,12 @@ neighbours:
   posterise badly, so rectangular regions that look photographic -- clusters
   of 8x8 blocks with many distinct colours -- are error-diffused against
   *dither_palette* exactly as the driver would have done.
+* A frame dominated by smooth gradients (a gradient clock face, a sky
+  background) has no flat fills to keep crisp, and snapping it would cut the
+  design into a few flat bands. :func:`gradient_dominated` spots such frames
+  so the caller can leave the whole frame to the driver's dithering. Small
+  decorative gradients (an icon, a chart fill) stay below the threshold and
+  are flattened like any other colour.
 
 Only numpy and Pillow are used; an 800x480 frame converts in a few tens of
 milliseconds on a desktop.
@@ -61,6 +67,15 @@ BLOCK = 8
 BUSY_COLOURS = 40
 CORE_NEIGHBOURS = 6
 MIN_PHOTO_CORES = 6
+
+# Gradient detection, on the same tiles: a tile is a smooth gradient when it
+# holds at least SMOOTH_MIN_COLOURS distinct colours but no channel varies by
+# more than SMOOTH_MAX_RANGE inside it. Anti-aliased text and icon edges jump
+# from ink to paper within a tile, so their range is far larger. A frame
+# where such tiles cover more than GRADIENT_SHARE of the area is left dithered.
+SMOOTH_MIN_COLOURS = 4
+SMOOTH_MAX_RANGE = 32
+GRADIENT_SHARE = 0.25
 
 # Integer luma weights (sum 256), ITU-R BT.601.
 _LUMA_WEIGHTS = np.array([77, 150, 29], dtype=np.int32)
@@ -111,6 +126,35 @@ def _box3(mask: np.ndarray) -> np.ndarray:
     return total
 
 
+def _tiles(values: np.ndarray) -> np.ndarray:
+    """Split ``(height, width, ...)`` into ``(h, w, BLOCK * BLOCK, ...)`` tiles."""
+    h, w = values.shape[0] // BLOCK, values.shape[1] // BLOCK
+    rest = values.shape[2:]
+    cropped = values[: h * BLOCK, : w * BLOCK]
+    tiles = cropped.reshape(h, BLOCK, w, BLOCK, *rest).swapaxes(1, 2)
+    return tiles.reshape(h, w, BLOCK * BLOCK, *rest)
+
+
+def _distinct_per_tile(packed: np.ndarray) -> np.ndarray:
+    ordered = np.sort(_tiles(packed), axis=2)
+    changes: np.ndarray = np.count_nonzero(np.diff(ordered, axis=2), axis=2)
+    return changes + 1
+
+
+def gradient_dominated(image: Image.Image) -> bool:
+    """True when smooth gradients cover more than ``GRADIENT_SHARE`` of *image*."""
+    rgb = np.asarray(image.convert("RGB"), dtype=np.int32)
+    tiles = _tiles(rgb)
+    if tiles.size == 0:
+        return False
+    packed = (rgb[..., 0] << 16) | (rgb[..., 1] << 8) | rgb[..., 2]
+    value_range = (tiles.max(axis=2) - tiles.min(axis=2)).max(axis=2)
+    smooth = (_distinct_per_tile(packed) >= SMOOTH_MIN_COLOURS) & (
+        value_range <= SMOOTH_MAX_RANGE
+    )
+    return float(smooth.mean()) > GRADIENT_SHARE
+
+
 def photo_regions(packed: np.ndarray) -> list[tuple[int, int, int, int]]:
     """Return ``(left, top, right, bottom)`` boxes that look photographic.
 
@@ -120,10 +164,7 @@ def photo_regions(packed: np.ndarray) -> list[tuple[int, int, int, int]]:
     h, w = height // BLOCK, width // BLOCK
     if h == 0 or w == 0:
         return []
-    blocks = packed[: h * BLOCK, : w * BLOCK].reshape(h, BLOCK, w, BLOCK)
-    ordered = np.sort(blocks.transpose(0, 2, 1, 3).reshape(h, w, -1), axis=2)
-    distinct = 1 + np.count_nonzero(np.diff(ordered, axis=2), axis=2)
-    busy = distinct >= BUSY_COLOURS
+    busy = _distinct_per_tile(packed) >= BUSY_COLOURS
     core = busy & (_box3(busy) >= CORE_NEIGHBOURS)
 
     boxes: list[tuple[int, int, int, int]] = []
