@@ -11,6 +11,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 import pytest
+from PIL import Image
 
 
 class DummyDeviceConfig:
@@ -93,15 +94,9 @@ def test_newspaper_defaults_slug_when_empty(monkeypatch: pytest.MonkeyPatch) -> 
 
     captured: dict[str, Any] = {}
 
-    class _FakeImage:
-        size = (800, 480)
-
-        def resize(self, *_a: Any, **_kw: Any) -> Any:
-            return self
-
     def fake_get_image(url: str) -> Any:
         captured["url"] = url
-        return _FakeImage()
+        return Image.new("RGB", (800, 480), "white")
 
     monkeypatch.setattr(np_mod, "get_image", fake_get_image)
 
