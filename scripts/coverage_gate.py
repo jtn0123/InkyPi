@@ -10,7 +10,7 @@ Two profiles, because they read different reports:
 * ``full`` (default) - the full-suite ``coverage.xml`` from the CI ``tests``
   job. Floors sit ~1-2 points under the measured numbers so they ratchet
   without flaking.
-* ``preflash`` - the 14-file subset run by ``scripts/preflash_validate.sh``
+* ``preflash`` - the 15-file subset run by ``scripts/preflash_validate.sh``
   (``INKYPI_VALIDATE_COVERAGE=1``). That subset only exercises the refresh
   task, the display manager and config, so it keeps its own, lower floors.
 

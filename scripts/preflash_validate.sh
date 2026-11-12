@@ -127,7 +127,7 @@ coverage_suite() {
     rm -f coverage.xml
     export INKYPI_PLUGIN_ISOLATION=none
     export INKYPI_NO_HOT_RELOAD=1
-    # --cov-fail-under=0: this is a 14-file subset, so the global
+    # --cov-fail-under=0: this is a 15-file subset, so the global
     # .coveragerc fail_under (sized for the full suite) would always fail it.
     # scripts/coverage_gate.py below is the real per-file gate; genuine test
     # failures in this run still fail the phase.
@@ -139,6 +139,7 @@ coverage_suite() {
         --cov-report=xml:coverage.xml \
         tests/unit/test_display_manager.py \
         tests/unit/test_display_manager_coverage.py \
+        tests/unit/test_crisp_display.py \
         tests/unit/test_config_resolution.py \
         tests/unit/test_config_validation.py \
         tests/unit/test_config_fallbacks_extra.py \
