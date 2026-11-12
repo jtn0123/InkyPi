@@ -259,3 +259,138 @@ def test_stale_display_path_prefers_processed_image(
     device_config_dev.current_image_file = str(current)
 
     assert task._stale_display_path() == str(processed)
+
+
+class _StubAction:
+    """Minimal refresh action: just what the loop reads before rendering."""
+
+    def get_plugin_id(self) -> str:
+        return "clock"
+
+    def get_refresh_info(self) -> dict[str, Any]:
+        return {"plugin_instance": "Clock"}
+
+
+def _loop_task(
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> tuple[Any, list[dict[str, Any]]]:
+    """A RefreshTask whose loop can be driven one trigger at a time."""
+    import contextlib
+
+    import refresh_task.task as task_mod
+    from display.display_manager import DisplayManager
+    from refresh_task import RefreshTask
+
+    task = RefreshTask(device_config_dev, DisplayManager(device_config_dev))
+    monkeypatch.setattr(
+        task_mod.crash_breadcrumb,
+        "trail",
+        lambda *args, **kwargs: contextlib.nullcontext(),
+    )
+    monkeypatch.setattr(task, "_maybe_run_history_cleanup", lambda: None)
+    completed: list[dict[str, Any]] = []
+    monkeypatch.setattr(
+        task,
+        "_complete_manual_request",
+        lambda request, **kwargs: completed.append({"request": request, **kwargs}),
+    )
+    return task, completed
+
+
+def test_run_refresh_without_image_keeps_previous_refresh_info(
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A refresh that yields no frame must not overwrite the last-refresh record."""
+    task, completed = _loop_task(device_config_dev, monkeypatch)
+    triggers = iter([("pm", "latest", task._get_current_datetime(), None), None])
+    monkeypatch.setattr(task, "_wait_for_trigger", lambda: next(triggers))
+    monkeypatch.setattr(
+        task, "_select_refresh_action", lambda *args: (_StubAction(), "req-1")
+    )
+    metrics = {"no_image": True}
+    monkeypatch.setattr(
+        task, "_perform_refresh", lambda *args, **kwargs: (None, False, metrics)
+    )
+
+    def _unexpected_update(*args: Any, **kwargs: Any) -> None:
+        raise AssertionError("refresh info must not be updated without a frame")
+
+    monkeypatch.setattr(task, "_update_refresh_info", _unexpected_update)
+
+    task._run()
+
+    assert completed == [{"request": None, "metrics": metrics}]
+    assert task._tick_count == 1
+    assert task._work_started_at is None
+
+
+def test_run_survives_failure_before_a_trigger_arrives(
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An error while waiting has no request to fail; the loop just carries on."""
+    task, completed = _loop_task(device_config_dev, monkeypatch)
+    calls = 0
+
+    def _flaky_wait() -> None:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            raise RuntimeError("config briefly unreadable")
+        return
+
+    monkeypatch.setattr(task, "_wait_for_trigger", _flaky_wait)
+
+    task._run()
+
+    assert calls == 2
+    assert completed == []
+    assert task._tick_count == 0
+
+
+def test_examine_previous_boot_quarantines_crashed_plugin(
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import refresh_task.task as task_mod
+
+    task, _completed = _loop_task(device_config_dev, monkeypatch)
+    breadcrumb = object()
+    monkeypatch.setattr(task_mod.crash_breadcrumb, "examine_boot", lambda: breadcrumb)
+    quarantined: list[Any] = []
+    monkeypatch.setattr(
+        task.health_tracker, "quarantine_after_crash", quarantined.append
+    )
+
+    task._examine_previous_boot()
+
+    assert quarantined == [breadcrumb]
+
+
+def test_examine_previous_boot_never_blocks_startup(
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Neither a broken breadcrumb nor a failed quarantine may raise."""
+    import refresh_task.task as task_mod
+
+    task, _completed = _loop_task(device_config_dev, monkeypatch)
+    quarantined: list[Any] = []
+
+    def _broken_examine() -> Any:
+        raise OSError("breadcrumb unreadable")
+
+    monkeypatch.setattr(task_mod.crash_breadcrumb, "examine_boot", _broken_examine)
+    monkeypatch.setattr(
+        task.health_tracker, "quarantine_after_crash", quarantined.append
+    )
+    task._examine_previous_boot()
+    assert quarantined == []
+
+    def _broken_quarantine(breadcrumb: Any) -> None:
+        quarantined.append(breadcrumb)
+        raise RuntimeError("health store locked")
+
+    monkeypatch.setattr(task_mod.crash_breadcrumb, "examine_boot", lambda: "crumb")
+    monkeypatch.setattr(
+        task.health_tracker, "quarantine_after_crash", _broken_quarantine
+    )
+    task._examine_previous_boot()
+    assert quarantined == ["crumb"]
