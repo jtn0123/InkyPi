@@ -14,6 +14,7 @@ from PIL import Image, ImageDraw
 
 from display import crisp
 from display.crisp import crisp_image, crisp_indices, photo_regions
+from display.rendering_settings import CRISP_IMAGE_SETTING
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -236,7 +237,7 @@ def test_render_image_plugins_declare_crisp() -> None:
     renders_html = set()
     for info_path in plugins_dir.glob("*/plugin-info.json"):
         info = json.loads(info_path.read_text(encoding="utf-8"))
-        if crisp.CRISP_IMAGE_SETTING in info.get("image_settings", []):
+        if CRISP_IMAGE_SETTING in info.get("image_settings", []):
             declared.add(info["id"])
         source = "\n".join(
             p.read_text(encoding="utf-8") for p in info_path.parent.glob("*.py")

@@ -22,7 +22,7 @@ from PIL import Image, ImageDraw
 import refresh_task.plugin_lookup as plugin_lookup_mod
 import refresh_task.task as task_mod
 import refresh_task.worker as worker_mod
-from display.crisp import CRISP_IMAGE_SETTING, SCREEN_RENDERING_KEY
+from display.rendering_settings import CRISP_IMAGE_SETTING, SCREEN_RENDERING_KEY
 from model import PluginInstance, RefreshInfo
 from refresh_task import RefreshTask
 from refresh_task.actions import PlaylistRefresh
@@ -519,3 +519,30 @@ def test_refresh_through_subprocess_carries_crisp_flag(
     assert driver.dithered == [expect_dithered]
     if not expect_dithered:
         assert driver.buf[140, 140] == 5  # solid panel blue
+
+
+def test_display_modules_do_not_load_numpy_at_import():
+    """The conversion code (and numpy) is loaded on the first crisp frame.
+
+    Importing it at startup costs every device about 18 MB of resident
+    memory, including ones whose display never uses it.
+    """
+    import subprocess
+
+    src = Path(__file__).resolve().parents[2] / "src"
+    probe = (
+        "import sys\n"
+        "import display.display_manager, display.inky_display\n"
+        "import blueprints.settings._config\n"
+        "sys.exit(1 if 'numpy' in sys.modules else 0)\n"
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", probe],
+        cwd=src,
+        env={"PYTHONPATH": str(src), "PATH": ""},
+        capture_output=True,
+        text=True,
+        timeout=120,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr or "numpy was imported at startup"

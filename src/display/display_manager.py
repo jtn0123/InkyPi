@@ -11,8 +11,8 @@ from typing import Any, Protocol, cast
 from PIL import Image
 
 from display.abstract_display import AbstractDisplay, DeviceConfigLike
-from display.crisp import CRISP_IMAGE_SETTING, SCREEN_RENDERING_KEY
 from display.mock_display import MockDisplay
+from display.rendering_settings import CRISP_IMAGE_SETTING, SCREEN_RENDERING_KEY
 from utils.image_utils import (
     FAST_PNG_COMPRESS_LEVEL,
     apply_image_enhancement,

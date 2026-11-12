@@ -41,14 +41,6 @@ from collections.abc import Sequence
 import numpy as np
 from PIL import Image
 
-# A plugin opts its frames in by listing this in plugin-info.json
-# "image_settings"; that list already travels with every display push.
-CRISP_IMAGE_SETTING = "crisp"
-# Device setting (in config "image_settings"): "auto" converts frames from
-# opted-in plugins crisply, "dithered" leaves every frame to the driver.
-SCREEN_RENDERING_KEY = "screen_rendering"
-SCREEN_RENDERING_MODES = ("auto", "dithered")
-
 # Channel spread (max - min, 0-255) from which a pixel counts as coloured.
 CHROMA_MIN = 56
 # Luma difference from the paper tone at which a neutral pixel becomes ink.
@@ -255,3 +247,18 @@ def crisp_image(
     """Return *image* as RGB using only the pure *palette* colours."""
     lut = np.asarray(palette, dtype=np.uint8).reshape(-1, 3)
     return Image.fromarray(lut[crisp_indices(image, palette, dither_palette)], "RGB")
+
+
+def exact_palette_image(image: Image.Image, palette: Palette) -> Image.Image:
+    """Mode-P copy of an image whose every pixel is already a *palette* colour.
+
+    The caller must have checked that; indices follow the order of *palette*.
+    """
+    pixels = np.asarray(image.convert("RGB"), dtype=np.uint32)
+    packed = (pixels[..., 0] << 16) | (pixels[..., 1] << 8) | pixels[..., 2]
+    pal_packed = np.array([(r << 16) | (g << 8) | b for r, g, b in palette])
+    order = np.argsort(pal_packed)
+    indices = order[np.searchsorted(pal_packed[order], packed)].astype(np.uint8)
+    frame = Image.fromarray(indices, "P")
+    frame.putpalette(bytes(v for colour in palette for v in colour))
+    return frame

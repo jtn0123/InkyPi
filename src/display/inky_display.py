@@ -3,11 +3,9 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any, Literal, cast
 
-import numpy as np
 from PIL import Image
 
 from display.abstract_display import AbstractDisplay
-from display.crisp import crisp_image, gradient_dominated
 
 logger = logging.getLogger(__name__)
 
@@ -124,6 +122,9 @@ class InkyDisplay(AbstractDisplay):
         handoff = self._handoff()
         if handoff is None:
             return None
+        # Imported here so numpy is only loaded once a frame is converted.
+        from display.crisp import crisp_image, gradient_dominated
+
         if gradient_dominated(image):
             logger.info("Inky: frame is mostly gradient; leaving it dithered")
             return None
@@ -152,14 +153,9 @@ class InkyDisplay(AbstractDisplay):
         colours = rgb.getcolors(len(handoff.palette))
         if colours is None or any(c not in handoff.palette for _n, c in colours):
             return None
-        pixels = np.asarray(rgb, dtype=np.uint32)
-        packed = (pixels[..., 0] << 16) | (pixels[..., 1] << 8) | pixels[..., 2]
-        pal_packed = np.array([(r << 16) | (g << 8) | b for r, g, b in handoff.palette])
-        order = np.argsort(pal_packed)
-        indices = order[np.searchsorted(pal_packed[order], packed)].astype(np.uint8)
-        frame = Image.fromarray(indices, "P")
-        frame.putpalette(bytes(v for colour in handoff.palette for v in colour))
-        return frame
+        from display.crisp import exact_palette_image
+
+        return exact_palette_image(rgb, handoff.palette)
 
     def display_image(
         self, image: Image.Image, image_settings: list[object] | None = None

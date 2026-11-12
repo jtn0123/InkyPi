@@ -8,7 +8,7 @@ from flask import current_app, redirect, render_template, request
 
 import blueprints.settings as _mod
 from app_setup.logging_setup import configure_log_timezone
-from display.crisp import SCREEN_RENDERING_KEY, SCREEN_RENDERING_MODES
+from display.rendering_settings import SCREEN_RENDERING_KEY, SCREEN_RENDERING_MODES
 from utils.backend_errors import ClientInputError, route_error_boundary
 from utils.http_utils import json_error, json_success
 from utils.time_utils import calculate_seconds
