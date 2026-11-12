@@ -18,7 +18,8 @@ Flow:
 3. Extract the image filename from the response. (_fetch_potd)
 4. Make another API request to get the image URL. (_fetch_image_src)
 5. Download the image from the URL. (_download_image)
-6. Optionally resize the image to fit the device dimensions. (_shrink_to_fit))
+6. Fit the image to the panel: whole picture on white by default
+   (_shrink_to_fit), or cropped to fill when "Shrink Image To Fit" is off.
 """
 
 import logging
@@ -28,12 +29,13 @@ from datetime import UTC, date, datetime, timedelta
 from random import randint
 from typing import Any, cast
 
-from PIL import Image
+from PIL import Image, ImageOps
 from PIL.Image import Image as ImageType
 
 from plugins.base_plugin.base_plugin import BasePlugin
 from plugins.base_plugin.settings_schema import callout, field, schema, section
 from utils.http_client import get_http_session
+from utils.image_utils import resolve_background_color
 
 logger = logging.getLogger(__name__)
 
@@ -149,13 +151,17 @@ class Wpotd(BasePlugin):
         # has its own guard around the loader — so there is nothing to check
         # here. The declared return type now enforces that.
         image = self._download_image(picurl)
-        if settings.get("shrinkToFitWpotd") == "true":
-            dimensions = self.get_oriented_dimensions(device_config)
-            max_width, max_height = dimensions
-            image = self._shrink_to_fit(image, max_width, max_height)
-            logger.info(
-                f"Image resized to fit device dimensions: {max_width},{max_height}"
-            )
+        dimensions = self.get_oriented_dimensions(device_config)
+        # "Shrink Image To Fit" defaults to on, so only an explicit "false"
+        # turns it off; an instance saved before the field existed shrinks.
+        # Off means fill the panel and crop the overflow — what the display
+        # used to do with the full-size original — never the original itself.
+        if settings.get("shrinkToFitWpotd") == "false":
+            image = ImageOps.fit(image, dimensions, method=Image.Resampling.LANCZOS)
+            logger.info("Image cropped to fill device dimensions: %s", dimensions)
+        else:
+            image = self._shrink_to_fit(image, *dimensions)
+            logger.info("Image resized to fit device dimensions: %s", dimensions)
 
         return image
 
@@ -292,35 +298,16 @@ class Wpotd(BasePlugin):
     def _shrink_to_fit(
         self, image: ImageType, max_width: int, max_height: int
     ) -> ImageType:
-        """
-        Resize the image to fit within max_width and max_height while maintaining aspect ratio.
-        Uses high-quality resampling.
-        """
-        orig_width, orig_height = image.size
+        """Return the whole picture centred on white at exactly the panel size.
 
-        if orig_width > max_width or orig_height > max_height:
-            # Determine whether to constrain by width or height
-            if orig_width >= orig_height:
-                # Landscape or square -> constrain by max_width
-                if orig_width > max_width:
-                    new_width = max_width
-                    new_height = int(orig_height * max_width / orig_width)
-                else:
-                    new_width, new_height = orig_width, orig_height
-            else:
-                # Portrait -> constrain by max_height
-                if orig_height > max_height:
-                    new_height = max_height
-                    new_width = int(orig_width * max_height / orig_height)
-                else:
-                    new_width, new_height = orig_width, orig_height
-            # Resize using high-quality resampling
-            image = image.resize((new_width, new_height), Image.Resampling.LANCZOS)
-            # Create a new image with white background and paste the resized image in the center
-            new_image = Image.new("RGB", (max_width, max_height), (255, 255, 255))
-            new_image.paste(
-                image, ((max_width - new_width) // 2, (max_height - new_height) // 2)
-            )
-            return new_image
-        # If the image is already within bounds, return it as is
-        return image
+        Large pictures are scaled down and small ones scaled up, preserving the
+        aspect ratio, so the result is always ``max_width`` x ``max_height``.
+        """
+        if image.mode not in ("RGB", "L"):
+            image = image.convert("RGB")
+        return ImageOps.pad(
+            image,
+            (max_width, max_height),
+            method=Image.Resampling.LANCZOS,
+            color=resolve_background_color(None, image.mode),
+        )

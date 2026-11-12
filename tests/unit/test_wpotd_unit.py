@@ -128,12 +128,12 @@ def test_fetch_image_src_success_and_missing(monkeypatch: pytest.MonkeyPatch) ->
         p._fetch_image_src("File:NoUrl.png")
 
 
-def test_shrink_to_fit_no_change_and_resize() -> None:
+def test_shrink_to_fit_always_returns_the_panel_size() -> None:
     p = wpotd_mod.Wpotd({"id": "wpotd"})
-    # small image, no resize
+    # small image: scaled up to the panel, never returned at its own size
     img = Image.new("RGB", (10, 10), "white")
     out = p._shrink_to_fit(img, 100, 100)
-    assert out.size == (10, 10)
+    assert out.size == (100, 100)
 
     # larger image, will be resized and padded
     img2 = Image.new("RGB", (200, 100), "white")

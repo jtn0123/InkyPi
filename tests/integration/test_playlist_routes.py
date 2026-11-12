@@ -12,6 +12,65 @@ def test_playlist_page_renders(client: FlaskClient) -> None:
     assert b'data-collapsed-label="Open"' in resp.data
 
 
+def _add_instance(device_config_dev: Any, name: str, **state: Any) -> Any:
+    pm = device_config_dev.get_playlist_manager()
+    if not pm.get_playlist("Default"):
+        pm.add_playlist("Default", "00:00", "24:00")
+    pm.get_playlist("Default").add_plugin(
+        {
+            "plugin_id": "clock",
+            "name": name,
+            "plugin_settings": {},
+            "refresh": {"interval": 300},
+        }
+    )
+    inst = pm.find_plugin("clock", name)
+    for key, value in state.items():
+        setattr(inst, key, value)
+    return inst
+
+
+def test_playlist_page_shows_paused_plugin_and_retry_time(
+    client: FlaskClient, device_config_dev: Any, monkeypatch: Any
+) -> None:
+    """A circuit-breaker pause is visible, with its reason and retry time."""
+    monkeypatch.delenv("PLUGIN_PAUSE_COOLDOWN_SECONDS", raising=False)
+    _add_instance(
+        device_config_dev,
+        "Paused Clock",
+        paused=True,
+        consecutive_failure_count=5,
+        disabled_reason="Paused after 5 consecutive failures. Last error: boom",
+        # Far future: the retry time is deterministic and still to come.
+        paused_at="2999-01-01T03:15:00+00:00",
+    )
+    _add_instance(device_config_dev, "Legacy Paused", paused=True)
+    _add_instance(device_config_dev, "Healthy Clock")
+
+    resp = client.get("/playlist")
+
+    assert resp.status_code == 200
+    html = resp.get_data(as_text=True)
+    # device_config_dev runs in UTC: 03:15 + 6 h cooldown.
+    assert "Paused — retrying at 09:15" in html
+    assert "Last error: boom" in html
+    # A pause from before paused_at existed is retried on its next turn.
+    assert "Paused — retrying on its next turn" in html
+    assert html.count("plugin-paused-chip") == 2
+
+
+def test_playlist_page_paused_label_when_auto_retry_is_off(
+    client: FlaskClient, device_config_dev: Any, monkeypatch: Any
+) -> None:
+    monkeypatch.setenv("PLUGIN_PAUSE_COOLDOWN_SECONDS", "0")
+    _add_instance(device_config_dev, "Paused Clock", paused=True)
+
+    html = client.get("/playlist").get_data(as_text=True)
+
+    assert ">Paused</span>" in html
+    assert "retrying" not in html
+
+
 def test_create_update_delete_playlist_flow(client: FlaskClient) -> None:
     # Create
     payload = {"playlist_name": "Morning", "start_time": "06:00", "end_time": "09:00"}

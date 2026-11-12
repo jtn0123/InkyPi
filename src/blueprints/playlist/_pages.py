@@ -6,6 +6,7 @@ from typing import Any, cast
 
 from flask import current_app, has_app_context, redirect, render_template, url_for
 
+from refresh_task.health import PluginHealthTracker
 from utils.time_utils import now_device_tz
 
 from ._common import playlist_bp
@@ -113,8 +114,14 @@ def playlists() -> Any:
     except Exception:
         playlist_timing = {}
 
+    try:
+        paused_status = _paused_status(playlist_manager, now_device_tz(device_config))
+    except Exception:
+        paused_status = {}
+
     return render_template(
         "playlist.html",
+        paused_status=paused_status,
         playlist_config=playlist_manager.to_dict(),
         refresh_info=refresh_info.to_dict(),
         plugins={p["id"]: p for p in plugins_list},
@@ -173,3 +180,26 @@ def format_relative_time(iso_date_string: str) -> str:
     return dt_local.strftime(month_day_format).replace(
         " 0", " "
     )  # Removes leading zero in day
+
+
+def _paused_status(playlist_manager: Any, now: datetime) -> dict[str, dict[str, str]]:
+    """Map playlist name -> paused instance name -> short "Paused" label.
+
+    A circuit-breaker pause is otherwise invisible on this page; the label says
+    when the automatic retry will happen so a glance explains a missing plugin.
+    """
+    status: dict[str, dict[str, str]] = {}
+    for pl in getattr(playlist_manager, "playlists", []):
+        for inst in getattr(pl, "plugins", []):
+            if not getattr(inst, "paused", False):
+                continue
+            label = "Paused"
+            retry_at = PluginHealthTracker.next_probe_at(inst, now)
+            if retry_at is not None:
+                if retry_at <= now:
+                    label = "Paused — retrying on its next turn"
+                else:
+                    local = retry_at.astimezone(now.tzinfo)
+                    label = f"Paused — retrying at {local.strftime('%H:%M')}"
+            status.setdefault(pl.name, {})[inst.name] = label
+    return status

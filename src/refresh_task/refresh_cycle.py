@@ -13,7 +13,11 @@ from refresh_task import plugin_lookup
 from refresh_task.actions import ManualUpdateRequest, PlaylistRefresh, RefreshAction
 from refresh_task.plugin_lookup import _plugin_requires_api_key
 from utils.image_utils import compute_image_hash
-from utils.output_validator import OutputDimensionMismatch, validate_image_dimensions
+from utils.output_validator import (
+    OutputDimensionMismatch,
+    fit_image_to_panel,
+    oriented_resolution,
+)
 from utils.progress import ProgressTracker, track_progress
 
 if TYPE_CHECKING:
@@ -224,6 +228,7 @@ class RefreshCycleMixin:
                 )
             except Exception as exc:
                 retain_path = self._stale_display_path()
+                probing = self._is_paused_probe(refresh_action, manual_request)
                 # JTN-779: log the full exception class + message so operators
                 # can diagnose.  The user-visible fallback image is sanitised
                 # via utils.fallback_image.sanitize_error_message.
@@ -251,13 +256,24 @@ class RefreshCycleMixin:
                     retained_display=bool(retain_path),
                     plugin_failed=True,
                 )
-                self._push_fallback_image(
-                    plugin_id=plugin_id,
-                    instance_name=instance_name,
-                    exc=exc,
-                    plugin_config=plugin_config,
-                    refresh_action=refresh_action,
-                )
+                if probing:
+                    # A failed automatic retry of a paused plugin keeps
+                    # whatever the panel shows; an error card here would
+                    # replace a good picture every cooldown.
+                    logger.info(
+                        "plugin_lifecycle: probe_failed | plugin_id=%s instance=%s"
+                        " — keeping the current display",
+                        plugin_id,
+                        instance_name,
+                    )
+                else:
+                    self._push_fallback_image(
+                        plugin_id=plugin_id,
+                        instance_name=instance_name,
+                        exc=exc,
+                        plugin_config=plugin_config,
+                        refresh_action=refresh_action,
+                    )
                 raise
             # A control-only plugin returns before the normal refresh-info
             # write in ``_run``, so its new timestamp is persisted here.
@@ -311,15 +327,18 @@ class RefreshCycleMixin:
             )
             return None, False, {"generate_ms": generate_ms, "no_image": True}
 
-        # Validate dimensions before doing anything expensive (hash / display push).
+        # Check dimensions before doing anything expensive (hash / display
+        # push). A wrong-size image is fitted to the panel rather than
+        # rejected; only an image that cannot be fitted fails the refresh.
         self.recorder.publish_step(
             plugin_id=plugin_id,
             request_id=request_id,
             step="Checking image",
         )
-        expected_w, expected_h = self.device_config.get_resolution()
+        expected_w, expected_h = oriented_resolution(self.device_config)
+        returned_size = image.size
         try:
-            image = validate_image_dimensions(
+            image = fit_image_to_panel(
                 image,
                 expected_w,
                 expected_h,
@@ -328,7 +347,8 @@ class RefreshCycleMixin:
         except OutputDimensionMismatch as exc:
             logger.error(
                 "plugin_lifecycle: dimension_mismatch | plugin_id=%s instance=%s "
-                "expected=%dx%d actual=%dx%d — skipping display push",
+                "expected=%dx%d actual=%dx%d — image cannot be fitted; "
+                "skipping display push",
                 plugin_id,
                 instance_name,
                 exc.expected[0],
@@ -353,6 +373,15 @@ class RefreshCycleMixin:
                 plugin_failed=True,
             )
             return None, False, {}
+        if returned_size not in ((expected_w, expected_h), (expected_h, expected_w)):
+            self.recorder.publish_step(
+                plugin_id=plugin_id,
+                request_id=request_id,
+                step=(
+                    f"Fitted {returned_size[0]}x{returned_size[1]} image to the "
+                    f"{expected_w}x{expected_h} panel"
+                ),
+            )
 
         image_hash = compute_image_hash(image)
 
@@ -402,6 +431,22 @@ class RefreshCycleMixin:
             duration_ms=request_ms,
         )
         return refresh_info | {"benchmark_id": benchmark_id}, used_cached, metrics
+
+    @staticmethod
+    def _is_paused_probe(
+        refresh_action: RefreshAction, manual_request: ManualUpdateRequest | None
+    ) -> bool:
+        """Return whether this refresh is the scheduler's retry of a paused plugin.
+
+        The scheduler only hands out a paused instance when its cooldown has
+        elapsed; anything the user asked for arrives as a manual request and
+        keeps the normal failure handling.
+        """
+        if manual_request is not None or not isinstance(
+            refresh_action, PlaylistRefresh
+        ):
+            return False
+        return bool(getattr(refresh_action.plugin_instance, "paused", False))
 
     def _push_or_skip_display(
         self,

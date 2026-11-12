@@ -3,12 +3,12 @@ from collections.abc import Mapping
 from datetime import UTC, datetime, timedelta
 from typing import Any, cast
 
-from PIL import Image
+from PIL import Image, ImageOps
 
 from plugins.base_plugin.base_plugin import BasePlugin
 from plugins.base_plugin.settings_schema import callout, schema, section, widget
 from plugins.newspaper.constants import NEWSPAPERS
-from utils.image_utils import get_image
+from utils.image_utils import get_image, resolve_background_color
 
 logger = logging.getLogger(__name__)
 
@@ -62,26 +62,36 @@ class Newspaper(BasePlugin):  # type: ignore[misc, unused-ignore]
                 )
                 break
 
-        if image:
-            # expand height if newspaper is wider than resolution
-            img_width, img_height = image.size
-
-            dimensions = self.get_oriented_dimensions(device_config)
-
-            desired_width, desired_height = dimensions
-
-            img_ratio = img_width / img_height
-            desired_ratio = desired_width / desired_height
-
-            if img_ratio < desired_ratio:
-                new_height = int(img_width / desired_ratio)
-                new_image = Image.new("RGB", (img_width, new_height), (255, 255, 255))
-                new_image.paste(image, (0, 0))
-                image = new_image
-        else:
+        if not image:
             raise RuntimeError("Newspaper front cover not found.")
 
-        return image
+        return self._fit_front_page(image, self.get_oriented_dimensions(device_config))
+
+    @staticmethod
+    def _fit_front_page(image: Image.Image, dimensions: tuple[int, int]) -> Image.Image:
+        """Return the front page at exactly *dimensions*.
+
+        A page taller than the panel (the usual broadsheet on a landscape
+        panel) keeps its full width and is cut to its top — the masthead and
+        lead story — then scaled to the panel. A page wider than the panel is
+        shown whole, scaled down and padded with white below.
+        """
+        image = image.convert("RGB")
+        img_width, img_height = image.size
+        desired_width, desired_height = dimensions
+
+        if img_width / img_height < desired_width / desired_height:
+            top_height = max(1, round(img_width * desired_height / desired_width))
+            top = image.crop((0, 0, img_width, top_height))
+            return top.resize(dimensions, Image.Resampling.LANCZOS)
+
+        return ImageOps.pad(
+            image,
+            dimensions,
+            method=Image.Resampling.LANCZOS,
+            color=resolve_background_color(None, image.mode),
+            centering=(0.5, 0.0),
+        )
 
     def generate_settings_template(self) -> dict[str, object]:
         template_params = super().generate_settings_template()
