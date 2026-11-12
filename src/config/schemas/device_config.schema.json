@@ -29,7 +29,9 @@
         "saturation": { "type": "number" },
         "brightness": { "type": "number" },
         "sharpness": { "type": "number" },
-        "contrast": { "type": "number" }
+        "contrast": { "type": "number" },
+        "inky_saturation": { "type": "number" },
+        "screen_rendering": { "type": "string", "enum": ["auto", "dithered"] }
       }
     },
     "playlist_config": {

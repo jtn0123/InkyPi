@@ -11,10 +11,8 @@
     "display_name": { "type": "string" },
     "image_settings": {
       "type": "array",
-      "items": {
-        "type": "object",
-        "additionalProperties": true
-      }
+      "description": "Display hints for this plugin's frames, e.g. \"keep-width\" or \"crisp\" (rendered UI: undithered on colour e-ink).",
+      "items": { "type": ["string", "object"] }
     }
   }
 }

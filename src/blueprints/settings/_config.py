@@ -8,6 +8,7 @@ from flask import current_app, redirect, render_template, request
 
 import blueprints.settings as _mod
 from app_setup.logging_setup import configure_log_timezone
+from display.crisp import SCREEN_RENDERING_KEY, SCREEN_RENDERING_MODES
 from utils.backend_errors import ClientInputError, route_error_boundary
 from utils.http_utils import json_error, json_success
 from utils.time_utils import calculate_seconds
@@ -557,6 +558,11 @@ def _validate_settings_form(form_data: dict[str, str]) -> tuple[Any | None, str 
     )
     if err:
         return err, None
+    err = _validate_enum_field(
+        form_data, SCREEN_RENDERING_KEY, SCREEN_RENDERING_MODES, required=False
+    )
+    if err:
+        return err, None
 
     return _validate_image_settings(form_data), normalized_device_name
 
@@ -571,7 +577,7 @@ def _build_settings_dict(
     assert unit is not None
     plugin_cycle_interval_seconds = calculate_seconds(int(interval), unit)
 
-    image_settings: dict[str, float] = {
+    image_settings: dict[str, float | str] = {
         "saturation": float(form_data.get("saturation", "1.0")),
         "brightness": float(form_data.get("brightness", "1.0")),
         "sharpness": float(form_data.get("sharpness", "1.0")),
@@ -592,6 +598,8 @@ def _build_settings_dict(
         image_settings["inky_saturation"] = float(
             form_data.get("inky_saturation", "0.5")
         )
+    if SCREEN_RENDERING_KEY in form_data:
+        image_settings[SCREEN_RENDERING_KEY] = form_data[SCREEN_RENDERING_KEY]
     return settings, plugin_cycle_interval_seconds
 
 

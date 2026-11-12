@@ -1865,6 +1865,11 @@
           "inky_saturation": {
             "type": "string",
             "example": "0.5"
+          },
+          "screen_rendering": {
+            "type": "string",
+            "enum": ["auto", "dithered"],
+            "example": "auto"
           }
         }
       },
