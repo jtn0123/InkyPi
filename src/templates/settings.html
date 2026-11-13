@@ -551,6 +551,14 @@
                                 value="{{ device_settings.get('image_settings', {}).get('inky_saturation', 0.5) }}"
                             />
                         </div>
+                        {% set _screen_rendering = device_settings.get('image_settings', {}).get('screen_rendering', 'auto') %}
+                        <div class="form-group">
+                            <label for="screen_rendering" class="form-label">Screen rendering</label>
+                            <select id="screen_rendering" name="screen_rendering" class="form-input">
+                                <option value="auto" {% if _screen_rendering != 'dithered' %}selected{% endif %}>Auto (crisp for dashboards, dithered for photos)</option>
+                                <option value="dithered" {% if _screen_rendering == 'dithered' %}selected{% endif %}>Always dithered</option>
+                            </select>
+                        </div>
                         {% endif %}
                     </div>
                     </div>

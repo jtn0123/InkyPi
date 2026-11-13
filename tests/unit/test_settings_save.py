@@ -327,6 +327,36 @@ class TestSaveSettings:
         img_settings = device_config_dev.get_config("image_settings")
         assert img_settings["inky_saturation"] == 0.7
 
+    @pytest.mark.parametrize("mode", ["auto", "dithered"])
+    def test_save_settings_with_screen_rendering(
+        self, client: FlaskClient, device_config_dev: Any, mode: str
+    ) -> None:
+        form = {**self.VALID_FORM, "screen_rendering": mode}
+        resp = client.post("/save_settings", data=form)
+        assert resp.status_code == 200
+        img_settings = device_config_dev.get_config("image_settings")
+        assert img_settings["screen_rendering"] == mode
+
+    def test_save_settings_rejects_unknown_screen_rendering(
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
+        form = {**self.VALID_FORM, "screen_rendering": "sparkly"}
+        resp = client.post("/save_settings", data=form)
+        assert resp.status_code == 422
+        img_settings = device_config_dev.get_config("image_settings") or {}
+        assert "screen_rendering" not in img_settings
+
+    def test_settings_page_shows_screen_rendering_for_inky(
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
+        device_config_dev.update_value("display_type", "inky")
+        device_config_dev.update_value(
+            "image_settings", {"screen_rendering": "dithered"}
+        )
+        html = client.get("/settings").get_data(as_text=True)
+        assert 'name="screen_rendering"' in html
+        assert '<option value="dithered" selected>' in html
+
     def test_save_settings_triggers_config_change(
         self, client: FlaskClient, device_config_dev: Any
     ) -> None:

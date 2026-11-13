@@ -12,6 +12,7 @@ from PIL import Image
 
 from display.abstract_display import AbstractDisplay, DeviceConfigLike
 from display.mock_display import MockDisplay
+from display.rendering_settings import CRISP_IMAGE_SETTING, SCREEN_RENDERING_KEY
 from utils.image_utils import (
     FAST_PNG_COMPRESS_LEVEL,
     apply_image_enhancement,
@@ -242,6 +243,37 @@ class DisplayManager:
             image, path, format="PNG", compress_level=FAST_PNG_COMPRESS_LEVEL
         )
 
+    def _maybe_crisp(
+        self, image: Image.Image, image_settings: list[object]
+    ) -> Image.Image:
+        """Snap rendered-UI frames to the panel's pure colours when enabled.
+
+        Applies when the plugin declared ``"crisp"`` in its image settings,
+        the device's screen rendering setting is "auto" (the default) and the
+        display offers a crisp conversion (colour Inky drivers). The result
+        is what the preview and history save, so redisplaying it later keeps
+        the undithered look without any plugin context.
+        """
+        if CRISP_IMAGE_SETTING not in image_settings:
+            return image
+        device_image_settings = self.device_config.get_config("image_settings")
+        mode = (
+            device_image_settings.get(SCREEN_RENDERING_KEY, "auto")
+            if isinstance(device_image_settings, Mapping)
+            else "auto"
+        )
+        if mode != "auto":
+            return image
+        crisp_frame = getattr(self.display, "crisp_frame", None)
+        if not callable(crisp_frame):
+            return image
+        t0 = perf_counter()
+        converted = crisp_frame(image)
+        if not isinstance(converted, Image.Image):
+            return image
+        logger.info("Crisp conversion took %d ms", (perf_counter() - t0) * 1000)
+        return converted
+
     def _write_panel(self, image: Image.Image, image_settings: list[object]) -> None:
         """Push *image* to the driver, one write at a time."""
         with self._panel_lock:
@@ -319,6 +351,7 @@ class DisplayManager:
             image = cast(Any, apply_image_enhancement)(
                 image, self.device_config.get_config("image_settings")
             )
+            image = self._maybe_crisp(image, image_settings)
             try:
                 self._save_preview(image, self.device_config.processed_image_file)
             except (OSError, ValueError, RuntimeError):
