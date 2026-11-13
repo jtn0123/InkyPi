@@ -79,7 +79,11 @@ jobs:
   build-image:
     name: Build pre-installed Pi image
     if: github.event_name != 'workflow_dispatch' || inputs.reuse_run_id == ''
-    runs-on: ubuntu-latest
+    # Pinned: on Ubuntu 26 `qemu-user-static` and `qemu-system-aarch64` are
+    # virtual packages with no install candidate, and the chroot staging below
+    # copies /usr/bin/qemu-aarch64-static, which the renamed packages do not
+    # ship under that name. Move to a newer runner together with that staging.
+    runs-on: ubuntu-24.04
     timeout-minutes: 90
     outputs:
       image_name: ${{ steps.package.outputs.image_name }}
