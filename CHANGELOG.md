@@ -2,6 +2,15 @@
 
 <!-- version list -->
 
+## v1.8.0 (2026-11-13)
+
+### Features
+
+- **display**: Crisp rendering for dashboard screens on colour e-ink
+  ([#712](https://github.com/jtn0123/InkyPi/pull/712),
+  [`83666ca`](https://github.com/jtn0123/InkyPi/commit/83666ca0d09313a150ab6f23d903ee116e6cacbe))
+
+
 ## v1.7.5 (2026-11-13)
 
 ### Bug Fixes
