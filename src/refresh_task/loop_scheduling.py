@@ -21,6 +21,7 @@ from utils.time_utils import now_device_tz
 
 if TYPE_CHECKING:
     from refresh_task.executor import RefreshExecutor
+    from refresh_task.health import PluginHealthTracker
     from refresh_task.housekeeping import RefreshHousekeeper
 
 # Moved out of task.py; keeps the original logger name so log records, level
@@ -45,6 +46,7 @@ class SchedulingMixin:
         scheduler: RefreshScheduler
         housekeeper: RefreshHousekeeper
         executor: RefreshExecutor
+        health_tracker: PluginHealthTracker
         refresh_context: RefreshContext
         _tick_count: int
         _work_started_at: float | None
@@ -246,19 +248,28 @@ class SchedulingMixin:
             return None, None
 
         # Use eligibility-aware selection; skip circuit-breaker paused plugins
+        # unless their cooldown has elapsed, in which case this turn is the
+        # single probe that decides whether they resume.
         attempts_left = len(playlist.plugins)
         while attempts_left > 0:
             plugin = playlist.get_next_eligible_plugin(current_dt)
             if plugin is None:
                 break
             if getattr(plugin, "paused", False):
+                if self.health_tracker.probe_due(plugin, current_dt):
+                    self.health_tracker.begin_probe(
+                        plugin, plugin.plugin_id, plugin.name
+                    )
+                    return playlist, plugin
+                next_probe = self.health_tracker.next_probe_at(plugin, current_dt)
                 logger.info(
                     "plugin circuit_breaker: skipping paused plugin | "
-                    "plugin_id=%s instance=%s failures=%s reason=%s",
+                    "plugin_id=%s instance=%s failures=%s reason=%s next_retry=%s",
                     plugin.plugin_id,
                     plugin.name,
                     getattr(plugin, "consecutive_failure_count", "?"),
                     getattr(plugin, "disabled_reason", None) or "not recorded",
+                    next_probe.isoformat() if next_probe else "manual only",
                 )
                 attempts_left -= 1
                 continue

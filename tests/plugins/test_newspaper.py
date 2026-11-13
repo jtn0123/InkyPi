@@ -10,6 +10,13 @@ def _png_image(size: Any = (600, 800), color: Any = "white") -> Any:
     return Image.new("RGB", size, color)
 
 
+def _front_page(size: Any, top_height: int) -> Any:
+    """A page whose top *top_height* rows are red and the rest blue."""
+    page = Image.new("RGB", size, "blue")
+    page.paste("red", (0, 0, size[0], top_height))
+    return page
+
+
 def test_newspaper_initialization() -> None:
     from plugins.newspaper.newspaper import Newspaper
 
@@ -24,9 +31,10 @@ def test_newspaper_success_with_expand_height(
 ) -> Any:
     from plugins.newspaper.newspaper import Newspaper
 
-    # Mock utils.image_utils.get_image to return a portrait image on first try
+    # A portrait page: only its top 400 / (800/480) = 240 rows fit the
+    # panel's shape at full width. Those are red; everything below is blue.
     def fake_get_image(url: Any) -> Any:
-        return _png_image((400, 800))
+        return _front_page((400, 800), top_height=240)
 
     monkeypatch.setattr("plugins.newspaper.newspaper.get_image", fake_get_image)
 
@@ -34,10 +42,29 @@ def test_newspaper_success_with_expand_height(
         {"newspaperSlug": "wsj"}, device_config_dev
     )
     assert img is not None
-    # device_config_dev has horizontal orientation, so dimensions stay (800, 480)
-    # img_ratio = 400/800 = 0.5 < desired_ratio = 800/480 = 1.667
-    # new_height = int(400 / (800/480)) = 240
-    assert img.size == (400, 240)
+    # Exactly the panel size (it used to come back at 400x240 and be rejected
+    # by the refresh task's dimension check, pausing the plugin).
+    assert img.size == (800, 480)
+    # The top of the page, at full width: no blue from further down.
+    assert img.getpixel((400, 470)) == (255, 0, 0)
+    assert img.getpixel((5, 5)) == (255, 0, 0)
+
+
+def test_newspaper_real_freedom_forum_shape_returns_panel_size(
+    monkeypatch: pytest.MonkeyPatch, device_config_dev: Any
+) -> None:
+    """A 700-wide front page used to come back as 700x420 for an 800x480 panel."""
+    from plugins.newspaper.newspaper import Newspaper
+
+    monkeypatch.setattr(
+        "plugins.newspaper.newspaper.get_image",
+        lambda url: _png_image((700, 1287)),
+    )
+
+    img = Newspaper({"id": "newspaper"}).generate_image(
+        {"newspaperSlug": "ny_nyt"}, device_config_dev
+    )
+    assert img.size == device_config_dev.get_resolution() == (800, 480)
 
 
 def test_newspaper_tries_multiple_days_then_fails(
@@ -111,7 +138,7 @@ def test_newspaper_invalid_slug_raises(device_config_dev: Any) -> None:
 def test_newspaper_image_wider_than_display(
     monkeypatch: pytest.MonkeyPatch, device_config_dev: Any
 ) -> Any:
-    """Image wider than display ratio is returned without height expansion."""
+    """A page wider than the panel is shown whole, padded with white below."""
     from plugins.newspaper.newspaper import Newspaper
 
     # device_config_dev is horizontal, so dimensions stay (800, 480)
@@ -119,7 +146,7 @@ def test_newspaper_image_wider_than_display(
     # For no expansion, img_ratio must be >= desired_ratio
     # Use 1000x500 image: img_ratio = 2.0 > 1.667, so no expansion
     def fake_get_image(url: Any) -> Any:
-        return _png_image((1000, 500))
+        return _png_image((1000, 500), "red")
 
     monkeypatch.setattr("plugins.newspaper.newspaper.get_image", fake_get_image)
 
@@ -127,8 +154,12 @@ def test_newspaper_image_wider_than_display(
         {"newspaperSlug": "WSJ"}, device_config_dev
     )
     assert img is not None
-    # Image should be unchanged since img_ratio >= desired_ratio
-    assert img.size == (1000, 500)
+    # 1000x500 scales to 800x400; the remaining 80 rows are white padding at
+    # the bottom so the masthead stays at the top of the panel.
+    assert img.size == (800, 480)
+    assert img.getpixel((400, 0)) == (255, 0, 0)
+    assert img.getpixel((400, 395)) == (255, 0, 0)
+    assert img.getpixel((400, 479)) == (255, 255, 255)
 
 
 def test_newspaper_vertical_orientation(
@@ -140,8 +171,10 @@ def test_newspaper_vertical_orientation(
     # Set orientation to vertical
     device_config_dev.update_value("orientation", "vertical")
 
+    # img_ratio = 400/800 = 0.5 < desired_ratio = 480/800 = 0.6, so the top
+    # 400 / 0.6 = 667 rows are kept at full width.
     def fake_get_image(url: Any) -> Any:
-        return _png_image((400, 800))
+        return _front_page((400, 800), top_height=667)
 
     monkeypatch.setattr("plugins.newspaper.newspaper.get_image", fake_get_image)
 
@@ -149,11 +182,9 @@ def test_newspaper_vertical_orientation(
         {"newspaperSlug": "wsj"}, device_config_dev
     )
     assert img is not None
-    # In vertical mode, dimensions are swapped to (480, 800)
-    # img_ratio = 400/800 = 0.5, desired_ratio = 480/800 = 0.6
-    # Since img_ratio < desired_ratio, height is expanded
-    # new_height = int(400 / 0.6) = 666
-    assert img.size == (400, 666)
+    # In vertical mode the panel canvas is portrait (480, 800).
+    assert img.size == (480, 800)
+    assert img.getpixel((240, 790)) == (255, 0, 0)
 
 
 def test_newspaper_finds_on_second_day(

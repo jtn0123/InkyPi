@@ -64,7 +64,7 @@ def test_wpotd_happy_path(
         {"shrinkToFitWpotd": "false"}, device_config_dev
     )
     assert img is not None
-    assert img.size[0] > 0
+    assert img.size == device_config_dev.get_resolution()
 
 
 def test_wpotd_bad_status_raises(
@@ -254,9 +254,60 @@ def test_wpotd_shrink_to_fit_disabled(
 
         result = p.generate_image(settings, device_config_dev)
 
-        # Verify shrink_to_fit was NOT called
+        # Fit is off: the picture fills the panel (cropping the overflow)
+        # instead of being shrunk — but it is never returned full size.
         mock_shrink.assert_not_called()
-        assert result is original_image
+        assert result is not original_image
+        assert result.size == device_config_dev.get_resolution()
+
+
+@pytest.mark.parametrize("settings", [{}, {"shrinkToFitWpotd": "true"}])
+@pytest.mark.parametrize(
+    ("source_size", "orientation", "expected"),
+    [
+        ((2201, 2935), "horizontal", (800, 480)),  # the real full-size original
+        ((300, 200), "horizontal", (800, 480)),  # smaller than the panel
+        ((2201, 2935), "vertical", (480, 800)),
+    ],
+)
+def test_wpotd_returns_the_panel_size_by_default(
+    settings: Any,
+    source_size: Any,
+    orientation: Any,
+    expected: Any,
+    device_config_dev: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Empty settings (an instance saved before the field existed) fit too.
+
+    "Shrink Image To Fit" defaults to on in the schema, so an absent value
+    behaves as on: the whole picture, padded white, at exactly the panel size.
+    """
+    from plugins.wpotd.wpotd import Wpotd
+
+    monkeypatch.setattr(device_config_dev, "get_resolution", lambda: (800, 480))
+    real_get_config = device_config_dev.get_config
+
+    def get_config(key: Any, default: Any = None) -> Any:
+        if key == "orientation":
+            return orientation
+        return real_get_config(key, default)
+
+    monkeypatch.setattr(device_config_dev, "get_config", get_config)
+    source = Image.new("RGB", source_size, "red")
+    with (
+        patch.object(Wpotd, "_fetch_potd", return_value={"image_src": "x.jpg"}),
+        patch.object(Wpotd, "_download_image", return_value=source),
+    ):
+        result = Wpotd({"id": "wpotd"}).generate_image(settings, device_config_dev)
+
+    assert result.size == expected
+    # Whole picture shown: the centre is the photo; a letterboxed edge is white.
+    assert result.getpixel((expected[0] // 2, expected[1] // 2)) == (255, 0, 0)
+    corners = (result.getpixel((0, 0)), result.getpixel((0, expected[1] - 1)))
+    w, h = source_size
+    if abs((w / h) / (expected[0] / expected[1]) - 1) > 0.02:
+        assert (255, 255, 255) in corners
 
 
 def test_determine_date_today() -> None:
@@ -401,19 +452,38 @@ def test_fetch_image_src_api_error() -> None:
             p._fetch_image_src("File:Example.png")
 
 
-def test_shrink_to_fit_no_resize_needed() -> None:
-    """Test _shrink_to_fit when image is already within bounds."""
+def test_shrink_to_fit_scales_a_small_image_up_to_the_panel() -> None:
+    """A picture smaller than the panel is scaled up, not returned as-is."""
     from plugins.wpotd.wpotd import Wpotd
 
     p = Wpotd({"id": "wpotd"})
 
-    # Create small image that doesn't need resizing
-    small_image = Image.new("RGB", (400, 300), "white")
+    small_image = Image.new("RGB", (400, 300), "red")
 
     result = p._shrink_to_fit(small_image, 800, 600)
 
-    # Should return the original image unchanged
-    assert result is small_image
+    assert result.size == (800, 600)
+    # Same 4:3 ratio, so it fills the panel with no letterbox.
+    assert result.getpixel((0, 0)) == (255, 0, 0)
+
+
+def test_shrink_to_fit_never_overflows_a_squarish_landscape_image() -> None:
+    """1000x900 is landscape but taller than 800x480's ratio.
+
+    The old width-constrained shrink made it 800x720 and pasted that onto an
+    800x480 canvas, silently cropping the top and bottom.
+    """
+    from plugins.wpotd.wpotd import Wpotd
+
+    image = Image.new("RGB", (1000, 900), "red")
+
+    result = Wpotd({"id": "wpotd"})._shrink_to_fit(image, 800, 480)
+
+    assert result.size == (800, 480)
+    # Whole picture visible: white bars at the sides, red top-to-bottom.
+    assert result.getpixel((0, 240)) == (255, 255, 255)
+    assert result.getpixel((400, 0)) == (255, 0, 0)
+    assert result.getpixel((400, 479)) == (255, 0, 0)
 
 
 def test_shrink_to_fit_landscape_resize() -> None:

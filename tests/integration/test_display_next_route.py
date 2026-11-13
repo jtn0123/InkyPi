@@ -120,3 +120,39 @@ def test_display_next_no_plugin_returns_error(
     retry = client.post("/display-next")
     assert retry.status_code == 400
     assert retry.get_json()["error"] == "No eligible plugin to display"
+
+
+@pytest.mark.integration
+def test_display_next_direct_fits_a_wrong_size_image(
+    client: FlaskClient,
+    device_config_dev: Any,
+    monkeypatch: pytest.MonkeyPatch,
+    flask_app: Flask,
+) -> Any:
+    """The dev-path "display next" fits wrong-size output like the refresh task."""
+    flask_app.config["REFRESH_TASK"].running = False
+    _add_playlist_with_plugin(device_config_dev)
+    monkeypatch.setattr("utils.time_utils.now_device_tz", _fixed_now, raising=True)
+
+    from plugins import plugin_registry
+
+    class _StubPlugin:
+        def generate_image(self, settings: Any, device_config: Any) -> Any:
+            return Image.new("RGB", (1024, 676), "red")  # the APOD frame
+
+    monkeypatch.setattr(
+        plugin_registry, "get_plugin_instance", lambda cfg: _StubPlugin(), raising=True
+    )
+    shown: list[Any] = []
+
+    def _display_image(
+        image: Any, image_settings: Any = None, history_meta: Any = None
+    ) -> None:
+        shown.append(image)
+
+    flask_app.config["DISPLAY_MANAGER"].display_image = _display_image
+
+    resp = client.post("/display-next")
+
+    assert resp.status_code == 200
+    assert [img.size for img in shown] == [(800, 480)]

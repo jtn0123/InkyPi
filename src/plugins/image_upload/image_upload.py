@@ -170,7 +170,9 @@ class ImageUpload(BasePlugin):
                 color=background_color,
                 method=Image.Resampling.LANCZOS,
             )
-        return image
+        # Cover: fill the panel, cropping the overflow — as image_folder and
+        # image_album do — rather than handing back the upload at its own size.
+        return ImageOps.fit(image, dimensions, method=Image.Resampling.LANCZOS)
 
     def cleanup(self, settings: Mapping[str, object]) -> None:
         """Delete all uploaded image files associated with this plugin instance."""
