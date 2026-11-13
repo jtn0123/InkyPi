@@ -2,6 +2,47 @@
 
 <!-- version list -->
 
+## v1.7.5 (2026-11-13)
+
+### Bug Fixes
+
+- **refresh**: Fit wrong-size images and auto-resume paused plugins
+  ([#711](https://github.com/jtn0123/InkyPi/pull/711),
+  [`ad59543`](https://github.com/jtn0123/InkyPi/commit/ad59543367c03ac70d51e303c8d690265a3056bb))
+
+### Refactoring
+
+- **http**: Split http_utils into focused modules
+  ([#707](https://github.com/jtn0123/InkyPi/pull/707),
+  [`3137985`](https://github.com/jtn0123/InkyPi/commit/3137985edf502cf505906b0c3841c99cdb928461))
+
+- **playlist**: Split playlist blueprint into focused modules
+  ([#708](https://github.com/jtn0123/InkyPi/pull/708),
+  [`e071b46`](https://github.com/jtn0123/InkyPi/commit/e071b46d8f72af6bcd0dd6880d9a671d863d6f6a))
+
+- **plugin**: Split plugin blueprint into focused modules
+  ([#706](https://github.com/jtn0123/InkyPi/pull/706),
+  [`209ebde`](https://github.com/jtn0123/InkyPi/commit/209ebdeb9bfe1e3ccee03ca368de32eeb359849a))
+
+- **refresh-task**: Split task.py into focused modules
+  ([#705](https://github.com/jtn0123/InkyPi/pull/705),
+  [`7ffa6d7`](https://github.com/jtn0123/InkyPi/commit/7ffa6d71c1b1945070e58079bf78dcc1f414c641))
+
+- **schemas**: Drop pre-3.13 compat branches in TypedDict validator
+  ([#709](https://github.com/jtn0123/InkyPi/pull/709),
+  [`ac74005`](https://github.com/jtn0123/InkyPi/commit/ac7400589d010b0a332a3f736ea647e24300f609))
+
+### Testing
+
+- Make ineffective patches exercise real code paths
+  ([#710](https://github.com/jtn0123/InkyPi/pull/710),
+  [`dd1994a`](https://github.com/jtn0123/InkyPi/commit/dd1994aeb4c619caf5f00c1e8cc021dc0a254200))
+
+- **playlist**: Wait for the app's post-delete reload instead of racing it
+  ([#704](https://github.com/jtn0123/InkyPi/pull/704),
+  [`0ce63fe`](https://github.com/jtn0123/InkyPi/commit/0ce63fe149e18c7f458e7d614d05701ff61e34f1))
+
+
 ## v1.7.4 (2026-11-08)
 
 ### Bug Fixes
