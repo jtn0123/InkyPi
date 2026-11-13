@@ -19,6 +19,12 @@ neighbours:
   blue instead of fading to white, and a muted red becomes the panel red.
   A hue with no reasonable match on the panel (blue on a black/white/red/
   yellow panel) falls back to the neutral rule.
+* Anti-aliasing between two flat colours produces in-between shades, and an
+  in-between shade can land on a third panel colour: green digits on a red
+  face get an olive edge, which on its own reads as yellow. An uncommon
+  colour lying on the straight line between two common colours is treated as
+  such a blend and takes the colour of whichever side it is nearer to, so an
+  edge never introduces a colour that neither side has.
 * Photographs embedded in a dashboard (RSS thumbnails, for example) would
   posterise badly, so rectangular regions that look photographic -- clusters
   of 8x8 blocks with many distinct colours -- are error-diffused against
@@ -68,6 +74,16 @@ MIN_PHOTO_CORES = 6
 SMOOTH_MIN_COLOURS = 4
 SMOOTH_MAX_RANGE = 32
 GRADIENT_SHARE = 0.25
+
+# An anti-aliased edge blends the two colours either side of it. The sides are
+# looked for among the EDGE_SIDES most common colours that each cover at least
+# EDGE_SIDE_SHARE of the frame; a blend is at least EDGE_RARITY times rarer
+# than both of its sides and within EDGE_LINE_DIST (RGB units) of the straight
+# line between them.
+EDGE_SIDES = 12
+EDGE_SIDE_SHARE = 0.001
+EDGE_RARITY = 4
+EDGE_LINE_DIST = 3
 
 # Integer luma weights (sum 256), ITU-R BT.601.
 _LUMA_WEIGHTS = np.array([77, 150, 29], dtype=np.int32)
@@ -190,6 +206,40 @@ def photo_regions(packed: np.ndarray) -> list[tuple[int, int, int, int]]:
     return boxes
 
 
+def _settle_edge_blends(u: np.ndarray, counts: np.ndarray, lut: np.ndarray) -> None:
+    """Stop anti-aliased edges introducing a colour neither side has.
+
+    *u* holds the frame's distinct colours, *counts* how often each occurs and
+    *lut* the panel index chosen for each; *lut* is corrected in place. Only
+    colours whose index differs from both sides of their edge are touched, so
+    grey text edges keep the weight the paper rule gave them.
+    """
+    common = np.argsort(counts)[::-1][:EDGE_SIDES]
+    common = common[counts[common] >= EDGE_SIDE_SHARE * counts.sum()]
+    chosen = lut.copy()
+    points = u.astype(np.float32)
+    best = np.full(len(u), np.inf, dtype=np.float32)
+    for pos, a in enumerate(common):
+        for b in common[pos + 1 :]:
+            if chosen[a] == chosen[b]:
+                continue
+            line = points[b] - points[a]
+            offset = points - points[a]
+            along = (offset @ line) / (line @ line)
+            dist2 = ((offset - along[:, None] * line) ** 2).sum(axis=1)
+            blend = (
+                (along > 0)
+                & (along < 1)
+                & (dist2 <= EDGE_LINE_DIST**2)
+                & (dist2 < best)
+                & (counts * EDGE_RARITY <= min(counts[a], counts[b]))
+                & (chosen != chosen[a])
+                & (chosen != chosen[b])
+            )
+            lut[blend] = np.where(along[blend] < 0.5, chosen[a], chosen[b])
+            best[blend] = dist2[blend]
+
+
 def crisp_indices(
     image: Image.Image,
     palette: Palette,
@@ -226,6 +276,7 @@ def crisp_indices(
         matched = dist[np.arange(len(best)), best] <= MAX_HUE_DIST2
         chosen = np.asarray(chromatic, dtype=np.uint8)[best]
         lut[coloured] = np.where(matched, chosen, lut[coloured])
+    _settle_edge_blends(u, counts, lut)
     out = lut[inverse].reshape(packed.shape)
 
     boxes = photo_regions(packed)
