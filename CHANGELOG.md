@@ -2,6 +2,21 @@
 
 <!-- version list -->
 
+## v1.8.1 (2026-11-13)
+
+### Bug Fixes
+
+- **display**: Keep anti-aliased edges from adding a third colour
+  ([#714](https://github.com/jtn0123/InkyPi/pull/714),
+  [`171af60`](https://github.com/jtn0123/InkyPi/commit/171af606338a0b5aa9c10d07eeca6b66db69bd5a))
+
+### Continuous Integration
+
+- **release**: Pin Pi image build to ubuntu-24.04
+  ([#713](https://github.com/jtn0123/InkyPi/pull/713),
+  [`1b8b119`](https://github.com/jtn0123/InkyPi/commit/1b8b1192ece765a40c18fabbed5d55030cbbbf7a))
+
+
 ## v1.8.0 (2026-11-13)
 
 ### Features
