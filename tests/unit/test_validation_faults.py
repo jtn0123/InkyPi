@@ -1,5 +1,7 @@
 import logging
 import sqlite3
+import time
+from collections.abc import Callable
 from typing import Any
 
 import pytest
@@ -8,6 +10,26 @@ from PIL import Image
 
 from display.display_manager import DisplayManager
 from refresh_task import ManualRefresh, RefreshTask
+
+
+def _health_when(
+    refresh_task: RefreshTask,
+    plugin_id: str,
+    settled: Callable[[dict[str, Any]], bool],
+    timeout: float = 10.0,
+) -> dict[str, Any]:
+    """Return the plugin's health entry once *settled* holds for it.
+
+    ``manual_update`` returns as soon as the image is saved; the loop records
+    the outcome a moment later, after the display write. Reading the health
+    snapshot straight after the call can therefore see the previous state.
+    """
+    deadline = time.monotonic() + timeout
+    while True:
+        entry: dict[str, Any] = refresh_task.get_health_snapshot()[plugin_id]
+        if settled(entry) or time.monotonic() >= deadline:
+            return entry
+        time.sleep(0.01)
 
 
 class GoodPlugin:
@@ -124,11 +146,13 @@ def test_plugin_failure_remains_actionable_and_task_recovers(
         metrics = refresh_task.manual_update(ManualRefresh("faulty", {}))
         assert metrics is not None
 
-        health = refresh_task.get_health_snapshot()
         # After successful recovery, failure_count is reset to 0
-        assert health["faulty"]["failure_count"] == 0
-        assert health["faulty"]["success_count"] >= 1
-        assert health["faulty"]["last_seen"]
+        health = _health_when(
+            refresh_task, "faulty", lambda entry: entry["failure_count"] == 0
+        )
+        assert health["failure_count"] == 0
+        assert health["success_count"] >= 1
+        assert health["last_seen"]
     finally:
         refresh_task.stop()
 
