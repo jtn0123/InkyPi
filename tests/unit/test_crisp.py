@@ -203,6 +203,85 @@ def test_dashboard_with_small_gradient_stays_crisp() -> None:
     assert not crisp.gradient_dominated(Image.new("RGB", (4, 4)))
 
 
+def _antialiased_shapes(
+    paper: tuple[int, int, int], ink: tuple[int, int, int]
+) -> Image.Image:
+    """Slanted *ink* shapes on *paper*, drawn 4x and shrunk so edges blend."""
+    big = Image.new("RGB", (1600, 960), paper)
+    draw = ImageDraw.Draw(big)
+    draw.polygon([(200, 100), (700, 160), (640, 800), (140, 760)], fill=ink)
+    draw.ellipse((900, 200, 1400, 700), fill=ink)
+    return big.resize((400, 240), Image.Resampling.BOX)
+
+
+def test_edges_between_two_colours_do_not_add_a_third() -> None:
+    """Green on red blends through olive, which alone would read as yellow."""
+    frame = _antialiased_shapes((208, 88, 88), (19, 247, 2))
+    assert len(frame.getcolors(100_000) or []) > 20  # the edges really blend
+
+    idx = crisp_indices(frame, SPECTRA6)
+
+    assert set(np.unique(idx).tolist()) == {RED, GREEN}
+
+
+def test_complementary_edges_do_not_turn_grey() -> None:
+    """Blue on yellow blends through grey, which alone would be black or white."""
+    frame = _antialiased_shapes((255, 255, 0), (0, 0, 255))
+
+    idx = crisp_indices(frame, SPECTRA6)
+
+    assert set(np.unique(idx).tolist()) == {YELLOW, BLUE}
+
+
+def test_edge_blend_takes_the_nearer_side() -> None:
+    frame = Image.new("RGB", (100, 100), (255, 0, 0))
+    draw = ImageDraw.Draw(frame)
+    draw.rectangle((50, 0, 99, 99), fill=(0, 255, 0))
+    draw.line((48, 0, 48, 99), fill=(170, 85, 0))  # a third of the way to green
+    draw.line((49, 0, 49, 99), fill=(85, 170, 0))  # two thirds of the way
+
+    idx = crisp_indices(frame, SPECTRA6)
+
+    assert (idx[:, :49] == RED).all()
+    assert (idx[:, 49:] == GREEN).all()
+
+
+def test_grey_text_edges_keep_their_weight() -> None:
+    """A blend that already takes one side's colour is left to the paper rule."""
+    frame = Image.new("RGB", (100, 100), "white")
+    draw = ImageDraw.Draw(frame)
+    draw.rectangle((40, 0, 59, 99), fill="black")
+    draw.line((39, 0, 39, 99), fill=(180, 180, 180))  # light anti-aliasing
+
+    idx = crisp_indices(frame, SPECTRA6)
+
+    assert (idx[:, 39] == BLACK).all()  # nearer to white, but still ink
+    assert (idx[:, :39] == WHITE).all()
+
+
+def test_third_colour_off_the_line_is_kept() -> None:
+    frame = Image.new("RGB", (100, 100), (255, 0, 0))
+    draw = ImageDraw.Draw(frame)
+    draw.rectangle((50, 0, 99, 99), fill=(0, 255, 0))
+    draw.rectangle((10, 10, 20, 20), fill=(255, 220, 0))  # a small yellow badge
+
+    idx = crisp_indices(frame, SPECTRA6)
+
+    assert (idx[10:21, 10:21] == YELLOW).all()
+
+
+def test_common_in_between_colour_is_not_treated_as_an_edge() -> None:
+    """Three equal bands: the middle one is a fill in its own right."""
+    frame = Image.new("RGB", (90, 30), (255, 0, 0))
+    draw = ImageDraw.Draw(frame)
+    draw.rectangle((30, 0, 59, 29), fill=(128, 127, 0))
+    draw.rectangle((60, 0, 89, 29), fill=(0, 255, 0))
+
+    idx = crisp_indices(frame, SPECTRA6)
+
+    assert (idx[:, 30:60] == YELLOW).all()
+
+
 def test_dither_palette_defaults_to_pure_palette() -> None:
     img = _photo((96, 96))
     idx = crisp_indices(img, SPECTRA6)
