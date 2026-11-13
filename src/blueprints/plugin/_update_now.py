@@ -17,6 +17,7 @@ from utils.backend_errors import ClientInputError, RefreshTaskUnavailable
 from utils.fallback_image import render_error_image
 from utils.form_utils import sanitize_log_field
 from utils.http_utils import json_error, json_success
+from utils.output_validator import fit_image_to_device
 from utils.plugin_errors import (
     MANUAL_UPDATE_TIMEOUT_MSG,
     SCREENSHOT_BACKEND_UNAVAILABLE_MSG,
@@ -79,7 +80,7 @@ def _direct_render_outcome(
     def display(image: Any) -> None:
         _safe_display_image(
             display_manager,
-            image,
+            fit_image_to_device(image, device_config, plugin_id),
             plugin_config.get("image_settings", []),
             history_meta,
         )

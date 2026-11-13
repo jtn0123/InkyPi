@@ -159,15 +159,22 @@ class TestUploadRenderRespectsFitMode:
         result = self._render({"padImage": "true"}, (400, 400))
         assert result.size == LANDSCAPE
 
-    def test_legacy_pad_false_still_returns_the_source(self) -> None:
-        """Cover previously left the loader to resize; behaviour is unchanged."""
+    def test_legacy_pad_false_crops_to_fill_the_panel(self) -> None:
+        """Cover fills the panel itself instead of returning the upload's size.
+
+        It used to hand back the source untouched, which the refresh task's
+        dimension check then rejected as a wrong-size image.
+        """
         result = self._render({"padImage": "false"}, (400, 400))
-        assert result.size == (400, 400)
+        assert result.size == LANDSCAPE
+        # Filled, not padded: no white letterbox at the edges.
+        assert result.getpixel((0, 0)) == (255, 0, 0)
 
     def test_auto_pads_a_portrait_image_on_a_landscape_display(self) -> None:
         result = self._render({"fitMode": "auto"}, (300, 900))
         assert result.size == LANDSCAPE
 
-    def test_auto_leaves_a_landscape_image_to_the_cover_path(self) -> None:
+    def test_auto_sends_a_landscape_image_down_the_cover_path(self) -> None:
         result = self._render({"fitMode": "auto"}, (1600, 900))
-        assert result.size == (1600, 900)
+        assert result.size == LANDSCAPE
+        assert result.getpixel((0, 0)) == (255, 0, 0)

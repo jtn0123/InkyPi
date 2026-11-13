@@ -112,6 +112,10 @@
                                     {% else %}
                                         <span class="latest-refresh">Never refreshed</span>
                                     {% endif %}
+                                    {% set paused_label = (paused_status or {}).get(playlist.name, {}).get(plugin_instance.name) %}
+                                    {% if paused_label %}
+                                        <span class="status-chip warning plugin-paused-chip" title="{{ plugin_instance.disabled_reason or 'Paused after repeated failures.' }} Display now retries it immediately.">{{ paused_label }}</span>
+                                    {% endif %}
                                 </div>
                                 <div class="loading-indicator small left-align"></div>
                             </div>

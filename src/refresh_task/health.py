@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 import os
 from collections.abc import Callable, Mapping
-from datetime import UTC
+from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Any, Protocol, cast
 
 from utils.metrics import (
@@ -16,6 +16,9 @@ from utils.metrics import (
 from utils.time_utils import now_device_tz
 
 logger = logging.getLogger(__name__)
+
+#: How long a paused plugin rests before one automatic probe refresh is tried.
+_DEFAULT_PAUSE_COOLDOWN_SECONDS = 6 * 60 * 60
 
 # Control characters that would let a crafted value forge extra log lines, or
 # break out of the single-line reason the UI renders.
@@ -36,12 +39,24 @@ HealthEntry = dict[str, object]
 Metrics = dict[str, object]
 
 
+def _parse_iso(value: object) -> datetime | None:
+    """Parse a stored ISO timestamp; naive values are UTC, junk is ``None``."""
+    if not isinstance(value, str) or not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(value)
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo is not None else parsed.replace(tzinfo=UTC)
+
+
 class PluginInstanceLike(Protocol):
     """Playlist instance surface needed for circuit-breaker updates."""
 
     paused: bool
     consecutive_failure_count: int
     disabled_reason: str | None
+    paused_at: str | None
 
 
 class SupportsPlaylistLookup(Protocol):
@@ -87,6 +102,84 @@ class PluginHealthTracker:
         except (ValueError, TypeError):
             return 5
         return max(1, value)
+
+    @staticmethod
+    def pause_cooldown_seconds(environ: Mapping[str, str] | None = None) -> int | None:
+        """Return how long a paused plugin waits before an automatic probe.
+
+        Read from ``PLUGIN_PAUSE_COOLDOWN_SECONDS`` (default six hours), next to
+        ``PLUGIN_FAILURE_THRESHOLD``. Invalid values fall back to the default;
+        ``0`` or a negative value turns automatic probing off, leaving the
+        manual "Force retry" as the only way out of a pause.
+        """
+        env = os.environ if environ is None else environ
+        try:
+            value = int(
+                env.get(
+                    "PLUGIN_PAUSE_COOLDOWN_SECONDS",
+                    str(_DEFAULT_PAUSE_COOLDOWN_SECONDS),
+                )
+            )
+        except (ValueError, TypeError):
+            return _DEFAULT_PAUSE_COOLDOWN_SECONDS
+        return value if value > 0 else None
+
+    @classmethod
+    def next_probe_at(
+        cls, plugin_instance: PluginInstanceLike, now: datetime
+    ) -> datetime | None:
+        """Return when a paused instance may next be probed, or ``None``.
+
+        ``None`` means the instance is not paused or automatic probing is off.
+        A pause with no usable ``paused_at`` (written before the field existed,
+        or hand-edited) is due at *now*: its age is unknown, and a pause that
+        predates this code is old enough that waiting longer only prolongs it.
+        """
+        if not plugin_instance.paused:
+            return None
+        cooldown = cls.pause_cooldown_seconds()
+        if cooldown is None:
+            return None
+        paused_at = _parse_iso(getattr(plugin_instance, "paused_at", None))
+        if paused_at is None:
+            return now
+        return paused_at + timedelta(seconds=cooldown)
+
+    @classmethod
+    def probe_due(cls, plugin_instance: PluginInstanceLike, now: datetime) -> bool:
+        """Return whether a paused instance has rested long enough to retry."""
+        due_at = cls.next_probe_at(plugin_instance, now)
+        return due_at is not None and now >= due_at
+
+    def begin_probe(
+        self, plugin_instance: PluginInstanceLike, plugin_id: str, instance: str
+    ) -> None:
+        """Restart the cooldown before a paused instance is retried.
+
+        Stamped and persisted *before* the probe runs, so a probe that takes
+        the whole process down (the crash-quarantine case) still waits a full
+        cooldown before the next attempt instead of being retried on every
+        restart. A successful probe clears the pause through ``on_success``.
+        """
+        now_iso = self._now_iso()
+
+        def _stamp() -> None:
+            plugin_instance.paused_at = now_iso
+
+        self._persist(
+            _stamp,
+            "plugin circuit_breaker: failed to persist probe start for %s/%s",
+            plugin_id,
+            instance,
+        )
+        logger.info(
+            "plugin circuit_breaker: probing paused plugin | plugin_id=%s "
+            "instance=%s failures=%s reason=%s",
+            plugin_id,
+            instance,
+            plugin_instance.consecutive_failure_count,
+            plugin_instance.disabled_reason or "not recorded",
+        )
 
     def update(
         self,
@@ -173,7 +266,10 @@ class PluginHealthTracker:
         webhook_sender: Callable[[list[str], dict[str, object]], None] | None = None,
     ) -> None:
         """Increment failure state and trip the circuit breaker when needed."""
-        if plugin_instance is None or plugin_instance.paused:
+        if plugin_instance is None:
+            return
+        if plugin_instance.paused:
+            self._record_failed_probe(plugin_instance, plugin_id, instance)
             return
         threshold = self.circuit_breaker_threshold()
         error_msg = str(
@@ -186,6 +282,7 @@ class PluginHealthTracker:
             plugin_instance.consecutive_failure_count += 1
             if plugin_instance.consecutive_failure_count >= threshold:
                 plugin_instance.paused = True
+                plugin_instance.paused_at = self._now_iso()
                 plugin_instance.disabled_reason = (
                     f"Paused after {plugin_instance.consecutive_failure_count} "
                     f"consecutive failures at {self._now_iso()}. "
@@ -272,10 +369,11 @@ class PluginHealthTracker:
 
         def _quarantine() -> None:
             plugin_instance.paused = True
+            plugin_instance.paused_at = self._now_iso()
             plugin_instance.disabled_reason = (
                 f"Paused automatically: the service died while this plugin was "
-                f"rendering (started {started}). Re-enable it once the cause is "
-                f"understood."
+                f"rendering (started {started}). It is retried automatically "
+                f"after a cooldown, or re-enable it once the cause is understood."
             )
 
         set_circuit_breaker_open(plugin_id, True)
@@ -323,6 +421,7 @@ class PluginHealthTracker:
             plugin_instance.paused
             or plugin_instance.consecutive_failure_count > 0
             or plugin_instance.disabled_reason is not None
+            or getattr(plugin_instance, "paused_at", None) is not None
         )
 
     @staticmethod
@@ -336,6 +435,47 @@ class PluginHealthTracker:
         plugin_instance.consecutive_failure_count = 0
         plugin_instance.paused = False
         plugin_instance.disabled_reason = None
+        plugin_instance.paused_at = None
+
+    def _record_failed_probe(
+        self,
+        plugin_instance: PluginInstanceLike,
+        plugin_id: str,
+        instance: str | None,
+    ) -> None:
+        """Keep a paused instance paused after another failure, and say so.
+
+        Reached when a probe (or a manual refresh) of a paused instance fails.
+        The counter is left alone — it already records the streak that tripped
+        the breaker — but the reason is refreshed so the UI shows the latest
+        error, and the cooldown restarts from now.
+        """
+        error_msg = str(
+            self.plugin_health.get(plugin_id, {}).get("last_error") or "unknown"
+        )
+        now_iso = self._now_iso()
+
+        def _restamp() -> None:
+            plugin_instance.paused_at = now_iso
+            plugin_instance.disabled_reason = (
+                f"Still failing on retry at {now_iso} "
+                f"(paused after {plugin_instance.consecutive_failure_count} "
+                f"consecutive failures). Last error: {error_msg[:120]}"
+            )
+
+        self._persist(
+            _restamp,
+            "plugin circuit_breaker: failed to persist probe failure for %s/%s",
+            plugin_id,
+            instance,
+        )
+        logger.warning(
+            "plugin circuit_breaker: probe failed; staying paused | plugin_id=%s "
+            "instance=%s retry_in_s=%s",
+            plugin_id,
+            instance,
+            self.pause_cooldown_seconds(),
+        )
 
     def _persist(
         self, mutate: Callable[[], None], failure_msg: str, *args: object

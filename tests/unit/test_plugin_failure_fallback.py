@@ -222,6 +222,114 @@ class TestFallbackImageOnFailure:
 
 
 # ---------------------------------------------------------------------------
+# Automatic retry (probe) of a paused plugin through _perform_refresh
+# ---------------------------------------------------------------------------
+
+
+class TestPausedPluginProbeRefresh:
+    """A probe is the scheduler handing out a paused instance after its cooldown."""
+
+    def _setup(
+        self,
+        device_config_dev: Any,
+        monkeypatch: pytest.MonkeyPatch,
+        plugin: Any,
+    ) -> tuple[Any, Any, Any, Any]:
+        monkeypatch.setenv("INKYPI_PLUGIN_ISOLATION", "none")
+        monkeypatch.setenv("INKYPI_PLUGIN_RETRY_MAX", "0")
+        task, dm = _make_task(device_config_dev)
+        pi = _make_plugin_instance()
+        pi.paused = True
+        pi.consecutive_failure_count = 5
+        pi.disabled_reason = "Paused after 5 consecutive failures. Last error: x"
+        pi.paused_at = "2026-04-25T08:00:00+00:00"
+        _add_plugin_to_pm(device_config_dev, pi)
+        dummy_cfg = {"id": "dummy", "class": "Dummy", "image_settings": []}
+        monkeypatch.setattr(device_config_dev, "get_plugin", lambda pid: dummy_cfg)
+        monkeypatch.setattr(
+            "refresh_task.plugin_lookup.get_plugin_instance", lambda cfg: plugin
+        )
+        playlist = device_config_dev.get_playlist_manager().get_playlist("Default")
+        return task, dm, pi, PlaylistRefresh(playlist, pi)
+
+    def test_failed_probe_keeps_the_current_display(
+        self, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        class StillBroken:
+            def generate_image(self, settings: Any, cfg: Any) -> None:
+                raise RuntimeError("still down")
+
+            def get_latest_metadata(self) -> Any:
+                return None
+
+        task, dm, pi, action = self._setup(
+            device_config_dev, monkeypatch, StillBroken()
+        )
+        current_dt = datetime(2026, 11, 12, 12, 0, 0, tzinfo=UTC)
+
+        with pytest.raises(RuntimeError):
+            task._perform_refresh(action, current_dt, current_dt)
+
+        # No error card replaces the picture on the panel.
+        dm.display_image.assert_not_called()
+        assert pi.paused is True
+        assert pi.paused_at != "2026-04-25T08:00:00+00:00"
+        assert "still down" in (pi.disabled_reason or "")
+
+    def test_manual_refresh_of_a_paused_plugin_still_shows_the_error(
+        self, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A button press is not a probe: the user gets the error card."""
+        from refresh_task.actions import ManualUpdateRequest
+
+        class StillBroken:
+            def generate_image(self, settings: Any, cfg: Any) -> None:
+                raise RuntimeError("still down")
+
+            def get_latest_metadata(self) -> Any:
+                return None
+
+        task, dm, _pi, action = self._setup(
+            device_config_dev, monkeypatch, StillBroken()
+        )
+        current_dt = datetime(2026, 11, 12, 12, 0, 0, tzinfo=UTC)
+
+        with pytest.raises(RuntimeError):
+            task._perform_refresh(
+                action,
+                current_dt,
+                current_dt,
+                manual_request=ManualUpdateRequest("req-1", action),
+            )
+
+        assert dm.display_image.called
+
+    def test_successful_probe_displays_and_resumes(
+        self, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        class Fixed:
+            def generate_image(self, settings: Any, cfg: Any) -> Image.Image:
+                return Image.new("RGB", (800, 480), "green")
+
+            def get_latest_metadata(self) -> Any:
+                return None
+
+        task, dm, pi, action = self._setup(device_config_dev, monkeypatch, Fixed())
+        current_dt = datetime(2026, 11, 12, 12, 0, 0, tzinfo=UTC)
+
+        refresh_info, _cached, _metrics = task._perform_refresh(
+            action, device_config_dev.get_refresh_info(), current_dt
+        )
+
+        assert refresh_info is not None
+        assert dm.display_image.called
+        assert pi.paused is False
+        assert pi.paused_at is None
+        assert pi.consecutive_failure_count == 0
+        assert pi.disabled_reason is None
+
+
+# ---------------------------------------------------------------------------
 # Circuit-breaker persistence to disk
 # ---------------------------------------------------------------------------
 

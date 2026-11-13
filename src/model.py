@@ -603,6 +603,7 @@ class PluginInstance:
         consecutive_failure_count: int = 0,
         paused: bool = False,
         disabled_reason: str | None = None,
+        paused_at: str | None = None,
     ) -> None:
         self.plugin_id = plugin_id
         self.name = name
@@ -614,6 +615,9 @@ class PluginInstance:
         self.consecutive_failure_count = consecutive_failure_count
         self.paused = paused
         self.disabled_reason = disabled_reason
+        # UTC ISO time the circuit breaker paused this instance (or last
+        # retried it); the automatic-retry cooldown is measured from here.
+        self.paused_at = paused_at
 
     def update(self, updated_data: dict[str, Any]) -> None:
         """Update attributes of the class with the dictionary values.
@@ -745,6 +749,8 @@ class PluginInstance:
         }
         if self.disabled_reason is not None:
             d["disabled_reason"] = self.disabled_reason
+        if self.paused_at is not None:
+            d["paused_at"] = self.paused_at
         return d
 
     @classmethod
@@ -797,4 +803,5 @@ class PluginInstance:
             consecutive_failure_count=data.get("consecutive_failure_count", 0),
             paused=data.get("paused", False),
             disabled_reason=data.get("disabled_reason"),
+            paused_at=data.get("paused_at"),
         )

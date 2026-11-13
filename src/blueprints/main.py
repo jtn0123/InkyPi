@@ -26,6 +26,7 @@ from utils.display_names import (
 )
 from utils.http_utils import json_error, json_success
 from utils.image_serving import maybe_serve_webp
+from utils.output_validator import fit_image_to_device
 from utils.rate_limiter import CooldownLimiter
 from utils.request_models import parse_plugin_order_request
 
@@ -547,7 +548,8 @@ def _display_next_direct(
     except Exception:
         pass
 
-    # Display
+    # Display — fitted to the panel exactly as the refresh task would.
+    image = fit_image_to_device(image, device_config, plugin_instance.plugin_id)
     image_settings = plugin_config.get("image_settings", [])
     try:
         display_manager.display_image(
