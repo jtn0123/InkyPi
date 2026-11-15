@@ -13,6 +13,10 @@ import yaml
 ROOT = Path(__file__).resolve().parents[2]
 ADVISORY_JOBS = {"sonarcloud"}
 EVENT_ONLY_JOBS = {"soak-nightly", "mutation-nightly"}
+#: Scheduled jobs deliberately left out of the gate. Hosted macOS runners can
+#: stay queued for hours, so the weekly macOS pre-flash reports on its own
+#: instead of holding PRs or turning the nightly gate red.
+UNGATED_JOBS = {"preflash-validate-macos"}
 
 
 def _jobs() -> dict[str, dict[str, object]]:
@@ -110,7 +114,7 @@ def test_gate_dependencies_and_success_loop_cover_mandatory_jobs() -> None:
     gate = jobs["ci-gate"]
     mandatory = _mandatory_jobs(jobs)
     conditional = {name for name, job in jobs.items() if job.get("if")}
-    assert conditional == EVENT_ONLY_JOBS | ADVISORY_JOBS | {"ci-gate"}
+    assert conditional == EVENT_ONLY_JOBS | ADVISORY_JOBS | UNGATED_JOBS | {"ci-gate"}
     assert gate["if"] == "always()"
     assert set(_needs(gate)) == mandatory | ADVISORY_JOBS | EVENT_ONLY_JOBS
     loops = _gate_loops(gate)
@@ -119,6 +123,31 @@ def test_gate_dependencies_and_success_loop_cover_mandatory_jobs() -> None:
     assert len(required) == len(set(required))
     assert set(required) == mandatory
     assert sorted(nightly) == sorted(EVENT_ONLY_JOBS)
+
+
+def test_ungated_jobs_stay_out_of_the_gate_and_off_pull_requests() -> None:
+    """An ungated job must not hold the gate, and must not run on every PR.
+
+    Running on pull_request while ungated would quietly drop a check people
+    believe is enforced; keeping it scheduled makes its status honest.
+    """
+    jobs = _jobs()
+    needs = set(_needs(jobs["ci-gate"]))
+    for name in UNGATED_JOBS:
+        assert name in jobs
+        assert name not in needs
+        condition = jobs[name]["if"]
+        assert isinstance(condition, str)
+        assert "pull_request" not in condition
+        assert "github.event.schedule" in condition
+
+
+def test_linux_preflash_stays_required() -> None:
+    jobs = _jobs()
+    assert "preflash-validate" in _mandatory_jobs(jobs)
+    strategy = jobs["preflash-validate"]["strategy"]
+    assert isinstance(strategy, dict)
+    assert strategy["matrix"]["os"] == ["ubuntu-latest"]
 
 
 def test_matrix_and_step_conditions_do_not_make_a_job_optional() -> None:
