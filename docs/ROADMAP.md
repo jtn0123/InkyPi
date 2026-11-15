@@ -60,8 +60,10 @@ The remaining code-quality items come from a local grade report
 
 - [ ] **A1** — Give scheduling policy one owner; next-due and next-up maths is
       still repeated across the scheduler and the routes.
-- [ ] **A4 / B5** — Domain errors carry HTTP status codes, so the same failure
-      gets different statuses on different routes.
+- [ ] **A4 / B5** — Partly done in #784: the refresh loop raises HTTP-free
+      domain errors and the four display routes map them the same way. Left:
+      the `WorkflowError` duplicate, direct-render (no refresh loop) statuses,
+      and the async `/update_now` job path.
 - [ ] **A5** — `blueprints/settings/__init__.py` is a service locator for
       updates, logs, the version check and benchmarks.
 - [ ] **A6** — The main process loads plugin code (and its imports) on each
