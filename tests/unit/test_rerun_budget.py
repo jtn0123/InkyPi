@@ -107,6 +107,24 @@ def test_retries_on_xdist_workers_are_counted_once(tmp_path: Path) -> None:
     assert "1 of at most 2 allowed retries used." in output
 
 
+def test_runs_with_a_conftest_in_a_subdirectory(tmp_path: Path) -> None:
+    """pluggy hashes every plugin when a nested conftest narrows the hooks.
+
+    The repository has conftests below tests/, so the plugin object must be
+    hashable; a plain dataclass is not and crashed the CI run.
+    """
+    sub = tmp_path / "sub"
+    sub.mkdir()
+    (sub / "conftest.py").write_text("")
+    (sub / "test_nested.py").write_text("def test_nested():\n    pass\n")
+
+    code, output, _ = _run(tmp_path, flaky=1)
+
+    assert code == 0, output
+    assert "INTERNALERROR" not in output
+    assert "RETRIED test_flaky_0.py::test_flaky_0" in output
+
+
 def test_invalid_budget_is_a_usage_error(tmp_path: Path) -> None:
     code, output, _ = _run(tmp_path, flaky=0, budget="lots")
 

@@ -41,7 +41,9 @@ def _last_lines(text: str, count: int) -> str:
     return "\n".join(lines[-count:])
 
 
-@dataclass
+# eq=False keeps object identity hashing: pluggy hashes registered plugins,
+# and a dataclass with the default eq=True sets __hash__ to None.
+@dataclass(eq=False)
 class RerunBudget:
     """Collects ``rerun`` reports on the controlling pytest process."""
 
