@@ -1,0 +1,68 @@
+name: Python next
+
+# The Pi runs Debian Trixie's Python 3.13, and pyproject.toml pins
+# ">=3.13,<3.14". This weekly run installs the same pinned dependencies on the
+# next Python and runs the test suite, so breakage (an incompatible wheel, a
+# removed API, a new DeprecationWarning from our own code) shows up before
+# Debian moves. It gates nothing: a red run is a heads-up, not a blocked merge.
+# The pull_request trigger only fires when this file changes.
+
+on:
+  schedule:
+    - cron: "0 7 * * 3"
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/python-next.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: python-next-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    name: Tests on Python 3.14
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14"
+      - name: Install OS dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libopenjp2-7 \
+            libopenblas-dev \
+            libfreetype6-dev \
+            fonts-noto-color-emoji
+      - name: Install the pinned dependencies
+        run: |
+          # uv.lock and the hashed requirement files only record 3.13 wheels.
+          # Keep the exact versions, drop the hashes, and let pip pick the
+          # 3.14 wheels (or build from source where none exist).
+          for f in requirements requirements-dev; do
+            sed -e '/--hash=/d' -e 's/ \\$//' "install/$f.txt" > "$RUNNER_TEMP/$f.txt"
+          done
+          python -m pip install --upgrade pip wheel
+          pip install -r "$RUNNER_TEMP/requirements.txt" -r "$RUNNER_TEMP/requirements-dev.txt"
+          pip check
+      - name: Build CSS
+        run: python scripts/build_css.py
+      - name: Run tests
+        env:
+          INKYPI_ENV: dev
+          INKYPI_NO_REFRESH: "1"
+          PYTHONPATH: src
+          SKIP_BROWSER: "1"
+          PYTHONFAULTHANDLER: "1"
+        run: |
+          # Same selection as the 3.13 job in ci.yml, without coverage.
+          timeout --signal=ABRT --kill-after=30s 25m \
+            pytest -q -m "not container" -o faulthandler_timeout=110
