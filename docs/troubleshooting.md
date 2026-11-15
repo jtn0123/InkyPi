@@ -266,23 +266,17 @@ RuntimeError: No EEPROM detected! You must manually initialise your Inky board.
 
 InkyPi uses the [inky python library](https://github.com/pimoroni/inky) from Pimoroni to detect and interface with Inky displays. However, the auto-detect functionality does not work on some boards, which requires manual setup (see [Manual Setup](https://github.com/pimoroni/inky?tab=readme-ov-file#manual-setup)).
 
-Manually import and instantiate the correct Inky module in src/display_manager.py. For the 7.3 Inky Impression, modify the file as follows:
-```
-@@ -1,5 +1,5 @@
- import os
--from inky.auto import auto
-+from inky.inky_ac073tc1a import Inky
- from utils.image_utils import resize_image, change_orientation
- from plugins.plugin_registry import get_plugin_instance
+Manually import and instantiate the correct Inky module in `initialize_display()` in `src/display/inky_display.py`. For the 7.3 Inky Impression, change it as follows:
+```diff
+-        from inky.auto import auto
++        from inky.inky_ac073tc1a import Inky
 
-@@ -8,7 +8,7 @@ class DisplayManager:
-     def __init__(self, device_config):
-         """Manages the display and rendering of images."""
-         self.device_config = device_config
 -        self.inky_display = auto()
 +        self.inky_display = Inky()
          self.inky_display.set_border(self.inky_display.BLACK)
 ```
+
+An update stashes this edit before it checks out the new version. Afterwards, run `git stash pop` in the InkyPi folder to put it back, or make the edit again.
 
 Then restart the inkypi service:
 ```
