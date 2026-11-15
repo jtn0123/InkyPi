@@ -231,32 +231,20 @@ run_counted_mypy tests "tests/" TESTS ratchet
 enforce_mypy_tests_ratchet
 
 echo "Running mypy strict check (blocking — strict subset only)..."
-# Strict subset: curated low-churn helpers that are enforced at --strict.
-# See docs/typing.md for how to add more modules to this list.
-mypy --strict \
-    src/utils/http_utils.py \
-    src/utils/api_responses.py \
-    src/utils/http_transport.py \
-    src/utils/dns_pinning.py \
-    src/utils/safe_fetch.py \
-    src/utils/plugin_errors.py \
-    src/utils/security_utils.py \
-    src/utils/client_endpoint.py \
-    src/utils/display_names.py \
-    src/utils/messages.py \
-    src/utils/output_validator.py \
-    src/utils/paths.py \
-    src/utils/refresh_stats.py \
-    src/refresh_task/actions.py \
-    src/refresh_task/context.py \
-    src/refresh_task/worker.py \
-    src/utils/sri.py \
-    src/utils/time_utils.py \
-    src/utils/request_models.py \
-    src/utils/google_ai.py \
-    src/utils/domain_errors.py \
-    src/utils/browser_env.py \
-    src/model.py
+# Strict subset: every [mypy-<module>] section in mypy.ini with strict = True.
+# See docs/typing.md for how to add a module.
+STRICT_FILES=()
+if STRICT_LIST="$(python scripts/mypy_strict_files.py)"; then
+    while IFS= read -r strict_file; do
+        [ -n "$strict_file" ] && STRICT_FILES+=("$strict_file")
+    done <<< "$STRICT_LIST"
+fi
+if [ ${#STRICT_FILES[@]} -eq 0 ]; then
+    echo "❌ could not read the strict module list from mypy.ini"
+    false
+else
+    mypy --strict "${STRICT_FILES[@]}"
+fi
 MYPY_STRICT_EXIT=$?
 if [ $MYPY_STRICT_EXIT -ne 0 ]; then
     echo "❌ mypy strict helper subset failed (exit code: $MYPY_STRICT_EXIT)"

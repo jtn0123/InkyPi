@@ -17,34 +17,17 @@ ongoing feature work.
 
 ## Current strict subset (CI-blocking)
 
-| Module | Added |
-|---|---|
-| `src/utils/http_utils.py` | JTN-525 |
-| `src/utils/api_responses.py` | JTN-525 (split from `http_utils.py`) |
-| `src/utils/http_transport.py` | JTN-525 (split from `http_utils.py`) |
-| `src/utils/dns_pinning.py` | JTN-525 (split from `http_utils.py`) |
-| `src/utils/safe_fetch.py` | JTN-525 (split from `http_utils.py`) |
-| `src/utils/security_utils.py` | JTN-525 |
-| `src/utils/client_endpoint.py` | Quality guards PR |
-| `src/utils/display_names.py` | Quality guards PR |
-| `src/utils/messages.py` | Quality guards PR |
-| `src/utils/output_validator.py` | Quality guards PR |
-| `src/utils/paths.py` | Quality guards PR |
-| `src/utils/refresh_stats.py` | Quality guards follow-up PR |
-| `src/refresh_task/actions.py` | Refresh guards PR |
-| `src/refresh_task/context.py` | Refresh guards PR |
-| `src/refresh_task/worker.py` | Refresh guards PR |
-| `src/utils/sri.py` | Quality guards follow-up PR |
-| `src/utils/time_utils.py` | Quality guards PR |
-| `src/utils/request_models.py` | Request-model ratchet PR |
-| `src/utils/google_ai.py` | google-genai 3 upgrade |
-| `src/utils/domain_errors.py` | Domain errors (A4/B5) |
-| `src/utils/browser_env.py` | Chromium environment allowlist (E3) |
-| `src/model.py` | JTN-663 |
+The strict subset is every `[mypy-<module>]` section in `mypy.ini` with
+`strict = True`. That is the only list. `scripts/lint.sh` runs `mypy --strict`
+on the files `scripts/mypy_strict_files.py` reads from it. To see the list:
 
-This list is intentionally low-churn: the broad `src/` ratchet protects the
-rest of production code from backsliding, while the modules above are held to
-full `--strict`.
+```bash
+python scripts/mypy_strict_files.py
+```
+
+The subset is intentionally low-churn: the broad `src/` check protects the
+rest of production code from backsliding, while these modules are held to full
+`--strict`.
 
 ## How to add a module to the strict subset
 
@@ -61,16 +44,9 @@ full `--strict`.
    strict = True
    ```
 
-3. **Add the file to the blocking check in `scripts/lint.sh`:**
-
-   ```bash
-   mypy --strict \
-     src/utils/http_utils.py \
-     src/utils/security_utils.py \
-     src/utils/your_module.py
-   ```
-4. **Update the table above** with the module path and Linear issue reference.
-5. Open a PR — CI will enforce strictness from that point forward.
+3. Open a PR. `scripts/lint.sh` picks the module up from `mypy.ini`, and CI
+   enforces strictness from then on. The script fails if a listed module has
+   no source file, so a rename can't silently drop it.
 
 ## Current CI behavior: clean `src/`, ratcheted `tests/`
 

@@ -128,7 +128,7 @@ also_copy = [
   ".pre-commit-config.yaml", ".github/", "install/", "scripts/", "docs/",
   "clients/", "runtime/", "templates/", "translations/", "vendor/",
   "devbox.json", ".editorconfig", ".gitattributes", ".gitmodules",
-  ".gitleaks.toml", ".lycheeignore", ".stylelintrc.json",
+  ".gitleaks.toml", ".lycheeignore",
 ]
 
 [tool.semantic_release]
