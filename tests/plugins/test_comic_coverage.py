@@ -6,6 +6,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
+pytestmark = pytest.mark.usefixtures("public_dns")
+
 
 @pytest.fixture()
 def plugin_config() -> Any:
@@ -18,7 +20,7 @@ def test_comic_http_error(
     from plugins.comic.comic import Comic
 
     monkeypatch.setattr(
-        "plugins.comic.comic_parser.get_panel",
+        "plugins.comic.comic.get_panel",
         lambda c: {"image_url": "http://img/broken.png", "title": "X", "caption": "Y"},
     )
 
@@ -37,7 +39,7 @@ def test_comic_invalid_image(
     from plugins.comic.comic import Comic
 
     monkeypatch.setattr(
-        "plugins.comic.comic_parser.get_panel",
+        "plugins.comic.comic.get_panel",
         lambda c: {"image_url": "http://img/bad.png", "title": "", "caption": ""},
     )
 
@@ -46,5 +48,5 @@ def test_comic_invalid_image(
     p.image_loader = MagicMock()
     p.image_loader.from_url.side_effect = Exception("decode error")
 
-    with pytest.raises(Exception):
+    with pytest.raises(Exception, match="decode error"):
         p.generate_image({"comic": "XKCD"}, device_config_dev)

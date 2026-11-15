@@ -3,6 +3,7 @@
 from io import BytesIO
 from unittest.mock import Mock, patch
 
+import pytest
 from PIL import Image
 
 from utils.image_utils import (
@@ -189,6 +190,7 @@ def test_screenshot_timeout_constants_sane() -> None:
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.usefixtures("public_dns")
 def test_fetch_and_resize_remote_image_success() -> None:
     """Test successful fetch and resize of a remote image."""
     from utils.image_utils import fetch_and_resize_remote_image
@@ -312,6 +314,7 @@ def test_stream_to_disk_raises_on_http_error() -> None:
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.usefixtures("public_dns")
 def test_fetch_and_resize_low_memory_success() -> None:
     """Test the low-memory streaming path through fetch_and_resize_remote_image."""
     from utils.image_utils import fetch_and_resize_remote_image
@@ -362,6 +365,7 @@ def test_fetch_and_resize_low_memory_cleans_up_on_failure() -> None:
     mock_unlink.assert_not_called()
 
 
+@pytest.mark.usefixtures("public_dns")
 def test_fetch_and_resize_low_memory_swallows_unlink_oserror() -> None:
     """If unlink fails during cleanup, the error is logged but not propagated."""
     from utils.image_utils import fetch_and_resize_remote_image

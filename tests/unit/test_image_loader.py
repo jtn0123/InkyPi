@@ -10,24 +10,14 @@ from unittest.mock import MagicMock, patch
 import pytest
 from PIL import Image
 
-_PUBLIC_IP = "93.184.216.34"
-
 
 def _ainfo(ip: str, port: Any = 0) -> list[Any]:
     """Build a minimal IPv4 addrinfo list for *ip*."""
     return [(socket.AF_INET, socket.SOCK_STREAM, socket.IPPROTO_TCP, "", (ip, port))]
 
 
-@pytest.fixture(autouse=True)
-def _public_dns(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Resolve every test hostname to a public address, offline.
-
-    ``from_url`` validates the host before fetching, so without this stub the
-    tests would hit real DNS (and fail offline).
-    """
-    monkeypatch.setattr(
-        socket, "getaddrinfo", lambda host, port=0, *a, **kw: _ainfo(_PUBLIC_IP, port)
-    )
+# ``from_url`` validates the host before fetching; resolve it offline.
+pytestmark = pytest.mark.usefixtures("public_dns")
 
 
 def _png_bytes(size: Any = (200, 150), color: Any = "red") -> Any:
