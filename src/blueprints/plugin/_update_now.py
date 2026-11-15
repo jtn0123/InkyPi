@@ -39,28 +39,6 @@ from ._common import (
 )
 
 
-def _safe_display_image(
-    display_manager: Any,
-    image: Any,
-    image_settings: Any,
-    history_meta: Mapping[str, Any] | None,
-) -> Any:
-    """Invoke display_manager.display_image, tolerating older stubs without ``history_meta``.
-
-    Some test doubles monkeypatch ``display_image`` with a (image, image_settings)
-    signature.  We prefer to pass ``history_meta`` so the history sidecar records
-    the plugin_id — without it, /plugin_latest_image/<plugin_id> cannot find the
-    image and the "Latest from this plugin" card stays empty (JTN-341).
-    """
-    try:
-        return display_manager.display_image(
-            image, image_settings=image_settings, history_meta=history_meta
-        )
-    except TypeError:
-        # Legacy/test stub without the history_meta kwarg
-        return display_manager.display_image(image, image_settings=image_settings)
-
-
 def _direct_render_outcome(
     plugin_id: str,
     plugin_settings: dict[str, Any],
@@ -78,11 +56,12 @@ def _direct_render_outcome(
     }
 
     def display(image: Any) -> None:
-        _safe_display_image(
-            display_manager,
+        # ``history_meta`` records the plugin_id in the history sidecar, which
+        # /plugin_latest_image/<plugin_id> needs to find the image (JTN-341).
+        display_manager.display_image(
             fit_image_to_device(image, device_config, plugin_id),
-            plugin_config.get("image_settings", []),
-            history_meta,
+            image_settings=plugin_config.get("image_settings", []),
+            history_meta=history_meta,
         )
 
     def timings() -> tuple[int | None, int | None]:
@@ -174,11 +153,10 @@ def _push_update_now_fallback(
             if record_history
             else None
         )
-        _safe_display_image(
-            display_manager,
+        display_manager.display_image(
             fallback,
-            plugin_config.get("image_settings", []),
-            history_meta,
+            image_settings=plugin_config.get("image_settings", []),
+            history_meta=history_meta,
         )
     except Exception:
         logger.warning(
