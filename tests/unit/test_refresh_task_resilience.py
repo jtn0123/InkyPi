@@ -45,7 +45,7 @@ def test_refresh_task_plugin_exception_isolated(
 
     # Trigger a manual update path when not running to exercise isolation logic
     from refresh_task import ManualRefresh
-    from utils.backend_errors import RefreshTaskUnavailable
+    from utils.domain_errors import RefreshTaskUnavailable
 
     # When not running, manual_update refuses with the typed 503 error; the
     # plugin is never invoked, so its RuntimeError must not be what escapes.

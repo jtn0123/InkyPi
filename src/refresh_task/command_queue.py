@@ -17,7 +17,7 @@ from uuid import uuid4
 
 from refresh_task.actions import DisplayCommand, ManualUpdateRequest, RefreshAction
 from utils import blackout, crash_breadcrumb
-from utils.backend_errors import RefreshTaskUnavailable
+from utils.domain_errors import RefreshTaskUnavailable
 
 if TYPE_CHECKING:
     from refresh_task.recorder import RefreshRecorder
@@ -294,8 +294,8 @@ class CommandQueueMixin:
 
         Raises:
             RefreshTaskUnavailable: the loop is not running, so nothing would
-                pick the request up. Routes map it to HTTP 503 rather than
-                reporting a display that never happened.
+                pick the request up. Routes report it as unavailable rather
+                than as a display that never happened.
             BlackoutActiveError: blackout is active.
         """
         if not self.running:

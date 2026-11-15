@@ -17,6 +17,8 @@ import logging
 from datetime import UTC, datetime
 from typing import Any
 
+from utils.domain_errors import DomainError
+
 logger = logging.getLogger(__name__)
 
 CONFIG_KEY = "blackout"
@@ -28,11 +30,10 @@ BLOCKED_MESSAGE = (
 )
 
 
-class BlackoutActiveError(RuntimeError):
+class BlackoutActiveError(DomainError):
     """Raised when a refresh is requested while blackout is active."""
 
-    def __init__(self, message: str = BLOCKED_MESSAGE) -> None:
-        super().__init__(message)
+    default_message = BLOCKED_MESSAGE
 
 
 def get_state(device_config: Any) -> dict[str, Any]:

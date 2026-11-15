@@ -38,6 +38,7 @@ ongoing feature work.
 | `src/utils/time_utils.py` | Quality guards PR |
 | `src/utils/request_models.py` | Request-model ratchet PR |
 | `src/utils/google_ai.py` | google-genai 3 upgrade |
+| `src/utils/domain_errors.py` | Domain errors (A4/B5) |
 | `src/model.py` | JTN-663 |
 
 This list is intentionally low-churn: the broad `src/` ratchet protects the
