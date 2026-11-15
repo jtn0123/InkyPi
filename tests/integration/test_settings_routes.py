@@ -58,12 +58,35 @@ def test_save_settings_success_triggers_interval_update(
 def test_start_update_endpoint(
     client: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    # Ensure start_update returns JSON and doesn't crash in dev
+    """Off systemd, starting an update hands off to the fallback runner.
+
+    The runner is stubbed: the real one sleeps for seconds on a daemon
+    thread and then clears the running flag, which could land in a later
+    test. The state dict is fresh so no earlier test can leave it running.
+    """
+    import blueprints.settings as settings_mod
+
+    started: list[tuple[str | None, str | None]] = []
+    monkeypatch.setattr(
+        settings_mod,
+        "_UPDATE_STATE",
+        {"running": False, "unit": None, "started_at": None, "last_unit": None},
+    )
+    monkeypatch.setattr(settings_mod, "_systemd_available", lambda: False)
+    monkeypatch.setattr(
+        settings_mod,
+        "_start_update_fallback_thread",
+        lambda script_path, target_tag=None: started.append((script_path, target_tag)),
+    )
+
     resp = client.post("/settings/update")
-    assert resp.status_code in (200, 409)
+    assert resp.status_code == 200
     data = resp.get_json()
-    assert isinstance(data, dict)
-    assert "running" in data
+    assert data["success"] is True
+    assert data["running"] is True
+    assert len(started) == 1
+    assert started[0][1] is None
+    assert settings_mod._UPDATE_STATE["running"] is True
 
 
 def test_update_status_endpoint(client: FlaskClient) -> None:

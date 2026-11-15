@@ -116,11 +116,10 @@ def test_current_image_with_invalid_if_modified_since(
 
 
 def test_dashboard_renders(client: FlaskClient, device_config_dev: Any) -> None:
-    """Test dashboard route — may return 500 if csrf_token unavailable in test env."""
+    """The dashboard renders, with the CSRF token its forms need."""
     resp = client.get("/")
-    # In test environments without CSRF extension, template rendering fails with 500.
-    # When CSRF is configured, it returns 200.
-    assert resp.status_code in (200, 500)
+    assert resp.status_code == 200
+    assert b'<meta name="csrf-token" content="' in resp.data
 
 
 def test_logs_endpoint(client: FlaskClient, device_config_dev: Any) -> None:

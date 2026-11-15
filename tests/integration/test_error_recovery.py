@@ -4,43 +4,49 @@
 from typing import Any
 
 import pytest
+from flask import Flask
 from flask.testing import FlaskClient
+
+_VALID_SETTINGS = {
+    "deviceName": "Kitchen Frame",
+    "unit": "minute",
+    "interval": "5",
+    "timeFormat": "24h",
+    "timezoneName": "UTC",
+}
 
 
 def test_config_write_failure_returns_error(
-    client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+    client: FlaskClient, flask_app: Flask, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Monkeypatch write_config to raise IOError -> server returns error."""
+    """A failed config write returns 500 and leaves the settings as they were."""
     import config as config_mod
 
-    def bad_write(self) -> None:
+    device_config = flask_app.config["DEVICE_CONFIG"]
+    name_before = device_config.get_config("name")
+    assert name_before != _VALID_SETTINGS["deviceName"]
+
+    def bad_write(self: Any) -> None:
         raise OSError("Disk full")
 
-    monkeypatch.setattr(config_mod.Config, "write_config", bad_write)
+    monkeypatch.setattr(config_mod.Config, "_write_config", bad_write)
 
-    data = {
-        "unit": "minute",
-        "interval": "5",
-        "timeFormat": "24h",
-        "timezoneName": "UTC",
-    }
-    resp = client.post("/save_settings", data=data)
-    # Should return error response, not crash
-    assert resp.status_code in (200, 422, 500)
-    if resp.status_code == 200:
-        result = resp.get_json()
-        if result:
-            assert result.get("success") is False or "error" in str(result).lower()
+    resp = client.post("/save_settings", data=_VALID_SETTINGS)
+    assert resp.status_code == 500
+    body = resp.get_json()
+    assert body["success"] is False
+    assert body["code"] == "internal_error"
+    assert "Disk full" not in resp.get_data(as_text=True)
+    # The rollback in Config.update_atomic undoes the in-memory change, so
+    # the page doesn't show settings that were never saved.
+    assert device_config.get_config("name") == name_before
 
 
 def test_plugin_generate_image_timeout(
     client: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Plugin generate_image raising TimeoutError returns error response."""
-    from plugins.plugin_registry import get_plugin_instance, get_registered_plugin_ids
-
-    if "clock" not in get_registered_plugin_ids():
-        pytest.skip("clock plugin not available")
+    """A plugin render raising TimeoutError returns a typed 504 (JTN-K4)."""
+    from plugins.plugin_registry import get_plugin_instance
 
     plugin = get_plugin_instance({"id": "clock", "class": "Clock"})
 
@@ -49,35 +55,30 @@ def test_plugin_generate_image_timeout(
 
     monkeypatch.setattr(plugin, "generate_image", slow_generate)
 
-    data = {"plugin_id": "clock"}
-    resp = client.post("/update_now", data=data)
-    # Should return error, not crash.  JTN-K4 now maps TimeoutError to a
-    # typed 504 ``manual_update_timeout`` (previously fell through to 500
-    # ``internal_error`` via the generic handler).
-    assert resp.status_code in (200, 500, 504)
-    if resp.status_code == 200:
-        result = resp.get_json()
-        if result:
-            assert result.get("success") is False or "error" in str(result).lower()
+    resp = client.post("/update_now", data={"plugin_id": "clock"})
+    assert resp.status_code == 504
+    body = resp.get_json()
+    assert body["success"] is False
+    assert body["code"] == "manual_update_timeout"
 
 
 def test_missing_plugin_update_now(client: FlaskClient) -> None:
-    """Requesting update_now for non-existent plugin returns error."""
-    data = {"plugin_id": "nonexistent_plugin_xyz"}
-    resp = client.post("/update_now", data=data)
-    assert resp.status_code in (200, 404, 500)
-    if resp.status_code == 200:
-        result = resp.get_json()
-        if result:
-            assert result.get("success") is False
+    """update_now for a plugin that isn't installed returns 404."""
+    resp = client.post("/update_now", data={"plugin_id": "nonexistent_plugin_xyz"})
+    assert resp.status_code == 404
+    body = resp.get_json()
+    assert body["success"] is False
+    assert body["code"] == "not_found"
 
 
 def test_invalid_json_body(client: FlaskClient) -> None:
-    """POST with invalid content type doesn't crash."""
+    """A text/plain body has no form fields, so it fails the first required one."""
     resp = client.post(
         "/save_settings",
         data="not-form-data",
         content_type="text/plain",
     )
-    # Should handle gracefully
-    assert resp.status_code in (200, 400, 415, 422, 500)
+    assert resp.status_code == 422
+    body = resp.get_json()
+    assert body["code"] == "validation_error"
+    assert body["details"] == {"field": "deviceName"}

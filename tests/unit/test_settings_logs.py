@@ -34,23 +34,18 @@ def test_api_logs_size_guard(
     assert "meta" in data
 
 
-def test_api_logs_rate_limit(
-    client: FlaskClient, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    # Simulate many quick requests from same remote addr to trigger 429
-    # Flask test client sets REMOTE_ADDR=127.0.0.1 by default
-    # Hit enough times to exceed _RATE_LIMIT_MAX_REQUESTS (120) -> None -> None
-    last = None
-    for _ in range(130):
-        last = client.get("/api/logs")
-        if last.status_code == 429:
-            break
-    assert last is not None
-    assert last.status_code in (200, 429)
-    # If not rate-limited in this environment, still acceptable; otherwise ensure JSON error
-    if last.status_code == 429:
-        body = last.get_json()
-        assert body.get("error") == "Too many requests"
+def test_api_logs_rate_limit(client: FlaskClient) -> None:
+    """120 requests a minute from one address pass; the 121st gets a 429.
+
+    The reset_rate_limiters fixture empties the limiter before each test, so
+    the count starts at zero.
+    """
+    statuses = [client.get("/api/logs").status_code for _ in range(120)]
+    assert statuses == [200] * 120
+
+    limited = client.get("/api/logs")
+    assert limited.status_code == 429
+    assert limited.get_json().get("error") == "Too many requests"
 
 
 # ---- Additional edge-case tests ----
