@@ -37,6 +37,13 @@
       for (const button of document.querySelectorAll("[data-settings-tab]")) {
         const isActive = button.dataset.settingsTab === tab;
         button.classList.toggle("active", isActive);
+        // The class is only visual; aria-current tells assistive tech which
+        // section is showing.
+        if (isActive) {
+          button.setAttribute("aria-current", "true");
+        } else {
+          button.removeAttribute("aria-current");
+        }
         if (isActive && mobileQuery.matches) {
           button.scrollIntoView({
             inline: "center",
