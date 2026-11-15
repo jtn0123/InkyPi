@@ -71,10 +71,22 @@ def test_ci_skips_only_hooks_that_exist() -> None:
 
 
 def test_ci_skips_only_what_is_checked_elsewhere() -> None:
-    # ruff/black/mypy: lint.sh. gitleaks: gitleaks.yml.
-    # browser-smoke-gate: the browser-smoke job.
-    assert _ci_skips() == {"ruff", "black", "mypy", "gitleaks", "browser-smoke-gate"}
+    # ruff/black/mypy: lint.sh. biome-ci: the lint job's Biome step.
+    # gitleaks: gitleaks.yml. browser-smoke-gate: the browser-smoke job.
+    assert _ci_skips() == {
+        "ruff",
+        "black",
+        "mypy",
+        "biome-ci",
+        "gitleaks",
+        "browser-smoke-gate",
+    }
     assert (REPO_ROOT / ".github" / "workflows" / "gitleaks.yml").exists()
+    lint_runs = [
+        step.get("run", "")
+        for step in yaml.safe_load(CI_YML.read_text())["jobs"]["lint"]["steps"]
+    ]
+    assert any(run.startswith("biome ci") for run in lint_runs)
 
 
 def test_ci_hook_step_has_the_base_commit() -> None:

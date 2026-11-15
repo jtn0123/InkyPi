@@ -42,14 +42,25 @@ jobs:
         env:
           CI: true
         run: scripts/lint.sh
+      # Biome lints every web UI script (src/static/scripts/; the rules are in
+      # biome.json). Lint only: biome.json turns the formatter off. The version
+      # is the one the biome-ci pre-commit hook pins;
+      # tests/unit/test_biome_config.py keeps the two in step.
+      - name: Install Biome
+        uses: biomejs/setup-biome@4c91541eaada48f67d7dbd7833600ce162b68f51 # v2.7.1
+        with:
+          version: 2.6.7
+      - name: Lint web scripts (Biome)
+        run: biome ci --error-on-warnings
       # The same hooks a local commit runs, on the files this change touches,
       # so a commit made without `pre-commit install` (or with --no-verify)
       # fails here rather than leaving whitespace or broken YAML on main.
       # Ruff, Black and mypy are skipped because lint.sh above already ran
-      # them on every file; gitleaks has its own workflow (gitleaks.yml).
+      # them on every file, and biome-ci because the step above linted every
+      # script; gitleaks has its own workflow (gitleaks.yml).
       - name: Pre-commit hooks on changed files
         env:
-          SKIP: ruff,black,mypy,gitleaks,browser-smoke-gate
+          SKIP: ruff,black,mypy,biome-ci,gitleaks,browser-smoke-gate
         run: pre-commit run --show-diff-on-failure --from-ref HEAD^1 --to-ref HEAD
       # Blocks GPL-3/AGPL-3 (not LGPL or GPL-2); the policy and its one
       # exemption live in the script. pip-licenses is the exact, hashed pin
