@@ -2,6 +2,19 @@
 
 <!-- version list -->
 
+## v1.8.27 (2026-11-15)
+
+### Bug Fixes
+
+- **playlist**: Keep checking overlaps past an unreadable playlist, and log swallowed failures
+  ([#757](https://github.com/jtn0123/InkyPi/pull/757),
+  [`aa2e1d9`](https://github.com/jtn0123/InkyPi/commit/aa2e1d9222f7f9a8cbd4752a122f995e7677c9a5))
+
+- **ui**: Claim the "Display next" and shutdown cooldowns before acting
+  ([#756](https://github.com/jtn0123/InkyPi/pull/756),
+  [`307a135`](https://github.com/jtn0123/InkyPi/commit/307a1352632abeae28ad9f33b983b980c7a56b06))
+
+
 ## v1.8.26 (2026-11-15)
 
 ### Performance Improvements
