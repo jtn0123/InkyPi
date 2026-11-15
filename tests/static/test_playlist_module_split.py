@@ -14,7 +14,7 @@ def test_playlist_template_loads_split_scripts_in_order() -> None:
         "scripts/playlist/shared.js",
         "scripts/playlist/cards.js",
         "scripts/playlist/modals.js",
-        "scripts/playlist/progress.js",
+        "scripts/playlist/display.js",
         "scripts/playlist/actions.js",
         "scripts/playlist/form.js",
         "scripts/playlist/page.js",

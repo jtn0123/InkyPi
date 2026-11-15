@@ -15,7 +15,6 @@
 
   ns.constants = ns.constants || {
     THUMB_PREFETCH_MARGIN: "200px",
-    PROGRESS_HIDE_DELAY_MS: 2000,
     PLAYLIST_NAME_RE: /^[A-Za-z0-9 _-]+$/,
     PLAYLIST_NAME_ERROR:
       "Playlist name can only contain ASCII letters, numbers, spaces, underscores, and hyphens",
@@ -58,16 +57,6 @@
       console.debug("Failed to parse playlist refresh settings:", error);
       return {};
     }
-  };
-
-  ns.buildProgressKey = function buildProgressKey(ctx) {
-    if (ctx?.page === "playlist") {
-      const playlist = ctx.playlist || "_";
-      const pluginId = ctx.pluginId || "_";
-      const instance = ctx.instance || "_";
-      return `INKYPI_LAST_PROGRESS:playlist:${playlist}:${pluginId}:${instance}`;
-    }
-    return "INKYPI_LAST_PROGRESS";
   };
 
   ns.normaliseTimeForInput = function normaliseTimeForInput(value) {
