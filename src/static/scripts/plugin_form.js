@@ -446,6 +446,45 @@
     }
   });
 
+  // The save route answers a rejected or failed save with the same partial
+  // as a success, under a 4xx/5xx status. htmx 2 does not swap error
+  // statuses by default, so without this the page showed nothing at all.
+  // A body that isn't the partial (a proxy or CSRF error) is not swapped in.
+  function saveSettingsError(xhr){
+    const body = xhr.responseText || '';
+    const partial = new DOMParser().parseFromString(body, 'text/html')
+      .querySelector('[data-plugin-form-error]');
+    if (partial) {
+      return {
+        isPartial: true,
+        error: partial.textContent.trim(),
+        field: partial.dataset.pluginFormErrorField || '',
+      };
+    }
+    try {
+      const data = JSON.parse(body);
+      if (data?.error) return { isPartial: false, error: String(data.error) };
+    } catch { /* not JSON either */ }
+    return { isPartial: false, error: `Saving failed (HTTP ${xhr.status}).` };
+  }
+
+  // htmx fires beforeSwap on the swap target; the element that sent the
+  // request is requestConfig.elt (set when htmx:configRequest fired on it).
+  document.addEventListener('htmx:beforeSwap', (event) => {
+    const detail = event && event.detail;
+    const sender = detail?.requestConfig?.elt;
+    if (sender?.id !== 'savePluginSettingsBtn' || detail.xhr.status < 400) return;
+    const failure = saveSettingsError(detail.xhr);
+    detail.shouldSwap = failure.isPartial;
+    detail.isError = false;
+    reportFailure(failure);
+  });
+
+  document.addEventListener('htmx:sendError', (event) => {
+    if (event?.detail?.elt?.id !== 'savePluginSettingsBtn') return;
+    notify('failure', 'Error! Could not reach the device to save settings. Check it is on and try again.');
+  });
+
   // Public API
   window.PluginForm = {
     sendForm

@@ -99,13 +99,21 @@ def test_plugin_page_update_preview_handler_still_uses_detailed_validator(
     handle_idx = js.find("async function handleAction(")
     assert handle_idx != -1, "handleAction must exist in plugin_page.js"
 
-    # Inside handleAction we expect the detailed validator + buildValidationMessage
-    # + focusFirstInvalid for settingsForm (JTN-378 contract). Bound the slice
-    # to the next nested function so this guard does not depend on an arbitrary
-    # character window as nearby branches grow.
+    # handleAction checks settingsForm through settingsFormIsValid(), which
+    # Save settings shares, and that helper runs the detailed validator +
+    # buildValidationMessage + focusFirstInvalid (JTN-378 contract). Bound
+    # each slice to the next function so this guard does not depend on an
+    # arbitrary character window as nearby branches grow.
     next_function_idx = js.find("async function refreshPreviewImage(", handle_idx)
     assert next_function_idx != -1, "refreshPreviewImage must follow handleAction"
     handle_body = js[handle_idx:next_function_idx]
-    assert "validateAllInputsDetailed(settingsForm)" in handle_body
-    assert "buildValidationMessage(result)" in handle_body
-    assert "focusFirstInvalid(settingsForm)" in handle_body
+    assert "settingsFormIsValid()" in handle_body
+
+    helper_idx = js.find("function settingsFormIsValid(")
+    assert helper_idx != -1, "settingsFormIsValid must exist in plugin_page.js"
+    helper_end = js.find("function runPluginValidation(", helper_idx)
+    assert helper_end != -1, "runPluginValidation must follow settingsFormIsValid"
+    helper_body = js[helper_idx:helper_end]
+    assert "validateAllInputsDetailed(settingsForm)" in helper_body
+    assert "buildValidationMessage(result)" in helper_body
+    assert "focusFirstInvalid(settingsForm)" in helper_body

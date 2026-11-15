@@ -105,6 +105,23 @@
       setHidden(metaDiv, metaContent.childNodes.length === 0);
     }
 
+    // Checks #settingsForm's required fields. On failure it marks each field,
+    // names the first in a toast (validateAllInputsDetailed, JTN-378) and
+    // focuses it.
+    function settingsFormIsValid() {
+      const settingsForm = document.getElementById("settingsForm");
+      if (!settingsForm || !globalThis.FormValidator) return true;
+      const result = globalThis.FormValidator.validateAllInputsDetailed(settingsForm);
+      if (result.count === 0) return true;
+      ensureInlineValidationMessages(result);
+      showResponseModal(
+        "failure",
+        globalThis.FormValidator.buildValidationMessage(result)
+      );
+      globalThis.FormValidator.focusFirstInvalid(settingsForm);
+      return false;
+    }
+
     function runPluginValidation(action) {
       try {
         if (typeof globalThis.validatePluginSettings === "function") {
@@ -165,22 +182,7 @@
       }
       if (!validateAddToPlaylistAction(action)) return;
 
-      // Validate settingsForm required fields. Use validateAllInputsDetailed so
-      // the failure modal names the specific field (JTN-378) instead of a
-      // generic "N fields need fixing" count.
-      const settingsForm = document.getElementById("settingsForm");
-      if (settingsForm && globalThis.FormValidator) {
-        const result = globalThis.FormValidator.validateAllInputsDetailed(settingsForm);
-        if (result.count > 0) {
-          ensureInlineValidationMessages(result);
-          showResponseModal(
-            "failure",
-            globalThis.FormValidator.buildValidationMessage(result)
-          );
-          globalThis.FormValidator.focusFirstInvalid(settingsForm);
-          return;
-        }
-      }
+      if (!settingsFormIsValid()) return;
 
       if (action === "add_to_playlist") {
         const scheduleForm = document.getElementById("scheduleForm");
@@ -692,19 +694,16 @@
       // carries `novalidate` so native HTML5 bubbles never appear.
       document.getElementById("settingsForm")?.addEventListener("submit", (event) => {
         event.preventDefault();
-        const settingsForm = event.currentTarget;
-        if (settingsForm && globalThis.FormValidator) {
-          const result = globalThis.FormValidator.validateAllInputsDetailed(settingsForm);
-          if (result.count > 0) {
-            ensureInlineValidationMessages(result);
-            showResponseModal(
-              "failure",
-              globalThis.FormValidator.buildValidationMessage(result)
-            );
-            globalThis.FormValidator.focusFirstInvalid(settingsForm);
-          }
-        }
+        settingsFormIsValid();
       });
+      // Save settings posts through htmx (plugin.html). htmx:confirm fires
+      // before the request goes out, and preventDefault() cancels it, so the
+      // button checks required fields like every other action here.
+      document
+        .getElementById("savePluginSettingsBtn")
+        ?.addEventListener("htmx:confirm", (event) => {
+          if (!settingsFormIsValid()) event.preventDefault();
+        });
       document.getElementById("scheduleForm")?.addEventListener("submit", (event) => {
         event.preventDefault();
       });

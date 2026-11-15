@@ -209,3 +209,99 @@ def test_image_upload_save_stores_picked_files(
     assert page.locator("[id='added-garden.png']").count() == 0
     assert page.evaluate("() => window.uploadedFiles['imageFiles[]'].length") == 0
     rc.assert_no_errors(str(tmp_path), "image_upload_save")
+
+
+def test_save_settings_checks_required_fields_before_sending(
+    live_server: str, browser_page: Page, tmp_path: Path
+) -> None:
+    """An empty required field stops Save settings, names the field and focuses it."""
+    page = browser_page
+    navigate_and_wait(page, live_server, "/plugin/rss")
+    sent: list[str] = []
+    page.on(
+        "request",
+        lambda req: (
+            sent.append(req.url) if "/save_plugin_settings" in req.url else None
+        ),
+    )
+
+    page.locator("#settingsForm [name='title']").fill("")
+    page.locator("#savePluginSettingsBtn").click()
+
+    expect(page.locator(".toast.error .toast-content")).to_contain_text("Title")
+    expect(page.locator("#settingsForm [name='title']")).to_be_focused()
+    page.wait_for_timeout(300)
+    assert sent == [], "Save settings sent a form with an empty required field"
+
+
+def test_save_settings_shows_the_error_the_server_sends(
+    live_server: str, browser_page: Page, tmp_path: Path
+) -> None:
+    """A 4xx/5xx save reply appears inline and in a toast, and frees the button."""
+    page = browser_page
+    rc = navigate_and_wait(page, live_server, "/plugin/clock")
+    page.route(
+        "**/save_plugin_settings",
+        lambda route: route.fulfill(
+            status=400,
+            content_type="text/html; charset=utf-8",
+            body=(
+                '<div class="validation-message error" role="alert" '
+                "data-plugin-form-error>Primary colour is not a colour.</div>"
+            ),
+        ),
+    )
+
+    page.locator("#savePluginSettingsBtn").click()
+
+    expect(page.locator("#plugin-form-errors")).to_have_text(
+        "Primary colour is not a colour."
+    )
+    expect(page.locator(".toast.error .toast-content")).to_have_text(
+        "Error! Primary colour is not a colour."
+    )
+    expect(page.locator("#savePluginSettingsBtn")).to_be_enabled()
+    # The 400 is the point of the test, so Chromium's own "Failed to load
+    # resource" line is expected; anything else in the console is not.
+    assert rc.page_errors == []
+    assert [e for e in rc.console_errors if "Failed to load resource" not in e] == []
+
+
+def test_save_settings_reports_a_reply_that_is_not_the_form_partial(
+    live_server: str, browser_page: Page, tmp_path: Path
+) -> None:
+    """A JSON error (CSRF, proxy) is toasted, not pasted into the page."""
+    page = browser_page
+    navigate_and_wait(page, live_server, "/plugin/clock")
+    page.route(
+        "**/save_plugin_settings",
+        lambda route: route.fulfill(
+            status=403,
+            content_type="application/json",
+            body='{"success": false, "error": "CSRF token missing"}',
+        ),
+    )
+
+    page.locator("#savePluginSettingsBtn").click()
+
+    expect(page.locator(".toast.error .toast-content")).to_have_text(
+        "Error! CSRF token missing"
+    )
+    expect(page.locator("#plugin-form-errors")).to_have_text("")
+
+
+def test_save_settings_says_when_the_device_cannot_be_reached(
+    live_server: str, browser_page: Page, tmp_path: Path
+) -> None:
+    page = browser_page
+    navigate_and_wait(page, live_server, "/plugin/clock")
+    page.route(
+        "**/save_plugin_settings", lambda route: route.abort("connectionrefused")
+    )
+
+    page.locator("#savePluginSettingsBtn").click()
+
+    expect(page.locator(".toast.error .toast-content")).to_contain_text(
+        "Could not reach the device"
+    )
+    expect(page.locator("#savePluginSettingsBtn")).to_be_enabled()
