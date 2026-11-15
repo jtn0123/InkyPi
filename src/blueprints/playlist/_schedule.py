@@ -65,8 +65,18 @@ def _check_playlist_overlap(
     for pl in playlists:
         if pl.name == exclude_name or getattr(pl, "name", "") == "Default":
             continue
-        ps = _to_minutes(pl.start_time)
-        pe = _to_minutes(pl.end_time)
+        try:
+            ps = _to_minutes(pl.start_time)
+            pe = _to_minutes(pl.end_time)
+        except (AttributeError, TypeError, ValueError):
+            # One unreadable stored window mustn't switch the check off for
+            # every other playlist.
+            logger.warning(
+                "Playlist %r has an unreadable time window; "
+                "leaving it out of the overlap check",
+                getattr(pl, "name", None),
+            )
+            continue
         if _windows_overlap(new_start, new_end, ps, pe):
             return json_error(
                 _MSG_TIME_OVERLAP,

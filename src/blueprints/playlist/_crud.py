@@ -101,15 +101,11 @@ def create_playlist() -> Any:
             )
 
         # Prevent overlapping time windows
-        try:
-            overlap_err = _check_playlist_overlap(
-                parsed.start_min, parsed.end_min, playlist_manager.playlists
-            )
-            if overlap_err:
-                return overlap_err
-        except Exception:
-            # best-effort, fallback to allow
-            pass
+        overlap_err = _check_playlist_overlap(
+            parsed.start_min, parsed.end_min, playlist_manager.playlists
+        )
+        if overlap_err:
+            return overlap_err
 
         add_pl_result: list[bool] = []
 
@@ -183,17 +179,14 @@ def update_playlist(playlist_name: str) -> Any:
         )
 
     # Prevent overlapping (exclude the playlist being updated)
-    try:
-        overlap_err = _check_playlist_overlap(
-            parsed.start_min,
-            parsed.end_min,
-            playlist_manager.playlists,
-            exclude_name=playlist_name,
-        )
-        if overlap_err:
-            return overlap_err
-    except Exception:
-        pass
+    overlap_err = _check_playlist_overlap(
+        parsed.start_min,
+        parsed.end_min,
+        playlist_manager.playlists,
+        exclude_name=playlist_name,
+    )
+    if overlap_err:
+        return overlap_err
 
     upd_result: list[bool] = []
     duplicate_name_result: list[bool] = []
