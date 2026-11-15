@@ -17,7 +17,7 @@ Developer, CI and device tools. Run them from the repo root. Python scripts add
 | `test_profile.sh` | Runs pytest under a profiler (see `docs/profiling.md`). |
 | `lint.sh` / `format.sh` | The Python and shell lint gate CI runs (ruff, black, mypy, shellcheck), and the auto-fixer. The web scripts are linted by Biome instead: `pre-commit run biome-ci --all-files` (see `docs/development.md`). |
 | `check_shell.sh` | `bash -n` and shellcheck (default severity) on every tracked shell script, found by extension and shebang; `lint.sh` runs it. |
-| `precommit_browser_warning.sh` | Pre-commit hook: runs the browser smoke gate when front-end files change. |
+| `precommit_browser_warning.sh` | Pre-push hook: runs the browser smoke gate when the pushed commits change front-end files (skips with a message when Playwright Chromium is missing). |
 | `precommit_tool.sh` | Pre-commit hook helper: runs ruff, black or mypy from the repo's `.venv` (or the main checkout's, inside a worktree), so hooks use the same versions as CI. |
 | `extract_strings.py` | Extracts translatable strings into `translations/`. |
 | `devbox_init.sh`, `devbox_renderer_smoke.py`, `devbox_verify_browser.sh` | Devbox setup, and a check that its Chromium renders plugins. |

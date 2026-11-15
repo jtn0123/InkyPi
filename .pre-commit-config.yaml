@@ -1,5 +1,8 @@
-# `pre-commit install` sets up both hook types, so commit messages are checked too.
-default_install_hook_types: [pre-commit, commit-msg]
+# `pre-commit install` sets up all three hook types: commit messages are
+# checked, and the browser smoke gate runs before a push. Hooks without their
+# own `stages` run at commit time only, not again on push.
+default_install_hook_types: [pre-commit, commit-msg, pre-push]
+default_stages: [pre-commit]
 
 # Vendored and generated files keep their upstream bytes: several are pinned
 # by hash, and main.css is rebuilt by scripts/build_css.py.
@@ -74,10 +77,12 @@ repos:
   # Run the lightweight browser smoke gate automatically for staged frontend files.
   - repo: local
     hooks:
+      # About 45 s, so it runs once per push of front-end changes rather
+      # than on every commit; CI's browser-smoke job runs it on every PR.
       - id: browser-smoke-gate
         name: Browser smoke gate (frontend changes)
         language: script
         entry: scripts/precommit_browser_warning.sh
         pass_filenames: false
         files: ^src/(static|templates)/
-        stages: [pre-commit]
+        stages: [pre-push]

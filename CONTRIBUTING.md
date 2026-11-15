@@ -86,7 +86,7 @@ explicitly with `SKIP_BROWSER=1`. Every test in those modules carries the
 auto-applied `browser` marker; CI runs them (plus `-m journey`) in the sharded
 `browser-full` job.
 
-**Run the lightweight browser smoke gate used by the frontend pre-commit hook:**
+**Run the lightweight browser smoke gate used by the front-end pre-push hook:**
 
 ```bash
 scripts/test.sh browser-smoke

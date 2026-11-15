@@ -101,3 +101,12 @@ def test_commit_message_hook_is_installed_by_default() -> None:
     config = yaml.safe_load(CONFIG.read_text())
     assert "commit-msg" in config["default_install_hook_types"]
     assert re.search(r"stages: \[commit-msg\]", CONFIG.read_text())
+
+
+def test_browser_smoke_gate_runs_before_a_push_not_every_commit() -> None:
+    # The smoke suite takes about 45 s; per commit it was too heavy.
+    config = yaml.safe_load(CONFIG.read_text())
+    assert "pre-push" in config["default_install_hook_types"]
+    # Without this, every hook lacking its own `stages` would rerun on push.
+    assert config["default_stages"] == ["pre-commit"]
+    assert _hooks()["browser-smoke-gate"]["stages"] == ["pre-push"]
