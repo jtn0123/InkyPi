@@ -1,9 +1,11 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, cast
 
 import pytest
 from PIL import Image
+
+from refresh_task.scheduler import Trigger
 
 
 def _dummy_plugin(device_config: Any) -> Any:
@@ -35,8 +37,8 @@ def test_wait_for_trigger_returns_manual_refresh(
     task.manual_update_requests.append(request)
     trigger = task._wait_for_trigger()
     assert trigger is not None
-    pm, latest, dt, queued = trigger
-    assert queued is request
+    assert trigger.manual_request is request
+    assert trigger.due is False
     assert not task.manual_update_requests
 
 
@@ -66,14 +68,14 @@ def test_select_refresh_action_playlist(
     fake_playlist = FakePlaylist()
     fake_plugin = FakePlugin()
 
-    def fake_determine(self: Any, pm: Any, latest: Any, current_dt: Any) -> Any:
+    def fake_determine(self: Any, pm: Any, current_dt: Any, *, due: bool) -> Any:
         return fake_playlist, fake_plugin
 
     monkeypatch.setattr(
         task, "_determine_next_plugin", fake_determine.__get__(task, RefreshTask)
     )
     action, request_id = task._select_refresh_action(
-        None, None, task._get_current_datetime(), None
+        Trigger(None, None, task._get_current_datetime(), None, True)
     )
     assert request_id is None
     assert isinstance(action, PlaylistRefresh)
@@ -93,11 +95,11 @@ def test_select_refresh_action_nothing_due(
 
     task = RefreshTask(device_config_dev, DisplayManager(device_config_dev))
     monkeypatch.setattr(
-        task, "_determine_next_plugin", lambda pm, latest, current_dt: next_plugin
+        task, "_determine_next_plugin", lambda pm, current_dt, *, due: next_plugin
     )
 
     action, request_id = task._select_refresh_action(
-        None, None, task._get_current_datetime(), None
+        Trigger(None, None, task._get_current_datetime(), None, True)
     )
 
     assert action is None
@@ -112,10 +114,12 @@ def test_run_scheduled_tick_with_nothing_due_skips_refresh(
     from refresh_task import RefreshTask
 
     task = RefreshTask(device_config_dev, DisplayManager(device_config_dev))
-    triggers = iter([("pm", "latest", task._get_current_datetime(), None), None])
+    triggers = iter(
+        [Trigger("pm", "latest", task._get_current_datetime(), None, True), None]
+    )
     monkeypatch.setattr(task, "_wait_for_trigger", lambda: next(triggers))
     monkeypatch.setattr(
-        task, "_determine_next_plugin", lambda pm, latest, current_dt: (None, None)
+        task, "_determine_next_plugin", lambda pm, current_dt, *, due: (None, None)
     )
 
     def _unexpected_refresh(*args: Any, **kwargs: Any) -> Any:
@@ -137,6 +141,59 @@ def test_run_scheduled_tick_with_nothing_due_skips_refresh(
     assert task._work_started_at is None
 
 
+def test_an_early_wake_after_a_failed_refresh_keeps_the_retry_spacing(
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A wake-up between retries must not render again.
+
+    The last good refresh is hours old, so the playlist is overdue, but the
+    loop already tried (and failed) this cycle. An early wake-up (a playlist
+    window boundary, a settings change) must wait for the next cycle instead
+    of retrying straight away.
+    """
+    from display.display_manager import DisplayManager
+    from model import RefreshInfo
+    from refresh_task import RefreshTask
+
+    device_config_dev.update_value("plugin_cycle_interval_seconds", 3600)
+    pm = device_config_dev.get_playlist_manager()
+    pm.add_playlist("All day", "00:00", "24:00")
+    pm.add_plugin_to_playlist(
+        "All day",
+        {"plugin_id": "clock", "name": "Hall clock", "plugin_settings": {}},
+    )
+    playlist = pm.get_playlist("All day")
+    monkeypatch.setattr(pm, "determine_active_playlist", lambda dt: playlist)
+
+    task = RefreshTask(device_config_dev, DisplayManager(device_config_dev))
+    hours_ago = task._get_current_datetime() - timedelta(hours=5)
+    device_config_dev.refresh_info = RefreshInfo(
+        refresh_type="Playlist",
+        plugin_id="clock",
+        refresh_time=hours_ago.isoformat(),
+        image_hash=None,
+    )
+    task.running = True
+    monkeypatch.setattr(task.condition, "wait", lambda timeout=None: None)
+
+    real_wait = task._wait_for_trigger
+    wakes = iter([real_wait, real_wait])
+    monkeypatch.setattr(task, "_wait_for_trigger", lambda: next(wakes, lambda: None)())
+
+    attempts: list[Any] = []
+
+    def _failed_refresh(action: Any, *args: Any, **kwargs: Any) -> Any:
+        attempts.append(action)
+        return None, False, {"no_image": True}
+
+    monkeypatch.setattr(task, "_perform_refresh", _failed_refresh)
+    monkeypatch.setattr(task, "_maybe_run_history_cleanup", lambda: None)
+
+    task._run()
+
+    assert len(attempts) == 1, "the second wake retried before the cycle was up"
+
+
 def test_select_refresh_action_manual(device_config_dev: Any) -> None:
     from display.display_manager import DisplayManager
     from refresh_task import ManualRefresh, ManualUpdateRequest, RefreshTask
@@ -145,10 +202,13 @@ def test_select_refresh_action_manual(device_config_dev: Any) -> None:
     task = RefreshTask(device_config_dev, dm)
     manual = ManualRefresh("dummy", {})
     action, request_id = task._select_refresh_action(
-        None,
-        None,
-        task._get_current_datetime(),
-        ManualUpdateRequest("req-1", manual),
+        Trigger(
+            None,
+            None,
+            task._get_current_datetime(),
+            ManualUpdateRequest("req-1", manual),
+            due=False,
+        )
     )
     assert action is manual
     assert request_id == "req-1"
@@ -302,7 +362,9 @@ def test_run_refresh_without_image_keeps_previous_refresh_info(
 ) -> None:
     """A refresh that yields no frame must not overwrite the last-refresh record."""
     task, completed = _loop_task(device_config_dev, monkeypatch)
-    triggers = iter([("pm", "latest", task._get_current_datetime(), None), None])
+    triggers = iter(
+        [Trigger("pm", "latest", task._get_current_datetime(), None, True), None]
+    )
     monkeypatch.setattr(task, "_wait_for_trigger", lambda: next(triggers))
     monkeypatch.setattr(
         task, "_select_refresh_action", lambda *args: (_StubAction(), "req-1")

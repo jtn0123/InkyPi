@@ -153,32 +153,8 @@ def test_playlist_manager_operations() -> None:
     pm.delete_playlist("day2")
     assert pm.get_playlist("day2") is None
 
-    # should_refresh utility
-    assert model.PlaylistManager.should_refresh(None, 10, datetime.now(UTC)) is True
-    latest = datetime.now(UTC)
-    assert (
-        model.PlaylistManager.should_refresh(latest, 10, latest + timedelta(seconds=11))
-        is True
-    )
-    assert (
-        model.PlaylistManager.should_refresh(latest, 10, latest + timedelta(seconds=5))
-        is False
-    )
-
 
 # pyright: reportMissingImports=false
-
-
-def test_should_refresh_interval_true() -> None:
-    now = datetime(2025, 1, 1, 12, 0, 0)
-    last = now - timedelta(seconds=3601)
-    assert PlaylistManager.should_refresh(last, 3600, now) is True
-
-
-def test_should_refresh_interval_false() -> None:
-    now = datetime(2025, 1, 1, 12, 0, 0)
-    last = now - timedelta(seconds=3599)
-    assert PlaylistManager.should_refresh(last, 3600, now) is False
 
 
 def test_determine_active_playlist_priority() -> None:

@@ -263,6 +263,10 @@ def _task(device_config: Any) -> tuple[Any, _Driver]:
 def test_scheduled_refresh_is_skipped_during_blackout(
     device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    from datetime import UTC, datetime
+
+    from refresh_task.scheduler import Trigger
+
     task, _ = _task(device_config_dev)
     blackout.set_active(device_config_dev, True)
     selected: list[Any] = []
@@ -272,7 +276,7 @@ def test_scheduled_refresh_is_skipped_during_blackout(
         return None, None
 
     monkeypatch.setattr(task, "_select_refresh_action", _select)
-    calls = iter([("pm", "latest", "now", None), None])
+    calls = iter([Trigger("pm", "latest", datetime.now(UTC), None, True), None])
     monkeypatch.setattr(task, "_wait_for_trigger", lambda: next(calls))
 
     task._run()

@@ -231,7 +231,6 @@ def test_refresh_task_determine_next_plugin_no_playlist(
 ) -> None:
     """Test determine next plugin when no playlist is active."""
     from display.display_manager import DisplayManager
-    from model import RefreshInfo
     from refresh_task import RefreshTask
 
     display_manager = DisplayManager(device_config_dev)
@@ -241,20 +240,10 @@ def test_refresh_task_determine_next_plugin_no_playlist(
     pm = device_config_dev.get_playlist_manager()
     monkeypatch.setattr(pm, "determine_active_playlist", lambda dt: None)
 
-    # Mock refresh info
-    latest_refresh = RefreshInfo(
-        refresh_time="2025-01-01T12:00:00",
-        image_hash="hash",
-        refresh_type="Playlist",
-        plugin_id="test",
-    )
-
     current_dt = __import__("datetime").datetime(2025, 1, 1, 12, 30, 0, tzinfo=UTC)
 
     # This should trigger the "no active playlist" logic
-    playlist, plugin_instance = task._determine_next_plugin(
-        pm, latest_refresh, current_dt
-    )
+    playlist, plugin_instance = task._determine_next_plugin(pm, current_dt, due=True)
     assert playlist is None
     assert plugin_instance is None
 
@@ -264,7 +253,7 @@ def test_refresh_task_determine_next_plugin_empty_playlist(
 ) -> None:
     """Test determine next plugin when playlist has no plugins."""
     from display.display_manager import DisplayManager
-    from model import Playlist, RefreshInfo
+    from model import Playlist
     from refresh_task import RefreshTask
 
     display_manager = DisplayManager(device_config_dev)
@@ -277,20 +266,10 @@ def test_refresh_task_determine_next_plugin_empty_playlist(
     pm = device_config_dev.get_playlist_manager()
     monkeypatch.setattr(pm, "determine_active_playlist", lambda dt: mock_playlist)
 
-    # Mock refresh info
-    latest_refresh = RefreshInfo(
-        refresh_time="2025-01-01T12:00:00",
-        image_hash="hash",
-        refresh_type="Playlist",
-        plugin_id="test",
-    )
-
     current_dt = __import__("datetime").datetime(2025, 1, 1, 12, 30, 0, tzinfo=UTC)
 
     # This should trigger the "playlist has no plugins" logic
-    playlist, plugin_instance = task._determine_next_plugin(
-        pm, latest_refresh, current_dt
-    )
+    playlist, plugin_instance = task._determine_next_plugin(pm, current_dt, due=True)
     assert playlist is None
     assert plugin_instance is None
 
@@ -429,18 +408,18 @@ def test_playlist_refresh_execute_use_cached_image(
 
 
 def test_determine_next_plugin_not_time_to_update_path(
-    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+    device_config_dev: Any,
 ) -> None:
+    """Not due: nothing is chosen and no plugin turn is used up, but the
+    playlist page still learns which playlist is active."""
     from display.display_manager import DisplayManager
     from refresh_task import RefreshTask
 
     dm = DisplayManager(device_config_dev)
     task = RefreshTask(device_config_dev, dm)
 
-    # Force should_refresh to False via method
-    monkeypatch.setattr("model.PlaylistManager.should_refresh", lambda *a, **k: False)
-
     pm = device_config_dev.get_playlist_manager()
+    pm.active_playlist = None
     # Ensure a playlist exists with one plugin to exercise the branch
     pm.add_playlist("P", "00:00", "24:00")
     pm.add_plugin_to_playlist(
@@ -459,10 +438,12 @@ def test_determine_next_plugin_not_time_to_update_path(
 
     tz = ZoneInfo(device_config_dev.get_config("timezone", default="UTC"))
     now = __import__("datetime").datetime(2025, 1, 1, 12, 0, 0, tzinfo=tz)
-    playlist, plugin_instance = task._determine_next_plugin(
-        pm, device_config_dev.get_refresh_info(), now
-    )
+    active = pm.determine_active_playlist(now)
+    index_before = active.current_plugin_index
+    playlist, plugin_instance = task._determine_next_plugin(pm, now, due=False)
     assert playlist is None and plugin_instance is None
+    assert pm.active_playlist == active.name
+    assert active.current_plugin_index == index_before
 
 
 def test_same_image_hash_skips_display(

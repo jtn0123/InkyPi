@@ -344,7 +344,6 @@ class TestCircuitBreakerScheduler:
         monkeypatch: pytest.MonkeyPatch,
         caplog: pytest.LogCaptureFixture,
     ) -> None:
-        from model import RefreshInfo
 
         monkeypatch.setenv("PLUGIN_FAILURE_THRESHOLD", "5")
         caplog.set_level(logging.INFO, logger="refresh_task")
@@ -362,14 +361,7 @@ class TestCircuitBreakerScheduler:
 
         pm = self._setup_playlist(device_config_dev, [paused_pi, good_pi])
 
-        latest_refresh = RefreshInfo(
-            refresh_type="Playlist",
-            plugin_id="clock",
-            refresh_time=None,
-            image_hash=None,
-        )
-
-        playlist, plugin = task._determine_next_plugin(pm, latest_refresh, current_dt)
+        playlist, plugin = task._determine_next_plugin(pm, current_dt, due=True)
 
         # Should have skipped the paused plugin and returned the good one
         assert plugin is not None
@@ -381,7 +373,6 @@ class TestCircuitBreakerScheduler:
     def test_all_paused_returns_none(
         self, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        from model import RefreshInfo
 
         monkeypatch.setenv("PLUGIN_FAILURE_THRESHOLD", "5")
         task = _make_task(device_config_dev)
@@ -397,21 +388,13 @@ class TestCircuitBreakerScheduler:
 
         pm = self._setup_playlist(device_config_dev, [paused1, paused2])
 
-        latest_refresh = RefreshInfo(
-            refresh_type="Playlist",
-            plugin_id="weather",
-            refresh_time=None,
-            image_hash=None,
-        )
-
-        playlist, plugin = task._determine_next_plugin(pm, latest_refresh, current_dt)
+        playlist, plugin = task._determine_next_plugin(pm, current_dt, due=True)
 
         assert plugin is None
 
     def test_non_paused_plugin_not_skipped(
         self, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        from model import RefreshInfo
 
         monkeypatch.setenv("PLUGIN_FAILURE_THRESHOLD", "5")
         task = _make_task(device_config_dev)
@@ -420,15 +403,8 @@ class TestCircuitBreakerScheduler:
 
         pm = self._setup_playlist(device_config_dev, [healthy_pi])
 
-        latest_refresh = RefreshInfo(
-            refresh_type="Playlist",
-            plugin_id="weather",
-            refresh_time=None,
-            image_hash=None,
-        )
-
         current_dt = datetime(2025, 1, 1, 12, 0, 0, tzinfo=UTC)
-        playlist, plugin = task._determine_next_plugin(pm, latest_refresh, current_dt)
+        playlist, plugin = task._determine_next_plugin(pm, current_dt, due=True)
 
         assert plugin is not None
         assert plugin.name == "healthy_weather"
@@ -555,14 +531,6 @@ class TestForceRetryEndpoint:
 # ---------------------------------------------------------------------------
 
 
-def _latest_refresh() -> Any:
-    from model import RefreshInfo
-
-    return RefreshInfo(
-        refresh_type="Playlist", plugin_id="clock", refresh_time=None, image_hash=None
-    )
-
-
 def _paused(plugin_id: str, name: str, paused_at: str | None) -> Any:
     pi = _make_plugin_instance(plugin_id, name)
     pi.paused = True
@@ -625,7 +593,7 @@ class TestPausedPluginProbe:
         pm = _playlist_of(device_config_dev, [paused, clock])
 
         for _ in range(3):
-            _, plugin = task._determine_next_plugin(pm, _latest_refresh(), self.NOW)
+            _, plugin = task._determine_next_plugin(pm, self.NOW, due=True)
             assert plugin is clock
 
         assert paused.paused is True
@@ -647,7 +615,7 @@ class TestPausedPluginProbe:
         writes: list[int] = []
         monkeypatch.setattr(device_config_dev, "write_config", lambda: writes.append(1))
 
-        _, plugin = task._determine_next_plugin(pm, _latest_refresh(), self.NOW)
+        _, plugin = task._determine_next_plugin(pm, self.NOW, due=True)
 
         assert plugin is paused
         # Still paused until the probe succeeds, but the cooldown restarted and
@@ -667,7 +635,7 @@ class TestPausedPluginProbe:
         )
         pm = _playlist_of(device_config_dev, [paused])
 
-        _, plugin = task._determine_next_plugin(pm, _latest_refresh(), self.NOW)
+        _, plugin = task._determine_next_plugin(pm, self.NOW, due=True)
         assert plugin is paused
 
     def test_disabled_cooldown_never_probes(
@@ -678,7 +646,7 @@ class TestPausedPluginProbe:
         paused = _paused("apod", "apod_inst", None)
         pm = _playlist_of(device_config_dev, [paused])
 
-        _, plugin = task._determine_next_plugin(pm, _latest_refresh(), self.NOW)
+        _, plugin = task._determine_next_plugin(pm, self.NOW, due=True)
         assert plugin is None
 
     def test_persisted_old_pause_resumes_on_first_cycle(
@@ -709,7 +677,7 @@ class TestPausedPluginProbe:
         clock = _make_plugin_instance("clock", "Clock")
         pm = _playlist_of(device_config_dev, [apod, clock])
 
-        _, plugin = task._determine_next_plugin(pm, _latest_refresh(), self.NOW)
+        _, plugin = task._determine_next_plugin(pm, self.NOW, due=True)
         assert plugin is apod
 
         task._update_plugin_health(
@@ -734,7 +702,7 @@ class TestPausedPluginProbe:
         clock = _make_plugin_instance("clock", "clock_inst")
         pm = _playlist_of(device_config_dev, [paused, clock])
 
-        _, plugin = task._determine_next_plugin(pm, _latest_refresh(), self.NOW)
+        _, plugin = task._determine_next_plugin(pm, self.NOW, due=True)
         assert plugin is paused
         task._update_plugin_health(
             plugin_id="apod",
@@ -753,11 +721,11 @@ class TestPausedPluginProbe:
         # The playlist moves on, and the cooldown now runs from the probe.
         probe_time = datetime.fromisoformat(paused.paused_at)
         _, plugin = task._determine_next_plugin(
-            pm, _latest_refresh(), probe_time + timedelta(hours=1)
+            pm, probe_time + timedelta(hours=1), due=True
         )
         assert plugin is clock
         _, plugin = task._determine_next_plugin(
-            pm, _latest_refresh(), probe_time + timedelta(hours=6, seconds=1)
+            pm, probe_time + timedelta(hours=6, seconds=1), due=True
         )
         assert plugin is paused
 

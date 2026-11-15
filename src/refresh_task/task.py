@@ -202,22 +202,20 @@ class RefreshTask(
     def _run(self) -> None:
         """Background thread loop coordinating refresh operations."""
         while True:
-            result = None
+            trigger = None
             try:
                 self._notify_watchdog()
-                result = self._wait_for_trigger()
-                if result is None:
+                trigger = self._wait_for_trigger()
+                if trigger is None:
                     break
 
-                playlist_manager, latest_refresh, current_dt, manual_request = result
+                manual_request = trigger.manual_request
                 if self._handle_special_request(manual_request):
                     continue
                 if manual_request is None and blackout.is_active(self.device_config):
                     logger.info("Blackout active; skipping scheduled refresh")
                     continue
-                refresh_action, request_id = self._select_refresh_action(
-                    playlist_manager, latest_refresh, current_dt, manual_request
-                )
+                refresh_action, request_id = self._select_refresh_action(trigger)
 
                 if refresh_action:
                     # Mark work in flight so the watchdog heartbeat can tell a
@@ -239,8 +237,8 @@ class RefreshTask(
                         ):
                             refresh_info, used_cached, metrics = self._perform_refresh(
                                 refresh_action,
-                                latest_refresh,
-                                current_dt,
+                                trigger.latest_refresh,
+                                trigger.current_dt,
                                 request_id=request_id,
                                 manual_request=manual_request,
                             )
@@ -256,8 +254,8 @@ class RefreshTask(
 
             except Exception as e:
                 logger.exception("Exception during refresh")
-                if result is not None:
-                    self._complete_manual_request(result[-1], exception=e)
+                if trigger is not None:
+                    self._complete_manual_request(trigger.manual_request, exception=e)
 
     # Class-level counter tracking threads that timed out but could not be stopped.
     # Python threads cannot be force-killed; the cancel event is internal

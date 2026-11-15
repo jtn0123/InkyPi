@@ -8,7 +8,7 @@ from typing import Any
 from refresh_task.actions import ManualRefresh, ManualUpdateRequest
 from refresh_task.health import PluginHealthTracker
 from refresh_task.housekeeping import RefreshHousekeeper
-from refresh_task.scheduler import RefreshScheduler
+from refresh_task.scheduler import RefreshScheduler, Trigger
 
 
 class _FakeSchedulerConfig:
@@ -52,11 +52,12 @@ def test_refresh_scheduler_wait_for_trigger_returns_manual_request() -> None:
 
     result = scheduler.wait_for_trigger(is_running=lambda: True)
 
-    assert result == (
+    assert result == Trigger(
         config.playlist_manager,
         config.refresh_info,
         current_dt,
         manual_request,
+        due=False,
     )
     assert not manual_update_requests
 
