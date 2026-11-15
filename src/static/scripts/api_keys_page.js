@@ -727,9 +727,10 @@
         if (action === "add-row") {
           addRow();
         } else if (action === "delete-key") {
-          deleteKey(actionEl.dataset.keyName, actionEl);
+          // Both handle their own failures; askToConfirm never rejects.
+          void deleteKey(actionEl.dataset.keyName, actionEl);
         } else if (action === "delete-row") {
-          deleteRow(actionEl);
+          void deleteRow(actionEl);
         } else if (action === "add-preset") {
           addPreset(actionEl);
         } else if (action === "toggle-password") {
