@@ -224,27 +224,25 @@ class TestSaveHistoryEntry:
     def test_png_is_published_atomically(
         self, device_config_dev: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """No display_*.png is visible until the encode has finished."""
+        """No display_*.png is visible until its bytes are fully written."""
         from display.display_manager import DisplayManager
 
         dm = DisplayManager(device_config_dev)
         history_dir = str(tmp_path / "history_atomic")
         device_config_dev.history_image_dir = history_dir
-        visible_during_save: list[str] = []
-        real_save = Image.Image.save
+        visible_before_publish: list[str] = []
+        real_replace = os.replace
 
-        def save_and_peek(
-            self: Image.Image, fp: Any, *args: Any, **kwargs: Any
-        ) -> None:
-            real_save(self, fp, *args, **kwargs)
-            visible_during_save.extend(
+        def peek_then_replace(src: str, dst: str) -> None:
+            visible_before_publish.extend(
                 f for f in os.listdir(history_dir) if f.endswith(".png")
             )
+            real_replace(src, dst)
 
-        monkeypatch.setattr(Image.Image, "save", save_and_peek)
+        monkeypatch.setattr(os, "replace", peek_then_replace)
         dm._save_history_entry(Image.new("RGB", (10, 10), "red"))
 
-        assert visible_during_save == []
+        assert visible_before_publish == []
         published = os.listdir(history_dir)
         assert len(published) == 1
         assert published[0].startswith("display_")
@@ -252,21 +250,21 @@ class TestSaveHistoryEntry:
             assert img.size == (10, 10)
 
     def test_failed_save_leaves_no_temp_file(
-        self, device_config_dev: Any, tmp_path: Path
+        self, device_config_dev: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         from display.display_manager import DisplayManager
 
         dm = DisplayManager(device_config_dev)
         history_dir = str(tmp_path / "history_tmp_cleanup")
         device_config_dev.history_image_dir = history_dir
-        img = MagicMock()
 
-        def partial_write(fp: str, *args: Any, **kwargs: Any) -> None:
-            Path(fp).write_bytes(b"\x89PNG partial")
+        def disk_full(src: str, dst: str) -> None:
             raise OSError("disk full")
 
-        img.save.side_effect = partial_write
-        dm._save_history_entry(img, history_meta={"plugin": "test"})
+        monkeypatch.setattr(os, "replace", disk_full)
+        dm._save_history_entry(
+            Image.new("RGB", (10, 10), "red"), history_meta={"plugin": "test"}
+        )
 
         assert os.listdir(history_dir) == []
 

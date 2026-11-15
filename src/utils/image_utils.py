@@ -8,7 +8,7 @@ import tempfile
 import time
 from collections.abc import Callable
 from io import BytesIO
-from typing import Any, cast
+from typing import Any, BinaryIO, cast
 
 from PIL import Image
 from PIL.Image import Resampling
@@ -442,19 +442,13 @@ FAST_PNG_COMPRESS_LEVEL = 1
 HISTORY_PNG_COMPRESS_LEVEL = 6
 
 
-def save_image_atomic(
-    image: Image.Image, path: str, *, format: str = "PNG", **save_kwargs: Any
-) -> None:
-    """Save *image* to *path* so readers never see a partial file.
+def _replace_atomically(path: str, write: Callable[[BinaryIO], object]) -> None:
+    """Have *write* fill a temp file next to *path*, then rename it over *path*.
 
-    The image is encoded into a uniquely named temp file in the destination
-    directory, flushed to disk, then renamed over *path* with ``os.replace``.
-    A crash, power cut or encoder error mid-save leaves the previous file
-    intact and removes the temp file. The destination's existing permission
-    bits are preserved (``mkstemp`` creates files as 0600); a new file gets
-    0644.
-
-    Raises whatever the encoder or filesystem raises.
+    The temp file is flushed to disk before ``os.replace``, so a crash, power
+    cut or writer error leaves the previous file intact, and the temp file is
+    removed on failure. The destination's existing permission bits are kept
+    (``mkstemp`` creates files as 0600); a new file gets 0644.
     """
     directory = os.path.dirname(os.path.abspath(path))
     try:
@@ -468,7 +462,7 @@ def save_image_atomic(
         os.fchmod(fd, mode)
         with os.fdopen(fd, "wb") as fh:
             fd = -1  # the file object owns (and closes) the descriptor now
-            image.save(fh, format=format, **save_kwargs)
+            write(fh)
             fh.flush()
             os.fsync(fh.fileno())
         os.replace(tmp_path, path)
@@ -479,6 +473,26 @@ def save_image_atomic(
         with contextlib.suppress(OSError):
             os.unlink(tmp_path)
         raise
+
+
+def save_image_atomic(
+    image: Image.Image, path: str, *, format: str = "PNG", **save_kwargs: Any
+) -> None:
+    """Save *image* to *path* so readers never see a partial file.
+
+    See :func:`_replace_atomically` for the guarantees. Raises whatever the
+    encoder or filesystem raises.
+    """
+    _replace_atomically(path, lambda fh: image.save(fh, format=format, **save_kwargs))
+
+
+def write_bytes_atomic(data: bytes, path: str) -> None:
+    """Write already-encoded *data* to *path* so readers never see a partial file.
+
+    Same guarantees as :func:`save_image_atomic`; used when one encode serves
+    several files. Raises whatever the filesystem raises.
+    """
+    _replace_atomically(path, lambda fh: fh.write(data))
 
 
 def _playwright_screenshot_html(

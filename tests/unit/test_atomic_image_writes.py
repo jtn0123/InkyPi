@@ -1,5 +1,6 @@
 """Atomic, fast-compressed preview writes and single hashing per refresh (G2)."""
 
+import io
 import os
 import stat
 from pathlib import Path
@@ -9,7 +10,11 @@ import pytest
 from PIL import Image
 
 import utils.image_utils as image_utils
-from utils.image_utils import FAST_PNG_COMPRESS_LEVEL, save_image_atomic
+from utils.image_utils import (
+    FAST_PNG_COMPRESS_LEVEL,
+    save_image_atomic,
+    write_bytes_atomic,
+)
 
 
 def _leftover_temp_files(directory: str | Path) -> list[str]:
@@ -103,6 +108,40 @@ class TestSaveImageAtomic:
         assert stat.S_IMODE(os.stat(target).st_mode) == 0o644
 
 
+class TestWriteBytesAtomic:
+    def test_replaces_the_file_and_keeps_its_permissions(self, tmp_path: Path) -> None:
+        target = tmp_path / "processed_image.png"
+        target.write_bytes(b"old")
+        os.chmod(target, 0o640)
+
+        write_bytes_atomic(b"new frame", str(target))
+
+        assert target.read_bytes() == b"new frame"
+        assert stat.S_IMODE(os.stat(target).st_mode) == 0o640
+        assert _leftover_temp_files(tmp_path) == []
+
+    def test_new_file_is_world_readable(self, tmp_path: Path) -> None:
+        target = tmp_path / "current_image.png"
+        write_bytes_atomic(b"frame", str(target))
+        assert stat.S_IMODE(os.stat(target).st_mode) == 0o644
+
+    def test_replace_failure_keeps_previous_file_and_cleans_temp(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        target = tmp_path / "processed_image.png"
+        target.write_bytes(b"old")
+
+        def boom(src: str, dst: str) -> None:
+            raise OSError("EIO")
+
+        monkeypatch.setattr(os, "replace", boom)
+        with pytest.raises(OSError, match="EIO"):
+            write_bytes_atomic(b"new frame", str(target))
+
+        assert target.read_bytes() == b"old"
+        assert _leftover_temp_files(tmp_path) == []
+
+
 class TestDisplayManagerPreviewWrites:
     def test_failed_save_keeps_previous_previews(
         self, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
@@ -127,7 +166,7 @@ class TestDisplayManagerPreviewWrites:
         assert _leftover_temp_files(current.parent) == []
         assert _leftover_temp_files(processed.parent) == []
 
-    def test_previews_use_fast_compression(
+    def test_raw_preview_uses_fast_compression(
         self, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         from display.display_manager import DisplayManager
@@ -137,23 +176,25 @@ class TestDisplayManagerPreviewWrites:
         real_save = Image.Image.save
 
         def spy(self: Image.Image, fp: Any, *args: Any, **kwargs: Any) -> Any:
-            if hasattr(fp, "write"):
+            if hasattr(fp, "write") and not isinstance(fp, io.BytesIO):
                 seen.append(kwargs)
             return real_save(self, fp, *args, **kwargs)
 
         monkeypatch.setattr(Image.Image, "save", spy)
         dm.display_image(Image.new("RGB", (800, 480), "green"))
 
-        assert len(seen) == 2  # current + processed
-        for kwargs in seen:
-            assert kwargs.get("compress_level") == FAST_PNG_COMPRESS_LEVEL
-            assert not kwargs.get("optimize")
+        assert len(seen) == 1  # current_image; the processed frame is below
+        assert seen[0].get("compress_level") == FAST_PNG_COMPRESS_LEVEL
+        assert not seen[0].get("optimize")
 
-    def test_history_snapshot_skips_the_optimize_search(
+    def test_processed_frame_is_encoded_once_for_preview_and_history(
         self, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """History PNGs use a fixed zlib level: optimize=True cost ~6 s of CPU
-        per photo on a Pi Zero 2 W for a 3% smaller file."""
+        """One encode serves processed_image.png and the history snapshot.
+
+        It uses a fixed zlib level: optimize=True cost ~6 s of CPU per photo
+        on a Pi Zero 2 W for a 3% smaller file.
+        """
         from display.display_manager import DisplayManager
         from utils.image_utils import HISTORY_PNG_COMPRESS_LEVEL
 
@@ -162,7 +203,7 @@ class TestDisplayManagerPreviewWrites:
         real_save = Image.Image.save
 
         def spy(self: Image.Image, fp: Any, *args: Any, **kwargs: Any) -> Any:
-            if isinstance(fp, str) and ".png.tmp" in fp:
+            if isinstance(fp, io.BytesIO):
                 seen.append(kwargs)
             return real_save(self, fp, *args, **kwargs)
 
@@ -172,6 +213,10 @@ class TestDisplayManagerPreviewWrites:
         assert len(seen) == 1
         assert seen[0].get("compress_level") == HISTORY_PNG_COMPRESS_LEVEL
         assert not seen[0].get("optimize")
+        history = list(Path(device_config_dev.history_image_dir).glob("display_*.png"))
+        assert len(history) == 1
+        processed = Path(device_config_dev.processed_image_file)
+        assert history[0].read_bytes() == processed.read_bytes()
 
     def test_supplied_hash_is_not_recomputed(
         self, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
