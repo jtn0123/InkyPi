@@ -2,6 +2,15 @@
 
 <!-- version list -->
 
+## v1.8.2 (2026-11-15)
+
+### Performance Improvements
+
+- **refresh**: Give the service a full core and drop the history PNG optimize pass
+  ([#716](https://github.com/jtn0123/InkyPi/pull/716),
+  [`abfbd2d`](https://github.com/jtn0123/InkyPi/commit/abfbd2de4fe6ed05e946971e9ad1cbae017dbff5))
+
+
 ## v1.8.1 (2026-11-13)
 
 ### Bug Fixes
