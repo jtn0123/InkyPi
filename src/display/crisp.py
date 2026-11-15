@@ -360,13 +360,14 @@ def crisp_image(
 def exact_palette_image(image: Image.Image, palette: Palette) -> Image.Image:
     """Mode-P copy of an image whose every pixel is already a *palette* colour.
 
-    The caller must have checked that; indices follow the order of *palette*.
+    The caller must have checked that, and *palette* must not repeat a colour;
+    indices follow the order of *palette*. Every pixel is then at distance zero
+    from exactly one entry, so Pillow's nearest-colour quantize, run in C, is
+    exact. It takes about 11 ms for an 800x480 frame on the Pi Zero 2 W, where
+    a numpy lookup took 73 ms.
     """
-    pixels = np.asarray(image.convert("RGB"), dtype=np.uint32)
-    packed = (pixels[..., 0] << 16) | (pixels[..., 1] << 8) | pixels[..., 2]
-    pal_packed = np.array([(r << 16) | (g << 8) | b for r, g, b in palette])
-    order = np.argsort(pal_packed)
-    indices = order[np.searchsorted(pal_packed[order], packed)].astype(np.uint8)
-    frame = Image.fromarray(indices, "P")
-    frame.putpalette(bytes(v for colour in palette for v in colour))
-    return frame
+    pal_img = Image.new("P", (1, 1))
+    pal_img.putpalette(bytes(v for colour in palette for v in colour))
+    return image.convert("RGB").quantize(
+        len(palette), palette=pal_img, dither=Image.Dither.NONE
+    )
