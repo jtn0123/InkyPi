@@ -10,7 +10,7 @@ import time
 import traceback
 from collections.abc import Callable, Mapping
 from datetime import datetime
-from typing import TYPE_CHECKING, Protocol, TypedDict, cast
+from typing import TYPE_CHECKING, NotRequired, Protocol, TypedDict, cast
 
 from plugins.plugin_registry import get_plugin_instance, load_plugins
 from refresh_task.actions import PluginLike, RefreshAction, StateDelta
@@ -44,6 +44,9 @@ class WorkerSuccessPayload(TypedDict):
     ok: bool
     # None when a control-only plugin deliberately produced no image.
     image_path: str | None
+    # False when image_path is the plugin's cache file, which the parent must
+    # keep; absent or True for a worker tempfile the parent deletes.
+    image_path_owned: NotRequired[bool]
     plugin_meta: object
     # Plugin-instance state execute() changed in this process; the parent
     # applies it to its own copy (see RefreshAction.state_delta).
@@ -310,6 +313,21 @@ def _execute_refresh_attempt_worker(
                 {
                     "ok": True,
                     "image_path": None,
+                    "plugin_meta": plugin_meta,
+                    "state_delta": state_delta,
+                }
+            )
+            return
+        cached_path = getattr(refresh_action, "cached_image_path", None)
+        if isinstance(cached_path, str) and os.path.isfile(cached_path):
+            # The action already saved exactly this image (the plugin's cache
+            # file); hand that over rather than encoding it again. The parent
+            # must not delete it.
+            result_queue.put(
+                {
+                    "ok": True,
+                    "image_path": cached_path,
+                    "image_path_owned": False,
                     "plugin_meta": plugin_meta,
                     "state_delta": state_delta,
                 }

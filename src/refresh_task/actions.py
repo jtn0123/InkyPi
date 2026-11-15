@@ -126,6 +126,11 @@ class RefreshAction:
     and return the resulting image.
     """
 
+    #: Set by :meth:`execute` when the image it returned is exactly the PNG
+    #: at this path, so a worker process can hand the parent the path
+    #: instead of encoding the same image a second time.
+    cached_image_path: str | None = None
+
     def execute(
         self, plugin: PluginLike, device_config: DeviceConfigLike, current_dt: datetime
     ) -> Image.Image | None:
@@ -296,6 +301,7 @@ class PlaylistRefresh(RefreshAction):
         )
 
         self._state_delta = {}
+        self.cached_image_path = None
         # Check if a refresh is needed based on the plugin instance's criteria
         if self.plugin_instance.should_refresh(current_dt) or self.force:
             logger.info(
@@ -332,4 +338,6 @@ class PlaylistRefresh(RefreshAction):
             if image is None:
                 raise RuntimeError("Failed to load existing plugin image from disk")
 
+        # Both branches return exactly what is now in the cache file.
+        self.cached_image_path = plugin_image_path
         return image
