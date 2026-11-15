@@ -11,19 +11,10 @@ from typing import Any
 
 import pytest
 from PIL import Image
+from tests.helpers.waiting import wait_until
 
 from display.display_manager import DisplayManager
 from refresh_task import ManualRefresh, RefreshTask
-
-
-def wait_until(predicate: Any, timeout: Any = 1.0, interval: Any = 0.01) -> Any:
-    """Poll until a condition becomes true."""
-    deadline = time.monotonic() + timeout
-    while time.monotonic() < deadline:
-        if predicate():
-            return True
-        time.sleep(interval)
-    return predicate()
 
 
 @pytest.fixture
@@ -250,9 +241,12 @@ def test_plugin_failure_doesnt_affect_subsequent_plugins(
                 metrics = task.manual_update(refresh)
                 assert metrics is not None
 
-        health = task.get_health_snapshot()
-        assert health["good"]["success_count"] == 2
-        assert health["bad"]["failure_count"] == 2
+        # Health is recorded after the display push, which can finish after
+        # manual_update returns; wait for the final refresh to land.
+        assert wait_until(
+            lambda: task.get_health_snapshot()["good"]["success_count"] == 2
+            and task.get_health_snapshot()["bad"]["failure_count"] == 2
+        ), task.get_health_snapshot()
 
     finally:
         task.stop()
@@ -403,9 +397,10 @@ def test_plugin_state_isolation(
         refresh = ManualRefresh("plugin2", {})
         task.manual_update(refresh)
 
-        health = task.get_health_snapshot()
-        assert health["plugin1"]["success_count"] == 2
-        assert health["plugin2"]["success_count"] == 1
+        assert wait_until(
+            lambda: task.get_health_snapshot()["plugin1"]["success_count"] == 2
+            and task.get_health_snapshot()["plugin2"]["success_count"] == 1
+        ), task.get_health_snapshot()
 
     finally:
         task.stop()

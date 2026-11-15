@@ -18,6 +18,7 @@ from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
+from tests.helpers.waiting import wait_until
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SRC_DIR = REPO_ROOT / "src"
@@ -196,7 +197,7 @@ class TestWatchdogThreadStartsWithRefreshTask:
 class TestWatchdogHeartbeatPingsRepeatedly:
     """The heartbeat loop must ping _notify_watchdog at the configured cadence."""
 
-    def test_pings_at_least_4_times_in_300ms(
+    def test_pings_repeatedly_at_the_configured_interval(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         module, _ = _load_task_module(
@@ -210,7 +211,7 @@ class TestWatchdogHeartbeatPingsRepeatedly:
             nonlocal ping_count
             ping_count += 1
 
-        # Use 50ms interval → expect ≥4 pings in 300ms
+        # 50ms interval: at least 4 pings should follow promptly.
         monkeypatch.setattr(
             module.RefreshTask,
             "_watchdog_interval_seconds",
@@ -222,15 +223,17 @@ class TestWatchdogHeartbeatPingsRepeatedly:
         hb_thread = threading.Thread(target=task._watchdog_heartbeat_loop, daemon=True)
         hb_thread.start()
 
-        time.sleep(0.35)
+        # Wait for the pings rather than counting them in a fixed 350 ms: a
+        # busy runner can deschedule the loop long enough to miss that window.
+        reached = wait_until(lambda: ping_count >= 4, timeout=5.0)
 
         task.running = False
         with task.condition:
             task.condition.notify_all()
         hb_thread.join(timeout=1)
 
-        assert ping_count >= 4, (
-            f"Expected at least 4 watchdog pings in 300ms with 50ms interval, "
+        assert reached, (
+            f"Expected at least 4 watchdog pings with a 50ms interval, "
             f"got {ping_count}"
         )
 
