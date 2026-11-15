@@ -39,9 +39,6 @@ jobs:
           python-version: '3.13'
           os-packages: 'true'
 
-      - name: Build CSS
-        run: python scripts/build_css.py
-
       - name: Run tests in random order
         env:
           INKYPI_ENV: dev
