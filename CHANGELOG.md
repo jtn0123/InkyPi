@@ -2,6 +2,25 @@
 
 <!-- version list -->
 
+## v1.9.2 (2026-11-15)
+
+### Bug Fixes
+
+- **dev**: Build the venv with Python 3.13, and make venv.sh work from zsh
+  ([#829](https://github.com/jtn0123/InkyPi/pull/829),
+  [`c6c6244`](https://github.com/jtn0123/InkyPi/commit/c6c6244bf212758563614ce89a12324e6ab066be))
+
+- **plugin-form**: Say when Update Now times out, and poll less while live steps arrive
+  ([#827](https://github.com/jtn0123/InkyPi/pull/827),
+  [`e8aed2e`](https://github.com/jtn0123/InkyPi/commit/e8aed2ecdd4def79dfac6475089d63d9da9d3898))
+
+### Build System
+
+- **mypy**: Lower the tests baseline from 496 to 487
+  ([#828](https://github.com/jtn0123/InkyPi/pull/828),
+  [`5506991`](https://github.com/jtn0123/InkyPi/commit/550699132668468ea96bf5d3e5fe4105b1367cfa))
+
+
 ## v1.9.1 (2026-11-15)
 
 ### Bug Fixes
