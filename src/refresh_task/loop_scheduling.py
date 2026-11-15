@@ -17,6 +17,7 @@ from model import PlaylistManager
 from refresh_task.actions import ManualUpdateRequest, PlaylistRefresh, RefreshAction
 from refresh_task.context import RefreshContext
 from refresh_task.scheduler import RefreshScheduler
+from services.schedule import effective_cycle_seconds
 from utils.time_utils import now_device_tz
 
 if TYPE_CHECKING:
@@ -137,9 +138,10 @@ class SchedulingMixin:
     ) -> tuple[Any, Any, datetime, ManualUpdateRequest | None] | None:
         """Wait for the next refresh trigger while holding the condition lock.
 
-        The method blocks for ``plugin_cycle_interval_seconds`` or until notified
-        of a manual update. It returns the contextual objects required for the
-        refresh cycle or ``None`` if the task was stopped.
+        The method blocks until the active playlist's next refresh is due, a
+        playlist window opens or closes, or another thread notifies (a manual
+        update, a config change). It returns the contextual objects required
+        for the refresh cycle or ``None`` if the task was stopped.
 
         Threading:
             Acquires ``self.condition`` and releases it before returning.
@@ -228,11 +230,10 @@ class SchedulingMixin:
             return None, None
 
         latest_refresh_dt = latest_refresh_info.get_refresh_datetime()
-        # Allow per-playlist override; fallback to device-level interval
-        plugin_cycle_interval = getattr(
-            playlist, "cycle_interval_seconds", None
-        ) or self.device_config.get_config(
-            "plugin_cycle_interval_seconds", default=3600
+        # The playlist's own cycle, else the device interval: the same rule
+        # the scheduler uses to decide how long to sleep.
+        plugin_cycle_interval = effective_cycle_seconds(
+            playlist, self.scheduler.device_interval_seconds()
         )
         should_refresh = PlaylistManager.should_refresh(
             latest_refresh_dt, plugin_cycle_interval, current_dt
