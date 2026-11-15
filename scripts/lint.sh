@@ -255,6 +255,7 @@ mypy --strict \
     src/utils/request_models.py \
     src/utils/google_ai.py \
     src/utils/domain_errors.py \
+    src/utils/browser_env.py \
     src/model.py
 MYPY_STRICT_EXIT=$?
 if [ $MYPY_STRICT_EXIT -ne 0 ]; then
