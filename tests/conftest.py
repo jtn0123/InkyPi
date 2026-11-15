@@ -77,6 +77,8 @@ UI_BROWSER_TESTS = {
     "test_sustained_load.py",
     # Every dialog traps Tab, closes on Escape and hands focus back.
     "test_modal_keyboard_e2e.py",
+    # Update Now progress: step timings, failure, timeout, live-step polling.
+    "test_plugin_form_async_job.py",
 }
 A11Y_BROWSER_TESTS = {
     "test_a11y_sweep.py",

@@ -325,11 +325,12 @@
       return { url: urls.add_to_playlist, method: 'POST' };
     }
     if (action === 'update_instance') return { url: urls.update_instance, method: 'PUT' };
+    if (action === 'update_now') return { url: urls.update_now, method: 'POST' };
     // NOTE: action === 'save_settings' is handled declaratively via HTMX on
     // the Save Settings button (JTN-506). It is intentionally no longer routed
     // through sendForm so validation errors can swap inline instead of firing
     // a toast.
-    return { url: urls.update_now, method: 'POST' };
+    throw new Error(`Unknown plugin action: ${action}`);
   }
 
   async function sendForm({ action, urls, uploadedFiles, onAfterSuccess }){
