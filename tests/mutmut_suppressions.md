@@ -72,7 +72,9 @@ add noise without catching real regressions.
 The substantive deferred work is reviewing the first successful sharded
 nightly artifacts. At that point, a follow-up issue should:
 
-1. Download the `mutmut-cache-<shard>` artifacts from the nightly run.
+1. Download the `mutmut-results-<shard>` artifacts from the nightly run and
+   extract them at the root of a checkout of the same commit. The score for
+   each shard is on the run's summary page.
 2. Iterate `mutmut results` → `mutmut show <id>` for each survivor.
 3. Append each survivor here under a **Deferred** heading, or kill it.
 
