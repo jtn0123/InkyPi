@@ -13,20 +13,19 @@
         : document.querySelector(".modal.is-open, .thumbnail-preview-modal.is-open");
     if (typeof ui?.syncModalOpenState !== "function")
       document.body.classList.toggle("modal-open", !!open);
-    const pageContent = document.getElementById("playlist-page-content");
-    if (!pageContent) return;
-    if (open) {
-      pageContent.setAttribute("inert", "");
-    } else {
-      pageContent.removeAttribute("inert");
-    }
   }
 
-  function focusFirstFocusable(modal) {
-    const focusable = modal.querySelector(
-      'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+  // The shared InkyPiModalFocus helper makes the page behind an open dialog
+  // inert, moves focus in, keeps Tab inside, closes the dialog on Escape and
+  // hands focus back to whatever opened it.
+  function trapFocus(modal, triggerEl, modalId) {
+    global.InkyPiModalFocus?.activate(modal, triggerEl, () =>
+      closeModalById(modalId)
     );
-    if (focusable) setTimeout(() => focusable.focus(), 0);
+  }
+
+  function releaseFocus(modal) {
+    global.InkyPiModalFocus?.deactivate(modal);
   }
 
   function syncMobileTimeInputs() {
@@ -47,49 +46,18 @@
     });
   }
 
-  function restoreLastModalTrigger() {
-    const lastModalTrigger = ns.runtime.lastModalTrigger;
-    if (
-      lastModalTrigger &&
-      typeof lastModalTrigger.focus === "function" &&
-      document.contains(lastModalTrigger)
-    ) {
-      lastModalTrigger.focus();
-    }
-    ns.runtime.lastModalTrigger = null;
-  }
-
   function setModalOpen(modalId, open, triggerEl) {
     const modal = document.getElementById(modalId);
     if (!modal) return;
-    if (open && triggerEl) ns.runtime.lastModalTrigger = triggerEl;
     modal.hidden = !open;
     modal.style.display = open ? "flex" : "none";
     modal.classList.toggle("is-open", open);
     syncModalOpenState();
     if (open) {
-      focusFirstFocusable(modal);
+      trapFocus(modal, triggerEl, modalId);
       return;
     }
-    restoreLastModalTrigger();
-  }
-
-  function getOpenModalId() {
-    const modalIds = [
-      "deleteInstanceModal",
-      "deletePlaylistModal",
-      "displayNextConfirmModal",
-      "thumbnailPreviewModal",
-      "refreshSettingsModal",
-      "deviceCycleModal",
-      "playlistModal",
-    ];
-    return (
-      modalIds.find((modalId) => {
-        const modal = document.getElementById(modalId);
-        return modal && !modal.hidden;
-      }) || null
-    );
+    releaseFocus(modal);
   }
 
   function closeModalById(modalId) {
@@ -158,7 +126,6 @@
     ns.state.currentEditPlaylist = playlistName;
     ns.state.currentEditPluginId = pluginId;
     ns.state.currentEditInstance = instanceName;
-    if (triggerEl) ns.runtime.lastModalTrigger = triggerEl;
     if (
       !ns.runtime.playlistRefreshManager &&
       typeof global.createRefreshSettingsManager === "function"
@@ -175,7 +142,7 @@
         modal.hidden = false;
         modal.classList.add("is-open");
         syncModalOpenState();
-        focusFirstFocusable(modal);
+        trapFocus(modal, triggerEl, "refreshSettingsModal");
       }
       return;
     }
@@ -190,12 +157,11 @@
         modal.hidden = true;
         modal.classList.remove("is-open");
         syncModalOpenState();
+        releaseFocus(modal);
       }
-    } else {
-      setModalOpen("refreshSettingsModal", false);
       return;
     }
-    restoreLastModalTrigger();
+    setModalOpen("refreshSettingsModal", false);
   }
 
   function openCreateModal(triggerEl) {
@@ -383,13 +349,6 @@
         closeDisplayNextConfirmModal();
       }
     });
-    document.addEventListener("keydown", (event) => {
-      if (event.key !== "Escape") return;
-      const modalId = getOpenModalId();
-      if (!modalId) return;
-      event.preventDefault();
-      closeModalById(modalId);
-    });
     ns.runtime.modalLifecycleBound = true;
   }
 
@@ -401,7 +360,6 @@
     closeModalById,
     closeRefreshModal,
     closeThumbnailPreview,
-    getOpenModalId,
     initModalLifecycle,
     openCreateModal,
     openDeleteInstanceModal,

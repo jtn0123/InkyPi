@@ -37,7 +37,6 @@
     cardsBound: false,
     deviceClockTimer: null,
     formControlsBound: false,
-    lastModalTrigger: null,
     modalLifecycleBound: false,
     mobileSyncBound: false,
     pageEnhancementsBound: false,

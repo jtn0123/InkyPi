@@ -1,22 +1,30 @@
 (function () {
   "use strict";
 
-  function setModalOpen(node, open) {
-    if (!node) return;
-    node.hidden = !open;
-    node.style.display = open ? "block" : "none";
-  }
-
   function getClearModal() {
     return document.getElementById("clearErrorsModal");
   }
 
-  function openClearModal() {
-    setModalOpen(getClearModal(), true);
+  // The shared helper moves focus into the dialog, keeps Tab inside it,
+  // closes it on Escape and hands focus back to the button that opened it.
+  function openClearModal(event) {
+    var modal = getClearModal();
+    if (!modal) return;
+    modal.hidden = false;
+    modal.style.display = "block";
+    globalThis.InkyPiModalFocus?.activate(
+      modal,
+      event?.currentTarget || document.activeElement,
+      closeClearModal
+    );
   }
 
   function closeClearModal() {
-    setModalOpen(getClearModal(), false);
+    var modal = getClearModal();
+    if (!modal) return;
+    modal.hidden = true;
+    modal.style.display = "none";
+    globalThis.InkyPiModalFocus?.deactivate(modal);
   }
 
   async function confirmClear() {
@@ -101,15 +109,6 @@
       if (event.target === getClearModal()) {
         closeClearModal();
       }
-    });
-
-    // Close on Escape
-    document.addEventListener("keydown", function (event) {
-      if (event.key !== "Escape") return;
-      var modal = getClearModal();
-      if (!modal || modal.hidden) return;
-      event.preventDefault();
-      closeClearModal();
     });
   }
 

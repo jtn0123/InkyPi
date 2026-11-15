@@ -116,5 +116,8 @@ def test_display_next_modal_registered_for_escape_and_backdrop(
         "event.target?.id === 'displayNextConfirmModal'" in js
         or 'event.target?.id === "displayNextConfirmModal"' in js
     ), "displayNextConfirmModal must close on backdrop click"
-    # It is tracked by getOpenModalId so Escape works.
-    assert "'displayNextConfirmModal'," in js or '"displayNextConfirmModal",' in js
+    # Escape (via the shared focus helper) closes it through closeModalById.
+    assert (
+        "case 'displayNextConfirmModal':" in js
+        or 'case "displayNextConfirmModal":' in js
+    )

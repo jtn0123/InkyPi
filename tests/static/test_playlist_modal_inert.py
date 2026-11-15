@@ -4,8 +4,8 @@ JTN-228: The Refresh Settings dialog (and other playlist modals) must make the
 underlying page inert — preventing mouse clicks, keyboard focus, and touch events
 on background controls.
 
-These are static-analysis tests that verify the HTML and JS implement the correct
-inert-attribute pattern without requiring a running browser.
+These static checks cover the template layout and the wiring;
+tests/integration/test_modal_keyboard_e2e.py checks the behaviour in a browser.
 """
 
 import pathlib
@@ -18,51 +18,25 @@ PLAYLIST_HTML = ROOT / "src" / "templates" / "playlist.html"
 
 
 class TestInertAttributeManagement:
-    """Verify that playlist/modals.js sets/removes inert on the page content wrapper."""
+    """The shared InkyPiModalFocus helper owns the inert state.
 
-    def test_js_sets_inert_on_page_content(self) -> None:
-        """syncModalOpenState must set the inert attribute when a modal opens."""
-        js = PLAYLIST_MODALS_JS.read_text()
-        assert (
-            "setAttribute('inert'" in js or 'setAttribute("inert"' in js
-        ), "playlist/modals.js must call setAttribute('inert', '') to block background"
+    It marks every sibling of the open dialog (including
+    #playlist-page-content) inert and restores the previous values on close.
+    playlist/modals.js must not toggle inert itself: the helper records the
+    value it found and puts it back, so a second owner would leave the page
+    inert after the dialog closed. tests/integration/test_modal_keyboard_e2e.py
+    checks the real behaviour in a browser.
+    """
 
-    def test_js_removes_inert_on_modal_close(self) -> None:
-        """syncModalOpenState must remove the inert attribute when all modals close."""
+    def test_js_delegates_inert_to_the_shared_helper(self) -> None:
         js = PLAYLIST_MODALS_JS.read_text()
-        assert (
-            "removeAttribute('inert'" in js or 'removeAttribute("inert"' in js
-        ), "playlist/modals.js must call removeAttribute('inert') when modals close"
+        assert "InkyPiModalFocus?.activate" in js
+        assert "InkyPiModalFocus?.deactivate" in js
 
-    def test_js_targets_playlist_page_content(self) -> None:
-        """The inert toggle must target the #playlist-page-content wrapper."""
+    def test_js_does_not_toggle_inert_itself(self) -> None:
         js = PLAYLIST_MODALS_JS.read_text()
-        assert (
-            "playlist-page-content" in js
-        ), "playlist/modals.js must reference #playlist-page-content as the inert target"
-
-    def test_inert_toggled_in_sync_function(self) -> None:
-        """The inert toggle must live inside the syncModalOpenState function so it
-        fires on every open/close path."""
-        js = PLAYLIST_MODALS_JS.read_text()
-        # Extract the syncModalOpenState function body
-        match = re.search(
-            r"function\s+syncModalOpenState\s*\(\s*\)\s*\{(.*?)\n\s*\}",
-            js,
-            re.DOTALL,
-        )
-        assert match, "syncModalOpenState function not found"
-        body = match.group(1)
-        assert (
-            "playlist-page-content" in body
-        ), "inert toggling must be inside syncModalOpenState"
-        assert "inert" in body, "syncModalOpenState must handle the inert attribute"
-
-    def test_sync_function_does_not_return_before_inert_toggle(self) -> None:
-        js = PLAYLIST_MODALS_JS.read_text()
-        assert (
-            "return ui.syncModalOpenState()" not in js
-        ), "syncModalOpenState must not return before it toggles inert state"
+        assert not re.search(r"(set|remove)Attribute\(\s*['\"]inert", js)
+        assert ".inert =" not in js
 
 
 class TestPageContentWrapperInTemplate:
@@ -103,25 +77,7 @@ class TestPageContentWrapperInTemplate:
 
 
 class TestFocusManagement:
-    """Verify that focus is moved into the modal when it opens and restored on close."""
-
-    def test_js_moves_focus_into_modal_on_open(self) -> None:
-        """setModalOpen / openRefreshModal must focus a child element when opening."""
-        js = PLAYLIST_MODALS_JS.read_text()
-        # Look for a focus() call inside an open path
-        assert (
-            "focusable.focus()" in js
-        ), "playlist/modals.js must call focusable.focus() when opening a modal"
-
-    def test_js_restores_focus_on_close(self) -> None:
-        """On close, focus must return to _lastModalTrigger."""
-        js = PLAYLIST_MODALS_JS.read_text()
-        assert (
-            "lastModalTrigger" in js
-        ), "playlist/modals.js must track lastModalTrigger for focus restoration"
-        assert (
-            "lastModalTrigger.focus()" in js
-        ), "playlist/modals.js must call lastModalTrigger.focus() when closing a modal"
+    """Focus moves in on open and returns to the opener on close (via the helper)."""
 
     def test_refresh_btn_listener_passes_trigger(self) -> None:
         """The delegated refresh action must pass the button element as the

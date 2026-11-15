@@ -3,6 +3,8 @@
 
 from pathlib import Path
 
+import pytest
+
 _SCRIPTS_DIR = Path(__file__).resolve().parents[2] / "src" / "static" / "scripts"
 
 
@@ -18,30 +20,47 @@ def test_history_page_script_handles_escape_for_open_modals() -> None:
     assert "clearHistoryModal" in content
 
 
-def test_playlist_script_handles_escape_for_playlist_modals() -> None:
+# Every custom dialog goes through the shared InkyPiModalFocus helper, which
+# moves focus in, keeps Tab inside, closes on Escape and restores focus.
+# tests/integration/test_modal_keyboard_e2e.py checks that behaviour in a real
+# browser; this cheap guard keeps a dialog from quietly dropping the helper in
+# lanes where browser tests are skipped.
+@pytest.mark.parametrize(
+    "script",
+    [
+        "errors_page.js",
+        "history_page.js",
+        "lightbox.js",
+        "playlist/modals.js",
+        "plugin_page.js",
+        "plugin_schema.js",
+        "settings/modals.js",
+    ],
+)
+def test_dialog_scripts_use_the_shared_focus_helper(script: str) -> None:
+    content = _read_script(script)
+
+    assert "InkyPiModalFocus?.activate" in content or (
+        "InkyPiModalFocus.activate" in content
+    )
+    assert "InkyPiModalFocus?.deactivate" in content or (
+        "InkyPiModalFocus.deactivate" in content
+    )
+
+
+def test_playlist_escape_routes_every_dialog_to_its_close_function() -> None:
     content = _read_script("playlist/modals.js")
 
-    assert "getOpenModalId" in content
-    assert "closeModalById" in content
-    assert "deleteInstanceModal" in content
-    assert "deviceCycleModal" in content
-    assert 'event.key !== "Escape"' in content or "event.key !== 'Escape'" in content
-
-
-def test_plugin_page_schedule_modal_handles_escape() -> None:
-    """JTN-461: #scheduleModal closes on Escape key."""
-    content = _read_script("plugin_page.js")
-
-    assert 'event.key !== "Escape"' in content
-    assert "scheduleModal" in content
-
-
-def test_plugin_page_open_modal_focuses_first_focusable() -> None:
-    """JTN-463: openModal moves focus to first focusable element on open."""
-    content = _read_script("plugin_page.js")
-
-    assert "focusable.focus()" in content
-    assert "_lastModalTrigger" in content
+    for modal_id in (
+        "deleteInstanceModal",
+        "deletePlaylistModal",
+        "displayNextConfirmModal",
+        "thumbnailPreviewModal",
+        "refreshSettingsModal",
+        "deviceCycleModal",
+        "playlistModal",
+    ):
+        assert f'case "{modal_id}":' in content, modal_id
 
 
 def test_settings_page_reboot_shutdown_modals_handle_escape() -> None:

@@ -3,7 +3,7 @@
 // - Click to open
 // - Esc or outside click to close
 // - Double-click on the preview image to toggle native sizing
-// - Focus trap for accessibility
+// - Keyboard focus kept inside while open (shared InkyPiModalFocus helper)
 // - Loading state with spinner
 (function(){
   'use strict';
@@ -11,7 +11,6 @@
   const MODAL_ID = 'imagePreviewModal';
   const IMG_ID = 'imagePreviewImg';
   const VISIBLE_CLASS = 'lightbox-img-visible';
-  let triggerElement = null;
   let clickTimer = null;
 
   function imgClickHandler(e) {
@@ -49,22 +48,6 @@
       if (l) l.style.display = 'none';
       hideImage(img);
       if (e) e.style.display = 'block';
-    });
-  }
-
-  function addFocusTrap(modal) {
-    modal.addEventListener('keydown', function(e) {
-      if (e.key === 'Tab') {
-        const focusable = modal.querySelectorAll('button, [tabindex]:not([tabindex="-1"])');
-        if (focusable.length === 0) return;
-        var first = focusable[0];
-        var last = focusable[focusable.length - 1];
-        if (e.shiftKey) {
-          if (document.activeElement === first) { e.preventDefault(); last.focus(); }
-        } else {
-          if (document.activeElement === last) { e.preventDefault(); first.focus(); }
-        }
-      }
     });
   }
 
@@ -121,8 +104,6 @@
       content.appendChild(img);
       modal.appendChild(content);
       document.body.appendChild(modal);
-
-      addFocusTrap(modal);
     } else {
       const content = modal.querySelector('.modal-content');
       const img = document.getElementById(IMG_ID);
@@ -159,8 +140,6 @@
           closeSpan.replaceWith(closeBtn);
         }
 
-        addFocusTrap(modal);
-
         img._lbInit = true;
       }
     }
@@ -176,8 +155,6 @@
     const modal = ensureModal();
     const img = document.getElementById(IMG_ID);
     if (!modal || !img) return;
-
-    triggerElement = document.activeElement;
 
     // Show loading state
     const loader = modal.querySelector('.lightbox-loading');
@@ -200,20 +177,15 @@
     modal.classList.add('is-open');
     syncModalOpen();
 
-    // Make background inert for accessibility
-    Array.from(document.body.children).forEach(function(el) {
-      if (el !== modal && el.nodeType === 1) el.inert = true;
-    });
-
     // If already cached, trigger load immediately
     if (img.complete && img.naturalWidth > 0) {
       if (loader) loader.style.display = 'none';
       showImage(img);
     }
 
-    // Focus the close button for keyboard users
-    const closeBtn = modal.querySelector('.close-button');
-    if (closeBtn) closeBtn.focus();
+    // Moves focus to the close button, makes the page behind inert, keeps Tab
+    // inside and closes on Escape; focus returns to the opener on close.
+    globalThis.InkyPiModalFocus?.activate(modal, document.activeElement, closeLightbox);
   }
 
   function closeLightbox(){
@@ -222,17 +194,9 @@
       modal.style.display = 'none';
       modal.setAttribute('hidden', '');
       modal.classList.remove('is-open');
+      globalThis.InkyPiModalFocus?.deactivate(modal);
     }
-    // Remove inert from background
-    Array.from(document.body.children).forEach(function(el) {
-      if (el.nodeType === 1) el.inert = false;
-    });
     syncModalOpen();
-    // Restore focus to the element that opened the lightbox
-    if (triggerElement && typeof triggerElement.focus === 'function') {
-      triggerElement.focus();
-      triggerElement = null;
-    }
   }
 
   function toggleNativeSizing(e){
@@ -255,16 +219,6 @@
       img.style.cursor = 'zoom-out';
     }
   }
-
-  // Persistent Esc handler — checks if modal is open
-  document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape') {
-      const modal = document.getElementById(MODAL_ID);
-      if (modal && modal.style.display !== 'none') {
-        closeLightbox();
-      }
-    }
-  });
 
   // Outside click closes the modal
   window.addEventListener('click', function(ev){
