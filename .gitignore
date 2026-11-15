@@ -243,3 +243,6 @@ dogfood-output/
 
 # mutmut 3 isolated source tree and results
 /mutants/
+
+# A dev run once set INKYPI_RUNTIME_DIR=true and wrote images here.
+/true/
