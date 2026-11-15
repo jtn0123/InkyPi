@@ -1,7 +1,8 @@
 name: Vendor versions
 
 # Dependabot can't see the front-end libraries that install/update_vendors.sh
-# downloads or that src/static/cdn_manifest.json loads from a CDN. This fails
+# downloads, that src/static/cdn_manifest.json loads from a CDN, or that are
+# committed under src/static/vendor/ (htmx, Leaflet). This fails
 # when one has a newer release in its pinned major; a new major is listed in
 # the run summary without failing. See scripts/check_vendor_versions.py.
 
