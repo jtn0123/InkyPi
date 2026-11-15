@@ -3,8 +3,15 @@
 
 Some storefronts reject Lychee's requests (HTTP 429) or shed load with a
 transient 503 while the same-runner curl GET succeeds. Neither status is ever
-accepted: curl must fetch that exact URL with valid TLS and finish with HTTP
-2xx. All other errors remain failures.
+accepted on its own: curl must fetch that exact URL with valid TLS and finish
+with HTTP 2xx. All other errors remain failures.
+
+The one exception is a short list of stores that refuse automated requests
+from CI runners outright (Cloudflare bot challenges, Amazon's robot check).
+From a runner their 403/429/5xx says nothing about whether the page exists,
+so when curl is refused too the link is reported as unverifiable, as a
+warning. A 404 or 410, a DNS or TLS failure, or any other status from those
+hosts is still a failure, and every other host keeps the strict rule.
 """
 
 from __future__ import annotations
@@ -19,6 +26,15 @@ from urllib.parse import urlsplit
 
 # Statuses that signal "try again later" rather than a broken link.
 RECHECK_STATUSES = frozenset({429, 503})
+# Stores whose bot protection refuses CI runners. Between 2026-10-25 and
+# 2026-11-15 they caused all 10 failed link checks out of 57 runs. Add a host
+# here only when its refusals are a runner block, not a dead page.
+BOT_HOSTILE_HOSTS = frozenset(
+    {"waveshare.com", "www.waveshare.com", "amzn.to", "collabs.shop"}
+)
+# How those stores refuse a runner: a bot challenge (403), throttling (429),
+# or an error page from the store or its CDN (5xx, Cloudflare 52x).
+REFUSAL_STATUSES = frozenset({403, 429, 500, 502, 503, 504, 520, 521, 522, 523, 524})
 # curl itself retries 429/5xx responses before giving up on a URL.
 CURL_RETRIES = 2
 CURL_RETRY_DELAY_S = 5
@@ -62,7 +78,19 @@ def curl_status(url: str) -> int:
     except (OSError, subprocess.TimeoutExpired):
         return 0
     status = result.stdout.strip()
-    return int(status) if result.returncode == 0 and status.isdigit() else 0
+    if not status.isdigit():
+        return 0
+    code = int(status)
+    if result.returncode == 0:
+        return code
+    # --fail exits non-zero on an HTTP error; keep that status so callers can
+    # tell a refusal from a missing page. Anything else (DNS, TLS, timeout,
+    # a cut-off body) is 0, never a success.
+    return code if code >= 400 else 0
+
+
+def is_bot_hostile(url: str) -> bool:
+    return (urlsplit(url).hostname or "").lower() in BOT_HOSTILE_HOSTS
 
 
 def report_errors(report: dict[str, Any]) -> list[dict[str, Any]] | None:
@@ -80,8 +108,11 @@ def report_errors(report: dict[str, Any]) -> list[dict[str, Any]] | None:
 
 
 def check_report(
-    report: dict[str, Any], fetch_status: Callable[[str], int] = curl_status
+    report: dict[str, Any],
+    fetch_status: Callable[[str], int] = curl_status,
+    unverifiable: list[str] | None = None,
 ) -> list[str]:
+    """Return the failures; links a store refused are appended to *unverifiable*."""
     total = report.get("total")
     errors = report_errors(report)
     if not isinstance(total, int) or total <= 0:
@@ -98,13 +129,20 @@ def check_report(
         if not isinstance(url, str) or not isinstance(status, dict):
             failures.append("Malformed link error entry.")
             continue
-        if status.get("code") in RECHECK_STATUSES:
+        code = status.get("code")
+        store = is_bot_hostile(url)
+        if code in RECHECK_STATUSES or (store and code in REFUSAL_STATUSES):
             if url not in verified:
                 verified[url] = fetch_status(url)
             if 200 <= verified[url] < 300:
                 print(f"Verified with curl HTTP {verified[url]}: {url}")
                 continue
-        failures.append(f"Link validation failed: {url} ({status.get('code')})")
+            if store and verified[url] in REFUSAL_STATUSES:
+                note = f"{url} (checker {code}, curl {verified[url]})"
+                if unverifiable is not None and note not in unverifiable:
+                    unverifiable.append(note)
+                continue
+        failures.append(f"Link validation failed: {url} ({code})")
     print(f"Checked {total} link occurrences; {len(failures)} failures remain.")
     return failures
 
@@ -150,13 +188,18 @@ def main() -> int:
             verified[url] = curl_status(url)
             return verified[url]
 
-        failures = check_report(report, verify)
+        refused: list[str] = []
+        failures = check_report(report, verify, refused)
         report["curl_verification"] = verified
+        report["unverifiable"] = refused
         report["validation_errors"] = failures
         args.report.write_text(json.dumps(report, indent=2) + "\n")
     except (OSError, ValueError) as error:
         print(f"Unable to validate link report: {error}")
         return 1
+    for note in refused:
+        # A GitHub Actions annotation, so the skipped check stays visible.
+        print(f"::warning::Store refused the link checker, not verified: {note}")
     for failure in failures:
         print(failure)
     return int(bool(failures))
