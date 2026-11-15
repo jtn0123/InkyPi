@@ -70,7 +70,7 @@ _SECRET_QUERY_PARAMS = r"key|sig|signature|auth|code"
 #      and the rest of the URL stays readable.
 #   3. Key/value pairs: api_key=..., token: "...", password=..., etc. Values
 #      already masked by step 2 are skipped.
-#   4. Raw 32+ hex strings (likely API keys / hashes).
+#   4. Raw 32+ hex strings (likely API keys), except a labelled image hash.
 _TOKEN_PATTERN = re.compile(r"(?i)((?:bearer|client-id)\s+)([A-Za-z0-9._+/=-]+)")
 _QUERY_PATTERN = re.compile(
     r"(?i)([?&](?:[\w.-]*?(?:"
@@ -88,6 +88,22 @@ _KEY_VALUE_PATTERN = re.compile(
     r'([^\s"\'`,}]+)',
 )
 _HEX_PATTERN = re.compile(r"(?i)\b([a-f0-9]{32,})\b")
+# The SHA-256 the app computes for every frame (``compute_image_hash``) is not
+# a secret, and it is the value that tells two refreshes apart in the log, so
+# it is kept when it sits right after an ``image_hash`` label. Only a value of
+# exactly 64 hex digits qualifies: a 32-digit key (OpenWeatherMap's shape)
+# stays masked even if something mislabels it.
+_IMAGE_HASH_LABEL = re.compile(r"(?i)\bimage_hash[\"']?\s*[:=]\s*[\"']?$")
+_SHA256_LEN = 64
+
+
+def _mask_hex(match: re.Match[str]) -> str:
+    value = match.group(1)
+    if len(value) == _SHA256_LEN:
+        before = match.string[max(0, match.start() - 24) : match.start()]
+        if _IMAGE_HASH_LABEL.search(before):
+            return value
+    return _REDACTED
 
 
 def _redact(text: str) -> str:
@@ -95,7 +111,7 @@ def _redact(text: str) -> str:
     text = _TOKEN_PATTERN.sub(r"\1" + _REDACTED, text)
     text = _QUERY_PATTERN.sub(r"\1" + _REDACTED, text)
     text = _KEY_VALUE_PATTERN.sub(r"\1\2" + _REDACTED, text)
-    return _HEX_PATTERN.sub(_REDACTED, text)
+    return _HEX_PATTERN.sub(_mask_hex, text)
 
 
 def redact_secrets(value: object) -> str:

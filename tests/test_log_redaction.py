@@ -106,6 +106,35 @@ class TestRedactHelper:
         clean = "Starting server on port 8080"
         assert _redact(clean) == clean
 
+    @pytest.mark.parametrize(
+        "template",
+        [
+            "refresh_info: {{'plugin_id': 'clock', 'image_hash': '{h}'}}",
+            'refresh_info: {{"image_hash": "{h}"}}',
+            "display skipped, image_hash={h}",
+        ],
+    )
+    def test_labelled_image_hash_is_kept(self, template: str) -> None:
+        """The frame's SHA-256 is what tells two refreshes apart in the log."""
+        sha256 = "3f" * 32
+        text = template.format(h=sha256)
+        assert _redact(text) == text
+
+    @pytest.mark.parametrize(
+        "text",
+        [
+            # A key with an image_hash label but a key's length.
+            "image_hash=" + "ab" * 16,
+            # A SHA-256-length value under any other label.
+            "content_hash=" + "3f" * 32,
+            "secret_image_hash=" + "3f" * 32,
+            # An unlabelled one.
+            "frame " + "3f" * 32,
+        ],
+    )
+    def test_other_long_hex_is_still_masked(self, text: str) -> None:
+        assert "***REDACTED***" in _redact(text)
+
     def test_mixed_sentence_only_secret_redacted(self) -> None:
         text = "User logged in successfully; api_key=TOPSECRETKEY123 from 192.168.1.1"  # gitleaks:allow
         result = _redact(text)
