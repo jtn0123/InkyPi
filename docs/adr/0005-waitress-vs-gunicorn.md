@@ -4,7 +4,7 @@
 
 ## Context
 
-InkyPi needs a production-grade WSGI server to replace Flask's built-in development server. The two most common choices in the Python ecosystem are Waitress and Gunicorn. The application runs a background `RefreshTask` thread that was started in the same process as the Flask app (`src/inkypi.py` line 370). Gunicorn's pre-fork worker model would fork the process after the refresh thread is already running, which is undefined behaviour in Python — threads do not survive `fork()` safely, and the forked workers would each hold a copy of the thread object pointing at state owned by the parent.
+InkyPi needs a production-grade WSGI server to replace Flask's built-in development server. The two most common choices in the Python ecosystem are Waitress and Gunicorn. The application runs a background `RefreshTask` thread that was started in the same process as the Flask app (from the `__main__` block of `src/inkypi.py`). Gunicorn's pre-fork worker model would fork the process after the refresh thread is already running, which is undefined behaviour in Python — threads do not survive `fork()` safely, and the forked workers would each hold a copy of the thread object pointing at state owned by the parent.
 
 ## Decision
 

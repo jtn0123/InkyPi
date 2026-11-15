@@ -6,11 +6,11 @@ the HTTP infrastructure available to plugins and how to use it correctly.
 
 ## Why use `get_http_session()`
 
-`get_http_session()` (`src/utils/http_client.py`, line 32) returns the plugin-facing
-compatibility session. Its pool/adapter wiring is built from the same shared helper used
-by `http_get()` in `src/utils/http_utils.py`, so the retry, pooling, and header defaults
-are easier to reason about across both entry points. Using a shared session has three
-concrete benefits on Pi hardware:
+`get_http_session()` (`src/utils/http_client.py`) returns the plugin-facing
+compatibility session. Its pool/adapter wiring is built by the same helpers
+(`_build_session`, `_build_retry` in `src/utils/http_transport.py`) as the session behind
+`http_get()`, so the retry, pooling, and header defaults are easier to reason about across
+both entry points. Using a shared session has three concrete benefits on Pi hardware:
 
 1. **TLS session resumption** – once a TLS handshake has been negotiated with a host, the
    underlying SSL session can be reused across requests. A cold TLS handshake to a CDN or
@@ -18,17 +18,19 @@ concrete benefits on Pi hardware:
 2. **TCP keep-alive / connection reuse** – HTTP/1.1 keep-alive keeps the TCP socket open
    between requests to the same host. On Pi Zero, even a TCP three-way handshake is
    measurable (~20–50 ms to a nearby host, more to a distant one).
-3. **Automatic retry on transient failures** – the adapter attached to the session
-   (lines 53–66 of `src/utils/http_client.py`) retries on HTTP 429, 500, 502, 503, 504
-   with a 0.5 s exponential backoff, up to 3 total attempts, for idempotent methods
-   (GET, HEAD, OPTIONS).
+3. **Automatic retry on transient failures** – the retry policy `get_http_session()`
+   attaches (`_PLUGIN_RETRY_*` in `src/utils/http_client.py`, status list
+   `HTTP_STATUS_FORCELIST` in `src/utils/http_transport.py`) retries on HTTP 429, 500,
+   502, 503, 504 with a 0.5 s exponential backoff, up to 3 retries, for idempotent
+   methods (GET, HEAD, OPTIONS).
 
 Calling `requests.get(url)` directly creates a new one-shot session for every request,
 paying the full TLS + TCP cost every time and getting no retry behaviour.
 
 ## Pool size rationale
 
-The shared adapter is configured with (lines 59–64 of `src/utils/http_client.py`):
+The shared adapter is built by `_build_session()` in `src/utils/http_transport.py`, from
+the `HTTP_POOL_*` constants in the same module:
 
 ```python
 requests.adapters.HTTPAdapter(
@@ -56,7 +58,7 @@ sockets are closed quickly by the remote server, so real resident overhead is we
 
 ## Default timeouts
 
-The default timeout is defined in `src/utils/http_utils.py` (line 202):
+The default timeout is `DEFAULT_TIMEOUT_SECONDS` in `src/utils/http_transport.py`:
 
 ```python
 DEFAULT_TIMEOUT_SECONDS: float = _env_float("INKYPI_HTTP_TIMEOUT_DEFAULT_S", 20.0)
@@ -89,10 +91,11 @@ response = session.get(url, timeout=(5, 30))
 
 ### `http_get()` wrapper
 
-`src/utils/http_utils.py` also exposes `http_get()`, which adds optional latency logging
-and applies the env-based default timeout automatically. It uses the same shared session
-factory as `get_http_session()`, but keeps its thread-local lifecycle because the request
-wrapper has different retry defaults:
+`http_get()` (defined in `src/utils/http_transport.py`, imported from
+`utils.http_utils`) adds optional latency logging and applies the env-based default
+timeout automatically. It uses the same session factory as `get_http_session()`, but
+keeps a per-thread session (`get_shared_session()`) because its retry defaults differ
+(the `INKYPI_HTTP_RETRIES*` and `INKYPI_HTTP_BACKOFF` env vars):
 
 ```python
 from utils.http_utils import http_get
@@ -117,8 +120,9 @@ it should keep what it fetched on disk itself.
 - **Handle `requests.exceptions.ReadTimeout` and `requests.exceptions.ConnectionError`**.
   These are the two most common failures on intermittent home Wi-Fi. Catch them in your
   plugin's `generate_image()` and raise a user-friendly `RuntimeError`.
-- **Prefer `http_get()` for repeat reads** – it deduplicates requests automatically and
-  respects `Cache-Control` headers from the server.
+- **Use `http_get()` when you want the env-configured defaults** – it applies
+  `INKYPI_HTTP_TIMEOUT_DEFAULT_S` when you pass no timeout and can log latency. It does
+  not cache or deduplicate responses (see above).
 - **Do not create a bare `requests.Session()`** unless you need a custom adapter (e.g.,
   a custom SSL context or a retry policy different from the shared one). If you must, document
   why in a comment and note it in the PR.
@@ -149,7 +153,7 @@ def fetch_data(url: str, api_key: str) -> dict:
 
 ## Noted exceptions
 
-`src/plugins/comic/comic_parser.py` uses `http_get()` from `src/utils/http_utils.py`
+`src/plugins/comic/comic_parser.py` uses `http_get()` (imported from `utils.http_utils`)
 rather than calling `get_http_session()` directly. This is acceptable: `http_get()` is a
 higher-level wrapper that internally calls `get_shared_session()` (another pooled session
 from `src/utils/http_transport.py`) and adds latency logging; the pool is still reused.

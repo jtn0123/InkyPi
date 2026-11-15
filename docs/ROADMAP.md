@@ -7,7 +7,7 @@ Detailed write-ups stay where they were made; this page links to them rather
 than repeating them. Older planning docs that are fully done or superseded live
 in [`archive/`](./archive/).
 
-Last reconciled: 2026-10-30.
+Last reconciled: 2026-11-15.
 
 ## Display output
 
@@ -16,7 +16,8 @@ Last reconciled: 2026-10-30.
       small-panel layout, not a CSS tweak.
 - [ ] **Warn when `calendar.min.js` is missing.** It is an install-time vendor
       file outside git; without it the calendar renders blank and nothing says
-      why. Fold into the boot asset check (review B10).
+      why. `scripts/dry_run_plugin.py` warns since #766, but the running app
+      does not: fold it into the boot asset check (review B10).
 - [ ] **Overflow coverage for calendar and weather.** The cross-platform text
       fit test (`tests/snapshots/test_render_text_fit.py`) does not cover them
       yet: calendar needs the vendor file, weather needs a larger mock payload.
@@ -47,18 +48,42 @@ tracked in Linear:
 - [ ] JTN-774 — configurable `image_url` download timeout
 - [ ] JTN-775 — servo control / rotating frame
 
-## Web UI
-
-- [ ] Re-audit the dashboard and playlists with real data (an active playlist,
-      a populated rotation) — earlier audits only saw empty states.
-
 ## Code health
 
-- [ ] **Split the largest modules.** `blueprints/plugin.py` and
-      `utils/http_utils.py` each exceed ~1,000
-      lines and carry most recent bug fixes. (`refresh_task/task.py` is done:
-      split into mixin modules, none over ~600 lines. `blueprints/playlist.py`
-      is done: split into the `blueprints/playlist/` package, none over ~360
-      lines.)
 - [ ] `FONTS["ds-digi"]` points at `static/fonts/DS-DIGI.TTF`; the file lives
       under `DS-DIGI/`. Unused today.
+
+## Grade follow-ups
+
+The remaining code-quality items come from a local grade report
+(`.claude/grade-report.md`, which is not committed); the IDs refer to it.
+
+- [ ] **A1** — Give scheduling policy one owner; next-due and next-up maths is
+      still repeated across the scheduler and the routes.
+- [ ] **A4 / B5** — Partly done in #784: the refresh loop raises HTTP-free
+      domain errors and the four display routes map them the same way. Left:
+      the `WorkflowError` duplicate, direct-render (no refresh loop) statuses,
+      and the async `/update_now` job path.
+- [ ] **A5** — `blueprints/settings/__init__.py` is a service locator for
+      updates, logs, the version check and benchmarks.
+- [ ] **A6** — The main process loads plugin code (and its imports) on each
+      refresh to pick a progress label and ask `skip_display_condition`.
+- [ ] **C6** — Modal dialogs handle keyboard focus inconsistently.
+- [ ] **C8–C12** — Other front-end cleanups: `plugin_form.js`, large page
+      closures and copied helpers, badge colours, leaked bundle globals,
+      one-off breakpoints.
+- [ ] **C5 / D4** — JS tests assert on source text instead of behaviour.
+- [ ] **E3** — The service runs as root with no systemd hardening.
+- [ ] **E5** — Updates trust release files; tags are not signed or verified.
+- [ ] **G3** — The forkserver preloads the whole web app, not what workers need.
+- [ ] **I4** — CI duplicates installs and checks.
+
+## Closed since the last reconcile
+
+- [x] Split the largest modules: `refresh_task/task.py` (#705),
+      `blueprints/plugin.py` (#706), `utils/http_utils.py` (#707) and
+      `blueprints/playlist.py` (#708).
+- [x] Re-audit the dashboard and playlists with real data — done while
+      dogfooding with populated playlists and history (#695).
+- [x] `scripts/render_weather_mock.py` (imported `pytz`) was replaced by
+      record/replay in `scripts/dry_run_plugin.py` (#766).

@@ -7,7 +7,7 @@ keeps working for plugins and blueprints:
 * :mod:`utils.api_responses` — canonical JSON envelope (``json_success``,
   ``json_error``, ``APIError``, ``wants_json``, ``content_disposition``).
 * :mod:`utils.http_transport` — ``http_get`` and the per-thread pooled
-  session (retries, timeouts, cache, latency logging).
+  session (retries, timeouts, latency logging).
 * :mod:`utils.dns_pinning` — ``pinned_dns`` (SSRF DNS-rebinding guard).
 * :mod:`utils.safe_fetch` — SSRF-guarded fetches (``guarded_fetch``,
   ``safe_http_get``, ``open_guarded_stream``, ``safe_fetch_bytes``,
