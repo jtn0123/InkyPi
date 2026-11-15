@@ -2,12 +2,10 @@
 // Configurable timing defaults (ms).
 const TOAST_DURATION_MS = 5000;
 const TOAST_ERROR_DURATION_MS = 8000;
-const MODAL_AUTO_CLOSE_MS = 10000;
 const TOAST_FADE_MS = 300;
 
 let toastContainer = null;
 let toastCounter = 0;
-let lastResponseModalTrigger = null;
 
 function ensureToastContainer() {
     if (!toastContainer) {
@@ -114,70 +112,9 @@ function closeToast(toastId) {
     }
 }
 
-// Function to Show the Response Modal (legacy support + new toast)
-function showResponseModal(status, message, useToast = true) {
-    if (useToast) {
-        return showToast(status === 'failure' ? 'error' : status, message);
-    }
-
-    // Legacy modal code
-    const modal = document.getElementById('responseModal');
-    if (!modal) {
-        return showToast(status === 'failure' ? 'error' : status, message);
-    }
-
-    const modalMessage = document.getElementById('modalMessage');
-    const closeButton = document.getElementById('responseModalClose');
-    lastResponseModalTrigger = document.activeElement instanceof HTMLElement
-        ? document.activeElement
-        : null;
-
-    // Remove any previous status classes
-    modal.classList.remove('success', 'failure');
-
-    // Add the correct class based on the status
-    if (status === 'success') {
-        modal.classList.add('success');
-    } else {
-        modal.classList.add('failure');
-    }
-
-    if (modalMessage) {
-        modalMessage.textContent = message;
-    }
-
-    // Display Modal
-    modal.hidden = false;
-    modal.style.display = 'block';
-    modal.classList.add('is-visible');
-    document.body.classList.add('success-failure-modal-open');
-    if (closeButton) {
-        setTimeout(() => closeButton.focus(), 0);
-    }
-
-    // Auto-close modal (skip for failure so users can read error details)
-    if (status === 'success') {
-        setTimeout(() => closeResponseModal(), MODAL_AUTO_CLOSE_MS);
-    }
-}
-
-// Function to Close the Modal
-function closeResponseModal() {
-    const modal = document.getElementById('responseModal');
-    if (modal) {
-        modal.hidden = true;
-        modal.style.display = 'none';
-        modal.classList.remove('is-visible');
-    }
-    document.body.classList.remove('success-failure-modal-open');
-    if (lastResponseModalTrigger) {
-        try {
-            lastResponseModalTrigger.focus();
-        } catch (_e) {
-            // Ignore focus restoration failures.
-        }
-        lastResponseModalTrigger = null;
-    }
+// Older name for showToast that many pages call. "failure" means "error".
+function showResponseModal(status, message) {
+    return showToast(status === 'failure' ? 'error' : status, message);
 }
 
 function showError(message, duration) {
@@ -185,12 +122,11 @@ function showError(message, duration) {
 }
 
 /**
- * Parse a fetch Response and surface a uniform modal for success/error.
+ * Parse a fetch Response and show a success or error toast for it.
  * Returns the parsed JSON object for further handling if needed.
  */
-// Enhanced error handling with better user feedback
 async function handleJsonResponse(response, options = {}) {
-    const { showToastNotification = true, includeRequestId = false } = options;
+    const { includeRequestId = false } = options;
 
     let data = null;
     try {
@@ -199,12 +135,7 @@ async function handleJsonResponse(response, options = {}) {
         // Non-JSON responses
         if (!response.ok) {
             console.warn('Non-JSON error response from', response.url, 'status:', response.status);
-            const message = getErrorMessage(response.status);
-            if (showToastNotification) {
-                showToast('error', message);
-            } else {
-                showResponseModal('failure', message);
-            }
+            showToast('error', getErrorMessage(response.status));
         }
         return null;
     }
@@ -212,23 +143,11 @@ async function handleJsonResponse(response, options = {}) {
     if (!response.ok || (data && data.success === false) || data?.error) {
         const rid = includeRequestId && data?.request_id ? ` (id: ${data.request_id})` : '';
         const msg = (data && (data.error || data.message)) || getErrorMessage(response.status);
-        const fullMessage = `${msg}${rid}`;
-
-        if (showToastNotification) {
-            showToast('error', fullMessage);
-        } else {
-            showResponseModal('failure', fullMessage);
-        }
+        showToast('error', `${msg}${rid}`);
     } else {
         const rid = includeRequestId && data?.request_id ? ` (id: ${data.request_id})` : '';
         const msg = (data && data.message) || 'Operation completed successfully';
-        const fullMessage = `${msg}${rid}`;
-
-        if (showToastNotification) {
-            showToast('success', fullMessage);
-        } else {
-            showResponseModal('success', fullMessage);
-        }
+        showToast('success', `${msg}${rid}`);
     }
     return data;
 }
@@ -250,20 +169,6 @@ function getErrorMessage(status, endpoint) {
 
     return errorMessages[status] || `An unexpected error occurred${ctx}. Please try again.`;
 }
-
-// Wire up legacy modal close button (replaces inline onclick)
-document.addEventListener('DOMContentLoaded', () => {
-    const closeBtn = document.getElementById('responseModalClose');
-    if (closeBtn) {
-        closeBtn.addEventListener('click', closeResponseModal);
-        closeBtn.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                closeResponseModal();
-            }
-        });
-    }
-});
 
 // Other scripts call these by bare name (biome.json lists them under
 // javascript.globals). A classic script's top-level functions are globals

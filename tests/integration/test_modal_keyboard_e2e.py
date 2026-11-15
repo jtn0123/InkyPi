@@ -16,9 +16,11 @@ the right words.
 from __future__ import annotations
 
 import os
+from pathlib import Path
 from typing import Any
 
 import pytest
+from PIL import Image
 from playwright.sync_api import Page
 from tests.integration.browser_helpers import navigate_and_wait, prepare_playlist
 
@@ -181,6 +183,38 @@ def test_playlist_dialogs_keyboard(
     first_trigger = f"{trigger} >> nth=0"
     page.locator(first_trigger).wait_for(state="visible")
     # Tag the trigger so the contract check can find it with a plain selector.
+    page.locator(first_trigger).evaluate(
+        "node => node.setAttribute('data-test-trigger', '')"
+    )
+
+    _open_with_keyboard(page, "[data-test-trigger]")
+    _assert_keyboard_contract(page, modal, "[data-test-trigger]")
+
+
+@pytest.mark.parametrize(
+    ("trigger", "modal"),
+    [
+        ("#historyClearBtn", "#clearHistoryModal"),
+        ('[data-history-action="delete"]', "#deleteHistoryModal"),
+        ("a.history-thumb", "#lightboxModal"),
+    ],
+)
+def test_history_dialogs_keyboard(
+    live_server: str,
+    browser_page: Page,
+    device_config_dev: Any,
+    trigger: str,
+    modal: str,
+) -> None:
+    history_dir = Path(device_config_dev.history_image_dir)
+    history_dir.mkdir(parents=True, exist_ok=True)
+    Image.new("RGB", (16, 16), "white").save(
+        history_dir / "display_20260101_120000.png"
+    )
+    page = browser_page
+    navigate_and_wait(page, live_server, "/history")
+    first_trigger = f"{trigger} >> nth=0"
+    page.locator(first_trigger).wait_for(state="visible")
     page.locator(first_trigger).evaluate(
         "node => node.setAttribute('data-test-trigger', '')"
     )

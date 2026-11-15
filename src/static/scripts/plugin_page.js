@@ -321,8 +321,6 @@
       if (fileInput) fileInput.value = "";
       setHidden(fileNameDisplay, true);
       setHidden(uploadButtonLabel, false);
-      const hidden = document.getElementById("hidden-file-name");
-      if (hidden) hidden.remove();
     }
 
     function populateStyleSettings() {
@@ -505,27 +503,6 @@
           parent.classList.toggle("show-frame", this.checked);
         });
       }
-    }
-
-    function collapseApiIndicator(apiIndicator) {
-      apiIndicator.classList.remove("auto-collapse");
-      apiIndicator.classList.add("collapsed");
-    }
-
-    function initApiIndicator() {
-      const apiIndicator = document.getElementById("apiKeyIndicator");
-      if (!apiIndicator) return;
-      // When the indicator lives in the plugin title-stack meta row it is
-      // already styled as a compact chip — skip the legacy auto-collapse
-      // animation that assumed a full-width header badge (JTN-design refresh).
-      if (apiIndicator.closest(".plugin-mode-row")) {
-        apiIndicator.classList.remove("auto-collapse", "collapsed");
-        return;
-      }
-      setTimeout(() => {
-        apiIndicator.classList.add("auto-collapse");
-        setTimeout(() => collapseApiIndicator(apiIndicator), 3000);
-      }, 100);
     }
 
     // JTN-629: Capture a snapshot of the settings form on load so we can
@@ -808,7 +785,6 @@
       bindPluginSubtabs();
       initStatusBar();
       initPreviewInteractions();
-      initApiIndicator();
       initApiKeysLeaveGuard();
       initColorPreviews();
       if (mobileQuery && typeof mobileQuery.addEventListener === "function") {

@@ -264,10 +264,6 @@ body.modal-open {
     max-width: 400px;
 }
 
-body.success-failure-modal-open .toast-container {
-    bottom: 84px;
-}
-
 .toast {
     background: var(--surface);
     border: 1px solid var(--surface-border);
@@ -538,48 +534,4 @@ details[open] > .update-release-notes-toggle::before {
 
 .form-shake {
     animation: form-shake 0.4s ease-in-out;
-}
-
-/* Legacy modal styles for backward compatibility */
-.success-failure-modal {
-    display: none;
-    position: fixed;
-    top: auto;
-    right: 20px;
-    bottom: 20px;
-    left: auto;
-    transform: none;
-    z-index: 1000;
-    max-width: 400px;
-    border-radius: 8px;
-    background-color: var(--accent);
-    padding: 10px 16px 10px 24px;
-    color: var(--on-accent);
-    font-family: inherit;
-    font-size: 16px;
-    text-align: center;
-}
-
-.success-failure-modal .response-modal-content {
-    border-radius: 8px;
-    background: inherit;
-    padding-right: 24px; /* Space between text and close button */
-}
-
-.success-failure-modal .close-button {
-    position: absolute;
-    top: 50%;
-    transform: translateY(-50%);
-    right: 12px;
-    font-size: 20px;
-    cursor: pointer;
-    color: var(--on-accent);
-}
-
-.success-failure-modal.success {
-    background-color: var(--accent);
-}
-
-.success-failure-modal.failure {
-    background-color: var(--error);
 }

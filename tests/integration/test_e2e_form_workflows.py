@@ -94,8 +94,6 @@ def test_settings_save_submit(live_server: str, tmp_path: Path) -> None:
                 422,
             ), f"Unexpected save response: {save_responses[0]}"
 
-            # Toast or modal should appear (check for toast container)
-            page.locator(".toast-container, #responseModal[style*='display: block']")
             # At minimum the page should still be functional
             assert page.locator("#saveSettingsBtn").count() == 1
         finally:
