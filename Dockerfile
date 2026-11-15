@@ -1,5 +1,6 @@
 # syntax=docker/dockerfile:1
-FROM python:3.13-slim-trixie
+# Pinned by digest so a rebuild gets the same base; Dependabot (docker) bumps it.
+FROM python:3.13-slim-trixie@sha256:e48f59cdba69a3cbd9ed2cf0f348d90d45a8d350d98134cf1070bc106ee9ed90
 
 # Install system dependencies required by Pillow, OpenJPEG, and fonts
 RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \

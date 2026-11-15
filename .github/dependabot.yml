@@ -22,3 +22,12 @@ updates:
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5
+
+  # The dev container's base image, pinned by digest in /Dockerfile. The
+  # install-matrix Dockerfiles in scripts/ deliberately float on debian:<codename>.
+  # Front-end libraries are checked by .github/workflows/vendor-versions.yml.
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 2

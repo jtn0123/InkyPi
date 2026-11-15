@@ -1,0 +1,28 @@
+name: Vendor versions
+
+# Dependabot can't see the front-end libraries that install/update_vendors.sh
+# downloads or that src/static/cdn_manifest.json loads from a CDN. This fails
+# when one has a newer release in its pinned major; a new major is listed in
+# the run summary without failing. See scripts/check_vendor_versions.py.
+
+on:
+  schedule:
+    - cron: "0 7 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+      - name: Compare pinned versions with npm
+        run: python scripts/check_vendor_versions.py
