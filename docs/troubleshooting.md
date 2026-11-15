@@ -93,7 +93,7 @@ The web server (waitress) runs a fixed pool of worker threads, and every open li
 - Streams also end within about a second of their tab closing.
 - Each stream is ended by the server after `INKYPI_SSE_MAX_LIFETIME_S` seconds (default `55`) and the browser reconnects automatically, which also frees threads held by tabs that closed without the server noticing.
 
-Set these in `.env` or a systemd drop-in, then restart the service.
+Set these in a systemd drop-in (`sudo systemctl edit inkypi`, then `Environment=INKYPI_WEB_THREADS=6` under `[Service]`) and restart the service. `/usr/local/inkypi/.env` is only read for API keys, not at startup.
 
 ## Blackout: pause refreshes and blank the panel
 
@@ -243,7 +243,7 @@ sudo /usr/local/bin/inkypi -d
 
 ## API Key not configured
 
-Some plugins require API Keys to be configured in order to run. These need to be configured in a .env file at the root of the project. See [API Keys](api_keys.md) for details.
+Some plugins need an API key to run. Add it on the **API Keys** page of the web UI, which stores it in `/usr/local/inkypi/.env`. See [API Keys](api_keys.md) for key names and where to get them.
 
 ## Clock/Sunset/Sunrise Time is wrong
 
@@ -401,14 +401,14 @@ sudo systemctl restart inkypi.service
 
 **Symptom:** The plugin error toast reads something like `"OPEN_WEATHER_MAP_SECRET API key not configured"`, `"GITHUB_SECRET API key not configured"`, or `"GOOGLE_AI_SECRET API key not configured"`. The display either retains the previous image or shows blank.
 
-**Likely cause:** The required secret is missing from the `.env` file at the project root, or the file itself does not exist. All API-backed plugins call `device_config.load_env_key("<KEY_NAME>")` and raise a `RuntimeError` when the result is falsy.
+**Likely cause:** The required secret is missing from `/usr/local/inkypi/.env` (not the `.env` in your clone of the repository), or the file doesn't exist. All API-backed plugins call `device_config.load_env_key("<KEY_NAME>")` and raise a `RuntimeError` when the result is falsy.
 
 **How to verify:**
 ```bash
 grep -E 'OPEN_WEATHER_MAP_SECRET|GITHUB_SECRET|GOOGLE_AI_SECRET|OPEN_AI_SECRET|NASA_SECRET' /usr/local/inkypi/.env
 ```
 
-**Fix:** Add the missing key to `.env` (create the file if needed) and restart the service. See [API Keys](api_keys.md) for per-plugin key names and where to obtain them.
+**Fix:** Add the key on the **API Keys** page. It applies from the plugin's next refresh; restart the service only if the old value is still used. See [API Keys](api_keys.md) for per-plugin key names and where to get them.
 
 ---
 
@@ -424,7 +424,7 @@ journalctl -u inkypi -n 50 | grep -E 'Timeout|ConnectionError|Failed to'
 ```
 Try the URL manually from the Pi: `curl -I <feed_url>`.
 
-**Fix:** Retry after a few minutes. For persistent issues, check that the Pi has network access (`ping 8.8.8.8`) and that the source service is operational. Increase the HTTP timeout via `INKYPI_HTTP_TIMEOUT_DEFAULT_S` in `.env` if the feed is reliably slow.
+**Fix:** Retry after a few minutes. For persistent issues, check that the Pi has network access (`ping 8.8.8.8`) and that the source service is operational. If the feed is reliably slow, raise the HTTP timeout with `INKYPI_HTTP_TIMEOUT_DEFAULT_S` in a systemd drop-in (see the `INKYPI_WEB_THREADS` note above).
 
 ---
 
