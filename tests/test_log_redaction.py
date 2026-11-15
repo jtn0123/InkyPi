@@ -445,7 +445,7 @@ class TestSetupLoggingWiresFilter:
         self, clean_root_logger: logging.Logger
     ) -> None:
         from app_setup.logging_setup import install_dev_log_handler
-        from blueprints.settings import DevModeLogHandler
+        from services.logs import DevModeLogHandler
 
         install_dev_log_handler()
 

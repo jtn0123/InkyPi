@@ -42,9 +42,9 @@ def test_shutdown_reboot_path(
 def test_download_logs_has_attachment_header(
     client: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    import blueprints.settings as settings_mod
+    from services import logs
 
-    monkeypatch.setattr(settings_mod, "JOURNAL_AVAILABLE", False)
+    monkeypatch.setattr(logs, "JOURNAL_AVAILABLE", False)
     resp = client.get("/download-logs?hours=2")
     assert resp.status_code == 200
     cd = resp.headers.get("Content-Disposition", "")
@@ -55,9 +55,9 @@ def test_download_logs_has_attachment_header(
 def test_api_logs_rate_limited(
     client: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    import blueprints.settings as settings_mod
+    from blueprints.settings import _logs
 
-    monkeypatch.setattr(settings_mod, "_rate_limit_ok", lambda remote: False)
+    monkeypatch.setattr(_logs, "_rate_limit_ok", lambda remote: False)
     resp = client.get("/api/logs")
     assert resp.status_code == 429
 
@@ -65,7 +65,7 @@ def test_api_logs_rate_limited(
 def test_api_logs_errors_level_filter(
     client: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> Any:
-    import blueprints.settings as settings_mod
+    from services import logs
 
     def fake_read(hours: int) -> Any:
         return [
@@ -75,7 +75,7 @@ def test_api_logs_errors_level_filter(
             "Jan 01 host app[1]: critical CRITICAL boom",
         ]
 
-    monkeypatch.setattr(settings_mod, "_read_log_lines", fake_read)
+    monkeypatch.setattr(logs, "_read_log_lines", fake_read)
     resp = client.get("/api/logs?level=errors")
     assert resp.status_code == 200
     lines = resp.get_json()["lines"]

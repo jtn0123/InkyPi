@@ -26,8 +26,9 @@ flowchart TD
     BP --> SettingsBP[settings/ — device settings, logs, updates, benchmarks]
     BP --> OtherBP[history, apikeys, blackout, events, ...]
 
-    PluginBP -->|save workflows| Services[services/<br/>plugin + playlist workflows]
+    PluginBP -->|save workflows| Services[services/<br/>workflows, updates, logs, version check]
     PlaylistBP --> Services
+    SettingsBP -->|update runner, log reads, version check| Services
 
     BP -->|reads/writes| Config[Config<br/>src/config.py]
     Config -->|loads| DeviceJSON[(device.json /<br/>device_dev.json)]
@@ -117,7 +118,10 @@ Single modules cover the rest: `main` (dashboard, previews, `/display-next`, `/r
 
 ### `src/services/`
 
-Flask-free workflows called by the blueprints: `plugin_workflows` (saving plugin settings and the saved-settings instance), `playlist_workflows` (adding an instance to a playlist and validating its settings), and `direct_render` (the outcome policy for a `/update_now` render that runs outside the refresh loop).
+Logic the blueprints call directly, kept out of the route modules:
+
+- Flask-free workflows: `plugin_workflows` (saving plugin settings and the saved-settings instance), `playlist_workflows` (adding an instance to a playlist and validating its settings), and `direct_render` (the outcome policy for a `/update_now` render that runs outside the refresh loop).
+- Behind the settings routes: `updates` (finding and validating the update and rollback scripts, launching them with `systemd-run` or a simulated thread off-device, and the in-memory update state and lock), `logs` (journal reads, and the in-memory buffer that stands in for the journal in dev mode; it reads the device timezone from the Flask app context) and `version_check` (the cached GitHub latest-release check behind `/api/version`). Tests patch names on these modules, for example `services.updates._systemd_available`.
 
 ### `src/refresh_task/`
 

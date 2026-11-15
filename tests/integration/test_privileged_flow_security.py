@@ -166,13 +166,14 @@ def privileged_client(client: FlaskClient, monkeypatch: pytest.MonkeyPatch) -> A
 
 @pytest.fixture(autouse=True)
 def reset_privileged_flow_state() -> Iterator[Any]:
-    import blueprints.settings as settings_mod
+    from blueprints.settings import _system
+    from services import updates
 
-    settings_mod._set_update_state(False, None)
-    settings_mod._shutdown_limiter.reset()
+    updates._set_update_state(False, None)
+    _system._shutdown_limiter.reset()
     yield
-    settings_mod._set_update_state(False, None)
-    settings_mod._shutdown_limiter.reset()
+    updates._set_update_state(False, None)
+    _system._shutdown_limiter.reset()
 
 
 @pytest.mark.parametrize("case", ALL_CASES, ids=lambda case: case.name)
@@ -279,7 +280,7 @@ def test_authenticated_session_can_save_and_delete_api_keys_with_csrf(
 def test_authenticated_session_can_shutdown_with_csrf(
     privileged_client: Any, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    import blueprints.settings as settings_mod
+    from blueprints.settings import _system
 
     _seed_authed_session(privileged_client)
 
@@ -288,7 +289,7 @@ def test_authenticated_session_can_shutdown_with_csrf(
     def _fake_run(argv: Any, check: Any) -> None:
         calls.append(list(argv))
 
-    monkeypatch.setattr(settings_mod.subprocess, "run", _fake_run)
+    monkeypatch.setattr(_system.subprocess, "run", _fake_run)
 
     resp = privileged_client.post(
         "/shutdown",
@@ -304,14 +305,14 @@ def test_authenticated_session_can_shutdown_with_csrf(
 def test_authenticated_session_can_start_update_with_csrf(
     privileged_client: Any, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    import blueprints.settings as settings_mod
+    from services import updates
 
     _seed_authed_session(privileged_client)
 
-    monkeypatch.setattr(settings_mod, "_systemd_available", lambda: False)
-    monkeypatch.setattr(settings_mod, "_get_update_script_path", lambda: None)
+    monkeypatch.setattr(updates, "_systemd_available", lambda: False)
+    monkeypatch.setattr(updates, "_get_update_script_path", lambda: None)
     monkeypatch.setattr(
-        settings_mod,
+        updates,
         "_start_update_fallback_thread",
         lambda script_path, target_tag=None: None,
     )
@@ -330,15 +331,15 @@ def test_authenticated_session_can_start_update_with_csrf(
 def test_authenticated_session_can_start_rollback_with_csrf(
     privileged_client: Any, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    import blueprints.settings as settings_mod
+    from services import updates
 
     _seed_authed_session(privileged_client)
     monkeypatch.setenv("INKYPI_LOCKFILE_DIR", str(tmp_path))
     _write_failure_record(tmp_path)
     _write_prev_version(tmp_path)
-    monkeypatch.setattr(settings_mod, "_systemd_available", lambda: False)
+    monkeypatch.setattr(updates, "_systemd_available", lambda: False)
     monkeypatch.setattr(
-        settings_mod,
+        updates,
         "_start_update_fallback_thread",
         lambda script_path, target_tag=None: None,
     )

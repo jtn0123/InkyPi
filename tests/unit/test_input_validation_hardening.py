@@ -296,10 +296,10 @@ class TestShutdownCooldownOnFailure:
     def test_failed_shutdown_does_not_block_retry(
         self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        import blueprints.settings as settings_mod
+        from blueprints.settings import _system
 
         # Reset cooldown
-        settings_mod._shutdown_limiter.reset()
+        _system._shutdown_limiter.reset()
 
         # First call: subprocess fails
         monkeypatch.setattr(
@@ -317,9 +317,9 @@ class TestShutdownCooldownOnFailure:
     def test_successful_shutdown_does_consume_cooldown(
         self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        import blueprints.settings as settings_mod
+        from blueprints.settings import _system
 
-        settings_mod._shutdown_limiter.reset()
+        _system._shutdown_limiter.reset()
 
         monkeypatch.setattr("subprocess.run", MagicMock())
         resp1 = client.post("/shutdown", json={})
@@ -342,7 +342,7 @@ class TestLogEndpointExceptionLeaks:
         self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         monkeypatch.setattr(
-            "blueprints.settings._read_log_lines",
+            "services.logs._read_log_lines",
             MagicMock(side_effect=Exception("secret-internal-detail")),
         )
         resp = client.get("/download-logs")
@@ -353,7 +353,7 @@ class TestLogEndpointExceptionLeaks:
         self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         monkeypatch.setattr(
-            "blueprints.settings._read_log_lines",
+            "services.logs._read_log_lines",
             MagicMock(side_effect=Exception("secret-db-password")),
         )
         resp = client.get("/api/logs")

@@ -48,12 +48,12 @@ class TestApiVersionInlineResult:
     def test_returns_update_available_field(
         self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        import blueprints.settings as mod
+        from services import version_check
 
-        mod._VERSION_CACHE["latest"] = "99.0.0"
-        mod._VERSION_CACHE["checked_at"] = time.time()
-        mod._VERSION_CACHE["release_notes"] = None
-        mod._VERSION_CACHE["last_error"] = None
+        version_check._VERSION_CACHE["latest"] = "99.0.0"
+        version_check._VERSION_CACHE["checked_at"] = time.time()
+        version_check._VERSION_CACHE["release_notes"] = None
+        version_check._VERSION_CACHE["last_error"] = None
         original_version = client.application.config.get("APP_VERSION")
         try:
             client.application.config["APP_VERSION"] = "1.0.0"
@@ -67,9 +67,9 @@ class TestApiVersionInlineResult:
             assert data["check_succeeded"] is True
             assert data["check_error"] is None
         finally:
-            mod._VERSION_CACHE["latest"] = None
-            mod._VERSION_CACHE["checked_at"] = 0.0
-            mod._VERSION_CACHE["last_error"] = None
+            version_check._VERSION_CACHE["latest"] = None
+            version_check._VERSION_CACHE["checked_at"] = 0.0
+            version_check._VERSION_CACHE["last_error"] = None
             if original_version is not None:
                 client.application.config["APP_VERSION"] = original_version
             else:
@@ -78,49 +78,49 @@ class TestApiVersionInlineResult:
     def test_up_to_date_returns_false(
         self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        import blueprints.settings as mod
+        from services import version_check
 
         # Set latest to same as current
         current = client.application.config.get("APP_VERSION", "0.0.1")
-        mod._VERSION_CACHE["latest"] = current
-        mod._VERSION_CACHE["checked_at"] = time.time()
-        mod._VERSION_CACHE["release_notes"] = None
+        version_check._VERSION_CACHE["latest"] = current
+        version_check._VERSION_CACHE["checked_at"] = time.time()
+        version_check._VERSION_CACHE["release_notes"] = None
         try:
             resp = client.get("/api/version")
             data = resp.get_json()
             assert data["update_available"] is False
         finally:
-            mod._VERSION_CACHE["latest"] = None
-            mod._VERSION_CACHE["checked_at"] = 0.0
+            version_check._VERSION_CACHE["latest"] = None
+            version_check._VERSION_CACHE["checked_at"] = 0.0
 
     def test_includes_release_notes_when_present(
         self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        import blueprints.settings as mod
+        from services import version_check
 
-        mod._VERSION_CACHE["latest"] = "99.0.0"
-        mod._VERSION_CACHE["checked_at"] = time.time()
-        mod._VERSION_CACHE["release_notes"] = "Bug fixes and improvements"
+        version_check._VERSION_CACHE["latest"] = "99.0.0"
+        version_check._VERSION_CACHE["checked_at"] = time.time()
+        version_check._VERSION_CACHE["release_notes"] = "Bug fixes and improvements"
         try:
             resp = client.get("/api/version")
             data = resp.get_json()
             assert data["release_notes"] == "Bug fixes and improvements"
         finally:
-            mod._VERSION_CACHE["latest"] = None
-            mod._VERSION_CACHE["checked_at"] = 0.0
-            mod._VERSION_CACHE["release_notes"] = None
+            version_check._VERSION_CACHE["latest"] = None
+            version_check._VERSION_CACHE["checked_at"] = 0.0
+            version_check._VERSION_CACHE["release_notes"] = None
 
     def test_network_failure_returns_error_gracefully(
         self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        import blueprints.settings as mod
+        from services import version_check
 
         # Force cache miss so it tries to fetch
-        mod._VERSION_CACHE["latest"] = None
-        mod._VERSION_CACHE["checked_at"] = 0.0
-        mod._VERSION_CACHE["last_error"] = None
+        version_check._VERSION_CACHE["latest"] = None
+        version_check._VERSION_CACHE["checked_at"] = 0.0
+        version_check._VERSION_CACHE["last_error"] = None
         monkeypatch.setattr(
-            "blueprints.settings.http_get",
+            "services.version_check.http_get",
             MagicMock(side_effect=Exception("network down")),
         )
         try:
@@ -136,9 +136,9 @@ class TestApiVersionInlineResult:
             assert data["check_error"].startswith("Couldn't reach GitHub")
             assert "network down" in data["check_error"]
         finally:
-            mod._VERSION_CACHE["latest"] = None
-            mod._VERSION_CACHE["checked_at"] = 0.0
-            mod._VERSION_CACHE["last_error"] = None
+            version_check._VERSION_CACHE["latest"] = None
+            version_check._VERSION_CACHE["checked_at"] = 0.0
+            version_check._VERSION_CACHE["last_error"] = None
 
     def test_pre_release_tag_is_not_reported_as_network_failure(
         self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
@@ -146,11 +146,11 @@ class TestApiVersionInlineResult:
         """A pre-release tag (v1.2.3-rc1) should produce a "not a stable
         release" message, not a misleading "Couldn't reach GitHub" one
         (JTN PR #590 review feedback)."""
-        import blueprints.settings as mod
+        from services import version_check
 
-        mod._VERSION_CACHE["latest"] = None
-        mod._VERSION_CACHE["checked_at"] = 0.0
-        mod._VERSION_CACHE["last_error"] = None
+        version_check._VERSION_CACHE["latest"] = None
+        version_check._VERSION_CACHE["checked_at"] = 0.0
+        version_check._VERSION_CACHE["last_error"] = None
 
         mock_resp = MagicMock()
         mock_resp.json.return_value = {
@@ -159,7 +159,7 @@ class TestApiVersionInlineResult:
         }
         mock_resp.raise_for_status = MagicMock()
         monkeypatch.setattr(
-            "blueprints.settings.http_get", MagicMock(return_value=mock_resp)
+            "services.version_check.http_get", MagicMock(return_value=mock_resp)
         )
 
         try:
@@ -175,20 +175,20 @@ class TestApiVersionInlineResult:
             assert "stable" in msg.lower()
             assert "v1.2.3-rc1" in msg
         finally:
-            mod._VERSION_CACHE["latest"] = None
-            mod._VERSION_CACHE["checked_at"] = 0.0
-            mod._VERSION_CACHE["last_error"] = None
+            version_check._VERSION_CACHE["latest"] = None
+            version_check._VERSION_CACHE["checked_at"] = 0.0
+            version_check._VERSION_CACHE["last_error"] = None
 
     def test_force_refresh_bypasses_cache(
         self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """?force=1 must hit the HTTP layer even if a fresh cache entry exists."""
-        import blueprints.settings as mod
+        from services import version_check
 
-        mod._VERSION_CACHE["latest"] = "1.0.0"
-        mod._VERSION_CACHE["checked_at"] = time.time()
-        mod._VERSION_CACHE["release_notes"] = None
-        mod._VERSION_CACHE["last_error"] = None
+        version_check._VERSION_CACHE["latest"] = "1.0.0"
+        version_check._VERSION_CACHE["checked_at"] = time.time()
+        version_check._VERSION_CACHE["release_notes"] = None
+        version_check._VERSION_CACHE["last_error"] = None
 
         mock_resp = MagicMock()
         mock_resp.json.return_value = {
@@ -197,7 +197,7 @@ class TestApiVersionInlineResult:
         }
         mock_resp.raise_for_status = MagicMock()
         mock_get = MagicMock(return_value=mock_resp)
-        monkeypatch.setattr("blueprints.settings.http_get", mock_get)
+        monkeypatch.setattr("services.version_check.http_get", mock_get)
 
         try:
             # Cached call should not invoke http_get
@@ -212,7 +212,7 @@ class TestApiVersionInlineResult:
             assert data["latest"] == "9.9.9"
             assert data["check_succeeded"] is True
         finally:
-            mod._VERSION_CACHE["latest"] = None
-            mod._VERSION_CACHE["checked_at"] = 0.0
-            mod._VERSION_CACHE["last_error"] = None
-            mod._VERSION_CACHE["release_notes"] = None
+            version_check._VERSION_CACHE["latest"] = None
+            version_check._VERSION_CACHE["checked_at"] = 0.0
+            version_check._VERSION_CACHE["last_error"] = None
+            version_check._VERSION_CACHE["release_notes"] = None

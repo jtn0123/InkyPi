@@ -646,12 +646,12 @@ def _release_check_up_to_date(
     and on the state that exposed the race. Other update states have their
     own tests (test_settings_updates_dom.py, test_sidebar_update_indicator.py).
     """
-    import blueprints.settings as settings_mod
+    from services import version_check
 
     current = str(flask_app.config.get("APP_VERSION", "0.0.0"))
 
     def _up_to_date(now: float) -> str:
-        cache = settings_mod._VERSION_CACHE
+        cache = version_check._VERSION_CACHE
         cache["latest"] = current
         cache["checked_at"] = now
         cache["release_notes"] = None
@@ -659,7 +659,7 @@ def _release_check_up_to_date(
         cache["failed_at"] = 0.0
         return current
 
-    monkeypatch.setattr(settings_mod, "_fetch_latest_version", _up_to_date)
+    monkeypatch.setattr(version_check, "_fetch_latest_version", _up_to_date)
 
 
 # JTN-702: Each page/viewport combination runs twice — once anonymous

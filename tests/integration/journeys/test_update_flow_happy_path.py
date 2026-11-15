@@ -103,7 +103,7 @@ def stub_update_seam(monkeypatch: pytest.MonkeyPatch) -> Iterator[Any]:
     """
     import threading
 
-    import blueprints.settings as settings_mod
+    from services import updates
 
     started = threading.Event()
     finished = threading.Event()
@@ -115,7 +115,7 @@ def stub_update_seam(monkeypatch: pytest.MonkeyPatch) -> Iterator[Any]:
             # given the test polls every 100ms.
             started.set()
             time.sleep(0.3)
-            settings_mod._set_update_state(False, None)
+            updates._set_update_state(False, None)
             finished.set()
 
         threading.Thread(
@@ -123,17 +123,17 @@ def stub_update_seam(monkeypatch: pytest.MonkeyPatch) -> Iterator[Any]:
         ).start()
 
     monkeypatch.setattr(
-        settings_mod, "_start_update_via_systemd", _fake_runner, raising=True
+        updates, "_start_update_via_systemd", _fake_runner, raising=True
     )
     monkeypatch.setattr(
-        settings_mod, "_start_update_fallback_thread", _fake_runner, raising=True
+        updates, "_start_update_fallback_thread", _fake_runner, raising=True
     )
 
     # Force ``/settings/update`` down the fallback-thread branch regardless of
     # the host platform. ``_systemd_available`` is already False on macOS dev
     # hosts but we pin it for clarity and for the rare CI runner that might
     # actually have systemd-run installed.
-    monkeypatch.setattr(settings_mod, "_systemd_available", lambda: False, raising=True)
+    monkeypatch.setattr(updates, "_systemd_available", lambda: False, raising=True)
 
     yield {"started": started, "finished": finished}
 
@@ -145,14 +145,14 @@ def stub_latest_version(monkeypatch: pytest.MonkeyPatch) -> Iterator[Any]:
     This both bypasses the real GitHub API call AND resets the module-level
     ``_VERSION_CACHE`` so the stubbed value is returned on the first call.
     """
-    import blueprints.settings as settings_mod
+    from services import version_check
 
-    settings_mod._VERSION_CACHE["latest"] = None
-    settings_mod._VERSION_CACHE["checked_at"] = 0.0
-    settings_mod._VERSION_CACHE["release_notes"] = None
-    settings_mod._VERSION_CACHE["last_error"] = None
+    version_check._VERSION_CACHE["latest"] = None
+    version_check._VERSION_CACHE["checked_at"] = 0.0
+    version_check._VERSION_CACHE["release_notes"] = None
+    version_check._VERSION_CACHE["last_error"] = None
     monkeypatch.setattr(
-        settings_mod,
+        version_check,
         "_check_latest_version",
         lambda force_refresh=False: _STUBBED_LATEST_TAG,
         raising=True,

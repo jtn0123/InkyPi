@@ -59,10 +59,10 @@ def reset_shutdown_limiter() -> Iterator[Any]:
     Yields a zero-argument callable that resets the limiter so tests can clear
     state mid-run without touching the private attribute directly.
     """
-    import blueprints.settings as settings_mod
+    from blueprints.settings import _system
 
     def _reset() -> None:
-        settings_mod._shutdown_limiter.reset()
+        _system._shutdown_limiter.reset()
 
     _reset()
     yield _reset

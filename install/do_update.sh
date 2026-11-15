@@ -201,7 +201,7 @@ if [ -z "$TARGET_TAG" ]; then
 fi
 
 # Defense-in-depth: validate the tag format even though the Flask caller
-# (src/blueprints/settings/__init__.py::_start_update_via_systemd) already
+# (src/services/updates.py::_start_update_via_systemd) already
 # enforces a strict semver regex before exec. See JTN-319.
 if ! [[ "$TARGET_TAG" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.]+)?$ ]]; then
   echo "ERROR: Invalid target tag format: $TARGET_TAG" >&2

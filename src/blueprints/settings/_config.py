@@ -6,14 +6,48 @@ from zoneinfo import available_timezones
 
 from flask import current_app, redirect, render_template, request
 
-import blueprints.settings as _mod
 from app_setup.logging_setup import configure_log_timezone
+from blueprints.settings import logger, settings_bp
 from display.rendering_settings import SCREEN_RENDERING_KEY, SCREEN_RENDERING_MODES
 from utils.backend_errors import ClientInputError, route_error_boundary
 from utils.http_utils import json_error, json_success
 from utils.time_utils import calculate_seconds
 
 _DEVICE_NAME_MAX_LEN = 64
+
+# Import allowlists for settings import. ``refresh_info`` is left out on
+# purpose: it records what this screen is showing right now, so restoring a
+# backup's copy would make the dashboard describe a picture that isn't there.
+_ALLOWED_IMPORT_CONFIG_KEYS = frozenset(
+    {
+        "name",
+        "resolution",
+        "orientation",
+        "timezone",
+        "color_mode",
+        "playlist_config",
+        "plugins",
+        "plugin_cycle_interval_seconds",
+        "time_format",
+        "image_settings",
+        "display_type",
+        "preview_size_mode",
+        "saved_settings",
+        "inverted_image",
+        "log_system_stats",
+    }
+)
+
+_ALLOWED_IMPORT_ENV_KEYS = frozenset(
+    {
+        "OPEN_AI_SECRET",
+        "OPEN_WEATHER_MAP_SECRET",
+        "NASA_SECRET",
+        "UNSPLASH_ACCESS_KEY",
+        "GITHUB_SECRET",
+        "GOOGLE_AI_SECRET",
+    }
+)
 
 
 def _isolation_state() -> tuple[Any, list[Any], set[Any]]:
@@ -56,7 +90,7 @@ def plugin_isolation() -> Any:
 def add_plugin_isolation() -> Any:
     with route_error_boundary(
         "add plugin isolation",
-        logger=_mod.logger,
+        logger=logger,
         hint="Provide a valid registered plugin_id in a JSON object.",
     ):
         device_config, isolated, registered_ids = _isolation_state()
@@ -73,7 +107,7 @@ def add_plugin_isolation() -> Any:
 def remove_plugin_isolation() -> Any:
     with route_error_boundary(
         "remove plugin isolation",
-        logger=_mod.logger,
+        logger=logger,
         hint="Provide a valid registered plugin_id in a JSON object.",
     ):
         device_config, isolated, registered_ids = _isolation_state()
@@ -86,22 +120,22 @@ def remove_plugin_isolation() -> Any:
         return json_success(isolated_plugins=sorted(set(isolated)))
 
 
-_mod.settings_bp.add_url_rule(
+settings_bp.add_url_rule(
     "/settings/isolation", view_func=plugin_isolation, methods=["GET"]
 )
-_mod.settings_bp.add_url_rule(
+settings_bp.add_url_rule(
     "/settings/isolation", view_func=add_plugin_isolation, methods=["POST"]
 )
-_mod.settings_bp.add_url_rule(
+settings_bp.add_url_rule(
     "/settings/isolation", view_func=remove_plugin_isolation, methods=["DELETE"]
 )
 
 
-@_mod.settings_bp.route("/settings/safe_reset", methods=["POST"])
+@settings_bp.route("/settings/safe_reset", methods=["POST"])
 def safe_reset() -> Any:
     with route_error_boundary(
         "safe reset",
-        logger=_mod.logger,
+        logger=logger,
         hint="Check config readability and write permissions.",
     ):
         device_config = current_app.config["DEVICE_CONFIG"]
@@ -125,7 +159,7 @@ def safe_reset() -> Any:
         return json_success(message="Safe reset applied.")
 
 
-@_mod.settings_bp.route("/settings", methods=["GET"])
+@settings_bp.route("/settings", methods=["GET"])
 def settings_page() -> Any:
     device_config = current_app.config["DEVICE_CONFIG"]
     timezones = sorted(available_timezones())
@@ -137,7 +171,7 @@ def settings_page() -> Any:
     )
 
 
-@_mod.settings_bp.route("/settings/diagnostics", methods=["GET"])
+@settings_bp.route("/settings/diagnostics", methods=["GET"])
 def diagnostics_redirect() -> Any:
     """Redirect /settings/diagnostics to the Diagnostics accordion on /settings.
 
@@ -149,7 +183,7 @@ def diagnostics_redirect() -> Any:
     return redirect("/settings#diagnostics", code=302)
 
 
-@_mod.settings_bp.route("/settings/backup", methods=["GET"])
+@settings_bp.route("/settings/backup", methods=["GET"])
 def backup_restore_page() -> Any:
     device_config = current_app.config["DEVICE_CONFIG"]
     # For now, reuse the main settings page and anchor to a section; separate template can be added later
@@ -178,14 +212,14 @@ def _include_export_keys() -> bool:
     return str(value or "").strip().lower() in ("1", "true", "yes", "on")
 
 
-@_mod.settings_bp.route("/settings/export", methods=["GET"])
-@_mod.settings_bp.route(
+@settings_bp.route("/settings/export", methods=["GET"])
+@settings_bp.route(
     "/settings/export", methods=["POST"], endpoint="export_settings_post"
 )
 def export_settings() -> Any:
     with route_error_boundary(
         "export settings",
-        logger=_mod.logger,
+        logger=logger,
         hint="Check config readability.",
     ):
         include_keys = _include_export_keys()
@@ -268,14 +302,14 @@ def _apply_imported_config(device_config: Any, filtered_cfg: dict[str, Any]) -> 
         try:
             refresh_task.signal_config_change()
         except Exception:
-            _mod.logger.exception("Could not notify refresh task after import")
+            logger.exception("Could not notify refresh task after import")
 
 
-@_mod.settings_bp.route("/settings/import", methods=["POST"])
+@settings_bp.route("/settings/import", methods=["POST"])
 def import_settings() -> Any:
     with route_error_boundary(
         "import settings",
-        logger=_mod.logger,
+        logger=logger,
         hint="Verify JSON structure and file permissions.",
     ):
         device_config = current_app.config["DEVICE_CONFIG"]
@@ -289,7 +323,7 @@ def import_settings() -> Any:
         if isinstance(cfg, dict):
             # Filter to allowed keys only
             filtered_cfg = {
-                k: v for k, v in cfg.items() if k in _mod._ALLOWED_IMPORT_CONFIG_KEYS
+                k: v for k, v in cfg.items() if k in _ALLOWED_IMPORT_CONFIG_KEYS
             }
             if filtered_cfg:
                 _apply_imported_config(device_config, filtered_cfg)
@@ -299,13 +333,13 @@ def import_settings() -> Any:
         env_keys = payload.get("env_keys") or {}
         if isinstance(env_keys, dict):
             for k, v in env_keys.items():
-                if k not in _mod._ALLOWED_IMPORT_ENV_KEYS or v is None:
+                if k not in _ALLOWED_IMPORT_ENV_KEYS or v is None:
                     continue
                 try:
                     device_config.set_env_key(k, str(v))
                     env_keys_applied += 1
                 except Exception:
-                    _mod.logger.exception("Failed setting env key during import: %s", k)
+                    logger.exception("Failed setting env key during import: %s", k)
 
         if cfg_keys_applied == 0 and env_keys_applied == 0:
             raise ClientInputError(
@@ -325,7 +359,7 @@ def import_settings() -> Any:
         return json_success(message=f"Restored {' and '.join(parts)}")
 
 
-@_mod.settings_bp.route("/settings/api-keys", methods=["GET"])
+@settings_bp.route("/settings/api-keys", methods=["GET"])
 def api_keys_page() -> Any:
     device_config = current_app.config["DEVICE_CONFIG"]
 
@@ -368,12 +402,12 @@ def api_keys_page() -> Any:
     )
 
 
-@_mod.settings_bp.route("/settings/save_api_keys", methods=["POST"])
+@settings_bp.route("/settings/save_api_keys", methods=["POST"])
 def save_api_keys() -> Any:
     device_config = current_app.config["DEVICE_CONFIG"]
     with route_error_boundary(
         "saving API keys",
-        logger=_mod.logger,
+        logger=logger,
         hint="Ensure .env is writable and values are valid; check disk space and permissions.",
     ):
         form_data = request.form.to_dict()
@@ -403,7 +437,7 @@ def save_api_keys() -> Any:
                 # the existing key unchanged.
                 continue
             if set(stripped) <= {"\u2022"}:
-                _mod.logger.warning(
+                logger.warning(
                     "Rejected save_api_keys value for %s: value is only U+2022 "
                     "placeholder characters (likely a stale cached page or a "
                     "client that appended to the legacy bullet pre-fill).",
@@ -422,7 +456,7 @@ def save_api_keys() -> Any:
         return json_success(message="API keys saved.", updated=updated)
 
 
-@_mod.settings_bp.route("/settings/delete_api_key", methods=["POST"])
+@settings_bp.route("/settings/delete_api_key", methods=["POST"])
 def delete_api_key() -> Any:
     device_config = current_app.config["DEVICE_CONFIG"]
     key = request.form.get("key")
@@ -438,7 +472,7 @@ def delete_api_key() -> Any:
         raise ClientInputError("Invalid key name", status=400)
     with route_error_boundary(
         "deleting API key",
-        logger=_mod.logger,
+        logger=logger,
         hint="Verify .env file permissions and that the key exists.",
     ):
         device_config.unset_env_key(key)
@@ -638,13 +672,13 @@ def _build_settings_dict(
     return settings, plugin_cycle_interval_seconds
 
 
-@_mod.settings_bp.route("/save_settings", methods=["POST"])
+@settings_bp.route("/save_settings", methods=["POST"])
 def save_settings() -> Any:
     device_config = current_app.config["DEVICE_CONFIG"]
 
     with route_error_boundary(
         "saving device settings",
-        logger=_mod.logger,
+        logger=logger,
         hint="Check numeric values and config file permissions.",
     ):
         form_data = request.form.to_dict()
@@ -695,21 +729,21 @@ def save_network_settings() -> Any:
     return save_settings()
 
 
-_mod.settings_bp.add_url_rule(
+settings_bp.add_url_rule(
     "/settings/device", view_func=device_settings_page, methods=["GET"]
 )
-_mod.settings_bp.add_url_rule(
+settings_bp.add_url_rule(
     "/settings/device", view_func=save_device_settings, methods=["POST"]
 )
-_mod.settings_bp.add_url_rule(
+settings_bp.add_url_rule(
     "/settings/display", view_func=display_settings_page, methods=["GET"]
 )
-_mod.settings_bp.add_url_rule(
+settings_bp.add_url_rule(
     "/settings/display", view_func=save_display_settings, methods=["POST"]
 )
-_mod.settings_bp.add_url_rule(
+settings_bp.add_url_rule(
     "/settings/network", view_func=network_settings_page, methods=["GET"]
 )
-_mod.settings_bp.add_url_rule(
+settings_bp.add_url_rule(
     "/settings/network", view_func=save_network_settings, methods=["POST"]
 )

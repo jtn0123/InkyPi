@@ -101,7 +101,7 @@ def test_logs_api_uses_device_timezone_for_since(
     dc.update_value("timezone", "US/Eastern", write=True)
 
     # Stub journal reader parts to capture the seek timestamp
-    import blueprints.settings as settings_mod
+    from services import logs
 
     captured: dict[str, int] = {"since_usec": 0}
 
@@ -118,12 +118,10 @@ def test_logs_api_uses_device_timezone_for_since(
         def __iter__(self) -> Any:
             return iter(())
 
-    monkeypatch.setattr(settings_mod, "JOURNAL_AVAILABLE", True, raising=True)
-    monkeypatch.setattr(settings_mod, "JournalReader", FakeJR, raising=True)
-    monkeypatch.setattr(
-        settings_mod, "JournalOpenMode", type("M", (), {"SYSTEM": object()})
-    )
-    monkeypatch.setattr(settings_mod, "Rule", lambda *a, **k: (a, k))
+    monkeypatch.setattr(logs, "JOURNAL_AVAILABLE", True, raising=True)
+    monkeypatch.setattr(logs, "JournalReader", FakeJR, raising=True)
+    monkeypatch.setattr(logs, "JournalOpenMode", type("M", (), {"SYSTEM": object()}))
+    monkeypatch.setattr(logs, "Rule", lambda *a, **k: (a, k))
 
     # Freeze to 08:00 ET and request 2 hours
     with freeze_time("2025-01-01 13:00:00", tz_offset=0):  # 08:00 ET
@@ -145,7 +143,7 @@ def test_logs_api_formats_journal_timestamps_in_device_timezone(
     dc = flask_app.config["DEVICE_CONFIG"]
     dc.update_value("timezone", "America/Los_Angeles", write=True)
 
-    import blueprints.settings as settings_mod
+    from services import logs
 
     class FakeRecord:
         data = {"PRIORITY": "6", "MESSAGE": "hello from journal"}
@@ -169,12 +167,10 @@ def test_logs_api_formats_journal_timestamps_in_device_timezone(
         def close(self) -> Any:
             return None
 
-    monkeypatch.setattr(settings_mod, "JOURNAL_AVAILABLE", True, raising=True)
-    monkeypatch.setattr(settings_mod, "JournalReader", FakeJR, raising=True)
-    monkeypatch.setattr(
-        settings_mod, "JournalOpenMode", type("M", (), {"SYSTEM": object()})
-    )
-    monkeypatch.setattr(settings_mod, "Rule", lambda *a, **k: (a, k))
+    monkeypatch.setattr(logs, "JOURNAL_AVAILABLE", True, raising=True)
+    monkeypatch.setattr(logs, "JournalReader", FakeJR, raising=True)
+    monkeypatch.setattr(logs, "JournalOpenMode", type("M", (), {"SYSTEM": object()}))
+    monkeypatch.setattr(logs, "Rule", lambda *a, **k: (a, k))
 
     resp = client.get("/api/logs?hours=2")
 

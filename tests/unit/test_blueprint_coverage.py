@@ -279,9 +279,9 @@ def test_rate_limiter_prunes_expired_keys(monkeypatch: pytest.MonkeyPatch) -> No
     """
     from collections import deque
 
-    import blueprints.settings as settings_mod
+    from blueprints.settings import _logs
 
-    limiter = settings_mod._logs_limiter
+    limiter = _logs._logs_limiter
 
     # Clear state from any previous test
     limiter._requests.clear()
@@ -301,7 +301,7 @@ def test_rate_limiter_prunes_expired_keys(monkeypatch: pytest.MonkeyPatch) -> No
         assert ip not in limiter._requests
 
     # A new IP is still allowed
-    result = settings_mod._rate_limit_ok("10.0.0.1")
+    result = _logs._rate_limit_ok("10.0.0.1")
     assert result is True
 
     # Confirm prune in isolation

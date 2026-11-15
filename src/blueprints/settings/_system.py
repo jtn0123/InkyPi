@@ -4,8 +4,12 @@ import subprocess
 
 from flask import Response, request
 
-import blueprints.settings as _mod
+from blueprints.settings import logger, settings_bp
 from utils.http_utils import JsonResponse, json_error, json_internal_error, json_success
+from utils.rate_limit import CooldownLimiter
+
+# Shutdown rate limiting
+_shutdown_limiter = CooldownLimiter(30)
 
 
 def _sanitize_log_value(value: str, max_len: int = 500) -> str:
@@ -13,7 +17,7 @@ def _sanitize_log_value(value: str, max_len: int = 500) -> str:
     return value.replace("\n", "").replace("\r", "").replace("\x00", "")[:max_len]
 
 
-@_mod.settings_bp.route("/settings/client_log", methods=["POST"])
+@settings_bp.route("/settings/client_log", methods=["POST"])
 def client_log() -> JsonResponse | Response:
     """Accept lightweight client logs and emit them to server logs.
 
@@ -42,29 +46,29 @@ def client_log() -> JsonResponse | Response:
         extra_str = _sanitize_log_value(extra_str)
         line = f"client_log | level={level} msg={message} extra={extra_str}"
         if level == "debug":
-            _mod.logger.debug(line)
+            logger.debug(line)
         elif level in ("warn", "warning"):
-            _mod.logger.warning(line)
+            logger.warning(line)
         elif level in ("err", "error"):
-            _mod.logger.error(line)
+            logger.error(line)
         else:
-            _mod.logger.info(line)
+            logger.info(line)
         return json_success()
     except Exception:
-        _mod.logger.exception("/settings/client_log failure")
+        logger.exception("/settings/client_log failure")
         return json_internal_error(
             "client_log", details={"hint": "Check payload shape."}
         )
 
 
-@_mod.settings_bp.route("/shutdown", methods=["POST"])
+@settings_bp.route("/shutdown", methods=["POST"])
 def shutdown() -> JsonResponse | Response:
     """Reboot or shut down the device.
 
     Rate-limited to one call per 30 seconds to prevent accidental repeats.
     """
     # Test and reserve the slot in one step, so two requests can't both pass.
-    allowed, retry_after = _mod._shutdown_limiter.acquire()
+    allowed, retry_after = _shutdown_limiter.acquire()
     if not allowed:
         remaining = int(retry_after)
         return json_error(
@@ -79,22 +83,22 @@ def shutdown() -> JsonResponse | Response:
         and "application/json" in request.content_type
     ):
         # Roll back reservation on input validation failure
-        _mod._shutdown_limiter.reset()
+        _shutdown_limiter.reset()
         return json_error("Invalid JSON payload", status=400)
     if not isinstance(data, dict):
         data = {}
     try:
         if data.get("reboot"):
-            _mod.logger.info("Reboot requested")
+            logger.info("Reboot requested")
             subprocess.run(["sudo", "reboot"], check=True)
         else:
-            _mod.logger.info("Shutdown requested")
+            logger.info("Shutdown requested")
             subprocess.run(["sudo", "shutdown", "-h", "now"], check=True)
         # Refresh the cooldown timestamp to the actual success time
-        _mod._shutdown_limiter.record()
+        _shutdown_limiter.record()
         return json_success()
     except subprocess.CalledProcessError:
         # Roll back so the cooldown isn't consumed by a failed attempt
-        _mod._shutdown_limiter.reset()
-        _mod.logger.exception("Failed to execute shutdown command")
+        _shutdown_limiter.reset()
+        logger.exception("Failed to execute shutdown command")
         return json_internal_error("shutdown")

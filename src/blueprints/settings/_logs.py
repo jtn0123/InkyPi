@@ -7,19 +7,46 @@ from typing import Any
 
 from flask import Response, current_app, jsonify, request
 
-import blueprints.settings as _mod
+from blueprints.settings import logger, settings_bp
+from services import logs, updates
 from utils.http_utils import json_error
+from utils.rate_limit import SlidingWindowLimiter
 from utils.time_utils import now_device_tz
 
+# Guardrails and limits for logs APIs
+MAX_LOG_HOURS = 24
+MIN_LOG_HOURS = 1
+MAX_LOG_LINES = 2000
+MIN_LOG_LINES = 50
+MAX_RESPONSE_BYTES = 512 * 1024
 
-@_mod.settings_bp.route("/download-logs", methods=["GET"])
+# Simple in-process rate limiter (per remote addr)
+_logs_limiter = SlidingWindowLimiter(120, 60)
+
+
+def _rate_limit_ok(remote_addr: str | None) -> bool:
+    """Thin wrapper kept for test compatibility (monkeypatching)."""
+    key = remote_addr or "unknown"
+    allowed, _ = _logs_limiter.check(key)
+    return bool(allowed)
+
+
+def _clamp_int(value: str | None, default: int, min_value: int, max_value: int) -> int:
+    try:
+        if value is None:
+            return default
+        parsed = int(value)
+        return max(min_value, min(parsed, max_value))
+    except Exception:
+        return default
+
+
+@settings_bp.route("/download-logs", methods=["GET"])
 def download_logs() -> Response:
     try:
         # Guardrail hours clamp
-        hours = _mod._clamp_int(
-            request.args.get("hours"), 2, _mod.MIN_LOG_HOURS, _mod.MAX_LOG_HOURS
-        )
-        lines = _mod._read_log_lines(hours)
+        hours = _clamp_int(request.args.get("hours"), 2, MIN_LOG_HOURS, MAX_LOG_HOURS)
+        lines = logs._read_log_lines(hours)
         buffer = io.StringIO("\n".join(lines))
         buffer.seek(0)
         # Add date and time to the filename
@@ -34,7 +61,7 @@ def download_logs() -> Response:
         )
 
     except Exception:
-        _mod.logger.exception("Error reading logs")
+        logger.exception("Error reading logs")
         return Response("Error reading logs", status=500, mimetype="text/plain")
 
 
@@ -60,8 +87,8 @@ def _parse_log_params(
     except Exception:
         pre_limit = 500
 
-    hours = _mod._clamp_int(raw_hours, 2, _mod.MIN_LOG_HOURS, _mod.MAX_LOG_HOURS)
-    limit = _mod._clamp_int(raw_limit, 500, _mod.MIN_LOG_LINES, _mod.MAX_LOG_LINES)
+    hours = _clamp_int(raw_hours, 2, MIN_LOG_HOURS, MAX_LOG_HOURS)
+    limit = _clamp_int(raw_limit, 500, MIN_LOG_LINES, MAX_LOG_LINES)
 
     contains = raw_contains_full.strip()
     contains_trimmed = False
@@ -90,11 +117,11 @@ def _filter_log_lines(lines: list[str], contains: str, level: str) -> list[str]:
     return lines
 
 
-@_mod.settings_bp.route("/api/logs", methods=["GET"])
+@settings_bp.route("/api/logs", methods=["GET"])
 def api_logs() -> Response | tuple[Any, int]:
     """JSON logs API with server-side filter, level selection and limits."""
     try:
-        if not _mod._rate_limit_ok(request.remote_addr):
+        if not _rate_limit_ok(request.remote_addr):
             return json_error("Too many requests", status=429)
 
         hours, limit, contains, contains_trimmed, level, pre_hours, pre_limit = (
@@ -103,13 +130,13 @@ def api_logs() -> Response | tuple[Any, int]:
 
         # Read raw lines for the main service; include update unit if running
         units = ["inkypi.service"]
-        update_unit = _mod._UPDATE_STATE.get("unit")
+        update_unit = updates._UPDATE_STATE.get("unit")
         if isinstance(update_unit, str) and update_unit:
             units.append(update_unit)
         if len(units) == 1:
-            lines = _mod._read_log_lines(hours)
+            lines = logs._read_log_lines(hours)
         else:
-            lines = _mod._read_units_log_lines(hours, units)
+            lines = logs._read_units_log_lines(hours, units)
 
         lines = _filter_log_lines(lines, contains, level)
 
@@ -121,7 +148,7 @@ def api_logs() -> Response | tuple[Any, int]:
         # Response size guardrail
         joined = "\n".join(lines)
         while (
-            len(joined.encode("utf-8", errors="ignore")) > _mod.MAX_RESPONSE_BYTES
+            len(joined.encode("utf-8", errors="ignore")) > MAX_RESPONSE_BYTES
             and len(lines) > 100
         ):
             truncated = True
@@ -143,5 +170,5 @@ def api_logs() -> Response | tuple[Any, int]:
             }
         )
     except Exception:
-        _mod.logger.exception("/api/logs error")
+        logger.exception("/api/logs error")
         return json_error("An error occurred while reading logs", status=500)

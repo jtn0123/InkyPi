@@ -218,10 +218,10 @@ def test_log_tail_respects_100_line_cap(
     client: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """log_tail_100 is capped to the most recent 100 entries, even if more exist."""
-    import blueprints.settings as settings_mod
+    from services import logs
 
     huge = [f"line-{i}" for i in range(500)]
-    monkeypatch.setattr(settings_mod, "_read_log_lines", lambda hours: huge)
+    monkeypatch.setattr(logs, "_read_log_lines", lambda hours: huge)
 
     resp = client.get("/api/diagnostics")
     data = resp.get_json()
@@ -237,12 +237,12 @@ def test_log_tail_handles_reader_error(
     client: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """A failing log reader degrades to an empty list, not a 500."""
-    import blueprints.settings as settings_mod
+    from services import logs
 
     def boom(hours: Any) -> None:  # signature match
         raise RuntimeError("journalctl unavailable")
 
-    monkeypatch.setattr(settings_mod, "_read_log_lines", boom)
+    monkeypatch.setattr(logs, "_read_log_lines", boom)
     resp = client.get("/api/diagnostics")
     assert resp.status_code == 200
     data = resp.get_json()

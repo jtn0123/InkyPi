@@ -7,13 +7,13 @@ from flask.testing import FlaskClient
 def test_settings_update_systemd_and_fallback(
     client: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from blueprints import settings as settings_mod
+    from services import updates
 
     # Ensure clean state
-    settings_mod._set_update_state(False, None)
+    updates._set_update_state(False, None)
 
     # Make systemd available and then force systemd-run failure to trigger fallback
-    monkeypatch.setattr(settings_mod, "_systemd_available", lambda: True, raising=True)
+    monkeypatch.setattr(updates, "_systemd_available", lambda: True, raising=True)
 
     called = {"systemd": False, "thread": False}
 
@@ -24,13 +24,13 @@ def test_settings_update_systemd_and_fallback(
     def fake_thread(script_path: Any, target_tag: Any = None) -> None:
         called["thread"] = True
         # Do not actually sleep inside the worker; immediately clear running state
-        settings_mod._set_update_state(False, None)
+        updates._set_update_state(False, None)
 
     monkeypatch.setattr(
-        settings_mod, "_start_update_via_systemd", fake_systemd, raising=True
+        updates, "_start_update_via_systemd", fake_systemd, raising=True
     )
     monkeypatch.setattr(
-        settings_mod, "_start_update_fallback_thread", fake_thread, raising=True
+        updates, "_start_update_fallback_thread", fake_thread, raising=True
     )
 
     # Start update
@@ -52,21 +52,21 @@ def test_settings_update_systemd_and_fallback(
 def test_settings_update_duplicate_returns_409(
     client: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from blueprints import settings as settings_mod
+    from services import updates
 
     # Ensure clean state
-    settings_mod._set_update_state(False, None)
+    updates._set_update_state(False, None)
 
     # Force non-systemd path to use thread runner
-    monkeypatch.setattr(settings_mod, "_systemd_available", lambda: False, raising=True)
+    monkeypatch.setattr(updates, "_systemd_available", lambda: False, raising=True)
 
     # Make fallback thread just mark running and keep it until we check 409
     def fake_thread(script_path: Any, target_tag: Any = None) -> None:
         # Mark running and do not clear
-        settings_mod._set_update_state(True, None)
+        updates._set_update_state(True, None)
 
     monkeypatch.setattr(
-        settings_mod, "_start_update_fallback_thread", fake_thread, raising=True
+        updates, "_start_update_fallback_thread", fake_thread, raising=True
     )
 
     r1 = client.post("/settings/update")

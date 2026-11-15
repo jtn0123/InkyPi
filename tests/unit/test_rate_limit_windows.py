@@ -263,8 +263,8 @@ def test_module_level_limiters_are_reset() -> None:
     import blueprints.client_log as client_log
     import blueprints.csp_report as csp_report
     import blueprints.main as main
-    import blueprints.settings as settings
     from app_setup import security_middleware
+    from blueprints.settings import _logs, _system
     from utils.rate_limit import _LIMITERS, reset_all_limiters
 
     limiters = [
@@ -272,8 +272,8 @@ def test_module_level_limiters_are_reset() -> None:
         client_log._rate_limiter,
         csp_report._csp_report_limiter,
         main._display_next_limiter,
-        settings._logs_limiter,
-        settings._shutdown_limiter,
+        _logs._logs_limiter,
+        _system._shutdown_limiter,
         security_middleware._mutation_limiter,
     ]
     for limiter in limiters:

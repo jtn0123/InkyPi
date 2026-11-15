@@ -56,9 +56,9 @@ class TestDownloadLogsHeaders:
         self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """download_logs must return attachment with a properly quoted filename."""
-        import blueprints.settings as mod
+        from services import logs
 
-        monkeypatch.setattr(mod, "JOURNAL_AVAILABLE", False)
+        monkeypatch.setattr(logs, "JOURNAL_AVAILABLE", False)
         resp = client.get("/download-logs")
         assert resp.status_code == 200
         cd = resp.headers.get("Content-Disposition", "")
@@ -68,9 +68,9 @@ class TestDownloadLogsHeaders:
         self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """download_logs filename must match inkypi_YYYYMMDD-HHMMSS.log."""
-        import blueprints.settings as mod
+        from services import logs
 
-        monkeypatch.setattr(mod, "JOURNAL_AVAILABLE", False)
+        monkeypatch.setattr(logs, "JOURNAL_AVAILABLE", False)
         resp = client.get("/download-logs")
         assert resp.status_code == 200
         cd = resp.headers.get("Content-Disposition", "")
@@ -82,9 +82,9 @@ class TestDownloadLogsHeaders:
         self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """Filename in Content-Disposition must contain only safe characters."""
-        import blueprints.settings as mod
+        from services import logs
 
-        monkeypatch.setattr(mod, "JOURNAL_AVAILABLE", False)
+        monkeypatch.setattr(logs, "JOURNAL_AVAILABLE", False)
         resp = client.get("/download-logs")
         assert resp.status_code == 200
         cd = resp.headers.get("Content-Disposition", "")
@@ -99,9 +99,9 @@ class TestDownloadLogsHeaders:
         self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """download_logs response must include X-Content-Type-Options: nosniff."""
-        import blueprints.settings as mod
+        from services import logs
 
-        monkeypatch.setattr(mod, "JOURNAL_AVAILABLE", False)
+        monkeypatch.setattr(logs, "JOURNAL_AVAILABLE", False)
         resp = client.get("/download-logs")
         assert resp.status_code == 200
         assert resp.headers.get("X-Content-Type-Options") == "nosniff"

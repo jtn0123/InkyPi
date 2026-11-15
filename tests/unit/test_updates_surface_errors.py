@@ -28,9 +28,9 @@ class TestUpdateStatusLastFailure:
     def test_update_status_includes_last_failure_when_file_present(
         self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
     ) -> None:
-        import blueprints.settings as mod
+        from services import updates
 
-        mod._set_update_state(False, None)
+        updates._set_update_state(False, None)
         failure_payload = {
             "timestamp": "2026-04-14T23:00:00Z",
             "exit_code": 97,
@@ -50,9 +50,9 @@ class TestUpdateStatusLastFailure:
     def test_update_status_last_failure_null_when_missing(
         self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
     ) -> None:
-        import blueprints.settings as mod
+        from services import updates
 
-        mod._set_update_state(False, None)
+        updates._set_update_state(False, None)
         # tmp_path exists but contains no .last-update-failure file
         monkeypatch.setenv("INKYPI_LOCKFILE_DIR", str(tmp_path))
 
@@ -66,9 +66,9 @@ class TestUpdateStatusLastFailure:
         self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
     ) -> None:
         """Malformed JSON must not crash the endpoint."""
-        import blueprints.settings as mod
+        from services import updates
 
-        mod._set_update_state(False, None)
+        updates._set_update_state(False, None)
         (tmp_path / ".last-update-failure").write_text(
             "{ this is not json",
             encoding="utf-8",
@@ -85,9 +85,9 @@ class TestUpdateStatusLastFailure:
         self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
     ) -> None:
         """A JSON array/scalar at the top level is still treated as parse_error."""
-        import blueprints.settings as mod
+        from services import updates
 
-        mod._set_update_state(False, None)
+        updates._set_update_state(False, None)
         (tmp_path / ".last-update-failure").write_text("[1, 2, 3]", encoding="utf-8")
         monkeypatch.setenv("INKYPI_LOCKFILE_DIR", str(tmp_path))
 
@@ -109,18 +109,18 @@ class TestSynthesizeFailureFromJournal:
     ) -> Any:
         import subprocess as real_subprocess
 
-        import blueprints.settings as mod
+        from services import updates
 
         # Mark an update as running with a known unit so the auto-clear
         # path is reached.
-        mod._UPDATE_STATE["running"] = True
-        mod._UPDATE_STATE["unit"] = "inkypi-update-1234.service"
-        mod._UPDATE_STATE["started_at"] = 1_000_000.0
+        updates._UPDATE_STATE["running"] = True
+        updates._UPDATE_STATE["unit"] = "inkypi-update-1234.service"
+        updates._UPDATE_STATE["started_at"] = 1_000_000.0
 
         # Isolate lockfile dir so the real ``.last-update-failure`` (if any)
         # on the developer box doesn't leak in.
         monkeypatch.setenv("INKYPI_LOCKFILE_DIR", str(tmp_path))
-        monkeypatch.setattr(mod, "_systemd_available", lambda: True)
+        monkeypatch.setattr(updates, "_systemd_available", lambda: True)
 
         journal_output = (
             "Apr 20 12:00:00 host do_update.sh[1234]: error: Your local "
@@ -163,7 +163,7 @@ class TestSynthesizeFailureFromJournal:
             assert "main.css" in lf.get("recent_journal_lines", "")
             assert lf.get("unit") == "inkypi-update-1234.service"
         finally:
-            mod._set_update_state(False, None)
+            updates._set_update_state(False, None)
 
     def test_does_not_synthesize_when_failure_file_already_exists(
         self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
@@ -172,7 +172,7 @@ class TestSynthesizeFailureFromJournal:
         and we must not overwrite it with the journal-synthesized one."""
         import subprocess as real_subprocess
 
-        import blueprints.settings as mod
+        from services import updates
 
         real_failure = {
             "timestamp": "2026-04-20T00:00:00Z",
@@ -185,10 +185,10 @@ class TestSynthesizeFailureFromJournal:
         )
         monkeypatch.setenv("INKYPI_LOCKFILE_DIR", str(tmp_path))
 
-        mod._UPDATE_STATE["running"] = True
-        mod._UPDATE_STATE["unit"] = "inkypi-update-5678.service"
-        mod._UPDATE_STATE["started_at"] = 1_000_000.0
-        monkeypatch.setattr(mod, "_systemd_available", lambda: True)
+        updates._UPDATE_STATE["running"] = True
+        updates._UPDATE_STATE["unit"] = "inkypi-update-5678.service"
+        updates._UPDATE_STATE["started_at"] = 1_000_000.0
+        monkeypatch.setattr(updates, "_systemd_available", lambda: True)
 
         def fake_run(cmd: Any, *args: Any, **kwargs: Any) -> Any:
             if cmd[:2] == ["systemctl", "is-active"]:
@@ -214,21 +214,21 @@ class TestSynthesizeFailureFromJournal:
             assert data["last_failure"] == real_failure
             assert "synthesized" not in data["last_failure"]
         finally:
-            mod._set_update_state(False, None)
+            updates._set_update_state(False, None)
 
 
 class TestStartUpdateRejectsEmptyTargetVersion:
     """POST /settings/update validates ``target_version`` explicitly."""
 
     def _install_mocks(self, monkeypatch: pytest.MonkeyPatch) -> Any:
-        import blueprints.settings as mod
+        from services import updates
 
-        monkeypatch.setattr(mod, "_systemd_available", lambda: False)
-        monkeypatch.setattr(mod, "_get_update_script_path", lambda: None)
+        monkeypatch.setattr(updates, "_systemd_available", lambda: False)
+        monkeypatch.setattr(updates, "_get_update_script_path", lambda: None)
         fallback_mock = MagicMock()
-        monkeypatch.setattr(mod, "_start_update_fallback_thread", fallback_mock)
-        mod._set_update_state(False, None)
-        return mod, fallback_mock
+        monkeypatch.setattr(updates, "_start_update_fallback_thread", fallback_mock)
+        updates._set_update_state(False, None)
+        return updates, fallback_mock
 
     def test_update_endpoint_rejects_null_target_version_with_validation_error(
         self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
@@ -371,14 +371,14 @@ class TestStartUpdateReapsStaleRunningState:
     """
 
     def _install_mocks(self, monkeypatch: pytest.MonkeyPatch) -> Any:
-        import blueprints.settings as mod
+        from services import updates
 
-        monkeypatch.setattr(mod, "_systemd_available", lambda: False)
-        monkeypatch.setattr(mod, "_get_update_script_path", lambda: None)
+        monkeypatch.setattr(updates, "_systemd_available", lambda: False)
+        monkeypatch.setattr(updates, "_get_update_script_path", lambda: None)
         fallback_mock = MagicMock()
-        monkeypatch.setattr(mod, "_start_update_fallback_thread", fallback_mock)
-        mod._set_update_state(False, None)
-        return mod, fallback_mock
+        monkeypatch.setattr(updates, "_start_update_fallback_thread", fallback_mock)
+        updates._set_update_state(False, None)
+        return updates, fallback_mock
 
     def test_post_reaps_timed_out_running_state(
         self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch

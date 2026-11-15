@@ -64,17 +64,17 @@ def test_start_update_endpoint(
     thread and then clears the running flag, which could land in a later
     test. The state dict is fresh so no earlier test can leave it running.
     """
-    import blueprints.settings as settings_mod
+    from services import updates
 
     started: list[tuple[str | None, str | None]] = []
     monkeypatch.setattr(
-        settings_mod,
+        updates,
         "_UPDATE_STATE",
         {"running": False, "unit": None, "started_at": None, "last_unit": None},
     )
-    monkeypatch.setattr(settings_mod, "_systemd_available", lambda: False)
+    monkeypatch.setattr(updates, "_systemd_available", lambda: False)
     monkeypatch.setattr(
-        settings_mod,
+        updates,
         "_start_update_fallback_thread",
         lambda script_path, target_tag=None: started.append((script_path, target_tag)),
     )
@@ -86,7 +86,7 @@ def test_start_update_endpoint(
     assert data["running"] is True
     assert len(started) == 1
     assert started[0][1] is None
-    assert settings_mod._UPDATE_STATE["running"] is True
+    assert updates._UPDATE_STATE["running"] is True
 
 
 def test_update_status_endpoint(client: FlaskClient) -> None:

@@ -95,9 +95,9 @@ def test_shutdown_refuses_a_second_request_while_the_first_runs(
 ) -> None:
     import subprocess
 
-    import blueprints.settings as settings_mod
+    from blueprints.settings import _system
 
-    settings_mod._shutdown_limiter.reset()
+    _system._shutdown_limiter.reset()
     second_request: list[int] = []
 
     def slow_shutdown(cmd: Any, check: bool = True) -> None:

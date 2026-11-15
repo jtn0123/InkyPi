@@ -6,8 +6,9 @@ import time
 from flask import Response, current_app, jsonify, request
 from werkzeug.exceptions import BadRequest
 
-import blueprints.settings as _mod
+from blueprints.settings import logger, settings_bp
 from blueprints.settings._update_status import read_last_update_failure
+from services import updates, version_check
 from utils.backend_errors import (
     ClientInputError,
     ConflictRouteError,
@@ -47,12 +48,12 @@ def _read_prev_version() -> str | None:
             raw = fh.read().strip()
     except OSError:
         return None
-    if not raw or not _mod._TAG_RE.fullmatch(raw):
+    if not raw or not updates._TAG_RE.fullmatch(raw):
         return None
     return raw
 
 
-@_mod.settings_bp.route("/settings/update", methods=["POST"])
+@settings_bp.route("/settings/update", methods=["POST"])
 def start_update() -> JsonResponse | Response:
     """Trigger InkyPi update via systemd-run when available, with dev fallback.
 
@@ -62,7 +63,7 @@ def start_update() -> JsonResponse | Response:
     """
     with route_error_boundary(
         "start update",
-        logger=_mod.logger,
+        logger=logger,
         hint="Check update script availability and update process startup.",
     ):
         # JTN-K3: If a prior update exited before the lockfile/trap machinery
@@ -103,7 +104,7 @@ def start_update() -> JsonResponse | Response:
                     field="target_version",
                 )
             target_tag = raw.strip()
-            if not _mod._TAG_RE.fullmatch(target_tag):
+            if not updates._TAG_RE.fullmatch(target_tag):
                 raise ClientInputError(
                     "Invalid target version format",
                     status=400,
@@ -111,8 +112,8 @@ def start_update() -> JsonResponse | Response:
                     field="target_version",
                 )
 
-        script_path = _mod._get_update_script_path()
-        use_systemd = _mod._systemd_available()
+        script_path = updates._get_update_script_path()
+        use_systemd = updates._systemd_available()
 
         # Atomically check-and-set the running flag so concurrent requests
         # cannot both pass the guard (TOCTOU fix: the check and the state flip
@@ -126,20 +127,20 @@ def start_update() -> JsonResponse | Response:
         # previous design generated a separate ``int(time.time())`` here and
         # another inside the helper; the two could diverge by a second and the
         # probe would query a non-existent unit, blocking the reaper.
-        with _mod._update_lock:
-            if _mod._UPDATE_STATE.get("running"):
+        with updates._update_lock:
+            if updates._UPDATE_STATE.get("running"):
                 # NOTE: ``running`` and ``unit`` are kept at the top level for
                 # backward compatibility with existing clients and tests.
                 response, _ = json_error("Update already in progress.", status=409)
                 payload = _json_payload(response)
                 payload["running"] = True
-                payload["unit"] = _mod._UPDATE_STATE.get("unit")
+                payload["unit"] = updates._UPDATE_STATE.get("unit")
                 return jsonify(payload), 409
             # Flip the state while still holding the lock (inlined to avoid
             # re-acquiring the non-reentrant lock inside _set_update_state).
-            _mod._UPDATE_STATE["running"] = True
-            _mod._UPDATE_STATE["unit"] = None
-            _mod._UPDATE_STATE["started_at"] = float(time.time())
+            updates._UPDATE_STATE["running"] = True
+            updates._UPDATE_STATE["unit"] = None
+            updates._UPDATE_STATE["started_at"] = float(time.time())
 
         # Start the actual update process outside the lock (I/O-heavy, must not
         # block other threads that only need a brief lock).
@@ -152,27 +153,27 @@ def start_update() -> JsonResponse | Response:
                 # the real unit name it passed to systemd-run so we can record
                 # the same value in ``_UPDATE_STATE["unit"]`` without
                 # regenerating ``int(time.time())`` out of phase.
-                real_unit = _mod._start_update_via_systemd(target_tag=target_tag)
+                real_unit = updates._start_update_via_systemd(target_tag=target_tag)
                 # Defensive: the contract is ``-> str`` but tests (and earlier
                 # callers) may mock this as returning None / MagicMock.  Only
                 # record the value when it's a real ``.service`` string so the
                 # reaper probe queries a valid systemd unit.
                 if isinstance(real_unit, str):
-                    with _mod._update_lock:
-                        _mod._UPDATE_STATE["unit"] = real_unit
+                    with updates._update_lock:
+                        updates._UPDATE_STATE["unit"] = real_unit
             except Exception:
                 # If systemd-run fails unexpectedly, fall back to thread runner
-                _mod.logger.exception(
-                    "systemd-run failed; falling back to thread runner"
+                logger.exception("systemd-run failed; falling back to thread runner")
+                updates._start_update_fallback_thread(
+                    script_path, target_tag=target_tag
                 )
-                _mod._start_update_fallback_thread(script_path, target_tag=target_tag)
         else:
-            _mod._start_update_fallback_thread(script_path, target_tag=target_tag)
+            updates._start_update_fallback_thread(script_path, target_tag=target_tag)
 
         return json_success(
             message="Update started. Watch the Logs panel for progress.",
             running=True,
-            unit=_mod._UPDATE_STATE.get("unit"),
+            unit=updates._UPDATE_STATE.get("unit"),
         )
 
 
@@ -223,9 +224,7 @@ def _synthesize_failure_from_journal(unit: str) -> dict[str, object] | None:
             timeout=5,
         )
     except Exception:
-        _mod.logger.debug(
-            "Failed to synthesize last_failure from journalctl", exc_info=True
-        )
+        logger.debug("Failed to synthesize last_failure from journalctl", exc_info=True)
         return None
     journal_tail = (journal_result.stdout or "").strip()
     if not journal_tail:
@@ -251,21 +250,21 @@ def _compare_and_clear_update_state(unit: object, started_at: object) -> bool:
     Returns True if the state was cleared; False if a concurrent POST
     replaced the snapshot and the reaper must leave it alone.
     """
-    with _mod._update_lock:
+    with updates._update_lock:
         if (
-            _mod._UPDATE_STATE.get("running")
-            and _mod._UPDATE_STATE.get("unit") == unit
-            and _mod._UPDATE_STATE.get("started_at") == started_at
+            updates._UPDATE_STATE.get("running")
+            and updates._UPDATE_STATE.get("unit") == unit
+            and updates._UPDATE_STATE.get("started_at") == started_at
         ):
             # Preserve the last_unit breadcrumb when unit is None (timeout
             # path with no systemd unit name on file) — matches
             # ``_set_update_state(False, None)`` which also leaves last_unit
             # alone so the UI can still surface the previous run's label.
             if unit is not None:
-                _mod._UPDATE_STATE["last_unit"] = unit
-            _mod._UPDATE_STATE["running"] = False
-            _mod._UPDATE_STATE["unit"] = None
-            _mod._UPDATE_STATE["started_at"] = None
+                updates._UPDATE_STATE["last_unit"] = unit
+            updates._UPDATE_STATE["running"] = False
+            updates._UPDATE_STATE["unit"] = None
+            updates._UPDATE_STATE["started_at"] = None
             return True
         return False
 
@@ -290,16 +289,16 @@ def _auto_clear_stale_update_state() -> tuple[str | None, bool]:
     between A's probe and A's clear, then A's clear erases B's freshly-set
     running flag and the guard lets a third request start a second update.
     """
-    if not _mod._UPDATE_STATE.get("running"):
+    if not updates._UPDATE_STATE.get("running"):
         return None, False
 
-    unit = _mod._UPDATE_STATE.get("unit")
-    started_at = _mod._UPDATE_STATE.get("started_at")
+    unit = updates._UPDATE_STATE.get("unit")
+    started_at = updates._UPDATE_STATE.get("started_at")
     failed_name: str | None = None
     unit_failed = False
 
     cleared = False
-    if isinstance(unit, str) and unit and _mod._systemd_available():
+    if isinstance(unit, str) and unit and updates._systemd_available():
         probe_cleared, unit_failed = _probe_finished_unit(unit)
         if probe_cleared:
             cleared = _compare_and_clear_update_state(unit, started_at)
@@ -311,25 +310,25 @@ def _auto_clear_stale_update_state() -> tuple[str | None, bool]:
     if (
         not cleared
         and isinstance(started_at, (int, float, str))
-        and (time.time() - float(started_at)) > _mod._UPDATE_TIMEOUT_SECONDS
+        and (time.time() - float(started_at)) > updates._UPDATE_TIMEOUT_SECONDS
     ):
         _compare_and_clear_update_state(unit, started_at)
 
     return failed_name, unit_failed
 
 
-@_mod.settings_bp.route("/settings/update_status", methods=["GET"])
+@settings_bp.route("/settings/update_status", methods=["GET"])
 def update_status() -> Response:
     with route_error_boundary(
         "update status",
-        logger=_mod.logger,
+        logger=logger,
         hint="Check systemd status access and last-update metadata files.",
     ):
         failed_unit_name, _unit_failed = _auto_clear_stale_update_state()
 
-        running = bool(_mod._UPDATE_STATE.get("running"))
-        unit = _mod._UPDATE_STATE.get("unit")
-        started_at = _mod._UPDATE_STATE.get("started_at")
+        running = bool(updates._UPDATE_STATE.get("running"))
+        unit = updates._UPDATE_STATE.get("unit")
+        started_at = updates._UPDATE_STATE.get("started_at")
 
         # JTN-710: surface the last update failure (written by the EXIT trap
         # in install/update.sh) so the UI can show *why* an update failed
@@ -362,7 +361,7 @@ def update_status() -> Response:
         )
 
 
-@_mod.settings_bp.route("/settings/update/rollback", methods=["POST"])
+@settings_bp.route("/settings/update/rollback", methods=["POST"])
 def start_rollback() -> JsonResponse | Response:
     """Trigger a rollback to the tag recorded in ``/var/lib/inkypi/prev_version``.
 
@@ -385,7 +384,7 @@ def start_rollback() -> JsonResponse | Response:
     try:
         with route_error_boundary(
             "start rollback",
-            logger=_mod.logger,
+            logger=logger,
             hint="Check rollback prerequisites and update runner availability.",
         ):
             # 1. Require a recorded last-update-failure.  Without one, a rollback
@@ -407,42 +406,42 @@ def start_rollback() -> JsonResponse | Response:
                     code="no_prev_version",
                 )
 
-            use_systemd = _mod._systemd_available()
+            use_systemd = updates._systemd_available()
 
             # 3. TOCTOU-safe check-and-set — mirror start_update's pattern so two
             #    concurrent rollback clicks can't both pass the guard.  ``unit``
             #    is set to None inside the lock and overwritten below with the
             #    actual value returned by ``_start_rollback_via_systemd`` (see
             #    start_update for the rationale).
-            with _mod._update_lock:
-                if _mod._UPDATE_STATE.get("running"):
+            with updates._update_lock:
+                if updates._UPDATE_STATE.get("running"):
                     response, _ = json_error(
                         "Update or rollback already in progress.", status=409
                     )
                     payload = _json_payload(response)
                     payload["running"] = True
-                    payload["unit"] = _mod._UPDATE_STATE.get("unit")
+                    payload["unit"] = updates._UPDATE_STATE.get("unit")
                     return jsonify(payload), 409
-                _mod._UPDATE_STATE["running"] = True
-                _mod._UPDATE_STATE["unit"] = None
-                _mod._UPDATE_STATE["started_at"] = float(time.time())
+                updates._UPDATE_STATE["running"] = True
+                updates._UPDATE_STATE["unit"] = None
+                updates._UPDATE_STATE["started_at"] = float(time.time())
 
             if use_systemd:
                 try:
-                    real_unit = _mod._start_rollback_via_systemd()
+                    real_unit = updates._start_rollback_via_systemd()
                     if isinstance(real_unit, str):
-                        with _mod._update_lock:
-                            _mod._UPDATE_STATE["unit"] = real_unit
+                        with updates._update_lock:
+                            updates._UPDATE_STATE["unit"] = real_unit
                 except Exception:
-                    _mod.logger.exception(
+                    logger.exception(
                         "systemd-run failed for rollback; clearing running state"
                     )
-                    _mod._set_update_state(False, None)
+                    updates._set_update_state(False, None)
                     raise
             else:
                 # Dev / macOS path: reuse the simulated update runner so the UI
                 # still sees log output.  Production Pi always has systemd.
-                _mod._start_update_fallback_thread(None, target_tag=prev_version)
+                updates._start_update_fallback_thread(None, target_tag=prev_version)
 
             # JTN-708: 202 Accepted lets clients/tests distinguish "rollback
             # kicked off" from a synchronous reply; the UI polls
@@ -454,15 +453,15 @@ def start_rollback() -> JsonResponse | Response:
                 ),
                 status=202,
                 running=True,
-                unit=_mod._UPDATE_STATE.get("unit"),
+                unit=updates._UPDATE_STATE.get("unit"),
                 target_version=prev_version,
             )
     except Exception:
-        _mod._set_update_state(False, None)
+        updates._set_update_state(False, None)
         raise
 
 
-@_mod.settings_bp.route("/api/version", methods=["GET"])
+@settings_bp.route("/api/version", methods=["GET"])
 def api_version() -> Response:
     """Return current and latest version info.
 
@@ -473,23 +472,23 @@ def api_version() -> Response:
     """
     with route_error_boundary(
         "version check",
-        logger=_mod.logger,
+        logger=logger,
         hint="Check release metadata retrieval and semver parsing.",
     ):
         force_refresh = request.args.get("force", "").lower() in ("1", "true", "yes")
         current = current_app.config.get("APP_VERSION", "unknown")
-        latest = _mod._check_latest_version(force_refresh=force_refresh)
+        latest = version_check._check_latest_version(force_refresh=force_refresh)
         update_available = False
         if latest and current != "unknown":
-            update_available = _mod._semver_gt(latest, current)
-        check_error = _mod._VERSION_CACHE.get("last_error")
+            update_available = version_check._semver_gt(latest, current)
+        check_error = version_check._VERSION_CACHE.get("last_error")
         return jsonify(
             {
                 "current": current,
                 "latest": latest,
                 "update_available": update_available,
-                "update_running": bool(_mod._UPDATE_STATE.get("running")),
-                "release_notes": _mod._VERSION_CACHE.get("release_notes"),
+                "update_running": bool(updates._UPDATE_STATE.get("running")),
+                "release_notes": version_check._VERSION_CACHE.get("release_notes"),
                 "check_succeeded": latest is not None,
                 "check_error": check_error if latest is None else None,
             }

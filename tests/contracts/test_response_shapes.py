@@ -417,13 +417,13 @@ def test_update_device_cycle_shape(client: FlaskClient) -> None:
 def test_update_control_shapes(
     client: FlaskClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    import blueprints.settings as mod
     from blueprints.settings import _updates as updates_mod
+    from services import updates
 
-    monkeypatch.setattr(mod, "_systemd_available", lambda: False)
-    monkeypatch.setattr(mod, "_get_update_script_path", lambda: None)
+    monkeypatch.setattr(updates, "_systemd_available", lambda: False)
+    monkeypatch.setattr(updates, "_get_update_script_path", lambda: None)
     monkeypatch.setattr(
-        mod,
+        updates,
         "_start_update_fallback_thread",
         lambda script_path, target_tag=None: None,
     )
@@ -434,7 +434,7 @@ def test_update_control_shapes(
     )
     monkeypatch.setattr(updates_mod, "_read_prev_version", lambda: "v1.2.3")
     monkeypatch.setenv("INKYPI_LOCKFILE_DIR", str(tmp_path))
-    mod._set_update_state(False, None)
+    updates._set_update_state(False, None)
 
     try:
         body = _request_json(client, "post", "/settings/update")
@@ -442,7 +442,7 @@ def test_update_control_shapes(
         assert body.get("success") is True
         assert body.get("running") is True
 
-        mod._set_update_state(False, None)
+        updates._set_update_state(False, None)
         body = _request_json(
             client,
             "post",
@@ -453,7 +453,7 @@ def test_update_control_shapes(
         assert body.get("success") is True
         assert body.get("running") is True
     finally:
-        mod._set_update_state(False, None)
+        updates._set_update_state(False, None)
 
 
 def test_delete_api_key_shape(client: FlaskClient) -> None:

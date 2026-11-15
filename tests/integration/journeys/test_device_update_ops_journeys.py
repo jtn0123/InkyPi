@@ -29,16 +29,16 @@ _STUBBED_LATEST_TAG = "99.0.0"
 @pytest.fixture
 def stable_version_check(monkeypatch: pytest.MonkeyPatch) -> None:
     """Force /api/version to stay local/deterministic during settings journeys."""
-    import blueprints.settings as settings_mod
+    from services import version_check
 
-    settings_mod._VERSION_CACHE["latest"] = None
-    settings_mod._VERSION_CACHE["checked_at"] = 0.0
-    settings_mod._VERSION_CACHE["release_notes"] = None
-    settings_mod._VERSION_CACHE["last_error"] = None
+    version_check._VERSION_CACHE["latest"] = None
+    version_check._VERSION_CACHE["checked_at"] = 0.0
+    version_check._VERSION_CACHE["release_notes"] = None
+    version_check._VERSION_CACHE["last_error"] = None
     # Accept the ``force_refresh`` kwarg the real implementation added so the
     # "Check for updates" button's ?force=1 path works without 500ing.
     monkeypatch.setattr(
-        settings_mod,
+        version_check,
         "_check_latest_version",
         lambda force_refresh=False: _STUBBED_LATEST_TAG,
         raising=True,
@@ -96,18 +96,17 @@ def test_jtn_728_reboot_shutdown_journey(
     stable_version_check: Any,
 ) -> Any:
     """JTN-728: Reboot/shutdown controls open confirms and hit /shutdown."""
-    import blueprints.settings as settings_mod
     from blueprints.settings import _system as system_mod
 
     # Keep the test focused on command dispatch, not cooldown timing.
     monkeypatch.setattr(
-        settings_mod._shutdown_limiter, "acquire", lambda: (True, 0.0), raising=True
+        system_mod._shutdown_limiter, "acquire", lambda: (True, 0.0), raising=True
     )
     monkeypatch.setattr(
-        settings_mod._shutdown_limiter, "record", lambda: None, raising=True
+        system_mod._shutdown_limiter, "record", lambda: None, raising=True
     )
     monkeypatch.setattr(
-        settings_mod._shutdown_limiter, "reset", lambda: None, raising=True
+        system_mod._shutdown_limiter, "reset", lambda: None, raising=True
     )
 
     calls: list[list[str]] = []
@@ -164,7 +163,8 @@ def test_jtn_727_logs_journey(
     stable_version_check: Any,
 ) -> Any:
     """JTN-727: Logs refresh/filter controls keep rendering expected output."""
-    import blueprints.settings as settings_mod
+    from blueprints.settings import _logs
+    from services import logs
 
     counter = {"n": 0}
 
@@ -178,12 +178,8 @@ def test_jtn_727_logs_journey(
             f"Apr 16 00:00:03 [INFO] service-{n}: heartbeat",
         ]
 
-    monkeypatch.setattr(
-        settings_mod, "_rate_limit_ok", lambda _addr: True, raising=True
-    )
-    monkeypatch.setattr(
-        settings_mod, "_read_log_lines", _fake_read_log_lines, raising=True
-    )
+    monkeypatch.setattr(_logs, "_rate_limit_ok", lambda _addr: True, raising=True)
+    monkeypatch.setattr(logs, "_read_log_lines", _fake_read_log_lines, raising=True)
 
     page = browser_page
     collector = _open_settings_page(page, live_server)
@@ -292,7 +288,7 @@ def test_jtn_725_update_failure_recovery_journey(
     stable_version_check: Any,
 ) -> None:
     """JTN-725: Failed-update banner renders and rollback recovery can be started."""
-    import blueprints.settings as settings_mod
+    from services import updates
 
     state_dir = tmp_path / "update_state"
     state_dir.mkdir(parents=True, exist_ok=True)
@@ -316,11 +312,11 @@ def test_jtn_725_update_failure_recovery_journey(
     def _fake_runner(script_path: Any, target_tag: Any = None) -> None:
         rollback_targets.append(target_tag)
         started.set()
-        settings_mod._set_update_state(False, None)
+        updates._set_update_state(False, None)
 
-    monkeypatch.setattr(settings_mod, "_systemd_available", lambda: False, raising=True)
+    monkeypatch.setattr(updates, "_systemd_available", lambda: False, raising=True)
     monkeypatch.setattr(
-        settings_mod, "_start_update_fallback_thread", _fake_runner, raising=True
+        updates, "_start_update_fallback_thread", _fake_runner, raising=True
     )
 
     page = browser_page

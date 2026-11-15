@@ -34,17 +34,17 @@ def test_sliding_window_limiter_prunes_stale_keys() -> None:
 
 def test_rate_limit_ok_adds_timestamp() -> None:
     """_rate_limit_ok records a timestamp for the given address via SlidingWindowLimiter."""
-    import blueprints.settings as settings_mod
+    from blueprints.settings import _logs
 
     addr = "192.0.2.99"
     # Clear any prior state for this key
-    settings_mod._logs_limiter._requests.pop(addr, None)
+    _logs._logs_limiter._requests.pop(addr, None)
 
-    result = settings_mod._rate_limit_ok(addr)
+    result = _logs._rate_limit_ok(addr)
 
     # Should have allowed the request and recorded a timestamp
     assert result is True
-    assert len(settings_mod._logs_limiter._requests.get(addr, [])) >= 1
+    assert len(_logs._logs_limiter._requests.get(addr, [])) >= 1
 
 
 # ---------------------------------------------------------------------------

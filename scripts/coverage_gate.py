@@ -59,6 +59,11 @@ FULL_THRESHOLDS: dict[str, tuple[float, float]] = {
     "utils/boot_self_test.py": (0.92, 0.88),  # 93.4 / 94.4
     "utils/blackout.py": (0.87, 0.50),  # 90.3 / 100 (2 branches)
     "utils/asset_check.py": (0.87, 0.90),  # 88.9 / 92.9
+    # Moved out of blueprints/settings/__init__.py, so blueprints/ no longer
+    # guards them.
+    "services/updates.py": (0.83, 0.76),  # projected 84.6 / 78.4
+    "services/logs.py": (0.94, 0.90),  # projected ~96 / ~100
+    "services/version_check.py": (0.98, 0.90),  # projected 100 / 100
 }
 
 # The preflash subset (coverage-gate artifact, same run).
