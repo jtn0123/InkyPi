@@ -7,7 +7,10 @@ For each page in :data:`PAGES_TO_SWEEP` this test:
    uncaught exceptions and critical HTTP failures are captured.
 2. Enumerates every visible ``<button>``, ``<a>`` and ``[data-*-action]``
    element that *isn't* flagged ``data-test-skip-click="true"``.
-3. Clicks each element and waits briefly (250 ms) for the UI to settle.
+3. Waits until the element has stopped moving (a smooth scroll from the
+   previous click may still be running), clicks it, and waits briefly
+   (250 ms) for the UI to settle. A link that shows no change by then gets
+   up to 3 s more for its navigation to commit.
 4. Asserts that **no** click produced a JS ``pageerror`` or ``console.error``
    and that *something observable changed* — URL, a DOM mutation, a network
    request firing, or a modal opening — so handlers that silently no-op are
@@ -28,6 +31,8 @@ import json
 import os
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
+from urllib.parse import urldefrag, urljoin
 
 import pytest
 from flask import Flask
@@ -161,6 +166,12 @@ _ENUMERATE_JS = """
   const currentPath = window.location.pathname;
   const isVisible = (el) => {
     if (!el.isConnected) return false;
+    // Catches what the checks below miss: content of a closed <details>
+    // (the mobile "Menu" links) keeps a layout box but is not rendered, so
+    // a click at its coordinates lands on whatever is underneath.
+    if (!el.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true })) {
+      return false;
+    }
     const rect = el.getBoundingClientRect();
     if (rect.width < 2 || rect.height < 2) return false;
     const style = window.getComputedStyle(el);
@@ -287,6 +298,37 @@ _SNAPSHOT_JS = """
 """
 
 
+# Resolves once the element's box has stayed put for three animation frames
+# (or after 2 s). The sweep clicks with ``force=True``, which skips
+# Playwright's own stability check, so without this a click fired while a
+# smooth scroll is still running (e.g. "Show live logs" scrolling to the
+# logs panel) lands on whatever has moved under the old coordinates.
+_WAIT_STABLE_JS = """
+async (sel) => {
+  const el = document.querySelector(sel);
+  if (!el) return false;
+  const nextFrame = () => new Promise((resolve) => requestAnimationFrame(resolve));
+  const deadline = performance.now() + 2000;
+  let last = null;
+  let steady = 0;
+  while (performance.now() < deadline) {
+    const r = el.getBoundingClientRect();
+    const box = `${r.x},${r.y},${r.width},${r.height},${scrollX},${scrollY}`;
+    steady = box === last ? steady + 1 : 0;
+    if (steady >= 3) return true;
+    last = box;
+    await nextFrame();
+  }
+  return false;
+}
+"""
+
+# Extra time a link gets to commit its navigation when nothing has changed
+# by the end of the settle wait. Loaded CI runners render the next page
+# more slowly than the 250 ms settle allows.
+_NAVIGATION_GRACE_MS = 3000
+
+
 def _install_observer(page: Page) -> None:
     page.evaluate(_INSTALL_OBSERVER_JS)
 
@@ -315,6 +357,17 @@ def _enumerate_candidates(page: Page) -> list[dict]:
     return page.evaluate(_ENUMERATE_JS, list(_SKIP_SELECTORS))
 
 
+def _navigation_target(page_url: str, descriptor: dict[str, Any]) -> str | None:
+    """The URL a link click should load, or None if it shouldn't navigate."""
+    href = descriptor.get("href")
+    if descriptor.get("tag") != "a" or not href or descriptor.get("tolerateNoChange"):
+        return None
+    if href.startswith(("#", "javascript:")):
+        return None
+    target = urldefrag(urljoin(page_url, href)).url
+    return None if target == urldefrag(page_url).url else target
+
+
 def _click_one(page: Page, descriptor: dict) -> tuple[dict, dict]:
     """Click a single candidate and return (before, after) snapshots.
 
@@ -324,8 +377,9 @@ def _click_one(page: Page, descriptor: dict) -> tuple[dict, dict]:
     on visibility grounds. We asserted visibility ourselves during
     enumeration, so this is a safe escape hatch.
     """
-    before = _snapshot(page)
     selector = f"[data-clicksweep-id='{descriptor['id']}']"
+    page.evaluate(_WAIT_STABLE_JS, selector)
+    before = _snapshot(page)
     locator = page.locator(selector).first
     try:
         locator.click(timeout=2000, force=True, no_wait_after=True)
@@ -348,6 +402,19 @@ def _click_one(page: Page, descriptor: dict) -> tuple[dict, dict]:
         pass
     page.wait_for_timeout(_CLICK_SETTLE_MS)
     after = _snapshot(page)
+    target = _navigation_target(before["url"], descriptor)
+    if target and not _observable_change(before, after):
+        try:
+            page.wait_for_url(
+                lambda url: url != before["url"],
+                timeout=_NAVIGATION_GRACE_MS,
+                wait_until="commit",
+            )
+        except Exception:  # still nothing: reported as a silent failure
+            pass
+        else:
+            page.wait_for_load_state("domcontentloaded")
+            after = _snapshot(page)
     return before, after
 
 
@@ -564,6 +631,35 @@ def _run_click_sweep(
     assert (
         not click_errors
     ), f"{sweep.path}: {len(click_errors)} click(s) errored: {click_errors[:5]}"
+
+
+@pytest.fixture(autouse=True)
+def _release_check_up_to_date(
+    flask_app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Answer the GitHub release check locally: "already on the latest".
+
+    The real check made the page depend on GitHub's rate limit. CI runners
+    usually get a 403, but when the check succeeded /settings rendered its
+    up-to-date state, and that was the only state in which the sweep's
+    clicks raced a smooth scroll. Pinning it keeps the sweep deterministic
+    and on the state that exposed the race. Other update states have their
+    own tests (test_settings_updates_dom.py, test_sidebar_update_indicator.py).
+    """
+    import blueprints.settings as settings_mod
+
+    current = str(flask_app.config.get("APP_VERSION", "0.0.0"))
+
+    def _up_to_date(now: float) -> str:
+        cache = settings_mod._VERSION_CACHE
+        cache["latest"] = current
+        cache["checked_at"] = now
+        cache["release_notes"] = None
+        cache["last_error"] = None
+        cache["failed_at"] = 0.0
+        return current
+
+    monkeypatch.setattr(settings_mod, "_fetch_latest_version", _up_to_date)
 
 
 # JTN-702: Each page/viewport combination runs twice — once anonymous
