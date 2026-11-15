@@ -19,42 +19,10 @@ from __future__ import annotations
 import io
 from typing import Any
 
-import pytest
 from PIL import Image
 
 # ---------------------------------------------------------------------------
-# 1. HTTP cache hit lookup
-# ---------------------------------------------------------------------------
-
-
-@pytest.fixture()
-def warm_http_cache() -> Any:
-    """A pre-warmed HTTPCache containing one entry the benchmark can hit."""
-    from utils.http_cache import HTTPCache
-
-    cache = HTTPCache(default_ttl=3600.0, max_size=128, max_entries=128)
-
-    # Build a fake response we can stuff into the cache directly.
-    import requests
-
-    response = requests.Response()
-    response.status_code = 200
-    response._content = b'{"hello": "world"}'
-    response.headers["Content-Type"] = "application/json"
-
-    cache.put("https://example.com/api", response)
-    return cache
-
-
-def test_http_cache_hit_lookup(benchmark: Any, warm_http_cache: Any) -> None:
-    """Measure the cost of a single cache hit (the hot path for cached plugins)."""
-    result = benchmark(warm_http_cache.get, "https://example.com/api")
-    assert result is not None
-    assert result.status_code == 200
-
-
-# ---------------------------------------------------------------------------
-# 2. PIL image resize + convert
+# 1. PIL image resize + convert
 # ---------------------------------------------------------------------------
 
 
@@ -82,7 +50,7 @@ def test_image_resize_and_convert(benchmark: Any) -> Any:
 
 
 # ---------------------------------------------------------------------------
-# 3. PIL image PNG encode
+# 2. PIL image PNG encode
 # ---------------------------------------------------------------------------
 
 
@@ -101,7 +69,7 @@ def test_image_png_encode(benchmark: Any) -> Any:
 
 
 # ---------------------------------------------------------------------------
-# 4. Config read (JSON parse + validate)
+# 3. Config read (JSON parse + validate)
 # ---------------------------------------------------------------------------
 
 
@@ -117,7 +85,7 @@ def test_config_read(benchmark: Any, device_config_dev: Any) -> None:
 
 
 # ---------------------------------------------------------------------------
-# 5. Plugin registry list scan
+# 4. Plugin registry list scan
 # ---------------------------------------------------------------------------
 
 
@@ -130,7 +98,7 @@ def test_plugin_registry_list_scan(benchmark: Any, device_config_dev: Any) -> No
 
 
 # ---------------------------------------------------------------------------
-# 6. Config read — cached (mtime unchanged)   JTN-519
+# 5. Config read — cached (mtime unchanged)   JTN-519
 # ---------------------------------------------------------------------------
 
 

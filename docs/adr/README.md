@@ -11,7 +11,7 @@ When to file a new ADR: when you make a choice that is non-obvious, hard to reve
 | # | Title | Status | Summary |
 |---|-------|--------|---------|
 | [0001](0001-subprocess-plugin-isolation.md) | Subprocess isolation for plugin execution | Accepted | Each plugin runs in a child process so a crash or memory leak cannot bring down the web server. |
-| [0002](0002-http-cache-strategy.md) | Custom in-process HTTP cache with TTL | Accepted | A bespoke TTL+LRU cache in `http_utils.py` reduces external API calls without adding a SQLite or Redis dependency. |
+| [0002](0002-http-cache-strategy.md) | Custom in-process HTTP cache with TTL | Withdrawn | Removed 2026-11-15: renders run in a child process that exits, so the in-memory cache never served a response. |
 | [0003](0003-playlist-scheduling.md) | Playlist scheduling — time windows, priority, and cycle interval | Accepted | Three orthogonal axes (time window, priority, cycle interval) cover the common multi-playlist use case with pure in-memory evaluation. |
 | [0004](0004-json-config-store.md) | JSON file as the sole config and state store | Accepted | A single `device.json` file keeps the deployment dependency-free and human-readable on a Pi. |
 | [0005](0005-waitress-vs-gunicorn.md) | Waitress as the production WSGI server | Accepted | Waitress is single-process/multi-thread, avoiding fork-after-thread hazards that would break the in-process refresh task. |

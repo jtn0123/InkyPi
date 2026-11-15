@@ -40,23 +40,6 @@ def test_env_int_invalid(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 # ---------------------------------------------------------------------------
-# http_cache: ValueError/IndexError on malformed Cache-Control
-# ---------------------------------------------------------------------------
-
-
-def test_cache_control_malformed_max_age() -> None:
-    """_parse_cache_control handles malformed max-age gracefully."""
-    from utils.http_cache import HTTPCache
-
-    cache = HTTPCache()
-    mock_resp = MagicMock()
-    mock_resp.headers = {"Cache-Control": "max-age=not_a_number"}
-    # Should not raise; returns None on parse failure
-    ttl = cache._parse_cache_control(mock_resp)
-    assert ttl is None
-
-
-# ---------------------------------------------------------------------------
 # config.py: OSError on chmod, AttributeError/TypeError on schema validation
 # ---------------------------------------------------------------------------
 

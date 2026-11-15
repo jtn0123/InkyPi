@@ -173,7 +173,7 @@ def test_redirect_to_public_host_is_followed_and_pinned(
             "https://cdn.example.net/b": final,
         }
     )
-    resp: object = safe_http_get("https://public.example.com/a", use_cache=False)
+    resp: object = safe_http_get("https://public.example.com/a")
     assert resp is final
     assert [(c["url"], c["ip"]) for c in router.calls] == [
         ("https://public.example.com/a", PUBLIC_A),
@@ -193,7 +193,7 @@ def test_relative_redirect_resolves_against_current_url(http_get_router: Any) ->
             "https://public.example.com/other?x=1": final,
         }
     )
-    resp: object = safe_http_get("https://public.example.com/dir/a", use_cache=False)
+    resp: object = safe_http_get("https://public.example.com/dir/a")
     assert resp is final
     assert router.calls[-1]["url"] == "https://public.example.com/other?x=1"
 
@@ -207,7 +207,7 @@ def test_too_many_redirects_fails(http_get_router: Any) -> None:
     }
     router = http_get_router(routes)
     with pytest.raises(requests.TooManyRedirects):
-        safe_http_get("https://public.example.com/0", use_cache=False)
+        safe_http_get("https://public.example.com/0")
     assert len(router.calls) == MAX_GUARDED_REDIRECTS + 1
 
 
@@ -216,9 +216,7 @@ def test_allow_redirects_false_returns_redirect_response(http_get_router: Any) -
 
     redirect = _redirect("http://192.168.1.1/")
     http_get_router({"https://public.example.com/a": redirect})
-    resp: object = safe_http_get(
-        "https://public.example.com/a", allow_redirects=False, use_cache=False
-    )
+    resp: object = safe_http_get("https://public.example.com/a", allow_redirects=False)
     assert resp is redirect
 
 
@@ -234,7 +232,6 @@ def test_cross_origin_redirect_drops_credentials(http_get_router: Any) -> None:
     safe_http_get(
         "https://public.example.com/a",
         headers={"Authorization": "Bearer s3cret", "X-Keep": "1"},
-        use_cache=False,
     )
     first, second = router.calls
     assert first["headers"]["Authorization"] == "Bearer s3cret"

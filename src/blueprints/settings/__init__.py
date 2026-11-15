@@ -900,7 +900,6 @@ def _fetch_latest_version(now: float) -> str | None:
             f"https://api.github.com/repos/{_GITHUB_REPO}/releases/latest",
             timeout=5,
             headers={"Accept": "application/vnd.github.v3+json"},
-            use_cache=False,
         )
         resp.raise_for_status()
         data = resp.json()

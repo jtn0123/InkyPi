@@ -25,7 +25,7 @@ The benchmark suite lives in `tests/benchmarks/` and uses [pytest-benchmark](htt
 .venv/bin/python -m pytest tests/benchmarks/ --benchmark-only
 
 # Run a single benchmark by name
-.venv/bin/python -m pytest tests/benchmarks/ --benchmark-only -k test_http_cache_hit_lookup
+.venv/bin/python -m pytest tests/benchmarks/ --benchmark-only -k test_image_png_encode
 ```
 
 ### Output Columns
@@ -122,7 +122,6 @@ You can also profile a script or function directly:
 ```bash
 .venv/bin/python -c "
 import cProfile, pstats, io
-from utils.http_cache import HTTPCache
 pr = cProfile.Profile()
 pr.enable()
 # ... code under test ...

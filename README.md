@@ -182,7 +182,6 @@ This fork is **1,100+ commits** ahead of upstream, transforming InkyPi from a fu
 |---------|---------|
 | Lazy Module Imports | Reduced startup memory footprint |
 | Low-Memory Image Loading | Memory-efficient image ops for preview plugins |
-| HTTP Cache with LRU Eviction | In-memory, bounded cache for `http_get()`; not kept between renders ([details](docs/http_cache.md)) |
 | Async Job Queue | Non-blocking plugin renders |
 | Systemd Hardening | `StartLimitBurst`, `OOMScoreAdjust`, failure service |
 | Multi-threaded Server | Concurrent request handling |

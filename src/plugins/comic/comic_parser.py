@@ -106,7 +106,7 @@ COMIC_LABELS: Mapping[str, str] = {
 
 
 def get_panel(comic_name: str) -> dict[str, str]:
-    response = http_get(COMICS[comic_name]["feed"], timeout=20.0, use_cache=False)
+    response = http_get(COMICS[comic_name]["feed"], timeout=20.0)
     response.raise_for_status()
     feed = feedparser.parse(response.content)
     try:

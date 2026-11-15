@@ -1,8 +1,8 @@
 """Outbound HTTP GET helper with a per-thread pooled session.
 
 :func:`http_get` wraps a thread-local ``requests.Session`` configured with
-retries, default headers, split timeouts from the environment, optional
-latency logging and the response cache in :mod:`utils.http_cache`.
+retries, default headers, split timeouts from the environment and optional
+latency logging.
 
 Re-exported from :mod:`utils.http_utils`, which remains the public import path.
 """
@@ -13,7 +13,7 @@ import logging
 import os
 import threading
 from time import perf_counter
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 
 from utils.env_flags import env_bool
 
@@ -181,30 +181,6 @@ def _resolve_timeout(
     return DEFAULT_TIMEOUT_SECONDS
 
 
-def _try_cache_lookup(url: str, params: dict[str, Any] | None) -> Any:
-    """Return a cached response for *url* + *params*, or ``None``."""
-    try:
-        from utils.http_cache import get_cache
-
-        cache = get_cache()
-        return cache.get(url, params)
-    except Exception:
-        return None
-
-
-def _try_cache_store(
-    url: str, resp: Any, params: dict[str, Any] | None, cache_ttl: float | None
-) -> None:
-    """Silently store *resp* in the HTTP cache."""
-    try:
-        from utils.http_cache import get_cache
-
-        cache = get_cache()
-        cache.put(url, resp, params, ttl=cache_ttl)
-    except Exception:
-        pass
-
-
 def _log_latency_on_error(url: str, t0: float, ex: Exception) -> None:
     """Log a warning about a failed HTTP GET with elapsed time."""
     elapsed_ms = int((perf_counter() - t0) * 1000)
@@ -242,8 +218,6 @@ def http_get(
     timeout: float | tuple[float, float] | None = None,
     stream: bool = False,
     allow_redirects: bool = True,
-    use_cache: bool = True,
-    cache_ttl: float | None = None,
 ) -> requests.Response:
     """Perform a GET using a shared session with retries and sane defaults.
 
@@ -251,7 +225,6 @@ def http_get(
     - Applies a default timeout if none is provided
     - Uses a shared requests.Session configured with HTTPAdapter retries
     - SSL verification is enabled by default (do not disable)
-    - Supports optional HTTP response caching with TTL
 
     Args:
         url: URL to request
@@ -260,22 +233,10 @@ def http_get(
         timeout: Request timeout (seconds or tuple)
         stream: Whether to stream the response
         allow_redirects: Whether to follow redirects
-        use_cache: Whether to use HTTP cache (default: True)
-        cache_ttl: Override cache TTL in seconds (default: from config)
 
     Returns:
-        Response object (may be from cache)
+        Response object
     """
-    # Lazy import: see module docstring (JTN-606).  ``requests`` is only
-    # loaded when an HTTP call is actually made.
-    import requests  # noqa: F811
-
-    # Check cache first (unless streaming or caching disabled)
-    if use_cache and not stream:
-        cached_response = cast(requests.Response, _try_cache_lookup(url, params))
-        if cached_response is not None:
-            return cached_response
-
     session = get_shared_session()
     final_headers = dict(DEFAULT_HEADERS)
     if headers:
@@ -303,9 +264,6 @@ def http_get(
 
     if log_latency:
         _log_latency_on_success(url, resp, t0, stream)
-
-    if use_cache and not stream:
-        _try_cache_store(url, resp, params, cache_ttl)
 
     return resp
 

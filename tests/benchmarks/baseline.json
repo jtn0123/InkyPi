@@ -1,18 +1,6 @@
 {
   "benchmarks": [
     {
-      "name": "test_http_cache_hit_lookup",
-      "group": null,
-      "stats": {
-        "min": 2.6670004444895312e-06,
-        "max": 1.1084001016570255e-05,
-        "mean": 3.073696185326998e-06,
-        "stddev": 1.9828953396683793e-07,
-        "median": 3.041999661945738e-06,
-        "rounds": 12606
-      }
-    },
-    {
       "name": "test_image_resize_and_convert",
       "group": null,
       "stats": {
