@@ -220,7 +220,7 @@ def _trusted_update_dirs() -> tuple[str, ...]:
     repo_install = os.path.abspath(os.path.join(here, "..", "..", "install"))
     dirs = list(_TRUSTED_UPDATE_DIRS) + [repo_install]
     project_dir = os.getenv("PROJECT_DIR")
-    if project_dir and isinstance(project_dir, str) and project_dir.startswith("/"):
+    if project_dir and project_dir.startswith("/"):
         dirs.append(os.path.join(project_dir, "install"))
         # Follow the src→repo symlink production install layout uses.
         src_link = os.path.join(project_dir, "src")
@@ -237,11 +237,11 @@ def _validate_update_script_path(script_path: str) -> str:
     """Resolve and validate an update script path against trusted install roots.
 
     Returns the canonical (realpath-resolved) path on success.  Raises
-    ``ValueError`` if the path is non-string, empty, has a disallowed
+    ``ValueError`` if the path is empty, has a disallowed
     basename, or — after symlink resolution — does not live under one of
     the trusted install directories from ``_trusted_update_dirs``.
     """
-    if not isinstance(script_path, str) or not script_path:
+    if not script_path:
         raise ValueError(f"Invalid update script path: {script_path!r}")
     real = os.path.realpath(script_path)
     # Symlink-safe trusted-root enforcement: ``commonpath`` is the canonical
@@ -270,7 +270,7 @@ def _validate_update_script_path(script_path: str) -> str:
 def _validate_target_tag_arg(target_tag: str | None) -> str | None:
     if target_tag is None:
         return None
-    if not isinstance(target_tag, str) or not target_tag:
+    if not target_tag:
         raise ValueError(f"Invalid target tag format: {target_tag!r}")
 
     version = target_tag[1:] if target_tag.startswith("v") else target_tag
@@ -327,11 +327,7 @@ def _start_update_via_systemd(target_tag: str | None = None) -> str:
     #    shape of an absolute POSIX path.  Anything user-controlled (env var)
     #    falls back to the literal default.
     project_dir = os.getenv("PROJECT_DIR", "/usr/local/inkypi")
-    project_dir_match = (
-        re.fullmatch(r"^/[A-Za-z0-9_./-]{1,255}$", project_dir)
-        if isinstance(project_dir, str)
-        else None
-    )
+    project_dir_match = re.fullmatch(r"^/[A-Za-z0-9_./-]{1,255}$", project_dir)
     if project_dir_match is None or ".." in project_dir.split("/"):
         project_dir = "/usr/local/inkypi"
     else:
@@ -370,7 +366,7 @@ def _validate_rollback_script_path(script_path: str) -> str:
     difference is the allowed basename, so a mis-wired caller cannot exec
     do_update.sh through the rollback path or vice-versa.
     """
-    if not isinstance(script_path, str) or not script_path:
+    if not script_path:
         raise ValueError(f"Invalid rollback script path: {script_path!r}")
     real = os.path.realpath(script_path)
     trusted = _trusted_update_dirs()
@@ -411,10 +407,8 @@ def _start_rollback_via_systemd() -> str:
           path regex before being passed through.
     """
     project_dir = os.getenv("PROJECT_DIR", _DEFAULT_PROJECT_DIR)
-    if (
-        not isinstance(project_dir, str)
-        or not re.fullmatch(r"^/[A-Za-z0-9_./-]{1,255}$", project_dir)
-        or ".." in project_dir.split("/")
+    if not re.fullmatch(r"^/[A-Za-z0-9_./-]{1,255}$", project_dir) or (
+        ".." in project_dir.split("/")
     ):
         project_dir = _DEFAULT_PROJECT_DIR
 

@@ -31,7 +31,7 @@ def test_save_settings_zero_interval_rejected(client: FlaskClient) -> None:
 def test_shutdown_reboot_path(
     client: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    calls = {"cmd": None}
+    calls: dict[str, list[str] | None] = {"cmd": None}
     monkeypatch.setattr("subprocess.run", lambda cmd, check: calls.update(cmd=cmd))
 
     resp = client.post("/shutdown", json={"reboot": True})

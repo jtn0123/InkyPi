@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfoNotFoundError
@@ -469,8 +469,13 @@ class TestOpenMeteoUnitsAndIcons:
     ) -> None:
         from astral import moon
 
-        seen = []
-        monkeypatch.setattr(moon, "phase", lambda d: seen.append(d) or 14.75)
+        seen: list[date] = []
+
+        def fake_phase(day: date) -> float:
+            seen.append(day)
+            return 14.75
+
+        monkeypatch.setattr(moon, "phase", fake_phase)
         weather_plugin.parse_open_meteo_forecast(
             {
                 "time": ["2026-08-15"],

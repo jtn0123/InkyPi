@@ -516,9 +516,7 @@ def create_app(options: RuntimeOptions | None = None) -> Flask:
     # broken install is reported in /api/diagnostics instead of surfacing as a
     # plugin failure. Runs before setup_asset_helpers, which reads one of them.
     app.config["ASSET_CHECK"] = run_asset_check(
-        plugin.get("id", "")
-        for plugin in device_config.get_plugins()
-        if isinstance(plugin, dict)
+        plugin.get("id", "") for plugin in device_config.get_plugins()
     )
     setup_asset_helpers(app)
     init_sri(app)

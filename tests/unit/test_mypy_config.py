@@ -90,3 +90,55 @@ def test_an_unlisted_import_without_types_fails(tmp_path: Path) -> None:
     sample.write_text("import inkypi_no_such_library\n", encoding="utf-8")
 
     assert "[import-not-found]" in _run_mypy(sample)
+
+
+_EXTRA_CHECKS_SAMPLE = """\
+from warnings import deprecated
+
+
+class Thing:
+    pass
+
+
+def redundant(s: str) -> bool:
+    return isinstance(s, str) and bool(s)
+
+
+def truthy(t: Thing) -> int:
+    return 1 if t else 0
+
+
+def maybe_unbound(flag: bool) -> int:
+    if flag:
+        n = 1
+    return n
+
+
+@deprecated("use something else")
+def old() -> None:
+    pass
+
+
+old()
+x: int = "a"  # type: ignore
+"""
+
+
+def test_checks_beyond_strict_are_enabled(tmp_path: Path) -> None:
+    """mypy.ini turns on error codes that ``strict`` leaves off.
+
+    Each has found dead or misleading code in this repo; dropping one from
+    ``enable_error_code`` should fail here rather than pass unnoticed.
+    """
+    sample = tmp_path / "extra_checks_sample.py"
+    sample.write_text(_EXTRA_CHECKS_SAMPLE, encoding="utf-8")
+    output = _run_mypy(sample)
+
+    for code in (
+        "redundant-expr",
+        "truthy-bool",
+        "possibly-undefined",
+        "deprecated",
+        "ignore-without-code",
+    ):
+        assert f"[{code}]" in output, f"[{code}] not reported:\n{output}"

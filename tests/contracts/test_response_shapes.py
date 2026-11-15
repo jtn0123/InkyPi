@@ -321,6 +321,7 @@ def test_job_status_shape(client: FlaskClient) -> None:
     import time
 
     final = None
+    body: Any = {}
     deadline = time.monotonic() + 8.0
     while time.monotonic() < deadline:
         body = _get_json(client, f"/api/job/{job_id}")

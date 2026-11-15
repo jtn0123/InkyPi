@@ -101,14 +101,13 @@ def test_repeated_reads_use_cache(
     import config as config_mod
 
     with patch.object(config_mod.json, "load", side_effect=counting_load):
-        for _ in range(1000):
-            result = cfg.read_config()
+        results = [cfg.read_config() for _ in range(1000)]
 
     assert parse_count["n"] == 0, (
         f"Expected 0 json.load calls (all cache hits) but got {parse_count['n']}. "
         "The mtime cache is not working."
     )
-    assert result["name"] == "CacheTest"
+    assert results[-1]["name"] == "CacheTest"
 
 
 def test_first_read_after_construction_hits_cache(

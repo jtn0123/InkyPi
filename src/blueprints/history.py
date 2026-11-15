@@ -286,7 +286,7 @@ def _resolve_history_path(history_dir: str, filename: str) -> str:
     reject embedded NUL bytes should do so before calling this helper; we
     defensively raise here too since ``os.path`` behaviour on NUL varies.
     """
-    if not isinstance(filename, str) or "\x00" in filename:
+    if "\x00" in filename:
         raise ValueError(_ERR_INVALID_FILENAME)
     # Reject absolute paths up-front — joining them with ``history_dir``
     # silently drops the base on POSIX, which would mask traversal intent.

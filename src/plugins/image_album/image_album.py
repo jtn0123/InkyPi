@@ -55,8 +55,12 @@ class ImmichProvider:
                 f"{self.base_url}/api/albums", headers=self.headers, timeout=10
             )
         r.raise_for_status()
-        albums_raw = cast(list[dict[str, object]], r.json())
-        albums = [a for a in albums_raw if isinstance(a, dict)]
+        albums_raw: object = r.json()
+        albums = (
+            [a for a in albums_raw if isinstance(a, dict)]
+            if isinstance(albums_raw, list)
+            else []
+        )
 
         matching_albums = [a for a in albums if a.get("albumName") == album]
         if not matching_albums:

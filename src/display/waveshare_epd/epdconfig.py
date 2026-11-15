@@ -126,7 +126,14 @@ class RaspberryPi:
             ]
             self.DEV_SPI = None
             for find_dir in find_dirs:
-                val = int(os.popen("getconf LONG_BIT").read())
+                val = int(
+                    subprocess.run(
+                        ["getconf", "LONG_BIT"],
+                        capture_output=True,
+                        text=True,
+                        check=False,
+                    ).stdout
+                )
                 logging.debug("System is %d bit" % val)
                 if val == 64:
                     so_filename = os.path.join(find_dir, "DEV_Config_64.so")

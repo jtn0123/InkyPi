@@ -9,6 +9,7 @@ from PIL import Image
 from utils.image_utils import (
     _DEFAULT_SCREENSHOT_TIMEOUT_S,
     _MAX_SCREENSHOT_TIMEOUT_S,
+    _screenshot_timeout_seconds,
 )
 
 
@@ -150,33 +151,19 @@ def test_resize_image_with_zero_dimension() -> None:
 
 
 def test_screenshot_timeout_default_when_none() -> None:
-    """When timeout_ms is None, the computed timeout should use the default."""
-    timeout_ms = None
-    timeout_seconds = min(
-        (timeout_ms / 1000) if timeout_ms else _DEFAULT_SCREENSHOT_TIMEOUT_S,
-        _MAX_SCREENSHOT_TIMEOUT_S,
-    )
-    assert timeout_seconds == _DEFAULT_SCREENSHOT_TIMEOUT_S
+    """When timeout_ms is None or 0, the default timeout is used."""
+    assert _screenshot_timeout_seconds(None) == _DEFAULT_SCREENSHOT_TIMEOUT_S
+    assert _screenshot_timeout_seconds(0) == _DEFAULT_SCREENSHOT_TIMEOUT_S
 
 
 def test_screenshot_timeout_caps_excessive() -> None:
     """Even if caller passes a huge timeout_ms, it should be capped at max."""
-    timeout_ms = 120_000
-    timeout_seconds = min(
-        (timeout_ms / 1000) if timeout_ms else _DEFAULT_SCREENSHOT_TIMEOUT_S,
-        _MAX_SCREENSHOT_TIMEOUT_S,
-    )
-    assert timeout_seconds == _MAX_SCREENSHOT_TIMEOUT_S
+    assert _screenshot_timeout_seconds(120_000) == _MAX_SCREENSHOT_TIMEOUT_S
 
 
 def test_screenshot_timeout_passes_normal() -> None:
     """A normal timeout_ms (e.g. 40000) should pass through as seconds."""
-    timeout_ms = 40_000
-    timeout_seconds = min(
-        (timeout_ms / 1000) if timeout_ms else _DEFAULT_SCREENSHOT_TIMEOUT_S,
-        _MAX_SCREENSHOT_TIMEOUT_S,
-    )
-    assert timeout_seconds == 40.0
+    assert _screenshot_timeout_seconds(40_000) == 40.0
 
 
 def test_screenshot_timeout_constants_sane() -> None:

@@ -33,7 +33,7 @@ SRC_ABS = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src"))
 
 
 def _make_auth_app(
-    pin: str | None = None, monkeypatch: pytest.MonkeyPatch = None
+    pin: str | None = None, monkeypatch: pytest.MonkeyPatch | None = None
 ) -> Flask:
     """Build a minimal Flask app with auth wired up.
 

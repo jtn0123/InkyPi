@@ -10,6 +10,7 @@ since InkyPi does not run on those platforms.
 import builtins
 import importlib
 import io
+import subprocess
 import sys
 import types
 from typing import Any
@@ -158,6 +159,16 @@ def test_spi_operations_raspberry_pi(monkeypatch: pytest.MonkeyPatch) -> None:
     epdconfig.module_exit(cleanup=False)
 
 
+def _fake_getconf(bits: str) -> Any:
+    """Stand in for ``getconf LONG_BIT`` so the word size doesn't come from the host."""
+
+    def run(cmd: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        assert cmd == ["getconf", "LONG_BIT"]
+        return subprocess.CompletedProcess(cmd, 0, stdout=f"{bits}\n", stderr="")
+
+    return run
+
+
 def test_module_init_cleanup_mode(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test module initialization in cleanup mode."""
     install_fake_modules(monkeypatch)
@@ -167,7 +178,7 @@ def test_module_init_cleanup_mode(monkeypatch: pytest.MonkeyPatch) -> None:
         mock_cdll.return_value = mock_dev_spi
 
         monkeypatch.setattr("os.path.exists", lambda path: True)
-        monkeypatch.setattr("os.popen", lambda cmd: MagicMock())
+        monkeypatch.setattr("subprocess.run", _fake_getconf("64"))
 
         epdconfig = _load_epdconfig_as_rpi(monkeypatch)
 
@@ -189,7 +200,7 @@ def test_module_init_cleanup_mode_library_not_found(
     epdconfig = _load_epdconfig_as_rpi(monkeypatch)
 
     monkeypatch.setattr("os.path.exists", lambda path: False)
-    monkeypatch.setattr("os.popen", lambda cmd: io.StringIO("64"))
+    monkeypatch.setattr("subprocess.run", _fake_getconf("64"))
 
     with pytest.raises(AttributeError):
         epdconfig.module_init(cleanup=True)
@@ -295,7 +306,7 @@ def test_raspberry_pi_cleanup_mode_with_dev_config(
     install_fake_modules(monkeypatch)
 
     monkeypatch.setattr("os.path.exists", lambda path: True)
-    monkeypatch.setattr("os.popen", lambda cmd: MagicMock())
+    monkeypatch.setattr("subprocess.run", _fake_getconf("32"))
 
     with patch("ctypes.CDLL") as mock_cdll:
         mock_dev_config = MagicMock()

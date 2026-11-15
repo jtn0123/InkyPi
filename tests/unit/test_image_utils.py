@@ -80,7 +80,7 @@ def test_apply_image_enhancement_and_compute_hash() -> None:
     )
     assert isinstance(enhanced, Image.Image)
     h = image_utils.compute_image_hash(enhanced)
-    assert isinstance(h, str) and len(h) == 64
+    assert len(h) == 64
 
     with pytest.raises(ValueError):
         image_utils.compute_image_hash(None)
