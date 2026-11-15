@@ -7,6 +7,7 @@ Related: JTN-516 (Grade F1 — supply-chain integrity)
 """
 
 import re
+import tomllib
 from importlib.metadata import requires
 from pathlib import Path
 
@@ -18,6 +19,28 @@ from packaging.utils import canonicalize_name
 INSTALL_DIR = Path(__file__).parent.parent.parent / "install"
 REQUIREMENTS_TXT = INSTALL_DIR / "requirements.txt"
 REQUIREMENTS_DEV_TXT = INSTALL_DIR / "requirements-dev.txt"
+PYPROJECT = INSTALL_DIR.parent / "pyproject.toml"
+_DEV_EXPORT = (
+    "uv lock && uv export --format requirements.txt --group dev "
+    "--no-emit-project --output-file install/requirements-dev.txt"
+)
+
+
+def _pinned_versions(path: Path) -> set[str]:
+    """``name==version`` for every pin in a lockfile, ignoring markers."""
+    found = set()
+    for pin in _parse_lockfile(path):
+        name, _, rest = pin.partition("==")
+        version = rest.split(";", 1)[0].strip()
+        found.add(f"{canonicalize_name(name)}=={version}")
+    return found
+
+
+def _dev_group() -> list[str]:
+    """The `dev` list under [dependency-groups] in pyproject.toml."""
+    groups = tomllib.loads(PYPROJECT.read_text())["dependency-groups"]
+    return [str(req) for req in groups["dev"]]
+
 
 # Lines that begin a pinned package block (package==version \\)
 _PIN_LINE_RE = re.compile(r"^\S+==\S+")
@@ -102,10 +125,9 @@ class TestRequirementsLockfile:
         )
 
     def test_requirements_dev_txt_exists(self) -> None:
-        assert REQUIREMENTS_DEV_TXT.exists(), (
-            f"{REQUIREMENTS_DEV_TXT} does not exist. "
-            "Regenerate the universal dev requirements with uv pip compile --universal."
-        )
+        assert (
+            REQUIREMENTS_DEV_TXT.exists()
+        ), f"{REQUIREMENTS_DEV_TXT} does not exist. Run: {_DEV_EXPORT}"
 
     def test_requirements_txt_has_hashes(self) -> None:
         """Every pinned package in requirements.txt must have at least one hash."""
@@ -126,7 +148,7 @@ class TestRequirementsLockfile:
         assert not missing, (
             f"The following packages in {REQUIREMENTS_DEV_TXT} have no --hash=sha256: entries:\n"
             + "\n".join(f"  {p}" for p in missing)
-            + "\nRegenerate with: uv pip compile --universal --python-version 3.13 --generate-hashes install/requirements-dev.in -o install/requirements-dev.txt"
+            + f"\nRegenerate with: {_DEV_EXPORT}"
         )
 
     def test_requirements_txt_hash_count(self) -> None:
@@ -150,51 +172,29 @@ class TestRequirementsLockfile:
     def test_types_requests_pin_preserved(self) -> None:
         """Requests stubs must match the explicitly validated source pin."""
         content = REQUIREMENTS_DEV_TXT.read_text()
-        source = (INSTALL_DIR / "requirements-dev.in").read_text()
-        pin = next(
-            line for line in source.splitlines() if line.startswith("types-requests==")
-        )
+        pin = next(req for req in _dev_group() if req.startswith("types-requests=="))
         assert pin in content, f"{pin} is missing from requirements-dev.txt"
 
     def test_dev_requirements_include_every_app_requirement(self) -> None:
         """The dev environment can run the app's code, not only the tests.
 
         ``scripts/dev_environment.py --sync`` installs only the dev lock, so a
-        package in requirements.in but not in requirements-dev.in leaves local
-        venvs unable to import it. CI hides the gap because it installs both
-        locks. Linux-only hardware packages are exempt: they don't install on
-        a developer's Mac.
+        runtime package missing from it leaves local venvs unable to import
+        it. CI hides the gap because it installs both locks. Both files are
+        exported from the same uv.lock, so each runtime pin must appear in the
+        dev file at the same version.
         """
-
-        def specs(path: Path) -> dict[str, str]:
-            found = {}
-            for raw in path.read_text().splitlines():
-                line = raw.split("#", 1)[0].strip()
-                if not line or line.startswith("-"):
-                    continue
-                req = Requirement(line)
-                if req.marker is not None and "linux" in str(req.marker):
-                    continue
-                found[canonicalize_name(req.name)] = str(req.specifier)
-            return found
-
-        app = specs(INSTALL_DIR / "requirements.in")
-        dev = specs(INSTALL_DIR / "requirements-dev.in")
+        app = _pinned_versions(REQUIREMENTS_TXT)
+        dev = _pinned_versions(REQUIREMENTS_DEV_TXT)
         missing = sorted(set(app) - set(dev))
-        assert not missing, f"add to install/requirements-dev.in: {missing}"
-        differ = {n: (app[n], dev[n]) for n in app if app[n] != dev[n]}
-        assert not differ, f"app vs dev constraints differ: {differ}"
+        assert not missing, f"runtime pins missing from requirements-dev.txt: {missing}"
 
-    def test_requirements_in_exists(self) -> None:
-        """Source .in files must be committed alongside lockfiles."""
-        assert (INSTALL_DIR / "requirements.in").exists(), (
-            "install/requirements.in is missing. "
-            "This is the human-maintained constraints reference."
-        )
-
-    def test_requirements_dev_in_exists(self) -> None:
-        """Dev source .in file must be committed alongside the dev lockfile."""
-        assert (INSTALL_DIR / "requirements-dev.in").exists(), (
-            "install/requirements-dev.in is missing. "
-            "This is the human-maintained constraints reference."
-        )
+    def test_dev_export_includes_every_dev_tool(self) -> None:
+        """requirements-dev.txt is exported with the dev group, not without it."""
+        pinned = {
+            pin.split("==", 1)[0] for pin in _pinned_versions(REQUIREMENTS_DEV_TXT)
+        }
+        declared = {canonicalize_name(Requirement(req).name) for req in _dev_group()}
+        assert declared, "pyproject.toml has no dev dependency group"
+        missing = sorted(declared - pinned)
+        assert not missing, f"dev tools missing from requirements-dev.txt: {missing}"

@@ -4,7 +4,10 @@ updates:
   # is generated from them by `uv export`. Pointing Dependabot at /install made it
   # edit that generated file, which fails the lockfile drift check by construction
   # and duplicated every security bump across both paths. The uv ecosystem updates
-  # pyproject.toml and uv.lock together, keeping `uv lock --check` green.
+  # pyproject.toml and uv.lock together, keeping `uv lock --check` green. That
+  # covers the dev tools too: they are the `dev` dependency group in the same
+  # lock. A bump PR still needs the two exports regenerated (the drift check
+  # in CI's lint job names the commands).
   - package-ecosystem: "uv"
     directory: "/"
     schedule:

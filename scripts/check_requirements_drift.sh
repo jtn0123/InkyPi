@@ -92,45 +92,43 @@ else
     DRIFT_FOUND=1
 fi
 
-echo "==> Checking universal dev requirements match their source ..."
-# Constrain to the committed versions so drift checks do not upgrade packages.
-# --no-config prevents inheriting runtime-only Pi wheel requirements for
-# desktop dev tools such as Playwright. Universal resolution still preserves
-# platform and interpreter-specific dependencies
-# (including Linux memray and libcst's Python 3.13 YAML backend).
-if ! uv --no-config pip compile \
-    --universal --python-version 3.13 --fork-strategy fewest \
-    --prerelease disallow --generate-hashes \
-    --constraints "${DEV_TXT}" --no-header --no-annotate \
-    install/requirements-dev.in --output-file "${tmp_dev}" --quiet; then
-    echo "ERROR: dev requirements no longer resolve against the committed pins."
-    DRIFT_FOUND=1
-elif ! python3 - "${DEV_TXT}" "${tmp_dev}" <<'PY'
-import difflib
+echo "==> Checking install/requirements-dev.txt matches uv export ..."
+# The dev group in pyproject.toml is locked in uv.lock with the runtime
+# dependencies; the dev file is that lock exported with the dev group.
+uv export \
+    --format requirements.txt \
+    --group dev \
+    --no-emit-project \
+    --output-file "${tmp_dev}" \
+    --quiet
+
+python3 - <<'PY' "${tmp_dev}" "install/requirements-dev.txt"
 import sys
-from pathlib import Path
-
-
-def normalized(path):
-    return [
-        line + "\n"
-        for line in Path(path).read_text().splitlines()
-        if line.strip() and not line.lstrip().startswith("#")
-    ]
-
-
-committed, generated = map(normalized, sys.argv[1:])
-if committed != generated:
-    sys.stdout.writelines(difflib.unified_diff(
-        committed, generated, fromfile=sys.argv[1], tofile="regenerated dev requirements"
-    ))
-    raise SystemExit(1)
+src, rel_out = sys.argv[1], sys.argv[2]
+with open(src) as f:
+    lines = f.read().splitlines(keepends=True)
+for i, line in enumerate(lines):
+    if line.startswith("#    uv export ") and "--output-file" in line:
+        lines[i] = (
+            "#    uv export --format requirements.txt --group dev "
+            "--no-emit-project --output-file " + rel_out + "\n"
+        )
+        break
+with open(src, "w") as f:
+    f.writelines(lines)
 PY
-then
-    echo "ERROR: regenerate install/requirements-dev.txt with uv pip compile --universal."
-    DRIFT_FOUND=1
+
+if diff -u "${DEV_TXT}" "${tmp_dev}"; then
+    echo "    OK — install/requirements-dev.txt is up to date."
 else
-    echo "    OK — universal dev requirements are up to date."
+    echo ""
+    echo "ERROR: install/requirements-dev.txt is out of sync with uv.lock."
+    echo "Run the following command to regenerate it and commit the result:"
+    echo ""
+    echo "  uv export --format requirements.txt --group dev --no-emit-project \\"
+    echo "      --output-file install/requirements-dev.txt"
+    echo ""
+    DRIFT_FOUND=1
 fi
 
 # Installer tools and optional hardware dependencies use the same integrity

@@ -734,7 +734,7 @@ if __name__ == "__main__":
         notify(Notification.READY)
         logger.info("Notified systemd: READY=1")
     except ImportError:
-        # cysystemd is Linux-only by design (see install/requirements.in), so
+        # cysystemd is Linux-only by design (see pyproject.toml), so
         # its absence off-device is expected rather than exceptional. Logging
         # it at ERROR with a traceback on every start trains developers to
         # scroll past ERROR lines, which is how a real startup failure gets

@@ -227,13 +227,13 @@ uv export --format requirements.txt --no-dev --no-emit-project \
     --output-file install/requirements.txt
 ```
 
-Dev constraints live in `install/requirements-dev.in`. Regenerate their hashed,
-universal requirements file with:
+Dev and CI tools live in the `dev` group under `[dependency-groups]` in
+`pyproject.toml`, locked in the same `uv.lock`. After changing one:
 
 ```bash
-uv --no-config pip compile --universal --python-version 3.13 --fork-strategy fewest \
-    --prerelease disallow --upgrade --generate-hashes \
-    install/requirements-dev.in -o install/requirements-dev.txt
+uv lock
+uv export --format requirements.txt --group dev --no-emit-project \
+    --output-file install/requirements-dev.txt
 bash scripts/check_requirements_drift.sh
 ```
 

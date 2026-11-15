@@ -21,7 +21,6 @@ def lock_fingerprint(root: Path = ROOT) -> str:
     for name in (
         "pyproject.toml",
         "uv.lock",
-        "install/requirements-dev.in",
         "install/requirements-dev.txt",
     ):
         digest.update(name.encode())
