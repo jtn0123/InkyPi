@@ -24,7 +24,7 @@ import posixpath
 import secrets
 import time
 from collections.abc import MutableMapping
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from flask import Flask, Response, redirect, request, session, url_for
 
@@ -137,7 +137,7 @@ def _pin_fingerprint(pin: str, secret_key: object) -> str:
     return hmac.new(key, b"inkypi-pin:" + pin.encode(), hashlib.sha256).hexdigest()[:16]
 
 
-def mark_session_authenticated(sess: MutableMapping[str, Any], app: Flask) -> None:
+def mark_session_authenticated(sess: MutableMapping[str, object], app: Flask) -> None:
     """Record a successful login in *sess* (timestamp + PIN fingerprint)."""
     sess["authed"] = True
     sess["auth_at"] = time.time()
@@ -146,7 +146,7 @@ def mark_session_authenticated(sess: MutableMapping[str, Any], app: Flask) -> No
         sess["auth_pin"] = fingerprint
 
 
-def is_session_authenticated(sess: MutableMapping[str, Any], app: Flask) -> bool:
+def is_session_authenticated(sess: MutableMapping[str, object], app: Flask) -> bool:
     """Return True when *sess* holds a current, unexpired login.
 
     Rejects sessions without a login timestamp, older than

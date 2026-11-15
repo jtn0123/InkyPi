@@ -7,7 +7,7 @@ import os
 import threading
 from collections.abc import Callable, Mapping
 from time import perf_counter
-from typing import Any, Protocol, cast
+from typing import Protocol
 
 from PIL import Image
 
@@ -217,7 +217,7 @@ class DisplayManager:
             )
             with self._history_lock:
                 os.makedirs(history_dir, exist_ok=True)
-                timestamp = now_device_tz(cast(Any, self.device_config))
+                timestamp = now_device_tz(self.device_config)
                 base_name = f"display_{timestamp.strftime('%Y%m%d_%H%M%S')}"
 
                 png_path: str | None = None
@@ -353,7 +353,7 @@ class DisplayManager:
         if image_hash is None:
             from utils.image_utils import compute_image_hash
 
-            image_hash = cast(Any, compute_image_hash)(image)
+            image_hash = compute_image_hash(image)
         with self._hash_lock:
             if image_hash == self._last_image_hash:
                 logger.info("Image unchanged, skipping display writes")
@@ -379,13 +379,19 @@ class DisplayManager:
             image = change_orientation(
                 image, orientation if isinstance(orientation, str) else "horizontal"
             )
-            image = cast(Any, resize_image)(
+            image = resize_image(
                 image, self.device_config.get_resolution(), image_settings
             )
             if self.device_config.get_config("inverted_image"):
                 image = image.rotate(180)
-            image = cast(Any, apply_image_enhancement)(
-                image, self.device_config.get_config("image_settings")
+            device_image_settings = self.device_config.get_config("image_settings")
+            image = apply_image_enhancement(
+                image,
+                (
+                    device_image_settings
+                    if isinstance(device_image_settings, Mapping)
+                    else None
+                ),
             )
             image = self._maybe_crisp(image, image_settings)
             # One encode serves the processed preview and the history copy.

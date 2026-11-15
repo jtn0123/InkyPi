@@ -2,7 +2,7 @@
 
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, NoReturn
 
 import pytest
 
@@ -57,7 +57,7 @@ def test_absent_default_rolls_back_with_failed_write(
     manager = device.playlist_manager
     original = manager.get_playlist("Other")
 
-    def fail(*args: Any, **kwargs: Any) -> None:
+    def fail(*args: Any, **kwargs: Any) -> NoReturn:
         raise OSError("replacement failed")
 
     with monkeypatch.context() as patch:
@@ -75,7 +75,7 @@ def test_absent_default_rolls_back_with_failed_write(
 def test_unavailable_validation_never_mutates(device: Config, failure: str) -> None:
     before = Path(device.config_file).read_bytes()
 
-    def fail(*args: Any, **kwargs: Any) -> None:
+    def fail(*args: Any, **kwargs: Any) -> NoReturn:
         raise ImportError("validator unavailable")
 
     class BrokenPlugin(ValidPlugin):
@@ -104,7 +104,7 @@ def test_unavailable_validation_never_mutates(device: Config, failure: str) -> N
 
 
 def test_history_failure_reports_committed_save(device: Config) -> None:
-    def fail(*args: Any, **kwargs: Any) -> None:
+    def fail(*args: Any, **kwargs: Any) -> NoReturn:
         raise OSError("history unavailable")
 
     result = save_plugin_settings_workflow(
@@ -157,7 +157,7 @@ def test_route_response_matches_persisted_state(
     app.register_blueprint(plugin_bp)
     register_error_handlers(app)
 
-    def fail(*args: Any, **kwargs: Any) -> None:
+    def fail(*args: Any, **kwargs: Any) -> NoReturn:
         raise OSError("injected failure")
 
     # The two routes live in different modules of the blueprint package;

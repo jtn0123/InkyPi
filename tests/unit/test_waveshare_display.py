@@ -312,6 +312,8 @@ def test_mode_argument_with_a_default_is_not_treated_as_mode_driven(
     assert _requires_mode_argument(init_required) is True
     assert _requires_mode_argument(init_defaulted) is False
     assert _requires_mode_argument(init_plain) is False
+    # A driver attribute that is not a method is the common shape too.
+    assert _requires_mode_argument(None) is False
 
 
 def test_clear_receives_a_color_when_the_driver_requires_one(

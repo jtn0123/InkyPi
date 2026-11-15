@@ -4,7 +4,8 @@ import re
 import sys
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any, cast
+from types import ModuleType
+from typing import cast
 
 from PIL import Image
 
@@ -74,7 +75,7 @@ def split_image_for_bi_color_epd(image: Image.Image) -> tuple[Image.Image, Image
     return black_layer, red_layer
 
 
-def _requires_mode_argument(method: Callable[..., Any]) -> bool:
+def _requires_mode_argument(method: object) -> bool:
     """Whether *method* takes a required ``mode`` parameter.
 
     Distinguishes the mode-driven drivers (``init(self, mode)``) from the
@@ -83,6 +84,8 @@ def _requires_mode_argument(method: Callable[..., Any]) -> bool:
     Signatures that cannot be introspected are treated as the common shape, so
     an exotic driver degrades to today's behaviour rather than failing here.
     """
+    if not callable(method):
+        return False
     try:
         parameter = inspect.signature(method).parameters.get("mode")
     except (TypeError, ValueError):
@@ -134,7 +137,7 @@ class WaveshareDisplay(AbstractDisplay):
             sys.path.insert(0, str(epd_dir))
 
         try:
-            self._epd_module: Any = __import__(module_name, fromlist=["EPD"])
+            self._epd_module: ModuleType = __import__(module_name, fromlist=["EPD"])
             self._bind_driver()
             self.epd_display_init()
 
@@ -165,7 +168,9 @@ class WaveshareDisplay(AbstractDisplay):
         Raises:
             AttributeError: If the driver has no ``Init``/``init`` method.
         """
-        self.epd_display: Any = self._epd_module.EPD()
+        # Each vendored driver has its own EPD class, with no shared base or
+        # signature (display() takes one or two buffers), so this stays untyped.
+        self.epd_display = self._epd_module.EPD()
         # Workaround for init functions with inconsistent casing
         init_method = getattr(self.epd_display, "Init", None)
         if not callable(init_method):

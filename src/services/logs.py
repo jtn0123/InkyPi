@@ -10,8 +10,8 @@ for the same views.
 import logging
 import threading
 from collections import deque
-from datetime import UTC, datetime, timedelta
-from typing import Any
+from collections.abc import Mapping
+from datetime import UTC, datetime, timedelta, tzinfo
 
 from flask import current_app
 
@@ -69,16 +69,16 @@ class DevModeLogHandler(logging.Handler):
             self.handleError(record)
 
 
-def _format_journal_line(formatted_ts: str, data: dict[str, Any]) -> str:
+def _format_journal_line(formatted_ts: str, data: Mapping[str, object]) -> str:
     priority = str(data.get("PRIORITY", "6"))
     level = _PRIORITY_TO_LEVEL.get(priority, "INFO")
     # Journal entries written before redaction reached every logger, or by
     # other processes in the unit, can still hold keys.
-    msg = redact_secrets((data.get("MESSAGE", "") or "").rstrip())
+    msg = redact_secrets(str(data.get("MESSAGE") or "").rstrip())
     return f"{formatted_ts} [{level}] {msg}"
 
 
-def _device_log_timezone() -> Any:
+def _device_log_timezone() -> tzinfo:
     try:
         device_config = current_app.config["DEVICE_CONFIG"]
         return get_timezone(device_config.get_config("timezone", default="UTC"))

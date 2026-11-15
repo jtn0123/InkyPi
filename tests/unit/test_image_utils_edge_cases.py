@@ -151,3 +151,27 @@ def test_apply_enhancement_preserves_image_mode() -> None:
     # Test with empty settings
     result2 = apply_image_enhancement(img_rgb, None)
     assert result2 is not None
+
+
+def test_apply_enhancement_reads_numbers_and_ignores_the_rest() -> None:
+    """The device's image_settings also hold screen_rendering, a string.
+
+    Only numeric factors apply; any other value counts as 1.0 (no change)
+    rather than reaching ImageEnhance, which would raise on a string.
+    """
+    from utils.image_utils import apply_image_enhancement
+
+    img = Image.new("RGB", (8, 8), (100, 120, 140))
+    unchanged = apply_image_enhancement(
+        img,
+        {
+            "screen_rendering": "auto",
+            "brightness": "1.5",
+            "contrast": True,
+            "saturation": None,
+        },
+    )
+    assert unchanged.getpixel((0, 0)) == (100, 120, 140)
+
+    darker = apply_image_enhancement(img, {"brightness": 0.5, "contrast": 1})
+    assert darker.getpixel((0, 0)) == (50, 60, 70)

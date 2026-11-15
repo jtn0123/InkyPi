@@ -6,7 +6,7 @@ import shutil
 import subprocess
 import tempfile
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Collection, Mapping
 from io import BytesIO
 from typing import Any, BinaryIO, cast
 
@@ -260,7 +260,7 @@ def change_orientation(
 def resize_image(
     image: Image.Image,
     desired_size: tuple[int, int],
-    image_settings: list[str] | None = None,
+    image_settings: Collection[object] | None = None,
 ) -> Image.Image:
     """Crop and resize an image to the desired dimensions while preserving aspect ratio.
 
@@ -272,7 +272,8 @@ def resize_image(
         image: A ``PIL.Image.Image`` to transform.
         desired_size: A ``(width, height)`` tuple specifying the output
             dimensions in pixels.
-        image_settings: An optional list of setting strings.  Passing
+        image_settings: An optional collection of display hints (a plugin's
+            ``image_settings``, which may hold objects too).  Passing
             ``"keep-width"`` suppresses the horizontal centring crop so the
             left edge of the original image is preserved.
 
@@ -321,19 +322,29 @@ def resize_image(
     return image.resize((desired_width, desired_height), LANCZOS)
 
 
+def _enhance_factor(image_settings: Mapping[str, object], key: str) -> float:
+    """Return the numeric factor stored under *key*, or 1.0 (no change)."""
+    value = image_settings.get(key, 1.0)
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        return 1.0
+    return float(value)
+
+
 def apply_image_enhancement(
-    img: Image.Image, image_settings: dict[str, float] | None = None
+    img: Image.Image, image_settings: Mapping[str, object] | None = None
 ) -> Image.Image:
     """Apply brightness, contrast, saturation, and sharpness adjustments to an image.
 
     Each parameter defaults to ``1.0`` (no change) when absent from
-    *image_settings*.
+    *image_settings*, or when it is not a number.
 
     Args:
         img: A ``PIL.Image.Image`` to enhance.
-        image_settings: A dict with optional float keys ``"brightness"``,
-            ``"contrast"``, ``"saturation"``, and ``"sharpness"``.  Values
-            below 1.0 reduce the property; values above 1.0 increase it.
+        image_settings: The device's ``image_settings``: optional numeric keys
+            ``"brightness"``, ``"contrast"``, ``"saturation"``, and
+            ``"sharpness"``, beside others this function ignores (such as
+            ``"screen_rendering"``).  Values below 1.0 reduce the property;
+            values above 1.0 increase it.
 
     Returns:
         The enhanced ``PIL.Image.Image``.
@@ -344,16 +355,22 @@ def apply_image_enhancement(
         image_settings = {}
 
     # Apply Brightness
-    img = ImageEnhance.Brightness(img).enhance(image_settings.get("brightness", 1.0))
+    img = ImageEnhance.Brightness(img).enhance(
+        _enhance_factor(image_settings, "brightness")
+    )
 
     # Apply Contrast
-    img = ImageEnhance.Contrast(img).enhance(image_settings.get("contrast", 1.0))
+    img = ImageEnhance.Contrast(img).enhance(
+        _enhance_factor(image_settings, "contrast")
+    )
 
     # Apply Saturation (Color)
-    img = ImageEnhance.Color(img).enhance(image_settings.get("saturation", 1.0))
+    img = ImageEnhance.Color(img).enhance(_enhance_factor(image_settings, "saturation"))
 
     # Apply Sharpness
-    return ImageEnhance.Sharpness(img).enhance(image_settings.get("sharpness", 1.0))
+    return ImageEnhance.Sharpness(img).enhance(
+        _enhance_factor(image_settings, "sharpness")
+    )
 
 
 def resolve_background_color(

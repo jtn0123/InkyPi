@@ -47,6 +47,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 
 import numpy as np
+import numpy.typing as npt
 from PIL import Image
 
 # Channel spread (max - min, 0-255) from which a pixel counts as coloured.
@@ -91,9 +92,20 @@ EDGE_LINE_DIST = 3
 _LUMA_WEIGHTS = np.array([77, 150, 29], dtype=np.int32)
 
 Palette = Sequence[Sequence[int]]
+#: ``uint8`` RGB channels.
+Pixels = npt.NDArray[np.uint8]
+#: Panel palette indexes, one per pixel or per distinct colour.
+Indices = npt.NDArray[np.uint8]
+#: Pixels or colours as ``0xRRGGBB``.
+Packed = npt.NDArray[np.int32]
+#: Per-tile or per-cell counts, and boolean masks over the same grids.
+Counts = npt.NDArray[np.intp]
+Mask = npt.NDArray[np.bool_]
 
 
-def _palette_roles(palette: Palette) -> tuple[int, int, list[int], np.ndarray]:
+def _palette_roles(
+    palette: Palette,
+) -> tuple[int, int, list[int], npt.NDArray[np.float32]]:
     """Return black index, white index, chromatic indexes and their hue vectors."""
     pal = np.asarray(palette, dtype=np.int32).reshape(-1, 3)
     luma = pal @ _LUMA_WEIGHTS
@@ -107,8 +119,12 @@ def _palette_roles(palette: Palette) -> tuple[int, int, list[int], np.ndarray]:
 
 
 def _paper_relative(
-    luma: np.ndarray, counts: np.ndarray, coloured: np.ndarray, black: int, white: int
-) -> np.ndarray:
+    luma: npt.NDArray[np.int32],
+    counts: Counts,
+    coloured: Mask,
+    black: int,
+    white: int,
+) -> Indices:
     """Black/white decision per colour, relative to the paper tone.
 
     *luma*, *counts* and *coloured* describe the image's distinct colours;
@@ -125,7 +141,7 @@ def _paper_relative(
     return np.where(luma >= paper + INK_CONTRAST, white, black).astype(np.uint8)
 
 
-def _box3(mask: np.ndarray) -> np.ndarray:
+def _box3(mask: Mask) -> npt.NDArray[np.int32]:
     """Count of set cells in each cell's 3x3 neighbourhood."""
     padded = np.pad(mask.astype(np.int32), 1)
     h, w = mask.shape
@@ -136,7 +152,7 @@ def _box3(mask: np.ndarray) -> np.ndarray:
     return total
 
 
-def _tiles(values: np.ndarray) -> np.ndarray:
+def _tiles(values: Packed) -> Packed:
     """Split ``(height, width)`` into ``(h, w, BLOCK * BLOCK)`` tiles."""
     h, w = values.shape[0] // BLOCK, values.shape[1] // BLOCK
     cropped = values[: h * BLOCK, : w * BLOCK]
@@ -144,7 +160,7 @@ def _tiles(values: np.ndarray) -> np.ndarray:
     return tiles.reshape(h, w, BLOCK * BLOCK)
 
 
-def _channel_tiles(rgb: np.ndarray) -> np.ndarray:
+def _channel_tiles(rgb: Pixels) -> Pixels:
     """Split ``(height, width, 3)`` into contiguous ``(3, h, w, BLOCK * BLOCK)``.
 
     Channels come first so per-tile reductions run along the last, contiguous
@@ -158,9 +174,9 @@ def _channel_tiles(rgb: np.ndarray) -> np.ndarray:
     return np.ascontiguousarray(tiles).reshape(3, h, w, BLOCK * BLOCK)
 
 
-def _distinct_per_tile(packed: np.ndarray) -> np.ndarray:
+def _distinct_per_tile(packed: Packed) -> Counts:
     ordered = np.sort(_tiles(packed), axis=2)
-    changes: np.ndarray = np.count_nonzero(np.diff(ordered, axis=2), axis=2)
+    changes: Counts = np.count_nonzero(np.diff(ordered, axis=2), axis=2)
     return changes + 1
 
 
@@ -179,14 +195,14 @@ class Frame:
     def __init__(self, image: Image.Image) -> None:
         self.image = image.convert("RGB")
         #: ``uint8`` pixels shaped ``(height, width, 3)``.
-        self.rgb = np.asarray(self.image)
+        self.rgb: Pixels = np.asarray(self.image)
         packed = self.rgb[..., 0].astype(np.int32) << 16
         packed |= self.rgb[..., 1].astype(np.int32) << 8
         packed |= self.rgb[..., 2]
         #: ``int32`` pixels as ``0xRRGGBB``, shaped ``(height, width)``.
-        self.packed = packed
+        self.packed: Packed = packed
         #: Distinct colours in each ``BLOCK x BLOCK`` tile, shaped ``(h, w)``.
-        self.distinct = _distinct_per_tile(packed)
+        self.distinct: Counts = _distinct_per_tile(packed)
 
 
 def _as_frame(image: Image.Image | Frame) -> Frame:
@@ -206,7 +222,7 @@ def gradient_dominated(image: Image.Image | Frame) -> bool:
 
 
 def photo_regions(
-    packed: np.ndarray, distinct: np.ndarray | None = None
+    packed: Packed, distinct: Counts | None = None
 ) -> list[tuple[int, int, int, int]]:
     """Return ``(left, top, right, bottom)`` boxes that look photographic.
 
@@ -254,7 +270,7 @@ def photo_regions(
     return boxes
 
 
-def _settle_edge_blends(u: np.ndarray, counts: np.ndarray, lut: np.ndarray) -> None:
+def _settle_edge_blends(u: npt.NDArray[np.int32], counts: Counts, lut: Indices) -> None:
     """Stop anti-aliased edges introducing a colour neither side has.
 
     *u* holds the frame's distinct colours, *counts* how often each occurs and
@@ -292,7 +308,7 @@ def crisp_indices(
     image: Image.Image | Frame,
     palette: Palette,
     dither_palette: Palette | None = None,
-) -> np.ndarray:
+) -> Indices:
     """Map every pixel of *image* to an index into *palette*.
 
     *palette* lists the panel's pure colours (black, white and its

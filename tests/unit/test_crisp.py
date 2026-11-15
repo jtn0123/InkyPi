@@ -14,7 +14,7 @@ import pytest
 from PIL import Image, ImageDraw
 
 from display import crisp
-from display.crisp import crisp_image, crisp_indices, photo_regions
+from display.crisp import Frame, crisp_image, crisp_indices, photo_regions
 from display.rendering_settings import CRISP_IMAGE_SETTING
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -141,9 +141,7 @@ def test_monochrome_palette_has_no_colour_path() -> None:
 def test_embedded_photo_is_dithered_and_ui_is_not() -> None:
     img = _dashboard()
     img.paste(_photo((160, 96)), (600, 320))
-    regions = photo_regions(
-        (np.asarray(img, dtype=np.int32) * [65536, 256, 1]).sum(axis=2)
-    )
+    regions = photo_regions(Frame(img).packed)
     assert len(regions) == 1
     left, top, right, bottom = regions[0]
     assert left <= 600 and top <= 320 and right >= 760 and bottom >= 416
@@ -165,7 +163,7 @@ def test_small_busy_patches_are_not_photos() -> None:
     img = Image.new("RGB", (200, 200), "white")
     img.paste(_photo((16, 16)), (50, 50))
     img.paste(_photo((24, 24), seed=3), (128, 128))  # a few cores, too few
-    packed = (np.asarray(img, dtype=np.int32) * [65536, 256, 1]).sum(axis=2)
+    packed = Frame(img).packed
     assert photo_regions(packed) == []
     assert photo_regions(packed[:4, :4]) == []
 

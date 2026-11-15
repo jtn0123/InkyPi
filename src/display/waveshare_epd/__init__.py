@@ -5,7 +5,7 @@ install fake modules can subclass it without mypy complaining about
 `display` attribute existence.
 """
 
-from typing import Any
+from PIL import Image
 
 
 class EPD:
@@ -20,10 +20,10 @@ class EPD:
     def Init(self) -> None:  # pragma: no cover - simple stub
         raise NotImplementedError
 
-    def getbuffer(self, img: Any) -> Any:  # pragma: no cover - stub
+    def getbuffer(self, img: Image.Image) -> object:  # pragma: no cover - stub
         raise NotImplementedError
 
-    def display(self, buf: Any, *args: Any) -> Any:  # pragma: no cover - stub
+    def display(self, buf: object, *args: object) -> None:  # pragma: no cover - stub
         raise NotImplementedError
 
     def Clear(self) -> None:  # pragma: no cover - stub
