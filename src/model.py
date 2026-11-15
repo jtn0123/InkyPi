@@ -244,18 +244,6 @@ class PlaylistManager:
             active_playlist=data.get("active_playlist"),
         )
 
-    @staticmethod
-    def should_refresh(
-        latest_refresh: datetime | None,
-        interval_seconds: float,
-        current_time: datetime,
-    ) -> bool:
-        """Determines whether a refresh should occur on the interval and latest refresh time."""
-        if not latest_refresh:
-            return True  # No previous refresh, so it's time to refresh
-
-        return (current_time - latest_refresh) >= timedelta(seconds=interval_seconds)
-
 
 class Playlist:
     """Represents a playlist with a time interval.

@@ -8,7 +8,7 @@ import threading
 from collections import deque
 from collections.abc import Callable, Mapping
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Protocol
+from typing import TYPE_CHECKING, Any, NamedTuple, Protocol
 
 from refresh_task import schedule
 
@@ -26,6 +26,22 @@ class SupportsRefreshScheduling(Protocol):
     def get_playlist_manager(self) -> object: ...
 
     def get_refresh_info(self) -> object: ...
+
+
+class Trigger(NamedTuple):
+    """Why the refresh loop woke, and what it saw when it did.
+
+    ``due`` is the scheduler's single answer to "is a scheduled refresh due?"
+    for this wake-up. Plugin selection acts on it rather than deciding again,
+    so an early wake-up (a playlist window boundary, a config change, the
+    device-interval cap) cannot render ahead of the retry spacing.
+    """
+
+    playlist_manager: Any
+    latest_refresh: Any
+    current_dt: datetime
+    manual_request: ManualUpdateRequest | None
+    due: bool
 
 
 class RefreshScheduler:
@@ -91,9 +107,7 @@ class RefreshScheduler:
             with self.condition:
                 self.condition.wait(timeout=interval_seconds)
 
-    def wait_for_trigger(
-        self, *, is_running: Callable[[], bool]
-    ) -> tuple[object, object, datetime, ManualUpdateRequest | None] | None:
+    def wait_for_trigger(self, *, is_running: Callable[[], bool]) -> Trigger | None:
         """Block until the next refresh is due, a window changes, or a request.
 
         The wait ends when the active playlist's next refresh is due (its own
@@ -112,11 +126,15 @@ class RefreshScheduler:
             latest_refresh = self.device_config.get_refresh_info()
             current_dt = self.get_current_datetime()
             manual_request = None
+            due = False
             if self.manual_update_requests:
                 manual_request = self.manual_update_requests.popleft()
             elif self._due(playlist_manager, latest_refresh, current_dt):
                 self.last_attempt = current_dt
-            return playlist_manager, latest_refresh, current_dt, manual_request
+                due = True
+            return Trigger(
+                playlist_manager, latest_refresh, current_dt, manual_request, due
+            )
 
     def device_interval_seconds(self) -> float:
         """Return the device-wide refresh interval in seconds."""

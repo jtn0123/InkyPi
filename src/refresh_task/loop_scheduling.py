@@ -11,13 +11,11 @@ import os
 import threading
 from datetime import datetime
 from time import monotonic
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 
-from model import PlaylistManager
-from refresh_task.actions import ManualUpdateRequest, PlaylistRefresh, RefreshAction
+from refresh_task.actions import PlaylistRefresh, RefreshAction
 from refresh_task.context import RefreshContext
-from refresh_task.schedule import effective_cycle_seconds
-from refresh_task.scheduler import RefreshScheduler
+from refresh_task.scheduler import RefreshScheduler, Trigger
 from utils.time_utils import now_device_tz
 
 if TYPE_CHECKING:
@@ -131,57 +129,48 @@ class SchedulingMixin:
             cleanup_interval_ticks=self._CLEANUP_INTERVAL_TICKS,
         )
 
-    def _wait_for_trigger(
-        self,
-    ) -> tuple[Any, Any, datetime, ManualUpdateRequest | None] | None:
+    def _wait_for_trigger(self) -> Trigger | None:
         """Wait for the next refresh trigger while holding the condition lock.
 
         The method blocks until the active playlist's next refresh is due, a
         playlist window opens or closes, or another thread notifies (a manual
-        update, a config change). It returns the contextual objects required
-        for the refresh cycle or ``None`` if the task was stopped.
+        update, a config change). It returns what the refresh cycle needs,
+        including whether a scheduled refresh is due, or ``None`` if the task
+        was stopped.
 
         Threading:
             Acquires ``self.condition`` and releases it before returning.
         """
-        return cast(
-            tuple[Any, Any, datetime, ManualUpdateRequest | None] | None,
-            self.scheduler.wait_for_trigger(is_running=lambda: self.running),
-        )
+        return self.scheduler.wait_for_trigger(is_running=lambda: self.running)
 
     def _select_refresh_action(
-        self,
-        playlist_manager: Any,
-        latest_refresh: Any,
-        current_dt: datetime,
-        manual_request: ManualUpdateRequest | None,
+        self, trigger: Trigger
     ) -> tuple[RefreshAction | None, str | None]:
         """Determine which refresh action to perform.
 
-        If ``manual_action`` is provided it is returned immediately. Otherwise,
-        the next eligible plugin is selected based on playlists.
+        A manual request is returned as is. Otherwise the next eligible
+        playlist plugin is chosen, if the scheduler found a refresh due.
 
         Threading:
             No locks are held during execution.
         """
-        refresh_action = None
-        request_id = None
+        manual_request = trigger.manual_request
         if manual_request is not None:
             logger.info("Manual update requested")
-            refresh_action = manual_request.refresh_action
-            request_id = manual_request.request_id
-        else:
-            if self.device_config.get_config("log_system_stats"):
-                self.log_system_stats()
-            logger.info(
-                f"Running interval refresh check. | current_time: {current_dt.strftime('%Y-%m-%d %H:%M:%S')}"
-            )
-            playlist, plugin_instance = self._determine_next_plugin(
-                playlist_manager, latest_refresh, current_dt
-            )
-            if playlist is not None and plugin_instance:
-                refresh_action = PlaylistRefresh(playlist, plugin_instance)
-        return refresh_action, request_id
+            return manual_request.refresh_action, manual_request.request_id
+
+        current_dt = trigger.current_dt
+        if self.device_config.get_config("log_system_stats"):
+            self.log_system_stats()
+        logger.info(
+            f"Running interval refresh check. | current_time: {current_dt.strftime('%Y-%m-%d %H:%M:%S')}"
+        )
+        playlist, plugin_instance = self._determine_next_plugin(
+            trigger.playlist_manager, current_dt, due=trigger.due
+        )
+        if playlist is not None and plugin_instance:
+            return PlaylistRefresh(playlist, plugin_instance), None
+        return None, None
 
     def signal_config_change(self) -> None:
         """Notify the background thread that config has changed (e.g., interval updated).
@@ -200,20 +189,25 @@ class SchedulingMixin:
         return now_device_tz(self.device_config)
 
     def _determine_next_plugin(
-        self, playlist_manager: Any, latest_refresh_info: Any, current_dt: datetime
+        self, playlist_manager: Any, current_dt: datetime, *, due: bool
     ) -> tuple[Any | None, Any | None]:
-        """Determines the next plugin to refresh based on the active playlist, plugin cycle interval, and current time."""
+        """Choose the next plugin to show from the active playlist.
+
+        ``due`` is the scheduler's verdict for this wake-up (see
+        :class:`~refresh_task.scheduler.Trigger`). When it is False nothing is
+        chosen, but the active playlist is still recorded for the dashboard.
+        """
         # Selection mutates the playlist manager (active playlist, plugin
         # index); hold the config lock so it cannot interleave with a web
         # thread's update_atomic snapshot/rollback. Persisted by the
         # refresh-info write at the end of the cycle.
         with self.device_config.locked():
             return self._determine_next_plugin_locked(
-                playlist_manager, latest_refresh_info, current_dt
+                playlist_manager, current_dt, due=due
             )
 
     def _determine_next_plugin_locked(
-        self, playlist_manager: Any, latest_refresh_info: Any, current_dt: datetime
+        self, playlist_manager: Any, current_dt: datetime, *, due: bool
     ) -> tuple[Any | None, Any | None]:
         """Body of :meth:`_determine_next_plugin`; caller holds the config lock."""
         playlist = playlist_manager.determine_active_playlist(current_dt)
@@ -227,23 +221,8 @@ class SchedulingMixin:
             logger.info(f"Active playlist '{playlist.name}' has no plugins.")
             return None, None
 
-        latest_refresh_dt = latest_refresh_info.get_refresh_datetime()
-        # The playlist's own cycle, else the device interval: the same rule
-        # the scheduler uses to decide how long to sleep.
-        plugin_cycle_interval = effective_cycle_seconds(
-            playlist, self.scheduler.device_interval_seconds()
-        )
-        should_refresh = PlaylistManager.should_refresh(
-            latest_refresh_dt, plugin_cycle_interval, current_dt
-        )
-
-        if not should_refresh:
-            # latest_refresh_dt is guaranteed non-None here because
-            # PlaylistManager.should_refresh() returns True when input is None.
-            latest_refresh_str = latest_refresh_dt.strftime("%Y-%m-%d %H:%M:%S")
-            logger.info(
-                f"Not time to update display. | latest_update: {latest_refresh_str} | plugin_cycle_interval: {plugin_cycle_interval}"
-            )
+        if not due:
+            logger.info("Not time to update display. | playlist: %s", playlist.name)
             return None, None
 
         # Use eligibility-aware selection; skip circuit-breaker paused plugins

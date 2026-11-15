@@ -75,21 +75,21 @@ def test_refresh_cadence_interval_respects_device_timezone_freeze(
     from refresh_task import RefreshTask
 
     task = RefreshTask(device_config_dev, device_config_dev)  # display manager unused
+    task.running = True
+    monkeypatch.setattr(task.condition, "wait", lambda timeout=None: None)
 
     # 1) At 09:00 -0500 only 30 mins elapsed → NOT time to refresh
     with freeze_time("2025-01-01 14:00:00", tz_offset=0):  # 09:00 ET
-        current_dt = task._get_current_datetime()
-        p, inst = task._determine_next_plugin(
-            pm, device_config_dev.get_refresh_info(), current_dt
-        )
+        trigger = task._wait_for_trigger()
+        assert trigger is not None and trigger.due is False
+        p, inst = task._determine_next_plugin(pm, trigger.current_dt, due=trigger.due)
         assert p is None and inst is None
 
     # 2) At 10:00 -0500 90 mins elapsed → SHOULD refresh
     with freeze_time("2025-01-01 15:00:00", tz_offset=0):  # 10:00 ET
-        current_dt = task._get_current_datetime()
-        p, inst = task._determine_next_plugin(
-            pm, device_config_dev.get_refresh_info(), current_dt
-        )
+        trigger = task._wait_for_trigger()
+        assert trigger is not None and trigger.due is True
+        p, inst = task._determine_next_plugin(pm, trigger.current_dt, due=trigger.due)
         assert p is not None and inst is not None
 
 

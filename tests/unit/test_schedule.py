@@ -150,6 +150,42 @@ def test_a_failed_or_skipped_attempt_waits_a_cycle_before_retrying() -> None:
     assert wait == pytest.approx(600)
 
 
+@pytest.mark.parametrize(
+    ("latest", "last_attempt", "expected"),
+    [
+        (None, None, True),  # never refreshed
+        (NOW - timedelta(seconds=3601), None, True),
+        (NOW - timedelta(seconds=3600), None, True),  # exactly a cycle
+        (NOW - timedelta(seconds=3599), None, False),
+        # Overdue, but the loop tried a minute ago: retries wait a cycle.
+        (NOW - timedelta(hours=5), NOW - timedelta(minutes=1), False),
+        (NOW - timedelta(hours=5), NOW - timedelta(seconds=3600), True),
+    ],
+)
+def test_is_due_counts_the_last_refresh_and_the_last_attempt(
+    latest: datetime | None, last_attempt: datetime | None, expected: bool
+) -> None:
+    due = schedule.is_due(
+        playlist_manager=_manager(_all_day()),
+        latest_refresh=latest,
+        last_attempt=last_attempt,
+        now=NOW,
+        device_interval=HOUR,
+    )
+    assert due is expected
+
+
+def test_nothing_is_due_without_a_playlist_to_show() -> None:
+    for manager in (_manager(), _manager(_all_day(plugins=False))):
+        assert not schedule.is_due(
+            playlist_manager=manager,
+            latest_refresh=None,
+            last_attempt=None,
+            now=NOW,
+            device_interval=HOUR,
+        )
+
+
 def test_the_wait_ends_when_a_playlist_window_changes() -> None:
     morning = Playlist("Morning", "06:00", "12:10", plugins=[CLOCK])
     manager = _manager(morning)

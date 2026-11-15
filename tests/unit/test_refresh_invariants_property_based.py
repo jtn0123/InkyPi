@@ -4,7 +4,8 @@ from typing import Any
 
 from hypothesis import HealthCheck, given, settings, strategies as st
 
-from model import Playlist, PlaylistManager, RefreshInfo
+from model import Playlist, RefreshInfo
+from refresh_task import schedule
 
 
 @given(
@@ -13,14 +14,13 @@ from model import Playlist, PlaylistManager, RefreshInfo
     interval_s=st.integers(min_value=0, max_value=86_400),
 )
 @settings(max_examples=100, suppress_health_check=[HealthCheck.function_scoped_fixture])
-def test_should_refresh_matches_elapsed_time(
+def test_a_refresh_is_due_once_a_cycle_has_passed(
     latest_epoch: Any, elapsed_s: Any, interval_s: Any
 ) -> None:
     latest = datetime.fromtimestamp(latest_epoch, tz=UTC)
     current = latest + timedelta(seconds=elapsed_s)
-    assert PlaylistManager.should_refresh(latest, interval_s, current) is (
-        elapsed_s >= interval_s
-    )
+    due_at = schedule.next_due_at(latest, None, interval_s, current)
+    assert (current >= due_at) is (elapsed_s >= interval_s)
 
 
 @given(

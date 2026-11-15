@@ -67,9 +67,7 @@ def test_interval_refresh_logic_without_thread(
     fixed_now = __import__("datetime").datetime(2025, 1, 1, 12, 30, 0, tzinfo=tz)
     monkeypatch.setattr(task, "_get_current_datetime", lambda: fixed_now, raising=True)
     now = task._get_current_datetime()
-    playlist, plugin_instance = task._determine_next_plugin(
-        pm, device_config_dev.get_refresh_info(), now
-    )
+    playlist, plugin_instance = task._determine_next_plugin(pm, now, due=True)
     assert plugin_instance is not None
 
     plugin_config = device_config_dev.get_plugin(plugin_instance.plugin_id)
