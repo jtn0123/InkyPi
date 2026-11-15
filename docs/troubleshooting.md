@@ -474,7 +474,7 @@ free -m
 ```
 
 **Fix:**
-1. Enable zram swap if not already active: `sudo systemctl enable --now zramswap`.
+1. Check that zram swap is active: `cat /proc/swaps` should list `/dev/zram0`. Pi OS Trixie sets it up with `rpi-swap`. Only on an OS without that does `install.sh` add `zram-tools` and its `zramswap` service.
 2. Increase the plugin refresh interval to reduce how often Chromium is launched.
 3. Limit simultaneous playlist plugins to avoid back-to-back Chromium launches.
 4. Consider a Pi Zero 2 W (512 MB with a faster CPU) for Chromium-heavy plugin sets.
