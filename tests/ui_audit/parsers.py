@@ -116,12 +116,12 @@ class _TemplateParser(HTMLParser):
 
     def handle_starttag(
         self, tag: str, attrs: list[tuple[str, str | None]]
-    ) -> None:  # noqa: D401 - HTMLParser override
+    ) -> None:  # HTMLParser override
         self._record(tag, attrs)
 
     def handle_startendtag(
         self, tag: str, attrs: list[tuple[str, str | None]]
-    ) -> None:  # noqa: D401 - HTMLParser override
+    ) -> None:  # HTMLParser override
         self._record(tag, attrs)
 
 

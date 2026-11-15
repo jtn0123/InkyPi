@@ -16,7 +16,7 @@ from typing import Any, cast
 
 from flask import Blueprint, Response, request
 
-from utils.rate_limiter import SlidingWindowLimiter
+from utils.rate_limit import SlidingWindowLimiter
 
 logger = logging.getLogger(__name__)
 

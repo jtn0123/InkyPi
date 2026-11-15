@@ -63,7 +63,7 @@ class Countdown(BasePlugin):  # type: ignore[misc, unused-ignore]
         title = raw_title if isinstance(raw_title, str) and raw_title else "Countdown"
         countdown_date_str = settings.get("date")
         try:
-            countdown_date = datetime.strptime(  # noqa: DTZ007
+            countdown_date = datetime.strptime(
                 countdown_date_str if isinstance(countdown_date_str, str) else "",
                 "%Y-%m-%d",
             ).replace(tzinfo=tz)

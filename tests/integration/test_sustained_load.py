@@ -226,11 +226,11 @@ def test_sustained_handler_load(live_server: str, browser_page: Page) -> None:
             t0 = time.monotonic()
             try:
                 locator.click(timeout=2_000, force=True, no_wait_after=True)
-            except Exception:  # noqa: BLE001 — load test tolerates miss-clicks
+            except Exception:  # load test tolerates miss-clicks
                 continue
             try:
                 page.wait_for_load_state("domcontentloaded", timeout=500)
-            except Exception:  # noqa: BLE001 — most clicks don't navigate
+            except Exception:  # most clicks don't navigate
                 pass
             page.wait_for_timeout(_CLICK_SETTLE_MS)
             click_latencies_ms.append((time.monotonic() - t0) * 1000.0)

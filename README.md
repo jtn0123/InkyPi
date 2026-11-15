@@ -205,7 +205,7 @@ This fork is **1,100+ commits** ahead of upstream, transforming InkyPi from a fu
 | Dev-Mode Response Validator | Middleware schema enforcement (no-op in prod) |
 | Docker Install Simulation | Multi-base Dockerfile testing |
 | Benchmark Compare Script | Performance regression analysis |
-| 22 Plugins (vs 14 upstream) | 8 additional built-in plugins |
+| 20 Built-in Plugins | Clocks, weather, news, calendars, AI art and more |
 
 ---
 
@@ -216,7 +216,7 @@ cd InkyPi
 sudo bash install/do_update.sh
 ```
 
-Pin a specific version: `sudo bash install/do_update.sh v0.51.6`
+Pin a specific version: `sudo bash install/do_update.sh vX.Y.Z` (a tag from [Releases](https://github.com/jtn0123/InkyPi/releases); with no tag it installs the latest)
 
 The web UI's "Update" button uses the same path. For branch tracking, use `git pull` then `sudo bash install/update.sh`.
 

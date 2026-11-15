@@ -18,7 +18,7 @@ import logging
 from typing import Any
 
 import pytest
-from flask import Flask  # noqa: E402
+from flask import Flask
 from flask.testing import FlaskClient
 
 # ---------------------------------------------------------------------------

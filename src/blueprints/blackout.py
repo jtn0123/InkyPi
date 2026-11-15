@@ -97,7 +97,7 @@ def _push(name: str, command: Any) -> str:
         return "failed"
     try:
         refresh_task.run_display_command(name, command, wait=False)
-    except Exception:  # noqa: BLE001 — the pause itself already took effect
+    except Exception:  # the pause itself already took effect
         logger.warning("blackout: display command %s failed", name, exc_info=True)
         return "failed"
     return "queued" if getattr(refresh_task, "running", False) else "done"

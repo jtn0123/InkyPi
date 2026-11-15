@@ -20,7 +20,7 @@ from flask.testing import FlaskClient
 
 def test_sliding_window_limiter_prunes_stale_keys() -> None:
     """SlidingWindowLimiter's amortised pruning removes empty keys."""
-    from utils.rate_limiter import SlidingWindowLimiter
+    from utils.rate_limit import SlidingWindowLimiter
 
     limiter = SlidingWindowLimiter(10, 60)
     # Manually inject an empty deque for a stale key

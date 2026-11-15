@@ -239,7 +239,7 @@ def test_log_tail_handles_reader_error(
     """A failing log reader degrades to an empty list, not a 500."""
     import blueprints.settings as settings_mod
 
-    def boom(hours: Any) -> None:  # noqa: ARG001 — signature match
+    def boom(hours: Any) -> None:  # signature match
         raise RuntimeError("journalctl unavailable")
 
     monkeypatch.setattr(settings_mod, "_read_log_lines", boom)

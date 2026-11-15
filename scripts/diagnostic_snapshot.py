@@ -75,7 +75,7 @@ def _collect_system_info() -> str:
         lines.append(f"total : {usage.total // (1024 ** 3)} GB")
         lines.append(f"used  : {usage.used // (1024 ** 3)} GB")
         lines.append(f"free  : {usage.free // (1024 ** 3)} GB")
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         lines.append(f"(unavailable: {exc})")
     lines.append("")
 
@@ -135,7 +135,7 @@ def _collect_system_info() -> str:
             lines.append(result.stdout.strip() or "(no packages)")
         else:
             lines.append(f"(pip freeze failed: {result.stderr.strip()})")
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         lines.append(f"(pip freeze unavailable: {exc})")
 
     return "\n".join(lines) + "\n"
@@ -169,7 +169,7 @@ def _collect_redacted_config(config_dir: str) -> bytes:
             data = json.load(f)
         redacted = _redact_dict(data)
         return json.dumps(redacted, indent=2).encode("utf-8")
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         return json.dumps(
             {"error": f"could not read device.json: {exc}"}, indent=2
         ).encode("utf-8")
@@ -202,7 +202,7 @@ def _collect_journal(lines: int = 200) -> str | None:
         )
         if result.returncode == 0 and result.stdout.strip():
             return result.stdout
-    except Exception:  # noqa: BLE001
+    except Exception:
         pass
 
     # Fallback: try without unit filter
@@ -215,7 +215,7 @@ def _collect_journal(lines: int = 200) -> str | None:
         )
         if result.returncode == 0 and result.stdout.strip():
             return "--- recent journal (no inkypi unit filter) ---\n" + result.stdout
-    except Exception:  # noqa: BLE001
+    except Exception:
         pass
 
     return None

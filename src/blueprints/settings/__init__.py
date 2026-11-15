@@ -20,7 +20,7 @@ from utils.env_flags import env_bool
 from utils.http_utils import http_get
 from utils.logging_utils import log_datetime_from_timestamp, redact_secrets
 from utils.progress_events import get_progress_bus
-from utils.rate_limiter import CooldownLimiter, SlidingWindowLimiter
+from utils.rate_limit import CooldownLimiter, SlidingWindowLimiter
 from utils.time_utils import get_timezone, now_device_tz
 
 # Try to import cysystemd for journal reading (Linux only)
@@ -626,7 +626,7 @@ def _start_update_via_systemd(target_tag: str | None = None) -> str:
     ]
     # All argv elements above are literals or trusted paths. The optional target
     # tag is passed via a fixed breadcrumb file read by do_update.sh.
-    subprocess.Popen(cmd)  # noqa: S603
+    subprocess.Popen(cmd)
     return f"{unit_name}.service"
 
 
@@ -704,7 +704,7 @@ def _start_rollback_via_systemd() -> str:
         script_path,
     ]
     # All argv elements above are string literals or validated internal values.
-    subprocess.Popen(cmd)  # noqa: S603  # all inputs sanitized; shell=False
+    subprocess.Popen(cmd)  # all inputs sanitized; shell=False
     return f"{unit_name}.service"
 
 
@@ -728,7 +728,7 @@ def _run_real_update(script_path: str, target_tag: str | None = None) -> None:
     cmd: list[str] = ["/bin/bash", script_path]
     if sanitized_target_tag is not None:
         cmd.append(sanitized_target_tag)
-    proc = subprocess.Popen(  # noqa: S603  # shell=False; trusted path/validated tag.
+    proc = subprocess.Popen(  # shell=False; trusted path/validated tag.
         cmd,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,

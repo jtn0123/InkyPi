@@ -46,9 +46,7 @@ _THUMB_MAX_HEIGHT = 10_000  # thumbnail() bounds both axes; only width matters
 
 
 @lru_cache(maxsize=_CACHE_MAX)
-def _encode_webp(
-    path: str, mtime: int, size: int
-) -> bytes:  # noqa: ARG001 (size is cache key)
+def _encode_webp(path: str, mtime: int, size: int) -> bytes:  # size is cache key
     """Return WebP-encoded bytes for *path*.
 
     The *mtime* and *size* parameters are only used as cache-key components;
@@ -63,7 +61,7 @@ def _encode_webp(
 @lru_cache(maxsize=_THUMB_CACHE_MAX)
 def _encode_webp_thumbnail(
     path: str, mtime: int, size: int, width: int
-) -> bytes:  # noqa: ARG001 (mtime and size are cache keys)
+) -> bytes:  # mtime and size are cache keys
     """Return WebP bytes for *path* scaled down to at most *width* pixels wide.
 
     Never upscales. Palette and bilevel images are converted first, because

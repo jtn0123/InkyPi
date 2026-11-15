@@ -8,7 +8,7 @@ self-initialise from the DOM, eliminating the need for inline JS.
 
 from __future__ import annotations
 
-import re  # noqa: I001 — re is used below; import order is intentional
+import re  # re is used below; import order is intentional
 
 from flask.testing import FlaskClient
 

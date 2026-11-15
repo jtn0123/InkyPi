@@ -13,7 +13,7 @@ from pathlib import Path
 import pytest
 from PIL import Image
 
-import utils.app_utils as app_utils  # noqa: E402 (conftest adjusts sys.path)
+import utils.app_utils as app_utils  # conftest adjusts sys.path
 
 # ---------------------------------------------------------------------------
 # Helpers

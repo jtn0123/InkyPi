@@ -246,7 +246,6 @@ mypy --strict \
     src/utils/messages.py \
     src/utils/output_validator.py \
     src/utils/paths.py \
-    src/utils/refresh_info.py \
     src/utils/refresh_stats.py \
     src/refresh_task/actions.py \
     src/refresh_task/context.py \

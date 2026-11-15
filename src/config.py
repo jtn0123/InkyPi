@@ -22,7 +22,6 @@ from utils.paths import (
     PROCESSED_IMAGE_FILE as _DEFAULT_PROCESSED_IMAGE,
     resolve_runtime_paths,
 )
-from utils.refresh_info import RefreshInfoRepository
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +49,11 @@ _DEVICE_JSON = "device.json"
 _DEVICE_NAME_MAX_LEN = 64
 
 _SENSITIVE_TERMS = ("secret", "token", "api", "key", "password")
+
+# A saved refresh record without all four of these is treated as damaged.
+_REFRESH_INFO_REQUIRED_KEYS = frozenset(
+    {"refresh_type", "plugin_id", "refresh_time", "image_hash"}
+)
 
 
 def _looks_sensitive(key_name: str) -> bool:
@@ -199,7 +203,6 @@ class Config:
         self.plugins_list: list[dict[str, Any]] = self.read_plugins_list()
         self.playlist_manager: PlaylistManager = self.load_playlist_manager()
         self.refresh_info: RefreshInfo = self.load_refresh_info()
-        self._refresh_info_repo: RefreshInfoRepository | None = None
         self._persisted_state = self._capture_mutable_state()
 
     def _resolve_runtime_paths(self) -> None:
@@ -700,13 +703,16 @@ class Config:
         return playlist_manager
 
     def load_refresh_info(self) -> RefreshInfo:
-        """Loads the refresh information from the config.
+        """Load the record of the last refresh from the config.
 
-        Delegates to :class:`~utils.refresh_info.RefreshInfoRepository`.
+        A missing or incomplete record falls back to an empty "Manual Update"
+        entry, so a damaged config file never stops the app from starting.
         """
-        data = self.get_config("refresh_info", {}) or {}
-        self._refresh_info_repo = RefreshInfoRepository(data)
-        return self._refresh_info_repo.get()
+        data = self.get_config("refresh_info", {})
+        if isinstance(data, dict) and _REFRESH_INFO_REQUIRED_KEYS.issubset(data):
+            return RefreshInfo.from_dict(data)
+        logger.warning("Invalid refresh_info in config, using defaults")
+        return RefreshInfo("Manual Update", "", None, None)
 
     def get_playlist_manager(self) -> PlaylistManager:
         """Returns the playlist manager."""

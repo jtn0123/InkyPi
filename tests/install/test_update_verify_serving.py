@@ -29,7 +29,7 @@ def _make_server(*, ready: bool, version: str | None) -> Any:
     """Serve just the two endpoints the verifier polls."""
 
     class Handler(BaseHTTPRequestHandler):
-        def do_GET(self) -> None:  # noqa: N802 — BaseHTTPRequestHandler API
+        def do_GET(self) -> None:  # BaseHTTPRequestHandler API
             if self.path == "/readyz":
                 if ready:
                     self.send_response(200)

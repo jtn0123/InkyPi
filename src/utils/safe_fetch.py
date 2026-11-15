@@ -152,7 +152,7 @@ def guarded_fetch(
         current = target
         ips = None
 
-    import requests  # noqa: F811
+    import requests
 
     raise requests.TooManyRedirects(f"Exceeded {max_redirects} redirects")
 
@@ -382,7 +382,7 @@ def fetch_feed_bytes(
     except URLValidationError:
         raise
     except ValueError as exc:
-        import requests  # noqa: F811
+        import requests
 
         if isinstance(exc, requests.RequestException):
             # ``requests.InvalidURL`` & co. subclass ValueError but are

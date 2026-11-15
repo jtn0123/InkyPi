@@ -21,12 +21,15 @@ Add these to `src/config/device.json` as needed. Defaults are safe in production
 
 ### Where instrumentation lives
 
-- `src/refresh_task.py`:
-  - Creates a `benchmark_id` per refresh.
-  - Persists `refresh_events` row with timing and system snapshot.
-  - Emits `stage_events` for `generate_image` and overall `display_pipeline`.
+- `src/refresh_task/refresh_cycle.py`:
+  - Creates a `benchmark_id` per refresh and emits the `generate_image` stage.
+  - Saves the `refresh_events` row at the end of the refresh.
+- `src/refresh_task/display_pipeline.py`:
+  - Emits the overall `display_pipeline` stage and, when the driver is known, `display_driver`.
+- `src/refresh_task/recorder.py`:
+  - `RefreshRecorder` adds the system snapshot and writes rows through `src/benchmarks/benchmark_storage.py`.
 - `src/display/display_manager.py`:
-  - Records `preprocess_ms` and `display_ms` and, if available, emits stage `display_driver` with driver type.
+  - Measures `preprocess_ms` and `display_ms` and reports the driver name.
 
 ### Exporting reports
 

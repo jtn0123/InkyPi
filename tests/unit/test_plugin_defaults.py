@@ -111,7 +111,7 @@ def test_rss_defaults_feed_url_when_empty(monkeypatch: pytest.MonkeyPatch) -> An
 
     captured: dict[str, Any] = {}
 
-    def fake_parse(self, url: str, timeout: int = 10) -> Any:  # noqa: ANN001
+    def fake_parse(self, url: str, timeout: int = 10) -> Any:
         captured["url"] = url
         return []
 
@@ -137,15 +137,13 @@ def test_weather_defaults_use_openmeteo_when_empty(
 
     def fake_get_open_meteo_data(
         self, lat: Any, long: Any, units: Any, days: Any
-    ) -> Any:  # noqa: ANN001
+    ) -> Any:
         captured["lat"] = lat
         captured["long"] = long
         captured["units"] = units
         return {}
 
-    def fake_get_open_meteo_air_quality(
-        self, lat: Any, long: Any
-    ) -> Any:  # noqa: ANN001
+    def fake_get_open_meteo_air_quality(self, lat: Any, long: Any) -> Any:
         return {}
 
     def fake_parse_open_meteo_data(self, *_a: Any, **_kw: Any) -> Any:

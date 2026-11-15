@@ -13,7 +13,7 @@ from utils.backend_errors import (
     ConflictRouteError,
     route_error_boundary,
 )
-from utils.http_utils import json_error, json_success
+from utils.http_utils import JsonResponse, json_error, json_success
 
 
 def _json_payload(response: Response | dict[str, object]) -> dict[str, object]:
@@ -52,8 +52,8 @@ def _read_prev_version() -> str | None:
     return raw
 
 
-@_mod.settings_bp.route("/settings/update", methods=["POST"])  # type: ignore
-def start_update() -> tuple[object, int] | Response:
+@_mod.settings_bp.route("/settings/update", methods=["POST"])
+def start_update() -> JsonResponse | Response:
     """Trigger InkyPi update via systemd-run when available, with dev fallback.
 
     Accepts optional JSON body ``{"target_version": "v1.2.0"}`` to update to a
@@ -362,8 +362,8 @@ def update_status() -> Response:
         )
 
 
-@_mod.settings_bp.route("/settings/update/rollback", methods=["POST"])  # type: ignore
-def start_rollback() -> tuple[object, int] | Response:
+@_mod.settings_bp.route("/settings/update/rollback", methods=["POST"])
+def start_rollback() -> JsonResponse | Response:
     """Trigger a rollback to the tag recorded in ``/var/lib/inkypi/prev_version``.
 
     JTN-708: completes the failed-update recovery loop.

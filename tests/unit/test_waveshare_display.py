@@ -227,15 +227,13 @@ class FakeGrayscaleModeEPD:
     def getbuffer(self, img: Any) -> Any:
         return ("buf", img.size)
 
-    def getbuffer_4Gray(
-        self, img: Any
-    ) -> Any:  # noqa: N802 — mirrors the vendor driver
+    def getbuffer_4Gray(self, img: Any) -> Any:  # mirrors the vendor driver
         return ("buf4", img.size)
 
-    def display_1Gray(self, buf: Any) -> None:  # noqa: N802 — mirrors the vendor driver
+    def display_1Gray(self, buf: Any) -> None:  # mirrors the vendor driver
         self.gray1.append(buf)
 
-    def display_4Gray(self, buf: Any) -> None:  # noqa: N802 — mirrors the vendor driver
+    def display_4Gray(self, buf: Any) -> None:  # mirrors the vendor driver
         self.gray4.append(buf)
 
     def Clear(self, color: Any, mode: Any) -> None:
