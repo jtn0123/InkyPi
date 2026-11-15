@@ -107,8 +107,7 @@
 
 .pl-item-thumb:empty { display: none; }
 
-.pl-item-thumb .plugin-thumbnail-container,
-.pl-item-thumb .plugin-thumb {
+.pl-item-thumb .plugin-thumbnail-container {
   width: 100%;
   height: 100%;
   margin: 0;

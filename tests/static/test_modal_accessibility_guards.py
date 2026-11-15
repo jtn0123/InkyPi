@@ -1,11 +1,14 @@
 # pyright: reportMissingImports=false
 """Regression guards for modal keyboard dismissal hooks."""
 
+import re
 from pathlib import Path
 
 import pytest
 
-_SCRIPTS_DIR = Path(__file__).resolve().parents[2] / "src" / "static" / "scripts"
+_SRC = Path(__file__).resolve().parents[2] / "src"
+_SCRIPTS_DIR = _SRC / "static" / "scripts"
+_TEMPLATES_DIR = _SRC / "templates"
 
 
 def _read_script(name: str) -> str:
@@ -50,17 +53,14 @@ def test_dialog_scripts_use_the_shared_focus_helper(script: str) -> None:
 
 def test_playlist_escape_routes_every_dialog_to_its_close_function() -> None:
     content = _read_script("playlist/modals.js")
+    # Read the dialogs from the page itself, so a new one can't be missed and
+    # a removed one doesn't keep its close code alive.
+    template = (_TEMPLATES_DIR / "playlist.html").read_text(encoding="utf-8")
+    modal_ids = set(re.findall(r'id="(\w+Modal)"', template))
+    assert {"playlistModal", "thumbnailPreviewModal"} <= modal_ids
 
-    for modal_id in (
-        "deleteInstanceModal",
-        "deletePlaylistModal",
-        "displayNextConfirmModal",
-        "thumbnailPreviewModal",
-        "refreshSettingsModal",
-        "deviceCycleModal",
-        "playlistModal",
-    ):
-        assert f'case "{modal_id}":' in content, modal_id
+    routed = set(re.findall(r'case "(\w+Modal)":', content))
+    assert routed == modal_ids
 
 
 def test_settings_page_reboot_shutdown_modals_handle_escape() -> None:

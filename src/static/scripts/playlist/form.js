@@ -225,31 +225,6 @@
     ns.openDeletePlaylistModal(name, document.activeElement);
   }
 
-  async function saveDeviceCycle() {
-    const input = document.getElementById("device_cycle_minutes");
-    const raw = (input?.value || "").trim();
-    const minutes = Number.parseInt(raw, 10);
-    if (!/^\d+$/.test(raw) || minutes < 1 || minutes > 1440) {
-      showResponseModal("failure", "Enter minutes between 1 and 1440");
-      return;
-    }
-    try {
-      const response = await fetch(ns.config.update_device_cycle_url, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ minutes }),
-      });
-      const result = await handleJsonResponse(response);
-      if (response.ok && result?.success) {
-        ns.closeDeviceCycleModal();
-        location.reload();
-      }
-    } catch (error) {
-      console.debug("Failed saving playlist device cadence:", error);
-      showResponseModal("failure", "Failed saving cadence");
-    }
-  }
-
   function reportPlaylistSaveFailure(error) {
     console.error("Failed to save playlist:", error);
     showResponseModal("failure", "An error occurred while processing your request.");
@@ -284,9 +259,6 @@
     document
       .getElementById("saveRefreshSettingsBtn")
       ?.addEventListener("click", ns.saveRefreshSettings);
-    document
-      .getElementById("editDeviceCycleBtn")
-      ?.addEventListener("click", ns.openDeviceCycleModal);
 
     ns.runtime.formControlsBound = true;
   }
@@ -297,7 +269,6 @@
     handlePlaylistMutationSuccess,
     initFormControls,
     runPlaylistMutation,
-    saveDeviceCycle,
     updatePlaylist,
   });
 
