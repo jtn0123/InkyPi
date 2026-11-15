@@ -36,7 +36,7 @@ jobs:
           enable-cache: true
 
       - name: Install semantic-release and SBOM tools
-        run: pip install python-semantic-release==10.7.0 cyclonedx-bom==7.5.0
+        run: pip install python-semantic-release==10.7.0 cyclonedx-bom==8.0.1
 
       - name: Semantic Release — version & publish
         env:

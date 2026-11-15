@@ -86,9 +86,11 @@ trap 'echo ""; echo "dev_watch: stopped."; exit 0' INT TERM
 
 # --recursive so nested partials/macros are covered. --ignore-patterns avoids
 # rebuild loops from the generated main.css / dist bundles.
+# watchdog 7 matches patterns against the whole path (PurePath.full_match), so
+# each pattern needs a leading **/; a bare *.css no longer matches anything.
 exec "${WATCHMEDO_RUN[@]}" shell-command \
-  --patterns="*.css;*.js;*.html" \
-  --ignore-patterns="*/main.css;*/dist/*;*/__pycache__/*" \
+  --patterns="**/*.css;**/*.js;**/*.html" \
+  --ignore-patterns="**/main.css;**/dist/**;**/__pycache__/**" \
   --ignore-directories \
   --recursive \
   --command="${PYTHON} ${DISPATCHER} \${watch_event_type} \${watch_src_path}" \

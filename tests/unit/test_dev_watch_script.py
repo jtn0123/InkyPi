@@ -76,6 +76,47 @@ class TestDevWatchShellScript:
         assert "main.css" in self.content
         assert "dist" in self.content
 
+    def _flag(self, name: str) -> list[str]:
+        match = re.search(rf'--{name}=["\']([^"\']+)["\']', self.content)
+        assert match, f"expected --{name}=... in watchmedo invocation"
+        return match.group(1).split(";")
+
+    def test_patterns_select_sources_with_installed_watchdog(self) -> None:
+        # Feed events through watchdog's own filter (the base class of the
+        # handler watchmedo shell-command builds), so a matching change in a
+        # new watchdog major fails here and not silently in dev_watch.sh.
+        # watchdog 7 broke the old bare "*.css" patterns this way.
+        from watchdog.events import FileCreatedEvent, PatternMatchingEventHandler
+
+        seen: list[str] = []
+
+        class Recorder(PatternMatchingEventHandler):
+            def on_any_event(self, event: Any) -> None:
+                seen.append(str(event.src_path))
+
+        handler = Recorder(
+            patterns=self._flag("patterns"),
+            ignore_patterns=self._flag("ignore-patterns"),
+            ignore_directories=True,
+        )
+        static = REPO_ROOT / "src" / "static"
+        wanted = [
+            static / "styles" / "partials" / "_buttons.css",
+            static / "scripts" / "settings" / "navigation.js",
+            REPO_ROOT / "src" / "templates" / "macros" / "forms.html",
+            static / "styles" / "top_level.css",
+        ]
+        ignored = [
+            static / "styles" / "main.css",
+            static / "scripts" / "dist" / "common.bundle.js",
+            static / "scripts" / "__pycache__" / "x.js",
+            static / "scripts" / "notes.txt",
+        ]
+        for path in wanted + ignored:
+            handler.dispatch(FileCreatedEvent(str(path)))
+
+        assert seen == [str(path) for path in wanted]
+
     def test_checks_watchdog_installed(self) -> None:
         assert "import watchdog" in self.content
         # Must print an install hint when missing.

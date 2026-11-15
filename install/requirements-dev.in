@@ -41,9 +41,9 @@ ruff>=0.16,<1
 
 # Dev watch-mode rebuilds (JTN-713) — provides the `watchmedo` CLI used by
 # scripts/dev_watch.sh to auto-rebuild CSS/JS bundles on file changes.
-# Not pinned in the compiled lockfile on purpose: it is an optional developer
-# convenience, not a CI requirement.
-watchdog>=6.0,<7
+# 7.x matches watch patterns against the full path; dev_watch.sh's **/
+# patterns and tests/unit/test_dev_watch_script.py depend on that.
+watchdog>=7.1,<8
 
 # Browser / E2E testing
 playwright>=1.63,<2
@@ -74,7 +74,7 @@ defusedxml>=0.7,<1
 
 # Audit / compliance
 pip-audit>=2.10,<3
-cyclonedx-bom>=7.5,<8
+cyclonedx-bom>=8.0,<9
 pre-commit>=4.6,<5
 # Matches the pin in .github/workflows/release.yml.
 python-semantic-release==10.7.0
