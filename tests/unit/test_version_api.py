@@ -345,3 +345,13 @@ def test_concurrent_check_answers_from_cache_instead_of_waiting() -> None:
     assert elapsed < 1.0
     assert calls == 1
     assert results == ["2.0.0"]
+
+
+def test_test_app_never_asks_the_real_github(flask_app: Flask) -> None:
+    """tests/conftest.py's flask_app keeps the update check offline."""
+    from services import version_check
+
+    assert version_check._check_latest_version(force_refresh=True) is None
+    assert version_check._VERSION_CACHE["last_error"] == (
+        "Couldn't reach GitHub: tests do not call GitHub"
+    )

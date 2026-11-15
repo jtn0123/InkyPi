@@ -567,7 +567,30 @@ def flask_app(device_config_dev: Any, monkeypatch: pytest.MonkeyPatch) -> Any:
     monkeypatch.setattr(inkypi, "setup_csrf_protection", _setup_csrf_token_only)
     monkeypatch.setattr(inkypi, "setup_signal_handlers", lambda app: None)
 
-    return inkypi.create_app()
+    app = inkypi.create_app()
+    _keep_github_offline(monkeypatch)
+    return app
+
+
+def _github_unreachable(*_args: Any, **_kwargs: Any) -> Any:
+    raise ConnectionError("tests do not call GitHub")
+
+
+def _keep_github_offline(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Stop the app's update check from asking the real GitHub.
+
+    Every page polls /api/version, which asked api.github.com for the latest
+    release: tests depended on the network, hit GitHub's rate limit, and
+    browser tests that wait for the page to go idle waited on GitHub too. The
+    check now fails at once, as it would offline. A test that installed its own
+    fake before the app was built keeps it; one that patches
+    ``services.version_check.http_get`` afterwards replaces this one.
+    """
+    from services import version_check
+    from utils.http_transport import http_get
+
+    if version_check.http_get is http_get:
+        monkeypatch.setattr(version_check, "http_get", _github_unreachable)
 
 
 @pytest.fixture()
