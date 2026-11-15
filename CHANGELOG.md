@@ -2,6 +2,15 @@
 
 <!-- version list -->
 
+## v1.8.12 (2026-11-15)
+
+### Bug Fixes
+
+- **dashboard**: Make the "Next up" peek pure and skip resting paused plugins
+  ([#731](https://github.com/jtn0123/InkyPi/pull/731),
+  [`58d84cd`](https://github.com/jtn0123/InkyPi/commit/58d84cdc6b0dddf06acbcaebcab27fb8832ca97f))
+
+
 ## v1.8.11 (2026-11-15)
 
 ### Bug Fixes
