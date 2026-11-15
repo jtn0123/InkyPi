@@ -188,3 +188,61 @@ def test_device_actions_confirm_cancel_paths(
     ]
 
     collector.assert_no_errors(name="journey_device_actions")
+
+
+def _failure_messages(page: Page) -> list[str]:
+    return list(page.evaluate("""() => (window.__journeyMessages || [])
+            .filter((entry) => entry.status === 'failure')
+            .map((entry) => entry.message)"""))
+
+
+def _success_messages(page: Page) -> list[str]:
+    return list(page.evaluate("""() => (window.__journeyMessages || [])
+            .filter((entry) => entry.status === 'success')
+            .map((entry) => entry.message)"""))
+
+
+def test_refused_reboot_and_failed_shutdown_are_reported(
+    live_server: str,
+    browser_page: Page,
+    device_action_calls: Any,
+    reset_shutdown_limiter: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The page reports the device's answer, not a success it assumed."""
+    page = browser_page
+    _open_settings_device_panel(page, live_server)
+
+    # A reboot inside the cooldown is refused with 429.
+    from blueprints.settings import _system
+
+    _system._shutdown_limiter.acquire()
+    page.locator("#rebootBtn").click()
+    page.locator("#rebootConfirmModal").wait_for(state="visible", timeout=5000)
+    with page.expect_response(
+        lambda r: r.url.endswith("/shutdown") and r.status == 429, timeout=7000
+    ):
+        page.locator("#confirmRebootBtn").click()
+    _assert_response_message(page, "before requesting another reboot/shutdown")
+    assert _success_messages(page) == []
+    assert device_action_calls == []
+
+    # A shutdown command that fails is reported as a failure too.
+    reset_shutdown_limiter()
+    import subprocess
+
+    def _failing_run(cmd: Any, check: Any = True) -> None:
+        raise subprocess.CalledProcessError(1, cmd)
+
+    monkeypatch.setattr(subprocess, "run", _failing_run)
+    page.locator("#shutdownBtn").click()
+    page.locator("#shutdownConfirmModal").wait_for(state="visible", timeout=5000)
+    with page.expect_response(
+        lambda r: r.url.endswith("/shutdown") and r.status == 500, timeout=7000
+    ):
+        page.locator("#confirmShutdownBtn").click()
+    page.wait_for_function(
+        "() => (window.__journeyMessages || []).length >= 2", timeout=5000
+    )
+    assert len(_failure_messages(page)) == 2
+    assert _success_messages(page) == []

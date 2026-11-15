@@ -464,11 +464,42 @@
       }
     }
 
+    // Ask the device first and report what it said. The device may drop the
+    // connection as it goes down, so a network error counts as success; a
+    // refusal (cooldown, failed command, sign-in needed) is shown as is.
     async function handleShutdown(reboot) {
+      const confirmBtn = document.getElementById(
+        reboot ? "confirmRebootBtn" : "confirmShutdownBtn"
+      );
+      if (confirmBtn?.disabled) return;
+      if (confirmBtn) confirmBtn.disabled = true;
+      let resp = null;
+      try {
+        resp = await fetch(config.shutdownUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ reboot }),
+        });
+      } catch (e) {
+        console.debug("Shutdown request ended early while the device was shutting down:", e);
+      } finally {
+        if (confirmBtn) confirmBtn.disabled = false;
+      }
       if (reboot) {
         closeRebootConfirm();
       } else {
         closeShutdownConfirm();
+      }
+      if (resp && !resp.ok) {
+        let message = reboot ? "Reboot failed" : "Shutdown failed";
+        try {
+          const data = await resp.json();
+          if (data?.error) message = data.error;
+        } catch {
+          // Not JSON: keep the generic message.
+        }
+        showResponseModal("failure", message);
+        return;
       }
       showResponseModal(
         "success",
@@ -476,16 +507,6 @@
           ? "The system is rebooting. The UI will be unavailable until the reboot is complete."
           : "The system is shutting down. The UI will remain unavailable until it is manually restarted."
       );
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      try {
-        await fetch(config.shutdownUrl, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ reboot }),
-        });
-      } catch (e) {
-        console.debug("Shutdown request ended early while the device was shutting down:", e);
-      }
     }
 
     function stop() {
