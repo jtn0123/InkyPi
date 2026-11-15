@@ -558,11 +558,32 @@ def _apply_hsts_header(response: Response) -> None:
         )
 
 
+def allow_extra_csp_sources(directive: str, *sources: str) -> None:
+    """Let this response's default CSP also allow *sources* for *directive*.
+
+    For the rare page that loads a pinned third-party file (the API docs).
+    An operator-supplied ``INKYPI_CSP`` still wins.
+    """
+    extra: dict[str, list[str]] = g.setdefault("csp_extra_sources", {})
+    extra.setdefault(directive, []).extend(sources)
+
+
+def _default_csp(nonce: str) -> str:
+    """The default policy, plus any sources this request's route added."""
+    extra: dict[str, list[str]] = getattr(g, "csp_extra_sources", None) or {}
+    directives = []
+    for part in _DEFAULT_CSP_TEMPLATE.format(nonce=nonce).split(";"):
+        part = part.strip()
+        name = part.split(" ", 1)[0]
+        directives.append(" ".join([part, *extra.get(name, [])]))
+    return "; ".join(directives)
+
+
 def _apply_csp_header(response: Response, *, dev_mode: bool) -> None:
     """Set the Content-Security-Policy header (report-only in dev mode)."""
     nonce = getattr(g, "csp_nonce", "")
     # Honour operator-supplied CSP verbatim (no nonce injection).
-    csp_value = os.getenv("INKYPI_CSP") or _DEFAULT_CSP_TEMPLATE.format(nonce=nonce)
+    csp_value = os.getenv("INKYPI_CSP") or _default_csp(nonce)
     if "report-uri" not in csp_value:
         csp_value = csp_value.rstrip("; ") + "; report-uri /api/csp-report"
     report_only = dev_mode or env_bool("INKYPI_CSP_REPORT_ONLY")
