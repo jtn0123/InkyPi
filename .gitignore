@@ -224,7 +224,6 @@ coverage.xml
 !/src/static/scripts/playlist/*.js
 !/src/static/scripts/ui_helpers.js
 !/src/static/scripts/csrf.js
-!/src/static/scripts/client_errors.js
 !/src/static/scripts/client_error_reporter.js
 !/src/static/scripts/client_log_reporter.js
 !/src/static/scripts/errors_page.js
