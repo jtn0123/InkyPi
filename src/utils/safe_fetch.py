@@ -290,7 +290,6 @@ def open_guarded_stream(
                 timeout=effective_timeout,
                 stream=True,
                 allow_redirects=False,
-                use_cache=False,
             )
         return session.get(
             hop_url,

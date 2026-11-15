@@ -58,14 +58,6 @@ def test_http_get_timeout_override(monkeypatch: pytest.MonkeyPatch) -> Any:
 
     http_utils._reset_shared_session_for_tests()
 
-    # Reset cache to ensure clean state
-    try:
-        from utils.http_cache import _reset_cache_for_tests
-
-        _reset_cache_for_tests()
-    except ImportError:
-        pass
-
     captured: _CapturedRequest = {}
 
     def fake_get(self: requests.Session, url: str, **kwargs: object) -> _ResponseStub:
@@ -238,14 +230,6 @@ def test_http_get_timeout_tuple_from_env(monkeypatch: pytest.MonkeyPatch) -> Any
     monkeypatch.setattr(http_transport, "READ_TIMEOUT_SECONDS", 3.0, raising=True)
 
     http_utils._reset_shared_session_for_tests()
-
-    # Reset cache to ensure clean state
-    try:
-        from utils.http_cache import _reset_cache_for_tests
-
-        _reset_cache_for_tests()
-    except ImportError:
-        pass
 
     captured: _CapturedRequest = {}
 

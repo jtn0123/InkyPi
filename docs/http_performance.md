@@ -89,11 +89,10 @@ response = session.get(url, timeout=(5, 30))
 
 ### `http_get()` wrapper
 
-`src/utils/http_utils.py` also exposes `http_get()` (line 285) which adds caching,
-latency logging, and applies the env-based default automatically. It uses the same shared
-session factory as `get_http_session()`, but keeps its thread-local lifecycle because the
-request wrapper has different retry defaults. Use it when you want both the pool and
-caching without wiring them by hand:
+`src/utils/http_utils.py` also exposes `http_get()`, which adds optional latency logging
+and applies the env-based default timeout automatically. It uses the same shared session
+factory as `get_http_session()`, but keeps its thread-local lifecycle because the request
+wrapper has different retry defaults:
 
 ```python
 from utils.http_utils import http_get
@@ -101,19 +100,12 @@ from utils.http_utils import http_get
 response = http_get(url, timeout=15)
 ```
 
-## When to use `http_cache` vs the raw session
+## Responses are not cached
 
-| Scenario | Recommendation |
-|---|---|
-| Fetching data that is valid for minutes (weather, RSS, APOD) | `http_get()` – caching is on by default |
-| Fetching the same URL multiple times in one refresh cycle | `http_get()` – second call is free |
-| POST / PUT / DELETE (write operations) | `get_http_session().post(...)` – cache skips non-GET by design |
-| One-shot reads where stale data would be wrong (live scores, stock prices) | `get_http_session().get(url, timeout=…)` with `use_cache=False` if using `http_get`, or the raw session |
-| Streaming a large binary (image download by URL) | `get_http_session().get(url, stream=True, timeout=…)` – cache stores full content, so skip it |
-
-**Decision rule:** if the URL+params combination will be requested more than once in a
-single refresh cycle, or if the data is stable for several minutes, reach for `http_get()`.
-If you are writing data or consuming a one-shot endpoint, use the raw session directly.
+Neither helper caches responses. A plugin renders in a child process that exits
+afterwards, so an in-memory cache would start empty every time (the old one was
+removed for that reason, see ADR-0002). If a plugin needs to avoid repeat downloads,
+it should keep what it fetched on disk itself.
 
 ## Plugin author checklist
 
@@ -157,12 +149,10 @@ def fetch_data(url: str, api_key: str) -> dict:
 
 ## Noted exceptions
 
-`src/plugins/comic/comic_parser.py` (line 94) uses `http_get()` from `src/utils/http_utils.py`
+`src/plugins/comic/comic_parser.py` uses `http_get()` from `src/utils/http_utils.py`
 rather than calling `get_http_session()` directly. This is acceptable: `http_get()` is a
 higher-level wrapper that internally calls `get_shared_session()` (another pooled session
-from `src/utils/http_utils.py`, line 255) and adds caching and latency logging. The comic
-parser sets `use_cache=False` because feed content changes frequently; the pool is still
-reused.
+from `src/utils/http_transport.py`) and adds latency logging; the pool is still reused.
 
 A follow-up should add a link to this document from `CONTRIBUTING.md` to make it
 discoverable for new plugin authors.

@@ -1,6 +1,14 @@
 # ADR-0002: Custom in-process HTTP cache with TTL
 
-**Status:** Accepted
+**Status:** Withdrawn (2026-11-15). The cache was removed.
+
+Plugins render in a child process that exits after each render (the default
+`INKYPI_PLUGIN_ISOLATION=process`), so an in-memory cache started empty every
+time and never served a response. The plugins that call APIs most often also
+used `get_http_session()` directly, which bypassed it. At the device's refresh
+interval no API is near its free-tier limit, so the cache was removed rather
+than moved to disk. If a plugin ever needs caching, cache on disk in that
+plugin, keyed on what it fetches. The original record follows.
 
 ## Context
 

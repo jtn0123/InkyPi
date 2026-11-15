@@ -11,10 +11,18 @@ model and they differ, the timing comparison is reported but not enforced
 (a benchmark missing from the current run still fails); the absolute budgets
 in ``scripts/perf_budget_gate.py`` keep guarding real regressions.
 
+A benchmark in the baseline but not in the current run fails the gate, so a
+benchmark can't quietly stop running. With ``--expected``, a benchmark that is
+also absent from that file (the committed ``tests/benchmarks/baseline.json``)
+counts as retired instead: CI's cached baseline comes from an older main run,
+so it still lists a benchmark a PR deletes on purpose. To retire one, delete
+the test and its entry in the committed baseline.
+
 Usage:
     python scripts/benchmark_compare.py \
         --baseline tests/benchmarks/baseline.json \
         --current  /tmp/bench-current.json \
+        [--expected tests/benchmarks/baseline.json] \
         [--threshold 15]
 
 The threshold is a percentage (default 15, i.e. +15% regression).
@@ -49,11 +57,20 @@ def compare(
     baseline: dict[str, float],
     current: dict[str, float],
     threshold_pct: float,
+    expected: set[str] | None = None,
 ) -> list[str]:
-    """Return a list of failure messages for benchmarks that regressed."""
+    """Return a list of failure messages for benchmarks that regressed.
+
+    *expected*, when given, is the set of benchmarks that should exist. One
+    missing from both it and the current run is reported as retired, not as
+    a failure.
+    """
     failures: list[str] = []
     for name, base_val in sorted(baseline.items()):
         cur_val = current.get(name)
+        if cur_val is None and expected is not None and name not in expected:
+            print(f"  RETIRED {name}: removed from the committed baseline")
+            continue
         if cur_val is None:
             label = f"  FAIL  {name}: missing in current run (present in baseline)"
             print(label)
@@ -89,6 +106,15 @@ def main() -> int:
         help="Path to the current benchmark JSON output",
     )
     parser.add_argument(
+        "--expected",
+        default=None,
+        help=(
+            "Committed baseline JSON listing the benchmarks that should exist; "
+            "a baseline benchmark missing from it and from the current run "
+            "is treated as retired rather than missing"
+        ),
+    )
+    parser.add_argument(
         "--threshold",
         type=float,
         default=None,
@@ -107,12 +133,13 @@ def main() -> int:
 
     baseline = load_benchmarks(args.baseline)
     current = load_benchmarks(args.current)
+    expected = set(load_benchmarks(args.expected)) if args.expected else None
 
     if not baseline:
         print("ERROR: No benchmarks found in baseline file")
         return 1
 
-    failures = compare(baseline, current, threshold)
+    failures = compare(baseline, current, threshold, expected)
 
     base_cpu, cur_cpu = cpu_model(args.baseline), cpu_model(args.current)
     if base_cpu and cur_cpu and base_cpu != cur_cpu:

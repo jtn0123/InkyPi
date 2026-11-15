@@ -158,7 +158,6 @@ def _stream_to_disk(url: str, timeout: float, pinned_ips: tuple[str, ...]) -> st
             hop_url,
             timeout=timeout,
             stream=True,
-            use_cache=False,
             allow_redirects=False,
         )
 

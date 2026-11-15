@@ -72,8 +72,6 @@ from utils.http_transport import (
     _reset_shared_session_for_tests,
     _resolve_timeout,
     _thread_local,
-    _try_cache_lookup,
-    _try_cache_store,
     get_shared_session,
     http_get,
 )
@@ -146,8 +144,6 @@ __all__ = [
     "_reset_shared_session_for_tests",
     "_resolve_timeout",
     "_thread_local",
-    "_try_cache_lookup",
-    "_try_cache_store",
     "get_shared_session",
     "http_get",
     # utils.dns_pinning
