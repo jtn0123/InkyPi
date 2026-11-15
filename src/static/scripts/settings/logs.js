@@ -2,11 +2,37 @@
   globalThis.InkyPiSettingsModules = globalThis.InkyPiSettingsModules || {};
   const settingsModules = globalThis.InkyPiSettingsModules;
 
-  function updateLastUpdated() {
+  function updateLastUpdated(state) {
+    state.logsUpdatedAt = new Date().toLocaleTimeString();
     const el = document.getElementById("logsUpdated");
     if (el) {
-      el.textContent = `Updated ${new Date().toLocaleTimeString()}`;
+      el.textContent = `Updated ${state.logsUpdatedAt}`;
     }
+  }
+
+  // A failed refresh keeps the logs already on screen and says so, instead
+  // of blanking them under a fresh "Updated" time.
+  function showRefreshFailed(state) {
+    const el = document.getElementById("logsUpdated");
+    if (!el) return;
+    el.textContent = state.logsUpdatedAt
+      ? `Refresh failed · showing logs from ${state.logsUpdatedAt}`
+      : "Refresh failed";
+  }
+
+  async function readLogsResponse(resp) {
+    let data = null;
+    try {
+      data = await resp.json();
+    } catch {
+      data = null;
+    }
+    if (resp.ok && Array.isArray(data?.lines)) {
+      return { lines: data.lines, error: null };
+    }
+    const reason =
+      data?.error || `The device answered with status ${resp.status}`;
+    return { lines: null, error: reason };
   }
 
   function isViewerAtBottom(viewer) {
@@ -163,14 +189,18 @@
       }
     }
 
-    async function fetchAndRenderLogs() {
+    // Returns true when the logs were refreshed. With announce, a failure
+    // also shows a toast (for refreshes the user asked for; background polls
+    // only update the status line).
+    async function fetchAndRenderLogs({ announce = false } = {}) {
       const viewer = document.getElementById("logsViewer");
-      if (!viewer) return;
+      if (!viewer) return false;
 
       const hoursSelect = document.getElementById("logsHours");
       const filterInput = document.getElementById("logsFilter");
       const levelSelect = document.getElementById("logsLevel");
       const maxLinesInput = document.getElementById("logsMaxLines");
+      let failure = "";
       try {
         const params = buildLogsParams(
           hoursSelect,
@@ -181,16 +211,25 @@
         const resp = await fetch(`${config.logsUrl}?${params.toString()}`, {
           cache: "no-store",
         });
-        const data = await resp.json();
-        state.lastLogsRaw = Array.isArray(data?.lines)
-          ? data.lines.join("\n")
-          : "";
-        updateLastUpdated();
-        applyLogFiltersAndRender();
-        flashLogsViewer();
+        const { lines, error } = await readLogsResponse(resp);
+        if (lines) {
+          state.lastLogsRaw = lines.join("\n");
+          updateLastUpdated(state);
+          applyLogFiltersAndRender();
+          flashLogsViewer();
+          return true;
+        }
+        failure = error;
       } catch (e) {
-        console.error("Failed to fetch logs", e);
+        // Shown on the page below, so it isn't logged as an error.
+        console.debug("Failed to fetch logs", e);
+        failure = "Couldn't reach the device";
       }
+      showRefreshFailed(state);
+      if (announce) {
+        showResponseModal("failure", `Couldn't refresh the logs: ${failure}`);
+      }
+      return false;
     }
 
     function toggleLogsAutoScroll() {
@@ -212,7 +251,7 @@
         ui.savePref("", prefKey("maxLines"), maxLines.value);
       }
       // fetchAndRenderLogs reports fetch/render errors internally.
-      void fetchAndRenderLogs();
+      void fetchAndRenderLogs({ announce: true });
     }
 
     function onLogsFilterChanged() {
@@ -236,7 +275,7 @@
       }
       if (updated) updated.textContent = "Refreshing...";
       try {
-        await fetchAndRenderLogs();
+        await fetchAndRenderLogs({ announce: true });
       } finally {
         if (btn) {
           btn.disabled = false;

@@ -18,6 +18,7 @@
       logsAutoScroll: true,
       logsWrap: true,
       lastLogsRaw: "",
+      logsUpdatedAt: "",
       updateTimer: null,
       attachGeo: false,
       activeTab: "device",
