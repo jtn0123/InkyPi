@@ -2,6 +2,74 @@
 
 <!-- version list -->
 
+## v1.9.1 (2026-11-15)
+
+### Bug Fixes
+
+- **logs**: Keep the frame's image hash readable
+  ([#818](https://github.com/jtn0123/InkyPi/pull/818),
+  [`4423fed`](https://github.com/jtn0123/InkyPi/commit/4423fedef1d004bec219152a0f8e7558905c6ebe))
+
+- **settings**: Tell screen readers which settings section is showing
+  ([#823](https://github.com/jtn0123/InkyPi/pull/823),
+  [`3c4a7eb`](https://github.com/jtn0123/InkyPi/commit/3c4a7ebce22ed7f91fca0bcdfb0821c8b0ca46b6))
+
+- **ui**: Keep toasts off a phone dialog's buttons
+  ([#819](https://github.com/jtn0123/InkyPi/pull/819),
+  [`2bb2768`](https://github.com/jtn0123/InkyPi/commit/2bb276832eb49b5eac9c9a09af4619c3cadc9f57))
+
+### Build System
+
+- **deps**: Lock dev tools in uv.lock as a dependency group
+  ([#824](https://github.com/jtn0123/InkyPi/pull/824),
+  [`053db5c`](https://github.com/jtn0123/InkyPi/commit/053db5c4e479e743102d267f80036660ffbab2e7))
+
+- **mypy**: Enable five checks strict leaves off, and fix what they find
+  ([#821](https://github.com/jtn0123/InkyPi/pull/821),
+  [`b221fa9`](https://github.com/jtn0123/InkyPi/commit/b221fa99afccb4484cbd5df2ffbf0956b03db1b0))
+
+- **types**: Add stub packages and list untyped imports by name
+  ([#816](https://github.com/jtn0123/InkyPi/pull/816),
+  [`47f0e4e`](https://github.com/jtn0123/InkyPi/commit/47f0e4ef0877f70e2ad1a4caface3e642ecbc566))
+
+### Continuous Integration
+
+- Lint the web scripts with Biome ([#815](https://github.com/jtn0123/InkyPi/pull/815),
+  [`2370505`](https://github.com/jtn0123/InkyPi/commit/237050525c853e40942adcb7b2ad074c28f9505a))
+
+- **sonar**: Skip the scan when a newer push cancels the run
+  ([#826](https://github.com/jtn0123/InkyPi/pull/826),
+  [`554aa43`](https://github.com/jtn0123/InkyPi/commit/554aa4307bfa9151e993ea87de45c4f7491bdba0))
+
+### Refactoring
+
+- **http**: Import HTTP helpers from their own modules, drop the facade
+  ([#810](https://github.com/jtn0123/InkyPi/pull/810),
+  [`e51007d`](https://github.com/jtn0123/InkyPi/commit/e51007df7aaf4c16b9b6828ee6dc5f5f826ca10a))
+
+- **settings**: Drop the orphaned /settings/client_log endpoint
+  ([#820](https://github.com/jtn0123/InkyPi/pull/820),
+  [`869d3ac`](https://github.com/jtn0123/InkyPi/commit/869d3ac159e4120df03771f9bcd0b24c3af4f375))
+
+- **types**: Type route handlers with Flask's ResponseReturnValue
+  ([#825](https://github.com/jtn0123/InkyPi/pull/825),
+  [`e244b24`](https://github.com/jtn0123/InkyPi/commit/e244b2439d653d0e214f556e1700f94a58509db8))
+
+### Testing
+
+- **browser**: Make the settings tab test click the tabs
+  ([#817](https://github.com/jtn0123/InkyPi/pull/817),
+  [`9aafcf0`](https://github.com/jtn0123/InkyPi/commit/9aafcf0b6a235d5f35dc4ca8098b41724c69b990))
+
+- **container**: Always remove the systemd container, even when launch times out
+  ([#814](https://github.com/jtn0123/InkyPi/pull/814),
+  [`9701ccd`](https://github.com/jtn0123/InkyPi/commit/9701ccdc391d514a1b5ba1a64fd4cf37cf8246cd))
+
+- **update**: Run update.sh's pre-flight on the test interpreter
+  ([#822](https://github.com/jtn0123/InkyPi/pull/822),
+  [`74d50a5`](https://github.com/jtn0123/InkyPi/commit/74d50a5f2af352cbf5a397f5b7e27b29db8f7370))
+
+
 ## v1.9.0 (2026-11-15)
 
 ### Bug Fixes
