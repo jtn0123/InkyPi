@@ -16,7 +16,7 @@ Plugins call external APIs (weather, news, NASA APOD, Unsplash, etc.) on every r
 
 ## Decision
 
-A custom `HTTPCache` class lives in `src/utils/http_cache.py`. It is an `OrderedDict`-backed, thread-safe, TTL+LRU store keyed on the full request URL (including query string). The helper `http_get()` in `src/utils/http_utils.py` wraps `requests.get()` and is the single call site all plugins use. Cache entries honour the server's `Cache-Control: max-age` when present; the default TTL is 300 s (overridable via `INKYPI_HTTP_CACHE_TTL_S`). LRU eviction was added in commit `6bc5ce7` (JTN-299) after the initial implementation allowed unbounded growth.
+A custom `HTTPCache` class lives in `src/utils/http_cache.py`. It is an `OrderedDict`-backed, thread-safe, TTL+LRU store keyed on the full request URL (including query string). The helper `http_get()` in `src/utils/http_utils.py` (since moved to `src/utils/http_transport.py`) wraps `requests.get()` and is the single call site all plugins use. Cache entries honour the server's `Cache-Control: max-age` when present; the default TTL is 300 s (overridable via `INKYPI_HTTP_CACHE_TTL_S`). LRU eviction was added in commit `6bc5ce7` (JTN-299) after the initial implementation allowed unbounded growth.
 
 ## Consequences
 

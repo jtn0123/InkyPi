@@ -9,7 +9,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 # ---------------------------------------------------------------------------
-# http_utils: RuntimeError on Flask context access outside request
+# api_responses: RuntimeError on Flask context access outside request
 # ---------------------------------------------------------------------------
 
 
