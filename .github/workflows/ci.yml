@@ -227,7 +227,11 @@ jobs:
     runs-on: ubuntu-latest
     # Dependabot PRs cannot read repo secrets, so SONAR_TOKEN is empty and the
     # scan always fails. Skip it rather than report a misleading red check.
-    if: always() && github.event.pull_request.user.login != 'dependabot[bot]'
+    # !cancelled(), not always(): the scan should still run when tests fail,
+    # because the tests job uploads coverage regardless. But when a newer push
+    # cancels this run there is no coverage, and a scan posts "0% coverage on
+    # new code, Quality Gate failed" on the PR.
+    if: ${{ !cancelled() && github.event.pull_request.user.login != 'dependabot[bot]' }}
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
