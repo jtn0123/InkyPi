@@ -236,6 +236,41 @@ def _extract_import_payload() -> dict[str, Any] | None:
     return dict(payload)
 
 
+def _apply_imported_config(device_config: Any, filtered_cfg: dict[str, Any]) -> None:
+    """Write imported settings and rebuild the models they feed.
+
+    Every config write serialises ``playlist_config`` from the in-memory
+    playlist manager, so the manager must be rebuilt from the imported dict
+    inside the same transaction or the write puts the old playlists back.
+    """
+    playlist_config = filtered_cfg.get("playlist_config")
+    if "playlist_config" in filtered_cfg and not isinstance(playlist_config, dict):
+        raise ClientInputError("Backup has an invalid playlist section", status=400)
+
+    def apply(config: dict[str, Any]) -> None:
+        config.update(filtered_cfg)
+        if playlist_config is not None:
+            try:
+                device_config.playlist_manager = device_config.load_playlist_manager()
+            except (AttributeError, KeyError, TypeError, ValueError) as exc:
+                raise ClientInputError(
+                    "Backup has an invalid playlist section", status=400
+                ) from exc
+
+    device_config.update_atomic(apply)
+
+    if "timezone" in filtered_cfg:
+        configure_log_timezone(device_config.get_config("timezone"))
+    # The refresh loop keeps a snapshot of timezone, resolution and playlists;
+    # rebuild it so the restored settings apply without a restart.
+    refresh_task = current_app.config.get("REFRESH_TASK")
+    if refresh_task is not None:
+        try:
+            refresh_task.signal_config_change()
+        except Exception:
+            _mod.logger.exception("Could not notify refresh task after import")
+
+
 @_mod.settings_bp.route("/settings/import", methods=["POST"])
 def import_settings() -> Any:
     with route_error_boundary(
@@ -257,7 +292,7 @@ def import_settings() -> Any:
                 k: v for k, v in cfg.items() if k in _mod._ALLOWED_IMPORT_CONFIG_KEYS
             }
             if filtered_cfg:
-                device_config.update_config(filtered_cfg)
+                _apply_imported_config(device_config, filtered_cfg)
                 cfg_keys_applied = len(filtered_cfg)
 
         env_keys_applied = 0
