@@ -21,6 +21,7 @@ def make_png_bytes(size: Any = (10, 10), color: Any = (1, 2, 3)) -> Any:
     return bio.getvalue()
 
 
+@pytest.mark.usefixtures("public_dns")
 def test_get_image_success(monkeypatch: pytest.MonkeyPatch) -> Any:
     content = make_png_bytes()
 
@@ -32,6 +33,7 @@ def test_get_image_success(monkeypatch: pytest.MonkeyPatch) -> Any:
     assert isinstance(img, Image.Image)
 
 
+@pytest.mark.usefixtures("public_dns")
 def test_get_image_typeerror_fallback(monkeypatch: pytest.MonkeyPatch) -> Any:
     content = make_png_bytes()
 
@@ -200,10 +202,9 @@ def test_resize_image_zero_desired_height() -> None:
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.usefixtures("public_dns")
 def test_get_image_returns_correct_size(monkeypatch: pytest.MonkeyPatch) -> None:
     """get_image returns an image with the correct dimensions."""
-    import socket
-
     buf = BytesIO()
     Image.new("RGB", (5, 5), "white").save(buf, format="PNG")
     png_bytes = buf.getvalue()
@@ -212,13 +213,6 @@ def test_get_image_returns_correct_size(monkeypatch: pytest.MonkeyPatch) -> None
         status_code = 200
         content = png_bytes
 
-    monkeypatch.setattr(
-        socket,
-        "getaddrinfo",
-        lambda *a, **kw: [
-            (socket.AF_INET, socket.SOCK_STREAM, 6, "", ("93.184.216.34", 0))
-        ],
-    )
     monkeypatch.setattr("utils.image_utils.http_get", lambda url, **kwargs: Resp())
     img = image_utils.get_image("http://example.com/img.png")
     assert img is not None

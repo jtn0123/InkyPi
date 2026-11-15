@@ -1,14 +1,34 @@
 # pyright: reportMissingImports=false
 from io import BytesIO
 from typing import Any
+from unittest.mock import MagicMock
 
 import pytest
 from PIL import Image
+
+# Comic URLs pass the SSRF guard, which resolves the host; keep that offline.
+pytestmark = pytest.mark.usefixtures("public_dns")
 
 
 @pytest.fixture()
 def plugin_config() -> Any:
     return {"id": "comic", "class": "Comic", "name": "Comic"}
+
+
+def _serve_image(monkeypatch: pytest.MonkeyPatch, png: bytes) -> None:
+    """Answer the comic image download offline.
+
+    The loader fetches through ``utils.image_loader.get_http_session`` once
+    the SSRF check passes, so patching ``requests.get`` never sees the call.
+    """
+    resp = MagicMock()
+    resp.status_code = 200
+    resp.headers = {}
+    resp.content = png
+    resp.iter_content = MagicMock(return_value=[png])
+    session = MagicMock()
+    session.get.return_value = resp
+    monkeypatch.setattr("utils.image_loader.get_http_session", lambda: session)
 
 
 def _png_bytes(size: Any = (30, 20), color: Any = "black") -> Any:
@@ -32,9 +52,9 @@ def test_generate_image_valid_flow_horizontal(
 ) -> Any:
     from plugins.comic.comic import Comic
 
-    # mock get_panel (upstream uses comic_parser.get_panel instead of get_image_url)
+    # comic.py imports get_panel by name, so it must be patched there.
     monkeypatch.setattr(
-        "plugins.comic.comic_parser.get_panel",
+        "plugins.comic.comic.get_panel",
         lambda c: {
             "image_url": "http://img/latest.png",
             "title": "Test",
@@ -42,15 +62,7 @@ def test_generate_image_valid_flow_horizontal(
         },
     )
 
-    # mock requests.get streaming for image bytes
-    class Resp:
-        status_code = 200
-        raw = BytesIO(_png_bytes((400, 300)))
-
-        def raise_for_status(self) -> Any:
-            return None
-
-    monkeypatch.setattr("requests.get", lambda url, **kwargs: Resp())
+    _serve_image(monkeypatch, _png_bytes((400, 300)))
 
     p = Comic(plugin_config)
     img = p.generate_image({"comic": "XKCD"}, device_config_dev)
@@ -67,7 +79,7 @@ def test_generate_image_vertical_orientation(
     device_config_dev.update_value("orientation", "vertical")
 
     monkeypatch.setattr(
-        "plugins.comic.comic_parser.get_panel",
+        "plugins.comic.comic.get_panel",
         lambda c: {
             "image_url": "http://img/latest.png",
             "title": "Test",
@@ -75,14 +87,7 @@ def test_generate_image_vertical_orientation(
         },
     )
 
-    class Resp:
-        status_code = 200
-        raw = BytesIO(_png_bytes((400, 300)))
-
-        def raise_for_status(self) -> Any:
-            return None
-
-    monkeypatch.setattr("requests.get", lambda url, **kwargs: Resp())
+    _serve_image(monkeypatch, _png_bytes((400, 300)))
 
     p = Comic(plugin_config)
     img = p.generate_image({"comic": "XKCD"}, device_config_dev)
@@ -120,21 +125,14 @@ def test_generate_image_centering(
     from plugins.comic.comic import Comic
 
     monkeypatch.setattr(
-        "plugins.comic.comic_parser.get_panel",
+        "plugins.comic.comic.get_panel",
         lambda c: {"image_url": "http://img/latest.png", "title": "", "caption": ""},
     )
 
     # create a tall/narrow source so centering is apparent
     src_w, src_h = 100, 300
 
-    class Resp:
-        status_code = 200
-        raw = BytesIO(_png_bytes((src_w, src_h), color="black"))
-
-        def raise_for_status(self) -> Any:
-            return None
-
-    monkeypatch.setattr("requests.get", lambda url, **kwargs: Resp())
+    _serve_image(monkeypatch, _png_bytes((src_w, src_h), color="black"))
 
     p = Comic(plugin_config)
     img = p.generate_image(

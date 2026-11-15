@@ -1,25 +1,9 @@
-import socket
 from typing import Any
 
 import pytest
 
-
-@pytest.fixture(autouse=True)
-def _public_dns(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Resolve test hostnames to a public address so the SSRF guard passes offline."""
-
-    def _resolve(host: Any, port: Any = 0, *args: Any, **kwargs: Any) -> Any:
-        return [
-            (
-                socket.AF_INET,
-                socket.SOCK_STREAM,
-                socket.IPPROTO_TCP,
-                "",
-                ("93.184.216.34", port),
-            )
-        ]
-
-    monkeypatch.setattr(socket, "getaddrinfo", _resolve)
+# The SSRF guard resolves each image host; keep that offline.
+pytestmark = pytest.mark.usefixtures("public_dns")
 
 
 def test_apod_decode_failure(

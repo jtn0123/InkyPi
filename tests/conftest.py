@@ -294,6 +294,30 @@ def disable_plugin_process_isolation(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("INKYPI_PLUGIN_ISOLATION", "none")
 
 
+@pytest.fixture()
+def public_dns(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Resolve every hostname to a public address (93.184.216.34), offline.
+
+    The SSRF guard resolves a URL's host before any fetch, so a test that
+    stubs the HTTP call but not DNS still does a real lookup: slow, and a
+    failure offline. Opt in with ``pytest.mark.usefixtures("public_dns")``.
+    """
+    import socket
+
+    def _resolve(host: Any, port: Any = 0, *args: Any, **kwargs: Any) -> Any:
+        return [
+            (
+                socket.AF_INET,
+                socket.SOCK_STREAM,
+                socket.IPPROTO_TCP,
+                "",
+                ("93.184.216.34", port),
+            )
+        ]
+
+    monkeypatch.setattr(socket, "getaddrinfo", _resolve)
+
+
 @pytest.fixture(scope="session")
 def _chromium_lock_dir(tmp_path_factory: pytest.TempPathFactory) -> str:
     return str(tmp_path_factory.mktemp("chromium-lock"))
