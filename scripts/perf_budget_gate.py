@@ -17,6 +17,7 @@ import sys
 import time
 import traceback
 from pathlib import Path
+from typing import Any
 
 
 def _parse_env_float(name: str, fallback: float) -> float:
@@ -47,7 +48,7 @@ def _parse_env_int(name: str, fallback: int) -> int:
         return fallback
 
 
-def _load_benchmarks(path: str) -> list[dict]:
+def _load_benchmarks(path: str) -> list[dict[str, Any]]:
     try:
         with open(path, encoding="utf-8") as f:
             data = json.load(f)
@@ -59,7 +60,7 @@ def _load_benchmarks(path: str) -> list[dict]:
     return [r for r in rows if isinstance(r, dict)]
 
 
-def _plugin_render_rows(benchmarks: list[dict]) -> list[tuple[str, float]]:
+def _plugin_render_rows(benchmarks: list[dict[str, Any]]) -> list[tuple[str, float]]:
     rows: list[tuple[str, float]] = []
     for bench in benchmarks:
         name = str(bench.get("name", ""))
@@ -76,7 +77,7 @@ def _plugin_render_rows(benchmarks: list[dict]) -> list[tuple[str, float]]:
 
 
 def evaluate_plugin_render_budget(
-    benchmarks: list[dict], max_median_ms: float
+    benchmarks: list[dict[str, Any]], max_median_ms: float
 ) -> list[str]:
     failures: list[str] = []
     rows = _plugin_render_rows(benchmarks)

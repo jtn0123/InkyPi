@@ -83,7 +83,7 @@ def _collect_system_info() -> str:
     lines.append("=== memory ===")
     _collected_memory = False
     try:
-        import psutil  # type: ignore[import-not-found]
+        import psutil
 
         vm = psutil.virtual_memory()
         lines.append(f"total    : {vm.total // (1024 ** 2)} MB")

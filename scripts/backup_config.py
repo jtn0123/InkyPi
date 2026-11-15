@@ -17,6 +17,7 @@ import os
 import sys
 import tarfile
 from datetime import UTC, datetime
+from typing import Any
 
 BACKUP_FORMAT_VERSION = "1"
 
@@ -88,8 +89,8 @@ def _build_manifest(
     timestamp: str,
     entries: list[tuple[str, str]],
     device_json_path: str | None,
-) -> dict:
-    manifest: dict = {
+) -> dict[str, Any]:
+    manifest: dict[str, Any] = {
         "backup_version": BACKUP_FORMAT_VERSION,
         "timestamp": timestamp,
         "included_paths": [arc for _fs, arc in entries],

@@ -152,7 +152,8 @@ def make_font_resolution(w: int, h: int) -> Image.Image:
     sample = "AaBbCc 0123 Quick brown fox — ({[<>]})"
 
     margin = 10
-    y = margin
+    # Becomes a float after the first line's textbbox height is added.
+    y: float = margin
 
     for pt in sizes:
         font = _default_font(pt)

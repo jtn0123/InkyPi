@@ -33,6 +33,7 @@ import os
 import re
 import sys
 from pathlib import Path
+from typing import Any
 
 # ---------------------------------------------------------------------------
 # Regex — capture the string literal argument of _("...") or _('...')
@@ -70,7 +71,7 @@ def _collect_strings(src_root: Path) -> list[str]:
     return sorted(found)
 
 
-def _build_catalogue(strings: list[str]) -> dict:
+def _build_catalogue(strings: list[str]) -> dict[str, Any]:
     """Return a JSON-serialisable catalogue dict."""
     return {
         "_meta": {
@@ -81,7 +82,7 @@ def _build_catalogue(strings: list[str]) -> dict:
     }
 
 
-def _write_output(catalogue: dict, output_path: Path) -> None:
+def _write_output(catalogue: dict[str, Any], output_path: Path) -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(
         json.dumps(catalogue, indent=2, ensure_ascii=False) + "\n",
@@ -89,12 +90,12 @@ def _write_output(catalogue: dict, output_path: Path) -> None:
     )
 
 
-def _is_stale(catalogue: dict, output_path: Path) -> bool:
+def _is_stale(catalogue: dict[str, Any], output_path: Path) -> bool:
     """Return True when *output_path* does not match the freshly built catalogue."""
     if not output_path.exists():
         return True
     try:
-        existing = json.loads(output_path.read_text(encoding="utf-8"))
+        existing: dict[str, Any] = json.loads(output_path.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError):
         return True
     # Compare only the strings list, not the _meta block (which includes count).

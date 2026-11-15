@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from __future__ import annotations
 
 import argparse
 import gc
@@ -11,6 +12,13 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
+from types import ModuleType
+from typing import TYPE_CHECKING, Any
+from unittest.mock import patch
+
+if TYPE_CHECKING:
+    from flask import Flask
+    from flask.testing import FlaskClient
 
 
 def _repo_root() -> Path:
@@ -46,7 +54,7 @@ def _prepare_env(
         os.environ.pop("INKYPI_CONFIG_FILE", None)
 
 
-def _base_config(runtime_dir: str) -> dict:
+def _base_config(runtime_dir: str) -> dict[str, Any]:
     return {
         "name": "InkyPi Preflight",
         "display_type": "mock",
@@ -87,7 +95,7 @@ def _base_config(runtime_dir: str) -> dict:
     }
 
 
-def _write_config(runtime_dir: str, overrides: dict | None = None) -> str:
+def _write_config(runtime_dir: str, overrides: dict[str, Any] | None = None) -> str:
     payload = _base_config(runtime_dir)
     payload.update(overrides or {})
     config_path = Path(runtime_dir) / "device.json"
@@ -97,7 +105,7 @@ def _write_config(runtime_dir: str, overrides: dict | None = None) -> str:
 
 def _load_inkypi(
     runtime_dir: str, config_path: str | None = None, web_only: bool = True
-):
+) -> tuple[ModuleType, Flask]:
     _prepare_env(runtime_dir, config_path=config_path, web_only=web_only)
     _ensure_src_on_path()
     sys.modules.pop("inkypi", None)
@@ -112,14 +120,14 @@ def _load_inkypi(
     return inkypi, app
 
 
-def _probe_routes(client, routes: list[str]) -> None:
+def _probe_routes(client: FlaskClient, routes: list[str]) -> None:
     for route in routes:
         response = client.get(route)
         if response.status_code != 200:
             raise RuntimeError(f"{route} returned {response.status_code}")
 
 
-def _force_inprocess_execution(refresh_task=None) -> None:
+def _force_inprocess_execution(refresh_task: object = None) -> None:
     """Disable subprocess isolation so plugins run in the current process.
 
     This avoids pickling issues with the ``spawn``/``forkserver``
@@ -294,28 +302,31 @@ def run_cache_smoke() -> None:
 
         writes = {"count": 0}
 
-        def fake_display(img, image_settings=None):
+        def fake_display(img: object, image_settings: object = None) -> None:
             writes["count"] += 1
-
-        display_manager.display.display_image = fake_display
 
         calls = {"count": 0}
 
-        def fake_generate(self, settings, cfg):
+        def fake_generate(self: object, settings: object, cfg: Config) -> Image.Image:
             calls["count"] += 1
             return Image.new("RGB", cfg.get_resolution(), (200, 200, 200))
 
-        original_generate = ai_text_mod.AIText.generate_image
-        ai_text_mod.AIText.generate_image = fake_generate
-
-        refresh_task.start()
-        try:
-            settings = {"title": "T", "textModel": "gpt-4o", "textPrompt": "Hi"}
-            metrics1 = refresh_task.manual_update(ManualRefresh("ai_text", settings))
-            metrics2 = refresh_task.manual_update(ManualRefresh("ai_text", settings))
-        finally:
-            refresh_task.stop()
-            ai_text_mod.AIText.generate_image = original_generate
+        # Both are deliberate test doubles; patch.object restores them on exit.
+        with (
+            patch.object(display_manager.display, "display_image", fake_display),
+            patch.object(ai_text_mod.AIText, "generate_image", fake_generate),
+        ):
+            refresh_task.start()
+            try:
+                settings = {"title": "T", "textModel": "gpt-4o", "textPrompt": "Hi"}
+                metrics1 = refresh_task.manual_update(
+                    ManualRefresh("ai_text", settings)
+                )
+                metrics2 = refresh_task.manual_update(
+                    ManualRefresh("ai_text", settings)
+                )
+            finally:
+                refresh_task.stop()
 
         if writes["count"] != 1:
             raise RuntimeError(f"Expected 1 display write, saw {writes['count']}")
@@ -361,20 +372,19 @@ def run_benchmark_smoke() -> None:
 
         calls = {"count": 0}
 
-        def fake_generate(self, settings, cfg):
+        def fake_generate(self: object, settings: object, cfg: Config) -> Image.Image:
             calls["count"] += 1
             color = (calls["count"] * 40) % 255
             return Image.new("RGB", cfg.get_resolution(), (color, 100, 150))
 
-        ai_text_mod.AIText.generate_image = fake_generate
-
-        refresh_task.start()
-        try:
-            settings = {"title": "T", "textModel": "gpt-4o", "textPrompt": "Hi"}
-            for _ in range(5):
-                refresh_task.manual_update(ManualRefresh("ai_text", settings))
-        finally:
-            refresh_task.stop()
+        with patch.object(ai_text_mod.AIText, "generate_image", fake_generate):
+            refresh_task.start()
+            try:
+                settings = {"title": "T", "textModel": "gpt-4o", "textPrompt": "Hi"}
+                for _ in range(5):
+                    refresh_task.manual_update(ManualRefresh("ai_text", settings))
+            finally:
+                refresh_task.stop()
 
         with sqlite3.connect(db_path) as conn:
             rows = conn.execute("""
@@ -517,12 +527,14 @@ def run_soak_smoke() -> None:
         from refresh_task import ManualRefresh, RefreshTask
 
         class SoakPlugin:
-            config = {"image_settings": []}
+            config: dict[str, list[object]] = {"image_settings": []}
 
-            def __init__(self):
+            def __init__(self) -> None:
                 self.calls = 0
 
-            def generate_image(self, settings, device_config):
+            def generate_image(
+                self, settings: dict[str, Any], device_config: Config
+            ) -> Image.Image:
                 self.calls += 1
                 color = (self.calls * 17) % 255
                 return Image.new(
@@ -539,23 +551,24 @@ def run_soak_smoke() -> None:
         import refresh_task.plugin_lookup as refresh_task_mod
 
         plugin = SoakPlugin()
-        original_get_plugin_instance = refresh_task_mod.get_plugin_instance
-        original_get_plugin = device_config.get_plugin
-
-        refresh_task_mod.get_plugin_instance = lambda cfg: plugin
-        device_config.get_plugin = lambda plugin_id: {"id": plugin_id, "class": "Soak"}
         process = psutil.Process(os.getpid())
         baseline_rss = process.memory_info().rss
         db_path = Path(device_config.get_config("benchmarks_db_path"))
 
-        refresh_task.start()
-        try:
-            for _ in range(30):
-                refresh_task.manual_update(ManualRefresh("soak", {}))
-        finally:
-            refresh_task.stop()
-            refresh_task_mod.get_plugin_instance = original_get_plugin_instance
-            device_config.get_plugin = original_get_plugin
+        with (
+            patch.object(refresh_task_mod, "get_plugin_instance", lambda cfg: plugin),
+            patch.object(
+                device_config,
+                "get_plugin",
+                lambda plugin_id: {"id": plugin_id, "class": "Soak"},
+            ),
+        ):
+            refresh_task.start()
+            try:
+                for _ in range(30):
+                    refresh_task.manual_update(ManualRefresh("soak", {}))
+            finally:
+                refresh_task.stop()
 
         gc.collect()
         final_rss = process.memory_info().rss

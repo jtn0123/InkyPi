@@ -61,16 +61,25 @@ never raised. When a package gets to zero, add it to that section;
 
 ## Current CI behavior: clean `src/`, ratcheted `tests/`
 
-`scripts/lint.sh` runs mypy as **two separate invocations**:
+`scripts/lint.sh` runs mypy as **three separate invocations**:
 
 1. `mypy src/` — production code, compared against the checked-in baseline in
    `scripts/mypy_src_baseline.txt`; this baseline should remain `0`
 2. `mypy tests/` — test suite, compared against the checked-in baseline in
    `scripts/mypy_tests_baseline.txt`
+3. `mypy scripts/` — the developer, CI and device tools, compared against the
+   checked-in baseline in `scripts/mypy_scripts_baseline.txt`
 
 CI fails if `mypy src/` reports any issue or cannot produce a summary, and if
-the test error count rises above the committed baseline or mypy cannot produce
-a summary to compare against.
+the test or script error count rises above its committed baseline or mypy
+cannot produce a summary to compare against.
+
+`scripts/` is checked with the same strict settings as `src/` and `tests/`.
+Its modules are not a package, so `mypy.ini` puts `scripts/` on `mypy_path`:
+that lets `restore_config.py` resolve its sibling `backup_config.py`. Runtime
+imports are unchanged; the scripts still add their own directory to `sys.path`.
+Its remaining baseline entries are the `defusedxml` stub errors, which stay
+until a stub package is added as a dependency.
 
 ### Why the split?
 
@@ -116,6 +125,11 @@ If `tests/` goes down:
    above it; `scripts/lint.sh` rejects a file with more than one value.
 3. Prefer paying down errors in clusters: shared fixtures, contract/security
    tests, then browser/integration tests.
+
+### What to do if the `scripts/` count changes
+
+The same rules as `tests/` apply, using `scripts/mypy_scripts_baseline.txt`.
+A new script should pass `mypy scripts/` without adding to the baseline.
 
 ## Coding guidelines for typed modules
 

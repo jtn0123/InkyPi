@@ -147,7 +147,7 @@ def find_in_dir(root: str, filename: str) -> str | None:
     return None
 
 
-def main():
+def main() -> None:
     ap = argparse.ArgumentParser(description="Compare weather icons (OWM codes)")
     ap.add_argument("--new-dir", required=True, help="Path to candidate icon pack root")
     ap.add_argument(

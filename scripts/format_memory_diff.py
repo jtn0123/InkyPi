@@ -21,6 +21,7 @@ import argparse
 import json
 import sys
 from pathlib import Path
+from typing import Any
 
 # The marker is the first line of the comment and is how github-script finds
 # the previous comment to overwrite. Do NOT change without also updating the
@@ -108,13 +109,13 @@ def _location_group(loc: str) -> str:
     return _short_location(loc, max_len=40)
 
 
-def _is_displayable_allocator(entry: dict) -> bool:
+def _is_displayable_allocator(entry: dict[str, Any]) -> bool:
     """Drop profiler-wrapper rows that are not actionable app attribution."""
     loc = str(entry.get("location", ""))
     return not loc.startswith("<string>")
 
 
-def _load(path: Path) -> dict:
+def _load(path: Path) -> dict[str, Any]:
     """Load a JSON summary, returning an empty shell if the file is missing.
 
     Missing files are tolerated so the formatter can still emit a helpful
@@ -129,7 +130,8 @@ def _load(path: Path) -> dict:
             "allocators": [],
         }
     try:
-        return json.loads(path.read_text())
+        loaded: dict[str, Any] = json.loads(path.read_text())
+        return loaded
     except json.JSONDecodeError as exc:
         print(
             f"format_memory_diff: failed to parse {path}: {exc}",
@@ -143,14 +145,16 @@ def _load(path: Path) -> dict:
         }
 
 
-def _merge_allocators(base: list[dict], pr: list[dict]) -> list[dict]:
+def _merge_allocators(
+    base: list[dict[str, Any]], pr: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
     """Merge two allocator lists by location, producing union-sorted rows.
 
     Returns a list of dicts with ``location``, ``base_bytes``, ``pr_bytes``,
     and ``delta`` keyed fields, sorted by absolute delta descending so the
     biggest regressors land at the top of the table.
     """
-    index: dict[str, dict] = {}
+    index: dict[str, dict[str, Any]] = {}
     for entry in base:
         loc = str(entry.get("location", "<unknown>"))
         index[loc] = {
@@ -175,9 +179,11 @@ def _merge_allocators(base: list[dict], pr: list[dict]) -> list[dict]:
     return rows
 
 
-def _merge_allocator_groups(base: list[dict], pr: list[dict]) -> list[dict]:
+def _merge_allocator_groups(
+    base: list[dict[str, Any]], pr: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
     """Aggregate allocator rows into package/module buckets before diffing."""
-    index: dict[str, dict] = {}
+    index: dict[str, dict[str, Any]] = {}
     for side, entries in (("base_bytes", base), ("pr_bytes", pr)):
         for entry in entries:
             group = _location_group(str(entry.get("location", "<unknown>")))
@@ -193,14 +199,14 @@ def _merge_allocator_groups(base: list[dict], pr: list[dict]) -> list[dict]:
     return rows
 
 
-def _significant_rows(rows: list[dict], top: int) -> list[dict]:
+def _significant_rows(rows: list[dict[str, Any]], top: int) -> list[dict[str, Any]]:
     """Return rows worth showing, suppressing zero-delta allocator noise."""
     return [
         row for row in rows if abs(int(row.get("delta", 0))) >= DETAIL_DELTA_FLOOR_BYTES
     ][:top]
 
 
-def format_comment(base: dict, pr: dict, top: int = 20) -> str:
+def format_comment(base: dict[str, Any], pr: dict[str, Any], top: int = 20) -> str:
     """Build the full Markdown comment body.
 
     The comment has three parts:

@@ -58,7 +58,7 @@ Developer, CI and device tools. Run them from the repo root. Python scripts add
 | `check_links.py` | Re-checks links that the Lychee link checker reported as throttled. |
 | `check_requirements_drift.sh` | Checks that the exported lockfile matches `uv.lock`. |
 | `check_vendor_versions.py` | Weekly check that the vendored front-end libraries (downloaded, CDN-loaded, and committed under `src/static/vendor/`) are current within their major (`vendor-versions.yml`). |
-| `mypy_src_baseline.txt`, `mypy_tests_baseline.txt` | The mypy error ratchets used by `lint.sh`. |
+| `mypy_src_baseline.txt`, `mypy_tests_baseline.txt`, `mypy_scripts_baseline.txt` | The mypy error ratchets used by `lint.sh`: `src/` must stay clean, and `tests/` and `scripts/` may not exceed their counts. |
 
 ## Install and Pi images
 
