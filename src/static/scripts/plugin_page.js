@@ -34,7 +34,6 @@
     const mobileQuery = globalThis.matchMedia ? globalThis.matchMedia("(max-width: 768px)") : { matches: false, addEventListener() {} };
     globalThis.uploadedFiles = globalThis.uploadedFiles || {};
     const uploadedFiles = globalThis.uploadedFiles;
-    let actionInFlight = false;
     let workflowMode = "configure";
     const {
       saveLastProgressSnapshot,
@@ -202,7 +201,6 @@
       if (!runPluginValidation(action)) return;
       if (!ensurePluginFormAvailable()) return;
 
-      actionInFlight = true;
       if (triggerButton) triggerButton.disabled = true;
       try {
         await globalThis.PluginForm.sendForm({
@@ -217,7 +215,6 @@
         });
         saveLastProgressSnapshot(config.progressContext);
       } finally {
-        actionInFlight = false;
         if (triggerButton) triggerButton.disabled = false;
       }
     }
