@@ -232,23 +232,44 @@
     if (!el || !txt || !btn) return;
     txt.textContent = `Delete playlist '${name}'?`;
     setModalOpen("deletePlaylistModal", true, triggerEl);
-    btn.onclick = async function () {
-      try {
-        const resp = await fetch(
-          ns.config.delete_playlist_base_url + encodeURIComponent(name),
-          { method: "DELETE" }
-        );
-        const result = await handleJsonResponse(resp);
-        if (resp.ok && result?.success) {
-          location.reload();
-          return;
+    btn.onclick = () =>
+      runConfirmed(btn, "cancelDeletePlaylistBtn", async () => {
+        try {
+          const resp = await fetch(
+            ns.config.delete_playlist_base_url + encodeURIComponent(name),
+            { method: "DELETE" }
+          );
+          const result = await handleJsonResponse(resp);
+          if (resp.ok && result?.success) {
+            location.reload();
+            return true;
+          }
+        } catch (error) {
+          console.debug("Failed to delete playlist from modal:", error);
+          showResponseModal("failure", "Failed to delete playlist");
         }
-      } catch (error) {
-        console.debug("Failed to delete playlist from modal:", error);
-        showResponseModal("failure", "Failed to delete playlist");
-        return;
-      }
+        return false;
+      });
+  }
+
+  // Run a confirm dialog's request with its buttons locked, so a double
+  // click sends one request. *request* resolves true when the page is
+  // reloading; otherwise the buttons unlock so the user can retry or cancel.
+  async function runConfirmed(confirmBtn, cancelBtnId, request) {
+    if (confirmBtn.disabled) return;
+    const cancelBtn = document.getElementById(cancelBtnId);
+    const setLocked = (locked) => {
+      confirmBtn.disabled = locked;
+      confirmBtn.setAttribute("aria-busy", String(locked));
+      if (cancelBtn) cancelBtn.disabled = locked;
     };
+    setLocked(true);
+    let reloading = false;
+    try {
+      reloading = await request();
+    } finally {
+      if (!reloading) setLocked(false);
+    }
   }
 
   function closeDeletePlaylistModal() {
@@ -269,28 +290,29 @@
     const label = instanceLabel || instanceName;
     txt.textContent = `Delete instance '${label}'?`;
     setModalOpen("deleteInstanceModal", true, triggerEl);
-    btn.onclick = async function () {
-      try {
-        const resp = await fetch(ns.config.delete_plugin_instance_url, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            playlist_name: playlistName,
-            plugin_id: pluginId,
-            plugin_instance: instanceName,
-          }),
-        });
-        const result = await handleJsonResponse(resp);
-        if (resp.ok && result?.success) {
-          location.reload();
-          return;
+    btn.onclick = () =>
+      runConfirmed(btn, "cancelDeleteInstanceBtn", async () => {
+        try {
+          const resp = await fetch(ns.config.delete_plugin_instance_url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              playlist_name: playlistName,
+              plugin_id: pluginId,
+              plugin_instance: instanceName,
+            }),
+          });
+          const result = await handleJsonResponse(resp);
+          if (resp.ok && result?.success) {
+            location.reload();
+            return true;
+          }
+        } catch (error) {
+          console.debug("Failed to delete playlist instance from modal:", error);
+          showResponseModal("failure", "Failed to delete instance");
         }
-      } catch (error) {
-        console.debug("Failed to delete playlist instance from modal:", error);
-        showResponseModal("failure", "Failed to delete instance");
-        return;
-      }
-    };
+        return false;
+      });
   }
 
   function closeDeleteInstanceModal() {

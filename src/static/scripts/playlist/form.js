@@ -215,25 +215,14 @@
     }
   }
 
-  async function deletePlaylist() {
+  // The edit dialog's Delete asks first, like the card's Delete: it closes
+  // the edit dialog and opens the same confirm dialog for this playlist.
+  function confirmDeletePlaylist() {
     const name = document.getElementById("editingPlaylistName").value;
-    try {
-      const response = await fetch(
-        ns.config.delete_playlist_base_url + encodeURIComponent(name),
-        { method: "DELETE" }
-      );
-      const result = await handleJsonResponse(response);
-      if (response.ok && result?.success) {
-        ns.closeModal();
-        location.reload();
-      }
-    } catch (error) {
-      console.error("Error:", error);
-      showResponseModal(
-        "failure",
-        "An error occurred while processing your request."
-      );
-    }
+    ns.closeModal();
+    // Closing hands focus back to the card's Edit button, so the confirm
+    // dialog returns focus there too.
+    ns.openDeletePlaylistModal(name, document.activeElement);
   }
 
   async function saveDeviceCycle() {
@@ -291,7 +280,7 @@
 
     document
       .getElementById("deleteButton")
-      ?.addEventListener("click", deletePlaylist);
+      ?.addEventListener("click", confirmDeletePlaylist);
     document
       .getElementById("saveRefreshSettingsBtn")
       ?.addEventListener("click", ns.saveRefreshSettings);
@@ -305,7 +294,6 @@
   Object.assign(ns, {
     applyFieldErrorFromResponse,
     createPlaylist,
-    deletePlaylist,
     handlePlaylistMutationSuccess,
     initFormControls,
     runPlaylistMutation,
