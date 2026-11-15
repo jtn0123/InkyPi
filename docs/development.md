@@ -26,7 +26,7 @@ cd InkyPi
 ./scripts/dev.sh
 
 # Or manual setup
-python3 -m venv .venv
+python3.13 -m venv .venv  # InkyPi supports Python 3.13 only
 source .venv/bin/activate  # Windows: .venv\Scripts\activate
 
 # 3. Install Python dependencies and vendor assets

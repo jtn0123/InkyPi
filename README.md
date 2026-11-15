@@ -225,7 +225,7 @@ The web UI's "Update" button uses the same path. For branch tracking, use `git p
 ## Development
 
 ```bash
-python -m venv .venv
+python3.13 -m venv .venv  # InkyPi supports Python 3.13 only
 source .venv/bin/activate
 pip install -r install/requirements-dev.txt
 .venv/bin/python src/inkypi.py --dev --web-only
