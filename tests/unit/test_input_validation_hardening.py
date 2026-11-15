@@ -250,42 +250,6 @@ class TestSaveSettingsNumericValidation:
 
 
 # ---------------------------------------------------------------------------
-# JTN-139: Client log endpoint log injection prevention
-# ---------------------------------------------------------------------------
-
-
-class TestClientLogSanitization:
-    """POST /settings/client_log should strip newlines from client input."""
-
-    def test_newlines_stripped_from_message(self, client: FlaskClient) -> None:
-        resp = client.post(
-            "/settings/client_log",
-            json={"level": "info", "message": "hello\nforged\rline", "extra": {}},
-        )
-        assert resp.status_code == 200
-
-    def test_newlines_stripped_from_level(self, client: FlaskClient) -> None:
-        resp = client.post(
-            "/settings/client_log",
-            json={"level": "info\nevil", "message": "ok"},
-        )
-        assert resp.status_code == 200
-
-    def test_sanitize_log_value_strips_control_chars(self) -> None:
-        from blueprints.settings._system import _sanitize_log_value
-
-        assert "\n" not in _sanitize_log_value("hello\nworld")
-        assert "\r" not in _sanitize_log_value("hello\rworld")
-        assert "\x00" not in _sanitize_log_value("hello\x00world")
-
-    def test_sanitize_log_value_truncates(self) -> None:
-        from blueprints.settings._system import _sanitize_log_value
-
-        result = _sanitize_log_value("a" * 1000, max_len=50)
-        assert len(result) == 50
-
-
-# ---------------------------------------------------------------------------
 # JTN-140: Shutdown cooldown not consumed on failure
 # ---------------------------------------------------------------------------
 

@@ -3,7 +3,7 @@
 
 End-to-end flow:
     1. Force dev-mode log capture so errors land in the in-memory buffer.
-    2. POST a malformed body to /settings/client_log -> server returns 400.
+    2. POST an empty batch to /api/client-log -> server returns 400.
     3. POST a valid level=error entry with a distinctive marker -> server logs it.
     4. Open /settings and click "Download Logs"; capture the /download-logs response.
     5. Verify attachment Content-Disposition, non-empty payload, and that the
@@ -63,27 +63,28 @@ def dev_log_handler(monkeypatch: pytest.MonkeyPatch) -> Iterator[Any]:
             logs._dev_log_buffer.clear()
 
 
+@pytest.mark.expected_client_logs(r"^JTN-727 deliberate error ")
 def test_logs_access_trigger_error_download_verify(
     live_server: str, browser_page: Page, client: FlaskClient, dev_log_handler: Any
 ) -> None:
     marker = f"JTN-727 deliberate error {uuid.uuid4().hex[:8]}"
     window_start = datetime.now(tz=UTC)
 
-    # ---- Step 1: trigger error — malformed POST returns 400; a follow-up
+    # ---- Step 1: trigger error — an empty batch returns 400; a follow-up
     # level=error entry is logged with our distinctive marker. ----
     bad = client.post(
-        "/settings/client_log",
-        data="[]",  # JSON array, not a dict — endpoint rejects with 400
+        "/api/client-log",
+        data="[]",  # empty batch — endpoint rejects with 400
         content_type="application/json",
     )
     assert (
         bad.status_code == 400
-    ), f"expected 4xx on malformed body, got {bad.status_code}"
+    ), f"expected 400 on an empty batch, got {bad.status_code}"
     logged = client.post(
-        "/settings/client_log",
+        "/api/client-log",
         json={"level": "error", "message": marker},
     )
-    assert logged.status_code == 200, "error-level log entry should be accepted"
+    assert logged.status_code == 204, "error-level log entry should be accepted"
 
     # ---- Step 2: open settings, click Download Logs, capture response. ----
     page = browser_page

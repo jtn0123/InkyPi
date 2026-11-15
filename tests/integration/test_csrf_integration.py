@@ -13,6 +13,11 @@ from typing import Any
 import pytest
 from flask.testing import FlaskClient
 
+# Each accepted POST lands in /api/client-log, which the integration
+# tripwire would otherwise report as a browser console error.
+_PROBE = "csrf integration probe"
+pytestmark = pytest.mark.expected_client_logs(r"^csrf integration probe$")
+
 
 @pytest.fixture()
 def csrf_client(client: FlaskClient) -> Any:
@@ -32,9 +37,9 @@ def csrf_client(client: FlaskClient) -> Any:
 def test_new_session_post_rejected_by_production_middleware(csrf_client: Any) -> None:
     """JTN-224: First POST in a new session must be rejected by production CSRF middleware."""
     resp = csrf_client.post(
-        "/settings/client_log",
+        "/api/client-log",
         content_type="application/json",
-        data=json.dumps({"level": "error", "message": "test"}),
+        data=json.dumps({"level": "error", "message": _PROBE}),
     )
     assert resp.status_code == 403
 
@@ -52,12 +57,12 @@ def test_post_with_valid_csrf_token_succeeds(csrf_client: Any) -> None:
 
     # POST with the valid token in header
     resp = csrf_client.post(
-        "/settings/client_log",
+        "/api/client-log",
         content_type="application/json",
-        data=json.dumps({"level": "info", "message": "test"}),
+        data=json.dumps({"level": "error", "message": _PROBE}),
         headers={"X-CSRFToken": token},
     )
-    assert resp.status_code == 200
+    assert resp.status_code == 204
 
 
 def test_post_with_wrong_csrf_token_rejected(csrf_client: Any) -> None:
@@ -65,9 +70,9 @@ def test_post_with_wrong_csrf_token_rejected(csrf_client: Any) -> None:
     # Establish session
     csrf_client.get("/")
     resp = csrf_client.post(
-        "/settings/client_log",
+        "/api/client-log",
         content_type="application/json",
-        data=json.dumps({"level": "error", "message": "test"}),
+        data=json.dumps({"level": "error", "message": _PROBE}),
         headers={"X-CSRFToken": "wrong-token-value"},
     )
     assert resp.status_code == 403
@@ -85,11 +90,11 @@ def test_json_body_csrf_token_accepted_by_production_middleware(
 
     # Send token in JSON body (sendBeacon path)
     resp = csrf_client.post(
-        "/settings/client_log",
+        "/api/client-log",
         content_type="application/json",
-        data=json.dumps({"level": "error", "message": "test", "_csrf_token": token}),
+        data=json.dumps({"level": "error", "message": _PROBE, "_csrf_token": token}),
     )
-    assert resp.status_code == 200
+    assert resp.status_code == 204
 
 
 def test_form_csrf_token_accepted_by_production_middleware(csrf_client: Any) -> None:
@@ -100,11 +105,11 @@ def test_form_csrf_token_accepted_by_production_middleware(csrf_client: Any) -> 
     assert token
 
     resp = csrf_client.post(
-        "/settings/client_log",
-        data={"csrf_token": token, "level": "info", "message": "test"},
+        "/api/client-log",
+        data={"csrf_token": token, "level": "error", "message": _PROBE},
         content_type="application/x-www-form-urlencoded",
     )
-    # client_log expects JSON, so form data may error — but CSRF itself passes (not 403)
+    # /api/client-log expects JSON, so form data is rejected — but CSRF itself passes (not 403)
     assert resp.status_code != 403
 
 
@@ -116,11 +121,11 @@ def test_extract_csrf_token_prefers_header(csrf_client: Any) -> None:
     assert token
 
     resp = csrf_client.post(
-        "/settings/client_log",
+        "/api/client-log",
         content_type="application/json",
         data=json.dumps(
-            {"level": "error", "message": "test", "_csrf_token": "wrong-body-token"}
+            {"level": "error", "message": _PROBE, "_csrf_token": "wrong-body-token"}
         ),
         headers={"X-CSRFToken": token},
     )
-    assert resp.status_code == 200
+    assert resp.status_code == 204
