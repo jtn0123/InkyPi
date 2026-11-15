@@ -22,7 +22,6 @@ MYPY_SRC_RATCHET_EXIT=0
 MYPY_TESTS_EXIT=0
 MYPY_TESTS_BASELINE="?"
 MYPY_TESTS_RATCHET_EXIT=0
-MYPY_STRICT_EXIT=0
 SHELLCHECK_EXIT=0
 
 echo "Running Ruff linter..."
@@ -43,11 +42,10 @@ else
     echo "✅ Black formatting check passed"
 fi
 
-# Non-strict mypy is split into two passes (src/ and tests/) so that
-# production-code type drift stays visible even when test-only typing
-# noise dominates. src/ must stay clean, while tests/ is ratcheted against
-# a checked-in baseline so new test typing debt cannot slip in silently.
-# The strict subset below stays CI-blocking.
+# mypy runs in strict mode (mypy.ini) as two passes, src/ and tests/, so that
+# production-code type drift stays visible even when test-only typing noise
+# dominates. src/ must stay clean, while tests/ is ratcheted against a
+# checked-in baseline so new test typing debt cannot slip in silently.
 # See docs/typing.md.
 count_mypy_errors() {
     # Parse "Found N errors" / "Success: ..." lines from captured output.
@@ -230,28 +228,6 @@ enforce_mypy_src_ratchet
 run_counted_mypy tests "tests/" TESTS ratchet
 enforce_mypy_tests_ratchet
 
-echo "Running mypy strict check (blocking — strict subset only)..."
-# Strict subset: every [mypy-<module>] section in mypy.ini with strict = True.
-# See docs/typing.md for how to add a module.
-STRICT_FILES=()
-if STRICT_LIST="$(python scripts/mypy_strict_files.py)"; then
-    while IFS= read -r strict_file; do
-        [ -n "$strict_file" ] && STRICT_FILES+=("$strict_file")
-    done <<< "$STRICT_LIST"
-fi
-if [ ${#STRICT_FILES[@]} -eq 0 ]; then
-    echo "❌ could not read the strict module list from mypy.ini"
-    false
-else
-    mypy --strict "${STRICT_FILES[@]}"
-fi
-MYPY_STRICT_EXIT=$?
-if [ $MYPY_STRICT_EXIT -ne 0 ]; then
-    echo "❌ mypy strict helper subset failed (exit code: $MYPY_STRICT_EXIT)"
-else
-    echo "✅ mypy strict helper subset clean"
-fi
-
 # Every tracked shell script: bash -n, then shellcheck at its default
 # severity. This is the only shellcheck run; CI's lint job gets it from here.
 # check_shell.sh discovers the scripts, so new ones are covered automatically.
@@ -259,16 +235,15 @@ echo "Running shell script checks..."
 scripts/check_shell.sh
 SHELLCHECK_EXIT=$?
 
-# Report summary — src/ must stay clean, tests/ is ratcheted, and the strict
-# subset remains fully blocking. Ruff, Black, and shellcheck are blocking too.
-if [ $RUFF_EXIT -ne 0 ] || [ $BLACK_EXIT -ne 0 ] || [ $MYPY_SRC_RATCHET_EXIT -ne 0 ] || [ $MYPY_TESTS_RATCHET_EXIT -ne 0 ] || [ $MYPY_STRICT_EXIT -ne 0 ] || [ $SHELLCHECK_EXIT -ne 0 ]; then
+# Report summary — src/ must stay clean and tests/ is ratcheted. Ruff, Black,
+# and shellcheck are blocking too.
+if [ $RUFF_EXIT -ne 0 ] || [ $BLACK_EXIT -ne 0 ] || [ $MYPY_SRC_RATCHET_EXIT -ne 0 ] || [ $MYPY_TESTS_RATCHET_EXIT -ne 0 ] || [ $SHELLCHECK_EXIT -ne 0 ]; then
     echo ""
     echo "❌ Some checks failed:"
     [ $RUFF_EXIT -ne 0 ] && echo "  - Ruff: $RUFF_EXIT"
     [ $BLACK_EXIT -ne 0 ] && echo "  - Black: $BLACK_EXIT"
     [ $MYPY_SRC_RATCHET_EXIT -ne 0 ] && echo "  - mypy src/ ratchet: $MYPY_SRC_RATCHET_EXIT"
     [ $MYPY_TESTS_RATCHET_EXIT -ne 0 ] && echo "  - mypy tests/ ratchet: $MYPY_TESTS_RATCHET_EXIT"
-    [ $MYPY_STRICT_EXIT -ne 0 ] && echo "  - mypy strict subset: $MYPY_STRICT_EXIT"
     [ $SHELLCHECK_EXIT -ne 0 ] && echo "  - shellcheck: $SHELLCHECK_EXIT"
     echo ""
     echo "Post-run actions will continue..."
@@ -303,7 +278,7 @@ else
     echo "✅ mypy tests/: ${MYPY_TESTS_COUNT} issue(s) matches baseline ${MYPY_TESTS_BASELINE}"
 fi
 
-if [ $RUFF_EXIT -ne 0 ] || [ $BLACK_EXIT -ne 0 ] || [ $MYPY_SRC_RATCHET_EXIT -ne 0 ] || [ $MYPY_TESTS_RATCHET_EXIT -ne 0 ] || [ $MYPY_STRICT_EXIT -ne 0 ] || [ $SHELLCHECK_EXIT -ne 0 ]; then
+if [ $RUFF_EXIT -ne 0 ] || [ $BLACK_EXIT -ne 0 ] || [ $MYPY_SRC_RATCHET_EXIT -ne 0 ] || [ $MYPY_TESTS_RATCHET_EXIT -ne 0 ] || [ $SHELLCHECK_EXIT -ne 0 ]; then
     exit 1
 fi
 

@@ -1,70 +1,35 @@
 # Type-Checking Strategy
 
-InkyPi uses [mypy](https://mypy.readthedocs.io/) for static type analysis.
-Rather than enabling strict mode everywhere at once, we follow an **incremental
-strict** path: a small "strict subset" is enforced as a CI blocker today, with
-more modules added over time as they stabilize. The broader `src/` check is now
-expected to stay clean, while `tests/` is ratcheted against a checked-in
-baseline so new test typing debt cannot slip in while we keep paying down the
-backlog.
+InkyPi uses [mypy](https://mypy.readthedocs.io/) in **strict mode for every
+module**: `strict = True` sits once in the `[mypy]` section of `mypy.ini`, plus
+`warn_unreachable`, which strict leaves out. `src/` must stay at zero errors;
+`tests/` is ratcheted against a checked-in baseline so new test typing debt
+cannot slip in while the backlog is paid down.
 
-## Why incremental strict?
+## Why there is no per-module strict list
 
-Enabling `--strict` across the whole codebase in one shot would produce
-hundreds of errors and risk churn on actively-changing files.  An incremental
-approach lets us raise the quality bar module by module without blocking
-ongoing feature work.
-
-## Current strict subset (CI-blocking)
-
-The strict subset is every `[mypy-<module>]` section in `mypy.ini` with
-`strict = True`. That is the only list. `scripts/lint.sh` runs `mypy --strict`
-on the files `scripts/mypy_strict_files.py` reads from it. To see the list:
-
-```bash
-python scripts/mypy_strict_files.py
-```
-
-The subset is intentionally low-churn: the broad `src/` check protects the
-rest of production code from backsliding, while these modules are held to full
-`--strict`.
-
-## How to add a module to the strict subset
-
-1. **Run mypy strict on the module locally** and fix all errors:
-
-   ```bash
-   .venv/bin/python -m mypy --strict src/utils/your_module.py
-   ```
-
-2. **Add a per-module block to `mypy.ini`:**
-
-   ```ini
-   [mypy-utils.your_module]
-   strict = True
-   ```
-
-3. Open a PR. `scripts/lint.sh` picks the module up from `mypy.ini`, and CI
-   enforces strictness from then on. The script fails if a listed module has
-   no source file, so a rename can't silently drop it.
+mypy applies `strict = True` from *any* section to the whole run. A
+`[mypy-utils.foo]` section with `strict = True` does not make only `utils.foo`
+strict; it makes everything strict. Until November 2026 `mypy.ini` held 22 such
+sections, documented as a "strict subset", and `scripts/lint.sh` ran a third
+`mypy --strict` pass over them. In fact the whole tree was strict, and deleting
+the last section would have dropped every module to non-strict with nothing
+failing. `tests/unit/test_mypy_config.py` now checks that strict is set once,
+globally, that no section switches a strict flag back off, and that mypy really
+reports `no-untyped-def` with the repo config.
 
 ## Current CI behavior: clean `src/`, ratcheted `tests/`
 
-`scripts/lint.sh` runs the non-strict mypy pass as **two separate invocations**
-plus the blocking strict subset:
+`scripts/lint.sh` runs mypy as **two separate invocations**:
 
 1. `mypy src/` — production code, compared against the checked-in baseline in
    `scripts/mypy_src_baseline.txt`; this baseline should remain `0`
 2. `mypy tests/` — test suite, compared against the checked-in baseline in
    `scripts/mypy_tests_baseline.txt`
-3. `mypy --strict ...` — curated strict subset, fully blocking
 
-`src/` is no longer purely informational. Now that the production baseline is
-zero, CI fails if `mypy src/` reports any issue or cannot produce a summary.
-`tests/` still has much higher typing noise, but it is no longer unbounded:
-CI fails if the test error count rises above the committed baseline, or if
-mypy cannot produce a summary to compare against. The strict subset above is
-unchanged and remains fully blocking.
+CI fails if `mypy src/` reports any issue or cannot produce a summary, and if
+the test error count rises above the committed baseline or mypy cannot produce
+a summary to compare against.
 
 ### Why the split?
 
@@ -87,8 +52,6 @@ If `src/` goes above zero:
 If `src/` stays at zero:
 
 1. Leave `scripts/mypy_src_baseline.txt` at `0`.
-2. Prefer adding newly stable modules to the strict subset instead of changing
-   the production baseline.
 
 If `mypy src/` exits without a `Found N errors` or `Success:` summary, treat it
 as a broken type-check invocation. The ratchet will fail until the underlying
