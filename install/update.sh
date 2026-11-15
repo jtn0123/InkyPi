@@ -459,6 +459,8 @@ fi
 
 # Refuse to update on an unsupported OS (e.g. Bookworm's Python 3.11) before
 # the service is stopped, so a too-old Pi keeps running its current version.
+# do_update.sh already checked the target's floor before checkout; this
+# covers update.sh being run directly (branch tracking, rollback).
 _current_step="python_version"
 if ! require_supported_python; then
   exit 1

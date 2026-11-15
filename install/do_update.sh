@@ -227,6 +227,20 @@ echo "Target version: $TARGET_TAG"
 _current_step="preflight"
 # shellcheck source=install/_common.sh
 source "$SCRIPT_DIR/_common.sh"
+
+# The target release's Python floor, read from its own pyproject.toml.
+# update.sh checks Python too, but only after this script has switched the
+# checkout, so a refusal there would leave the new code on disk under a
+# service still running the old version.
+_target_python=$(git_repo show "refs/tags/$TARGET_TAG:pyproject.toml" 2>/dev/null \
+  | python_floor_from_pyproject || true)
+if ! require_supported_python "$_target_python"; then
+  _current_step="preflight: $TARGET_TAG needs Python ${_target_python:-$INKYPI_MIN_PYTHON}+"
+  echo "ERROR: Update to $TARGET_TAG aborted by pre-flight checks: system python3 is too old" >&2
+  echo "  Nothing was changed; the current version keeps running." >&2
+  exit 1
+fi
+
 if ! run_update_preflight "${INKYPI_VENV_PYTHON:-$PROJECT_DIR/venv_inkypi/bin/python}" \
     --repo-dir "$REPO_DIR" \
     --disk-path "$PROJECT_DIR" \
