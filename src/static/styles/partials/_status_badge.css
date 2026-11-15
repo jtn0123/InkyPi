@@ -1,5 +1,11 @@
 /* In-app status badge (JTN-709) ------------------------------------------- */
 
+/* Colours come from the theme tokens, using the same tone/text pairs as
+   .status-chip, so the badge follows light and dark mode. Each state sets
+   --status-badge-tone (tints the fill and border) and --status-badge-fg. The
+   fill is mixed with --surface rather than transparent because the badge
+   floats over page content. */
+
 .status-badge {
     position: fixed;
     bottom: 1rem;
@@ -12,19 +18,21 @@
     border-radius: 999px;
     font-size: 0.85rem;
     font-weight: 600;
-    color: var(--status-badge-fg, #111827);
-    background: var(--status-badge-bg, #d97706);
+    --status-badge-tone: var(--warning);
+    --status-badge-fg: var(--warning-contrast);
+    color: var(--status-badge-fg);
+    background: color-mix(in oklab, var(--status-badge-tone) 14%, var(--surface));
     box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
     cursor: pointer;
     user-select: none;
-    border: 1px solid rgba(0, 0, 0, 0.1);
+    border: 1px solid color-mix(in oklab, var(--status-badge-tone) 35%, transparent);
     transition: transform 120ms ease, opacity 120ms ease;
 }
 
 .status-badge:hover,
 .status-badge:focus-visible {
     transform: translateY(-1px);
-    outline: 2px solid var(--focus-ring, #60a5fa);
+    outline: 2px solid var(--accent);
     outline-offset: 2px;
 }
 
@@ -43,15 +51,18 @@
 }
 
 .status-badge.status-ok {
-    --status-badge-bg: #059669;
+    --status-badge-tone: var(--success);
+    --status-badge-fg: var(--success);
 }
 
 .status-badge.status-warning {
-    --status-badge-bg: #d97706;
+    --status-badge-tone: var(--warning);
+    --status-badge-fg: var(--warning-contrast);
 }
 
 .status-badge.status-error {
-    --status-badge-bg: #dc2626;
+    --status-badge-tone: var(--error);
+    --status-badge-fg: var(--error-contrast);
     animation: status-badge-pulse 2s ease-in-out infinite;
 }
 
@@ -77,8 +88,8 @@ body[data-page="api-keys"] .status-popover {
 }
 
 @keyframes status-badge-pulse {
-    0%, 100% { box-shadow: 0 4px 14px rgba(220, 38, 38, 0.25); }
-    50% { box-shadow: 0 4px 20px rgba(220, 38, 38, 0.55); }
+    0%, 100% { box-shadow: 0 4px 14px color-mix(in oklab, var(--error) 25%, transparent); }
+    50% { box-shadow: 0 4px 20px color-mix(in oklab, var(--error) 55%, transparent); }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -95,9 +106,9 @@ body[data-page="api-keys"] .status-popover {
     min-width: 16rem;
     max-width: 22rem;
     padding: 0.75rem 1rem;
-    background: var(--surface-bg, #f9fafb);
-    color: var(--surface-fg, #111827);
-    border: 1px solid var(--border-color, #e5e7eb);
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border-color);
     border-radius: 0.5rem;
     box-shadow: 0 10px 25px rgba(0, 0, 0, 0.18);
     font-size: 0.9rem;
@@ -118,21 +129,21 @@ body[data-page="api-keys"] .status-popover {
 
 .status-popover-item {
     padding: 0.25rem 0;
-    border-top: 1px solid var(--border-color, #e5e7eb);
+    border-top: 1px solid var(--border-color);
 }
 
 .status-popover-item:first-child { border-top: 0; }
 
-.status-popover-item.severity-error strong { color: #dc2626; }
-.status-popover-item.severity-warning strong { color: #d97706; }
+.status-popover-item.severity-error strong { color: var(--error-contrast); }
+.status-popover-item.severity-warning strong { color: var(--warning-contrast); }
 
 .status-popover-detail {
-    color: var(--muted-fg, #4b5563);
+    color: var(--muted);
 }
 
 .status-popover-link,
 .status-popover-action {
-    color: var(--link-color, #2563eb);
+    color: var(--accent);
     text-decoration: underline;
 }
 
@@ -141,5 +152,5 @@ body[data-page="api-keys"] .status-popover {
     gap: 0.75rem;
     margin-top: 0.5rem;
     padding-top: 0.5rem;
-    border-top: 1px solid var(--border-color, #e5e7eb);
+    border-top: 1px solid var(--border-color);
 }

@@ -34,11 +34,6 @@
 
 default: []
 
-plugin_default:
-  - id: aria-hidden-focus
-    reason: >-
-      Hidden-by-default modals (response modal, schedule modal) still contain
-      focusable children at page load. Resolved when the modals render lazily
-      or use ``inert``. Tracked in JTN-511.
+plugin_default: []
 
 pages: {}
