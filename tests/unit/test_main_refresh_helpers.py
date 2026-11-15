@@ -17,50 +17,13 @@ import pytest
 from blueprints.main import (
     _annotate_refresh_schedule,
     _build_next_refresh_meta,
-    _device_cycle_minutes,
     _format_next_refresh_relative,
     _parse_refresh_datetime,
-    _playlist_cycle_minutes,
+    _playlist_cycle_seconds,
 )
 
 # ---------------------------------------------------------------------------
-# _device_cycle_minutes
-# ---------------------------------------------------------------------------
-
-
-def _device_config(value: Any) -> Any:
-    """Return a device-config stub whose get_config() yields ``value``."""
-
-    class _Cfg:
-        def get_config(self, key: str, default: Any = None) -> Any:
-            assert key == "plugin_cycle_interval_seconds"
-            return value
-
-    return _Cfg()
-
-
-def test_device_cycle_minutes_converts_seconds_to_minutes() -> None:
-    assert _device_cycle_minutes(_device_config(3600)) == 60
-    assert _device_cycle_minutes(_device_config(300)) == 5
-
-
-def test_device_cycle_minutes_clamps_sub_60s_intervals_to_one_minute() -> None:
-    # A sub-minute cycle would schedule the next refresh in the past.
-    # Clamp to 1 minute to avoid a perpetual "Due now" state.
-    assert _device_cycle_minutes(_device_config(30)) == 1
-    assert _device_cycle_minutes(_device_config(0)) == 1
-
-
-def test_device_cycle_minutes_falls_back_on_invalid_config() -> None:
-    class _Boom:
-        def get_config(self, *args: Any, **kwargs: Any) -> Any:
-            raise RuntimeError("config read failed")
-
-    assert _device_cycle_minutes(_Boom()) == 60
-
-
-# ---------------------------------------------------------------------------
-# _playlist_cycle_minutes
+# _playlist_cycle_seconds — the loop's cycle for the last refresh's playlist
 # ---------------------------------------------------------------------------
 
 
@@ -77,31 +40,24 @@ def _device_with_playlist(device_seconds: int, playlist: Any) -> Any:
     return _Cfg()
 
 
-def test_playlist_cycle_minutes_uses_device_when_name_missing() -> None:
+def test_playlist_cycle_uses_device_when_name_missing() -> None:
     cfg = _device_with_playlist(600, playlist=None)
-    assert _playlist_cycle_minutes(cfg, "") == 10
-    assert _playlist_cycle_minutes(cfg, None) == 10
+    assert _playlist_cycle_seconds(cfg, "") == 600
+    assert _playlist_cycle_seconds(cfg, None) == 600
 
 
-def test_playlist_cycle_minutes_uses_playlist_override_when_set() -> None:
+def test_playlist_cycle_uses_playlist_override_when_set() -> None:
     playlist = SimpleNamespace(cycle_interval_seconds=300)
     cfg = _device_with_playlist(3600, playlist=playlist)
-    assert _playlist_cycle_minutes(cfg, "Focus") == 5
+    assert _playlist_cycle_seconds(cfg, "Focus") == 300
 
 
-def test_playlist_cycle_minutes_clamps_sub_60s_playlist_override() -> None:
-    playlist = SimpleNamespace(cycle_interval_seconds=30)
-    cfg = _device_with_playlist(3600, playlist=playlist)
-    # 30 // 60 == 0, but the clamp keeps it at 1.
-    assert _playlist_cycle_minutes(cfg, "Focus") == 1
-
-
-def test_playlist_cycle_minutes_falls_back_to_device_when_playlist_missing() -> None:
+def test_playlist_cycle_falls_back_to_device_when_playlist_missing() -> None:
     cfg = _device_with_playlist(1800, playlist=None)
-    assert _playlist_cycle_minutes(cfg, "Ghost") == 30
+    assert _playlist_cycle_seconds(cfg, "Ghost") == 1800
 
 
-def test_playlist_cycle_minutes_falls_back_on_playlist_manager_error() -> None:
+def test_playlist_cycle_falls_back_on_playlist_manager_error() -> None:
     class _Cfg:
         def get_config(self, key: str, default: Any = None) -> Any:
             return 3600
@@ -109,7 +65,20 @@ def test_playlist_cycle_minutes_falls_back_on_playlist_manager_error() -> None:
         def get_playlist_manager(self) -> Any:
             raise RuntimeError("playlist_manager unavailable")
 
-    assert _playlist_cycle_minutes(_Cfg(), "Focus") == 60
+    assert _playlist_cycle_seconds(_Cfg(), "Focus") == 3600
+
+
+def test_sub_minute_cycle_reads_one_minute_not_zero(monkeypatch: Any) -> None:
+    # 30 // 60 == 0 would print "Every 0 min".
+    monkeypatch.setattr(
+        "blueprints.main.now_device_tz", lambda cfg: datetime(2025, 1, 1, tzinfo=UTC)
+    )
+    playlist = SimpleNamespace(cycle_interval_seconds=30)
+    cfg = _device_with_playlist(3600, playlist=playlist)
+
+    result = _annotate_refresh_schedule({"playlist": "Focus"}, cfg)
+
+    assert result["cycle_minutes"] == 1
 
 
 # ---------------------------------------------------------------------------
@@ -276,6 +245,37 @@ def test_annotate_refresh_schedule_projects_next_refresh(monkeypatch: Any) -> No
     assert result["next_refresh_relative"] == "in 3m"
     assert "ETA" in result["next_refresh_meta"]
     assert "Every 5 min" in result["next_refresh_meta"]
+
+
+def test_annotate_refresh_schedule_counts_a_failed_attempt(monkeypatch: Any) -> None:
+    # The 07:55 refresh succeeded; the loop's 08:00 turn failed, so it next
+    # acts at 08:05. The dashboard must say so, not "Due now" until then.
+    fixed_now = datetime(2025, 1, 1, 8, 1, tzinfo=UTC)
+    monkeypatch.setattr("blueprints.main.now_device_tz", lambda cfg: fixed_now)
+    cfg = _device_with_playlist(300, playlist=None)
+    payload: dict[str, Any] = {"refresh_time": "2025-01-01T07:55:00+00:00"}
+
+    result = _annotate_refresh_schedule(
+        payload, cfg, last_attempt=datetime(2025, 1, 1, 8, 0, tzinfo=UTC)
+    )
+
+    assert result["next_refresh_time"] == "2025-01-01T08:05:00+00:00"
+    assert result["next_refresh_relative"] == "in 4m"
+
+
+def test_annotate_refresh_schedule_uses_seconds_not_floored_minutes(
+    monkeypatch: Any,
+) -> None:
+    # A 90-second cycle is due 90 s after the refresh, not 60.
+    fixed_now = datetime(2025, 1, 1, 8, 0, tzinfo=UTC)
+    monkeypatch.setattr("blueprints.main.now_device_tz", lambda cfg: fixed_now)
+    cfg = _device_with_playlist(90, playlist=None)
+
+    result = _annotate_refresh_schedule(
+        {"refresh_time": "2025-01-01T08:00:00+00:00"}, cfg
+    )
+
+    assert result["next_refresh_time"] == "2025-01-01T08:01:30+00:00"
 
 
 def test_annotate_refresh_schedule_converts_next_to_device_timezone(

@@ -1,7 +1,7 @@
 import logging
 import math
 import os
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
 from typing import Any
 from uuid import uuid4
@@ -17,6 +17,7 @@ from flask import (
 )
 
 from benchmarks.benchmark_storage import save_refresh_event, save_stage_event
+from refresh_task import schedule
 from refresh_task.health import PluginHealthTracker
 from utils import blackout
 from utils.backend_errors import mapped_render_errors
@@ -37,38 +38,27 @@ logger = logging.getLogger(__name__)
 main_bp = Blueprint("main", __name__)
 
 
-def _device_cycle_minutes(device_config: Any) -> int:
-    try:
-        cycle_seconds = int(
-            device_config.get_config("plugin_cycle_interval_seconds", default=3600)
-        )
-        # Mirror the playlist override clamp: avoid a zero-minute cycle (which
-        # would schedule the next refresh in the past and surface "Due now"
-        # immediately) for any configured interval below 60 seconds.
-        return max(1, cycle_seconds // 60)
-    except Exception:
-        return 60
-
-
-def _playlist_cycle_minutes(device_config: Any, playlist_name: Any) -> int:
-    cycle_minutes = _device_cycle_minutes(device_config)
+def _playlist_cycle_seconds(device_config: Any, playlist_name: Any) -> float:
+    """The cycle the refresh loop uses for *playlist_name*, in seconds."""
+    device_interval = schedule.device_interval_seconds(device_config)
     if not playlist_name:
-        return cycle_minutes
+        return device_interval
 
     try:
         playlist_manager = device_config.get_playlist_manager()
         playlist = playlist_manager.get_playlist(playlist_name)
-        cycle_seconds = getattr(playlist, "cycle_interval_seconds", None)
-        if cycle_seconds:
-            return max(1, int(cycle_seconds) // 60)
+        return schedule.effective_cycle_seconds(playlist, device_interval)
     except Exception:
         logger.warning(
             "Playlist %r has an unreadable cycle interval; using the device's",
             playlist_name,
             exc_info=True,
         )
+        return device_interval
 
-    return cycle_minutes
+
+def _loop_last_attempt() -> datetime | None:
+    return schedule.last_attempt_of(current_app.config.get("REFRESH_TASK"))
 
 
 def _parse_refresh_datetime(iso_value: Any) -> datetime | None:
@@ -117,13 +107,20 @@ def _build_next_refresh_meta(
     return " · ".join(parts)
 
 
-def _annotate_refresh_schedule(payload: Any, device_config: Any) -> Any:
-    """Attach next-refresh timing metadata for dashboard rendering."""
+def _annotate_refresh_schedule(
+    payload: Any, device_config: Any, last_attempt: datetime | None = None
+) -> Any:
+    """Attach next-refresh timing metadata for dashboard rendering.
+
+    ``last_attempt`` is when the refresh loop last acted on a due refresh
+    (:func:`refresh_task.schedule.last_attempt_of`).
+    """
     if not isinstance(payload, dict):
         return payload
 
     now_dt = now_device_tz(device_config)
-    cycle_minutes = _playlist_cycle_minutes(device_config, payload.get("playlist"))
+    cycle_seconds = _playlist_cycle_seconds(device_config, payload.get("playlist"))
+    cycle_minutes = schedule.cycle_minutes(cycle_seconds)
     payload["cycle_minutes"] = cycle_minutes
 
     refresh_dt = _parse_refresh_datetime(payload.get("refresh_time"))
@@ -135,7 +132,14 @@ def _annotate_refresh_schedule(payload: Any, device_config: Any) -> Any:
         )
         return payload
 
-    next_dt = refresh_dt.astimezone(now_dt.tzinfo) + timedelta(minutes=cycle_minutes)
+    # The loop's own rule: a cycle after the last refresh or the last attempt,
+    # so a failed or skipped refresh doesn't read "Due now" for a whole cycle.
+    next_dt = schedule.next_due_at(
+        refresh_dt.astimezone(now_dt.tzinfo),
+        last_attempt,
+        cycle_seconds,
+        now_dt,
+    )
     payload["next_refresh_time"] = next_dt.isoformat()
     payload["next_refresh_relative"] = _format_next_refresh_relative(next_dt, now_dt)
     payload["next_refresh_meta"] = _build_next_refresh_meta(
@@ -196,7 +200,9 @@ def main_page() -> Any:
         device_config.current_image_file
     )
 
-    device_cycle_minutes = _device_cycle_minutes(device_config)
+    device_cycle_minutes = schedule.cycle_minutes(
+        schedule.device_interval_seconds(device_config)
+    )
     # Mirror /refresh-info's degrade-to-{} behaviour so a broken or missing
     # refresh info file cannot 500 the dashboard shell. The template guards
     # against empty refresh_info with `| default({})` helpers, so an empty
@@ -208,7 +214,7 @@ def main_page() -> Any:
         refresh_info = {}
     else:
         _annotate_instance_labels(refresh_info)
-        _annotate_refresh_schedule(refresh_info, device_config)
+        _annotate_refresh_schedule(refresh_info, device_config, _loop_last_attempt())
 
     return render_template(
         "inky.html",
@@ -392,7 +398,7 @@ def refresh_info() -> Any:
         # broken or missing.
         return jsonify({})
     _annotate_instance_labels(info)
-    _annotate_refresh_schedule(info, device_config)
+    _annotate_refresh_schedule(info, device_config, _loop_last_attempt())
     return jsonify(info)
 
 

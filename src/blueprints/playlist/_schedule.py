@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 from typing import Any, cast
 
 from model import Playlist
+from refresh_task import schedule
 from utils.http_utils import json_error
 
 from ._common import _CODE_VALIDATION, _MSG_TIME_OVERLAP, logger
@@ -102,22 +103,38 @@ def _safe_next_index(pl: Any, num: int) -> int:
 
 
 def _safe_until_next_min(
-    is_active: bool, last_dt: datetime | None, cycle_min: int, now: datetime
+    next_dt: datetime | None, cycle_min: int, now: datetime
 ) -> int:
     """Return minutes until the next cycle tick for a playlist.
 
-    ``is_active`` should be True when ``last_dt`` belongs to this playlist.
-    Falls back to ``cycle_min`` on any error.
+    ``next_dt`` is the playlist's next due time when it is the one the loop
+    last refreshed, else None. Falls back to ``cycle_min`` on any error.
     """
-    if not is_active or last_dt is None:
+    if next_dt is None:
         return cycle_min
     try:
-        return max(
-            0,
-            int((last_dt + timedelta(minutes=cycle_min) - now).total_seconds() // 60),
-        )
+        return max(0, int((next_dt - now).total_seconds() // 60))
     except Exception:
         return cycle_min
+
+
+def _playlist_next_due(
+    pl: Any,
+    *,
+    last_refresh: datetime | None,
+    last_refresh_playlist: object,
+    last_attempt: datetime | None,
+    cycle_seconds: float,
+    now: datetime,
+) -> datetime | None:
+    """When the loop next refreshes *pl*, or None if it isn't the active one.
+
+    Uses the loop's own rule (:func:`refresh_task.schedule.next_due_at`), so
+    the playlist pages agree with the dashboard and the scheduler.
+    """
+    if last_refresh is None or last_refresh_playlist != getattr(pl, "name", None):
+        return None
+    return schedule.next_due_at(last_refresh, last_attempt, cycle_seconds, now)
 
 
 def _compute_playlist_rotation_eta(

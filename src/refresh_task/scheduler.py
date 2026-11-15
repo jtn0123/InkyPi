@@ -155,19 +155,7 @@ class RefreshScheduler:
 
     def _cycle_interval_seconds(self) -> float:
         """Read the configured refresh interval with a safe fallback."""
-        raw_value = self.device_config.get_config(
-            "plugin_cycle_interval_seconds", default=60 * 60
-        )
-        value = float(60 * 60)
-        if isinstance(raw_value, (int, float)) and not isinstance(raw_value, bool):
-            value = float(raw_value)
-        elif isinstance(raw_value, str):
-            try:
-                value = float(raw_value or 60 * 60)
-            except ValueError:
-                pass
-        # Zero or negative would make the loop spin; treat it as unset.
-        return value if value > 0 else float(60 * 60)
+        return schedule.device_interval_seconds(self.device_config)
 
 
 def _refresh_datetime(refresh_info: Any) -> datetime | None:
