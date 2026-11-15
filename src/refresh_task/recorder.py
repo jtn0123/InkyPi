@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any, Protocol
 from uuid import uuid4
 
 from utils.event_bus import EventBus, get_event_bus
+from utils.logging_utils import redact_secrets
 from utils.progress_events import ProgressEventBus, get_progress_bus
 
 if TYPE_CHECKING:
@@ -105,6 +106,8 @@ class RefreshRecorder:
         retained_display: bool | None = None,
         plugin_failed: bool = False,
     ) -> None:
+        # Error text goes to every open browser tab and event subscriber.
+        error = redact_secrets(error)
         payload: dict[str, Any] = {
             "state": "error",
             "plugin_id": plugin_id,

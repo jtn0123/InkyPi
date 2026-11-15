@@ -64,5 +64,11 @@ INKYPI_LOG_FORMAT=json INKYPI_LOG_LEVEL=DEBUG python src/inkypi.py
 
 - No additional dependencies — uses only Python stdlib `json` + `logging`.
 - Non-JSON-serialisable extra values are automatically converted to strings.
-- Secrets are **not** automatically redacted; avoid passing sensitive data
-  via `extra={}`.
+- Secrets are masked as `***REDACTED***` in both formats, on every handler
+  (console, `INKYPI_LOG_FILE` and the dev-mode buffer). The filter covers the
+  rendered message, tracebacks, `stack_info` and string `extra={}` values, and
+  recognises `api_key=`/`token=`/`password=`/`client_id=`/`appid=`-style
+  pairs, credential query parameters (`?key=`, `&sig=`), `Bearer` and
+  `Client-ID` header values and bare 32+ character hex strings. The log viewer
+  (`/api/logs`, log download, diagnostics) masks journal lines again when it
+  reads them. It is pattern-based, so still keep secrets out of log calls.

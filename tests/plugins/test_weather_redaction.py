@@ -19,7 +19,7 @@ import pytest
 from plugins.weather import weather_api, weather_data
 
 # A 40-char hex string — matches the "raw 32+ hex" secret pattern in
-# utils.logging_utils._SECRET_PATTERNS.
+# utils.logging_utils._HEX_PATTERN.
 _FAKE_API_KEY = "a" * 40
 _REDACTED = "***REDACTED***"
 
