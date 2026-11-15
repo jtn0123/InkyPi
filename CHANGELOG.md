@@ -2,6 +2,15 @@
 
 <!-- version list -->
 
+## v1.8.24 (2026-11-15)
+
+### Performance Improvements
+
+- **display**: Convert crisp frames about 3.5x faster on the Pi
+  ([#753](https://github.com/jtn0123/InkyPi/pull/753),
+  [`621c034`](https://github.com/jtn0123/InkyPi/commit/621c0347395cd1245906993df11dc210b498d72e))
+
+
 ## v1.8.23 (2026-11-15)
 
 ### Bug Fixes
