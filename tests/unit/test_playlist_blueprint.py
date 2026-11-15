@@ -72,6 +72,19 @@ class TestCreatePlaylist:
         pm = device_config_dev.get_playlist_manager()
         assert pm.get_playlist("Morning") is not None
 
+    def test_one_digit_hours_are_saved_as_two_digit_times(
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
+        """The API accepts 8:00; the config schema only accepts 08:00, so
+        storing the raw text left a config the next start rejected."""
+        resp = _create_playlist(client, "Morning", "8:00", "9:30")
+        assert resp.status_code == 200
+        playlist = device_config_dev.get_playlist_manager().get_playlist("Morning")
+        assert (playlist.start_time, playlist.end_time) == ("08:00", "09:30")
+        restarted = type(device_config_dev)()
+        saved = restarted.get_playlist_manager().get_playlist("Morning")
+        assert (saved.start_time, saved.end_time) == ("08:00", "09:30")
+
     def test_missing_name(self, client: FlaskClient) -> None:
         resp = client.post(
             "/create_playlist",
@@ -176,6 +189,18 @@ class TestUpdatePlaylist:
         pm = device_config_dev.get_playlist_manager()
         assert pm.get_playlist("New") is not None
         assert pm.get_playlist("Old") is None
+
+    def test_one_digit_hours_are_saved_as_two_digit_times(
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
+        _create_playlist(client, "Day", "06:00", "10:00")
+        resp = client.put(
+            "/update_playlist/Day",
+            json={"new_name": "Day", "start_time": "7:05", "end_time": "24:00"},
+        )
+        assert resp.status_code == 200
+        saved = type(device_config_dev)().get_playlist_manager().get_playlist("Day")
+        assert (saved.start_time, saved.end_time) == ("07:05", "24:00")
 
     def test_nonexistent_playlist(self, client: FlaskClient) -> None:
         resp = client.put(

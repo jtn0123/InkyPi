@@ -1,11 +1,21 @@
 # pyright: reportMissingImports=false
 """Tests for save settings, validation, plugin isolation, safe reset, and API keys."""
 
+import json
+import re
+from pathlib import Path
 from typing import Any
 from unittest.mock import patch
 
 import pytest
 from flask.testing import FlaskClient
+
+
+def _restart_config(device_config_dev: Any) -> Any:
+    """Load the saved config the way the next start (and every render
+    worker) does; raises ConfigValidationError if the file is invalid."""
+    return type(device_config_dev)()
+
 
 # ---------------------------------------------------------------------------
 # /settings/isolation (GET, POST, DELETE) - plugin isolation
@@ -112,11 +122,24 @@ class TestSafeReset:
         client.post("/settings/safe_reset")
         assert device_config_dev.get_config("timezone") == original_tz
 
+    def test_safe_reset_leaves_a_config_the_device_can_start_with(
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
+        """Keys that were never set stay unset. Copying them in wrote null,
+        which the schema rejects, so the next start exited."""
+        assert device_config_dev.get_config("preview_size_mode") is None
+        resp = client.post("/settings/safe_reset")
+        assert resp.status_code == 200
+        on_disk = json.loads(Path(device_config_dev.config_file).read_text())
+        assert "preview_size_mode" not in on_disk
+        restarted = _restart_config(device_config_dev)
+        assert restarted.get_config("plugin_cycle_interval_seconds") == 3600
+
     def test_safe_reset_error(
         self, client: FlaskClient, device_config_dev: Any
     ) -> None:
         with patch.object(
-            device_config_dev, "get_config", side_effect=RuntimeError("boom")
+            device_config_dev, "update_config", side_effect=RuntimeError("boom")
         ):
             resp = client.post("/settings/safe_reset")
             assert resp.status_code == 500
@@ -374,13 +397,35 @@ class TestSaveSettings:
         resp = client.post("/save_settings", data=form)
         assert resp.status_code == 200
 
-    def test_save_settings_preview_size_mode(
+    def test_save_without_orientation_keeps_the_saved_one(
         self, client: FlaskClient, device_config_dev: Any
     ) -> None:
-        form = {**self.VALID_FORM, "previewSizeMode": "fit"}
+        """Orientation is optional on the form. Leaving it out used to write
+        null, which the schema rejects at the next start."""
+        device_config_dev.update_value("orientation", "vertical", write=True)
+        form = {k: v for k, v in self.VALID_FORM.items() if k != "orientation"}
         resp = client.post("/save_settings", data=form)
         assert resp.status_code == 200
-        assert device_config_dev.get_config("preview_size_mode") == "fit"
+        assert _restart_config(device_config_dev).get_config("orientation") == (
+            "vertical"
+        )
+
+    def test_every_preview_size_on_the_page_survives_a_restart(
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
+        """Each preview size the settings page offers saves, and the saved
+        file still loads. "Fit to container" used to fail the schema, which
+        broke every render and stopped the next start."""
+        html = client.get("/settings").get_data(as_text=True)
+        offered = re.findall(r'name="previewSizeMode" value="([^"]+)"', html)
+        assert "fit" in offered
+        for mode in offered:
+            form = {**self.VALID_FORM, "previewSizeMode": mode}
+            resp = client.post("/save_settings", data=form)
+            assert resp.status_code == 200, mode
+            assert device_config_dev.get_config("preview_size_mode") == mode
+            restarted = _restart_config(device_config_dev)
+            assert restarted.get_config("preview_size_mode") == mode
 
     def test_save_settings_legacy_device_post(
         self, client: FlaskClient, device_config_dev: Any

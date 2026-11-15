@@ -490,6 +490,11 @@ class Config:
             if content_hash == self._last_written_hash:
                 logger.debug("Config unchanged, skipping write")
                 return
+            # Check the same schema the loader enforces before anything reaches
+            # disk. A value the loader rejects would otherwise fail every
+            # render worker (which reloads the file) and stop the next start.
+            # The caller's rollback restores the in-memory config.
+            validate_device_config(json.loads(serialized))
             logger.debug(f"Writing device config to {self.config_file}")
             config_dir = os.path.dirname(self.config_file) or "."
             fd, tmp_path = tempfile.mkstemp(

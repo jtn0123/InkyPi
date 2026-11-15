@@ -175,6 +175,16 @@ def _to_minutes(time_str: str) -> int:
     return hour * 60 + minute
 
 
+def _format_minutes(minutes: int) -> str:
+    """Canonical ``HH:MM`` for a minute offset (1440 is ``24:00``).
+
+    The parser accepts loose input such as ``8:00``; the config schema only
+    accepts two-digit fields, so the stored value is rebuilt from the
+    parsed minutes.
+    """
+    return f"{minutes // 60:02d}:{minutes % 60:02d}"
+
+
 def validate_playlist_times(
     start_time: Any, end_time: Any
 ) -> tuple[int | None, int | None, RequestModelError | None]:
@@ -380,8 +390,8 @@ def parse_playlist_create_request(
     return (
         PlaylistCreateRequest(
             playlist_name=playlist_name,
-            start_time=str(start_time),
-            end_time=str(end_time),
+            start_time=_format_minutes(start_min),
+            end_time=_format_minutes(end_min),
             start_min=start_min,
             end_min=end_min,
             cycle_minutes_int=cycle_minutes_int,
@@ -414,8 +424,8 @@ def parse_playlist_update_request(
     return (
         PlaylistUpdateRequest(
             new_name=new_name,
-            start_time=str(start_time),
-            end_time=str(end_time),
+            start_time=_format_minutes(start_min),
+            end_time=_format_minutes(end_min),
             start_min=start_min,
             end_min=end_min,
             cycle_minutes_int=cycle_minutes_int,

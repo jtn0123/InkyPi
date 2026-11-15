@@ -29,6 +29,21 @@ class TestImportSettings:
         assert data["success"] is True
         assert device_config_dev.get_config("name") == "Imported Device"
 
+    def test_import_refuses_values_this_device_cannot_load(
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
+        """A backup value the schema rejects is refused with a 400 that names
+        it, and nothing is changed; saving it stopped the next start."""
+        from pathlib import Path
+
+        disk_before = Path(device_config_dev.config_file).read_bytes()
+        payload = {"config": {"name": "Imported", "orientation": "sideways"}}
+        resp = client.post("/settings/import", json=payload)
+        assert resp.status_code == 400
+        assert "orientation" in resp.get_json()["error"]
+        assert device_config_dev.get_config("name") == "InkyPi Test"
+        assert Path(device_config_dev.config_file).read_bytes() == disk_before
+
     def test_import_filters_disallowed_keys(
         self, client: FlaskClient, device_config_dev: Any
     ) -> None:

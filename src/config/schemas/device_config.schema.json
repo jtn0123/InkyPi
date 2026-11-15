@@ -21,7 +21,7 @@
     },
     "orientation": { "type": "string", "enum": ["horizontal", "vertical"] },
     "plugin_cycle_interval_seconds": { "type": "integer", "minimum": 1, "maximum": 86400 },
-    "preview_size_mode": { "type": "string", "enum": ["native", "scaled"] },
+    "preview_size_mode": { "type": "string", "enum": ["native", "scaled", "fit"] },
     "image_settings": {
       "type": "object",
       "additionalProperties": true,

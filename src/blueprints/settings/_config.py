@@ -12,6 +12,7 @@ from blueprints.settings import logger, settings_bp
 from display.rendering_settings import SCREEN_RENDERING_KEY, SCREEN_RENDERING_MODES
 from utils.api_responses import JsonResponse, json_error, json_success
 from utils.backend_errors import ClientInputError, route_error_boundary
+from utils.config_schema import ConfigValidationError
 from utils.time_utils import calculate_seconds
 
 _DEVICE_NAME_MAX_LEN = 64
@@ -140,23 +141,17 @@ def safe_reset() -> ResponseReturnValue:
         hint="Check config readability and write permissions.",
     ):
         device_config = current_app.config["DEVICE_CONFIG"]
-        config = device_config.get_config().copy()
-        keep = {
-            "playlist_config": config.get("playlist_config"),
-            "plugins_enabled": config.get("plugins_enabled"),
-            "name": config.get("name"),
-            "timezone": config.get("timezone"),
-            "time_format": config.get("time_format"),
-            "display_type": config.get("display_type"),
-            "resolution": config.get("resolution"),
-            "orientation": config.get("orientation"),
-            "preview_size_mode": config.get("preview_size_mode"),
-        }
-        # Reset selected runtime controls to safe defaults while preserving plugins/playlists.
-        keep["plugin_cycle_interval_seconds"] = 3600
-        keep["log_system_stats"] = False
-        keep["isolated_plugins"] = []
-        device_config.update_config(keep)
+        # Reset only these runtime controls. update_config merges, so every
+        # other key (plugins, playlists, name, display) is left as it was;
+        # copying them in here wrote null for any that had never been set,
+        # which the config schema rejects at the next start.
+        device_config.update_config(
+            {
+                "plugin_cycle_interval_seconds": 3600,
+                "log_system_stats": False,
+                "isolated_plugins": [],
+            }
+        )
         return json_success(message="Safe reset applied.")
 
 
@@ -292,7 +287,13 @@ def _apply_imported_config(device_config: Any, filtered_cfg: dict[str, Any]) -> 
                     "Backup has an invalid playlist section", status=400
                 ) from exc
 
-    device_config.update_atomic(apply)
+    try:
+        device_config.update_atomic(apply)
+    except ConfigValidationError as exc:
+        # Nothing was written; the rollback restored the running config.
+        raise ClientInputError(
+            f"Backup does not fit this device's settings: {exc}", status=400
+        ) from exc
 
     if "timezone" in filtered_cfg:
         configure_log_timezone(device_config.get_config("timezone"))
@@ -659,7 +660,6 @@ def _build_settings_dict(
     }
     settings: dict[str, Any] = {
         "name": normalized_device_name,
-        "orientation": form_data.get("orientation"),
         "inverted_image": form_data.get("invertImage") == "on",
         "log_system_stats": form_data.get("logSystemStats") == "on",
         "timezone": form_data.get("timezoneName"),
@@ -668,6 +668,10 @@ def _build_settings_dict(
         "image_settings": image_settings,
         "preview_size_mode": form_data.get("previewSizeMode", "native"),
     }
+    # Optional on the form: when it is left out, keep the saved value rather
+    # than writing null, which the config schema rejects.
+    if form_data.get("orientation"):
+        settings["orientation"] = form_data["orientation"]
     if "inky_saturation" in form_data:
         image_settings["inky_saturation"] = float(
             form_data.get("inky_saturation", "0.5")
