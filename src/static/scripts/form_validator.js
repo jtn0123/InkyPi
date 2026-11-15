@@ -77,7 +77,7 @@
     // Number range validation
     if (input.type === "number") {
       const num = parseFloat(value);
-      if (isNaN(num)) {
+      if (Number.isNaN(num)) {
         showError(input, "Please enter a valid number");
         return false;
       }
@@ -120,7 +120,7 @@
     if (ariaLabel) return ariaLabel.trim();
     var id = input.id;
     if (id) {
-      var explicit = document.querySelector('label[for="' + id + '"]');
+      const explicit = document.querySelector('label[for="' + id + '"]');
       if (explicit && explicit.textContent) {
         return explicit.textContent.trim().replace(/\s+/g, " ");
       }
@@ -139,8 +139,8 @@
     var value = (input.value || "").trim();
     if (input.required && !value) return "required";
     if (input.type === "number" && value) {
-      var num = parseFloat(value);
-      if (isNaN(num)) return "not_a_number";
+      const num = parseFloat(value);
+      if (Number.isNaN(num)) return "not_a_number";
       if (input.min !== "" && num < parseFloat(input.min)) return "below_min";
       if (input.max !== "" && num > parseFloat(input.max)) return "above_max";
     }
@@ -172,7 +172,7 @@
     var invalid = [];
     inputs.forEach(function (input) {
       if (!validateInput(input)) {
-        var reason = classifyInvalid(input);
+        const reason = classifyInvalid(input);
         invalid.push({
           input: input,
           label: getInputLabel(input),

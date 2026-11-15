@@ -126,7 +126,6 @@ function showResponseModal(status, message, useToast = true) {
         return showToast(status === 'failure' ? 'error' : status, message);
     }
 
-    const modalContent = document.getElementById('modalContent');
     const modalMessage = document.getElementById('modalMessage');
     const closeButton = document.getElementById('responseModalClose');
     lastResponseModalTrigger = document.activeElement instanceof HTMLElement
@@ -181,28 +180,8 @@ function closeResponseModal() {
     }
 }
 
-// Utility functions for different notification types
-function showSuccess(message, duration) {
-    return showToast('success', message, duration);
-}
-
 function showError(message, duration) {
     return showToast('error', message, duration);
-}
-
-function showWarning(message, duration) {
-    return showToast('warning', message, duration);
-}
-
-function showInfo(message, duration) {
-    return showToast('info', message, duration);
-}
-
-// Clear all toasts
-function clearAllToasts() {
-    if (toastContainer) {
-        toastContainer.innerHTML = '';
-    }
 }
 
 /**
@@ -216,7 +195,7 @@ async function handleJsonResponse(response, options = {}) {
     let data = null;
     try {
         data = await response.json();
-    } catch (e) {
+    } catch {
         // Non-JSON responses
         if (!response.ok) {
             console.warn('Non-JSON error response from', response.url, 'status:', response.status);
@@ -259,7 +238,7 @@ function getErrorMessage(status, endpoint) {
     const errorMessages = {
         400: `Invalid request${ctx}. Please check your input.`,
         401: `Authentication required${ctx}. Please log in.`,
-        403: `Access denied${ctx}. You don\'t have permission.`,
+        403: `Access denied${ctx}. You don't have permission.`,
         404: `Resource not found${ctx}.`,
         408: `Request timed out${ctx}. Please try again.`,
         429: `Too many requests${ctx}. Please wait a moment and retry.`,
@@ -285,3 +264,11 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 });
+
+// Other scripts call these by bare name (biome.json lists them under
+// javascript.globals). A classic script's top-level functions are globals
+// already; assigning them here states that contract where it is defined.
+globalThis.showToast = showToast;
+globalThis.showResponseModal = showResponseModal;
+globalThis.showError = showError;
+globalThis.handleJsonResponse = handleJsonResponse;

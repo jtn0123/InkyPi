@@ -61,7 +61,7 @@
     if (!_list) return;
     _list.innerHTML = "";
     if (_entries.length === 0) {
-      var empty = document.createElement("li");
+      const empty = document.createElement("li");
       empty.className = "debug-console-empty";
       empty.textContent = "No errors recorded.";
       _list.appendChild(empty);

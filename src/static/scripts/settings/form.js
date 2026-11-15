@@ -1,7 +1,6 @@
 (function () {
-  const settingsModules =
-    globalThis.InkyPiSettingsModules ||
-    (globalThis.InkyPiSettingsModules = {});
+  globalThis.InkyPiSettingsModules = globalThis.InkyPiSettingsModules || {};
+  const settingsModules = globalThis.InkyPiSettingsModules;
 
   function isFormValid(form = document.querySelector(".settings-form")) {
     if (!form || typeof form.checkValidity !== "function") return true;

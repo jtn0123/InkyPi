@@ -1,7 +1,6 @@
 (function () {
-  const settingsModules =
-    globalThis.InkyPiSettingsModules ||
-    (globalThis.InkyPiSettingsModules = {});
+  globalThis.InkyPiSettingsModules = globalThis.InkyPiSettingsModules || {};
+  const settingsModules = globalThis.InkyPiSettingsModules;
   const VERSION_CACHE_KEY = "inkypi-update-check";
   const VERSION_CACHE_TTL_MS = 10 * 60 * 1000;
 

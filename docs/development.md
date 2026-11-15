@@ -78,14 +78,42 @@ pre-commit install
 ```
 
 On every `git commit` this runs: whitespace/YAML/merge-conflict checks, **ruff** (lint),
-**black** (format), **mypy** on `src/`, **gitleaks** (secret scanning of the staged changes), and
-**conventional-commit** message validation. Ruff, Black and mypy run from `.venv`, so they are
-the same pinned versions `scripts/lint.sh` and CI use. See
-[`.pre-commit-config.yaml`](../.pre-commit-config.yaml) for the full hook list.
+**black** (format), **mypy** on `src/`, **Biome** (lint of the web scripts, see below),
+**gitleaks** (secret scanning of the staged changes), and **conventional-commit** message
+validation. Ruff, Black and mypy run from `.venv`, so they are the same pinned versions
+`scripts/lint.sh` and CI use. See [`.pre-commit-config.yaml`](../.pre-commit-config.yaml) for
+the full hook list.
 
 > **Bypass when needed:** `git commit --no-verify` skips the hooks locally, but CI enforces the
-> same checks: the lint job runs `scripts/lint.sh` and the hygiene hooks on the files your change
-> touches, and gitleaks has its own workflow.
+> same checks: the lint job runs `scripts/lint.sh`, Biome on every web script, and the hygiene
+> hooks on the files your change touches, and gitleaks has its own workflow.
+
+### Linting the web scripts (Biome)
+
+The web UI's JavaScript (`src/static/scripts/`) is linted by [Biome](https://biomejs.dev).
+There is no build step and no `package.json`: the pre-commit hook uses Biome's official mirror,
+which installs the pinned Biome into pre-commit's own cache, and CI's lint job installs the same
+version. Biome only lints; its formatter is off, so it never rewrites a file.
+
+```bash
+pre-commit run biome-ci --all-files   # every script, the same check CI runs
+```
+
+[`biome.json`](../biome.json) holds the rules: Biome's recommended `correctness`, `suspicious`
+and `security` rules plus `noUndeclaredVariables` and `noUnusedVariables`, with warnings failing
+the check. Biome reads each file as a module, so two things need care in these classic scripts:
+
+- A function another script calls by **bare name** (`showResponseModal(...)`) goes in
+  `javascript.globals` in `biome.json`, and its defining script assigns it to `globalThis`
+  (see the end of `response_modal.js`). Globals read as `window.X` / `globalThis.X` need no entry.
+- `noRedundantUseStrict` is off: `"use strict"` is not redundant in a classic script.
+
+Fix a finding rather than suppressing it. When a suppression really is needed, use
+`// biome-ignore lint/<group>/<rule>: <specific reason>` on the line above.
+
+To bump Biome, change the version in `biome.json` (`$schema`), the hook's `rev` in
+`.pre-commit-config.yaml` and the `setup-biome` input in `.github/workflows/ci.yml` together;
+`tests/unit/test_biome_config.py` fails if they disagree.
 
 ## What You Can Do
 

@@ -8,7 +8,7 @@
   function parseJson(value, fallback) {
     try {
       return JSON.parse(value);
-    } catch (error) {
+    } catch {
       // Intentionally ignored — invalid JSON returns the provided fallback value
       return fallback;
     }
@@ -538,7 +538,8 @@
     // plugin_form.js read this same object (window.uploadedFiles, declared in
     // plugin.html); a private store here meant no picked file was ever sent.
     const fieldName = "imageFiles[]";
-    const uploadedFiles = globalThis.uploadedFiles || (globalThis.uploadedFiles = {});
+    globalThis.uploadedFiles = globalThis.uploadedFiles || {};
+    const uploadedFiles = globalThis.uploadedFiles;
     if (!uploadedFiles[fieldName]) uploadedFiles[fieldName] = [];
 
     const renderFile = (id, fileName, removeHandler) => {

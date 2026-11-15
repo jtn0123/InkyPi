@@ -1,5 +1,6 @@
 (function (global) {
-  const ns = (global.InkyPiPlaylist = global.InkyPiPlaylist || {});
+  global.InkyPiPlaylist = global.InkyPiPlaylist || {};
+  const ns = global.InkyPiPlaylist;
 
   function hideThumbnail(img) {
     img.style.display = "none";
@@ -33,7 +34,6 @@
       box.addEventListener("click", (event) => {
         const target = event.currentTarget;
         ns.showThumbnailPreview(
-          target.dataset.thumbnailPlaylist,
           target.dataset.thumbnailPlugin,
           target.dataset.thumbnailDisplayName,
           target.dataset.thumbnailInstance,

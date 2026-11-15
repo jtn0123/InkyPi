@@ -42,6 +42,20 @@ repos:
         pass_filenames: false
         files: ^src/.*\.py$
 
+  # Biome lints the web UI's scripts; biome.json holds the rules and turns the
+  # formatter off, and `biome ci` never rewrites files. The official mirror is
+  # a `language: node` hook, so pre-commit installs the pinned @biomejs/biome
+  # into its own cache: the repo gets no package.json or node_modules/. The rev
+  # is the Biome version (the mirror tags match Biome releases); CI installs
+  # the same one (ci.yml), and tests/unit/test_biome_config.py checks they
+  # agree. Run it on every script with `pre-commit run biome-ci --all-files`.
+  - repo: https://github.com/biomejs/pre-commit
+    rev: v2.6.7
+    hooks:
+      - id: biome-ci
+        args: [--error-on-warnings]
+        files: ^src/static/scripts/.*\.js$
+
   # The hook's own entry scans only the staged changes. The old
   # `detect --source=.` args were appended to that entry and made gitleaks
   # exit with "unknown flag: --source". CI scans the full history separately

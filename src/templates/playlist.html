@@ -130,7 +130,6 @@
                             {% if plugin_instance.latest_refresh_time %}
                             <div class="pl-item-thumb">
                                 <div class="plugin-thumbnail-container lightboxable"
-                                     data-thumbnail-playlist="{{ playlist.name }}"
                                      data-thumbnail-plugin="{{ plugin_instance.plugin_id }}"
                                      data-thumbnail-display-name="{{ (plugins.get(plugin_instance.plugin_id, {}).display_name or plugin_instance.plugin_id) }}"
                                      data-thumbnail-instance="{{ plugin_instance.name }}"

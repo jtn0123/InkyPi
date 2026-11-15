@@ -32,8 +32,8 @@
   function createPluginPage(config) {
     const ui = globalThis.InkyPiUI || {};
     const mobileQuery = globalThis.matchMedia ? globalThis.matchMedia("(max-width: 768px)") : { matches: false, addEventListener() {} };
-    const uploadedFiles = (globalThis.uploadedFiles = globalThis.uploadedFiles || {});
-    let actionInFlight = false;
+    globalThis.uploadedFiles = globalThis.uploadedFiles || {};
+    const uploadedFiles = globalThis.uploadedFiles;
     let workflowMode = "configure";
     const {
       saveLastProgressSnapshot,
@@ -201,7 +201,6 @@
       if (!runPluginValidation(action)) return;
       if (!ensurePluginFormAvailable()) return;
 
-      actionInFlight = true;
       if (triggerButton) triggerButton.disabled = true;
       try {
         await globalThis.PluginForm.sendForm({
@@ -216,7 +215,6 @@
         });
         saveLastProgressSnapshot(config.progressContext);
       } finally {
-        actionInFlight = false;
         if (triggerButton) triggerButton.disabled = false;
       }
     }
@@ -433,7 +431,7 @@
             refreshPreviewsAfterSuccess().catch(reportPreviewRefreshFailure);
           }, 400);
         }
-      } catch (e) {
+      } catch {
         showResponseModal("failure", "Failed to display instance");
       }
     }
