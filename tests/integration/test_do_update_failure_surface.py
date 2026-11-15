@@ -335,7 +335,17 @@ class TestK2SafeDirectoryAndAutoStash:
         """
         _require_bash_git()
 
-        # Confirm this git build honours the test knob; skip if not.
+        # Confirm the knob trips git's ownership guard, so the pass below
+        # means something. GitHub's runner images trust every directory
+        # (``safe.directory = *`` in /etc/gitconfig), which silently turned
+        # the knob off and left this test skipping on every CI run; ignore
+        # the system and global config so only do_update.sh's own override
+        # can lift the guard, as on a Pi.
+        ownership_env = {
+            "GIT_TEST_ASSUME_DIFFERENT_OWNER": "1",
+            "GIT_CONFIG_NOSYSTEM": "1",
+            "GIT_CONFIG_GLOBAL": os.devnull,
+        }
         probe_repo = tmp_path / "probe"
         probe_repo.mkdir()
         subprocess.run(
@@ -343,16 +353,15 @@ class TestK2SafeDirectoryAndAutoStash:
         )
         probe = subprocess.run(
             ["git", "-C", str(probe_repo), "rev-parse", "--git-dir"],
-            env={**os.environ, "GIT_TEST_ASSUME_DIFFERENT_OWNER": "1"},
+            env={**os.environ, **ownership_env},
             capture_output=True,
             text=True,
             check=False,
         )
-        if probe.returncode == 0:
-            pytest.skip(
-                "this git build ignores GIT_TEST_ASSUME_DIFFERENT_OWNER; "
-                "cannot simulate CVE-2022-24765 ownership mismatch"
-            )
+        assert probe.returncode != 0, (
+            "git ignored GIT_TEST_ASSUME_DIFFERENT_OWNER, so the ownership "
+            "mismatch can't be simulated"
+        )
         assert "dubious ownership" in (probe.stderr + probe.stdout).lower()
 
         repo = tmp_path / "repo"
@@ -368,7 +377,7 @@ class TestK2SafeDirectoryAndAutoStash:
             {
                 "INKYPI_LOCKFILE_DIR": str(state_dir),
                 "PROJECT_DIR": str(proj),
-                "GIT_TEST_ASSUME_DIFFERENT_OWNER": "1",
+                **ownership_env,
             },
             args=["v0.0.1"],
         )

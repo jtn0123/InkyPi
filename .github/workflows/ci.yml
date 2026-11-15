@@ -975,6 +975,9 @@ jobs:
           INKYPI_TEST_SHARD: ${{ matrix.shard }}/2
           PYTHONPATH: src
           REQUIRE_BROWSER_SMOKE: '1'
+          # The two-minute sustained-load loop (test_sustained_load.py) runs
+          # on the nightly schedule only; on PRs it stays skipped.
+          SKIP_LOAD: ${{ github.event_name == 'schedule' && '0' || '1' }}
         run: |
           # xdist is safe here: every browser test boots its own live server
           # on a free port and its own Chromium instance (verified locally

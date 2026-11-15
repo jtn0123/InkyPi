@@ -3471,24 +3471,31 @@ class TestInstallPreflight:
 
         if not _shutil.which("git"):
             pytest.skip("git is not available on this host")
-        # Verify the env knob actually trips this git build before relying on
-        # it for the negative assertion — old gits, msysgit etc. may ignore
-        # it. The knob was added alongside the CVE-2022-24765 fix.
+        # Verify the env knob actually trips git before relying on it for the
+        # negative assertion. GitHub's runner images trust every directory
+        # (``safe.directory = *`` in /etc/gitconfig), which silently turned
+        # the knob off and left this test skipping on every CI run; ignore
+        # the system and global config so only install.sh's own scoped
+        # override can lift the guard, as on a Pi.
+        ownership_env = {
+            "GIT_TEST_ASSUME_DIFFERENT_OWNER": "1",
+            "GIT_CONFIG_NOSYSTEM": "1",
+            "GIT_CONFIG_GLOBAL": _os.devnull,
+        }
         src_path = tmp_path / "probe-repo"
         src_path.mkdir()
         _sp.run(["git", "init", "-q", str(src_path)], check=True)
         probe = _sp.run(
             ["git", "-C", str(src_path), "rev-parse", "--git-dir"],
-            env={**_os.environ, "GIT_TEST_ASSUME_DIFFERENT_OWNER": "1"},
+            env={**_os.environ, **ownership_env},
             capture_output=True,
             text=True,
             check=False,
         )
-        if probe.returncode == 0:
-            pytest.skip(
-                "this git build ignores GIT_TEST_ASSUME_DIFFERENT_OWNER; "
-                "cannot simulate sudo-on-user-owned-clone here"
-            )
+        assert probe.returncode != 0, (
+            "git ignored GIT_TEST_ASSUME_DIFFERENT_OWNER, so the "
+            "sudo-on-user-owned-clone case can't be simulated"
+        )
         # Sanity: the knob really did raise the expected dubious-ownership
         # error so our negative assertion below isn't a false positive.
         assert "dubious ownership" in (probe.stderr + probe.stdout).lower()
@@ -3499,7 +3506,7 @@ class TestInstallPreflight:
         # `safe.directory=*` override should let rev-parse succeed, so
         # preflight must still pass cleanly.
         env["INKYPI_PREFLIGHT_SRC_PATH"] = str(src_path)
-        env["GIT_TEST_ASSUME_DIFFERENT_OWNER"] = "1"
+        env.update(ownership_env)
         proc = self._run(env)
         combined = proc.stdout + proc.stderr
         assert proc.returncode == 0, (
