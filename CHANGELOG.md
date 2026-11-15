@@ -2,6 +2,15 @@
 
 <!-- version list -->
 
+## v1.8.7 (2026-11-15)
+
+### Bug Fixes
+
+- **ui**: Stop plugin pages deleting field error messages
+  ([#723](https://github.com/jtn0123/InkyPi/pull/723),
+  [`d003261`](https://github.com/jtn0123/InkyPi/commit/d0032618e8bd11de295cb1d63ab4c5752851b2bd))
+
+
 ## v1.8.6 (2026-11-15)
 
 ### Bug Fixes
