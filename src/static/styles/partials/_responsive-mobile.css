@@ -396,6 +396,15 @@
         align-items: flex-end;
     }
 
+    /* Dialogs open as bottom sheets here, with their buttons along the bottom
+       edge, which is also where toasts stack. While a dialog is open, toasts
+       move to the top over the dimmed backdrop, so a "Saved" toast can't sit
+       on the dialog's Confirm button and take the tap meant for it. */
+    body.modal-open .toast-container {
+        top: max(16px, calc(env(safe-area-inset-top, 0px) + 16px));
+        bottom: auto;
+    }
+
     /* ── 36 px minimum touch targets (JTN-223) ── */
     button,
 .btn,

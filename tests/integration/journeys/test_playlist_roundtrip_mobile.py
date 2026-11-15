@@ -19,7 +19,7 @@ from typing import Any
 
 import pytest
 from flask import Flask
-from playwright.sync_api import Page, expect
+from playwright.sync_api import Locator, Page, expect
 
 pytestmark = [
     pytest.mark.journey,
@@ -91,6 +91,31 @@ def _backend_instance_names(device_config: Any, playlist_name: Any) -> Any:
     if not pl:
         return None
     return [p.name for p in pl.plugins]
+
+
+def _assert_confirm_not_under_a_toast(page: Page, confirm_btn: Locator) -> None:
+    """A tap on the dialog's Confirm button must land on it, not on a toast.
+
+    At phone width the dialog is a bottom sheet and toasts stack along the
+    bottom edge too, so a "Saved" toast used to sit on Confirm for its 5 s
+    and take the tap. The reorder toasts may already have timed out on a
+    slow runner, so add one that stays for the check.
+    """
+    page.evaluate("() => showToast('success', 'Shown over the dialog', 60000)")
+    expect(
+        page.locator(".toast-container .toast.show", has_text="Shown over the dialog")
+    ).to_be_visible()
+    hit = confirm_btn.evaluate("""(button) => {
+        const box = button.getBoundingClientRect();
+        const top = document.elementFromPoint(
+            box.left + box.width / 2, box.top + box.height / 2
+        );
+        return {
+            onButton: button === top || button.contains(top),
+            hitClass: top ? String(top.className) : null,
+        };
+    }""")
+    assert hit["onButton"], f"a tap on Confirm lands on {hit['hitClass']!r} instead"
 
 
 def _assert_touch_target(locator: Any, label: Any) -> None:
@@ -238,20 +263,11 @@ def test_playlist_roundtrip_mobile_create_reorder_delete_persist(
             f"{expected_reordered!r}"
         )
 
-        # Each reorder save reports back with a success toast. At phone width
-        # the toast stack sits over the delete modal's confirm button until
-        # the toasts close themselves 5 s later, so whether the confirm tap
-        # beat the toasts' slide-in was a race. Wait for both toasts, then
-        # close them as a user would.
-        saved_toasts = page.locator(".toast-container .toast.success.show")
-        expect(saved_toasts).to_have_count(reorder_presses)
-        for toast_id in saved_toasts.evaluate_all(
-            "(toasts) => toasts.map((toast) => toast.id)"
-        ):
-            page.locator(f"#{toast_id}").get_by_role(
-                "button", name="Close notification"
-            ).click()
-        expect(page.locator(".toast-container .toast")).to_have_count(0)
+        # Each reorder save reports back with a success toast, and the user
+        # goes straight on to delete while those are still up.
+        expect(page.locator(".toast-container .toast.success.show")).to_have_count(
+            reorder_presses
+        )
 
         # Step 5: delete middle item via the UI.
         middle_name = expected_reordered[1]
@@ -268,6 +284,7 @@ def test_playlist_roundtrip_mobile_create_reorder_delete_persist(
         confirm_modal.wait_for(state="visible", timeout=3000)
         confirm_btn = page.locator("#confirmDeleteInstanceBtn")
         _assert_touch_target(confirm_btn, "confirmDeleteInstanceBtn")
+        _assert_confirm_not_under_a_toast(page, confirm_btn)
         # On success the delete handler calls location.reload(). That reload
         # cannot be stubbed (Location.reload is [LegacyUnforgeable], so
         # assigning to it is a silent no-op), and previously the test's own
