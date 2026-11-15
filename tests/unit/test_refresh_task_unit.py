@@ -168,11 +168,14 @@ def test_ai_image_timeout_defaults_are_longer(monkeypatch: Any) -> None:
     monkeypatch.delenv("INKYPI_PLUGIN_TIMEOUT_S_AI_IMAGE", raising=False)
     monkeypatch.delenv("INKYPI_MANUAL_UPDATE_WAIT_S", raising=False)
     monkeypatch.delenv("INKYPI_MANUAL_UPDATE_WAIT_S_AI_IMAGE", raising=False)
+    monkeypatch.delenv("INKYPI_PLUGIN_RETRY_MAX", raising=False)
+    monkeypatch.delenv("INKYPI_PLUGIN_RETRY_BACKOFF_MS", raising=False)
 
+    # Two attempts, the 0.5 s pause between them, and 30 s for the rest.
     assert RefreshTask._plugin_timeout_seconds("ai_image") == 180.0
-    assert RefreshTask._manual_update_wait_seconds("ai_image") == 210.0
+    assert RefreshTask._manual_update_wait_seconds("ai_image") == 390.5
     assert RefreshTask._plugin_timeout_seconds("clock") == 60.0
-    assert RefreshTask._manual_update_wait_seconds("clock") == 60.0
+    assert RefreshTask._manual_update_wait_seconds("clock") == 150.5
 
 
 def test_plugin_specific_timeout_env_overrides_global(monkeypatch: Any) -> None:

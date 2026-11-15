@@ -128,6 +128,7 @@ class RefreshScheduler:
             due = False
             if self.manual_update_requests:
                 manual_request = self.manual_update_requests.popleft()
+                manual_request.started.set()
             elif self._due(playlist_manager, latest_refresh, current_dt):
                 self.last_attempt = current_dt
                 due = True

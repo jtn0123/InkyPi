@@ -14,10 +14,12 @@ def test_display_hang_fault_times_out_and_surfaces_error(
     refresh_task = flask_app.config["REFRESH_TASK"]
     display_manager = flask_app.config["DISPLAY_MANAGER"]
 
-    monkeypatch.setenv("INKYPI_MANUAL_UPDATE_WAIT_S", "0.05")
+    # The loop takes the request at once (nothing else is due), so the wait
+    # for it to start passes and the wait for the image runs out mid-hang.
+    monkeypatch.setenv("INKYPI_MANUAL_UPDATE_WAIT_S", "0.2")
 
     def _hung_display(*_args: Any, **_kwargs: Any) -> None:
-        time.sleep(0.4)
+        time.sleep(0.6)
         # Include "timed out" so that if the raw exception wins a timing race
         # with the manual-update timeout wrapper, the diagnostic text still
         # satisfies the assertion below.
@@ -35,8 +37,14 @@ def test_display_hang_fault_times_out_and_surfaces_error(
         assert resp.status_code == 504
         assert resp.get_json().get("code") == "manual_update_timeout"
 
-        diagnostics = client.get("/api/diagnostics").get_json()
-        last_error = diagnostics["refresh_task"]["last_error"] or ""
-        assert "timed out" in last_error.lower()
+        # The caller giving up records nothing. Once the hung display gives
+        # up too, diagnostics shows the display's own error.
+        last_error = ""
+        deadline = time.monotonic() + 5
+        while not last_error and time.monotonic() < deadline:
+            diagnostics = client.get("/api/diagnostics").get_json()
+            last_error = diagnostics["refresh_task"]["last_error"] or ""
+            time.sleep(0.05)
+        assert "display driver hang" in last_error
     finally:
         refresh_task.stop()

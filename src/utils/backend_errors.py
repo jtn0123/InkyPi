@@ -9,7 +9,7 @@ from typing import Any
 
 from utils.api_responses import APIError
 from utils.blackout import BLOCKED_MESSAGE, BlackoutActiveError
-from utils.domain_errors import DomainError, RefreshTaskUnavailable
+from utils.domain_errors import DomainError, RefreshLoopBusy, RefreshTaskUnavailable
 from utils.plugin_errors import (
     MANUAL_UPDATE_TIMEOUT_MSG,
     SCREENSHOT_BACKEND_UNAVAILABLE_MSG,
@@ -163,10 +163,12 @@ class InternalOperationError(BackendRouteError):
         super().__init__(message, status=status, code=code, details=merged_details)
 
 
-#: Response text for RefreshTaskUnavailable. A module constant, like the other
+#: Response text for RefreshTaskUnavailable and RefreshLoopBusy. Module
+#: constants, like the other
 #: messages below, so no exception text reaches a response body (CodeQL
 #: ``py/stack-trace-exposure``).
 REFRESH_TASK_UNAVAILABLE_MSG = RefreshTaskUnavailable.default_message
+REFRESH_LOOP_BUSY_MSG = RefreshLoopBusy.default_message
 
 
 def route_error_for(err: BaseException) -> BackendRouteError | None:
@@ -181,6 +183,10 @@ def route_error_for(err: BaseException) -> BackendRouteError | None:
     if isinstance(err, RefreshTaskUnavailable):
         return ServiceUnavailableRouteError(
             REFRESH_TASK_UNAVAILABLE_MSG, code="refresh_task_unavailable"
+        )
+    if isinstance(err, RefreshLoopBusy):
+        return ServiceUnavailableRouteError(
+            REFRESH_LOOP_BUSY_MSG, code="refresh_loop_busy"
         )
     if isinstance(err, URLValidationError):
         return ClientInputError(

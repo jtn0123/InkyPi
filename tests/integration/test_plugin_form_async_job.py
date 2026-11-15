@@ -50,7 +50,7 @@ window.fetch = async (url) => {
   const json = (body, status) => new Response(JSON.stringify(body), {
     status, headers: { 'Content-Type': 'application/json' }
   });
-  if (String(url) === '/update_now') return json({ job_id: 'j1' }, 202);
+  if (String(url) === '/update_now') return json(window.__accepted || { job_id: 'j1' }, 202);
   if (String(url) === '/api/job/j1') { window.__polls++; return json(window.__job, 200); }
   throw new TypeError('unexpected fetch ' + url);
 };
@@ -73,10 +73,14 @@ window.__send = () => {
 """
 
 
-def _open(page: Page, *, live_stream: bool = True) -> None:
+def _open(
+    page: Page, *, live_stream: bool = True, accepted: dict[str, Any] | None = None
+) -> None:
     page.clock.install()
     page.set_content(PAGE)
     page.add_script_tag(content=STUBS)
+    if accepted is not None:
+        page.evaluate("(body) => { window.__accepted = body; }", accepted)
     if not live_stream:
         page.evaluate("() => { window.EventSource = undefined; }")
     page.add_script_tag(content=SCRIPT.read_text(encoding="utf-8"))
@@ -139,6 +143,37 @@ def test_render_that_never_finishes_says_it_timed_out(browser_page: Page) -> Non
     modals = browser_page.evaluate("() => window.__modals")
     assert len(modals) == 1
     assert modals[0][0] == "failure"
+    assert modals[0][1].startswith("Request timed out.")
+
+
+def test_page_waits_as_long_as_the_server_says_the_render_can_take(
+    browser_page: Page,
+) -> None:
+    """An AI image can take minutes. The page gave up at 90 s regardless."""
+    _open(browser_page, live_stream=False, accepted={"job_id": "j1", "wait_s": 200})
+    _run(browser_page, 120_000)
+    assert browser_page.evaluate("() => window.__modals") == []
+
+    browser_page.evaluate("""() => { window.__job = { status: 'done', result: {
+        success: true, message: 'Display updated'
+    } }; }""")
+    _run(browser_page, 1200)
+
+    assert _result(browser_page)["success"] is True
+
+
+def test_page_still_gives_up_once_the_server_wait_is_over(
+    browser_page: Page,
+) -> None:
+    _open(browser_page, live_stream=False, accepted={"job_id": "j1", "wait_s": 100})
+    # 100 s of server wait plus 30 s for the job to start and the last poll.
+    _run(browser_page, 129_000)
+    assert browser_page.evaluate("() => window.__modals") == []
+    _run(browser_page, 2_000)
+
+    assert _result(browser_page)["success"] is False
+    modals = browser_page.evaluate("() => window.__modals")
+    assert [kind for kind, _ in modals] == ["failure"]
     assert modals[0][1].startswith("Request timed out.")
 
 

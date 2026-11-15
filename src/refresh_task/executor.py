@@ -26,6 +26,16 @@ from refresh_task.worker import (
 logger = logging.getLogger(__name__)
 
 
+class RenderTimeoutError(TimeoutError):
+    """A render attempt used its whole time limit and was stopped.
+
+    Not retried: a second attempt doubles the wait, and an AI image provider
+    bills for the generation it may still be finishing. A plain
+    ``TimeoutError`` from inside the plugin (a slow socket, say) is still
+    retried like any other transient failure.
+    """
+
+
 class ZombieStateOwner(Protocol):
     _zombie_thread_count: int
     _zombie_thread_lock: threading.Lock
@@ -208,7 +218,7 @@ class RefreshExecutor:
             proc.join(timeout=timeout_s)
             if proc.is_alive():
                 self.cleanup_subprocess(proc, plugin_id)
-                return None, TimeoutError(self.timeout_msg(plugin_id, timeout_s))
+                return None, RenderTimeoutError(self.timeout_msg(plugin_id, timeout_s))
             return self.handle_process_result(
                 result_queue, proc, plugin_id, attempt, refresh_action
             )
@@ -376,7 +386,7 @@ class RefreshExecutor:
             int(timeout_s),
             zombie_count,
         )
-        return TimeoutError(RefreshExecutor.timeout_msg(plugin_id, timeout_s))
+        return RenderTimeoutError(RefreshExecutor.timeout_msg(plugin_id, timeout_s))
 
     def execute_inprocess(
         self,
@@ -448,6 +458,16 @@ class RefreshExecutor:
     ) -> None:
         if self._raise_if_permanent(exc, plugin_id, attempt, attempts):
             raise exc
+        if isinstance(exc, RenderTimeoutError):
+            logger.info(
+                "plugin_lifecycle: attempt_terminal | plugin_id=%s attempt=%s/%s "
+                "reason=time_limit error=%s",
+                plugin_id,
+                attempt,
+                attempts,
+                exc,
+            )
+            raise exc
 
         if attempt >= attempts:
             return
@@ -471,6 +491,8 @@ class RefreshExecutor:
     def _normalize_timeout(
         plugin_id: str, timeout_s: float, exc: BaseException
     ) -> BaseException:
+        if isinstance(exc, RenderTimeoutError):
+            return exc
         if isinstance(exc, TimeoutError):
             return TimeoutError(RefreshExecutor.timeout_msg(plugin_id, timeout_s))
         return exc

@@ -28,7 +28,7 @@ from utils.backend_errors import (
     route_error_for,
 )
 from utils.blackout import BLOCKED_MESSAGE, BlackoutActiveError
-from utils.domain_errors import DomainError, RefreshTaskUnavailable
+from utils.domain_errors import DomainError, RefreshLoopBusy, RefreshTaskUnavailable
 from utils.plugin_errors import (
     ProviderReportedPluginError,
     ScreenshotBackendError,
@@ -43,6 +43,7 @@ _SECRET = "/var/lib/inkypi/secret-path: upstream said no"
 _FAILURES: list[tuple[str, Callable[[], BaseException], int, str]] = [
     ("blackout", BlackoutActiveError, 409, "blackout_active"),
     ("loop-stopped", RefreshTaskUnavailable, 503, "refresh_task_unavailable"),
+    ("loop-busy", RefreshLoopBusy, 503, "refresh_loop_busy"),
     ("timeout", lambda: TimeoutError(_SECRET), 504, "manual_update_timeout"),
     (
         "bad-url",
