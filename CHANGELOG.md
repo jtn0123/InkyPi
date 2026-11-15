@@ -2,6 +2,97 @@
 
 <!-- version list -->
 
+## v1.8.31 (2026-11-15)
+
+### Bug Fixes
+
+- Report blackout and other render failures the same on every display route
+  ([#784](https://github.com/jtn0123/InkyPi/pull/784),
+  [`5edbc60`](https://github.com/jtn0123/InkyPi/commit/5edbc60cf815549967066109f1a56819e6a6af0e))
+
+- **a11y**: Follow "reduce motion" for scrolls the app starts
+  ([#779](https://github.com/jtn0123/InkyPi/pull/779),
+  [`64575db`](https://github.com/jtn0123/InkyPi/commit/64575db1d3cb87e0b26baf383ace8d990db489db))
+
+- **deps**: Move google-genai to 3.x, keeping the v1beta endpoint
+  ([#780](https://github.com/jtn0123/InkyPi/pull/780),
+  [`758c8a8`](https://github.com/jtn0123/InkyPi/commit/758c8a8cf2866302765500b46ef6aceb60f9fc2a))
+
+### Chores
+
+- **deps**: Move watchdog to 7 and cyclonedx-bom to 8
+  ([#781](https://github.com/jtn0123/InkyPi/pull/781),
+  [`f1008e4`](https://github.com/jtn0123/InkyPi/commit/f1008e42144cb17e38e823739d5d75d1026435c2))
+
+- **pre-commit**: Run the same tools as CI and check hooks in CI
+  ([#775](https://github.com/jtn0123/InkyPi/pull/775),
+  [`7bb0640`](https://github.com/jtn0123/InkyPi/commit/7bb0640aa331f1eab2f3cf46a254d8d8620b7a22))
+
+### Continuous Integration
+
+- Start jobs without waiting for the test job ([#774](https://github.com/jtn0123/InkyPi/pull/774),
+  [`7adff1a`](https://github.com/jtn0123/InkyPi/commit/7adff1a0f44e92d37c573468863f0da7481e9a38))
+
+- **bench**: Refresh the cached benchmark baseline on every main push
+  ([#770](https://github.com/jtn0123/InkyPi/pull/770),
+  [`4c2dadc`](https://github.com/jtn0123/InkyPi/commit/4c2dadc85c66bd21a5870aa5a7cde575b134c939))
+
+- **release**: Release only commits that passed CI
+  ([#778](https://github.com/jtn0123/InkyPi/pull/778),
+  [`0cca085`](https://github.com/jtn0123/InkyPi/commit/0cca0854f47081b29a6e438092c7b2e934c92cc4))
+
+### Documentation
+
+- Reconcile the roadmap and fix stale doc references
+  ([#786](https://github.com/jtn0123/InkyPi/pull/786),
+  [`d618cc3`](https://github.com/jtn0123/InkyPi/commit/d618cc36c0149b3109feb99c2f99f8afd3c8bc9d))
+
+- Rewrite the architecture map from the current tree
+  ([#785](https://github.com/jtn0123/InkyPi/pull/785),
+  [`e984c8d`](https://github.com/jtn0123/InkyPi/commit/e984c8d1134d69f5b4bd3734fd6ee40a555b0ccc))
+
+- **plugins**: Teach the settings schema, not hand-written settings.html
+  ([#783](https://github.com/jtn0123/InkyPi/pull/783),
+  [`047b26f`](https://github.com/jtn0123/InkyPi/commit/047b26f5c9af6c72802e08b1203e772c5fbdae1d))
+
+- **scripts**: Describe precommit_tool.sh and keep the README complete
+  ([#782](https://github.com/jtn0123/InkyPi/pull/782),
+  [`550b88f`](https://github.com/jtn0123/InkyPi/commit/550b88f78804f1156fb9a59b727bb5dd72ed0f23))
+
+### Refactoring
+
+- **http**: Remove the response cache that never served a response
+  ([#768](https://github.com/jtn0123/InkyPi/pull/768),
+  [`8dca3f0`](https://github.com/jtn0123/InkyPi/commit/8dca3f0bf669e71bf86f83beacff10d66744854e))
+
+### Testing
+
+- Make scripts/test.sh run CI's selection on at most 4 workers
+  ([#773](https://github.com/jtn0123/InkyPi/pull/773),
+  [`b8905e9`](https://github.com/jtn0123/InkyPi/commit/b8905e98f445e7ff4020d24bc10ec392f9e29d98))
+
+- Replace tests that ran no product code ([#769](https://github.com/jtn0123/InkyPi/pull/769),
+  [`9bb726c`](https://github.com/jtn0123/InkyPi/commit/9bb726c11c07c1668eacd6ee142b9cb8813c2708))
+
+- Run the three tests that no CI job ever ran ([#772](https://github.com/jtn0123/InkyPi/pull/772),
+  [`daf00ea`](https://github.com/jtn0123/InkyPi/commit/daf00ea16a5ace3a03fb5e5663d852ab14518612))
+
+- Show deprecation warnings and fail on our own ([#767](https://github.com/jtn0123/InkyPi/pull/767),
+  [`75bde95`](https://github.com/jtn0123/InkyPi/commit/75bde958f4b16ff15feb98a198ed454d99aed415))
+
+- **browser**: Stop the click sweep racing scrolls and GitHub
+  ([#777](https://github.com/jtn0123/InkyPi/pull/777),
+  [`cb77a0d`](https://github.com/jtn0123/InkyPi/commit/cb77a0d03ff5b9be88066b717c510b0ef09b7577))
+
+- **ci**: Container gates fail instead of skipping when CI requires them
+  ([#771](https://github.com/jtn0123/InkyPi/pull/771),
+  [`a07cc58`](https://github.com/jtn0123/InkyPi/commit/a07cc582634573eeccdc632e5b69fc5f5954a66b))
+
+- **coverage**: Raise the coverage floors to the current numbers
+  ([#776](https://github.com/jtn0123/InkyPi/pull/776),
+  [`b0e5a1f`](https://github.com/jtn0123/InkyPi/commit/b0e5a1f6a858d6722d434f7b9be43fbc2f297f1d))
+
+
 ## v1.8.30 (2026-11-15)
 
 ### Bug Fixes
