@@ -30,6 +30,7 @@ from typing import Any
 from flask import Blueprint, current_app, jsonify, request
 
 from utils import blackout, boot_self_test, crash_breadcrumb
+from utils.app_version import read_app_version
 from utils.http_utils import json_error
 
 logger = logging.getLogger(__name__)
@@ -156,22 +157,11 @@ def _disk_info(path: str = "/") -> dict[str, Any]:
 
 
 def _read_version() -> str:
-    """Return the version string from the VERSION file at repo root."""
-    try:
-        repo_root = Path(__file__).resolve().parent.parent.parent
-        value = (repo_root / "VERSION").read_text().strip()
-        if value and value != "{version}":
-            return value
-    except Exception:
-        pass
-    # Fall back to cached APP_VERSION on the flask app if present
-    try:
-        cfg_version = current_app.config.get("APP_VERSION")
-        if isinstance(cfg_version, str) and cfg_version:
-            return cfg_version
-    except Exception:
-        pass
-    return "unknown"
+    """Return the version the app started with, else the installed one."""
+    cfg_version = current_app.config.get("APP_VERSION")
+    if isinstance(cfg_version, str) and cfg_version:
+        return cfg_version
+    return read_app_version()
 
 
 def _read_text_file(path: Path) -> str | None:

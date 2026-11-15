@@ -434,64 +434,28 @@ def test_disk_info_returns_nulls_on_oserror(monkeypatch: pytest.MonkeyPatch) -> 
 # ---------------------------------------------------------------------------
 
 
-def test_read_version_falls_back_to_app_config(
+def test_read_version_prefers_the_version_the_app_started_with(
     flask_app: Flask, monkeypatch: pytest.MonkeyPatch
 ) -> Any:
-    """When the VERSION file is unreadable, APP_VERSION from flask config is used."""
+    """The running app's APP_VERSION wins over what is on disk now."""
     import blueprints.diagnostics as diag
 
     flask_app.config["APP_VERSION"] = "9.9.9-test"
-
-    class _NoFile:
-        def __init__(self, *_args: Any, **_kw: Any) -> None:
-            pass
-
-        def resolve(self) -> Any:
-            return self
-
-        @property
-        def parent(self) -> Any:
-            return self
-
-        def __truediv__(self, _other: Any) -> Any:
-            return self
-
-        def read_text(self, *_a: Any, **_kw: Any) -> None:
-            raise FileNotFoundError
-
-    monkeypatch.setattr(diag, "Path", _NoFile)
+    monkeypatch.setattr(diag, "read_app_version", lambda: "0.0.0-disk")
     with flask_app.test_request_context("/api/diagnostics"):
         assert diag._read_version() == "9.9.9-test"
 
 
-def test_read_version_unknown_when_no_source(
+def test_read_version_falls_back_to_the_installed_version(
     flask_app: Flask, monkeypatch: pytest.MonkeyPatch
 ) -> Any:
-    """Returns the literal 'unknown' when VERSION and APP_VERSION are both missing."""
+    """Without a recorded APP_VERSION, report what the shared reader finds."""
     import blueprints.diagnostics as diag
 
     flask_app.config.pop("APP_VERSION", None)
-
-    class _NoFile:
-        def __init__(self, *_args: Any, **_kw: Any) -> None:
-            pass
-
-        def resolve(self) -> Any:
-            return self
-
-        @property
-        def parent(self) -> Any:
-            return self
-
-        def __truediv__(self, _other: Any) -> Any:
-            return self
-
-        def read_text(self, *_a: Any, **_kw: Any) -> None:
-            raise FileNotFoundError
-
-    monkeypatch.setattr(diag, "Path", _NoFile)
+    monkeypatch.setattr(diag, "read_app_version", lambda: "4.5.6")
     with flask_app.test_request_context("/api/diagnostics"):
-        assert diag._read_version() == "unknown"
+        assert diag._read_version() == "4.5.6"
 
 
 # ---------------------------------------------------------------------------

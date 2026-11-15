@@ -24,6 +24,7 @@ from pathlib import Path
 from flask import Blueprint, Response, jsonify
 
 from schemas.responses import UptimeResponse, VersionInfoResponse
+from utils.app_version import read_app_version
 
 version_info_bp = Blueprint("version_info", __name__)
 
@@ -33,37 +34,6 @@ version_info_bp = Blueprint("version_info", __name__)
 
 _PROCESS_START_TIME: float = time.monotonic()
 _PROCESS_START_DATETIME: datetime = datetime.now(UTC)
-
-
-def _read_app_version() -> str:
-    """Return the installed application version (JTN-624).
-
-    Reads ``VERSION`` at the repo root first, falling back to
-    ``[project].version`` in ``pyproject.toml`` when ``VERSION`` is missing,
-    empty, or still contains the unexpanded ``{version}`` placeholder that a
-    broken release pipeline can leave behind. Returns ``"unknown"`` only if
-    both sources fail.
-    """
-    repo_root = Path(__file__).parent.parent.parent
-    try:
-        value = (repo_root / "VERSION").read_text().strip()
-        if value and value != "{version}" and value != "0.1.0":
-            return value
-    except Exception:
-        pass
-
-    try:
-        import tomllib
-
-        with (repo_root / "pyproject.toml").open("rb") as f:
-            data = tomllib.load(f)
-        version = data.get("project", {}).get("version")
-        if isinstance(version, str) and version:
-            return version
-    except Exception:
-        pass
-
-    return "unknown"
 
 
 def _run_git(*args: str) -> str:
@@ -95,7 +65,7 @@ def _read_build_time() -> str:
 
 
 # Cached at module import — never recomputed per request
-_APP_VERSION: str = _read_app_version()
+_APP_VERSION: str = read_app_version()
 _GIT_SHA: str = _run_git("rev-parse", "--short", "HEAD")
 _GIT_BRANCH: str = _run_git("rev-parse", "--abbrev-ref", "HEAD")
 _BUILD_TIME: str = _read_build_time()

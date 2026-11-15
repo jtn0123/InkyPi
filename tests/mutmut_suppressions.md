@@ -48,9 +48,9 @@ cross-referenced to the assertion that catches them.
 | `src/utils/display_names.py:42` | remove `.strip()` from `humanize_plugin_id` | `tests/unit/test_display_names.py::TestHumanizePluginId::test_humanize_strips_surrounding_whitespace` |
 | `src/blueprints/csp_report.py:47` | drop `"#"` from `_redact_url` separator tuple | `tests/test_csp_report.py::test_source_file_url_fragment_is_redacted` |
 | `src/blueprints/csp_report.py:98` | drop any entry from `_sanitise_report` url_keys set | `tests/test_csp_report.py::test_all_url_fields_are_redacted` |
-| `src/blueprints/version_info.py:50` | remove `value != "{version}"` guard | `tests/test_version_uptime.py::test_read_app_version_rejects_unexpanded_placeholder` |
-| `src/blueprints/version_info.py:50` | remove `value != "0.1.0"` guard | `tests/test_version_uptime.py::test_read_app_version_rejects_bootstrap_placeholder` |
-| `src/blueprints/version_info.py:49-51` | return-value mutation of happy path | `tests/test_version_uptime.py::test_read_app_version_accepts_real_version_string` |
+| `src/utils/app_version.py:12` | drop `"{version}"` from `_PLACEHOLDERS` | `tests/test_version_uptime.py::test_read_app_version_rejects_unexpanded_placeholder` |
+| `src/utils/app_version.py:12` | drop `"0.1.0"` from `_PLACEHOLDERS` | `tests/test_version_uptime.py::test_read_app_version_rejects_bootstrap_placeholder` |
+| `src/utils/app_version.py:26-28` | return-value mutation of happy path | `tests/test_version_uptime.py::test_read_app_version_accepts_real_version_string` |
 
 ## Deferred / acceptable survivors
 
