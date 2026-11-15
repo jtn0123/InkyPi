@@ -334,6 +334,31 @@ def test_crisp_frame_dithers_photos_against_driver_blend(
     assert len(np.unique(region, axis=0)) > 3
 
 
+def test_crisp_frame_analyses_each_frame_once(
+    monkeypatch: pytest.MonkeyPatch, device_config_dev: Any
+) -> None:
+    """The gradient check and the conversion share one analysis of the frame.
+
+    Counting the colours in every tile is the costly part of that analysis;
+    doing it twice per frame cost the Pi about 35 ms per refresh.
+    """
+    from display import crisp
+
+    calls: list[int] = []
+    count_tiles = crisp._distinct_per_tile
+
+    def counting(packed: np.ndarray) -> np.ndarray:
+        calls.append(1)
+        return count_tiles(packed)
+
+    monkeypatch.setattr(crisp, "_distinct_per_tile", counting)
+    disp = _inky(monkeypatch, device_config_dev, _FakeE673())
+    img = _ui_frame()
+    img.paste(_photo((160, 96)), (560, 320))  # also takes the photo-region path
+    assert disp.crisp_frame(img) is not None
+    assert len(calls) == 1
+
+
 # --- DisplayManager ------------------------------------------------------------
 
 

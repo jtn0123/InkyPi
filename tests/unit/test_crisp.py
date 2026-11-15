@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
+import pytest
 from PIL import Image, ImageDraw
 
 from display import crisp
@@ -203,6 +204,51 @@ def test_dashboard_with_small_gradient_stays_crisp() -> None:
     assert not crisp.gradient_dominated(Image.new("RGB", (4, 4)))
 
 
+def _tile_ramps(channel: int, spread: int) -> Image.Image:
+    """Every 8x8 tile ramps one channel by *spread* from left to right.
+
+    The size is not a multiple of the tile size, so the partial edge tiles
+    have to be cropped away correctly too.
+    """
+    width, height = 85, 45
+    rgb = np.full((height, width, 3), 100, dtype=np.uint8)
+    step = np.arange(width) % crisp.BLOCK
+    rgb[..., channel] = 100 + step * spread // (crisp.BLOCK - 1)
+    return Image.fromarray(rgb, "RGB")
+
+
+@pytest.mark.parametrize("channel", [0, 1, 2])
+def test_gradient_range_is_judged_per_channel_per_tile(channel: int) -> None:
+    limit = crisp.SMOOTH_MAX_RANGE
+    assert crisp.gradient_dominated(_tile_ramps(channel, limit))
+    assert not crisp.gradient_dominated(_tile_ramps(channel, limit + 1))
+
+
+@pytest.mark.parametrize(
+    "image",
+    [_dashboard(), _gradient_face(), _photo((203, 117), seed=4)],
+    ids=["dashboard", "gradient", "photo"],
+)
+def test_analysed_frame_gives_the_same_answers_as_the_image(
+    image: Image.Image,
+) -> None:
+    """The display analyses a frame once and passes it to every step."""
+    img = image.copy()
+    if img.width >= 400:
+        img.paste(_photo((160, 96)), (200, 300))
+    frame = crisp.Frame(img)
+
+    assert crisp.gradient_dominated(frame) == crisp.gradient_dominated(img)
+    np.testing.assert_array_equal(
+        crisp_indices(frame, SPECTRA6, BLEND), crisp_indices(img, SPECTRA6, BLEND)
+    )
+    assert (
+        crisp_image(frame, SPECTRA6, BLEND).tobytes()
+        == crisp_image(img, SPECTRA6, BLEND).tobytes()
+    )
+    assert photo_regions(frame.packed, frame.distinct) == photo_regions(frame.packed)
+
+
 def _antialiased_shapes(
     paper: tuple[int, int, int], ink: tuple[int, int, int]
 ) -> Image.Image:
@@ -350,3 +396,27 @@ def test_panel_preview_script_builds_sheet(tmp_path: Path) -> None:
     assert module.main([str(src)]) == 0
     sheet = Image.open(tmp_path / "frame_sheet.png")
     assert sheet.width == 800 * 3 + 2 * module.GUTTER
+
+
+@pytest.mark.parametrize(
+    "palette",
+    [
+        [SPECTRA6[i] for i in (3, 1, 5, 0, 2, 4)],
+        # Colours a level apart share a slot in Pillow's colour cache, so
+        # quantize alone would merge them; the exact lookup takes over.
+        [(100, 100, 100), (101, 101, 101), (0, 0, 0), (102, 102, 102)],
+    ],
+    ids=["panel", "near-greys"],
+)
+def test_exact_palette_image_follows_palette_order(
+    palette: list[tuple[int, int, int]],
+) -> None:
+    """Indexes follow *palette*, whichever position each colour holds."""
+    rng = np.random.default_rng(7)
+    indices = rng.integers(0, len(palette), size=(37, 53), dtype=np.uint8)
+    rgb = np.asarray(palette, dtype=np.uint8)[indices]
+    frame = crisp.exact_palette_image(Image.fromarray(rgb, "RGB"), palette)
+    assert frame.mode == "P"
+    np.testing.assert_array_equal(np.asarray(frame), indices)
+    assert frame.palette is not None
+    assert len(frame.palette.colors) == len(palette)
