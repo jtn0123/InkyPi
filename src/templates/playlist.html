@@ -58,6 +58,7 @@
             {% if not playlist_config.playlists %}
             {{ empty_state('squares-four', 'No playlists yet.', 'Click New Playlist to create one.') }}
             {% endif %}
+            <p id="playlistReorderHint" class="sr-only">To move this item, press the up or down arrow key.</p>
             {% for playlist in playlist_config.playlists %}
             <div class="playlist-item pl-card {% if playlist.name == playlist_config.active_playlist %}active is-active{% endif %}" data-playlist-name="{{ playlist.name }}" data-playlist-card>
                     <div class="playlist-header" data-playlist-action="toggle-card">
@@ -93,12 +94,12 @@
                     <div class="playlist-card-body" data-playlist-body>
                     <!-- Plugin List -->
                     {% if playlist.plugins %}
-                    <div class="plugin-list">
+                    <div class="plugin-list" role="list" aria-label="Items in {{ playlist.name }}">
                         {% for plugin_instance in playlist.plugins %}
                         {% set pi_label = plugin_instance.name | friendly_instance_label(plugin_instance.plugin_id) %}
                         {% set pi_suffix = plugin_instance.name | instance_suffix_label(plugin_instance.plugin_id) %}
                         {% set is_playing = playlist.name == refresh_info.playlist and plugin_instance.name == refresh_info.plugin_instance %}
-                        <div class="plugin-item pl-item{% if is_playing %} is-playing{% endif %}" data-plugin-id="{{ plugin_instance.plugin_id }}" data-instance-name="{{ plugin_instance.name }}" data-instance-label="{{ pi_label }}">
+                        <div class="plugin-item pl-item{% if is_playing %} is-playing{% endif %}" role="listitem" data-plugin-id="{{ plugin_instance.plugin_id }}" data-instance-name="{{ plugin_instance.name }}" data-instance-label="{{ pi_label }}">
                             <span class="drag-handle" aria-hidden="true">{{ icon('dots-six-vertical', 'drag-handle-icon') | safe }}</span>
                             <span class="pl-item-icon" aria-hidden="true">
                                 <img src="{{ url_for('plugin.image', plugin_id=plugin_instance.plugin_id, filename='icon.png') }}" alt="" class="plugin-icon">
