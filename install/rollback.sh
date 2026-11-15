@@ -83,7 +83,7 @@ if [ -z "$PREV_TAG" ]; then
 fi
 
 # Defense-in-depth: the same strict semver regex used by the Flask caller in
-# src/blueprints/settings/__init__.py::_TAG_RE and by do_update.sh.  Matching
+# src/services/updates.py::_TAG_RE and by do_update.sh.  Matching
 # the *bash* flavor here deliberately — keep this byte-for-byte aligned with
 # do_update.sh's validator so an attacker cannot bypass validation by writing
 # a crafted value into prev_version.

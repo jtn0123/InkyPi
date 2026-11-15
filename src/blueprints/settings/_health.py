@@ -10,7 +10,7 @@ from typing import Any
 
 from flask import Response, current_app, request
 
-import blueprints.settings as _mod
+from blueprints.settings import settings_bp
 from utils.env_flags import env_bool
 from utils.http_utils import json_error, json_internal_error, json_success
 from utils.progress_events import get_progress_bus, to_sse
@@ -123,7 +123,7 @@ def _filter_health_by_window(health: dict[str, Any], window_min: int) -> dict[st
     return filtered
 
 
-@_mod.settings_bp.route("/api/health/plugins", methods=["GET"])
+@settings_bp.route("/api/health/plugins", methods=["GET"])
 def health_plugins() -> tuple[Any, int] | Response:
     try:
         rt = current_app.config["REFRESH_TASK"]
@@ -139,7 +139,7 @@ def health_plugins() -> tuple[Any, int] | Response:
         return json_internal_error("health plugins")
 
 
-@_mod.settings_bp.route("/api/health/system", methods=["GET"])
+@settings_bp.route("/api/health/system", methods=["GET"])
 def health_system() -> tuple[Any, int] | Response:
     try:
         data: dict[str, Any] = {}
@@ -167,7 +167,7 @@ def health_system() -> tuple[Any, int] | Response:
         return json_internal_error("health system")
 
 
-@_mod.settings_bp.route("/api/progress/stream", methods=["GET"])
+@settings_bp.route("/api/progress/stream", methods=["GET"])
 def progress_stream() -> Response | tuple[Any, int]:
     if not _progress_stream_enabled():
         return json_error("Progress SSE disabled", status=404)

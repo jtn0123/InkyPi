@@ -310,12 +310,12 @@ def _log_tail(max_lines: int = _LOG_TAIL_LINES) -> list[str]:
     if cap == 0:
         return []
     try:
-        # Reuse the existing helper from the settings blueprint. It knows how to
+        # Reuse the log reader behind the settings logs page. It knows how to
         # pull from journald on Linux and falls back to in-memory buffers in
         # dev mode. 2h of history is ample for a 100-line tail.
-        from blueprints import settings as settings_mod
+        from services import logs
 
-        lines = settings_mod._read_log_lines(hours=2)
+        lines = logs._read_log_lines(hours=2)
         if len(lines) > cap:
             lines = lines[-cap:]
         return [str(ln) for ln in lines]

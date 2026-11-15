@@ -332,13 +332,13 @@ def _assert_no_leak(resp: Any, context: str) -> None:
 def test_benchmark_errors_do_not_leak_exception_text(
     client: FlaskClient, monkeypatch: pytest.MonkeyPatch, path: str, context: str
 ) -> None:
-    import blueprints.settings as settings_mod
+    from blueprints.settings import _benchmarks
 
     def _boom() -> str:
         raise RuntimeError(_SECRET)
 
-    monkeypatch.setattr(settings_mod, "_benchmarks_enabled", lambda: True)
-    monkeypatch.setattr(settings_mod, "_get_bench_db_path", _boom)
+    monkeypatch.setattr(_benchmarks, "_benchmarks_enabled", lambda: True)
+    monkeypatch.setattr(_benchmarks, "_get_bench_db_path", _boom)
 
     _assert_no_leak(client.get(path), context)
 
@@ -359,9 +359,9 @@ def test_health_plugins_error_does_not_leak_exception_text(
 def test_shutdown_error_does_not_leak_exception_text(
     client: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    import blueprints.settings as settings_mod
+    from blueprints.settings import _system
 
-    settings_mod._shutdown_limiter.reset()
+    _system._shutdown_limiter.reset()
     monkeypatch.setattr(
         subprocess,
         "run",

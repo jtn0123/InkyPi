@@ -1,3 +1,5 @@
+from collections.abc import Iterator
+
 import pytest
 from flask.testing import FlaskClient
 
@@ -66,10 +68,10 @@ def test_download_logs_exception_500(
     client: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """_read_log_lines raising returns 500 text response."""
-    import blueprints.settings as mod
+    from services import logs
 
     monkeypatch.setattr(
-        mod, "_read_log_lines", lambda h: (_ for _ in ()).throw(RuntimeError("fail"))
+        logs, "_read_log_lines", lambda h: (_ for _ in ()).throw(RuntimeError("fail"))
     )
 
     resp = client.get("/download-logs")
@@ -122,23 +124,25 @@ def test_api_logs_response_size_guardrail(
     client: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Huge output is truncated under MAX_RESPONSE_BYTES."""
-    import blueprints.settings as mod
+    from blueprints.settings import _logs
+    from services import logs
 
     # Generate huge log output
     big_lines = ["X" * 1000 for _ in range(2000)]
-    monkeypatch.setattr(mod, "_read_log_lines", lambda h: big_lines)
+    monkeypatch.setattr(logs, "_read_log_lines", lambda h: big_lines)
 
     resp = client.get("/api/logs?hours=2&limit=2000")
     assert resp.status_code == 200
     resp.get_json()
     # Response body should be under the guardrail
     raw = resp.data
-    assert len(raw) <= mod.MAX_RESPONSE_BYTES + 10000  # some overhead for JSON wrapping
+    # some overhead for JSON wrapping
+    assert len(raw) <= _logs.MAX_RESPONSE_BYTES + 10000
 
 
 def test_format_journal_line_strips_internals() -> None:
     """_format_journal_line maps priority to level and omits hostname/PID."""
-    from blueprints.settings import _format_journal_line
+    from services.logs import _format_journal_line
 
     data = {
         "PRIORITY": "3",
@@ -156,7 +160,7 @@ def test_format_journal_line_strips_internals() -> None:
 
 def test_format_journal_line_masks_keys_already_in_the_journal() -> None:
     """Lines written before redaction covered every logger still hold keys."""
-    from blueprints.settings import _format_journal_line
+    from services.logs import _format_journal_line
 
     data = {
         "PRIORITY": "4",
@@ -170,7 +174,7 @@ def test_format_journal_line_masks_keys_already_in_the_journal() -> None:
 
 def test_format_journal_line_defaults_to_info() -> None:
     """Missing PRIORITY defaults to INFO level."""
-    from blueprints.settings import _format_journal_line
+    from services.logs import _format_journal_line
 
     result = _format_journal_line("Apr 02 10:00:00", {"MESSAGE": "hello"})
     assert result == "Apr 02 10:00:00 [INFO] hello"
@@ -182,7 +186,7 @@ def test_log_lines_exclude_internal_details(
     """Log lines should not expose hostname, PID, or process identifiers."""
     import re
 
-    import blueprints.settings as mod
+    from services import logs
 
     # Simulate journal-style lines that the formatter would produce
     fake_lines = [
@@ -190,7 +194,7 @@ def test_log_lines_exclude_internal_details(
         "Apr 02 10:00:01 [ERROR] Something went wrong",
         "Apr 02 10:00:02 [DEBUG] Detailed trace info",
     ]
-    monkeypatch.setattr(mod, "_read_log_lines", lambda _hours: fake_lines)
+    monkeypatch.setattr(logs, "_read_log_lines", lambda _hours: fake_lines)
 
     resp = client.get("/api/logs?hours=2")
     assert resp.status_code == 200
@@ -205,11 +209,11 @@ def test_log_lines_exclude_internal_details(
 def test_dev_mode_log_handler_uses_configured_timezone() -> None:
     import logging
 
-    import blueprints.settings as mod
+    from services import logs
     from utils.logging_utils import set_log_timezone
 
     set_log_timezone("America/Los_Angeles")
-    mod._dev_log_buffer.clear()
+    logs._dev_log_buffer.clear()
     record = logging.LogRecord(
         name="test",
         level=logging.INFO,
@@ -222,14 +226,180 @@ def test_dev_mode_log_handler_uses_configured_timezone() -> None:
     record.created = 1735693200.0  # 2025-01-01T01:00:00Z
 
     try:
-        mod.DevModeLogHandler().emit(record)
-        assert mod._dev_log_buffer[-1][1].startswith("Dec 31 17:00:00")
+        logs.DevModeLogHandler().emit(record)
+        assert logs._dev_log_buffer[-1][1].startswith("Dec 31 17:00:00")
     finally:
-        mod._dev_log_buffer.clear()
+        logs._dev_log_buffer.clear()
         set_log_timezone("UTC")
 
 
 def test_device_log_timezone_falls_back_without_app_context() -> None:
-    import blueprints.settings as mod
+    from services import logs
 
-    assert mod._device_log_timezone().key == "UTC"
+    assert logs._device_log_timezone().key == "UTC"
+
+
+# ---------------------------------------------------------------------------
+# services.logs readers: journal merge for several units, dev-buffer cutoffs,
+# and the fallbacks for records that cannot be read.
+# ---------------------------------------------------------------------------
+
+
+class _FakeJournalRecord:
+    def __init__(self, unit: str, usec: int, message: str) -> None:
+        self.data = {"_SYSTEMD_UNIT": unit, "PRIORITY": "6", "MESSAGE": message}
+        self._usec = usec
+
+    def get_realtime_usec(self) -> int:
+        return self._usec
+
+
+class _UnreadableJournalRecord:
+    @property
+    def data(self) -> dict[str, str]:
+        raise RuntimeError("corrupt journal entry")
+
+    def get_realtime_usec(self) -> int:
+        raise RuntimeError("corrupt journal entry")
+
+
+class _FakeJournalReader:
+    records: list[_FakeJournalRecord | _UnreadableJournalRecord] = []
+    closed = False
+
+    def open(self, mode: object) -> None:
+        pass
+
+    def add_filter(self, rule: object) -> None:
+        pass
+
+    def seek_realtime_usec(self, usec: int) -> None:
+        pass
+
+    def __iter__(self) -> Iterator[_FakeJournalRecord | _UnreadableJournalRecord]:
+        return iter(self.records)
+
+    def close(self) -> None:
+        type(self).closed = True
+        raise OSError("journal already closed")
+
+
+def _use_fake_journal(
+    monkeypatch: pytest.MonkeyPatch,
+    records: list[_FakeJournalRecord | _UnreadableJournalRecord],
+) -> None:
+    from services import logs
+
+    monkeypatch.setattr(_FakeJournalReader, "records", records)
+    monkeypatch.setattr(_FakeJournalReader, "closed", False)
+    monkeypatch.setattr(logs, "JOURNAL_AVAILABLE", True)
+    monkeypatch.setattr(logs, "JournalReader", _FakeJournalReader)
+    monkeypatch.setattr(logs, "JournalOpenMode", type("M", (), {"SYSTEM": object()}))
+    monkeypatch.setattr(logs, "Rule", lambda *_a, **_k: None)
+
+
+def test_read_units_log_lines_merges_requested_units_in_time_order(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from services import logs
+
+    _use_fake_journal(
+        monkeypatch,
+        [
+            _FakeJournalRecord("inkypi.service", 2_000_000, "second"),
+            _FakeJournalRecord("other.service", 500_000, "not requested"),
+            _UnreadableJournalRecord(),
+            _FakeJournalRecord("inkypi-update-1.service", 1_000_000, "first"),
+        ],
+    )
+
+    lines = logs._read_units_log_lines(1, ["inkypi.service", "inkypi-update-1.service"])
+
+    assert lines == [
+        "Jan 01 00:00:01 [INFO] first",
+        "Jan 01 00:00:02 [INFO] second",
+    ]
+    # close() raising is swallowed; the read still returns its lines.
+    assert _FakeJournalReader.closed
+
+
+def test_read_log_lines_marks_unreadable_timestamps(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from services import logs
+
+    record = _FakeJournalRecord("inkypi.service", 0, "no clock")
+    monkeypatch.setattr(
+        record,
+        "get_realtime_usec",
+        lambda: (_ for _ in ()).throw(RuntimeError("bad timestamp")),
+    )
+    _use_fake_journal(monkeypatch, [record])
+
+    assert logs._read_log_lines(1) == ["??? ?? ??:??:?? [INFO] no clock"]
+    assert _FakeJournalReader.closed
+
+
+@pytest.mark.parametrize("reader", ["single", "units"])
+def test_dev_buffer_reads_keep_only_recent_entries(
+    monkeypatch: pytest.MonkeyPatch, reader: str
+) -> None:
+    import time
+
+    from services import logs
+
+    monkeypatch.setattr(logs, "JOURNAL_AVAILABLE", False)
+    units = ["inkypi.service", "inkypi-update-1.service"]
+    with logs._dev_log_lock:
+        logs._dev_log_buffer.clear()
+        logs._dev_log_buffer.append((0.0, "too old"))
+        logs._dev_log_buffer.append((time.time(), "recent"))
+    try:
+        if reader == "single":
+            lines = logs._read_log_lines(1)
+        else:
+            lines = logs._read_units_log_lines(1, units)
+    finally:
+        with logs._dev_log_lock:
+            logs._dev_log_buffer.clear()
+
+    assert lines[0] == "=== Development Mode Logs (In-Memory Buffer) ==="
+    assert lines[-1] == "recent"
+    assert "too old" not in lines
+    if reader == "units":
+        assert "Units requested: inkypi.service, inkypi-update-1.service" in lines
+
+
+def test_read_units_log_lines_reports_an_empty_dev_buffer(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from services import logs
+
+    monkeypatch.setattr(logs, "JOURNAL_AVAILABLE", False)
+    with logs._dev_log_lock:
+        logs._dev_log_buffer.clear()
+
+    lines = logs._read_units_log_lines(2, ["inkypi.service"])
+
+    assert len(lines) == 6
+    assert lines[-1] == "(No logs captured in buffer yet)"
+
+
+def test_dev_mode_log_handler_routes_format_errors_to_handle_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import logging
+
+    from services import logs
+
+    handler = logs.DevModeLogHandler()
+    errors: list[logging.LogRecord] = []
+    monkeypatch.setattr(handler, "format", lambda _r: 1 / 0)
+    monkeypatch.setattr(handler, "handleError", errors.append)
+    record = logging.LogRecord("test", logging.INFO, __file__, 1, "x", (), None)
+    before = len(logs._dev_log_buffer)
+
+    handler.emit(record)
+
+    assert errors == [record]
+    assert len(logs._dev_log_buffer) == before

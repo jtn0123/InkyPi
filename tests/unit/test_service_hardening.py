@@ -180,8 +180,8 @@ def test_every_runtime_write_location_is_writable(
     # utils.paths holds the defaults; Config's class attributes can be
     # reassigned at runtime (inkypi.py --config), so don't read those.
     from benchmarks.benchmark_storage import _get_db_path
-    from blueprints.settings import _update_target_version_path
     from config import Config
+    from services.updates import _update_target_version_path
     from utils import paths
     from utils.app_utils import resolve_path
     from utils.plugin_history import _history_dir

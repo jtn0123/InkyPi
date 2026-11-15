@@ -7,7 +7,7 @@ from flask.testing import FlaskClient
 def test_logs_api_truncation_and_level_filter(
     client: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> Any:
-    from blueprints import settings as settings_mod
+    from services import logs
 
     # Monkeypatch readers to return controlled lines
     def fake_read_log_lines(hours: Any) -> Any:
@@ -18,9 +18,7 @@ def test_logs_api_truncation_and_level_filter(
             "ERROR failed to do thing",
         ] * 1000  # many lines to trigger truncation/byte cap
 
-    monkeypatch.setattr(
-        settings_mod, "_read_log_lines", fake_read_log_lines, raising=True
-    )
+    monkeypatch.setattr(logs, "_read_log_lines", fake_read_log_lines, raising=True)
 
     # errors level should only return error lines and be truncated
     r = client.get("/api/logs?hours=2&limit=100&level=errors")

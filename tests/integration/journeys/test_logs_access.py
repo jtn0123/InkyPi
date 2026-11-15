@@ -45,22 +45,22 @@ def dev_log_handler(monkeypatch: pytest.MonkeyPatch) -> Iterator[Any]:
     never reach ``_dev_log_buffer`` which ``/download-logs`` reads from in the
     no-journal path. This fixture wires both up and tears down cleanly.
     """
-    import blueprints.settings as settings_mod
+    from services import logs
 
-    monkeypatch.setattr(settings_mod, "JOURNAL_AVAILABLE", False)
-    handler = settings_mod.DevModeLogHandler()
+    monkeypatch.setattr(logs, "JOURNAL_AVAILABLE", False)
+    handler = logs.DevModeLogHandler()
     handler.setLevel(logging.DEBUG)
     root = logging.getLogger()
     root.addHandler(handler)
     # Clear any stale buffer contents from earlier tests in the same process.
-    with settings_mod._dev_log_lock:
-        settings_mod._dev_log_buffer.clear()
+    with logs._dev_log_lock:
+        logs._dev_log_buffer.clear()
     try:
         yield
     finally:
         root.removeHandler(handler)
-        with settings_mod._dev_log_lock:
-            settings_mod._dev_log_buffer.clear()
+        with logs._dev_log_lock:
+            logs._dev_log_buffer.clear()
 
 
 def test_logs_access_trigger_error_download_verify(

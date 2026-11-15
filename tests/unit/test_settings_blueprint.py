@@ -113,9 +113,9 @@ class TestShutdown:
     ) -> None:
         import subprocess
 
-        import blueprints.settings as mod
+        from blueprints.settings import _system
 
-        mod._shutdown_limiter.reset()
+        _system._shutdown_limiter.reset()
         monkeypatch.setattr(subprocess, "run", MagicMock())
         resp = client.post("/shutdown", json={"reboot": True})
         assert resp.status_code == 200
@@ -139,9 +139,9 @@ class TestShutdown:
     ) -> None:
         import subprocess
 
-        import blueprints.settings as mod
+        from blueprints.settings import _system
 
-        mod._shutdown_limiter.reset()
+        _system._shutdown_limiter.reset()
         monkeypatch.setattr(
             subprocess,
             "run",
@@ -156,9 +156,9 @@ class TestShutdown:
         """POST /shutdown with no body should default to shutdown (not reboot)."""
         import subprocess
 
-        import blueprints.settings as mod
+        from blueprints.settings import _system
 
-        mod._shutdown_limiter.reset()
+        _system._shutdown_limiter.reset()
         mock_run = MagicMock()
         monkeypatch.setattr(subprocess, "run", mock_run)
         resp = client.post("/shutdown")
@@ -239,9 +239,9 @@ class TestApiLogs:
     def test_api_logs_rate_limited(
         self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        import blueprints.settings as mod
+        from blueprints.settings import _logs
 
-        monkeypatch.setattr(mod, "_rate_limit_ok", lambda addr: False)
+        monkeypatch.setattr(_logs, "_rate_limit_ok", lambda addr: False)
         resp = client.get("/api/logs")
         assert resp.status_code == 429
 
@@ -249,16 +249,16 @@ class TestApiLogs:
         self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """When an update is running, logs should include the update unit."""
-        import blueprints.settings as mod
+        from services import updates
 
-        mod._set_update_state(True, "inkypi-update-test.service")
+        updates._set_update_state(True, "inkypi-update-test.service")
         try:
             resp = client.get("/api/logs")
             assert resp.status_code == 200
             data = resp.get_json()
             assert "inkypi-update-test.service" in data["meta"]["units"]
         finally:
-            mod._set_update_state(False, None)
+            updates._set_update_state(False, None)
 
 
 # ---------------------------------------------------------------------------
@@ -287,20 +287,20 @@ class TestBenchmarkAPIs:
     def test_benchmarks_summary_disabled(
         self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        import blueprints.settings as mod
+        from blueprints.settings import _benchmarks
 
-        monkeypatch.setattr(mod, "_benchmarks_enabled", lambda: False)
+        monkeypatch.setattr(_benchmarks, "_benchmarks_enabled", lambda: False)
         resp = client.get("/api/benchmarks/summary")
         assert resp.status_code == 404
 
     def test_benchmarks_summary_enabled(
         self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
     ) -> None:
-        import blueprints.settings as mod
+        from blueprints.settings import _benchmarks
 
-        monkeypatch.setattr(mod, "_benchmarks_enabled", lambda: True)
+        monkeypatch.setattr(_benchmarks, "_benchmarks_enabled", lambda: True)
         db_path = str(tmp_path / "bench.db")
-        monkeypatch.setattr(mod, "_get_bench_db_path", lambda: db_path)
+        monkeypatch.setattr(_benchmarks, "_get_bench_db_path", lambda: db_path)
         resp = client.get("/api/benchmarks/summary")
         assert resp.status_code == 200
         data = resp.get_json()
@@ -310,20 +310,20 @@ class TestBenchmarkAPIs:
     def test_benchmarks_refreshes_disabled(
         self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        import blueprints.settings as mod
+        from blueprints.settings import _benchmarks
 
-        monkeypatch.setattr(mod, "_benchmarks_enabled", lambda: False)
+        monkeypatch.setattr(_benchmarks, "_benchmarks_enabled", lambda: False)
         resp = client.get("/api/benchmarks/refreshes")
         assert resp.status_code == 404
 
     def test_benchmarks_refreshes_enabled(
         self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
     ) -> None:
-        import blueprints.settings as mod
+        from blueprints.settings import _benchmarks
 
-        monkeypatch.setattr(mod, "_benchmarks_enabled", lambda: True)
+        monkeypatch.setattr(_benchmarks, "_benchmarks_enabled", lambda: True)
         db_path = str(tmp_path / "bench.db")
-        monkeypatch.setattr(mod, "_get_bench_db_path", lambda: db_path)
+        monkeypatch.setattr(_benchmarks, "_get_bench_db_path", lambda: db_path)
         resp = client.get("/api/benchmarks/refreshes")
         assert resp.status_code == 200
         data = resp.get_json()
@@ -332,20 +332,20 @@ class TestBenchmarkAPIs:
     def test_benchmarks_plugins_disabled(
         self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        import blueprints.settings as mod
+        from blueprints.settings import _benchmarks
 
-        monkeypatch.setattr(mod, "_benchmarks_enabled", lambda: False)
+        monkeypatch.setattr(_benchmarks, "_benchmarks_enabled", lambda: False)
         resp = client.get("/api/benchmarks/plugins")
         assert resp.status_code == 404
 
     def test_benchmarks_plugins_enabled(
         self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
     ) -> None:
-        import blueprints.settings as mod
+        from blueprints.settings import _benchmarks
 
-        monkeypatch.setattr(mod, "_benchmarks_enabled", lambda: True)
+        monkeypatch.setattr(_benchmarks, "_benchmarks_enabled", lambda: True)
         db_path = str(tmp_path / "bench.db")
-        monkeypatch.setattr(mod, "_get_bench_db_path", lambda: db_path)
+        monkeypatch.setattr(_benchmarks, "_get_bench_db_path", lambda: db_path)
         resp = client.get("/api/benchmarks/plugins")
         assert resp.status_code == 200
         data = resp.get_json()
@@ -354,20 +354,20 @@ class TestBenchmarkAPIs:
     def test_benchmarks_stages_no_refresh_id(
         self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        import blueprints.settings as mod
+        from blueprints.settings import _benchmarks
 
-        monkeypatch.setattr(mod, "_benchmarks_enabled", lambda: True)
+        monkeypatch.setattr(_benchmarks, "_benchmarks_enabled", lambda: True)
         resp = client.get("/api/benchmarks/stages")
         assert resp.status_code == 422
 
     def test_benchmarks_stages_with_refresh_id(
         self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
     ) -> None:
-        import blueprints.settings as mod
+        from blueprints.settings import _benchmarks
 
-        monkeypatch.setattr(mod, "_benchmarks_enabled", lambda: True)
+        monkeypatch.setattr(_benchmarks, "_benchmarks_enabled", lambda: True)
         db_path = str(tmp_path / "bench.db")
-        monkeypatch.setattr(mod, "_get_bench_db_path", lambda: db_path)
+        monkeypatch.setattr(_benchmarks, "_get_bench_db_path", lambda: db_path)
         resp = client.get("/api/benchmarks/stages?refresh_id=abc-123")
         assert resp.status_code == 200
         data = resp.get_json()
@@ -376,42 +376,42 @@ class TestBenchmarkAPIs:
     def test_benchmarks_stages_disabled(
         self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        import blueprints.settings as mod
+        from blueprints.settings import _benchmarks
 
-        monkeypatch.setattr(mod, "_benchmarks_enabled", lambda: False)
+        monkeypatch.setattr(_benchmarks, "_benchmarks_enabled", lambda: False)
         resp = client.get("/api/benchmarks/stages?refresh_id=abc")
         assert resp.status_code == 404
 
     def test_benchmarks_summary_with_window(
         self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
     ) -> None:
-        import blueprints.settings as mod
+        from blueprints.settings import _benchmarks
 
-        monkeypatch.setattr(mod, "_benchmarks_enabled", lambda: True)
+        monkeypatch.setattr(_benchmarks, "_benchmarks_enabled", lambda: True)
         db_path = str(tmp_path / "bench.db")
-        monkeypatch.setattr(mod, "_get_bench_db_path", lambda: db_path)
+        monkeypatch.setattr(_benchmarks, "_get_bench_db_path", lambda: db_path)
         resp = client.get("/api/benchmarks/summary?window=1h")
         assert resp.status_code == 200
 
     def test_benchmarks_refreshes_with_cursor(
         self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
     ) -> None:
-        import blueprints.settings as mod
+        from blueprints.settings import _benchmarks
 
-        monkeypatch.setattr(mod, "_benchmarks_enabled", lambda: True)
+        monkeypatch.setattr(_benchmarks, "_benchmarks_enabled", lambda: True)
         db_path = str(tmp_path / "bench.db")
-        monkeypatch.setattr(mod, "_get_bench_db_path", lambda: db_path)
+        monkeypatch.setattr(_benchmarks, "_get_bench_db_path", lambda: db_path)
         resp = client.get("/api/benchmarks/refreshes?cursor=999")
         assert resp.status_code == 200
 
     def test_benchmarks_refreshes_invalid_cursor_is_ignored(
         self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
     ) -> None:
-        import blueprints.settings as mod
+        from blueprints.settings import _benchmarks
 
-        monkeypatch.setattr(mod, "_benchmarks_enabled", lambda: True)
+        monkeypatch.setattr(_benchmarks, "_benchmarks_enabled", lambda: True)
         db_path = str(tmp_path / "bench.db")
-        monkeypatch.setattr(mod, "_get_bench_db_path", lambda: db_path)
+        monkeypatch.setattr(_benchmarks, "_get_bench_db_path", lambda: db_path)
         resp = client.get("/api/benchmarks/refreshes?cursor=not-an-int&limit=nope")
         assert resp.status_code == 200
         data = resp.get_json()
@@ -441,9 +441,9 @@ class TestHealthAPIs:
         self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
     ) -> Any:
         """When psutil is unavailable, system health returns None fields."""
-        import blueprints.settings as mod
+        from blueprints.settings import _health
 
-        _original = mod.health_system  # kept for potential future use
+        _original = _health.health_system  # kept for potential future use
 
         # Patch psutil import to fail within the route
         import builtins
@@ -488,33 +488,33 @@ class TestSettingsPages:
 
 class TestHelpers:
     def test_window_since_seconds_hours(self) -> None:
-        from blueprints.settings import _window_since_seconds
+        from blueprints.settings._benchmarks import _window_since_seconds
 
         result = _window_since_seconds("6h")
         assert result > 0
         assert result < time.time()
 
     def test_window_since_seconds_minutes(self) -> None:
-        from blueprints.settings import _window_since_seconds
+        from blueprints.settings._benchmarks import _window_since_seconds
 
         result = _window_since_seconds("30m")
         assert result > 0
 
     def test_window_since_seconds_days(self) -> None:
-        from blueprints.settings import _window_since_seconds
+        from blueprints.settings._benchmarks import _window_since_seconds
 
         result = _window_since_seconds("2d")
         assert result > 0
 
     def test_window_since_seconds_none(self) -> None:
-        from blueprints.settings import _window_since_seconds
+        from blueprints.settings._benchmarks import _window_since_seconds
 
         result = _window_since_seconds(None)
         # Should default to 24h ago
         assert abs(result - (time.time() - 24 * 3600)) < 2
 
     def test_window_since_seconds_invalid_defaults_to_24h(self) -> None:
-        from blueprints.settings import _window_since_seconds
+        from blueprints.settings._benchmarks import _window_since_seconds
 
         result = _window_since_seconds("abch")
         assert abs(result - (time.time() - 24 * 3600)) < 2
@@ -522,7 +522,7 @@ class TestHelpers:
     def test_window_since_seconds_invalid_does_not_log_raw_input(
         self, caplog: pytest.LogCaptureFixture
     ) -> None:
-        from blueprints.settings import _window_since_seconds
+        from blueprints.settings._benchmarks import _window_since_seconds
 
         raw_window = "not-a-number\nforged-log-lineh"
         with caplog.at_level(logging.WARNING, logger="blueprints.settings"):
@@ -535,17 +535,17 @@ class TestHelpers:
         assert raw_window not in caplog.text
 
     def test_pct_empty(self) -> None:
-        from blueprints.settings import _pct
+        from blueprints.settings._benchmarks import _pct
 
         assert _pct([], 0.5) is None
 
     def test_pct_values(self) -> None:
-        from blueprints.settings import _pct
+        from blueprints.settings._benchmarks import _pct
 
         assert _pct([10, 20, 30, 40, 50], 0.5) == 30
 
     def test_clamp_int(self) -> None:
-        from blueprints.settings import _clamp_int
+        from blueprints.settings._logs import _clamp_int
 
         assert _clamp_int("5", 10, 1, 100) == 5
         assert _clamp_int("200", 10, 1, 100) == 100
@@ -554,20 +554,20 @@ class TestHelpers:
         assert _clamp_int("abc", 10, 1, 100) == 10
 
     def test_rate_limit_ok(self) -> None:
-        from blueprints.settings import _logs_limiter, _rate_limit_ok
+        from blueprints.settings._logs import _logs_limiter, _rate_limit_ok
 
         _logs_limiter._requests.clear()
         assert _rate_limit_ok("127.0.0.1") is True
 
     def test_benchmarks_enabled_default(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.delenv("INKYPI_BENCHMARK_API_ENABLED", raising=False)
-        from blueprints.settings import _benchmarks_enabled
+        from blueprints.settings._benchmarks import _benchmarks_enabled
 
         assert _benchmarks_enabled() is True
 
     def test_benchmarks_disabled(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("INKYPI_BENCHMARK_API_ENABLED", "false")
-        from blueprints.settings import _benchmarks_enabled
+        from blueprints.settings._benchmarks import _benchmarks_enabled
 
         assert _benchmarks_enabled() is False
 

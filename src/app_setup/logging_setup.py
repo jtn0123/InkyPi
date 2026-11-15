@@ -228,7 +228,7 @@ def install_dev_log_handler() -> None:
     """Attach the in-memory log handler used in development mode."""
     logger = logging.getLogger(__name__)
     try:
-        from blueprints.settings import DevModeLogHandler
+        from services.logs import DevModeLogHandler
 
         dev_handler = DevModeLogHandler()
         dev_handler.setLevel(logging.DEBUG)

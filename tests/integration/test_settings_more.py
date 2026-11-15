@@ -23,9 +23,9 @@ def test_download_logs_dev_mode_message(
     client: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     # Force JOURNAL_AVAILABLE = False path by re-importing module symbol
-    import blueprints.settings as settings_mod
+    from services import logs
 
-    monkeypatch.setattr(settings_mod, "JOURNAL_AVAILABLE", False)
+    monkeypatch.setattr(logs, "JOURNAL_AVAILABLE", False)
 
     resp = client.get("/download-logs?hours=1")
     assert resp.status_code == 200
@@ -34,9 +34,9 @@ def test_download_logs_dev_mode_message(
 
 def test_api_logs_basic(client: FlaskClient, monkeypatch: pytest.MonkeyPatch) -> None:
     # Force JOURNAL_AVAILABLE False path so response is deterministic
-    import blueprints.settings as settings_mod
+    from services import logs
 
-    monkeypatch.setattr(settings_mod, "JOURNAL_AVAILABLE", False)
+    monkeypatch.setattr(logs, "JOURNAL_AVAILABLE", False)
 
     resp = client.get("/api/logs")
     assert resp.status_code == 200
@@ -50,7 +50,7 @@ def test_api_logs_filters_and_limits(
     client: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> Any:
     # Stub _read_log_lines to a fixed corpus
-    import blueprints.settings as settings_mod
+    from services import logs
 
     def fake_read(hours: int) -> Any:
         return [
@@ -60,7 +60,7 @@ def test_api_logs_filters_and_limits(
             "Jan 01 host app[1]: DEBUG noisy",
         ]
 
-    monkeypatch.setattr(settings_mod, "_read_log_lines", fake_read)
+    monkeypatch.setattr(logs, "_read_log_lines", fake_read)
 
     resp = client.get("/api/logs?level=warn_errors&limit=2")
     assert resp.status_code == 200
@@ -80,13 +80,13 @@ def test_api_logs_filters_and_limits(
 def test_api_logs_guardrails(
     client: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    import blueprints.settings as settings_mod
+    from services import logs
 
     # very large fake corpus to trigger size trimming
     big_line = "X" * 4096
     corpus = [f"Jan 01 host app[1]: ERROR {big_line} #{i}" for i in range(1000)]
 
-    monkeypatch.setattr(settings_mod, "_read_log_lines", lambda h: corpus)
+    monkeypatch.setattr(logs, "_read_log_lines", lambda h: corpus)
 
     resp = client.get(
         "/api/logs?hours=9999&limit=999999&level=errors&contains=" + ("a" * 500)
@@ -103,38 +103,38 @@ def test_api_logs_guardrails(
 def test_rate_limit_functions(
     client: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    import blueprints.settings as settings_mod
+    from blueprints.settings import _logs
 
     # Test rate limiting
-    monkeypatch.setattr(settings_mod, "_rate_limit_ok", lambda addr: False)
+    monkeypatch.setattr(_logs, "_rate_limit_ok", lambda addr: False)
     resp = client.get("/api/logs")
     assert resp.status_code == 429
     assert "Too many requests" in resp.get_json().get("error", "")
 
 
 def test_clamp_int_exception_handling(monkeypatch: pytest.MonkeyPatch) -> None:
-    import blueprints.settings as settings_mod
+    from blueprints.settings import _logs
 
     # Test clamp_int with invalid input
-    result = settings_mod._clamp_int("invalid", 5, 1, 10)
+    result = _logs._clamp_int("invalid", 5, 1, 10)
     assert result == 5
 
 
 def test_read_log_lines_journal_available_false(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    import blueprints.settings as settings_mod
+    from services import logs
 
     # Force JOURNAL_AVAILABLE = False
-    monkeypatch.setattr(settings_mod, "JOURNAL_AVAILABLE", False)
+    monkeypatch.setattr(logs, "JOURNAL_AVAILABLE", False)
 
-    lines = settings_mod._read_log_lines(5)
+    lines = logs._read_log_lines(5)
     assert len(lines) > 0
     assert "Development Mode Logs" in lines[0]
 
 
 def test_read_log_lines_journal_available_true(monkeypatch: pytest.MonkeyPatch) -> Any:
-    import blueprints.settings as settings_mod
+    from services import logs
 
     class FakeRecord:
         def __init__(self) -> None:
@@ -177,12 +177,12 @@ def test_read_log_lines_journal_available_true(monkeypatch: pytest.MonkeyPatch) 
         def __init__(self, *args: Any, **kwargs: Any) -> None:
             pass
 
-    monkeypatch.setattr(settings_mod, "JOURNAL_AVAILABLE", True)
-    monkeypatch.setattr(settings_mod, "JournalReader", FakeJournalReader)
-    monkeypatch.setattr(settings_mod, "JournalOpenMode", FakeJournalOpenMode)
-    monkeypatch.setattr(settings_mod, "Rule", FakeRule)
+    monkeypatch.setattr(logs, "JOURNAL_AVAILABLE", True)
+    monkeypatch.setattr(logs, "JournalReader", FakeJournalReader)
+    monkeypatch.setattr(logs, "JournalOpenMode", FakeJournalOpenMode)
+    monkeypatch.setattr(logs, "Rule", FakeRule)
 
-    lines = settings_mod._read_log_lines(1)
+    lines = logs._read_log_lines(1)
     assert any("test message" in ln for ln in lines)
     # ensure reader.close() was called
     assert FakeJournalReader.instance.closed
@@ -291,11 +291,11 @@ def test_save_settings_exception_handling(
 def test_shutdown_route_reboot(
     client: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    import blueprints.settings as settings_mod
+    from blueprints.settings import _system
 
     calls = {"cmd": None}
     monkeypatch.setattr(
-        settings_mod.subprocess, "run", lambda cmd, check: calls.update(cmd=cmd)
+        _system.subprocess, "run", lambda cmd, check: calls.update(cmd=cmd)
     )
 
     resp = client.post("/shutdown", json={"reboot": True})
@@ -307,9 +307,9 @@ def test_shutdown_route_reboot(
 def test_download_logs_with_parameters(
     client: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    import blueprints.settings as settings_mod
+    from services import logs
 
-    monkeypatch.setattr(settings_mod, "JOURNAL_AVAILABLE", False)
+    monkeypatch.setattr(logs, "JOURNAL_AVAILABLE", False)
 
     resp = client.get("/download-logs?hours=5")
     assert resp.status_code == 200
@@ -320,12 +320,12 @@ def test_download_logs_with_parameters(
 def test_download_logs_exception_handling(
     client: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    import blueprints.settings as settings_mod
+    from services import logs
 
     def failing_read(hours: Any) -> None:
         raise Exception("test error")
 
-    monkeypatch.setattr(settings_mod, "_read_log_lines", failing_read)
+    monkeypatch.setattr(logs, "_read_log_lines", failing_read)
 
     resp = client.get("/download-logs")
     assert resp.status_code == 500
@@ -333,10 +333,10 @@ def test_download_logs_exception_handling(
 
 
 def test_api_logs_rate_limiting_disabled(monkeypatch: pytest.MonkeyPatch) -> None:
-    import blueprints.settings as settings_mod
+    from blueprints.settings import _logs
 
     # Test when rate limiting allows request
-    monkeypatch.setattr(settings_mod, "_rate_limit_ok", lambda addr: True)
+    monkeypatch.setattr(_logs, "_rate_limit_ok", lambda addr: True)
 
     # This would normally work but we can't easily test the full flow without mocking more
     # The rate limit check happens before the main logic
@@ -345,12 +345,12 @@ def test_api_logs_rate_limiting_disabled(monkeypatch: pytest.MonkeyPatch) -> Non
 def test_api_logs_exception_handling(
     client: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    import blueprints.settings as settings_mod
+    from services import logs
 
     def failing_read(hours: Any) -> None:
         raise Exception("test error")
 
-    monkeypatch.setattr(settings_mod, "_read_log_lines", failing_read)
+    monkeypatch.setattr(logs, "_read_log_lines", failing_read)
 
     resp = client.get("/api/logs")
     assert resp.status_code == 500
@@ -389,10 +389,10 @@ def test_settings_time_format_12h() -> None:
 
 def test_settings_journal_availability() -> None:
     """Test journal availability detection."""
-    import blueprints.settings as settings_mod
+    from services import logs
 
     # Test that JOURNAL_AVAILABLE is set
-    journal_available = getattr(settings_mod, "JOURNAL_AVAILABLE", None)
+    journal_available = getattr(logs, "JOURNAL_AVAILABLE", None)
     assert journal_available is not None
     assert isinstance(journal_available, bool)
 
@@ -400,7 +400,7 @@ def test_settings_journal_availability() -> None:
 def test_settings_rate_limit_edge_cases() -> None:
     """Test rate limiting edge cases."""
 
-    from blueprints.settings import _rate_limit_ok
+    from blueprints.settings._logs import _rate_limit_ok
 
     # Test with None remote_addr
     result = _rate_limit_ok(None)
@@ -414,7 +414,7 @@ def test_settings_rate_limit_edge_cases() -> None:
 
 def test_settings_log_line_processing() -> None:
     """Test log line processing functions."""
-    from blueprints.settings import _clamp_int
+    from blueprints.settings._logs import _clamp_int
 
     # Test _clamp_int function
     assert _clamp_int("5", 10, 1, 20) == 5
@@ -456,28 +456,28 @@ def test_settings_log_contains_filter() -> None:
 
 
 def test_rate_limit_ok_threshold(monkeypatch: pytest.MonkeyPatch) -> None:
-    import blueprints.settings as settings_mod
+    from blueprints.settings import _logs
 
     addr = "1.2.3.4"
     # Clear any prior state for this key
-    settings_mod._logs_limiter._requests.pop(addr, None)
+    _logs._logs_limiter._requests.pop(addr, None)
 
-    max_requests = settings_mod._logs_limiter._max
+    max_requests = _logs._logs_limiter._max
 
     # Fill to just under the limit
     for _ in range(max_requests - 1):
-        assert settings_mod._rate_limit_ok(addr) is True
+        assert _logs._rate_limit_ok(addr) is True
 
     # Next should still pass (reaches limit)
-    assert settings_mod._rate_limit_ok(addr) is True
+    assert _logs._rate_limit_ok(addr) is True
     # And the next should be denied until timestamps age out
-    assert settings_mod._rate_limit_ok(addr) is False
+    assert _logs._rate_limit_ok(addr) is False
 
 
 def test_api_logs_warnings_alias_combines_warn_and_errors(
     client: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> Any:
-    import blueprints.settings as settings_mod
+    from services import logs
 
     def fake_read(hours: int) -> Any:
         return [
@@ -487,7 +487,7 @@ def test_api_logs_warnings_alias_combines_warn_and_errors(
             "Jan 01 host app[1]: CRITICAL boom",
         ]
 
-    monkeypatch.setattr(settings_mod, "_read_log_lines", fake_read)
+    monkeypatch.setattr(logs, "_read_log_lines", fake_read)
 
     resp = client.get("/api/logs?level=warnings")
     assert resp.status_code == 200
