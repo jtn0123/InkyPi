@@ -77,7 +77,7 @@
     try {
       const value = localStorage.getItem(prefix + key);
       return value === null ? defaultValue : value;
-    } catch (e) {
+    } catch {
       // Intentionally ignored — localStorage may be unavailable; return the default value
       return defaultValue;
     }

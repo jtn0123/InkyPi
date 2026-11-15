@@ -89,7 +89,6 @@
   }
 
   function showThumbnailPreview(
-    playlistName,
     pluginId,
     pluginName,
     instanceName,

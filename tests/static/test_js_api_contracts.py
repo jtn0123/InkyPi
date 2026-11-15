@@ -113,10 +113,7 @@ def test_response_modal_script_exists(client: FlaskClient) -> None:
         "function closeResponseModal()",
         "async function handleJsonResponse(response, options = {})",
         "function getErrorMessage(status, endpoint)",
-        "function showSuccess(message, duration)",
         "function showError(message, duration)",
-        "function showWarning(message, duration)",
-        "function showInfo(message, duration)",
     ]:
         assert token in js
 

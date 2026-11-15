@@ -22,12 +22,12 @@
     };
     function fmtElapsed(ms){
       const s = Math.floor(ms / 1000); const m = Math.floor(s / 60); const rem = s % 60; return m > 0 ? `${m}m ${rem}s` : `${s}s`; }
-    function tickClock(){ try { if (els.clock) els.clock.textContent = new Date().toLocaleTimeString(); const elapsedMs = Date.now() - t0; if (els.elapsed) els.elapsed.textContent = fmtElapsed(elapsedMs); if (elapsedMs > 15000 && lastStepBase && els.text && !lastStepBase.includes('Done') && !lastStepBase.includes('Failed')) { els.text.textContent = lastStepBase + ' (' + fmtElapsed(elapsedMs) + ')'; } } catch(e){} }
+    function tickClock(){ try { if (els.clock) els.clock.textContent = new Date().toLocaleTimeString(); const elapsedMs = Date.now() - t0; if (els.elapsed) els.elapsed.textContent = fmtElapsed(elapsedMs); if (elapsedMs > 15000 && lastStepBase && els.text && !lastStepBase.includes('Done') && !lastStepBase.includes('Failed')) { els.text.textContent = lastStepBase + ' (' + fmtElapsed(elapsedMs) + ')'; } } catch {} }
     function setStep(text, pct){ lastStepBase = text; if (els.block) { els.block.hidden = false; els.block.style.display = ''; } if (els.text) els.text.textContent = text; if (els.bar && typeof pct === 'number') { els.bar.style.width = pct + '%'; if (els.meter) els.meter.value = pct; }
-      if (els.list){ const li = document.createElement('li'); const ts = document.createElement('time'); ts.dateTime = new Date().toISOString(); ts.textContent = new Date().toLocaleTimeString(); li.appendChild(ts); li.appendChild(document.createTextNode(' ' + text)); els.list.appendChild(li); try { els.list.scrollTop = els.list.scrollHeight; } catch(e){} }
+      if (els.list){ const li = document.createElement('li'); const ts = document.createElement('time'); ts.dateTime = new Date().toISOString(); ts.textContent = new Date().toLocaleTimeString(); li.appendChild(ts); li.appendChild(document.createTextNode(' ' + text)); els.list.appendChild(li); try { els.list.scrollTop = els.list.scrollHeight; } catch {} }
     }
-    function start(){ t0 = Date.now(); try { if (els.list) els.list.innerHTML = ''; if (els.elapsed) els.elapsed.textContent = '0s'; if (els.clock) els.clock.textContent = new Date().toLocaleTimeString(); if (els.bar) els.bar.style.width = '10%'; if (els.meter) els.meter.value = 10; } catch(e){} tickClock(); clockTimer = setInterval(tickClock, 1000); setStep('Preparing…', 10); }
-    function stop(){ try { if (clockTimer) clearInterval(clockTimer); } catch(e){} /* Persistent progress card: leave the final state visible in the aside rather than hiding the block. */ }
+    function start(){ t0 = Date.now(); try { if (els.list) els.list.innerHTML = ''; if (els.elapsed) els.elapsed.textContent = '0s'; if (els.clock) els.clock.textContent = new Date().toLocaleTimeString(); if (els.bar) els.bar.style.width = '10%'; if (els.meter) els.meter.value = 10; } catch {} tickClock(); clockTimer = setInterval(tickClock, 1000); setStep('Preparing…', 10); }
+    function stop(){ try { if (clockTimer) clearInterval(clockTimer); } catch {} /* Persistent progress card: leave the final state visible in the aside rather than hiding the block. */ }
     return { setStep, start, stop };
   }
 
@@ -56,21 +56,21 @@
       const pctByState = { queued: 15, running: 25, step: 50, done: 100, error: 100 };
       progress.setStep(text, pctByState[payload.state] || 55);
       if (payload.state === 'done' || payload.state === 'error') {
-        try { source?.close(); } catch(e){}
+        try { source?.close(); } catch {}
       }
     }
     try {
       source = new EventSource('/api/progress/stream');
       ['queued', 'running', 'step', 'done', 'error'].forEach((eventName) => {
         source.addEventListener(eventName, (event) => {
-          try { applyEvent(JSON.parse(event.data || '{}')); } catch(e){}
+          try { applyEvent(JSON.parse(event.data || '{}')); } catch {}
         });
       });
     } catch (e) {
       console.warn('Live progress stream unavailable:', e);
     }
     return {
-      close(){ try { source?.close(); } catch(e){} },
+      close(){ try { source?.close(); } catch {} },
       hasRecent(){ return lastLiveAt > 0 && Date.now() - lastLiveAt < 3000; }
     };
   }
@@ -119,7 +119,7 @@
       fallback.textContent = message;
       group.appendChild(fallback);
     }
-    try { input.focus(); } catch(e){}
+    try { input.focus(); } catch {}
     return true;
   }
 
@@ -153,11 +153,11 @@
     // append uploaded files
     try { appendUploadedFiles(formData, uploadedFiles); } catch(e){ console.warn('Failed to append uploaded files:', e); if (window.showResponseModal) window.showResponseModal('failure', 'Failed to attach uploaded files: ' + (e.message || e)); return { success: false, result: null }; }
 
-    let url = urls.update_now; let method = 'POST'; let clearFormOnSubmit = true;
+    let url = urls.update_now; let method = 'POST';
     if (action === 'add_to_playlist'){
       url = urls.add_to_playlist; const scheduleFormData = new FormData(scheduleForm); const scheduleData = {}; for (const [k, v] of scheduleFormData.entries()) scheduleData[k] = v; formData.append('refresh_settings', JSON.stringify(scheduleData));
     } else if (action === 'update_instance'){
-      url = urls.update_instance; method = 'PUT'; clearFormOnSubmit = false;
+      url = urls.update_instance; method = 'PUT';
     }
     // NOTE: action === 'save_settings' is handled declaratively via HTMX on the
     // Save Settings button (JTN-506). It is intentionally no longer routed
@@ -265,7 +265,7 @@
       }
     } finally {
       clearTimeout(timeoutId);
-      try { liveProgress?.close(); } catch(e){}
+      try { liveProgress?.close(); } catch {}
       if (loadingIndicator) loadingIndicator.style.display = 'none';
       progress.setStep(success ? 'Done' : 'Failed \u2014 see error above', 100);
       progress.stop();

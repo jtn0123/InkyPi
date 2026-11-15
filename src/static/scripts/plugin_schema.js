@@ -8,7 +8,7 @@
   function parseJson(value, fallback) {
     try {
       return JSON.parse(value);
-    } catch (error) {
+    } catch {
       // Intentionally ignored — invalid JSON returns the provided fallback value
       return fallback;
     }

@@ -433,7 +433,7 @@
             refreshPreviewsAfterSuccess().catch(reportPreviewRefreshFailure);
           }, 400);
         }
-      } catch (e) {
+      } catch {
         showResponseModal("failure", "Failed to display instance");
       }
     }

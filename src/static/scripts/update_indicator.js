@@ -24,7 +24,7 @@
         return null;
       }
       return parsed.data;
-    } catch (e) {
+    } catch {
       return null;
     }
   }
@@ -35,7 +35,7 @@
         CACHE_KEY,
         JSON.stringify({ ts: Date.now(), data })
       );
-    } catch (e) {}
+    } catch {}
   }
 
   async function fetchVersion(signal) {
@@ -132,7 +132,7 @@
           location.href = "/settings#section-software-update";
         }, 600);
       }
-    } catch (e) {
+    } catch {
       if (typeof window.showResponseModal === "function") {
         window.showResponseModal("failure", "Failed to start update");
       }
@@ -209,7 +209,7 @@
       } else {
         hideIndicator(btn);
       }
-    } catch (e) {
+    } catch {
       // Silent — no indicator until the next successful check. A chip on
       // the Settings page surfaces check failures to users who care.
     } finally {

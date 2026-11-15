@@ -33,7 +33,6 @@
       box.addEventListener("click", (event) => {
         const target = event.currentTarget;
         ns.showThumbnailPreview(
-          target.dataset.thumbnailPlaylist,
           target.dataset.thumbnailPlugin,
           target.dataset.thumbnailDisplayName,
           target.dataset.thumbnailInstance,

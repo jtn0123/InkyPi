@@ -435,7 +435,7 @@
         } else {
           setTimeout(refreshPreviewSafely, refreshDelayMs);
         }
-      } catch (error) {
+      } catch {
         showResponseModal("failure", "Failed to display next");
       } finally {
         if (button) {
@@ -464,7 +464,7 @@
           return;
         }
         globalThis.location.reload();
-      } catch (error) {
+      } catch {
         showResponseModal("failure", "Failed to resume");
         button.disabled = false;
       }

@@ -321,7 +321,7 @@
         } else {
           showResponseModal("failure", `Error! ${result.error}`);
         }
-      } catch (e) {
+      } catch {
         showResponseModal("failure", "Failed to save keys. Please try again.");
       } finally {
         finalizeSaveButton(saveBtn, savedOk);
@@ -344,7 +344,7 @@
         } else {
           showResponseModal("failure", `Error! ${result.error}`);
         }
-      } catch (e) {
+      } catch {
         showResponseModal("failure", "Failed to delete key. Please try again.");
       }
     }
@@ -594,7 +594,7 @@
         } else {
           showResponseModal("failure", result.error);
         }
-      } catch (error) {
+      } catch {
         showResponseModal("failure", "Failed to save API keys");
       } finally {
         finalizeSaveButton(saveBtn, savedOk);

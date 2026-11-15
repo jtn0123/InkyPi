@@ -16,7 +16,7 @@
           return value;
         }
       }
-    } catch (e) {}
+    } catch {}
     return null;
   }
 
@@ -25,7 +25,7 @@
       for (const key of STORAGE_KEYS) {
         localStorage.setItem(key, theme);
       }
-    } catch (e) {}
+    } catch {}
   }
 
   function getPreferredTheme() {
@@ -83,14 +83,14 @@
       mq.addEventListener("change", function () {
         if (!getStoredTheme()) applyTheme(getPreferredTheme());
       });
-    } catch (e) {}
+    } catch {}
   }
 
   try {
     const earlyTheme = getPreferredTheme();
     // document.documentElement.setAttribute('data-theme', earlyTheme)
     document.documentElement.setAttribute("data-theme", earlyTheme);
-  } catch (e) {}
+  } catch {}
 
   // Scrolls the app starts itself (jumping to a section, revealing a panel)
   // follow the system "reduce motion" setting. The stylesheet's
@@ -101,7 +101,7 @@
       return window.matchMedia("(prefers-reduced-motion: reduce)").matches
         ? "auto"
         : "smooth";
-    } catch (e) {
+    } catch {
       return "smooth";
     }
   }
