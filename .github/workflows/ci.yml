@@ -27,6 +27,10 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # HEAD^1 is the base the hygiene hooks below diff against: the PR's
+          # base branch for a PR's merge commit, the previous commit on main.
+          fetch-depth: 2
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: '3.13'
@@ -40,6 +44,15 @@ jobs:
         env:
           CI: true
         run: scripts/lint.sh
+      # The same hooks a local commit runs, on the files this change touches,
+      # so a commit made without `pre-commit install` (or with --no-verify)
+      # fails here rather than leaving whitespace or broken YAML on main.
+      # Ruff, Black and mypy are skipped because lint.sh above already ran
+      # them on every file; gitleaks has its own workflow (gitleaks.yml).
+      - name: Pre-commit hooks on changed files
+        env:
+          SKIP: ruff,black,mypy,gitleaks,browser-smoke-gate
+        run: pre-commit run --show-diff-on-failure --from-ref HEAD^1 --to-ref HEAD
       - name: Check dependency licenses
         run: |
           pip install --quiet pip-licenses

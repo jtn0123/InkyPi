@@ -67,8 +67,9 @@ Node 24 actions require a current Actions runner: the self-hosted Pi runner
 must be at least version 2.327.1 (2.329.0 for authenticated Git in container
 actions). GitHub-hosted runners are managed by GitHub.
 
-Pre-commit hook revisions are recorded in `.pre-commit-config.yaml`; keep Ruff
-and mypy aligned with the dev lock.
+Pre-commit hook revisions are recorded in `.pre-commit-config.yaml`. Ruff,
+Black and mypy are local hooks that run from `.venv` (via
+`scripts/precommit_tool.sh`), so the dev lock is their only pin.
 
 ## Hash verification and Pi wheels
 

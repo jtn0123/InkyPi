@@ -77,12 +77,15 @@ After cloning, install the git hooks so linting runs automatically before each c
 pre-commit install
 ```
 
-On every `git commit` this runs: whitespace/YAML/merge-conflict checks, **ruff** (lint + format),
-**mypy** (type checks), **gitleaks** (secret scanning), and **conventional-commit** message
-validation. See [`.pre-commit-config.yaml`](../.pre-commit-config.yaml) for the full hook list.
+On every `git commit` this runs: whitespace/YAML/merge-conflict checks, **ruff** (lint),
+**black** (format), **mypy** on `src/`, **gitleaks** (secret scanning of the staged changes), and
+**conventional-commit** message validation. Ruff, Black and mypy run from `.venv`, so they are
+the same pinned versions `scripts/lint.sh` and CI use. See
+[`.pre-commit-config.yaml`](../.pre-commit-config.yaml) for the full hook list.
 
 > **Bypass when needed:** `git commit --no-verify` skips the hooks locally, but CI enforces the
-> same checks — failures will surface there instead.
+> same checks: the lint job runs `scripts/lint.sh` and the hygiene hooks on the files your change
+> touches, and gitleaks has its own workflow.
 
 ## What You Can Do
 
@@ -118,7 +121,7 @@ devbox / direnv method
 devbox run dev # run InkyPi in dev mode, terminating deactivates `devbox shell`
 
 # direnv will activate / deactivate `devbox shell` automatically when entering
-# and leaving the project directory (provided `direnv allow` has run once)... 
+# and leaving the project directory (provided `direnv allow` has run once)...
 # Otherwise to manually activate / deactivate:
 devbox shell                         # Installs deps, and activates Python virtual environment
 python src/inkypi.py --dev           # Start development server

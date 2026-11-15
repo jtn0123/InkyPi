@@ -1,4 +1,13 @@
+# `pre-commit install` sets up both hook types, so commit messages are checked too.
+default_install_hook_types: [pre-commit, commit-msg]
+
+# Vendored and generated files keep their upstream bytes: several are pinned
+# by hash, and main.css is rebuilt by scripts/build_css.py.
+exclude: ^(src/static/vendor/|src/templates/icons/|src/static/fonts/|vendor/|clients/android/assets/|tests/fixtures/|tests/snapshots/|src/static/styles/main\.css$|src/display/waveshare_epd/)
+
 repos:
+  # CI runs these on the files each change touches (the lint job), so older
+  # files are cleaned up as they are edited rather than in one sweep.
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
     hooks:
@@ -8,31 +17,39 @@ repos:
       - id: check-added-large-files
       - id: check-merge-conflict
 
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.16.9
+  # Ruff, Black and mypy run from the project's virtualenv, so they are the
+  # versions pinned in install/requirements-dev.txt that CI's lint job uses
+  # (scripts/lint.sh), and mypy can import the project's dependencies. Black is
+  # the formatter CI enforces; ruff only lints.
+  - repo: local
     hooks:
       - id: ruff
-        args: ["--fix", "--exit-non-zero-on-fix"]
+        name: ruff (lint, autofix)
+        language: system
+        entry: scripts/precommit_tool.sh ruff check --fix --exit-non-zero-on-fix --force-exclude
+        types: [python]
         files: ^(src|tests|scripts)/
-      - id: ruff-format
+      - id: black
+        name: black (format)
+        language: system
+        entry: scripts/precommit_tool.sh black
+        types: [python]
         files: ^(src|tests|scripts)/
-
-  - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v2.3.1
-    hooks:
       - id: mypy
-        args: [
-          "--config-file",
-          "mypy.ini",
-          "--disable-error-code=unused-ignore",
-        ]
-        files: ^(src|tests)/
+        name: mypy src/ (CI's blocking pass)
+        language: system
+        entry: scripts/precommit_tool.sh mypy src
+        pass_filenames: false
+        files: ^src/.*\.py$
 
+  # The hook's own entry scans only the staged changes. The old
+  # `detect --source=.` args were appended to that entry and made gitleaks
+  # exit with "unknown flag: --source". CI scans the full history separately
+  # (.github/workflows/gitleaks.yml).
   - repo: https://github.com/gitleaks/gitleaks
     rev: v8.30.1
     hooks:
       - id: gitleaks
-        args: ["detect", "--no-banner", "--redact", "--source=."]
 
   - repo: https://github.com/compilerla/conventional-pre-commit
     rev: v4.4.0
