@@ -376,12 +376,17 @@ def _rewind_file_stream(file: Any) -> None:
         logger.debug("Failed to rewind file stream", exc_info=True)
 
 
+def get_upload_dir() -> str:
+    """Return the folder uploaded files are saved in."""
+    return resolve_path(os.path.join("static", "images", "saved"))
+
+
 def _save_uploaded_file(
     file: Any, file_name: str, extension: str, content: bytes
 ) -> str:
     """Persist the uploaded file and return its path on disk."""
     safe_name = os.path.basename(file_name)
-    file_save_dir = resolve_path(os.path.join("static", "images", "saved"))
+    file_save_dir = get_upload_dir()
     os.makedirs(file_save_dir, exist_ok=True)
     # Prefix with timestamp to avoid silent overwrites from duplicate filenames
     unique_name = f"{int(time.time())}_{safe_name}"
