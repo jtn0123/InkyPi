@@ -5,6 +5,7 @@ from typing import Any
 from flask import current_app, request
 from flask.typing import ResponseReturnValue
 
+from blueprints._refresh_loop import wake_refresh_loop
 from utils.api_responses import json_error, json_success
 from utils.backend_errors import (
     ClientInputError,
@@ -123,6 +124,7 @@ def create_playlist() -> ResponseReturnValue:
         device_config.update_atomic(_do_add_playlist)
         if not add_pl_result or not add_pl_result[0]:
             raise OperationFailedError("Failed to create playlist")
+        wake_refresh_loop("creating a playlist")
 
         warning = None
         if parsed.playlist_name != "Default":
@@ -219,6 +221,7 @@ def update_playlist(playlist_name: str) -> ResponseReturnValue:
         )
     if not upd_result or not upd_result[0]:
         return json_error("Failed to update playlist", status=500)
+    wake_refresh_loop("updating a playlist")
 
     # Warn if the updated playlist overlaps with Default.
     warning = None
@@ -273,6 +276,7 @@ def delete_playlist(playlist_name: str) -> ResponseReturnValue:
     device_config.update_atomic(
         lambda cfg: playlist_manager.delete_playlist(playlist_name)
     )
+    wake_refresh_loop("deleting a playlist")
 
     return json_success("Deleted playlist!")
 
@@ -280,7 +284,6 @@ def delete_playlist(playlist_name: str) -> ResponseReturnValue:
 @playlist_bp.route("/update_device_cycle", methods=["PUT"])
 def update_device_cycle() -> ResponseReturnValue:
     device_config = current_app.config["DEVICE_CONFIG"]
-    refresh_task = current_app.config["REFRESH_TASK"]
     parsed, parse_error = parse_device_cycle_request(request.get_json(silent=True))
     if parse_error is not None:
         return _request_model_error_response(parse_error)
@@ -295,10 +298,7 @@ def update_device_cycle() -> ResponseReturnValue:
         device_config.update_value(
             "plugin_cycle_interval_seconds", parsed.minutes * 60, write=True
         )
-        try:
-            refresh_task.signal_config_change()
-        except Exception:
-            pass
+        wake_refresh_loop("changing the device cycle")
         return json_success("Device refresh cadence updated.")
 
 

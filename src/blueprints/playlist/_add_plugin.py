@@ -11,6 +11,7 @@ from typing import Any, cast
 from flask import current_app, request
 from flask.typing import ResponseReturnValue
 
+from blueprints._refresh_loop import wake_refresh_loop
 from services.playlist_workflows import prepare_add_plugin_workflow
 from utils.api_responses import JsonResponse, json_error, json_success
 from utils.app_utils import handle_request_files, parse_form
@@ -107,4 +108,6 @@ def add_plugin() -> ResponseReturnValue:
             if error is None:
                 raise OperationFailedError("Failed to add to playlist")
             return json_error(error.message, **error.as_json_kwargs())
+        # A new plugin can make its playlist due sooner than the loop planned.
+        wake_refresh_loop("adding a plugin to a playlist")
     return json_success("Scheduled refresh configured.")

@@ -17,6 +17,7 @@ from typing import Any, cast
 from flask import Blueprint, Response, current_app, jsonify, request
 from flask.typing import ResponseReturnValue
 
+from blueprints._refresh_loop import wake_refresh_loop
 from services.playlist_workflows import validate_plugin_settings_security
 from utils.api_responses import JsonResponse, content_disposition, json_error
 from utils.form_utils import sanitize_log_field
@@ -315,6 +316,8 @@ def import_plugins() -> ResponseReturnValue:
         if import_error is not None:
             return import_error
         renamed = _add_import_instances(device_config, prepared)
+        if prepared:
+            wake_refresh_loop("importing plugins")
     except Exception:
         logger.exception("plugin import failed")
         return json_error(
