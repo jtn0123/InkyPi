@@ -13,7 +13,7 @@ Design notes
   ``/next-up`` endpoint returns ``{}`` when no plugin is scheduled).
 * Envelope fields (``success``, ``request_id``, ``message``) are included as
   optional when the endpoint wraps its payload with ``json_success``; see
-  ``utils.http_utils.json_success``.
+  ``utils.api_responses.json_success``.
 """
 
 from __future__ import annotations

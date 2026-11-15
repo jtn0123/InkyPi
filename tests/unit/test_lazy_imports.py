@@ -108,7 +108,7 @@ def test_inkypi_startup_does_not_import_heavy_module(forbidden: str) -> None:
     assert forbidden not in loaded, (
         f"{forbidden!r} was imported during inkypi startup. "
         "Something on the critical path (inkypi.py, app_setup.*, "
-        "utils.app_utils, utils.http_utils, utils.webhooks, utils.fallback_image, "
+        "utils.app_utils, utils.api_responses, utils.webhooks, utils.fallback_image, "
         "utils.image_utils, refresh_task, plugins.plugin_registry) "
         "now pulls it in eagerly. Move the import into the function that "
         "actually uses it (see JTN-606)."
@@ -135,14 +135,16 @@ def test_inkypi_startup_module_count_is_bounded() -> None:
     )
 
 
-def test_http_utils_helpers_do_not_require_requests_at_import_time() -> None:
-    """``from utils.http_utils import json_error`` must not load ``requests``.
+def test_json_helpers_do_not_require_requests_at_import_time() -> None:
+    """``from utils.api_responses import json_error`` must not load ``requests``.
 
     The json_* helpers are pure Flask wrappers used by every error handler
     on the startup path. Keeping ``requests`` out of that import chain is a
     core piece of the JTN-606 memory reduction.
     """
-    result = _probe("from utils.http_utils import json_error, json_success, wants_json")
+    result = _probe(
+        "from utils.api_responses import json_error, json_success, wants_json"
+    )
     loaded = set(result["modules"])  # type: ignore[arg-type]
     assert "requests" not in loaded
     assert "urllib3" not in loaded

@@ -2,7 +2,7 @@
 
 All JSON API routes that signal an outcome (success or failure) must return a
 response shaped like the canonical envelope documented in
-``src/utils/http_utils.py``:
+``src/utils/api_responses.py``:
 
 Success::
 

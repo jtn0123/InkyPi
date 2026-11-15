@@ -8,15 +8,15 @@ from flask import Flask, Response, make_response, render_template
 from werkzeug.exceptions import HTTPException
 from werkzeug.wrappers import Response as WerkzeugResponse
 
-from utils.backend_errors import route_error_for
-from utils.domain_errors import DomainError
-from utils.http_utils import (
+from utils.api_responses import (
     APIError,
     JsonResponse,
     json_error,
     json_internal_error,
     wants_json,
 )
+from utils.backend_errors import route_error_for
+from utils.domain_errors import DomainError
 
 logger = logging.getLogger(__name__)
 

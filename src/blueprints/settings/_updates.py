@@ -9,12 +9,12 @@ from werkzeug.exceptions import BadRequest
 from blueprints.settings import logger, settings_bp
 from blueprints.settings._update_status import read_last_update_failure
 from services import updates, version_check
+from utils.api_responses import JsonResponse, json_error, json_success
 from utils.backend_errors import (
     ClientInputError,
     ConflictRouteError,
     route_error_boundary,
 )
-from utils.http_utils import JsonResponse, json_error, json_success
 
 
 def _json_payload(response: Response | dict[str, object]) -> dict[str, object]:

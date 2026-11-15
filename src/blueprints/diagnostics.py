@@ -30,8 +30,8 @@ from typing import Any
 from flask import Blueprint, current_app, jsonify, request
 
 from utils import blackout, boot_self_test, crash_breadcrumb
+from utils.api_responses import json_error
 from utils.app_version import read_app_version
-from utils.http_utils import json_error
 
 logger = logging.getLogger(__name__)
 

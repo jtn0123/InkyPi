@@ -11,7 +11,7 @@ import threading
 import time
 from typing import TypedDict, cast
 
-from utils.http_utils import http_get
+from utils.http_transport import http_get
 
 logger = logging.getLogger(__name__)
 

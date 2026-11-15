@@ -13,6 +13,7 @@ from services.plugin_workflows import (
     record_saved_settings_change,
     validate_plugin_for_save,
 )
+from utils.api_responses import json_error, json_success
 from utils.backend_errors import (
     ClientInputError,
     ResourceLookupError,
@@ -21,7 +22,6 @@ from utils.backend_errors import (
     route_error_boundary,
 )
 from utils.form_utils import sanitize_log_field, validate_plugin_required_fields
-from utils.http_utils import json_error, json_success
 from utils.plugin_history import record_change as _record_plugin_change
 from utils.request_models import (
     RequestModelError,

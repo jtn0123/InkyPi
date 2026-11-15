@@ -195,7 +195,7 @@ def rate_limit_app() -> Any:
     _AUTH_PATHS = frozenset({"/login"})
     _REFRESH_PATHS = frozenset({"/display-next", "/refresh"})
 
-    from utils.http_utils import json_error
+    from utils.api_responses import json_error
 
     @app.before_request
     def _rl() -> Any:
@@ -347,7 +347,7 @@ class TestNonRateLimitedEndpoints:
 @pytest.fixture()
 def mutating_rate_app() -> Any:
     """Minimal Flask app with mutating-endpoint token-bucket rate limiting (JTN-513)."""
-    from utils.http_utils import json_error
+    from utils.api_responses import json_error
     from utils.rate_limit import TokenBucket
 
     app = Flask(__name__)

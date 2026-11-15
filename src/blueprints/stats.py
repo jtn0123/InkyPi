@@ -22,7 +22,7 @@ from typing import Any, cast
 from flask import Blueprint, current_app, jsonify
 
 from schemas.responses import RefreshStatsResponse, RefreshStatsWindow
-from utils.http_utils import json_error
+from utils.api_responses import json_error
 from utils.refresh_stats import compute_stats_windows
 
 logger = logging.getLogger(__name__)

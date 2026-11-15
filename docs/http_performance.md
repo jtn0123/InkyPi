@@ -91,14 +91,13 @@ response = session.get(url, timeout=(5, 30))
 
 ### `http_get()` wrapper
 
-`http_get()` (defined in `src/utils/http_transport.py`, imported from
-`utils.http_utils`) adds optional latency logging and applies the env-based default
+`http_get()` (in `src/utils/http_transport.py`) adds optional latency logging and applies the env-based default
 timeout automatically. It uses the same session factory as `get_http_session()`, but
 keeps a per-thread session (`get_shared_session()`) because its retry defaults differ
 (the `INKYPI_HTTP_RETRIES*` and `INKYPI_HTTP_BACKOFF` env vars):
 
 ```python
-from utils.http_utils import http_get
+from utils.http_transport import http_get
 
 response = http_get(url, timeout=15)
 ```
@@ -153,7 +152,7 @@ def fetch_data(url: str, api_key: str) -> dict:
 
 ## Noted exceptions
 
-`src/plugins/comic/comic_parser.py` uses `http_get()` (imported from `utils.http_utils`)
+`src/plugins/comic/comic_parser.py` uses `http_get()` (from `utils.http_transport`)
 rather than calling `get_http_session()` directly. This is acceptable: `http_get()` is a
 higher-level wrapper that internally calls `get_shared_session()` (another pooled session
 from `src/utils/http_transport.py`) and adds latency logging; the pool is still reused.

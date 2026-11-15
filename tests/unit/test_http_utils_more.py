@@ -5,9 +5,9 @@ import requests
 
 
 def test_http_client_headers_and_ssl_verify(monkeypatch: pytest.MonkeyPatch) -> Any:
-    import utils.http_utils as http_utils
+    import utils.http_transport as http_transport
 
-    http_utils._reset_shared_session_for_tests()
+    http_transport._reset_shared_session_for_tests()
 
     captured = {}
 
@@ -26,7 +26,7 @@ def test_http_client_headers_and_ssl_verify(monkeypatch: pytest.MonkeyPatch) -> 
 
     monkeypatch.setattr(requests.Session, "get", fake_get, raising=True)
 
-    http_utils.http_get("https://secure.example.com", headers={"X-Test": "1"})
+    http_transport.http_get("https://secure.example.com", headers={"X-Test": "1"})
     hdrs = captured.get("headers") or {}
     assert isinstance(hdrs, dict)
     assert str(hdrs.get("User-Agent", "")).startswith("InkyPi/")

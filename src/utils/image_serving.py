@@ -28,7 +28,7 @@ from werkzeug.http import is_resource_modified
 # werkzeug.utils, which does not list it in __all__.
 from werkzeug.security import safe_join
 
-from utils.http_utils import content_disposition
+from utils.api_responses import content_disposition
 
 # ---------------------------------------------------------------------------
 # Internal cache

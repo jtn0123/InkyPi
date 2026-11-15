@@ -20,8 +20,13 @@ from flask import (
 )
 from werkzeug.exceptions import BadRequest
 
+from utils.api_responses import (
+    JsonResponse,
+    json_error,
+    json_internal_error,
+    json_success,
+)
 from utils.form_utils import sanitize_log_field
-from utils.http_utils import JsonResponse, json_error, json_internal_error, json_success
 from utils.image_serving import THUMBNAIL_WIDTHS, maybe_serve_webp
 from utils.security_utils import validate_file_path
 from utils.time_utils import now_device_tz

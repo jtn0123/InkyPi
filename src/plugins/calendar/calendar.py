@@ -21,8 +21,8 @@ from plugins.base_plugin.settings_schema import (
 )
 from plugins.calendar.constants import FONT_SIZES, LOCALE_GROUPS, LOCALE_MAP
 from utils.http_client import get_http_session
-from utils.http_utils import fetch_feed_bytes
 from utils.plugin_errors import URLValidationError
+from utils.safe_fetch import fetch_feed_bytes
 
 logger = logging.getLogger(__name__)
 

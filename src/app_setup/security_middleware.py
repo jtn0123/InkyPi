@@ -22,14 +22,14 @@ from urllib.parse import quote, urlencode, urlunsplit
 from flask import Flask, Response, abort, g, redirect, request, session
 
 # `redirect` returns a werkzeug Response, and `json_error` may return a
-# plain dict when there is no app context — see utils.http_utils.
+# plain dict when there is no app context — see utils.api_responses.
 from werkzeug.wrappers import Response as WerkzeugResponse
 
 from app_setup.scheme_proxy import TrustedSchemeProxy
 from app_setup.smoke import SMOKE_RENDER_PATH, smoke_render_enabled
 from config import Config
+from utils.api_responses import JsonResponse, json_error
 from utils.env_flags import env_bool
-from utils.http_utils import JsonResponse, json_error
 from utils.rate_limit import (
     SlidingWindowLimiter,
     TokenBucket,

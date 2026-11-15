@@ -16,7 +16,7 @@ from typing import Any
 import pytest
 
 from plugins.plugin_registry import get_plugin_instance, load_plugins
-from utils.http_utils import json_error, json_success
+from utils.api_responses import json_error, json_success
 from utils.time_utils import get_next_occurrence, parse_cron_field
 
 

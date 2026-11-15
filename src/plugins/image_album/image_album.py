@@ -8,8 +8,8 @@ from PIL import Image, ImageOps
 
 from plugins.base_plugin.base_plugin import BasePlugin, DeviceConfigLike
 from plugins.base_plugin.settings_schema import field, option, row, schema, section
+from utils.dns_pinning import pinned_dns
 from utils.http_client import get_http_session
-from utils.http_utils import pinned_dns
 from utils.image_loader import (
     FIT_AUTO,
     FIT_CONTAIN,

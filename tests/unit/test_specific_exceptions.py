@@ -9,13 +9,13 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 # ---------------------------------------------------------------------------
-# http_utils: RuntimeError on Flask context access outside request
+# api_responses: RuntimeError on Flask context access outside request
 # ---------------------------------------------------------------------------
 
 
 def test_get_request_id_outside_context() -> None:
     """_get_or_set_request_id returns None outside Flask request context."""
-    from utils.http_utils import _get_or_set_request_id
+    from utils.api_responses import _get_or_set_request_id
 
     result = _get_or_set_request_id()
     assert result is None
@@ -24,7 +24,7 @@ def test_get_request_id_outside_context() -> None:
 def test_env_float_invalid(monkeypatch: pytest.MonkeyPatch) -> None:
     """_env_float returns default when env var is not a valid float."""
     monkeypatch.setenv("TEST_BAD_FLOAT", "not_a_number")
-    from utils.http_utils import _env_float
+    from utils.http_transport import _env_float
 
     result = _env_float("TEST_BAD_FLOAT", 42.0)
     assert result == 42.0
@@ -33,7 +33,7 @@ def test_env_float_invalid(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_env_int_invalid(monkeypatch: pytest.MonkeyPatch) -> None:
     """_env_int returns default when env var is not a valid int."""
     monkeypatch.setenv("TEST_BAD_INT", "xyz")
-    from utils.http_utils import _env_int
+    from utils.http_transport import _env_int
 
     result = _env_int("TEST_BAD_INT", 99)
     assert result == 99

@@ -9,13 +9,13 @@ from typing import Any
 from flask import abort, current_app, render_template, request
 
 from plugins.plugin_registry import get_plugin_instance
+from utils.api_responses import json_error, json_success
 from utils.backend_errors import (
     ClientInputError,
     ResourceLookupError,
     route_error_boundary,
 )
 from utils.form_utils import sanitize_log_field
-from utils.http_utils import json_error, json_success
 
 from ._common import _CONFIG_KEY, _ERR_PLUGIN_INSTANCE_NOT_FOUND, logger, plugin_bp
 from ._images import _find_latest_plugin_refresh_time

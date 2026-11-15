@@ -3,8 +3,6 @@
 :func:`http_get` wraps a thread-local ``requests.Session`` configured with
 retries, default headers, split timeouts from the environment and optional
 latency logging.
-
-Re-exported from :mod:`utils.http_utils`, which remains the public import path.
 """
 
 from __future__ import annotations
@@ -26,7 +24,7 @@ if TYPE_CHECKING:  # pragma: no cover — type hints only
     from urllib3.util.retry import Retry
 
 # Keeps the pre-split logger name so log filters and output are unchanged.
-logger = logging.getLogger("utils.http_utils")
+logger = logging.getLogger(__name__)
 
 
 # ---- HTTP client helpers ----------------------------------------------------

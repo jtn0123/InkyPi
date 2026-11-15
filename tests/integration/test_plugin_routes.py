@@ -129,7 +129,7 @@ def test_update_plugin_instance_does_not_reflect_instance_name(
 def test_update_plugin_instance_api_error_handling(
     client: FlaskClient, flask_app: Flask, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from utils.http_utils import APIError
+    from utils.api_responses import APIError
 
     pm = flask_app.config["DEVICE_CONFIG"].get_playlist_manager()
 

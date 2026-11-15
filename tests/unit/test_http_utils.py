@@ -21,9 +21,9 @@ class _ResponseStub(Protocol):
 def test_http_get_user_agent_and_default_timeout(
     monkeypatch: pytest.MonkeyPatch,
 ) -> Any:
-    import utils.http_utils as http_utils
+    import utils.http_transport as http_transport
 
-    http_utils._reset_shared_session_for_tests()
+    http_transport._reset_shared_session_for_tests()
 
     captured: _CapturedRequest = {}
 
@@ -43,20 +43,20 @@ def test_http_get_user_agent_and_default_timeout(
 
     monkeypatch.setattr(requests.Session, "get", fake_get, raising=True)
 
-    http_utils.http_get("https://example.com")
+    http_transport.http_get("https://example.com")
 
     headers = captured.get("headers")
     assert isinstance(headers, dict)
     user_agent = headers.get("User-Agent")
     assert isinstance(user_agent, str)
     assert user_agent.startswith("InkyPi/")
-    assert captured.get("timeout") == http_utils.DEFAULT_TIMEOUT_SECONDS
+    assert captured.get("timeout") == http_transport.DEFAULT_TIMEOUT_SECONDS
 
 
 def test_http_get_timeout_override(monkeypatch: pytest.MonkeyPatch) -> Any:
-    import utils.http_utils as http_utils
+    import utils.http_transport as http_transport
 
-    http_utils._reset_shared_session_for_tests()
+    http_transport._reset_shared_session_for_tests()
 
     captured: _CapturedRequest = {}
 
@@ -75,17 +75,17 @@ def test_http_get_timeout_override(monkeypatch: pytest.MonkeyPatch) -> Any:
 
     monkeypatch.setattr(requests.Session, "get", fake_get, raising=True)
 
-    http_utils.http_get("https://example.com", timeout=5)
+    http_transport.http_get("https://example.com", timeout=5)
     assert captured.get("timeout") == 5
 
 
 def test_shared_session_retry_configuration(monkeypatch: pytest.MonkeyPatch) -> None:
     from urllib3.util.retry import Retry
 
-    import utils.http_utils as http_utils
+    import utils.http_transport as http_transport
 
-    http_utils._reset_shared_session_for_tests()
-    session = http_utils.get_shared_session()
+    http_transport._reset_shared_session_for_tests()
+    session = http_transport.get_shared_session()
     https_adapter = session.adapters.get("https://")
     assert isinstance(https_adapter, HTTPAdapter)
     assert isinstance(getattr(https_adapter, "max_retries", None), Retry)
@@ -101,20 +101,20 @@ def test_shared_session_thread_isolation() -> None:
 
     import requests
 
-    import utils.http_utils as http_utils
+    import utils.http_transport as http_transport
 
-    http_utils._reset_shared_session_for_tests()
+    http_transport._reset_shared_session_for_tests()
 
     # Same thread should reuse the session
-    s1 = http_utils.get_shared_session()
-    s2 = http_utils.get_shared_session()
+    s1 = http_transport.get_shared_session()
+    s2 = http_transport.get_shared_session()
     assert s1 is s2
 
     # Different threads should get distinct sessions
     other_session: list[requests.Session] = []
 
     def worker() -> None:
-        other_session.append(http_utils.get_shared_session())
+        other_session.append(http_transport.get_shared_session())
 
     t = threading.Thread(target=worker)
     t.start()
@@ -126,7 +126,7 @@ def test_shared_session_thread_isolation() -> None:
 
 from unittest.mock import Mock, patch  # noqa: E402
 
-from utils.http_utils import (  # noqa: E402
+from utils.api_responses import (  # noqa: E402
     APIError,
     json_error,
     json_internal_error,
@@ -222,14 +222,13 @@ def test_http_get_timeout_tuple_from_env(monkeypatch: pytest.MonkeyPatch) -> Any
     import requests
 
     import utils.http_transport as http_transport
-    import utils.http_utils as http_utils
 
     # Force split timeout tuple via module-level variables (evaluated at import).
     # Patched on http_transport, the module whose globals http_get reads.
     monkeypatch.setattr(http_transport, "CONNECT_TIMEOUT_SECONDS", 1.5, raising=True)
     monkeypatch.setattr(http_transport, "READ_TIMEOUT_SECONDS", 3.0, raising=True)
 
-    http_utils._reset_shared_session_for_tests()
+    http_transport._reset_shared_session_for_tests()
 
     captured: _CapturedRequest = {}
 
@@ -247,7 +246,7 @@ def test_http_get_timeout_tuple_from_env(monkeypatch: pytest.MonkeyPatch) -> Any
 
     monkeypatch.setattr(requests.Session, "get", fake_get, raising=True)
 
-    http_utils.http_get("https://example.com")
+    http_transport.http_get("https://example.com")
     t = captured.get("timeout")
     assert isinstance(t, tuple) and t == (1.5, 3.0)
 
@@ -259,13 +258,13 @@ def test_http_get_latency_logging_success_and_failure(
 
     import requests
 
-    import utils.http_utils as http_utils
+    import utils.http_transport as http_transport
 
-    http_utils._reset_shared_session_for_tests()
+    http_transport._reset_shared_session_for_tests()
 
     # Enable latency logging
     monkeypatch.setenv("INKYPI_HTTP_LOG_LATENCY", "1")
-    caplog.set_level(logging.INFO, logger=http_utils.__name__)
+    caplog.set_level(logging.INFO, logger=http_transport.__name__)
 
     # Success path
     def ok_get(self: requests.Session, url: str, **kwargs: object) -> _ResponseStub:
@@ -279,7 +278,7 @@ def test_http_get_latency_logging_success_and_failure(
         return R()
 
     monkeypatch.setattr(requests.Session, "get", ok_get, raising=True)
-    http_utils.http_get("https://example.com/success")
+    http_transport.http_get("https://example.com/success")
     assert any(
         "HTTP GET | url=https://example.com/success" in r.getMessage()
         for r in caplog.records
@@ -290,10 +289,10 @@ def test_http_get_latency_logging_success_and_failure(
         raise requests.exceptions.ConnectionError("boom")
 
     caplog.clear()
-    caplog.set_level(logging.WARNING, logger=http_utils.__name__)
+    caplog.set_level(logging.WARNING, logger=http_transport.__name__)
     monkeypatch.setattr(requests.Session, "get", err_get, raising=True)
     try:
-        http_utils.http_get("https://example.com/fail")
+        http_transport.http_get("https://example.com/fail")
     except Exception:
         pass
     assert any(
@@ -303,7 +302,7 @@ def test_http_get_latency_logging_success_and_failure(
 
 
 def test_retry_backoff_env_configuration(monkeypatch: pytest.MonkeyPatch) -> None:
-    import utils.http_utils as http_utils
+    import utils.http_transport as http_transport
 
     # Override env-based values by monkeypatching the helper accessors indirectly
     monkeypatch.setenv("INKYPI_HTTP_RETRIES", "7")
@@ -313,8 +312,8 @@ def test_retry_backoff_env_configuration(monkeypatch: pytest.MonkeyPatch) -> Non
     monkeypatch.setenv("INKYPI_HTTP_BACKOFF", "0.25")
 
     # Force rebuild of session to pick up new retry config
-    http_utils._reset_shared_session_for_tests()
-    session = http_utils.get_shared_session()
+    http_transport._reset_shared_session_for_tests()
+    session = http_transport.get_shared_session()
     https_adapter = session.adapters.get("https://")
     assert isinstance(https_adapter, HTTPAdapter)
     retry = https_adapter.max_retries
@@ -594,7 +593,7 @@ class TestRequestIdIsNotReflectedUnvalidated:
     """
 
     def _request_id(self, flask_app: Any, header: str | None) -> Any:
-        from utils.http_utils import json_success
+        from utils.api_responses import json_success
 
         headers = {"X-Request-Id": header} if header is not None else {}
         with flask_app.test_request_context("/", headers=headers):

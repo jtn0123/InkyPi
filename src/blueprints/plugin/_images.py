@@ -6,8 +6,8 @@ from typing import Any
 from flask import abort, current_app, send_from_directory
 
 from utils import history_index
+from utils.api_responses import content_disposition
 from utils.form_utils import sanitize_log_field
-from utils.http_utils import content_disposition
 from utils.security_utils import validate_file_path
 
 from ._common import (

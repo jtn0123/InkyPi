@@ -194,14 +194,14 @@ class TestNonAsciiFilenames:
     client does not enforce that, so assert the encoding explicitly."""
 
     def test_content_disposition_ascii_passthrough(self) -> None:
-        from utils.http_utils import content_disposition
+        from utils.api_responses import content_disposition
 
         assert content_disposition("inline", "clock_Kitchen_Clock.png") == (
             'inline; filename="clock_Kitchen_Clock.png"'
         )
 
     def test_content_disposition_non_ascii_and_quotes(self) -> None:
-        from utils.http_utils import content_disposition
+        from utils.api_responses import content_disposition
 
         cd = content_disposition("attachment", 'Weather – "Brooklyn".png')
         cd.encode("latin-1")  # must not raise

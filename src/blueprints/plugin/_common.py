@@ -11,9 +11,9 @@ from typing import Any, NoReturn
 
 from flask import Blueprint, abort, request, send_file
 
+from utils.api_responses import content_disposition
 from utils.app_utils import handle_request_files, parse_form, resolve_path
 from utils.backend_errors import ClientInputError
-from utils.http_utils import content_disposition
 from utils.request_models import RequestModelError
 
 # Both names are pinned to the pre-split module path ``blueprints.plugin`` so

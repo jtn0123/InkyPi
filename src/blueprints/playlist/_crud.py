@@ -4,13 +4,13 @@ from typing import Any
 
 from flask import current_app, request
 
+from utils.api_responses import json_error, json_success
 from utils.backend_errors import (
     ClientInputError,
     OperationFailedError,
     ResourceLookupError,
     route_error_boundary,
 )
-from utils.http_utils import json_error, json_success
 from utils.messages import PLAYLIST_NAME_REQUIRED_ERROR
 from utils.request_models import (
     PlaylistUpdateRequest,
