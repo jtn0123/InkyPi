@@ -1,7 +1,7 @@
 # pyright: reportMissingImports=false
 import os
 import re
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import pytest
@@ -283,6 +283,52 @@ def test_next_up_endpoint_and_ssr(client: FlaskClient, device_config_dev: Any) -
     assert isinstance(data, dict)
     # One of the seeded plugin ids
     assert data.get("plugin_id") in ("weather", "clock")
+
+
+def _seed_paused_middle(device_config_dev: Any, paused_at: str) -> None:
+    pm = device_config_dev.get_playlist_manager()
+    pm.add_playlist("Default", "00:00", "24:00")
+    pl = pm.get_playlist("Default")
+    for pid, name in (("clock", "Clock"), ("weather", "Weather"), ("rss", "News")):
+        pl.add_plugin(
+            {
+                "plugin_id": pid,
+                "name": name,
+                "plugin_settings": {},
+                "refresh": {"interval": 600},
+            }
+        )
+    pl.current_plugin_index = 0
+    paused = pl.find_plugin("weather", "Weather")
+    assert paused is not None
+    paused.paused = True
+    paused.paused_at = paused_at
+    device_config_dev.write_config()
+
+
+def test_next_up_skips_a_resting_paused_instance(
+    client: FlaskClient, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """B4: "Next up" must match the scheduler, which passes over a paused
+    instance until its retry probe is due, and must not move the index."""
+    monkeypatch.setenv("PLUGIN_PAUSE_COOLDOWN_SECONDS", "3600")
+    _seed_paused_middle(device_config_dev, datetime.now(UTC).isoformat())
+
+    data = client.get("/next-up").get_json()
+    assert data["plugin_id"] == "rss"
+    pl = device_config_dev.get_playlist_manager().get_playlist("Default")
+    assert pl.current_plugin_index == 0
+
+
+def test_next_up_shows_a_paused_instance_whose_probe_is_due(
+    client: FlaskClient, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("PLUGIN_PAUSE_COOLDOWN_SECONDS", "60")
+    old = (datetime.now(UTC) - timedelta(hours=1)).isoformat()
+    _seed_paused_middle(device_config_dev, old)
+
+    data = client.get("/next-up").get_json()
+    assert data["plugin_id"] == "weather"
 
 
 # JTN-213: Dashboard detail panel empty state when preview image exists

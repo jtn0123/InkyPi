@@ -17,6 +17,7 @@ from flask import (
     send_from_directory,
 )
 
+from refresh_task.health import PluginHealthTracker
 from utils import blackout
 from utils.backend_errors import RefreshTaskUnavailable
 from utils.display_names import (
@@ -161,6 +162,36 @@ def _annotate_refresh_schedule(payload: Any, device_config: Any) -> Any:
     return payload
 
 
+def _peek_next_up(device_config: Any, current_dt: datetime) -> dict[str, Any]:
+    """What the refresh loop would show next, without touching the playlist.
+
+    Mirrors ``_determine_next_plugin_locked`` in ``refresh_task.loop_scheduling``:
+    the next show-eligible instance, skipping circuit-breaker-paused instances
+    unless their retry probe is due. The peek never writes
+    ``current_plugin_index``, so it needs no config lock and cannot undo an
+    advance the refresh thread makes meanwhile (B4).
+    """
+    playlist = device_config.get_playlist_manager().determine_active_playlist(
+        current_dt
+    )
+    if not playlist:
+        return {}
+
+    def _paused_and_resting(inst: Any) -> bool:
+        return bool(getattr(inst, "paused", False)) and not (
+            PluginHealthTracker.probe_due(inst, current_dt)
+        )
+
+    inst = playlist.peek_next_eligible_plugin(current_dt, skip=_paused_and_resting)
+    if not inst:
+        return {}
+    return {
+        "playlist": playlist.name,
+        "plugin_id": inst.plugin_id,
+        "plugin_instance": inst.name,
+    }
+
+
 def _is_dev_mode() -> bool:
     env = (os.getenv("INKYPI_ENV") or os.getenv("FLASK_ENV") or "").strip().lower()
     return env in {"dev", "development"}
@@ -169,25 +200,12 @@ def _is_dev_mode() -> bool:
 @main_bp.route("/", methods=["GET"])
 def main_page() -> Any:
     device_config = current_app.config["DEVICE_CONFIG"]
-    # Compute a non-mutating next-up preview for SSR convenience
     playlist_manager = device_config.get_playlist_manager()
+    # Compute a non-mutating next-up preview for SSR convenience
     current_dt = _current_dt(device_config)
 
-    next_up = {}
     try:
-        playlist = playlist_manager.determine_active_playlist(current_dt)
-        if playlist:
-            inst = (
-                playlist.peek_next_eligible_plugin(current_dt)
-                if hasattr(playlist, "peek_next_eligible_plugin")
-                else playlist.peek_next_plugin()
-            )
-            if inst:
-                next_up = {
-                    "playlist": playlist.name,
-                    "plugin_id": inst.plugin_id,
-                    "plugin_instance": inst.name,
-                }
+        next_up = _peek_next_up(device_config, current_dt)
     except Exception:
         next_up = {}
 
@@ -399,25 +417,12 @@ def refresh_info() -> Any:
 @main_bp.route("/next-up", methods=["GET"])
 def next_up() -> Any:
     device_config = current_app.config["DEVICE_CONFIG"]
-    playlist_manager = device_config.get_playlist_manager()
     current_dt = _current_dt(device_config)
 
     try:
-        playlist = playlist_manager.determine_active_playlist(current_dt)
-        if not playlist:
+        payload = _peek_next_up(device_config, current_dt)
+        if not payload:
             return jsonify({})
-        inst = (
-            playlist.peek_next_eligible_plugin(current_dt)
-            if hasattr(playlist, "peek_next_eligible_plugin")
-            else playlist.peek_next_plugin()
-        )
-        if not inst:
-            return jsonify({})
-        payload = {
-            "playlist": playlist.name,
-            "plugin_id": inst.plugin_id,
-            "plugin_instance": inst.name,
-        }
         _annotate_instance_labels(payload)
         return jsonify(payload)
     except Exception:
