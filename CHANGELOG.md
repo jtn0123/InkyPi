@@ -2,6 +2,21 @@
 
 <!-- version list -->
 
+## v1.8.15 (2026-11-15)
+
+### Bug Fixes
+
+- **playlist**: Report the triggered refresh's timings from "display next"
+  ([#738](https://github.com/jtn0123/InkyPi/pull/738),
+  [`c418da6`](https://github.com/jtn0123/InkyPi/commit/c418da654c5f86b412d1252478df79beab3af840))
+
+### Documentation
+
+- **api-keys**: Point at the real .env and lead with the API Keys page
+  ([#739](https://github.com/jtn0123/InkyPi/pull/739),
+  [`df72145`](https://github.com/jtn0123/InkyPi/commit/df72145bea1e4bcbb671b4766d4220f2ab3bc4ff))
+
+
 ## v1.8.14 (2026-11-15)
 
 ### Bug Fixes
