@@ -3,6 +3,7 @@ import json
 import re
 from typing import Any
 
+import pytest
 from flask.testing import FlaskClient
 
 
@@ -298,24 +299,45 @@ def test_saved_settings_page_skips_instance_image_until_it_renders(
     assert _boot_instance_image_url(page) == "null"
 
 
-def test_instance_image_history_fallback(
-    client: FlaskClient, device_config_dev: Any
+def test_manual_update_feeds_the_plugin_image_not_the_instance_image(
+    client: FlaskClient, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    # Simulate a manual update that creates history sidecar with instance name
-    data = {
-        "plugin_id": "ai_text",
-        "title": "T1",
-        "textModel": "gpt-4o",
-        "textPrompt": "Hi",
-        "instance_name": "ai_text_saved_settings",
-    }
-    resp = client.post("/update_now", data=data)
-    assert resp.status_code in (200, 400, 500)
+    """A manual render isn't an instance render: its history sidecar has no
+    plugin_instance. So instance_image stays 404 and the plugin page's
+    fallback, /plugin_latest_image, serves the new image instead. (The
+    instance's own history fallback is covered in test_plugin_routes.py.)"""
+    import io
 
-    # Now request the instance image (no plugin image file exists), should fallback to history
-    resp2 = client.get("/instance_image/ai_text/ai_text_saved_settings")
-    # Should either serve or 404 if environment cannot generate; accept 200 as success criteria
-    assert resp2.status_code in (200, 404)
+    from PIL import Image
+
+    from plugins.ai_text.ai_text import AIText
+
+    _add_ai_text_instance(client, "ai_text_saved_settings")
+
+    def _render(self: Any, settings: Any, device_config: Any) -> Image.Image:
+        return Image.new("RGB", device_config.get_resolution(), "white")
+
+    monkeypatch.setattr(AIText, "generate_image", _render)
+
+    resp = client.post(
+        "/update_now",
+        data={
+            "plugin_id": "ai_text",
+            "title": "T1",
+            "textModel": "gpt-4o",
+            "textPrompt": "Hi",
+            "instance_name": "ai_text_saved_settings",
+        },
+    )
+    assert resp.status_code == 200
+
+    instance = client.get("/instance_image/ai_text/ai_text_saved_settings")
+    assert instance.status_code == 404
+
+    latest = client.get("/plugin_latest_image/ai_text")
+    assert latest.status_code == 200
+    with Image.open(io.BytesIO(latest.data)) as img:
+        assert img.convert("RGB").getpixel((0, 0)) == (255, 255, 255)
 
 
 def test_api_key_indicator_shows_missing_when_no_key(

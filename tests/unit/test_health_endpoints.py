@@ -10,9 +10,11 @@ def test_health_endpoints(client: FlaskClient) -> None:
     # Liveness is always OK
     r = client.get("/healthz")
     assert r.status_code == 200
-    # Readiness reflects running state or web-only
+    # Readiness follows the refresh loop, which the test app doesn't start.
+    # The ready and web-only states are covered in test_inkypi.py.
     r2 = client.get("/readyz")
-    assert r2.status_code in (200, 503)
+    assert r2.status_code == 503
+    assert r2.data == b"not-ready"
 
 
 # ---------------------------------------------------------------------------

@@ -319,7 +319,7 @@ def test_update_now_async_poll_completes(
     import plugins.clock.clock as clock_mod
     from refresh_task.job_queue import get_job_queue
 
-    def fake_generate(self, settings: Any, device_config: Any) -> Any:
+    def fake_generate(self: Any, settings: Any, device_config: Any) -> Any:
         return Image.new("RGB", device_config.get_resolution(), "white")
 
     monkeypatch.setattr(clock_mod.Clock, "generate_image", fake_generate, raising=True)
@@ -509,14 +509,16 @@ def test_delete_plugin_instance_missing(client: FlaskClient) -> None:
         "/delete_plugin_instance",
         json={"playlist_name": "Default", "plugin_id": "x", "plugin_instance": "nope"},
     )
-    assert resp.status_code in (200, 400)
+    assert resp.status_code == 400
+    assert resp.get_json()["error"] == "Plugin instance not found"
 
 
 def test_update_plugin_instance_missing(client: FlaskClient) -> None:
     resp = client.put(
         "/update_plugin_instance/does-not-exist", data={"plugin_id": "ai_text"}
     )
-    assert resp.status_code in (200, 404, 500)
+    assert resp.status_code == 404
+    assert resp.get_json()["error"] == "Plugin instance not found"
 
 
 def test_save_plugin_settings_persist_and_load_on_plugin_page(
