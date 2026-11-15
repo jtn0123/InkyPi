@@ -75,6 +75,9 @@ update_app_service() {
     # update is idempotent and future-proofs against in-place RAM upgrades
     # (swapping an SD card between Pi models).
     install_memory_dropin
+    # E3: sandbox the service; src/ becomes read-only to it, so compile now.
+    install_hardening_dropin
+    precompile_app_bytecode
     sudo systemctl daemon-reload
     sudo systemctl enable "$SERVICE_FILE"
     echo "Starting $APPNAME service."

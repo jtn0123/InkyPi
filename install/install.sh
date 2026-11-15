@@ -593,6 +593,9 @@ install_app_service() {
   # JTN-785: Write the memory-cap drop-in tuned for this device's RAM. Must
   # precede daemon-reload so systemd picks up the caps on the next start.
   install_memory_dropin
+  # E3: sandbox the service; src/ becomes read-only to it, so compile now.
+  install_hardening_dropin
+  precompile_app_bytecode
 
   sudo systemctl daemon-reload
   sudo systemctl enable $SERVICE_FILE

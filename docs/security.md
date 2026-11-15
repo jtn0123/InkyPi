@@ -38,6 +38,41 @@ same PIN and `SECRET_KEY` keeps existing logins. Set
 the lifetime. Webhook notifications log only the scheme and host of each
 webhook URL, never the path or query that carries its token.
 
+## Service sandbox
+
+`inkypi.service` runs as root because it drives the display over SPI and GPIO,
+reboots the Pi and starts updates. The installer adds a systemd drop-in,
+`/etc/systemd/system/inkypi.service.d/hardening.conf`, that makes the rest of
+the filesystem read-only to the service. A bug or a hostile plugin can't
+rewrite `/etc`, `/usr`, `/boot`, the venv or InkyPi's own code. The service can
+write only to:
+
+- `/usr/local/inkypi`, for `.env` (API keys and `SECRET_KEY`)
+- `src/config` and `src/static/images` in the checkout
+- `runtime/` in the checkout, for the benchmarks database
+- `/var/lib/inkypi` and `/run/inkypi`, for update, boot and crash state
+- root's `.cache`, `.config`, `.pki` and `.local`, for Chromium and fontconfig
+
+It also gets a private `/tmp`, can't gain privileges through setuid programs
+and can't load kernel modules or change kernel settings. Updates still work:
+the app hands them to `systemd-run`, which runs them as a separate unit
+outside the sandbox.
+
+This is a speed bump, not a wall. The service is still root, and it can still
+ask systemd to run commands outside the sandbox, which is how updates work.
+Running it as an unprivileged user would close that gap.
+
+The installer rewrites `hardening.conf` on every install and update, with this
+device's paths. To loosen it on one device, add a later drop-in instead, for
+example `/etc/systemd/system/inkypi.service.d/zz-local.conf`:
+
+```ini
+[Service]
+ReadWritePaths=/home/pi/extra-folder
+```
+
+Then run `sudo systemctl daemon-reload && sudo systemctl restart inkypi`.
+
 ## Remote-page rendering
 
 The Screenshot plugin accepts public HTTP/HTTPS websites. Its Chromium process
