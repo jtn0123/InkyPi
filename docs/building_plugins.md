@@ -107,11 +107,19 @@ If your plugin requires user configuration through the web UI, you’ll need to 
     ```
 - Test and ensure that your plugin:
     - Loads correctly on service start.
-    - Appears under the "Plugins" section in the web UI with it's icon.
+    - Appears under the "Plugins" section in the web UI with its icon.
     - Generates images for different display sizes and orientations.
     - Settings template is rendered correctly.
     - Generates and displays images with immediate updates and in a playlist.
     - Setting template is prepopulated and saved correctly when editing an existing playlist
+
+To check the image without a Pi or the web UI, render it straight to a PNG:
+
+```bash
+python scripts/dry_run_plugin.py --plugin my_plugin --config settings.json --output out.png
+```
+
+If the plugin calls an API, add `--record fixtures/` once, then use `--replay fixtures/` while you iterate on the layout. Replay serves the saved responses, so it uses no network and no API quota.
 
 ## Example Directory Structure
 

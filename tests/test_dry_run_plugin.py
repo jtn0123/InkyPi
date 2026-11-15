@@ -242,3 +242,135 @@ def test_main_default_output_path(
 
     pngs = list(tmp_path.glob("dry-run-year_progress-*.png"))
     assert len(pngs) == 1, f"Expected one auto-named PNG, found: {pngs}"
+
+
+# ── record / replay ──────────────────────────────────────────────────────────
+
+_ONECALL_URL = (
+    "https://api.openweathermap.org/data/3.0/onecall"
+    "?lat=1&lon=2&units=metric&appid=SECRET-KEY"
+)
+
+
+def _fake_network(payload: bytes, content_type: str) -> Any:
+    """A transport adapter standing in for the internet."""
+    import requests
+    from requests.adapters import BaseAdapter
+
+    class _Net(BaseAdapter):
+        def __init__(self) -> None:
+            super().__init__()
+            self.calls = 0
+
+        def send(self, request: Any, *args: Any, **kwargs: Any) -> Any:
+            self.calls += 1
+            resp = requests.Response()
+            resp.status_code = 200
+            resp.url = request.url
+            resp.request = request
+            resp._content = payload
+            resp.headers["Content-Type"] = content_type
+            return resp
+
+        def close(self) -> None:
+            return None
+
+    return _Net()
+
+
+def test_response_key_drops_the_query_so_keys_stay_out_of_file_names(
+    dry_run_mod: Any,
+) -> None:
+    key = dry_run_mod._response_key(_ONECALL_URL)
+    assert key == "api.openweathermap.org_data_3.0_onecall.body"
+    assert "SECRET" not in key
+
+
+def test_response_key_separates_hosts_and_paths(dry_run_mod: Any) -> None:
+    keys = {
+        dry_run_mod._response_key(u)
+        for u in (
+            "https://api.open-meteo.com/v1/forecast?x=1",
+            "https://air-quality-api.open-meteo.com/v1/air-quality?x=1",
+            "https://api.openweathermap.org/data/2.5/air_pollution?x=1",
+        )
+    }
+    assert len(keys) == 3
+
+
+def test_record_then_replay_round_trip(dry_run_mod: Any, tmp_path: Path) -> None:
+    import requests
+
+    body = json.dumps({"current": {"temp": 21}}).encode()
+
+    recorder = requests.Session()
+    net = _fake_network(body, "application/json; charset=utf-8")
+    recorder.mount("https://", net)
+    dry_run_mod._start_recording(recorder, tmp_path)
+    assert recorder.get(_ONECALL_URL, timeout=5).json() == {"current": {"temp": 21}}
+    assert net.calls == 1
+
+    saved = tmp_path / "api.openweathermap.org_data_3.0_onecall.body"
+    assert saved.read_bytes() == body
+    index_text = (tmp_path / "_index.json").read_text()
+    assert "SECRET" not in index_text
+    assert json.loads(index_text)[saved.name]["content_type"].startswith(
+        "application/json"
+    )
+
+    player = requests.Session()
+    dry_run_mod._start_replay(player, tmp_path)
+    resp = player.get(_ONECALL_URL, timeout=5)
+    assert resp.status_code == 200
+    assert resp.json() == {"current": {"temp": 21}}
+    assert resp.headers["Content-Type"].startswith("application/json")
+
+
+def test_replay_serves_streamed_bytes(dry_run_mod: Any, tmp_path: Path) -> None:
+    """Image downloads read with stream=True / iter_content still work."""
+    import requests
+
+    (tmp_path / "example.com_pic.png.body").write_bytes(b"\x89PNG-bytes")
+    session = requests.Session()
+    dry_run_mod._start_replay(session, tmp_path)
+    resp = session.get("https://example.com/pic.png", stream=True, timeout=5)
+    assert b"".join(resp.iter_content(4)) == b"\x89PNG-bytes"
+
+
+def test_replay_miss_fails_loudly_without_the_query(
+    dry_run_mod: Any, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    import requests
+
+    session = requests.Session()
+    dry_run_mod._start_replay(session, tmp_path)
+    with pytest.raises(requests.ConnectionError) as excinfo:
+        session.get(_ONECALL_URL, timeout=5)
+    assert "api.openweathermap.org/data/3.0/onecall" in str(excinfo.value)
+    assert "SECRET" not in str(excinfo.value)
+    assert "replay miss" in capsys.readouterr().err
+
+
+def test_record_skips_error_responses(dry_run_mod: Any, tmp_path: Path) -> None:
+    import requests
+
+    session = requests.Session()
+    net = _fake_network(b"nope", "text/plain")
+    session.mount("https://", net)
+    dry_run_mod._start_recording(session, tmp_path)
+
+    def _fail(response: Any, *args: Any, **kwargs: Any) -> Any:
+        response.status_code = 401
+        return response
+
+    # Runs before the recorder, the way a real 401 would arrive.
+    session.hooks["response"].insert(0, _fail)
+    session.get(_ONECALL_URL, timeout=5)
+    assert not list(tmp_path.glob("*.body"))
+
+
+def test_replay_missing_directory_exits(dry_run_mod: Any, tmp_path: Path) -> None:
+    import requests
+
+    with pytest.raises(SystemExit, match="--replay directory not found"):
+        dry_run_mod._start_replay(requests.Session(), tmp_path / "nope")
