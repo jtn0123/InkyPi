@@ -2,6 +2,15 @@
 
 <!-- version list -->
 
+## v1.8.32 (2026-11-15)
+
+### Bug Fixes
+
+- One history retention setting instead of two that override each other
+  ([#787](https://github.com/jtn0123/InkyPi/pull/787),
+  [`3077ec8`](https://github.com/jtn0123/InkyPi/commit/3077ec86f31ff4bdc1e0bd515abf99e6c4aa28c4))
+
+
 ## v1.8.31 (2026-11-15)
 
 ### Bug Fixes
