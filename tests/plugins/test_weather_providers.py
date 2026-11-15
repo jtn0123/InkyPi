@@ -2,7 +2,7 @@
 """Provider-specific tests (OpenWeatherMap, OpenMeteo API mocking)."""
 
 from datetime import UTC
-from typing import Any, cast
+from typing import Any
 from unittest.mock import MagicMock, patch
 from zoneinfo import ZoneInfo
 
@@ -201,37 +201,33 @@ def test_openmeteo_forecast_invalid_date_raises() -> None:
         )
 
 
-def test_openmeteo_hourly_parsing() -> None:
-    """Test OpenMeteo hourly data parsing."""
+def test_openmeteo_hourly_humidity_and_pressure() -> None:
+    """Humidity and pressure come from the hourly entry for the current hour."""
+    from datetime import datetime, timedelta
 
-    # Mock hourly data
-    hourly_data = {
-        "time": ["2025-01-01T12:00"],
-        "relative_humidity_2m": [50],
-        "surface_pressure": [1010],
+    from plugins.weather.weather_data import parse_open_meteo_data_points
+
+    hour = datetime.now(UTC).replace(minute=0, second=0, microsecond=0)
+    # The first entry is twelve hours away and must be skipped. The hours
+    # either side of now carry the same values, so the test still holds if
+    # the clock ticks over to the next hour while it runs.
+    times = [(hour + timedelta(hours=h)).isoformat() for h in (12, -1, 0, 1)]
+    weather_data = {
+        "hourly": {
+            "time": times,
+            "relative_humidity_2m": [99, 55, 55, 55],
+            "surface_pressure": [999.0, 1012.7, 1012.7, 1012.7],
+        },
     }
 
-    # Test the parsing logic for humidity and pressure
-    humidity_hourly_times = cast(list[str], hourly_data.get("time", []))
-    humidity_values = cast(list[int], hourly_data.get("relative_humidity_2m", []))
+    points = parse_open_meteo_data_points(
+        weather_data, {}, UTC, "metric", "24h", plugin_dir="/weather"
+    )
 
-    for i, _time_str in enumerate(humidity_hourly_times):
-        try:
-            # This covers the humidity parsing logic
-            current_humidity = str(int(humidity_values[i]))
-            assert current_humidity is not None
-        except (ValueError, IndexError):
-            continue
-
-    # Test pressure parsing
-    pressure_values = cast(list[int], hourly_data.get("surface_pressure", []))
-    for i, _time_str in enumerate(humidity_hourly_times):
-        try:
-            # This covers the pressure parsing logic
-            current_pressure = str(int(pressure_values[i]))
-            assert current_pressure is not None
-        except (ValueError, IndexError):
-            continue
+    by_label = {point["label"]: point for point in points}
+    assert by_label["Humidity"]["measurement"] == 55
+    assert by_label["Pressure"]["measurement"] == 1012
+    assert by_label["Pressure"]["unit"] == "hPa"
 
 
 def test_weather_openweathermap_api_failure(

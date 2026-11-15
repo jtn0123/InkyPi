@@ -173,62 +173,6 @@ def test_refresh_task_system_stats_logging_no_getloadavg(
     monkeypatch.setattr("builtins.__import__", _orig_import, raising=True)
 
 
-def test_refresh_task_plugin_config_not_found(
-    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Test handling when plugin config is not found."""
-    from refresh_task import PlaylistRefresh
-
-    # Mock plugin config to return None
-    monkeypatch.setattr(device_config_dev, "get_plugin", lambda plugin_id: None)
-
-    # Create a mock refresh action
-    refresh_action = PlaylistRefresh(
-        None, type("MockPlugin", (), {"plugin_id": "nonexistent"})()
-    )
-
-    # This should trigger the plugin config not found error
-    try:
-        plugin_config = device_config_dev.get_plugin(refresh_action.get_plugin_id())
-        if plugin_config is None:
-            pass  # This covers the missing line
-    except Exception:
-        pass
-
-
-def test_refresh_task_plugin_returns_none_image(
-    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Test handling when plugin returns None image."""
-
-    # This should trigger the None image error check
-    image = None
-    if image is None:
-        pass  # This covers the missing line about plugin returning None image
-
-
-def test_refresh_task_image_already_displayed(
-    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Test handling when image is already displayed."""
-    from model import RefreshInfo
-
-    # Mock refresh info with same image hash
-    latest_refresh = RefreshInfo(
-        refresh_time="2025-01-01T12:00:00",
-        image_hash="same_hash",
-        refresh_type="Playlist",
-        plugin_id="test",
-    )
-
-    # This should trigger the "image already displayed" logic
-    image_hash = "same_hash"
-    if image_hash != latest_refresh.image_hash:
-        pass  # Display new image
-    else:
-        pass  # This covers the "image already displayed" line
-
-
 def test_refresh_task_manual_update_exception_handling(
     device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -259,20 +203,23 @@ def test_refresh_task_manual_update_exception_handling(
 def test_refresh_task_signal_config_change(
     device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Test signal config change functionality."""
-    from display.display_manager import DisplayManager
-    from refresh_task import RefreshTask
-
+    """A config change rebuilds the refresh context, and wakes the loop only
+    while the task is running."""
     display_manager = DisplayManager(device_config_dev)
     task = RefreshTask(device_config_dev, display_manager)
+    wakeups: list[bool] = []
+    monkeypatch.setattr(task.condition, "notify_all", lambda: wakeups.append(True))
+    old_context = task.refresh_context
 
-    # Test when task is running
     task.running = True
-    task.signal_config_change()  # This covers the signal config change logic
+    task.signal_config_change()
+    assert wakeups == [True]
+    assert task.refresh_context is not old_context
+    assert task.executor.refresh_context is task.refresh_context
 
-    # Test when task is not running
     task.running = False
-    task.signal_config_change()  # This should be a no-op
+    task.signal_config_change()
+    assert wakeups == [True]
 
 
 def test_refresh_task_determine_next_plugin_no_playlist(
@@ -342,20 +289,6 @@ def test_refresh_task_determine_next_plugin_empty_playlist(
     )
     assert playlist is None
     assert plugin_instance is None
-
-
-def test_refresh_task_not_time_to_update(
-    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Test handling when it's not time to update."""
-
-    # Mock should_refresh to return False
-    monkeypatch.setattr("model.PlaylistManager.should_refresh", lambda *args: False)
-
-    # This should trigger the "not time to update" logic
-    should_refresh = False  # Mocked above
-    if not should_refresh:
-        pass  # This covers the "not time to update" logging
 
 
 def test_refresh_action_base_class() -> None:
