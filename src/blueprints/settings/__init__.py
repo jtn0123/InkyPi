@@ -16,6 +16,7 @@ from flask import (
     current_app,
 )
 
+from utils.env_flags import env_bool
 from utils.http_utils import http_get
 from utils.logging_utils import log_datetime_from_timestamp, redact_secrets
 from utils.progress_events import get_progress_bus
@@ -130,12 +131,7 @@ _dev_log_lock = threading.Lock()
 
 
 def _benchmarks_enabled() -> bool:
-    return os.getenv("INKYPI_BENCHMARK_API_ENABLED", "true").strip().lower() in (
-        "1",
-        "true",
-        "yes",
-        "on",
-    )
+    return env_bool("INKYPI_BENCHMARK_API_ENABLED", default=True)
 
 
 def _get_bench_db_path() -> str:

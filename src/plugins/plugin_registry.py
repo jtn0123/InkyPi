@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any, cast
 
 from utils.app_utils import resolve_path
+from utils.env_flags import env_bool
 
 logger = logging.getLogger("plugins.plugin_registry")
 PLUGINS_DIR = "plugins"
@@ -60,11 +61,7 @@ def _load_single_plugin_instance(plugin_config: dict[str, Any]) -> Any:
     )
     try:
         reloaded = False
-        no_hot_reload = os.getenv("INKYPI_NO_HOT_RELOAD", "").strip().lower() in (
-            "1",
-            "true",
-            "yes",
-        )
+        no_hot_reload = env_bool("INKYPI_NO_HOT_RELOAD")
         if _is_dev_mode() and module_name in sys.modules and not no_hot_reload:
             logger.info(f"Hot reloading plugin module {module_name}")
             module = importlib.reload(sys.modules[module_name])

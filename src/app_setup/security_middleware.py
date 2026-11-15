@@ -29,6 +29,7 @@ from werkzeug.wrappers import Response as WerkzeugResponse
 from app_setup.scheme_proxy import TrustedSchemeProxy
 from app_setup.smoke import SMOKE_RENDER_PATH, smoke_render_enabled
 from config import Config
+from utils.env_flags import env_bool
 from utils.http_utils import JsonResponse, json_error
 from utils.rate_limit import (
     TokenBucket,
@@ -66,8 +67,6 @@ _RATE_EXEMPT = frozenset({"/healthz", "/readyz", "/api/csp-report"})
 _MUTATE_WINDOW = 60  # seconds
 _MUTATE_MAX = 60  # requests per IP per window
 
-_TRUTHY = frozenset({"1", "true", "yes"})
-
 #: Hostnames always accepted in the ``Host`` header, in addition to IP
 #: literals, the machine's own hostname (bare and ``.local``) and any entries
 #: from ``INKYPI_ALLOWED_HOSTS``. ``inkypi`` is the installer's default Pi
@@ -75,10 +74,6 @@ _TRUTHY = frozenset({"1", "true", "yes"})
 #: HTTPS upgrade redirect (open-redirect defence, JTN-317 / CodeQL
 #: ``py/url-redirection`` alert #52).
 _DEFAULT_ALLOWED_HOSTS = frozenset({"inkypi", "inkypi.local", "localhost"})
-
-
-def _env_bool(name: str, default: str = "") -> bool:
-    return os.getenv(name, default).strip().lower() in _TRUTHY
 
 
 def _normalise_host_name(name: str) -> str:
@@ -226,8 +221,8 @@ def setup_secret_key(app: Flask, device_config: Config) -> None:
 
 def setup_https_redirect(app: Flask, *, dev_mode: bool) -> None:
     """When INKYPI_FORCE_HTTPS=1 (and not in dev mode), redirect HTTP→HTTPS."""
-    force_https = not dev_mode and _env_bool("INKYPI_FORCE_HTTPS")
-    app.config["SESSION_COOKIE_SECURE"] = force_https or _env_bool(
+    force_https = not dev_mode and env_bool("INKYPI_FORCE_HTTPS")
+    app.config["SESSION_COOKIE_SECURE"] = force_https or env_bool(
         "INKYPI_SECURE_COOKIES"
     )
     cast(_WSGIHost, app).wsgi_app = TrustedSchemeProxy(
@@ -516,7 +511,7 @@ _DEFAULT_CSP_TEMPLATE = (
 
 def _emit_request_timing_log(response: Response) -> None:
     """Emit a timing log line if INKYPI_REQUEST_TIMING is set."""
-    if not _env_bool("INKYPI_REQUEST_TIMING"):
+    if not env_bool("INKYPI_REQUEST_TIMING"):
         return
     t0 = getattr(g, "_t0", None)
     if t0 is None:
@@ -578,7 +573,7 @@ def _apply_csp_header(response: Response, *, dev_mode: bool) -> None:
     csp_value = os.getenv("INKYPI_CSP") or _DEFAULT_CSP_TEMPLATE.format(nonce=nonce)
     if "report-uri" not in csp_value:
         csp_value = csp_value.rstrip("; ") + "; report-uri /api/csp-report"
-    report_only = dev_mode or _env_bool("INKYPI_CSP_REPORT_ONLY")
+    report_only = dev_mode or env_bool("INKYPI_CSP_REPORT_ONLY")
     header_name = (
         "Content-Security-Policy-Report-Only"
         if report_only

@@ -15,6 +15,8 @@ import threading
 from time import perf_counter
 from typing import TYPE_CHECKING, Any, cast
 
+from utils.env_flags import env_bool
+
 # ``requests`` / ``urllib3`` are imported lazily (JTN-606) because they add
 # ~8 MB of RSS at process startup.  The json_* helpers used by error
 # handlers do not need them, so deferring the import to the first
@@ -57,17 +59,6 @@ def _env_int(name: str, default: int) -> int:
     except (ValueError, TypeError):
         logger.warning(
             "Failed to parse env var %s as int, using default %s", name, default
-        )
-        return default
-
-
-def _env_bool(name: str, default: bool = False) -> bool:
-    try:
-        raw = os.getenv(name, "")
-        return raw.strip().lower() in ("1", "true", "yes", "on")
-    except Exception:
-        logger.warning(
-            "Failed to parse env var %s as bool, using default %s", name, default
         )
         return default
 
@@ -294,7 +285,7 @@ def http_get(
         timeout, CONNECT_TIMEOUT_SECONDS, READ_TIMEOUT_SECONDS
     )
 
-    log_latency = _env_bool("INKYPI_HTTP_LOG_LATENCY", False)
+    log_latency = env_bool("INKYPI_HTTP_LOG_LATENCY")
     t0 = perf_counter() if log_latency else 0.0
     try:
         resp = session.get(

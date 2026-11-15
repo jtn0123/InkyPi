@@ -17,6 +17,8 @@ from typing import Any
 
 import requests
 
+from utils.env_flags import env_bool
+
 logger = logging.getLogger(__name__)
 
 
@@ -393,11 +395,7 @@ def get_cache() -> HTTPCache:
             return cache
 
         # Read configuration from environment
-        enabled = os.getenv("INKYPI_HTTP_CACHE_ENABLED", "true").lower() in (
-            "true",
-            "1",
-            "yes",
-        )
+        enabled = env_bool("INKYPI_HTTP_CACHE_ENABLED", default=True)
         try:
             ttl = float(os.getenv("INKYPI_HTTP_CACHE_TTL_S", "300"))
         except ValueError:

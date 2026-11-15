@@ -15,10 +15,10 @@ from collections.abc import Callable
 from typing import IO, TYPE_CHECKING, Any, cast
 
 from utils.dns_pinning import pinned_dns
+from utils.env_flags import env_bool
 from utils.http_transport import (
     CONNECT_TIMEOUT_SECONDS,
     READ_TIMEOUT_SECONDS,
-    _env_bool,
     _resolve_timeout,
     http_get,
 )
@@ -348,7 +348,7 @@ def private_feeds_allowed() -> bool:
     """
     from utils.plugin_errors import ALLOW_PRIVATE_FEEDS_ENV
 
-    return _env_bool(ALLOW_PRIVATE_FEEDS_ENV, False)
+    return env_bool(ALLOW_PRIVATE_FEEDS_ENV)
 
 
 def fetch_feed_bytes(

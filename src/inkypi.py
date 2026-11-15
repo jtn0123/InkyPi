@@ -67,6 +67,7 @@ from utils.app_utils import generate_startup_image, get_ip_address
 from utils.asset_check import run_boot_check as run_asset_check
 from utils.backend_errors import RefreshTaskUnavailable
 from utils.config_schema import ConfigValidationError
+from utils.env_flags import env_bool
 from utils.i18n import init_i18n
 from utils.sri import init_sri
 from utils.sse import max_concurrent_streams, web_threads
@@ -103,7 +104,6 @@ logger = logging.getLogger(__name__)
 # Module-level runtime config (env-derived; main() may overwrite)
 # ---------------------------------------------------------------------------
 
-_TRUTHY = frozenset({"1", "true", "yes"})
 _DEFAULT_MAX_UPLOAD = 10 * 1024 * 1024
 
 
@@ -183,11 +183,6 @@ def _get_web_threads() -> int:
     return web_threads()
 
 
-def _env_bool(name: str, default: str = "") -> bool:
-    """Return True when the environment variable *name* holds a truthy value."""
-    return os.getenv(name, default).strip().lower() in _TRUTHY
-
-
 def _env_dev_mode() -> bool:
     env_mode = (
         os.getenv("INKYPI_ENV", "").strip() or os.getenv("FLASK_ENV", "").strip()
@@ -196,8 +191,8 @@ def _env_dev_mode() -> bool:
 
 
 DEV_MODE = _env_dev_mode()
-WEB_ONLY = _env_bool("INKYPI_NO_REFRESH")
-FAST_DEV = _env_bool("INKYPI_FAST_DEV")
+WEB_ONLY = env_bool("INKYPI_NO_REFRESH")
+FAST_DEV = env_bool("INKYPI_FAST_DEV")
 
 
 def _env_port() -> int:
@@ -319,7 +314,7 @@ def main(argv: list[str] | None = None) -> Flask:
     DEV_MODE = bool(args.dev or env_mode in ("dev", "development"))
 
     # Toggle for disabling background refresh thread
-    WEB_ONLY = bool(args.web_only or _env_bool("INKYPI_NO_REFRESH"))
+    WEB_ONLY = bool(args.web_only or env_bool("INKYPI_NO_REFRESH"))
 
     if args.dev:
         _apply_dev_env(args)
@@ -332,7 +327,7 @@ def main(argv: list[str] | None = None) -> Flask:
     mode_label = "DEVELOPMENT" if DEV_MODE else "PRODUCTION"
     logger.info(f"Starting InkyPi in {mode_label} mode on port {PORT}")
     logging.getLogger("waitress.queue").setLevel(logging.ERROR)
-    FAST_DEV = bool(args.fast_dev or _env_bool("INKYPI_FAST_DEV"))
+    FAST_DEV = bool(args.fast_dev or env_bool("INKYPI_FAST_DEV"))
 
     app = create_app()
 
