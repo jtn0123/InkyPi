@@ -638,6 +638,8 @@
       modal.hidden = false;
       modal.style.display = "block";
       modal.classList.add("is-open");
+      // Escape behaves like the close button: it keeps the pin's position.
+      globalThis.InkyPiModalFocus?.activate(modal, openButton, closeModal);
       setTimeout(initLeafletMap, 100);
     };
 
@@ -650,6 +652,7 @@
       modal.hidden = true;
       modal.style.display = "none";
       modal.classList.remove("is-open");
+      globalThis.InkyPiModalFocus?.deactivate(modal);
     };
 
     openButton.addEventListener("click", openModal);

@@ -212,7 +212,6 @@
             setTimeout(() => {
               refreshPreviewsAfterSuccess().catch(reportPreviewRefreshFailure);
             }, 250);
-            closeModal("scheduleModal");
           },
         });
         saveLastProgressSnapshot(config.progressContext);
@@ -261,23 +260,18 @@
       await refreshInstancePreview({ force: true });
     }
 
-    // Track the element that triggered the most-recently opened modal so focus
-    // can be restored when the modal closes (WAI-ARIA best practice).
-    let _lastModalTrigger = null;
-
+    // The shared InkyPiModalFocus helper moves focus into the dialog, keeps Tab
+    // inside it, closes it on Escape and returns focus to the opener on close.
     function openModal(modalId, triggerEl) {
       const modal = document.getElementById(modalId);
       if (!modal) return;
-      if (triggerEl) _lastModalTrigger = triggerEl;
       modal.hidden = false;
       modal.style.display = "flex";
       modal.classList.add("is-open");
       syncModalOpenState(ui);
-      // JTN-463: move focus into the modal on open
-      const focusable = modal.querySelector(
-        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+      globalThis.InkyPiModalFocus?.activate(modal, triggerEl, () =>
+        closeModal(modalId)
       );
-      if (focusable) setTimeout(() => focusable.focus(), 0);
     }
 
     function closeModal(modalId) {
@@ -287,11 +281,7 @@
       modal.style.display = "none";
       modal.classList.remove("is-open");
       syncModalOpenState(ui);
-      // Restore focus to the trigger element (WAI-ARIA best practice)
-      if (_lastModalTrigger) {
-        _lastModalTrigger.focus();
-        _lastModalTrigger = null;
-      }
+      globalThis.InkyPiModalFocus?.deactivate(modal);
     }
 
     function selectedFrame(element) {
@@ -598,32 +588,8 @@
         _settingsFormSnapshot = getSettingsFormSnapshot();
       }, 0);
       links.forEach((link) => link.addEventListener("click", handleApiKeysLinkClick));
-      document.addEventListener("keydown", (event) => {
-        if (event.key !== "Escape") return;
-        if (modal.hidden) return;
-        event.preventDefault();
-        closeModal("apiKeysLeaveConfirmModal");
-      });
       globalThis.addEventListener("click", (event) => {
         if (event.target === modal) closeModal("apiKeysLeaveConfirmModal");
-      });
-    }
-
-    function bindModalClose() {
-      globalThis.addEventListener("click", (event) => {
-        if (actionInFlight) return;
-        const modal = document.getElementById("scheduleModal");
-        if (event.target === modal) {
-          closeModal("scheduleModal");
-        }
-      });
-      // JTN-461: close #scheduleModal when Escape is pressed
-      document.addEventListener("keydown", (event) => {
-        if (event.key !== "Escape") return;
-        const modal = document.getElementById("scheduleModal");
-        if (!modal || modal.hidden) return;
-        event.preventDefault();
-        closeModal("scheduleModal");
       });
     }
 
@@ -848,7 +814,6 @@
       initApiIndicator();
       initApiKeysLeaveGuard();
       initColorPreviews();
-      bindModalClose();
       if (mobileQuery && typeof mobileQuery.addEventListener === "function") {
         mobileQuery.addEventListener("change", () => setWorkflowMode(workflowMode));
       }

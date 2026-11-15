@@ -4,6 +4,9 @@
   const inertBefore = new Map();
   const selector = 'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
   const top = () => stack.at(-1);
+  // Toasts report the outcome of actions taken inside a dialog, so they stay
+  // live (announced and dismissable) while the rest of the page is inert.
+  const staysLive = node => node.classList.contains('toast-container');
   function focusables(modal) {
     return Array.from(modal.querySelectorAll(selector)).filter(node =>
       node.getClientRects().length && !node.closest('[hidden], [inert]'));
@@ -19,7 +22,7 @@
     let branch = entry.modal;
     while (branch.parentElement) {
       for (const sibling of branch.parentElement.children) {
-        if (sibling !== branch && sibling instanceof HTMLElement) {
+        if (sibling !== branch && sibling instanceof HTMLElement && !staysLive(sibling)) {
           inertBefore.set(sibling, sibling.inert);
           sibling.inert = true;
         }
