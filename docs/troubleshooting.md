@@ -130,6 +130,109 @@ sudo systemctl restart inkypi.service
 ```
 
 
+## When an update fails
+
+Updates run from **Settings → Updates → Software update**. When one fails,
+that card shows a red banner the next time you open it. If an earlier version
+is on record, it also shows a **Roll back to vX.Y.Z** button. Try that button
+first. The rest of this section is for when the web UI is down or the button
+doesn't help. Every command runs over SSH on the Pi.
+
+### 1. Read the verdict
+
+```bash
+cat /var/lib/inkypi/.last-update-outcome
+sudo cat /var/lib/inkypi/.last-update-failure 2>/dev/null
+```
+
+After the service restarts, the update checks that the app answers and
+reports the version it just installed. `.last-update-outcome` holds the
+result as `verdict`, plus `expected_version` and `observed_version`:
+
+| Verdict | Meaning | What to do |
+|---|---|---|
+| `confirmed` | The new version is up and serving. | Nothing. |
+| `unconfirmed` | The app answers, but reports a different version. An old process may still be running, or the checkout didn't take. | Restart the service (`sudo systemctl restart inkypi.service`), then check `curl -s http://127.0.0.1/api/version/info`. If it is still wrong, re-run the update (step 3). |
+| `dark` | The app never answered within 45 seconds. | Read the logs (step 2), then roll back (step 4). |
+| `skipped` | `curl` is missing, so nothing was checked. | Check the version in the web UI. |
+
+`.last-update-failure` exists only when the update script itself failed. It
+records the `exit_code`, the `last_command` that failed, and the last journal
+lines. A successful update removes it.
+
+### 2. Read the logs
+
+```bash
+# The update or rollback run itself (each runs in its own systemd unit)
+journalctl -u 'inkypi-update-*' -u 'inkypi-rollback-*' -n 200 --no-pager
+# The app since it last started
+journalctl -u inkypi.service -b -n 200 --no-pager
+# The automatic rollback check (see below)
+journalctl -u inkypi-failure.service -n 50 --no-pager
+```
+
+### 3. Re-run the update, or install a specific version
+
+```bash
+REPO=$(dirname "$(readlink -f /usr/local/inkypi/src)")
+sudo systemd-run --collect --unit=inkypi-update-$(date +%s) \
+  --property=StandardOutput=journal --property=StandardError=journal \
+  --setenv=PROJECT_DIR=/usr/local/inkypi \
+  /bin/bash "$REPO/install/do_update.sh" v1.2.3
+```
+
+Replace `v1.2.3` with the release tag you want, or leave it off to get the
+latest release. Run it through `systemd-run` as shown, not as a plain
+`sudo bash`. That way the update keeps going if your SSH session drops
+partway through, and its output goes to the journal (step 2). The new
+verdict appears in `.last-update-outcome` when it finishes.
+
+### 4. Roll back to the previous version
+
+Before checking out a new version, each update saves the version it replaces
+in `/var/lib/inkypi/prev_version`. To go back to that version:
+
+```bash
+cat /var/lib/inkypi/prev_version
+REPO=$(dirname "$(readlink -f /usr/local/inkypi/src)")
+sudo systemd-run --collect --unit=inkypi-rollback-$(date +%s) \
+  --property=StandardOutput=journal --property=StandardError=journal \
+  --setenv=PROJECT_DIR=/usr/local/inkypi \
+  /bin/bash "$REPO/install/rollback.sh"
+```
+
+This is what the **Roll back** button runs. If it stops early, the exit code
+in the journal (step 2) tells you why:
+
+| Exit code | Meaning |
+|---|---|
+| `10` | No previous version is recorded, so there is nothing to roll back to. Install a specific version instead (step 3). |
+| `11` | `prev_version` doesn't hold a valid version tag. Install a specific version instead (step 3). |
+| `12` | That version's tag isn't in the local checkout and couldn't be fetched. Check the network and try again. |
+| `1` | Anything else, such as a git or installer error. The journal shows the failing command. |
+
+### Automatic rollback
+
+You often won't need step 4. Suppose the service fails to start, systemd
+gives up retrying twice, and the running version has never been
+`confirmed`. In that case `inkypi-failure.service` rolls back to
+`prev_version` by itself. It only tries this once; a second attempt is
+blocked by `/var/lib/inkypi/.auto-rollback-attempted`. If a version that
+was confirmed before starts failing later, it isn't rolled back either,
+because the cause is probably the device (a full disk, a failing SD card)
+rather than the update. `journalctl -u inkypi-failure.service` shows each
+decision.
+
+### Last resort: reflash
+
+If none of the above brings the frame back, reflash the SD card with the
+pre-built image. See [Option 1 in the installation guide](installation.md#option-1--pre-built-image-easiest-pi-zero-2-w-only).
+If the web UI still works, first use **Settings → Download backup**. If it
+doesn't, copy these two files off the Pi. Both need `sudo` to read.
+
+- `/usr/local/inkypi/src/config/device.json` (settings and playlists)
+- `/usr/local/inkypi/.env` (API keys)
+
 ## Run InkyPi Manually
 
 If the InkyPi service is not running, try manually running the startup script to diagnose. This should output the logs to the terminal and make it easier to troubleshoot any errors:
