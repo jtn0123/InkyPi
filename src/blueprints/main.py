@@ -19,13 +19,13 @@ from flask import (
 from benchmarks.benchmark_storage import save_refresh_event, save_stage_event
 from refresh_task.health import PluginHealthTracker
 from utils import blackout
-from utils.backend_errors import RefreshTaskUnavailable
+from utils.backend_errors import mapped_render_errors
 from utils.display_names import (
     friendly_instance_label,
     instance_suffix_label,
     is_auto_instance_name,
 )
-from utils.http_utils import JsonResponse, json_error, json_success
+from utils.http_utils import APIError, JsonResponse, json_error, json_success
 from utils.image_serving import maybe_serve_webp
 from utils.output_validator import fit_image_to_device
 from utils.rate_limit import CooldownLimiter
@@ -688,9 +688,10 @@ def _show_next_plugin() -> JsonResponse:
             from refresh_task import PlaylistRefresh
 
             try:
-                update_metrics = refresh_task.manual_update(
-                    PlaylistRefresh(playlist, plugin_instance, force=True)
-                )
+                with mapped_render_errors("display_next", logger=logger):
+                    update_metrics = refresh_task.manual_update(
+                        PlaylistRefresh(playlist, plugin_instance, force=True)
+                    )
             except RuntimeError:
                 logger.exception("manual_update failed")
                 return json_error("Plugin update failed", status=400)
@@ -705,9 +706,12 @@ def _show_next_plugin() -> JsonResponse:
             )
             if err:
                 return err
-    except RefreshTaskUnavailable as exc:
-        # The loop stopped between the ``running`` check and the enqueue.
-        return json_error(exc.message, status=exc.status, code=exc.code)
+    except APIError as exc:
+        # A known failure (blackout, the loop stopping between the
+        # ``running`` check and the enqueue, a timeout ...), mapped above.
+        return json_error(
+            exc.message, status=exc.status, code=exc.code, details=exc.details
+        )
     except Exception:
         logger.exception("display_next failed")
         return json_error("An internal error occurred", status=500)

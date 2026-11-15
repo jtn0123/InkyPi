@@ -10,6 +10,7 @@ from refresh_task import PlaylistRefresh, manual_update_timings
 from utils.backend_errors import (
     ClientInputError,
     ResourceLookupError,
+    mapped_render_errors,
     route_error_boundary,
 )
 from utils.http_utils import json_success
@@ -81,9 +82,10 @@ def display_next_in_playlist() -> Any:
                 field="playlist_name",
             )
 
-        update_metrics = refresh_task.manual_update(
-            PlaylistRefresh(playlist, plugin_instance, force=True)
-        )
+        with mapped_render_errors("display_next_in_playlist", logger=logger):
+            update_metrics = refresh_task.manual_update(
+                PlaylistRefresh(playlist, plugin_instance, force=True)
+            )
 
         def _persist_active_playlist(_cfg: Any) -> None:
             playlist_manager.active_playlist = playlist.name

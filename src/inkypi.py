@@ -66,8 +66,8 @@ from utils import blackout, boot_self_test
 from utils.app_utils import generate_startup_image, get_ip_address
 from utils.app_version import read_app_version
 from utils.asset_check import run_boot_check as run_asset_check
-from utils.backend_errors import RefreshTaskUnavailable
 from utils.config_schema import ConfigValidationError
+from utils.domain_errors import RefreshTaskUnavailable
 from utils.env_flags import env_bool
 from utils.i18n import init_i18n
 from utils.sri import init_sri

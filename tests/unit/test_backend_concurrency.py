@@ -20,7 +20,8 @@ from flask import Flask
 from flask.testing import FlaskClient
 from PIL import Image
 
-from utils.backend_errors import RefreshTaskUnavailable
+from utils.backend_errors import route_error_for
+from utils.domain_errors import RefreshTaskUnavailable
 
 _SECRET = "/var/lib/inkypi/secret-path.db: no such table refresh_events"
 
@@ -154,7 +155,8 @@ def test_manual_update_raises_when_task_not_running(device_config_dev: Any) -> N
 
     with pytest.raises(RefreshTaskUnavailable) as excinfo:
         task.manual_update(ManualRefresh("clock", {}))
-    assert excinfo.value.status == 503
+    mapped = route_error_for(excinfo.value)
+    assert mapped is not None and mapped.status == 503
 
 
 def test_update_now_returns_503_if_task_stops_before_enqueue(

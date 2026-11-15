@@ -17,6 +17,7 @@ from utils.backend_errors import (
     ClientInputError,
     ResourceLookupError,
     UnsupportedMediaTypeRouteError,
+    mapped_render_errors,
     route_error_boundary,
 )
 from utils.form_utils import sanitize_log_field, validate_plugin_required_fields
@@ -289,9 +290,10 @@ def display_plugin_instance() -> Any:
                 status=400,
             )
 
-        refresh_task.manual_update(
-            PlaylistRefresh(playlist, plugin_instance, force=True)
-        )
+        with mapped_render_errors("display_plugin_instance", logger=logger):
+            refresh_task.manual_update(
+                PlaylistRefresh(playlist, plugin_instance, force=True)
+            )
 
     return json_success(message=_MSG_DISPLAY_UPDATED)
 

@@ -7,7 +7,16 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from typing import Any
 
+from utils.blackout import BLOCKED_MESSAGE, BlackoutActiveError
+from utils.domain_errors import DomainError, RefreshTaskUnavailable
 from utils.http_utils import APIError
+from utils.plugin_errors import (
+    MANUAL_UPDATE_TIMEOUT_MSG,
+    SCREENSHOT_BACKEND_UNAVAILABLE_MSG,
+    ProviderReportedPluginError,
+    ScreenshotBackendError,
+    URLValidationError,
+)
 
 
 class BackendRouteError(APIError):
@@ -99,19 +108,20 @@ class UnsupportedMediaTypeRouteError(BackendRouteError):
         super().__init__(message, status=415, code=code, details=details)
 
 
-class RefreshTaskUnavailable(BackendRouteError):
-    """The background refresh task is not running, so nothing can be displayed."""
+class ServiceUnavailableRouteError(BackendRouteError):
+    """Something the request needs is not running or not responding."""
 
     category = "unavailable"
 
     def __init__(
         self,
-        message: str = "Display refresh service is not running",
+        message: str,
         *,
-        code: int | str | None = "refresh_task_unavailable",
+        status: int = 503,
+        code: int | str | None = "backend_unavailable",
         details: dict[str, Any] | None = None,
     ) -> None:
-        super().__init__(message, status=503, code=code, details=details)
+        super().__init__(message, status=status, code=code, details=details)
 
 
 class OperationFailedError(BackendRouteError):
@@ -153,6 +163,62 @@ class InternalOperationError(BackendRouteError):
         super().__init__(message, status=status, code=code, details=merged_details)
 
 
+#: Response text for RefreshTaskUnavailable. A module constant, like the other
+#: messages below, so no exception text reaches a response body (CodeQL
+#: ``py/stack-trace-exposure``).
+REFRESH_TASK_UNAVAILABLE_MSG = RefreshTaskUnavailable.default_message
+
+
+def route_error_for(err: BaseException) -> BackendRouteError | None:
+    """Return the route error for an expected failure, or None for a crash.
+
+    This is the one place that decides what each known failure from the
+    refresh loop or a plugin render means over HTTP, so a failure gets the
+    same status and code on every route that can hit it.
+    """
+    if isinstance(err, BlackoutActiveError):
+        return ConflictRouteError(BLOCKED_MESSAGE, code="blackout_active")
+    if isinstance(err, RefreshTaskUnavailable):
+        return ServiceUnavailableRouteError(
+            REFRESH_TASK_UNAVAILABLE_MSG, code="refresh_task_unavailable"
+        )
+    if isinstance(err, URLValidationError):
+        return ClientInputError(
+            err.safe_message(), status=422, code="validation_error", field="url"
+        )
+    if isinstance(err, ProviderReportedPluginError):
+        return ClientInputError(err.safe_message(), code="provider_rejected")
+    if isinstance(err, ScreenshotBackendError):
+        return ServiceUnavailableRouteError(SCREENSHOT_BACKEND_UNAVAILABLE_MSG)
+    if isinstance(err, TimeoutError):
+        return ServiceUnavailableRouteError(
+            MANUAL_UPDATE_TIMEOUT_MSG, status=504, code="manual_update_timeout"
+        )
+    return None
+
+
+@contextmanager
+def mapped_render_errors(
+    context: str, *, logger: logging.Logger | None = None
+) -> Iterator[None]:
+    """Re-raise known failures from a render or refresh as their route error.
+
+    Wrap the call that renders or asks the refresh loop to render. Anything
+    :func:`route_error_for` does not recognise propagates unchanged.
+    """
+    try:
+        yield
+    except APIError:
+        raise
+    except Exception as err:
+        mapped = route_error_for(err)
+        if mapped is None:
+            raise
+        if logger is not None:
+            logger.warning("%s: %s", context, mapped.code)
+        raise mapped from err
+
+
 @contextmanager
 def route_error_boundary(
     context: str,
@@ -168,6 +234,11 @@ def route_error_boundary(
     except APIError:
         raise
     except Exception as err:
+        # Blackout and a stopped refresh loop are expected states, not
+        # crashes, so every route reports them with their own status.
+        mapped = route_error_for(err) if isinstance(err, DomainError) else None
+        if mapped is not None:
+            raise mapped from err
         if logger is not None:
             logger.exception("%s", context)
         raise InternalOperationError(

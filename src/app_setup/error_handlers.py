@@ -8,6 +8,8 @@ from flask import Flask, Response, make_response, render_template
 from werkzeug.exceptions import HTTPException
 from werkzeug.wrappers import Response as WerkzeugResponse
 
+from utils.backend_errors import route_error_for
+from utils.domain_errors import DomainError
 from utils.http_utils import (
     APIError,
     JsonResponse,
@@ -27,6 +29,15 @@ def register_error_handlers(app: Flask) -> None:
         return json_error(
             err.message, status=err.status, code=err.code, details=err.details
         )
+
+    @app.errorhandler(DomainError)
+    def _handle_domain_error(
+        err: DomainError,
+    ) -> Response | WerkzeugResponse | JsonResponse:
+        mapped = route_error_for(err)
+        if mapped is None:
+            return _handle_unexpected_error(err)
+        return _handle_api_error(mapped)
 
     @app.errorhandler(400)
     def _handle_bad_request(err: object) -> JsonResponse | Response:

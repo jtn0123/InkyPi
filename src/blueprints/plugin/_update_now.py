@@ -13,19 +13,12 @@ from services.direct_render import (
     DirectRenderOutcome,
     execute_direct_render,
 )
-from utils.backend_errors import ClientInputError, RefreshTaskUnavailable
+from utils.backend_errors import ClientInputError, route_error_for
 from utils.fallback_image import render_error_image
 from utils.form_utils import sanitize_log_field
 from utils.http_utils import json_error, json_success
 from utils.output_validator import fit_image_to_device
-from utils.plugin_errors import (
-    MANUAL_UPDATE_TIMEOUT_MSG,
-    SCREENSHOT_BACKEND_UNAVAILABLE_MSG,
-    ProviderReportedPluginError,
-    ScreenshotBackendError,
-)
 from utils.request_models import RequestModelError, parse_plugin_update_now_request
-from utils.security_utils import URLValidationError
 
 from ._common import (
     _CONFIG_KEY,
@@ -257,79 +250,26 @@ def update_now() -> Any:
         return _update_now_direct(
             plugin_id, plugin_settings, device_config, display_manager
         )
-    except URLValidationError as e:
-        # JTN-776: URL validation failures surfaced through the refresh-task
-        # path (manual_update re-raises the plugin's exception) must become
-        # HTTP 4xx, not 500, so the user sees the real reason. ``safe_message``
-        # returns a whitelisted string from :mod:`utils.security_utils`, so no
-        # exception-derived text reaches the response body (CodeQL
-        # ``py/stack-trace-exposure``).
-        safe_msg = e.safe_message()
-        logger.info(
-            "update_now: URL validation rejected plugin %s: %s",
-            sanitize_log_field(plugin_id or "?"),
-            sanitize_log_field(safe_msg),
-        )
-        return json_error(
-            safe_msg,
-            status=422,
-            code="validation_error",
-            details={"field": "url"},
-        )
-    except ScreenshotBackendError:
-        # JTN-789: chromium subprocess failed twice in a row (initial + one
-        # retry). Surface a specific 503 ``backend_unavailable`` with a
-        # whitelisted constant message so CodeQL ``py/stack-trace-exposure``
-        # cannot taint-track exception text into the HTTP body (mirrors the
-        # JTN-776 URLValidationError pattern). exc_info is intentionally
-        # NOT captured — plugin_id is enough for operators to correlate
-        # with the upstream chromium error ``take_screenshot`` already logged.
-        logger.warning(
-            "update_now: screenshot backend unavailable for plugin %s",
-            sanitize_log_field(plugin_id or "?"),
-        )
-        return json_error(
-            SCREENSHOT_BACKEND_UNAVAILABLE_MSG,
-            status=503,
-            code="backend_unavailable",
-        )
-    except TimeoutError:
-        # JTN-K4: covers the alternate path where ``refresh_task.running``
-        # is True and ``manual_update`` re-raises TimeoutError from the
-        # subprocess worker (preserved via ``_remote_exception`` since the
-        # exception was added to the allow-list alongside JTN-789).
-        # Without this handler the exception falls through to the generic
-        # 500 ``internal_error`` below.  Message comes from a module
-        # constant so CodeQL ``py/stack-trace-exposure`` cannot taint
-        # exception text into the body.
-        logger.warning(
-            "update_now: manual update timed out for plugin %s",
-            sanitize_log_field(plugin_id or "?"),
-        )
-        return json_error(
-            MANUAL_UPDATE_TIMEOUT_MSG,
-            status=504,
-            code="manual_update_timeout",
-        )
-    except ProviderReportedPluginError as e:
-        safe_msg = e.safe_message()
-        logger.info(
-            "update_now: provider rejected plugin %s: %s",
-            sanitize_log_field(plugin_id or "?"),
-            sanitize_log_field(str(e)),
-        )
-        return json_error(
-            safe_msg,
-            status=400,
-            code="provider_rejected",
-        )
-    except (ClientInputError, RefreshTaskUnavailable) as e:
-        return json_error(
-            e.message,
-            status=e.status,
-            code=e.code,
-            details=e.details,
-        )
+    except ClientInputError as e:
+        return json_error(e.message, status=e.status, code=e.code, details=e.details)
     except Exception as e:
-        logger.exception("Error in update_now: %s", e)
-        return json_error(_ERR_INTERNAL, status=500, code="internal_error")
+        mapped = route_error_for(e)
+        if mapped is None:
+            logger.exception("Error in update_now: %s", e)
+            return json_error(_ERR_INTERNAL, status=500, code="internal_error")
+        # Expected failures (blackout, a stopped loop, a timeout, a rejected
+        # URL, a provider refusal, chromium down) get the same status and code
+        # here as on every other display route. ``route_error_for`` builds the
+        # message from module constants and ``safe_message()`` only, so no
+        # exception text reaches the body (CodeQL ``py/stack-trace-exposure``).
+        logger.warning(
+            "update_now: %s for plugin %s",
+            mapped.code,
+            sanitize_log_field(plugin_id or "?"),
+        )
+        return json_error(
+            mapped.message,
+            status=mapped.status,
+            code=mapped.code,
+            details=mapped.details,
+        )
