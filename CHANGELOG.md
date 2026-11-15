@@ -2,6 +2,15 @@
 
 <!-- version list -->
 
+## v1.8.25 (2026-11-15)
+
+### Performance Improvements
+
+- **refresh**: Hand the app the plugin's cache file instead of re-encoding
+  ([#754](https://github.com/jtn0123/InkyPi/pull/754),
+  [`864f502`](https://github.com/jtn0123/InkyPi/commit/864f502ac979f62ceefaf2b879a836ddc36e46e0))
+
+
 ## v1.8.24 (2026-11-15)
 
 ### Performance Improvements
