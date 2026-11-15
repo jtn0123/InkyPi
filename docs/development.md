@@ -102,7 +102,7 @@ validation. See [`.pre-commit-config.yaml`](../.pre-commit-config.yaml) for the 
 Traditional activation method
 
 ```bash
-source venv/bin/activate             # Activate virtual environment
+source .venv/bin/activate            # Activate virtual environment
 python src/inkypi.py --dev           # Start development server (full program)
 python src/inkypi.py --dev --web-only# Start web UI only (no background thread)
 python src/inkypi.py --dev --fast-dev# Fast cycle, skip startup image

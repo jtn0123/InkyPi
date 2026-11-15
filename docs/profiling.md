@@ -93,7 +93,7 @@ Saved runs land in `.benchmarks/` (gitignored). Use descriptive names so you can
 scripts/test_profile.sh
 
 # Profile a single plugin directory
-scripts/test_profile.sh tests/plugins/test_clock_plugin.py
+scripts/test_profile.sh tests/plugins/test_clock.py
 
 # Override the number of slowest tests shown
 PYTEST_DURATIONS=50 scripts/test_profile.sh
@@ -108,7 +108,7 @@ When `--durations` points to a hot function, use `cProfile` for a call-graph bre
 ```bash
 # Profile a specific test (writes profile data to /tmp/out.prof)
 .venv/bin/python -m cProfile -o /tmp/out.prof \
-    -m pytest tests/plugins/test_clock_plugin.py -x -q
+    -m pytest tests/plugins/test_clock.py -x -q
 
 # View the profile interactively with snakeviz
 .venv/bin/pip install snakeviz
