@@ -49,4 +49,8 @@
 # 132775578091 (main at 6d4d9586). #717's test fixes and #749's annotations.
 # Until now this file held two values and lint.sh read the first, so lowering
 # the later one had no effect.
-496
+# 496 -> 488 (2026-11-15): Linux Python 3.13 CI run 43748942488, lint job
+# 132918853084 (#825 on main at b221fa99). #821 turned on redundant-expr,
+# truthy-bool, possibly-undefined, deprecated and ignore-without-code, and
+# fixed what they found in tests too.
+488
