@@ -156,6 +156,8 @@ def safe_reset() -> ResponseReturnValue:
                 "isolated_plugins": [],
             }
         )
+        # The loop may be sleeping on the old interval.
+        wake_refresh_loop("a safe reset")
         return json_success(message="Safe reset applied.")
 
 

@@ -40,7 +40,7 @@
     const diagnosticsModule = requireSettingsFactory(
       settingsModules,
       "createDiagnosticsModule"
-    )({ ui });
+    )({ ui, modals: modalModule });
     const navigationModule = requireSettingsFactory(
       settingsModules,
       "createNavigationModule"
@@ -58,7 +58,27 @@
       }
     }
 
+    // Show a message an action stored before reloading the page (Safe reset).
+    function restoreStoredMessage() {
+      let stored = null;
+      try {
+        stored = sessionStorage.getItem("storedMessage");
+        sessionStorage.removeItem("storedMessage");
+      } catch (e) {
+        console.debug("Stored message unavailable:", e);
+        return;
+      }
+      if (!stored) return;
+      try {
+        const { type, text } = JSON.parse(stored);
+        if (text) showResponseModal(type, text);
+      } catch (e) {
+        console.debug("Invalid stored message:", e);
+      }
+    }
+
     function init() {
+      restoreStoredMessage();
       formModule.populateIntervalFields();
       formModule.bind();
       actionsModule.bind();
