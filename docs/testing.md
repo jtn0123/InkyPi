@@ -80,6 +80,21 @@ Notes:
   - Builds a minimal Flask app mirroring production blueprints and config.
   - Exposes a `test_client` for endpoint tests.
 
+- no_outside_network (autouse):
+  - A test may only connect to this machine (loopback and Unix sockets). Any
+    other connect or DNS lookup raises `NetworkBlocked`, an `OSError`, so the
+    code under test behaves as if it were offline. The test then fails even if
+    that code swallowed the error. Chromium runs in its own process and isn't
+    covered.
+  - Code that checks a URL resolves to a public address (image downloads, RSS,
+    Calendar, Screenshot) needs `@pytest.mark.usefixtures("public_dns")`. That
+    fixture answers every lookup with a public address without asking DNS.
+    Stub the HTTP call as well.
+  - Anything that builds the startup screen needs `lan_address`, which fixes
+    the IP shown on it.
+  - `@pytest.mark.allow_network` turns the guard off for one test. Nothing in
+    the suite uses it.
+
 ---
 
 ### Test Coverage Focus

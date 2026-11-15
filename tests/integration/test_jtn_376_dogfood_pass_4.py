@@ -172,6 +172,7 @@ _ACCEPT_CASES = [
     [d for _, d in _ACCEPT_CASES],
     ids=[tid for tid, _ in _ACCEPT_CASES],
 )
+@pytest.mark.usefixtures("public_dns")
 def test_save_plugin_accepts_valid(client: FlaskClient, form_data: Any) -> None:
     """Valid plugin settings are accepted with a 200."""
     _save_plugin(client, form_data, expect_status=200)

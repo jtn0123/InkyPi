@@ -875,6 +875,11 @@ dev = [
     { name = "uv" },
     { name = "watchdog" },
 ]
+release = [
+    { name = "cyclonedx-bom" },
+    { name = "gitpython" },
+    { name = "python-semantic-release" },
+]
 
 [package.metadata]
 requires-dist = [
@@ -932,6 +937,11 @@ dev = [
     { name = "types-waitress", specifier = "==3.0.1.20260724" },
     { name = "uv", specifier = "==0.13.4" },
     { name = "watchdog", specifier = ">=7.1,<8" },
+]
+release = [
+    { name = "cyclonedx-bom", specifier = ">=8.0,<9" },
+    { name = "gitpython", specifier = ">=3.1.59,<4" },
+    { name = "python-semantic-release", specifier = "==10.7.0" },
 ]
 
 [[package]]

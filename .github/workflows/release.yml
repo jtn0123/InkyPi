@@ -91,8 +91,14 @@ jobs:
           version: "0.13.4"
           enable-cache: true
 
+      # This job can push tags and publish releases, so the tools and every
+      # dependency are installed from the locked `release` group, hash-checked.
       - name: Install semantic-release and SBOM tools
-        run: pip install python-semantic-release==10.7.0 cyclonedx-bom==8.0.1
+        run: |
+          uv export --frozen --only-group release --no-emit-project \
+            --format requirements.txt --output-file "$RUNNER_TEMP/release-tools.txt"
+          python -m pip install --require-hashes --no-deps \
+            -r "$RUNNER_TEMP/release-tools.txt"
 
       - name: Semantic Release — version & publish
         env:

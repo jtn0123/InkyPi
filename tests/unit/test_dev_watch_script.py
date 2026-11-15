@@ -243,7 +243,9 @@ class TestWatchdogDependencyDeclared:
         pyproject = tomllib.loads((REPO_ROOT / "pyproject.toml").read_text())
         dev = pyproject["dependency-groups"]["dev"]
         # Tolerate any version constraint — we just want it present.
-        assert any(re.match(r"watchdog[>=<~!\s]", req) for req in dev), (
+        assert any(
+            isinstance(req, str) and re.match(r"watchdog[>=<~!\s]", req) for req in dev
+        ), (
             "watchdog should be in pyproject.toml's dev dependency group "
             "so contributors know it's an expected dev dependency"
         )

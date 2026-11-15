@@ -36,6 +36,11 @@ uv export --format requirements.txt --group dev --no-emit-project \
     --output-file install/requirements-dev.txt
 ```
 
+The release tools (Python Semantic Release, GitPython's patched floor and
+cyclonedx-bom) are a separate `release` group, which `dev` includes. The
+release workflow installs only that group, exported from `uv.lock` with hashes,
+because that job can push tags and publish releases.
+
 The lock must satisfy `required-environments`, which includes the 32-bit ARM
 Pis. A dev tool with no build for them (Playwright) carries a
 `platform_machine` marker so those environments skip it. uv 0.13.4 is pinned in
@@ -50,7 +55,8 @@ then run `pip check` and the test and strict mypy gates.
 - `pydantic-core` follows Pydantic's exact pin. Google GenAI currently caps
   `websockets` below 17. Upgrade through their parent libraries.
 - Requests type stubs are explicitly pinned to a version validated by mypy.
-- Python Semantic Release is pinned in both the dev group and release workflow.
+- Python Semantic Release is pinned in the `release` group; the release
+  workflow installs it from the lock.
   Its v10 changelog uses update mode and the `<!-- version list -->` marker;
   keep that marker above the existing releases. The parser options preserve
   the previous squash-commit behavior.

@@ -94,11 +94,15 @@ jobs:
           # default interpreter. Mirrors the runtime the wheels will be
           # installed onto so wheel tags line up exactly with what pip sees
           # during install on-device.
+          # Pinned by the multi-arch index digest, so a re-tagged image can't
+          # change what builds the release wheels. Dependabot doesn't see
+          # `docker run`; refresh with
+          #   docker buildx imagetools inspect debian:trixie-slim
           docker run --rm \
             --platform "$PLATFORM" \
             -v "$PWD:/src" \
             -w /src \
-            debian:trixie-slim \
+            debian:trixie-slim@sha256:a72b4433de1cf7d6bae0c4cee74d0547f58601a643b3375f070c51600d63b6b2 \
             bash -c '
               set -euo pipefail
               export DEBIAN_FRONTEND=noninteractive
@@ -114,7 +118,9 @@ jobs:
                 swig ca-certificates
               python3 -m venv /tmp/buildvenv
               . /tmp/buildvenv/bin/activate
-              python3 -m pip install --upgrade pip wheel build
+              # pip, setuptools and wheel at the hashed installer pins.
+              python3 -m pip install --require-hashes \
+                -r /src/install/bootstrap-requirements.txt
               # Build wheels for every dep in the locked requirements file.
               # --no-deps is intentional: pip wheel already walks the
               # dependency graph from the requirements file, and we do not
