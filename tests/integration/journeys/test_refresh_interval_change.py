@@ -8,7 +8,7 @@ poll reports the new cadence -> ``last_run_ts`` advances by roughly one
 interval after a simulated refresh tick.
 
 The refresh task is not running in the test fixture, so we simulate its
-effect on ``device_config.refresh_info.latest_refresh_time`` — which is the
+effect on ``device_config.refresh_info.refresh_time`` — which is the
 field ``/api/diagnostics`` exposes as ``refresh_task.last_run_ts``.
 """
 
@@ -124,7 +124,7 @@ def test_refresh_interval_change_save_persist_cadence_respected(
     # simulate the next refresh. last_run_ts from /api/diagnostics should
     # advance by approximately the new cadence.
     t0 = datetime.now(UTC)
-    device_config_dev.refresh_info.latest_refresh_time = t0.isoformat()
+    device_config_dev.refresh_info.refresh_time = t0.isoformat()
     before = client.get("/api/diagnostics").get_json() or {}
     assert before["refresh_task"]["last_run_ts"] == t0.isoformat()
 
@@ -132,7 +132,7 @@ def test_refresh_interval_change_save_persist_cadence_respected(
     # feasible in tests; we verify monotonic advance by ~interval instead).
     time.sleep(1.0)
     t1 = t0 + timedelta(seconds=expected_seconds)
-    device_config_dev.refresh_info.latest_refresh_time = t1.isoformat()
+    device_config_dev.refresh_info.refresh_time = t1.isoformat()
     after = client.get("/api/diagnostics").get_json() or {}
     last_run = after["refresh_task"]["last_run_ts"]
     assert isinstance(last_run, str) and last_run == t1.isoformat()
