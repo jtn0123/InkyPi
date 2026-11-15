@@ -2,6 +2,15 @@
 
 <!-- version list -->
 
+## v1.8.6 (2026-11-15)
+
+### Bug Fixes
+
+- **refresh**: Sleep until the next refresh is due, not a fixed interval
+  ([#721](https://github.com/jtn0123/InkyPi/pull/721),
+  [`892a623`](https://github.com/jtn0123/InkyPi/commit/892a623f346eeb3a52bcc3eab7eed159105fe12e))
+
+
 ## v1.8.5 (2026-11-15)
 
 ### Bug Fixes
