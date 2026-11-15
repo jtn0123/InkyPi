@@ -6,18 +6,7 @@
   function $(id){ return document.getElementById(id); }
 
   function initProgress(){
-    // Use InkyPiStore for progress state when available (JTN-502)
-    const store = globalThis.InkyPiStore
-      ? globalThis.InkyPiStore.createStore({ t0: 0, clockTimer: null, lastStepBase: '' })
-      : null;
-
-    let _t0 = 0, _clockTimer = null, _lastStepBase = '';
-    function getT0(){ return store ? store.get('t0') : _t0; }
-    function setT0(v){ if (store) { store.set({ t0: v }); } else { _t0 = v; } }
-    function getClockTimer(){ return store ? store.get('clockTimer') : _clockTimer; }
-    function setClockTimer(v){ if (store) { store.set({ clockTimer: v }); } else { _clockTimer = v; } }
-    function getLastStepBase(){ return store ? store.get('lastStepBase') : _lastStepBase; }
-    function setLastStepBase(v){ if (store) { store.set({ lastStepBase: v }); } else { _lastStepBase = v; } }
+    let t0 = 0, clockTimer = null, lastStepBase = '';
 
     const els = {
       block: $('requestProgress'),
@@ -33,12 +22,12 @@
     };
     function fmtElapsed(ms){
       const s = Math.floor(ms / 1000); const m = Math.floor(s / 60); const rem = s % 60; return m > 0 ? `${m}m ${rem}s` : `${s}s`; }
-    function tickClock(){ try { if (els.clock) els.clock.textContent = new Date().toLocaleTimeString(); const elapsedMs = Date.now() - getT0(); if (els.elapsed) els.elapsed.textContent = fmtElapsed(elapsedMs); if (elapsedMs > 15000 && getLastStepBase() && els.text && !getLastStepBase().includes('Done') && !getLastStepBase().includes('Failed')) { els.text.textContent = getLastStepBase() + ' (' + fmtElapsed(elapsedMs) + ')'; } } catch(e){} }
-    function setStep(text, pct){ setLastStepBase(text); if (els.block) { els.block.hidden = false; els.block.style.display = ''; } if (els.text) els.text.textContent = text; if (els.bar && typeof pct === 'number') { els.bar.style.width = pct + '%'; if (els.meter) els.meter.value = pct; }
+    function tickClock(){ try { if (els.clock) els.clock.textContent = new Date().toLocaleTimeString(); const elapsedMs = Date.now() - t0; if (els.elapsed) els.elapsed.textContent = fmtElapsed(elapsedMs); if (elapsedMs > 15000 && lastStepBase && els.text && !lastStepBase.includes('Done') && !lastStepBase.includes('Failed')) { els.text.textContent = lastStepBase + ' (' + fmtElapsed(elapsedMs) + ')'; } } catch(e){} }
+    function setStep(text, pct){ lastStepBase = text; if (els.block) { els.block.hidden = false; els.block.style.display = ''; } if (els.text) els.text.textContent = text; if (els.bar && typeof pct === 'number') { els.bar.style.width = pct + '%'; if (els.meter) els.meter.value = pct; }
       if (els.list){ const li = document.createElement('li'); const ts = document.createElement('time'); ts.dateTime = new Date().toISOString(); ts.textContent = new Date().toLocaleTimeString(); li.appendChild(ts); li.appendChild(document.createTextNode(' ' + text)); els.list.appendChild(li); try { els.list.scrollTop = els.list.scrollHeight; } catch(e){} }
     }
-    function start(){ setT0(Date.now()); try { if (els.list) els.list.innerHTML = ''; if (els.elapsed) els.elapsed.textContent = '0s'; if (els.clock) els.clock.textContent = new Date().toLocaleTimeString(); if (els.bar) els.bar.style.width = '10%'; if (els.meter) els.meter.value = 10; } catch(e){} tickClock(); setClockTimer(setInterval(tickClock, 1000)); setStep('Preparing…', 10); }
-    function stop(){ try { if (getClockTimer()) clearInterval(getClockTimer()); } catch(e){} /* Persistent progress card: leave the final state visible in the aside rather than hiding the block. */ }
+    function start(){ t0 = Date.now(); try { if (els.list) els.list.innerHTML = ''; if (els.elapsed) els.elapsed.textContent = '0s'; if (els.clock) els.clock.textContent = new Date().toLocaleTimeString(); if (els.bar) els.bar.style.width = '10%'; if (els.meter) els.meter.value = 10; } catch(e){} tickClock(); clockTimer = setInterval(tickClock, 1000); setStep('Preparing…', 10); }
+    function stop(){ try { if (clockTimer) clearInterval(clockTimer); } catch(e){} /* Persistent progress card: leave the final state visible in the aside rather than hiding the block. */ }
     return { setStep, start, stop };
   }
 

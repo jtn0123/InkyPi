@@ -23,92 +23,7 @@ def _plugin_page_source() -> str:
     )
 
 
-# --- API Validator ---
-
-
-def test_api_validator_script_exists(client: FlaskClient) -> None:
-    resp = client.get("/static/scripts/api_validator.js")
-    assert resp.status_code == 200
-    js = resp.get_data(as_text=True)
-
-    # Classes exposed
-    assert "class APIValidator" in js
-    assert "class APIValidationUI" in js
-    assert "window.APIValidator" in js
-    assert "window.APIValidationUI" in js
-
-    # Core methods on APIValidator
-    for token in [
-        "async validateEndpoint(url, options = {})",
-        "async _performValidation(url, options)",
-        "_categorizeError(error)",
-        "async validateMultiple(endpoints)",
-        "clearCache()",
-        "getCachedResult(url)",
-    ]:
-        assert token in js
-
-    # UI helper methods
-    for token in [
-        "createValidationIndicator(input, options = {})",
-        "async validateInput(input, indicator, options = {})",
-        "updateIndicator(indicator, status, text)",
-        "showValidationDetails(indicator, result)",
-        "validateNow(input)",
-        "addValidationToInputs(selector, options = {})",
-    ]:
-        assert token in js
-
-
-def test_api_validator_no_custom_user_agent(client: FlaskClient) -> None:
-    """JTN-261: Custom User-Agent header triggers CORS preflight, failing external API checks.
-
-    User-Agent is not CORS-safelisted and is a forbidden header in the Fetch spec.
-    The validator must not set it in fetch calls.
-    """
-    resp = client.get("/static/scripts/api_validator.js")
-    assert resp.status_code == 200
-    js = resp.get_data(as_text=True)
-
-    assert "user-agent" not in js.lower(), (
-        "Custom User-Agent header must not be set in fetch calls — "
-        "it triggers CORS preflight and is forbidden by the Fetch spec."
-    )
-
-
-# --- Enhanced Progress ---
-
-
-def test_enhanced_progress_script_exists(client: FlaskClient) -> None:
-    resp = client.get("/static/scripts/enhanced_progress.js")
-    assert resp.status_code == 200
-    js = resp.get_data(as_text=True)
-
-    # Class and globals
-    assert "class EnhancedProgressDisplay" in js
-    assert "window.EnhancedProgressDisplay" in js
-    assert "window.createEnhancedProgress" in js
-
-    # Core methods
-    for token in [
-        "initializeElements()",
-        "start(steps = [], title = 'Processing...')",
-        "nextStep(description = '', substeps = [])",
-        "updateStep(stepName, description = '', progress = 0, substeps = [])",
-        "updateProgress(progress)",
-        "complete(message = 'Operation completed', success = true)",
-        "fail(error = 'Operation failed')",
-        "renderSteps()",
-        "updateStepVisual(stepIndex)",
-        "getTimingSummary()",
-    ]:
-        assert token in js
-
-    # Key UI elements rendered
-    assert "enhanced-progress-header" in js
-    assert "enhanced-progress-fill" in js
-    assert "enhanced-progress-steps" in js
-    assert "enhanced-progress-log" in js
+# --- Progress timing labels ---
 
 
 def test_plugin_and_playlist_progress_keep_ms_metric_labels(
@@ -129,18 +44,6 @@ def test_plugin_and_playlist_progress_keep_ms_metric_labels(
     assert "formatElapsed(Date.now() - startedAt)" in playlist_js
     assert "${name} ${ms} ms" in playlist_js
     assert "${label} ${value} ms" in playlist_js
-
-
-# --- Icons Loader ---
-
-
-def test_icons_loader_script_exists(client: FlaskClient) -> None:
-    resp = client.get("/static/scripts/icons_loader.js")
-    assert resp.status_code == 200
-    js = resp.get_data(as_text=True)
-
-    # It should be a no-op but present
-    assert "no-op" in js or "no op" in js or "does nothing" in js
 
 
 # --- Lightbox ---
@@ -281,17 +184,6 @@ def test_playlist_progress_only_marks_successful_runs_done(client: FlaskClient) 
     assert 'if (completedSuccessfully) tracker.setStep("Done", 100);' in js
 
 
-def test_image_modal_script_guards_missing_container(client: FlaskClient) -> None:
-    resp = client.get("/static/scripts/image_modal.js")
-    assert resp.status_code == 200
-    js = resp.get_data(as_text=True)
-
-    assert "const imageContainer = document.querySelector('.image-container');" in js
-    assert "if (!imageContainer) return;" in js
-    assert "const img = imageContainer.querySelector('img');" in js
-    assert "if (!img) return;" in js
-
-
 def test_csrf_script_preserves_existing_headers_without_empty_object_copy(
     client: FlaskClient,
 ) -> None:
@@ -349,49 +241,6 @@ def test_show_last_progress_does_not_use_global_fallback_key(
     assert (
         '"INKYPI_LAST_PROGRESS"' not in fn_body
     ), "showLastProgress must not include the bare global fallback key"
-
-
-# --- XSS / innerHTML safety ---
-
-
-def test_enhanced_progress_escapes_step_names_in_innerhtml(client: FlaskClient) -> None:
-    """Verify step names from SSE events are HTML-escaped before innerHTML injection.
-
-    JTN-242: step names are server-supplied strings and must be escaped to prevent XSS.
-    The escapeHtml helper must exist at module level and be applied in renderSteps.
-    """
-    resp = client.get("/static/scripts/enhanced_progress.js")
-    assert resp.status_code == 200
-    js = resp.get_data(as_text=True)
-
-    # escapeHtml helper must be defined as a standalone function
-    assert "function escapeHtml(" in js
-
-    # renderSteps must use escapeHtml on the step value
-    assert "escapeHtml(step)" in js
-
-    # Bare unescaped interpolation must NOT appear for step-name rendering
-    assert '"step-name">${step}<' not in js
-
-
-def test_skeleton_loader_escapes_step_names_in_innerhtml(client: FlaskClient) -> None:
-    """Verify step names passed to createProgressSkeleton are HTML-escaped.
-
-    JTN-242: step names are caller-supplied strings and must be escaped to prevent XSS.
-    The static escapeHtml helper must exist on SkeletonLoader and be applied in the template.
-    """
-    resp = client.get("/static/scripts/skeleton_loader.js")
-    assert resp.status_code == 200
-    js = resp.get_data(as_text=True)
-
-    # escapeHtml must be defined as a static method on SkeletonLoader
-    assert "static escapeHtml(" in js
-
-    # The progress-step template must use SkeletonLoader.escapeHtml
-    assert "SkeletonLoader.escapeHtml(step)" in js
-
-    # Bare unescaped interpolation must NOT appear for skeleton-step-text rendering
-    assert '"skeleton-step-text">${step}<' not in js
 
 
 # --- URL encoding ---

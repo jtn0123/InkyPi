@@ -32,7 +32,7 @@
 
   // Pure helpers — hoisted to module scope so Sonar S7721 ("move function to
   // outer scope") stops flagging them as closure-bound. None of these touch
-  // `config`, the store, or any createDashboardPage-local state.
+  // `config` or any createDashboardPage-local state.
   function setCell(valueId, metaId, value, meta, title) {
     const v = document.getElementById(valueId);
     const m = document.getElementById(metaId);
@@ -90,23 +90,7 @@
     const pollIntervalMs = config.pollIntervalMs || DEFAULTS.pollIntervalMs;
     const refreshDelayMs = config.refreshDelayMs || DEFAULTS.refreshDelayMs;
 
-    // Store for polling / image-hash state (JTN-502)
-    const store = globalThis.InkyPiStore
-      ? globalThis.InkyPiStore.createStore({
-          imageHash: config.imageHash,
-          consecutiveFailures: 0,
-        })
-      : null;
-
-    // Compatibility shim: read/write via store when available, plain vars otherwise.
-    function getImageHash() { return store ? store.get('imageHash') : _legacyImageHash; }
-    function setImageHash(v) { if (store) { store.set({ imageHash: v }); } else { _legacyImageHash = v; } }
-    function getConsecutiveFailures() { return store ? store.get('consecutiveFailures') : _legacyFailures; }
-    function setConsecutiveFailures(v) { if (store) { store.set({ consecutiveFailures: v }); } else { _legacyFailures = v; } }
-
-    // Fallback vars used only when store is not loaded.
-    let _legacyImageHash = config.imageHash;
-    let _legacyFailures = 0;
+    let imageHash = config.imageHash;
     let refreshCountdownTimerId = null;
     let previewRefreshSequence = 0;
     let kpiRefreshSequence = 0;
@@ -194,16 +178,13 @@
     function updatePreviewConnectivity(info, up) {
       // A partial refresh is still stale; only full recovery clears the warning.
       const connWarn = document.getElementById("connectivityWarning");
-      if (!info || !up) {
-        setConsecutiveFailures(getConsecutiveFailures() + 1);
-        if (connWarn) {
-          connWarn.textContent = "Some dashboard data is unavailable. Retrying…";
-          setHidden(connWarn, false);
-        }
-      } else {
-        setConsecutiveFailures(0);
-        if (connWarn) setHidden(connWarn, true);
+      if (!connWarn) return;
+      if (info && up) {
+        setHidden(connWarn, true);
+        return;
       }
+      connWarn.textContent = "Some dashboard data is unavailable. Retrying…";
+      setHidden(connWarn, false);
     }
 
     async function refreshPreview() {
@@ -232,8 +213,8 @@
 
       updatePreviewConnectivity(info, up);
 
-      if (info?.image_hash && info.image_hash !== getImageHash() && previewImg) {
-        setImageHash(info.image_hash);
+      if (info?.image_hash && info.image_hash !== imageHash && previewImg) {
+        imageHash = info.image_hash;
         if (previewSkel) { previewSkel.style.display = ''; previewSkel.classList.remove('is-hidden'); }
         setHidden(previewSkel, false);
         previewImg.src = `${config.previewUrl}?t=${Date.now()}`;

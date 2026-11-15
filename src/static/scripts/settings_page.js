@@ -13,18 +13,8 @@
       ? globalThis.matchMedia("(max-width: 768px)")
       : { matches: false, addEventListener() {} };
 
-    const store = globalThis.InkyPiStore
-      ? globalThis.InkyPiStore.createStore({
-          logsAutoScroll: true,
-          logsWrap: true,
-          lastLogsRaw: "",
-          updateTimer: null,
-          attachGeo: false,
-          activeTab: "device",
-        })
-      : null;
-
-    const stateFallback = {
+    // Shared mutable page state, passed by reference to every settings module.
+    const state = {
       logsAutoScroll: true,
       logsWrap: true,
       lastLogsRaw: "",
@@ -32,20 +22,6 @@
       attachGeo: false,
       activeTab: "device",
     };
-
-    const state = new Proxy(stateFallback, {
-      get(target, key) {
-        return store ? store.get(key) : target[key];
-      },
-      set(target, key, value) {
-        if (store) {
-          store.set({ [key]: value });
-        } else {
-          target[key] = value;
-        }
-        return true;
-      },
-    });
 
     const settingsModules = globalThis.InkyPiSettingsModules || {};
     const shared = settingsModules.shared || {};
