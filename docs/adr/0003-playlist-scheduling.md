@@ -14,7 +14,7 @@ Scheduling is encoded in three orthogonal axes, all stored in `device.json` and 
 
 2. **Priority** (`Playlist.get_priority()`): when multiple playlists are active at the same time (overlapping windows), the one with the numerically lowest priority value wins. `PlaylistManager.determine_active_playlist()` sorts active playlists by priority and picks `[0]` (model.py line 173).
 
-3. **Cycle interval** (`plugin_cycle_interval_seconds` on the device config, defaulting to 3600 s): the refresh task's `_wait_for_trigger()` sleeps for this duration between ticks. Per-plugin `refresh_interval` (stored on `PluginInstance`) allows individual plugins to declare a minimum cadence independently of the playlist cycle; `PlaylistManager.should_refresh()` checks elapsed time against the interval (model.py line 233).
+3. **Cycle interval** (`plugin_cycle_interval_seconds` on the device config, defaulting to 3600 s, overridable per playlist with `Playlist.cycle_interval_seconds`): the refresh task's `_wait_for_trigger()` sleeps until the active playlist's next refresh is due (`latest_refresh + cycle`), or until a playlist window opens or closes, whichever is sooner. It never sleeps longer than the device interval or shorter than 5 s. A due attempt that does not refresh the screen (a failed plugin, a blackout, a fully paused playlist) is also remembered, so retries stay a cycle apart. After a restart an overdue refresh runs within seconds. The arithmetic lives in `src/refresh_task/schedule.py`. Per-plugin `refresh_interval` (stored on `PluginInstance`) allows individual plugins to declare a minimum cadence independently of the playlist cycle; `PlaylistManager.should_refresh()` checks elapsed time against the interval (model.py line 233).
 
 Within an active playlist, plugins cycle round-robin via `Playlist.get_next_eligible_plugin()`, skipping plugins that fail `is_show_eligible()` (e.g., circuit-broken plugins).
 
@@ -27,7 +27,7 @@ Within an active playlist, plugins cycle round-robin via `Playlist.get_next_elig
 
 ### Negative
 - Overlapping time windows with equal priority are non-deterministic (sort is not stable across restarts) — users must assign distinct priorities if they want predictable overlap resolution.
-- The cycle interval is global; giving one playlist a faster cadence than another requires separate priority + time window configuration rather than a per-playlist interval setting.
+- A playlist's own cycle cannot outlast the device interval in a single sleep; a longer one is reached in device-interval steps, re-checked at each wake.
 - Midnight-spanning windows (`start > end`, e.g., 22:00–06:00) are supported by `is_active()` but not surfaced clearly in the UI, which can confuse users.
 
 ## Alternatives considered
