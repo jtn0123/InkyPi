@@ -2,6 +2,21 @@
 
 <!-- version list -->
 
+## v1.8.29 (2026-11-15)
+
+### Bug Fixes
+
+- **time**: Make "now in the device time zone" never raise, and drop its wrappers
+  ([#760](https://github.com/jtn0123/InkyPi/pull/760),
+  [`e224a92`](https://github.com/jtn0123/InkyPi/commit/e224a92aa6eab8ed39c6237c6972f04862fb5151))
+
+### Refactoring
+
+- **version**: Read the app version in one place
+  ([#758](https://github.com/jtn0123/InkyPi/pull/758),
+  [`f9229bb`](https://github.com/jtn0123/InkyPi/commit/f9229bb59c75074ecc7363b158dcd8713a504b25))
+
+
 ## v1.8.28 (2026-11-15)
 
 ### Bug Fixes
