@@ -86,8 +86,15 @@
       const dstPlaylist = dropTarget.closest(".playlist-item");
       if (srcPlaylist !== dstPlaylist) return false;
       const restoreOrder = capturePlaylistOrder(srcEl);
-      // Keep the legacy insertBefore marker for the drag-guard static test.
-      dropTarget.after(srcEl);
+      // Dropped on a row further down: go after it. Further up: go before
+      // it, or nothing could ever be dropped into first place.
+      const movingDown =
+        srcEl.compareDocumentPosition(dropTarget) & Node.DOCUMENT_POSITION_FOLLOWING;
+      if (movingDown) {
+        dropTarget.after(srcEl);
+      } else {
+        dropTarget.before(srcEl);
+      }
       persistPlaylistOrder(dropTarget.closest(".playlist-item"), restoreOrder);
     }
     return false;
@@ -109,6 +116,9 @@
 
   function handleKeyReorder(event) {
     if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
+    // Only the row itself: an arrow key on its Display or Delete button is
+    // not a request to move the row.
+    if (event.target !== event.currentTarget) return;
     event.preventDefault();
     const item = event.currentTarget;
     const target = getAdjacentPlaylistItem(
@@ -134,7 +144,9 @@
       if (!item.id) item.id = nextPlaylistDragId();
       item.draggable = true;
       item.tabIndex = 0;
-      item.setAttribute("role", "listitem");
+      if (document.getElementById("playlistReorderHint")) {
+        item.setAttribute("aria-describedby", "playlistReorderHint");
+      }
       item.addEventListener("dragstart", handleDragStart);
       item.addEventListener("dragover", handleDragOver);
       item.addEventListener("drop", handleDrop);

@@ -115,6 +115,110 @@ def test_playlist_keyboard_reorder(
             browser.close()
 
 
+def _record_reorders(page: Any) -> list[list[str]]:
+    """Answer each reorder request, keeping the order it asked for."""
+    import json
+
+    orders: list[list[str]] = []
+
+    def answer(route: Any) -> None:
+        body = json.loads(route.request.post_data or "{}")
+        orders.append([item["name"] for item in body.get("ordered", [])])
+        route.fulfill(
+            status=200,
+            content_type="application/json",
+            body='{"success": true, "message": "Reordered"}',
+        )
+
+    page.route("**/reorder_plugins", answer)
+    return orders
+
+
+def _open_playlist(page: Any, live_server: str) -> None:
+    stub_leaflet(page)
+    page.goto(f"{live_server}/playlist", wait_until="domcontentloaded", timeout=30000)
+    page.wait_for_selector("[data-page-shell]", timeout=10000)
+    page.wait_for_selector(".plugin-item[draggable='true']", timeout=10000)
+
+
+def _row_names(page: Any) -> list[str]:
+    names = page.locator(".plugin-item").evaluate_all(
+        "rows => rows.map(r => r.dataset.instanceName)"
+    )
+    return [str(name) for name in names]
+
+
+def test_arrow_keys_on_a_row_button_leave_the_order_alone(
+    live_server: str, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Up or down on a row's Display button used to move the row and save."""
+    pytest.importorskip("playwright.sync_api", reason="playwright not available")
+    monkeypatch.setattr("utils.time_utils.now_device_tz", _fixed_now, raising=True)
+    _prepare_playlist(device_config_dev)
+
+    from playwright.sync_api import sync_playwright
+
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        try:
+            page = browser.new_page(viewport={"width": 1280, "height": 900})
+            orders = _record_reorders(page)
+            _open_playlist(page, live_server)
+
+            button = (
+                page.locator(".plugin-item").nth(0).locator(".playlist-row-display-btn")
+            )
+            button.focus()
+            button.press("ArrowDown")
+            # The keydown handler moves rows synchronously, so this is final.
+            assert _row_names(page) == ["Clock A", "Weather B"]
+
+            # The row itself still moves, and says how.
+            row = page.locator(".plugin-item").nth(0)
+            assert row.get_attribute("aria-describedby") == "playlistReorderHint"
+            hint = page.locator("#playlistReorderHint").text_content() or ""
+            assert "arrow key" in hint
+            assert page.locator(".plugin-list").first.get_attribute("role") == "list"
+            row.focus()
+            with page.expect_response(is_response_to("POST", "/reorder_plugins")):
+                row.press("ArrowDown")
+            # Only this press saved an order; the button press sent none.
+            assert orders == [["Weather B", "Clock A"]]
+        finally:
+            browser.close()
+
+
+def test_dragging_a_row_up_drops_it_above_the_target(
+    live_server: str, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A drop always went after the target, so nothing could be moved to first."""
+    pytest.importorskip("playwright.sync_api", reason="playwright not available")
+    monkeypatch.setattr("utils.time_utils.now_device_tz", _fixed_now, raising=True)
+    _prepare_playlist(device_config_dev)
+
+    from playwright.sync_api import sync_playwright
+
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        try:
+            page = browser.new_page(viewport={"width": 1280, "height": 900})
+            orders = _record_reorders(page)
+            _open_playlist(page, live_server)
+            rows = page.locator(".plugin-item")
+
+            with page.expect_response(is_response_to("POST", "/reorder_plugins")):
+                rows.nth(1).drag_to(rows.nth(0))
+            assert _row_names(page) == ["Weather B", "Clock A"]
+
+            # And down again: dropped on a lower row, it goes below it.
+            with page.expect_response(is_response_to("POST", "/reorder_plugins")):
+                rows.nth(0).drag_to(rows.nth(1))
+            assert _row_names(page) == ["Clock A", "Weather B"]
+            assert orders == [["Weather B", "Clock A"], ["Clock A", "Weather B"]]
+        finally:
+            browser.close()
+
+
 def test_playlist_delete_modal(
     live_server: str, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
 ) -> None:
