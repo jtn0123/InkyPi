@@ -60,6 +60,5 @@ tracked in Linear:
       split into mixin modules, none over ~600 lines. `blueprints/playlist.py`
       is done: split into the `blueprints/playlist/` package, none over ~360
       lines.)
-- [ ] `scripts/render_weather_mock.py` is stale (imports `pytz`).
 - [ ] `FONTS["ds-digi"]` points at `static/fonts/DS-DIGI.TTF`; the file lives
       under `DS-DIGI/`. Unused today.

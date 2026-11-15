@@ -10,13 +10,29 @@ Usage examples (run from repo root):
   python scripts/dry_run_plugin.py --plugin clock --width 640 --height 400
   python scripts/dry_run_plugin.py --plugin year_progress --config /tmp/my_settings.json
   python scripts/dry_run_plugin.py --plugin weather --output /tmp/weather.png
+
+Record once, then re-render as often as you like with no network or API calls:
+  python scripts/dry_run_plugin.py --plugin weather --config w.json --record /tmp/wx
+  python scripts/dry_run_plugin.py --plugin weather --config w.json --replay /tmp/wx
+
+--record saves each response body that goes through the shared HTTP session
+(``utils.http_client``) under DIR, named by host and path. The query string
+is left out, so API keys never end up in file names. --replay serves those
+files instead of the network and fails loudly on a request it has no file
+for. Fetches that resolve DNS themselves before using the session (the
+remote-image SSRF guard) still need the network.
 """
 
 import argparse
+import io
 import json
 import os
+import re
 import sys
+from pathlib import Path
 from time import perf_counter
+from typing import Any
+from urllib.parse import urlsplit
 
 # Ensure src/ is on the import path (script may be run from any directory)
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -38,11 +54,11 @@ class _MockDeviceConfig:
         self._orientation = orientation
         self._timezone = timezone
 
-    def get_resolution(self):
+    def get_resolution(self) -> tuple[int, int]:
         return (self._width, self._height)
 
-    def get_config(self, key, default=None):
-        mapping: dict = {
+    def get_config(self, key: str, default: Any = None) -> Any:
+        mapping: dict[str, Any] = {
             "orientation": self._orientation,
             "timezone": self._timezone,
             "time_format": "12h",
@@ -50,12 +66,123 @@ class _MockDeviceConfig:
         }
         return mapping.get(key, default)
 
-    def load_env_key(self, key: str):
+    def load_env_key(self, key: str) -> str | None:
         """Return the real env var so plugins that need keys can still work."""
         return os.environ.get(key)
 
 
-def _discover_plugin_config(plugin_id: str) -> dict:
+_INDEX_FILE = "_index.json"
+
+
+def _missing_vendor_files() -> list[str]:
+    """Vendored scripts listed in install/update_vendors.sh that are absent.
+
+    They are gitignored (a fresh clone or worktree has none). Plugin
+    templates load them, so without them a chart or calendar renders blank
+    instead of failing.
+    """
+    try:
+        text = (Path(REPO_ROOT) / "install" / "update_vendors.sh").read_text(
+            encoding="utf-8"
+        )
+    except OSError:
+        return []
+    paths = re.findall(r'^\s*"[^|"]+\|[^|"]+\|([^|"]+)\|', text, flags=re.M)
+    return [path for path in paths if not (Path(REPO_ROOT) / path).is_file()]
+
+
+def _response_key(url: str) -> str:
+    """File name for a recorded response: host and path, query left out."""
+    parts = urlsplit(url)
+    raw = f"{parts.hostname or 'unknown'}{parts.path}"
+    return re.sub(r"[^A-Za-z0-9.-]+", "_", raw).strip("_") + ".body"
+
+
+def _read_index(directory: Path) -> dict[str, Any]:
+    try:
+        data = json.loads((directory / _INDEX_FILE).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def _start_recording(session: Any, directory: Path) -> None:
+    """Save every response *session* receives into *directory*.
+
+    A response hook rather than an adapter, so the session's own adapters
+    (retries, connection pooling) still do the real request.
+    """
+    directory.mkdir(parents=True, exist_ok=True)
+
+    def _save(response: Any, *args: Any, **kwargs: Any) -> Any:
+        if not 200 <= response.status_code < 300:
+            return response
+        key = _response_key(response.url)
+        (directory / key).write_bytes(response.content)
+        parts = urlsplit(response.url)
+        index = _read_index(directory)
+        index[key] = {
+            "url": f"{parts.scheme}://{parts.hostname}{parts.path}",
+            "content_type": response.headers.get("Content-Type", ""),
+        }
+        (directory / _INDEX_FILE).write_text(
+            json.dumps(index, indent=2, sort_keys=True), encoding="utf-8"
+        )
+        print(f"[dry-run] recorded {key}")
+        return response
+
+    session.hooks.setdefault("response", []).append(_save)
+
+
+def _replay_adapter(directory: Path) -> Any:
+    """A transport adapter that answers from files saved by --record."""
+    import requests
+    from requests.adapters import BaseAdapter
+    from requests.structures import CaseInsensitiveDict
+
+    index = _read_index(directory)
+
+    class _ReplayAdapter(BaseAdapter):
+        def send(self, request: Any, *args: Any, **kwargs: Any) -> Any:
+            key = _response_key(request.url)
+            body_path = directory / key
+            if not body_path.is_file():
+                parts = urlsplit(request.url)
+                message = (
+                    f"no recorded response for {parts.hostname}{parts.path} "
+                    f"(expected {body_path}); run once with --record"
+                )
+                print(f"[dry-run] replay miss: {message}", file=sys.stderr)
+                raise requests.ConnectionError(message, request=request)
+            response = requests.Response()
+            response.status_code = 200
+            response.reason = "OK"
+            response.url = request.url
+            response.request = request
+            # A byte stream, so .content, .json() and stream=True reads all work.
+            response.raw = io.BytesIO(body_path.read_bytes())
+            response.encoding = "utf-8"
+            content_type = index.get(key, {}).get("content_type", "")
+            response.headers = CaseInsensitiveDict(
+                {"Content-Type": content_type} if content_type else {}
+            )
+            return response
+
+        def close(self) -> None:
+            return None
+
+    return _ReplayAdapter()
+
+
+def _start_replay(session: Any, directory: Path) -> None:
+    if not directory.is_dir():
+        sys.exit(f"ERROR: --replay directory not found: {directory}")
+    adapter = _replay_adapter(directory)
+    session.mount("https://", adapter)
+    session.mount("http://", adapter)
+
+
+def _discover_plugin_config(plugin_id: str) -> dict[str, Any]:
     """Read plugin-info.json from the plugin's source directory.
 
     Returns a minimal config dict suitable for passing to load_plugins().
@@ -85,7 +212,7 @@ def _discover_plugin_config(plugin_id: str) -> dict:
     }
 
 
-def _load_settings(config_path: str | None) -> dict:
+def _load_settings(config_path: str | None) -> dict[str, Any]:
     """Load plugin instance settings from a JSON file, or return empty dict."""
     if not config_path:
         return {}
@@ -162,6 +289,19 @@ def main() -> None:
             "(key/value pairs). These override any device.json lookup."
         ),
     )
+    traffic = parser.add_mutually_exclusive_group()
+    traffic.add_argument(
+        "--record",
+        metavar="DIR",
+        default=None,
+        help="Save every HTTP response the plugin receives into DIR.",
+    )
+    traffic.add_argument(
+        "--replay",
+        metavar="DIR",
+        default=None,
+        help="Answer HTTP requests from DIR (made by --record); no network.",
+    )
     args = parser.parse_args()
 
     plugin_id: str = args.plugin
@@ -174,6 +314,15 @@ def main() -> None:
     print(f"[dry-run] Timezone : {args.timezone}")
     print(f"[dry-run] Output   : {output_path}")
 
+    missing_vendor = _missing_vendor_files()
+    if missing_vendor:
+        print(
+            f"[dry-run] WARNING: missing {', '.join(missing_vendor)}; charts and "
+            "calendars will render blank. Fetch them with: "
+            "bash install/update_vendors.sh",
+            file=sys.stderr,
+        )
+
     # Discover plugin metadata
     plugin_config = _discover_plugin_config(plugin_id)
 
@@ -183,6 +332,16 @@ def main() -> None:
         print(f"[dry-run] Settings : {list(settings.keys())}")
     else:
         print("[dry-run] Settings : (none — using plugin defaults)")
+
+    if args.record or args.replay:
+        from utils.http_client import get_http_session
+
+        if args.record:
+            _start_recording(get_http_session(), Path(args.record))
+            print(f"[dry-run] Recording: {os.path.abspath(args.record)}")
+        else:
+            _start_replay(get_http_session(), Path(args.replay))
+            print(f"[dry-run] Replaying: {os.path.abspath(args.replay)}")
 
     # Register the plugin with the registry so get_plugin_instance() works
     from plugins.plugin_registry import get_plugin_instance, load_plugins
