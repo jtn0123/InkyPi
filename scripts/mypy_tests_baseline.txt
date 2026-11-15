@@ -54,4 +54,8 @@
 # e244b243 also counts 487). #821 turned on redundant-expr, truthy-bool,
 # possibly-undefined, deprecated and ignore-without-code, and fixed what they
 # found in tests too. A later merge (#822 to #825) removed one more.
-487
+# 487 -> 485 (2026-11-15): Linux Python 3.13 CI run 43753148518, lint job
+# 132931337390 (#830; local mypy on main at 35b20e6f also counts 485). #830
+# gave tests a SettingsValidator Protocol, NoReturn fail() helpers and real
+# array types for crisp.
+485
