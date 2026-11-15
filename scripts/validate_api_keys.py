@@ -254,7 +254,8 @@ def _find_env_path(config_path: str) -> str:
 def _load_device_config(config_path: str) -> dict[str, Any]:
     """Load device.json and return the parsed dict."""
     with open(config_path) as fh:
-        return json.load(fh)
+        config: dict[str, Any] = json.load(fh)
+    return config
 
 
 def _extract_configured_plugin_ids(device_config: dict[str, Any]) -> set[str]:

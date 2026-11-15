@@ -25,7 +25,6 @@ from flask import Flask
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SRC_ROOT = REPO_ROOT / "src"
-SCRIPTS_ROOT = REPO_ROOT / "scripts"
 CDN_MANIFEST_PATH = SRC_ROOT / "static" / "cdn_manifest.json"
 
 # Make src importable
@@ -343,15 +342,9 @@ class TestCdnManifest:
 
 
 class TestUpdateCdnSriScript:
-    @pytest.fixture(autouse=True)
-    def patch_sys_path(self) -> Iterator[Any]:
-        if str(SCRIPTS_ROOT) not in sys.path:
-            sys.path.insert(0, str(SCRIPTS_ROOT))
-        yield
-
     def test_computes_correct_hash(self, tmp_path: Path) -> None:
         """update_cdn_sri should download and write correct hashes."""
-        import update_cdn_sri as ucs
+        from scripts import update_cdn_sri as ucs
 
         fake_data = b"fake cdn content"
         expected_hash = _make_sri(fake_data)
@@ -383,7 +376,7 @@ class TestUpdateCdnSriScript:
 
     def test_dry_run_does_not_write(self, tmp_path: Path) -> None:
         """--dry-run should compute but not write."""
-        import update_cdn_sri as ucs
+        from scripts import update_cdn_sri as ucs
 
         original_integrity = "sha384-original"
         manifest = {
@@ -411,7 +404,7 @@ class TestUpdateCdnSriScript:
         assert still["test-lib"]["integrity"] == original_integrity
 
     def test_rejects_non_https_cdn_urls(self) -> None:
-        import update_cdn_sri as ucs
+        from scripts import update_cdn_sri as ucs
 
         with patch("urllib.request.urlopen") as urlopen:
             with pytest.raises(ValueError, match="absolute HTTPS"):
@@ -420,7 +413,7 @@ class TestUpdateCdnSriScript:
         urlopen.assert_not_called()
 
     def test_missing_manifest_returns_error(self, tmp_path: Path) -> None:
-        import update_cdn_sri as ucs
+        from scripts import update_cdn_sri as ucs
 
         exit_code = ucs.main(["--manifest", str(tmp_path / "nope.json")])
         assert exit_code != 0

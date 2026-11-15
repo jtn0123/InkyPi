@@ -24,6 +24,7 @@ import json
 import sys
 import urllib.request
 from pathlib import Path
+from typing import Any
 from urllib.parse import urlparse
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -65,7 +66,9 @@ def main(argv: list[str] | None = None) -> int:
         print(f"ERROR: manifest not found: {manifest_path}", file=sys.stderr)
         return 1
 
-    manifest: dict[str, dict] = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest: dict[str, dict[str, Any]] = json.loads(
+        manifest_path.read_text(encoding="utf-8")
+    )
     errors: list[str] = []
 
     for key, entry in manifest.items():

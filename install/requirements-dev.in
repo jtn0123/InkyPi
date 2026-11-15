@@ -35,6 +35,13 @@ types-PyYAML==6.0.12.20260906
 # Keep the current requests stubs; validate updates with the strict mypy gate.
 types-requests==2.33.0.20260906
 
+# Stubs for runtime libraries that ship no types of their own, each matched to
+# the version pinned in requirements.txt. mypy.ini lists the imports that
+# still have no types anywhere.
+types-jsonschema==4.26.0.20261006
+types-psutil==7.2.2.20261111
+types-waitress==3.0.1.20260724
+
 # Linting / formatting
 black>=26.0,<27
 ruff>=0.16,<1

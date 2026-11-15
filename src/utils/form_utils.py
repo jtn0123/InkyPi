@@ -11,6 +11,8 @@ from dataclasses import dataclass, field
 from html import escape
 from typing import Any
 
+import jsonschema
+
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
@@ -124,18 +126,9 @@ def validate_int_range(
 # Schema-based validation
 # ---------------------------------------------------------------------------
 
-try:
-    import jsonschema as _jsonschema
-except ImportError:  # pragma: no cover
-    _jsonschema = None
-
 
 def validate_json_schema(data: dict[str, Any], schema: dict[str, Any]) -> list[str]:
     """Validate *data* against *schema* (JSON Schema draft 2020-12).
-
-    Uses ``jsonschema`` when available; falls back to a no-op when the
-    library is absent (library is listed in requirements, so this is a
-    safety net only).
 
     Args:
         data: The dictionary to validate.
@@ -145,13 +138,9 @@ def validate_json_schema(data: dict[str, Any], schema: dict[str, Any]) -> list[s
         A list of human-readable error strings.  An empty list means
         validation passed.
     """
-    if _jsonschema is None:  # pragma: no cover
-        logger.debug("jsonschema not available; skipping schema validation")
-        return []
-
     errors: list[str] = []
     try:
-        validator = _jsonschema.Draft202012Validator(schema)
+        validator = jsonschema.Draft202012Validator(schema)
         for err in validator.iter_errors(data):
             try:
                 path = ".".join(str(p) for p in err.path)

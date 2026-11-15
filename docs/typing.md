@@ -18,6 +18,23 @@ failing. `tests/unit/test_mypy_config.py` now checks that strict is set once,
 globally, that no section switches a strict flag back off, and that mypy really
 reports `no-untyped-def` with the repo config.
 
+## Third-party libraries without types
+
+`ignore_missing_imports` is not set globally, so an import that mypy has no
+types for fails the check instead of quietly becoming `Any`. Each library
+falls into one of three cases:
+
+- It ships its own types. Nothing to do.
+- A stub package exists (mypy says "Library stubs not installed for ...").
+  Pin it in `install/requirements-dev.in` next to `types-requests`,
+  `types-PyYAML`, `types-psutil`, `types-jsonschema` and `types-waitress`,
+  matched to the library's version, and regenerate the lock.
+- Neither exists (mypy says "missing library stubs or py.typed marker", or
+  "Cannot find implementation" for a device-only library). Add the module to
+  one of the two `[mypy-...]` sections at the end of `mypy.ini`.
+
+`tests/unit/test_mypy_config.py` fails if the global switch comes back.
+
 ## Current CI behavior: clean `src/`, ratcheted `tests/`
 
 `scripts/lint.sh` runs mypy as **two separate invocations**:
