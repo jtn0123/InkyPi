@@ -1716,9 +1716,11 @@ class TestUpdateVendorsScript:
         # rewrite every destination.
         import re
 
-        # Match lines like: `  "Chart JS|https://.../x.js|src/static/..."`
+        # Match lines like: `  "Chart JS|https://.../x.js|src/static/...|<sha256>"`
         vendor_lines = re.findall(
-            r'^\s*"[^"|]+\|https?://[^"|]+\|([^"|]+)"', self.content, re.MULTILINE
+            r'^\s*"[^"|]+\|https?://[^"|]+\|([^"|]+)\|[0-9a-f]{64}"',
+            self.content,
+            re.MULTILINE,
         )
         assert vendor_lines, "No vendor entries found in update_vendors.sh"
         for path in vendor_lines:
