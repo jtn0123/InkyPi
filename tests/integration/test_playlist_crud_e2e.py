@@ -153,6 +153,52 @@ def test_delete_playlist_modal(
     rc.assert_no_errors(str(tmp_path), "delete_playlist_modal")
 
 
+def test_edit_dialog_delete_asks_first_and_sends_one_request(
+    live_server: str, device_config_dev: Any, browser_page: Page, tmp_path: Path
+) -> None:
+    """The edit dialog's Delete opens the confirm dialog instead of deleting.
+
+    Confirming with a double click sends one DELETE: the confirm button is
+    locked while the request runs.
+    """
+    prepare_playlist(device_config_dev)
+    pm = device_config_dev.get_playlist_manager()
+    if not pm.get_playlist("Deletable"):
+        pm.add_playlist("Deletable", "00:00", "24:00")
+    device_config_dev.write_config()
+
+    page = browser_page
+    deletes: list[str] = []
+    page.on(
+        "request",
+        lambda r: (
+            deletes.append(r.url)
+            if r.method == "DELETE" and "/delete_playlist/" in r.url
+            else None
+        ),
+    )
+    rc = navigate_and_wait(page, live_server, "/playlist")
+
+    page.locator('.edit-playlist-btn[data-playlist-name="Deletable"]').click()
+    page.locator("#playlistModal").wait_for(state="visible", timeout=3000)
+    page.locator("#deleteButton").click()
+
+    confirm = page.locator("#deletePlaylistModal")
+    confirm.wait_for(state="visible", timeout=3000)
+    assert page.locator("#playlistModal").is_hidden()
+    assert "Deletable" in (page.locator("#deletePlaylistText").text_content() or "")
+    assert deletes == [], "the edit dialog's Delete must ask before deleting"
+    assert pm.get_playlist("Deletable") is not None
+
+    with page.expect_event("domcontentloaded"):
+        confirm.locator("#confirmDeletePlaylistBtn").dblclick()
+    rc.requests.wait_until_idle()
+
+    assert len(deletes) == 1, f"expected one DELETE, got {deletes}"
+    assert device_config_dev.get_playlist_manager().get_playlist("Deletable") is None
+    rc.assert_no_errors(str(tmp_path), "edit_dialog_delete_confirm")
+
+
 def test_delete_instance_modal(
     live_server: str, device_config_dev: Any, browser_page: Page, tmp_path: Path
 ) -> None:

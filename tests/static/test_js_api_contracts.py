@@ -239,14 +239,13 @@ def test_playlist_script_url_encodes_playlist_names_in_fetch_calls(
     # update_playlist_base_url must use encodeURIComponent, not raw concatenation
     assert "update_playlist_base_url + encodeURIComponent(oldName)" in form_js
 
-    # Both delete_playlist fetch sites must use encodeURIComponent
-    delete_encode_count = form_js.count(
-        "delete_playlist_base_url + encodeURIComponent("
-    )
-    delete_encode_count += modal_js.count(
-        "delete_playlist_base_url + encodeURIComponent("
-    )
-    assert delete_encode_count >= 2
+    # Every delete_playlist fetch must use encodeURIComponent. The confirm
+    # dialog is the only one: the edit dialog's Delete opens it.
+    for js in (form_js, modal_js):
+        assert js.count("delete_playlist_base_url +") == js.count(
+            "delete_playlist_base_url + encodeURIComponent("
+        )
+    assert "delete_playlist_base_url + encodeURIComponent(name)" in modal_js
 
 
 # --- API Keys dirty tracking (JTN-225) ---
