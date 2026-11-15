@@ -2,6 +2,15 @@
 
 <!-- version list -->
 
+## v1.8.4 (2026-11-15)
+
+### Bug Fixes
+
+- **refresh**: Only kill a process group the plugin worker leads
+  ([#720](https://github.com/jtn0123/InkyPi/pull/720),
+  [`cc9232f`](https://github.com/jtn0123/InkyPi/commit/cc9232fed191ffd3847744b64d6952dbc58fd76f))
+
+
 ## v1.8.3 (2026-11-15)
 
 ### Bug Fixes
