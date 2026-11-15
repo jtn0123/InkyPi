@@ -2,6 +2,15 @@
 
 <!-- version list -->
 
+## v1.8.20 (2026-11-15)
+
+### Performance Improvements
+
+- **images**: Answer an unchanged WebP revalidation before encoding
+  ([#744](https://github.com/jtn0123/InkyPi/pull/744),
+  [`ca7ca06`](https://github.com/jtn0123/InkyPi/commit/ca7ca064883b89344574e6ced7b2be2fc1ec10ab))
+
+
 ## v1.8.19 (2026-11-15)
 
 ### Performance Improvements
