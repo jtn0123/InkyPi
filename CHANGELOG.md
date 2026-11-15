@@ -2,6 +2,15 @@
 
 <!-- version list -->
 
+## v1.8.26 (2026-11-15)
+
+### Performance Improvements
+
+- **display**: Encode each processed frame once, as a palette PNG when it can
+  ([#755](https://github.com/jtn0123/InkyPi/pull/755),
+  [`6a52ee4`](https://github.com/jtn0123/InkyPi/commit/6a52ee4dc4d6a05419848f99de2c60ed56a8d3d3))
+
+
 ## v1.8.25 (2026-11-15)
 
 ### Performance Improvements
