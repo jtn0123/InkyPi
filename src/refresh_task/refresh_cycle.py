@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Mapping
+from dataclasses import dataclass
 from datetime import datetime
 from time import perf_counter
 from typing import TYPE_CHECKING, Any, cast
@@ -27,6 +28,23 @@ if TYPE_CHECKING:
     from refresh_task.recorder import RefreshRecorder
 
 logger = logging.getLogger(__name__)
+
+#: ``(refresh_info, used_cached, metrics)`` — see ``_perform_refresh``.
+RefreshOutcome = tuple[dict[str, Any] | None, bool, dict[str, Any]]
+
+
+@dataclass(frozen=True, slots=True)
+class _Turn:
+    """What every step of one refresh needs to know about it."""
+
+    refresh_action: RefreshAction
+    plugin_config: dict[str, Any]
+    current_dt: datetime
+    benchmark_id: str
+    plugin_id: str
+    instance_name: str | None
+    request_id: str | None
+    manual_request: ManualUpdateRequest | None
 
 
 class RefreshCycleMixin:
@@ -116,221 +134,284 @@ class RefreshCycleMixin:
         current_dt: datetime,
         request_id: str | None = None,
         manual_request: ManualUpdateRequest | None = None,
-    ) -> tuple[dict[str, Any] | None, bool, dict[str, Any]]:
+    ) -> RefreshOutcome:
         """Execute the refresh action and update the display if needed.
 
         Returns a tuple ``(refresh_info, used_cached, metrics)`` where
         ``refresh_info`` is a dictionary with metadata, ``used_cached`` indicates
         whether the image was unchanged, and ``metrics`` contains timing data.
 
+        The turn runs in four steps, each of which may end it early: ask the
+        plugin whether to skip, generate, fit the image to the panel, then
+        display and record.
+
         Threading:
             Must be called without holding ``self.condition``.
         """
-        plugin_config = self.device_config.get_plugin(refresh_action.get_plugin_id())
+        plugin_config = self._plugin_config_for(refresh_action)
         if plugin_config is None:
-            logger.error(
-                f"Plugin config not found for '{refresh_action.get_plugin_id()}'."
-            )
             return None, False, {}
 
-        isolated_plugins = self.device_config.get_config("isolated_plugins", default=[])
-        if (
-            isinstance(isolated_plugins, list)
-            and refresh_action.get_plugin_id() in isolated_plugins
-        ):
-            raise RuntimeError(
-                f"Plugin '{refresh_action.get_plugin_id()}' is currently isolated/disabled."
-            )
-
-        _t_req_start = perf_counter()
-        # Correlate this refresh with a benchmark id so parallel stage events can attach
-        benchmark_id = self.recorder.refresh_id(request_id)
-        plugin_id = refresh_action.get_plugin_id()
-        instance_name = refresh_action.get_refresh_info().get("plugin_instance")
-
-        # Ask the plugin whether it has anything worth showing before paying for
-        # a render. The playlist index has already advanced, so a skip yields
-        # the turn to the next plugin rather than sticking.
-        skip_reason = self._skip_display_reason(
-            refresh_action, plugin_config, current_dt, manual_request
+        started = perf_counter()
+        turn = _Turn(
+            refresh_action=refresh_action,
+            plugin_config=plugin_config,
+            current_dt=current_dt,
+            # Correlate this refresh with a benchmark id so parallel stage
+            # events can attach.
+            benchmark_id=self.recorder.refresh_id(request_id),
+            plugin_id=refresh_action.get_plugin_id(),
+            instance_name=refresh_action.get_refresh_info().get("plugin_instance"),
+            request_id=request_id,
+            manual_request=manual_request,
         )
-        if skip_reason is not None:
-            logger.info(
-                "plugin_lifecycle: skipped | plugin_id=%s instance=%s reason=%s",
-                plugin_id,
-                instance_name,
-                skip_reason,
-            )
-            self.recorder.publish_step(
-                plugin_id=plugin_id,
-                request_id=request_id,
-                step=f"Skipped: {skip_reason}",
-            )
-            # A skip is a healthy outcome, not a failure — recording it as one
-            # would march the circuit breaker toward pausing a working plugin.
-            self._update_plugin_health(
-                plugin_id=plugin_id,
-                instance=instance_name,
-                ok=True,
-                metrics={"skipped": True, "skip_reason": skip_reason},
-                error=None,
-            )
-            return None, False, {"skipped": True, "skip_reason": skip_reason}
 
-        # Plugin lifecycle: generate_start
+        skipped = self._skip_turn(turn)
+        if skipped is not None:
+            return None, False, skipped
+
+        image, plugin_meta, generate_ms, tracker = self._generate(turn)
+        if image is None:
+            return None, False, self._finish_without_image(turn, generate_ms)
+
+        image = self._fit_to_panel(turn, image)
+        if image is None:
+            return None, False, {}
+
+        return self._display_and_record(
+            turn,
+            image,
+            plugin_meta,
+            latest_refresh,
+            started=started,
+            generate_ms=generate_ms,
+            tracker=tracker,
+        )
+
+    def _plugin_config_for(
+        self, refresh_action: RefreshAction
+    ) -> dict[str, Any] | None:
+        """Return the plugin's config, or ``None`` if it is not installed.
+
+        Raises ``RuntimeError`` when the plugin has been isolated.
+        """
+        plugin_id = refresh_action.get_plugin_id()
+        plugin_config = self.device_config.get_plugin(plugin_id)
+        if plugin_config is None:
+            logger.error(f"Plugin config not found for '{plugin_id}'.")
+            return None
+
+        isolated_plugins = self.device_config.get_config("isolated_plugins", default=[])
+        if isinstance(isolated_plugins, list) and plugin_id in isolated_plugins:
+            raise RuntimeError(f"Plugin '{plugin_id}' is currently isolated/disabled.")
+        return cast(dict[str, Any], plugin_config)
+
+    def _skip_turn(self, turn: _Turn) -> dict[str, Any] | None:
+        """Let the plugin yield this turn; return the skip metrics if it does.
+
+        Asked before paying for a render. The playlist index has already
+        advanced, so a skip yields the turn to the next plugin rather than
+        sticking.
+        """
+        skip_reason = self._skip_display_reason(
+            turn.refresh_action,
+            turn.plugin_config,
+            turn.current_dt,
+            turn.manual_request,
+        )
+        if skip_reason is None:
+            return None
+        logger.info(
+            "plugin_lifecycle: skipped | plugin_id=%s instance=%s reason=%s",
+            turn.plugin_id,
+            turn.instance_name,
+            skip_reason,
+        )
+        self.recorder.publish_step(
+            plugin_id=turn.plugin_id,
+            request_id=turn.request_id,
+            step=f"Skipped: {skip_reason}",
+        )
+        # A skip is a healthy outcome, not a failure — recording it as one
+        # would march the circuit breaker toward pausing a working plugin.
+        self._update_plugin_health(
+            plugin_id=turn.plugin_id,
+            instance=turn.instance_name,
+            ok=True,
+            metrics={"skipped": True, "skip_reason": skip_reason},
+            error=None,
+        )
+        return {"skipped": True, "skip_reason": skip_reason}
+
+    def _generate(self, turn: _Turn) -> tuple[Any, Any, int, ProgressTracker]:
+        """Render the plugin's image; return ``(image, meta, ms, tracker)``.
+
+        A failure is recorded (health, error event, fallback card) and then
+        re-raised.
+        """
         logger.info(
             "plugin_lifecycle: generate_start",
             extra={
                 "stage": "generate_start",
-                "plugin_id": plugin_id,
-                "instance": instance_name,
-                "refresh_id": benchmark_id,
-                "request_id": request_id,
+                "plugin_id": turn.plugin_id,
+                "instance": turn.instance_name,
+                "refresh_id": turn.benchmark_id,
+                "request_id": turn.request_id,
             },
         )
-        _t_gen_start = perf_counter()
+        started = perf_counter()
         tracker: ProgressTracker
         with track_progress() as tracker:
             stage_t0 = perf_counter()
-            self.recorder.publish_running(
-                plugin_id=plugin_id,
-                instance=instance_name,
-                refresh_id=benchmark_id,
-                request_id=request_id,
-            )
-            self.recorder.publish_step(
-                plugin_id=plugin_id,
-                request_id=request_id,
-                step="Preparing plugin",
-            )
-            self.recorder.publish_step(
-                plugin_id=plugin_id,
-                request_id=request_id,
-                step=(
-                    "Checking provider credentials"
-                    if _plugin_requires_api_key(plugin_config)
-                    else "Checking plugin settings"
-                ),
-            )
-            self.recorder.publish_step(
-                plugin_id=plugin_id,
-                request_id=request_id,
-                step="Generating image",
-            )
+            self._announce_generation(turn)
             try:
                 image, plugin_meta = self.executor.execute_with_policy(
-                    refresh_action,
-                    plugin_config,
-                    current_dt,
-                    request_id=request_id,
+                    turn.refresh_action,
+                    turn.plugin_config,
+                    turn.current_dt,
+                    request_id=turn.request_id,
                 )
             except Exception as exc:
-                retain_path = self._stale_display_path()
-                probing = self._is_paused_probe(refresh_action, manual_request)
-                # JTN-779: log the full exception class + message so operators
-                # can diagnose.  The user-visible fallback image is sanitised
-                # via utils.fallback_image.sanitize_error_message.
-                logger.error(
-                    "plugin_lifecycle: failure | plugin_id=%s instance=%s retained_display=%s error_class=%s error=%s",
-                    plugin_id,
-                    instance_name,
-                    bool(retain_path),
-                    type(exc).__name__,
-                    exc,
-                )
-                self._update_plugin_health(
-                    plugin_id=plugin_id,
-                    instance=instance_name,
-                    ok=False,
-                    metrics={"retained_display": bool(retain_path)},
-                    error=str(exc),
-                )
-                self.recorder.publish_error(
-                    plugin_id=plugin_id,
-                    instance=instance_name,
-                    refresh_id=benchmark_id,
-                    request_id=request_id,
-                    error=str(exc),
-                    retained_display=bool(retain_path),
-                    plugin_failed=True,
-                )
-                if probing:
-                    # A failed automatic retry of a paused plugin keeps
-                    # whatever the panel shows; an error card here would
-                    # replace a good picture every cooldown.
-                    logger.info(
-                        "plugin_lifecycle: probe_failed | plugin_id=%s instance=%s"
-                        " — keeping the current display",
-                        plugin_id,
-                        instance_name,
-                    )
-                else:
-                    self._push_fallback_image(
-                        plugin_id=plugin_id,
-                        instance_name=instance_name,
-                        exc=exc,
-                        plugin_config=plugin_config,
-                        refresh_action=refresh_action,
-                    )
+                self._record_generate_failure(turn, exc)
                 raise
             # A control-only plugin returns before the normal refresh-info
             # write in ``_run``, so its new timestamp is persisted here.
-            self._commit_refresh_state(refresh_action, persist=image is None)
+            self._commit_refresh_state(turn.refresh_action, persist=image is None)
             self.recorder.save_stage(
-                benchmark_id,
+                turn.benchmark_id,
                 "generate_image",
                 int((perf_counter() - stage_t0) * 1000),
             )
-        generate_ms = int((perf_counter() - _t_gen_start) * 1000)
-        # Plugin lifecycle: generate_complete
+        generate_ms = int((perf_counter() - started) * 1000)
         logger.info(
             "plugin_lifecycle: generate_complete",
             extra={
                 "stage": "generate_complete",
-                "plugin_id": plugin_id,
-                "instance": instance_name,
+                "plugin_id": turn.plugin_id,
+                "instance": turn.instance_name,
                 "duration_ms": generate_ms,
-                "refresh_id": benchmark_id,
-                "request_id": request_id,
+                "refresh_id": turn.benchmark_id,
+                "request_id": turn.request_id,
             },
         )
         self.recorder.publish_step(
-            plugin_id=plugin_id,
-            request_id=request_id,
+            plugin_id=turn.plugin_id,
+            request_id=turn.request_id,
             step="Image generated",
         )
-        if image is None:
-            # A control-only plugin (servo, webhook poke, anything whose point
-            # is the side effect) legitimately produces no image. That is a
-            # completed refresh with nothing to display — not a failure — so
-            # the display, the history record and plugin health are all left
-            # alone rather than being handed a fallback error frame.
-            logger.info(
-                "plugin_lifecycle: no_image | plugin_id=%s instance=%s — plugin "
-                "produced no image; leaving the display unchanged",
-                plugin_id,
-                instance_name,
-            )
-            self.recorder.publish_step(
-                plugin_id=plugin_id,
-                request_id=request_id,
-                step="Plugin produced no image",
-            )
-            self._update_plugin_health(
-                plugin_id=plugin_id,
-                instance=instance_name,
-                ok=True,
-                metrics={"no_image": True},
-                error=None,
-            )
-            return None, False, {"generate_ms": generate_ms, "no_image": True}
+        return image, plugin_meta, generate_ms, tracker
 
-        # Check dimensions before doing anything expensive (hash / display
-        # push). A wrong-size image is fitted to the panel rather than
-        # rejected; only an image that cannot be fitted fails the refresh.
+    def _announce_generation(self, turn: _Turn) -> None:
+        """Publish the running event and the progress steps before rendering."""
+        self.recorder.publish_running(
+            plugin_id=turn.plugin_id,
+            instance=turn.instance_name,
+            refresh_id=turn.benchmark_id,
+            request_id=turn.request_id,
+        )
+        for step in (
+            "Preparing plugin",
+            (
+                "Checking provider credentials"
+                if _plugin_requires_api_key(turn.plugin_config)
+                else "Checking plugin settings"
+            ),
+            "Generating image",
+        ):
+            self.recorder.publish_step(
+                plugin_id=turn.plugin_id,
+                request_id=turn.request_id,
+                step=step,
+            )
+
+    def _record_generate_failure(self, turn: _Turn, exc: Exception) -> None:
+        """Record a failed render and decide what the panel shows instead."""
+        retain_path = self._stale_display_path()
+        probing = self._is_paused_probe(turn.refresh_action, turn.manual_request)
+        # JTN-779: log the full exception class + message so operators can
+        # diagnose. The user-visible fallback image is sanitised via
+        # utils.fallback_image.sanitize_error_message.
+        logger.error(
+            "plugin_lifecycle: failure | plugin_id=%s instance=%s retained_display=%s error_class=%s error=%s",
+            turn.plugin_id,
+            turn.instance_name,
+            bool(retain_path),
+            type(exc).__name__,
+            exc,
+        )
+        self._update_plugin_health(
+            plugin_id=turn.plugin_id,
+            instance=turn.instance_name,
+            ok=False,
+            metrics={"retained_display": bool(retain_path)},
+            error=str(exc),
+        )
+        self.recorder.publish_error(
+            plugin_id=turn.plugin_id,
+            instance=turn.instance_name,
+            refresh_id=turn.benchmark_id,
+            request_id=turn.request_id,
+            error=str(exc),
+            retained_display=bool(retain_path),
+            plugin_failed=True,
+        )
+        if probing:
+            # A failed automatic retry of a paused plugin keeps whatever the
+            # panel shows; an error card here would replace a good picture
+            # every cooldown.
+            logger.info(
+                "plugin_lifecycle: probe_failed | plugin_id=%s instance=%s"
+                " — keeping the current display",
+                turn.plugin_id,
+                turn.instance_name,
+            )
+            return
+        self._push_fallback_image(
+            plugin_id=turn.plugin_id,
+            instance_name=turn.instance_name,
+            exc=exc,
+            plugin_config=turn.plugin_config,
+            refresh_action=turn.refresh_action,
+        )
+
+    def _finish_without_image(self, turn: _Turn, generate_ms: int) -> dict[str, Any]:
+        """Complete a turn whose plugin legitimately produced no image.
+
+        A control-only plugin (servo, webhook poke, anything whose point is the
+        side effect) is a completed refresh with nothing to display — not a
+        failure — so the display, the history record and plugin health are all
+        left alone rather than being handed a fallback error frame.
+        """
+        logger.info(
+            "plugin_lifecycle: no_image | plugin_id=%s instance=%s — plugin "
+            "produced no image; leaving the display unchanged",
+            turn.plugin_id,
+            turn.instance_name,
+        )
         self.recorder.publish_step(
-            plugin_id=plugin_id,
-            request_id=request_id,
+            plugin_id=turn.plugin_id,
+            request_id=turn.request_id,
+            step="Plugin produced no image",
+        )
+        self._update_plugin_health(
+            plugin_id=turn.plugin_id,
+            instance=turn.instance_name,
+            ok=True,
+            metrics={"no_image": True},
+            error=None,
+        )
+        return {"generate_ms": generate_ms, "no_image": True}
+
+    def _fit_to_panel(self, turn: _Turn, image: Any) -> Any | None:
+        """Fit the image to the panel; ``None`` if it cannot be fitted.
+
+        Checked before anything expensive (hash, display push). A wrong-size
+        image is fitted rather than rejected; only an image that cannot be
+        fitted fails the refresh.
+        """
+        self.recorder.publish_step(
+            plugin_id=turn.plugin_id,
+            request_id=turn.request_id,
             step="Checking image",
         )
         expected_w, expected_h = oriented_resolution(self.device_config)
@@ -340,71 +421,84 @@ class RefreshCycleMixin:
                 image,
                 expected_w,
                 expected_h,
-                plugin_id=plugin_id,
+                plugin_id=turn.plugin_id,
             )
         except OutputDimensionMismatch as exc:
             logger.error(
                 "plugin_lifecycle: dimension_mismatch | plugin_id=%s instance=%s "
                 "expected=%dx%d actual=%dx%d — image cannot be fitted; "
                 "skipping display push",
-                plugin_id,
-                instance_name,
+                turn.plugin_id,
+                turn.instance_name,
                 exc.expected[0],
                 exc.expected[1],
                 exc.actual[0],
                 exc.actual[1],
             )
             self._update_plugin_health(
-                plugin_id=plugin_id,
-                instance=instance_name,
+                plugin_id=turn.plugin_id,
+                instance=turn.instance_name,
                 ok=False,
                 metrics={"retained_display": bool(self._stale_display_path())},
                 error=str(exc),
             )
             self.recorder.publish_error(
-                plugin_id=plugin_id,
-                instance=instance_name,
-                refresh_id=benchmark_id,
-                request_id=request_id,
+                plugin_id=turn.plugin_id,
+                instance=turn.instance_name,
+                refresh_id=turn.benchmark_id,
+                request_id=turn.request_id,
                 error=str(exc),
                 retained_display=bool(self._stale_display_path()),
                 plugin_failed=True,
             )
-            return None, False, {}
+            return None
         if returned_size not in ((expected_w, expected_h), (expected_h, expected_w)):
             self.recorder.publish_step(
-                plugin_id=plugin_id,
-                request_id=request_id,
+                plugin_id=turn.plugin_id,
+                request_id=turn.request_id,
                 step=(
                     f"Fitted {returned_size[0]}x{returned_size[1]} image to the "
                     f"{expected_w}x{expected_h} panel"
                 ),
             )
+        return image
 
+    def _display_and_record(
+        self,
+        turn: _Turn,
+        image: Any,
+        plugin_meta: Any,
+        latest_refresh: Any,
+        *,
+        started: float,
+        generate_ms: int,
+        tracker: ProgressTracker,
+    ) -> RefreshOutcome:
+        """Show the image (unless unchanged) and record the finished turn."""
         image_hash = compute_image_hash(image)
 
-        refresh_info = refresh_action.get_refresh_info()
+        refresh_info = turn.refresh_action.get_refresh_info()
         if plugin_meta:
             refresh_info.update({"plugin_meta": plugin_meta})
 
         refresh_info.update(
-            {"refresh_time": current_dt.isoformat(), "image_hash": image_hash}
+            {"refresh_time": turn.current_dt.isoformat(), "image_hash": image_hash}
         )
         used_cached = image_hash == latest_refresh.image_hash
         display_duration_ms, preprocess_ms = self._push_or_skip_display(
             used_cached=used_cached,
             image=image,
-            plugin_config=plugin_config,
-            refresh_action=refresh_action,
+            plugin_config=turn.plugin_config,
+            refresh_action=turn.refresh_action,
             refresh_info=cast(Any, refresh_info),
-            benchmark_id=benchmark_id,
-            plugin_id=plugin_id,
-            instance_name=instance_name,
-            request_id=request_id,
-            manual_request=manual_request,
+            benchmark_id=turn.benchmark_id,
+            plugin_id=turn.plugin_id,
+            instance_name=turn.instance_name,
+            request_id=turn.request_id,
+            manual_request=turn.manual_request,
         )
 
-        request_ms = int((perf_counter() - _t_req_start) * 1000)
+        request_ms = int((perf_counter() - started) * 1000)
         metrics = {
             "request_ms": request_ms,
             "display_ms": display_duration_ms,
@@ -412,23 +506,27 @@ class RefreshCycleMixin:
             "preprocess_ms": preprocess_ms,
             "steps": tracker.get_steps(),
         }
-        self._save_benchmark(benchmark_id, refresh_info, used_cached, metrics)
+        self._save_benchmark(turn.benchmark_id, refresh_info, used_cached, metrics)
         self._update_plugin_health(
-            plugin_id=plugin_id,
-            instance=instance_name,
+            plugin_id=turn.plugin_id,
+            instance=turn.instance_name,
             ok=True,
             metrics=metrics,
             error=None,
         )
         self.recorder.publish_done(
-            plugin_id=plugin_id,
-            instance=instance_name,
-            refresh_id=benchmark_id,
-            request_id=request_id,
+            plugin_id=turn.plugin_id,
+            instance=turn.instance_name,
+            refresh_id=turn.benchmark_id,
+            request_id=turn.request_id,
             metrics=metrics,
             duration_ms=request_ms,
         )
-        return refresh_info | {"benchmark_id": benchmark_id}, used_cached, metrics
+        return (
+            refresh_info | {"benchmark_id": turn.benchmark_id},
+            used_cached,
+            metrics,
+        )
 
     @staticmethod
     def _is_paused_probe(
