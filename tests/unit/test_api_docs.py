@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import json
-import re
+from html.parser import HTMLParser
 from typing import Any
 from urllib.parse import urlsplit
 
@@ -54,6 +54,22 @@ def _csp(resp: Any) -> dict[str, list[str]]:
     return directives
 
 
+class _Tags(HTMLParser):
+    """Collect <script> attributes and stylesheet links from a page."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.scripts: list[dict[str, str]] = []
+        self.stylesheets: list[str] = []
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        values = {name: value or "" for name, value in attrs}
+        if tag == "script":
+            self.scripts.append(values)
+        elif tag == "link" and values.get("rel") == "stylesheet":
+            self.stylesheets.append(values["href"])
+
+
 def test_api_docs_page_is_allowed_by_its_own_csp(
     client: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -68,17 +84,17 @@ def test_api_docs_page_is_allowed_by_its_own_csp(
         parts = urlsplit(url)
         return f"{parts.scheme}://{parts.netloc}"
 
-    scripts = re.findall(r'<script src="([^"]+)"', body)
-    styles = re.findall(r'<link rel="stylesheet"\s+href="([^"]+)"', body)
-    assert scripts and styles
+    page = _Tags()
+    page.feed(body)
+    scripts = [a["src"] for a in page.scripts if a.get("src")]
+    inline = [a for a in page.scripts if not a.get("src")]
+    assert scripts and inline and page.stylesheets
     for url in scripts:
         assert origin(url) in csp["script-src"]
-    for url in styles:
+    for url in page.stylesheets:
         assert origin(url) in csp["style-src"]
-    inline = re.findall(r"<script( nonce=\"([^\"]*)\")?>", body)
-    assert inline
-    for _attr, nonce in inline:
-        assert nonce and f"'nonce-{nonce}'" in csp["script-src"]
+    for attrs in inline:
+        assert attrs.get("nonce") and f"'nonce-{attrs['nonce']}'" in csp["script-src"]
 
 
 def test_api_docs_sources_do_not_leak_to_other_pages(
