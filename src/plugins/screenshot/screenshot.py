@@ -1,6 +1,6 @@
 import logging
 from collections.abc import Mapping
-from typing import Any, cast
+from typing import Any
 
 from PIL import Image
 
@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 _MAX_RENDER_WAIT_MS = 30_000
 
 
-class Screenshot(BasePlugin):  # type: ignore[misc, unused-ignore]
+class Screenshot(BasePlugin):
     def validate_settings(self, settings: Mapping[str, object]) -> str | None:
         """Reject non-http(s) URLs at save time to prevent unsafe values persisting."""
         raw_url = settings.get("url", "")
@@ -31,49 +31,46 @@ class Screenshot(BasePlugin):  # type: ignore[misc, unused-ignore]
         return None
 
     def build_settings_schema(self) -> dict[str, object]:
-        return cast(  # type: ignore[redundant-cast, unused-ignore]
-            dict[str, object],
-            schema(
-                section(
-                    "Capture",
-                    field(
-                        "url",
-                        "url",
-                        label="URL",
-                        placeholder="https://example.com",
-                        pattern="https?://.*",
-                        required=True,
+        return schema(
+            section(
+                "Capture",
+                field(
+                    "url",
+                    "url",
+                    label="URL",
+                    placeholder="https://example.com",
+                    pattern="https?://.*",
+                    required=True,
+                ),
+                field(
+                    "renderWaitMs",
+                    "number",
+                    label="Render wait (ms)",
+                    hint=(
+                        "Extra time for JavaScript-driven pages to finish "
+                        "painting before capture. Leave empty to capture as "
+                        "soon as the page loads."
                     ),
-                    field(
-                        "renderWaitMs",
-                        "number",
-                        label="Render wait (ms)",
-                        hint=(
-                            "Extra time for JavaScript-driven pages to finish "
-                            "painting before capture. Leave empty to capture as "
-                            "soon as the page loads."
-                        ),
-                        placeholder="2000",
+                    placeholder="2000",
+                ),
+                field(
+                    "skipIfBlank",
+                    "checkbox",
+                    label="Skip if the capture is blank",
+                    hint=(
+                        "If the screenshot comes back a single flat colour, "
+                        "leave the display on its previous content instead of "
+                        "pushing an empty frame."
                     ),
-                    field(
-                        "skipIfBlank",
-                        "checkbox",
-                        label="Skip if the capture is blank",
-                        hint=(
-                            "If the screenshot comes back a single flat colour, "
-                            "leave the display on its previous content instead of "
-                            "pushing an empty frame."
-                        ),
-                        checked_value="true",
-                        unchecked_value="false",
-                        submit_unchecked=True,
-                    ),
-                    callout(
-                        "Public websites only; private network addresses are blocked. Slow or heavily scripted sites may fail to render before the screenshot timeout.",
-                        tone="warning",
-                    ),
-                )
-            ),
+                    checked_value="true",
+                    unchecked_value="false",
+                    submit_unchecked=True,
+                ),
+                callout(
+                    "Public websites only; private network addresses are blocked. Slow or heavily scripted sites may fail to render before the screenshot timeout.",
+                    tone="warning",
+                ),
+            )
         )
 
     @staticmethod
