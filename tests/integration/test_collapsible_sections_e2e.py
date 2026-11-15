@@ -47,25 +47,41 @@ def test_playlist_card_toggle(
 
 
 def test_settings_tabs_switch(live_server: str, browser_page: Page) -> None:
-    """Settings page tabs switch between content panels."""
+    """Each settings section button shows its own panel and hides the others.
+
+    This used to look for ``[data-tab], .tab-button, .settings-tab``, none of
+    which the page has, so it fell through to checking that the Save button
+    was visible and never clicked a tab at all.
+    """
     page = browser_page
     navigate_and_wait(page, live_server, "/settings")
 
-    tabs = page.locator("[data-tab], .tab-button, .settings-tab")
-    tab_count = tabs.count()
+    buttons = page.locator("[data-settings-tab]")
+    names = [
+        buttons.nth(i).get_attribute("data-settings-tab") or ""
+        for i in range(buttons.count())
+    ]
+    assert len(names) > 1, f"expected several settings sections, found {names}"
+    panels = page.locator("[data-settings-panel]")
+    assert sorted(
+        panels.nth(i).get_attribute("data-settings-panel") or ""
+        for i in range(panels.count())
+    ) == sorted(names), "every section button needs exactly one panel"
 
-    if tab_count > 1:
-        tabs.nth(1).click()
-        expect(
-            tabs.nth(1).and_(page.locator(".active, [aria-selected='true']")),
-            "Clicked tab should become active",
-        ).to_have_count(1)
-        is_active = tabs.nth(1).evaluate(
-            "el => el.classList.contains('active') || el.getAttribute('aria-selected') === 'true'"
+    # Walk backwards so the first click moves away from the default section.
+    for name in reversed(names):
+        page.locator(f'[data-settings-tab="{name}"]').click()
+
+        expect(page.locator(f'[data-settings-tab="{name}"]')).to_have_class(
+            re.compile(r"\bactive\b")
         )
-        assert is_active, "Clicked tab should become active"
-    else:
-        assert page.locator("#saveSettingsBtn").is_visible()
+        expect(page.locator("[data-settings-tab].active")).to_have_count(1)
+        panel = page.locator(f'[data-settings-panel="{name}"]')
+        expect(panel).to_be_visible()
+        expect(panel).to_have_attribute("aria-hidden", "false")
+        for other in names:
+            if other != name:
+                expect(page.locator(f'[data-settings-panel="{other}"]')).to_be_hidden()
 
 
 def test_plugin_style_accordion_chevron_flips(
