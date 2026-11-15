@@ -6,12 +6,8 @@ This guide explains how to run, extend, and understand the test setup.
 
 ### Setup & Running
 
-1) Create a venv and install deps
-```bash
-bash scripts/venv.sh
-. .venv/bin/activate
-python -m pip install -r install/requirements.txt -r install/requirements-dev.txt || true
-```
+1) Set up the environment as in [development.md → Setup](development.md#setup):
+`source scripts/venv.sh` (in each new shell).
 
 2) Run tests
 ```bash

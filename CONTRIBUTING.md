@@ -9,29 +9,10 @@ Thanks for your interest in contributing to InkyPi! This guide covers setup, tes
 
 ## Dev Setup
 
-```bash
-# Clone the current repo or your fork
-git clone https://github.com/jtn0123/InkyPi.git
-cd InkyPi
-
-# Create and activate a virtual environment
-python3.13 -m venv .venv  # InkyPi supports Python 3.13 only
-source .venv/bin/activate
-
-# Install dev dependencies
-pip install -r install/requirements-dev.txt
-
-# Install pre-commit hooks
-pre-commit install
-```
-
-## Running the Dev Server
-
-```bash
-.venv/bin/python src/inkypi.py --dev --web-only
-```
-
-This starts the web UI on port 8080 without requiring e-ink display hardware.
+Follow [development.md → Setup](docs/development.md#setup): clone, then
+`source scripts/venv.sh`, then `./scripts/dev.sh --web-only` for the web UI on
+port 8080 with no display hardware. Then install the git hooks with
+`pre-commit install` ([details](docs/development.md#install-pre-commit-hooks-recommended)).
 
 ## Running Tests
 
