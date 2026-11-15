@@ -3,21 +3,11 @@
 from __future__ import annotations
 
 import json
-import os
-import sys
 from pathlib import Path
 from typing import Any
 
 import pytest
-
-# ---------------------------------------------------------------------------
-# Import helper — the script lives in scripts/, not on sys.path by default
-# ---------------------------------------------------------------------------
-_SCRIPTS_DIR = os.path.join(os.path.dirname(__file__), "..", "scripts")
-if _SCRIPTS_DIR not in sys.path:
-    sys.path.insert(0, _SCRIPTS_DIR)
-
-import validate_api_keys as vak  # noqa: E402  (import after path manipulation)
+from scripts import validate_api_keys as vak
 
 # ---------------------------------------------------------------------------
 # Fixtures

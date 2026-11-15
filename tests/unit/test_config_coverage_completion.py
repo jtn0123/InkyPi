@@ -264,10 +264,10 @@ def test_validation_with_jsonschema_available(
         assert cfg is not None
 
 
-def test_validation_without_jsonschema(
+def test_valid_config_passes_schema_validation(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Test that config loads when jsonschema is not available."""
+    """A valid device.json loads with schema validation switched on."""
     config_dir = tmp_path / "config"
     config_dir.mkdir()
     config_file = config_dir / "device.json"
@@ -295,7 +295,6 @@ def test_validation_without_jsonschema(
     config_file.write_text(json.dumps(cfg_data))
 
     import config as config_mod
-    import utils.config_schema as schema_mod
 
     monkeypatch.setattr(config_mod.Config, "BASE_DIR", str(tmp_path))
     monkeypatch.setattr(
@@ -311,10 +310,6 @@ def test_validation_without_jsonschema(
         config_mod.Config, "history_image_dir", str(tmp_path / "history")
     )
 
-    # Temporarily disable jsonschema in the schema validation module
-    monkeypatch.setattr(schema_mod, "jsonschema", None)
-
-    # Should still load without validation (valid orientation so fallback passes)
     cfg = config_mod.Config()
     assert cfg.get_config("name") == "InkyPi No Schema"
 

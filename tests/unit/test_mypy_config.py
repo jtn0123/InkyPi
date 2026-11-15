@@ -47,11 +47,7 @@ def test_strict_flags_are_not_switched_back_off() -> None:
     assert relaxed == set()
 
 
-def test_mypy_actually_reports_strict_errors(tmp_path: Path) -> None:
-    """Run mypy with the repo config on an untyped function."""
-    sample = tmp_path / "untyped_sample.py"
-    sample.write_text("def f(x):\n    return x\n", encoding="utf-8")
-
+def _run_mypy(sample: Path) -> str:
     result = subprocess.run(
         [
             sys.executable,
@@ -68,5 +64,29 @@ def test_mypy_actually_reports_strict_errors(tmp_path: Path) -> None:
         check=False,
         timeout=120,
     )
+    return result.stdout + result.stderr
 
-    assert "[no-untyped-def]" in result.stdout, result.stdout + result.stderr
+
+def test_mypy_actually_reports_strict_errors(tmp_path: Path) -> None:
+    """Run mypy with the repo config on an untyped function."""
+    sample = tmp_path / "untyped_sample.py"
+    sample.write_text("def f(x):\n    return x\n", encoding="utf-8")
+
+    assert "[no-untyped-def]" in _run_mypy(sample)
+
+
+def test_missing_imports_are_not_ignored_wholesale() -> None:
+    """Untyped libraries are named in mypy.ini, one section per group.
+
+    A global ``ignore_missing_imports`` turns every new import without types
+    into a silent ``Any``, including a library whose stub package was simply
+    never added to requirements-dev.
+    """
+    assert not _config().getboolean("mypy", "ignore_missing_imports", fallback=False)
+
+
+def test_an_unlisted_import_without_types_fails(tmp_path: Path) -> None:
+    sample = tmp_path / "unlisted_import.py"
+    sample.write_text("import inkypi_no_such_library\n", encoding="utf-8")
+
+    assert "[import-not-found]" in _run_mypy(sample)

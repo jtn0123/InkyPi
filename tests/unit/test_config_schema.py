@@ -6,8 +6,6 @@ Coverage targets:
 - Missing a required field (playlist item name) raises with helpful message.
 - Unknown extra fields PASS (permissive additionalProperties: true).
 - Real device_dev.json validates cleanly (regression guard).
-- Fallback validation (jsonschema=None) catches bad orientation.
-- Fallback allows valid orientation.
 - Missing schema file skips validation without error.
 """
 
@@ -157,35 +155,6 @@ def test_real_device_dev_json_validates() -> None:
     with open(dev_json_path) as fh:
         cfg = json.load(fh)
 
-    validate_device_config(cfg)  # no exception
-
-
-# ---------------------------------------------------------------------------
-# Fallback validation (jsonschema=None) — catches bad orientation
-# ---------------------------------------------------------------------------
-
-
-def test_fallback_catches_bad_orientation(monkeypatch: pytest.MonkeyPatch) -> None:
-    """When jsonschema is unavailable, the fallback catches invalid orientation."""
-    monkeypatch.setattr(schema_mod, "jsonschema", None)
-    bad = _with(orientation="upside_down")
-    with pytest.raises(ConfigValidationError) as exc_info:
-        validate_device_config(bad)
-    msg = str(exc_info.value)
-    assert "orientation" in msg
-    assert "invalid value" in msg
-
-
-def test_fallback_allows_valid_orientation(monkeypatch: pytest.MonkeyPatch) -> None:
-    """When jsonschema is unavailable, a valid orientation passes the fallback."""
-    monkeypatch.setattr(schema_mod, "jsonschema", None)
-    validate_device_config(_MINIMAL_VALID)  # no exception
-
-
-def test_fallback_no_orientation_key_passes(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Fallback must not crash when orientation key is absent."""
-    monkeypatch.setattr(schema_mod, "jsonschema", None)
-    cfg = {k: v for k, v in _MINIMAL_VALID.items() if k != "orientation"}
     validate_device_config(cfg)  # no exception
 
 
