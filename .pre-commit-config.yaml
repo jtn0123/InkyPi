@@ -54,7 +54,7 @@ repos:
     hooks:
       - id: biome-ci
         args: [--error-on-warnings]
-        files: ^src/static/scripts/.*\.js$
+        files: ^src/static/(scripts/.*\.js|sw\.js)$
 
   # The hook's own entry scans only the staged changes. The old
   # `detect --source=.` args were appended to that entry and made gitleaks

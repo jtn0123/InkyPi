@@ -90,7 +90,8 @@ the full hook list.
 
 ### Linting the web scripts (Biome)
 
-The web UI's JavaScript (`src/static/scripts/`) is linted by [Biome](https://biomejs.dev).
+The web UI's JavaScript (`src/static/scripts/` and the service worker, `src/static/sw.js`) is
+linted by [Biome](https://biomejs.dev).
 There is no build step and no `package.json`: the pre-commit hook uses Biome's official mirror,
 which installs the pinned Biome into pre-commit's own cache, and CI's lint job installs the same
 version. Biome only lints; its formatter is off, so it never rewrites a file.
@@ -98,6 +99,8 @@ version. Biome only lints; its formatter is off, so it never rewrites a file.
 ```bash
 pre-commit run biome-ci --all-files   # every script, the same check CI runs
 ```
+
+`scripts/lint.sh` runs the same command, so a passing local lint means a passing CI lint job.
 
 [`biome.json`](../biome.json) holds the rules: Biome's recommended `correctness`, `suspicious`
 and `security` rules plus `noUndeclaredVariables` and `noUnusedVariables`, with warnings failing

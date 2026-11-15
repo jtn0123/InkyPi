@@ -23,6 +23,7 @@ MYPY_TESTS_EXIT=0
 MYPY_TESTS_BASELINE="?"
 MYPY_TESTS_RATCHET_EXIT=0
 SHELLCHECK_EXIT=0
+BIOME_EXIT=0
 
 echo "Running Ruff linter..."
 ruff check src tests scripts
@@ -235,9 +236,29 @@ echo "Running shell script checks..."
 scripts/check_shell.sh
 SHELLCHECK_EXIT=$?
 
-# Report summary — src/ must stay clean and tests/ is ratcheted. Ruff, Black,
-# and shellcheck are blocking too.
-if [ $RUFF_EXIT -ne 0 ] || [ $BLACK_EXIT -ne 0 ] || [ $MYPY_SRC_RATCHET_EXIT -ne 0 ] || [ $MYPY_TESTS_RATCHET_EXIT -ne 0 ] || [ $SHELLCHECK_EXIT -ne 0 ]; then
+# Biome lints the web scripts and the service worker (biome.json), as CI's
+# lint job does in its own step, so a green local run means a green CI lint.
+# Locally, prefer the pinned version through the biome-ci pre-commit hook.
+if [[ -n "${CI:-}" ]]; then
+    echo "Skipping Biome here: CI's lint job runs it in its own step"
+elif command -v pre-commit >/dev/null 2>&1; then
+    echo "Running Biome (pinned, via the biome-ci pre-commit hook)..."
+    pre-commit run biome-ci --all-files
+    BIOME_EXIT=$?
+elif command -v biome >/dev/null 2>&1; then
+    echo "Running Biome..."
+    biome ci --error-on-warnings
+    BIOME_EXIT=$?
+else
+    echo "⚠️  Biome not run: install the dev requirements (they include pre-commit)"
+fi
+if [ $BIOME_EXIT -ne 0 ]; then
+    echo "❌ Biome found issues (exit code: $BIOME_EXIT)"
+fi
+
+# Report summary — src/ must stay clean and tests/ is ratcheted. Ruff,
+# Black, shellcheck and Biome are blocking too.
+if [ $RUFF_EXIT -ne 0 ] || [ $BLACK_EXIT -ne 0 ] || [ $MYPY_SRC_RATCHET_EXIT -ne 0 ] || [ $MYPY_TESTS_RATCHET_EXIT -ne 0 ] || [ $SHELLCHECK_EXIT -ne 0 ] || [ $BIOME_EXIT -ne 0 ]; then
     echo ""
     echo "❌ Some checks failed:"
     [ $RUFF_EXIT -ne 0 ] && echo "  - Ruff: $RUFF_EXIT"
@@ -245,6 +266,7 @@ if [ $RUFF_EXIT -ne 0 ] || [ $BLACK_EXIT -ne 0 ] || [ $MYPY_SRC_RATCHET_EXIT -ne
     [ $MYPY_SRC_RATCHET_EXIT -ne 0 ] && echo "  - mypy src/ ratchet: $MYPY_SRC_RATCHET_EXIT"
     [ $MYPY_TESTS_RATCHET_EXIT -ne 0 ] && echo "  - mypy tests/ ratchet: $MYPY_TESTS_RATCHET_EXIT"
     [ $SHELLCHECK_EXIT -ne 0 ] && echo "  - shellcheck: $SHELLCHECK_EXIT"
+    [ $BIOME_EXIT -ne 0 ] && echo "  - Biome: $BIOME_EXIT"
     echo ""
     echo "Post-run actions will continue..."
 else
@@ -278,7 +300,7 @@ else
     echo "✅ mypy tests/: ${MYPY_TESTS_COUNT} issue(s) matches baseline ${MYPY_TESTS_BASELINE}"
 fi
 
-if [ $RUFF_EXIT -ne 0 ] || [ $BLACK_EXIT -ne 0 ] || [ $MYPY_SRC_RATCHET_EXIT -ne 0 ] || [ $MYPY_TESTS_RATCHET_EXIT -ne 0 ] || [ $SHELLCHECK_EXIT -ne 0 ]; then
+if [ $RUFF_EXIT -ne 0 ] || [ $BLACK_EXIT -ne 0 ] || [ $MYPY_SRC_RATCHET_EXIT -ne 0 ] || [ $MYPY_TESTS_RATCHET_EXIT -ne 0 ] || [ $SHELLCHECK_EXIT -ne 0 ] || [ $BIOME_EXIT -ne 0 ]; then
     exit 1
 fi
 

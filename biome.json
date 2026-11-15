@@ -3,6 +3,7 @@
   "files": {
     "includes": [
       "src/static/scripts/**/*.js",
+      "src/static/sw.js",
       "!**/vendor",
       "!**/*.min.js",
       "!src/static/scripts/chart.js"
