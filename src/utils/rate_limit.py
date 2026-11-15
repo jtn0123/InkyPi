@@ -2,7 +2,8 @@
 
 Designed for per-IP limiting of specific Flask endpoints such as /login and
 /display-next.  No external dependencies — uses only threading, time, and
-os from the standard library.
+os from the standard library, plus the limiter registry in
+:mod:`utils.rate_limiter` (also stdlib-only) so tests can reset every bucket.
 
 Usage::
 
@@ -18,6 +19,8 @@ from __future__ import annotations
 import os
 import threading
 import time
+
+from utils.rate_limiter import register_limiter
 
 
 class TokenBucket:
@@ -43,6 +46,12 @@ class TokenBucket:
         # keyed by (str -> [tokens: float, last_refill: float, last_used: float])
         self._buckets: dict[str, list[float]] = {}
         self._lock = threading.Lock()
+        register_limiter(self)
+
+    def clear(self) -> None:
+        """Refill every bucket by forgetting all keys."""
+        with self._lock:
+            self._buckets.clear()
 
     # ------------------------------------------------------------------
     # Public API

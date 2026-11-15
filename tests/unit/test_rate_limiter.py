@@ -216,3 +216,72 @@ class TestThreadSafety:
 
         # Total allowed must not exceed max_requests
         assert allowed_count["value"] <= 50
+
+
+# ---- reset_all_limiters registry (grade item D3) ----
+
+
+def test_reset_all_limiters_clears_every_limiter_type() -> None:
+    from utils.rate_limit import TokenBucket
+    from utils.rate_limiter import reset_all_limiters
+
+    cooldown = CooldownLimiter(60)
+    window = SlidingWindowLimiter(1, 60)
+    bucket = TokenBucket(capacity=1, refill_rate=0.0)
+
+    cooldown.record("k")
+    assert window.check("k")[0] is True
+    assert bucket.try_acquire("k") is True
+    assert cooldown.check("k")[0] is False
+    assert window.check("k")[0] is False
+    assert bucket.try_acquire("k") is False
+
+    reset_all_limiters()
+
+    assert cooldown.check("k")[0] is True
+    assert window.check("k")[0] is True
+    assert bucket.try_acquire("k") is True
+
+
+def test_registry_does_not_keep_limiters_alive() -> None:
+    import gc
+    import weakref
+
+    from utils.rate_limiter import _LIMITERS
+
+    limiter = SlidingWindowLimiter(1, 60)
+    ref = weakref.ref(limiter)
+    assert limiter in _LIMITERS
+    del limiter
+    gc.collect()
+    assert ref() is None
+
+
+def test_module_level_limiters_are_reset() -> None:
+    """The limiters D3 found leaking between tests are reachable by the reset."""
+    import blueprints.client_error as client_error
+    import blueprints.client_log as client_log
+    import blueprints.csp_report as csp_report
+    import blueprints.main as main
+    import blueprints.settings as settings
+    from app_setup import security_middleware
+    from utils.rate_limiter import _LIMITERS, reset_all_limiters
+
+    limiters = [
+        client_error._rate_limiter,
+        client_log._rate_limiter,
+        csp_report._csp_report_limiter,
+        main._display_next_limiter,
+        settings._logs_limiter,
+        settings._shutdown_limiter,
+        security_middleware._mutation_limiter,
+    ]
+    for limiter in limiters:
+        assert limiter in _LIMITERS
+
+    # Exhaust the client-error bucket (5 tokens), then reset it.
+    while client_error._rate_limiter.try_acquire("10.0.0.9"):
+        pass
+    assert client_error._rate_limiter.try_acquire("10.0.0.9") is False
+    reset_all_limiters()
+    assert client_error._rate_limiter.try_acquire("10.0.0.9") is True

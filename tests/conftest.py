@@ -320,16 +320,26 @@ def clear_managed_api_key_env(monkeypatch: pytest.MonkeyPatch) -> None:
     for env_var in MANAGED_API_KEY_ENV_VARS:
         monkeypatch.delenv(env_var, raising=False)
 
-    try:
-        import blueprints.playlist._display as playlist_display_mod
-        import blueprints.settings as settings_mod
+    import blueprints.playlist._display as playlist_display_mod
 
-        playlist_display_mod._eta_cache.clear()
-        settings_mod._logs_limiter._requests.clear()
-        # Reset the shutdown rate limiter so tests are independent
-        settings_mod._shutdown_limiter.reset()
-    except Exception:
-        pass
+    playlist_display_mod._eta_cache.clear()
+
+
+@pytest.fixture(autouse=True)
+def reset_rate_limiters() -> Iterator[None]:
+    """Clear every rate limiter before and after each test.
+
+    The limiters live in module globals (client_error, client_log,
+    csp_report, /display-next, settings logs and shutdown, the mutation
+    limiter), so without this one test's requests count against the next and
+    results depend on test order. The registry reaches all of them, including
+    any added later, without naming each one here.
+    """
+    from utils.rate_limiter import reset_all_limiters
+
+    reset_all_limiters()
+    yield
+    reset_all_limiters()
 
 
 @pytest.fixture(autouse=True)
@@ -395,16 +405,6 @@ def reset_utils_singletons() -> Iterator[Any]:
     _reset_http_session()
     _reset_http_cache()
     _reset_i18n()
-
-
-@pytest.fixture(autouse=True)
-def reset_display_next_cooldown() -> Iterator[Any]:
-    """Reset the /display-next rate limiter between tests."""
-    from blueprints.main import _reset_display_next_cooldown
-
-    _reset_display_next_cooldown()
-    yield
-    _reset_display_next_cooldown()
 
 
 @pytest.fixture()

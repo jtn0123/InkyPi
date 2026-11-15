@@ -1,8 +1,40 @@
 """Thread-safe rate limiters for cooldowns and sliding windows."""
 
+from __future__ import annotations
+
 import threading
 import time
+import weakref
 from collections import deque
+from typing import Protocol
+
+
+class _Clearable(Protocol):
+    def clear(self) -> None: ...
+
+
+#: Every limiter instance, so :func:`reset_all_limiters` can reach the
+#: module-level ones in blueprints and middleware without importing them.
+#: Weak, so a limiter that goes away is not kept alive by the registry.
+_LIMITERS: weakref.WeakSet[_Clearable] = weakref.WeakSet()
+_LIMITERS_LOCK = threading.Lock()
+
+
+def register_limiter(limiter: _Clearable) -> None:
+    """Record *limiter* so :func:`reset_all_limiters` clears it."""
+    with _LIMITERS_LOCK:
+        _LIMITERS.add(limiter)
+
+
+def reset_all_limiters() -> None:
+    """Forget every request recorded by every limiter in the process.
+
+    For test isolation: one test's requests must not count against the next.
+    """
+    with _LIMITERS_LOCK:
+        limiters = list(_LIMITERS)
+    for limiter in limiters:
+        limiter.clear()
 
 
 class CooldownLimiter:
@@ -20,6 +52,7 @@ class CooldownLimiter:
         self._cooldown = cooldown_seconds
         self._timestamps: dict[str, float] = {}
         self._lock = threading.Lock()
+        register_limiter(self)
 
     def check(self, key: str = "global") -> tuple[bool, float]:
         """Read-only test: (allowed, retry_after_seconds).
@@ -45,6 +78,11 @@ class CooldownLimiter:
         with self._lock:
             self._timestamps.pop(key, None)
 
+    def clear(self) -> None:
+        """Clear the cooldown for every key."""
+        with self._lock:
+            self._timestamps.clear()
+
 
 class SlidingWindowLimiter:
     """Per-key sliding window rate limiter.
@@ -62,6 +100,13 @@ class SlidingWindowLimiter:
         self._requests: dict[str, deque[float]] = {}
         self._lock = threading.Lock()
         self._call_count = 0
+        register_limiter(self)
+
+    def clear(self) -> None:
+        """Forget every recorded request for every key."""
+        with self._lock:
+            self._requests.clear()
+            self._call_count = 0
 
     def check(self, key: str) -> tuple[bool, float]:
         """Atomically test-and-record.
