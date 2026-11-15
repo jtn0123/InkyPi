@@ -10,6 +10,7 @@ from refresh_task.actions import (
     ManualUpdateRequest,
     PlaylistRefresh,
     RefreshAction,
+    manual_update_timings,
 )
 from refresh_task.context import RefreshContext
 from refresh_task.task import RefreshTask
@@ -29,6 +30,7 @@ __all__ = [
     "ManualRefresh",
     "PlaylistRefresh",
     "ManualUpdateRequest",
+    "manual_update_timings",
     "_execute_refresh_attempt_worker",
     "_get_mp_context",
     "_remote_exception",

@@ -6,7 +6,7 @@ from typing import Any, cast
 
 from flask import current_app, request
 
-from refresh_task import PlaylistRefresh
+from refresh_task import PlaylistRefresh, manual_update_timings
 from utils.backend_errors import (
     ClientInputError,
     ResourceLookupError,
@@ -88,7 +88,7 @@ def display_next_in_playlist() -> Any:
                 field="playlist_name",
             )
 
-        refresh_task.manual_update(
+        update_metrics = refresh_task.manual_update(
             PlaylistRefresh(playlist, plugin_instance, force=True)
         )
 
@@ -97,21 +97,12 @@ def display_next_in_playlist() -> Any:
 
         device_config.update_atomic(_persist_active_playlist)
 
-        # Include latest metrics from refresh info if available
-        metrics = {}
-        try:
-            ri = device_config.get_refresh_info()
-            metrics = {
-                "request_ms": getattr(ri, "request_ms", None),
-                "generate_ms": getattr(ri, "generate_ms", None),
-                "preprocess_ms": getattr(ri, "preprocess_ms", None),
-                "display_ms": getattr(ri, "display_ms", None),
-            }
-        except Exception:
-            pass
-
+        # This refresh's own timings, not refresh_info's (which can still
+        # describe the previous refresh when manual_update returns early).
         return json_success(
-            "Displayed next instance", metrics=metrics, playlist=playlist.name
+            "Displayed next instance",
+            metrics=manual_update_timings(update_metrics),
+            playlist=playlist.name,
         )
 
 

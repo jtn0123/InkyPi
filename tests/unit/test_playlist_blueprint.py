@@ -4,6 +4,7 @@
 import json
 import threading
 from datetime import UTC, datetime
+from types import SimpleNamespace
 from typing import Any
 from unittest.mock import patch
 
@@ -766,6 +767,41 @@ class TestAddPluginSettingsValidation:
 # ---------------------------------------------------------------------------
 
 
+_STALE_REFRESH_INFO = SimpleNamespace(
+    request_ms=9999, generate_ms=9999, preprocess_ms=9999, display_ms=9999
+)
+_TIMING_CASES = [
+    pytest.param(
+        # manual_update returned at image_saved: the panel write is still going.
+        {"generate_ms": None, "preprocess_ms": 42, "display_ms": None},
+        {
+            "request_ms": None,
+            "generate_ms": None,
+            "preprocess_ms": 42,
+            "display_ms": None,
+        },
+        id="image-saved",
+    ),
+    pytest.param(
+        {
+            "request_ms": 120,
+            "generate_ms": 80,
+            "preprocess_ms": 30,
+            "display_ms": 10,
+            "steps": [["Generate", 80]],
+        },
+        {
+            "request_ms": 120,
+            "generate_ms": 80,
+            "preprocess_ms": 30,
+            "display_ms": 10,
+            "steps": [["Generate", 80]],
+        },
+        id="completed",
+    ),
+]
+
+
 class TestDisplayNextInPlaylist:
     def test_missing_playlist_name(self, client: FlaskClient) -> None:
         resp = client.post(
@@ -798,7 +834,9 @@ class TestDisplayNextInPlaylist:
         _add_plugin_to_playlist(client, "Next", "Inst1", "weather")
 
         refresh_task = client.application.config["REFRESH_TASK"]
-        with patch.object(refresh_task, "manual_update") as mock_update:
+        with patch.object(
+            refresh_task, "manual_update", return_value={}
+        ) as mock_update:
             resp = client.post(
                 "/display_next_in_playlist",
                 json={"playlist_name": "Next"},
@@ -808,6 +846,29 @@ class TestDisplayNextInPlaylist:
             assert resp.get_json()["playlist"] == "Next"
             assert mock_update.called
         assert device_config_dev.get_playlist_manager().active_playlist == "Next"
+
+    @pytest.mark.parametrize(("returned", "expected"), _TIMING_CASES)
+    def test_reports_this_refreshs_timings(
+        self,
+        client: FlaskClient,
+        device_config_dev: Any,
+        monkeypatch: pytest.MonkeyPatch,
+        returned: dict[str, Any],
+        expected: dict[str, Any],
+    ) -> None:
+        """Not refresh_info's, which can still describe the previous refresh."""
+        _create_playlist(client, "Next", "00:00", "24:00")
+        _add_plugin_to_playlist(client, "Next", "Inst1", "weather")
+        refresh_task = client.application.config["REFRESH_TASK"]
+        monkeypatch.setattr(refresh_task, "manual_update", lambda action: returned)
+        monkeypatch.setattr(
+            device_config_dev, "get_refresh_info", lambda: _STALE_REFRESH_INFO
+        )
+
+        resp = client.post("/display_next_in_playlist", json={"playlist_name": "Next"})
+
+        assert resp.status_code == 200
+        assert resp.get_json()["metrics"] == expected
 
 
 # ---------------------------------------------------------------------------
