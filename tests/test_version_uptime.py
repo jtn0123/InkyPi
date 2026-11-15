@@ -265,6 +265,46 @@ def test_run_git_returns_unknown_on_exception() -> None:
     assert result == "unknown"
 
 
+def test_run_git_reads_the_checkout_from_any_working_directory(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The service starts in /run/inkypi, which is not a repository."""
+    import blueprints.version_info as version_info
+
+    repo = tmp_path / "checkout"
+    repo.mkdir()
+    subprocess.run(["git", "init", "-q", str(repo)], check=True)
+    elsewhere = tmp_path / "run-inkypi"
+    elsewhere.mkdir()
+    monkeypatch.setattr(version_info, "_REPO_ROOT", repo)
+    monkeypatch.chdir(elsewhere)
+
+    toplevel = version_info._run_git("rev-parse", "--show-toplevel")
+
+    assert Path(toplevel).resolve() == repo.resolve()
+
+
+def test_run_git_trusts_only_the_checkout() -> None:
+    """Root reading a user-owned checkout needs safe.directory for that repo."""
+    from blueprints.version_info import _REPO_ROOT, _run_git
+
+    mock_result = MagicMock(returncode=0, stdout="abc1234\n")
+    with patch(
+        "blueprints.version_info.subprocess.run", return_value=mock_result
+    ) as run:
+        assert _run_git("rev-parse", "--short", "HEAD") == "abc1234"
+
+    argv = run.call_args.args[0]
+    assert argv[:5] == [
+        "git",
+        "-c",
+        f"safe.directory={_REPO_ROOT}",
+        "-C",
+        str(_REPO_ROOT),
+    ]
+    assert (_REPO_ROOT / "src" / "blueprints" / "version_info.py").is_file()
+
+
 def test_read_build_time_uses_file_when_present(tmp_path: Path) -> None:
     """_read_build_time returns file content when build_time.txt exists."""
     from blueprints.version_info import _read_build_time
