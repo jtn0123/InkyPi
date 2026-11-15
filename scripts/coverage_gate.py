@@ -32,24 +32,25 @@ from pathlib import Path
 
 import defusedxml.ElementTree as ET
 
-# Measured on main @ 38c08e10 (CI run 42440236419, coverage-3.13 artifact):
-# total 91.27%. Small files have coarse granularity (blackout.py has two
-# branches, so one missed branch is -50%), hence the looser branch floors.
+# Measured on main @ ef403dce (CI run 43706509445, coverage-3.13 and
+# coverage-gate artifacts), identical to 0.1 point on the two main runs before
+# it: total 93.4% lines / 86.8% branches. Small files have coarse granularity
+# (blackout.py has two branches, so one missed branch is -50%; task.py has 30,
+# so one is -3.3%), hence floors at least one branch under the measurement.
 FULL_THRESHOLDS: dict[str, tuple[float, float]] = {
     # Packages
-    "refresh_task/": (0.93, 0.82),  # 94.4 / 83.9
-    "display/": (0.93, 0.85),  # 94.2 / 86.5
-    "blueprints/": (0.89, 0.83),  # 90.7 / 85.1
-    "app_setup/": (0.91, 0.84),  # 92.8 / 85.6
+    "refresh_task/": (0.94, 0.85),  # 95.8 / 86.5
+    "display/": (0.95, 0.90),  # 96.2 / 92.1
+    "blueprints/": (0.90, 0.85),  # 91.6 / 86.5
+    "app_setup/": (0.91, 0.84),  # 92.9 / 85.4
+    "plugins/": (0.92, 0.81),  # 94.0 / 82.9
+    "utils/": (0.92, 0.88),  # 93.5 / 89.7
     # Files
-    # task.py was split into task.py + mixin modules after the run above.
-    # These four were measured by a local run of every refresh-task-related
-    # test file (a strict subset of the full suite, so a lower bound on it).
-    "refresh_task/task.py": (0.91, 0.85),  # 92.5 / 86.7 (subset)
-    "refresh_task/refresh_cycle.py": (0.91, 0.83),  # 92.3 / 84.6 (subset)
-    "refresh_task/command_queue.py": (0.91, 0.86),  # 92.5 / 88.1 (subset)
-    "refresh_task/loop_scheduling.py": (0.94, 0.90),  # 95.5 / 92.3 (subset)
-    "display/display_manager.py": (0.94, 0.89),  # 95.9 / 91.3
+    "refresh_task/task.py": (0.95, 0.90),  # 96.9 / 93.3
+    "refresh_task/refresh_cycle.py": (0.91, 0.84),  # 92.9 / 87.5
+    "refresh_task/command_queue.py": (0.91, 0.86),  # 92.5 / 88.1
+    "refresh_task/loop_scheduling.py": (0.94, 0.89),  # 95.7 / 92.9
+    "display/display_manager.py": (0.95, 0.89),  # 96.4 / 92.9
     "config.py": (0.88, 0.82),  # 89.8 / 84.4
     "app_setup/auth.py": (0.94, 0.86),  # 95.7 / 88.5
     "app_setup/security_middleware.py": (0.91, 0.83),  # 92.5 / 85.4
@@ -60,17 +61,14 @@ FULL_THRESHOLDS: dict[str, tuple[float, float]] = {
     "utils/asset_check.py": (0.87, 0.90),  # 88.9 / 92.9
 }
 
-# The preflash subset (coverage-gate job artifact, same run):
-# display_manager.py 82.6 / 71.7, config.py 73.4 / 65.6. The refresh_task
-# entries replace the old single task.py floor (70.5 / 54.7) after task.py was
-# split into mixin modules; measured with a local run of the same 14 files.
+# The preflash subset (coverage-gate artifact, same run).
 PREFLASH_THRESHOLDS: dict[str, tuple[float, float]] = {
-    "refresh_task/task.py": (0.81, 0.50),  # 83.1 / 53.3
-    "refresh_task/refresh_cycle.py": (0.71, 0.50),  # 73.1 / 53.8
+    "refresh_task/task.py": (0.88, 0.63),  # 89.9 / 66.7
+    "refresh_task/refresh_cycle.py": (0.76, 0.59),  # 78.0 / 62.5
     "refresh_task/command_queue.py": (0.60, 0.57),  # 61.9 / 59.5
-    "refresh_task/loop_scheduling.py": (0.50, 0.32),  # 52.3 / 34.6
-    "display/display_manager.py": (0.80, 0.70),
-    "config.py": (0.72, 0.64),
+    "refresh_task/loop_scheduling.py": (0.60, 0.39),  # 62.1 / 42.9
+    "display/display_manager.py": (0.82, 0.73),  # 84.3 / 76.8
+    "config.py": (0.72, 0.64),  # 73.4 / 65.6
 }
 
 PROFILES: dict[str, dict[str, tuple[float, float]]] = {

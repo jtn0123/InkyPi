@@ -93,7 +93,7 @@ def test_main_profiles_and_exit_codes(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     # Coverage that clears the preflash subset floors but not the full ones.
-    lines = [_line(i, 1 if i <= 85 else 0) for i in range(1, 101)]
+    lines = [_line(i, 1 if i <= 90 else 0) for i in range(1, 101)]
     lines.append(_line(101, 1, "75% (3/4)"))
     xml = _write_xml(
         tmp_path,
@@ -120,6 +120,8 @@ def test_full_floors_cover_critical_modules() -> None:
         "display/",
         "blueprints/",
         "app_setup/",
+        "plugins/",
+        "utils/",
         "app_setup/auth.py",
         "app_setup/security_middleware.py",
         "utils/boot_self_test.py",
