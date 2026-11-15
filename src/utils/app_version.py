@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import tomllib
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -29,6 +28,10 @@ def read_app_version(repo_root: Path = REPO_ROOT) -> str:
             return value
     except (OSError, ValueError):
         pass
+
+    # Imported here: a real install has VERSION, and tomllib costs the
+    # Pi four modules and about 0.5 MB it would otherwise never use.
+    import tomllib
 
     try:
         with (repo_root / "pyproject.toml").open("rb") as f:
