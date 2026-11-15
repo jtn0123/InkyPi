@@ -142,7 +142,7 @@ As of the version that resolves [JTN-604](https://linear.app/jtn0123/issue/JTN-6
 - First-boot install time drops from **~15 min to ~2–3 min**
 - Peak RAM during install drops from **~400 MB to < 200 MB** (no native compilation)
 - SD card wear drops because pip never writes intermediate build objects
-- The `--require-hashes` lockfile still applies — every wheel is verified against the hashes in `install/requirements.txt` before install
+- Hash checking stays on. The tarball is checked against its published `.sha256`, and every wheel inside it against the release's per-wheel manifest (`inkypi-wheels-<version>-<arch>.tar.gz.manifest.sha256`). pip/uv then install with `--require-hashes` from a copy of `install/requirements.txt` whose pins also accept those manifest hashes. That copy is needed because the Pi wheels CI builds (numpy, Pillow and cffi for `linux_armv7l`) have hashes PyPI never published. Packages without a matching wheel are still checked against the PyPI hashes in `install/requirements.txt`. The manifest comes from the same GitHub release as the tarball, so this catches a corrupted or swapped download, not a tampered release.
 
 **Graceful fallback.** If the wheelhouse is missing (dev branches, network failure, unsupported arch, checksum mismatch, etc.), `install.sh` logs a `falling back to source install` message and runs the normal online pip install — no manual intervention needed.
 
