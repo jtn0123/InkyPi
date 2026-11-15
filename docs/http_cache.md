@@ -1,6 +1,16 @@
 # HTTP Response Caching
 
-InkyPi includes an HTTP response cache to dramatically reduce redundant API calls and improve performance, especially important on resource-constrained devices like Raspberry Pi.
+InkyPi includes an in-memory HTTP response cache for `http_get()` calls.
+
+> **What it does and doesn't do today.** The cache is on by default, but only
+> for requests made through `utils.http_utils.http_get()`. It lives in the
+> memory of the process that made the request. By default
+> (`INKYPI_PLUGIN_ISOLATION=process`), each plugin render runs in its own
+> short-lived process, so anything cached during a render is gone when the
+> render ends. A later refresh downloads again. Most built-in plugins (Weather,
+> Calendar, RSS, NASA APOD) also fetch through the shared session from
+> `get_http_session()`, which skips the cache entirely. In practice the cache
+> saves repeat requests only within one render, or in the web process.
 
 ## Overview
 
@@ -12,7 +22,7 @@ The HTTP cache automatically stores successful API responses and reuses them for
 
 ## Features
 
-- **Automatic caching**: Enabled by default for all GET requests
+- **Automatic caching**: Enabled by default for GET requests made with `http_get()` (not the shared session; see the note above)
 - **TTL-based expiration**: Configurable time-to-live per entry
 - **Cache-Control support**: Respects HTTP `Cache-Control` headers
 - **LRU eviction**: Automatically removes least-used entries when full
