@@ -79,6 +79,7 @@ install_plugin() {
             exit 1
         fi
 
+        # shellcheck source=/dev/null
         source "$VENV_PATH/bin/activate"
         pip install -r "$REQ_FILE"
         deactivate

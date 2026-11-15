@@ -47,4 +47,4 @@ for sc in "${SCENES[@]}"; do
     else shoot "$p" "$OUT/$sc-$scr.png" panel; fi
   done
 done
-echo "shots in $OUT: $(ls "$OUT" | wc -l | tr -d ' ')"
+echo "shots in $OUT: $(find "$OUT" -maxdepth 1 -type f -name '*.png' | wc -l | tr -d ' ')"

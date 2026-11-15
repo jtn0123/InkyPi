@@ -17,8 +17,12 @@ updates:
           - "minor"
           - "patch"
 
+  # The composite action in .github/actions/ pins actions too; listing it here
+  # keeps those pins moving with the workflow ones.
   - package-ecosystem: "github-actions"
-    directory: "/"
+    directories:
+      - "/"
+      - "/.github/actions/*"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5

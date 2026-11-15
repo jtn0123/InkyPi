@@ -252,34 +252,12 @@ else
     echo "✅ mypy strict helper subset clean"
 fi
 
-# Shell scripts under install/ and scripts/ — must pass shellcheck.
-# Dynamic discovery ensures new scripts are covered automatically.
-shopt -s nullglob
-EXISTING_SHELLCHECK_FILES=(install/*.sh scripts/*.sh)
-shopt -u nullglob
-
-echo "Running shellcheck..."
-if command -v shellcheck > /dev/null 2>&1; then
-    if [[ ${#EXISTING_SHELLCHECK_FILES[@]} -gt 0 ]]; then
-        shellcheck --severity=warning "${EXISTING_SHELLCHECK_FILES[@]}"
-        SHELLCHECK_EXIT=$?
-    else
-        echo "No shell script files found to check."
-    fi
-    if [ $SHELLCHECK_EXIT -ne 0 ]; then
-        echo "❌ shellcheck found issues (exit code: $SHELLCHECK_EXIT)"
-    else
-        echo "✅ shellcheck passed"
-    fi
-else
-    # In CI the binary must be present; locally we skip with a warning.
-    if [[ -n "${CI:-}" ]]; then
-        echo "❌ shellcheck not found — install it in the CI image."
-        SHELLCHECK_EXIT=1
-    else
-        echo "⚠️  shellcheck not found — skipping (install via: brew install shellcheck / apt install shellcheck)"
-    fi
-fi
+# Every tracked shell script: bash -n, then shellcheck at its default
+# severity. This is the only shellcheck run; CI's lint job gets it from here.
+# check_shell.sh discovers the scripts, so new ones are covered automatically.
+echo "Running shell script checks..."
+scripts/check_shell.sh
+SHELLCHECK_EXIT=$?
 
 # Report summary — src/ must stay clean, tests/ is ratcheted, and the strict
 # subset remains fully blocking. Ruff, Black, and shellcheck are blocking too.
