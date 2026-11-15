@@ -130,7 +130,7 @@ class TestUploadPadsInTheImageMode:
                 return default
 
         plugin = ImageUpload({"id": "image_upload"})
-        plugin.open_image = lambda _i, _locs: source
+        plugin.open_image = lambda _i, _locs, **_kw: source
         result = plugin.generate_image(
             {
                 "imageFiles[]": ["a.png"],
