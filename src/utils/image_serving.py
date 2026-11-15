@@ -5,6 +5,10 @@ the PNG file.  The encoded bytes are cached in-process (keyed on path, mtime,
 and file size) so repeated requests within a server lifetime are essentially
 free.  Browsers that do not advertise WebP support receive the original PNG via
 a standard ``flask.send_file`` call.
+
+Callers may also ask for a narrower WebP thumbnail (for example the History
+grid), restricted to :data:`THUMBNAIL_WIDTHS` so arbitrary sizes cannot fill
+the cache or the CPU.
 """
 
 from __future__ import annotations
@@ -33,6 +37,12 @@ from utils.http_utils import content_disposition
 _WEBP_QUALITY = 85
 _WEBP_METHOD = 4
 _CACHE_MAX = 32  # maximum number of distinct (path, mtime, size) entries
+# Thumbnails are a few KB each; keep enough for a couple of History pages so
+# they don't push full-size images out of the cache above.
+_THUMB_CACHE_MAX = 64
+#: Widths, in pixels, that callers may request with ``width=``.
+THUMBNAIL_WIDTHS = frozenset({480})
+_THUMB_MAX_HEIGHT = 10_000  # thumbnail() bounds both axes; only width matters
 
 
 @lru_cache(maxsize=_CACHE_MAX)
@@ -50,6 +60,26 @@ def _encode_webp(
         return buf.getvalue()
 
 
+@lru_cache(maxsize=_THUMB_CACHE_MAX)
+def _encode_webp_thumbnail(
+    path: str, mtime: int, size: int, width: int
+) -> bytes:  # noqa: ARG001 (mtime and size are cache keys)
+    """Return WebP bytes for *path* scaled down to at most *width* pixels wide.
+
+    Never upscales. Palette and bilevel images are converted first, because
+    Pillow resamples those modes with nearest-neighbour only.
+    """
+    with Image.open(path) as img:
+        thumb: Image.Image = img
+        if img.mode not in ("RGB", "RGBA", "L"):
+            has_alpha = img.mode.endswith("A") or "transparency" in img.info
+            thumb = img.convert("RGBA" if has_alpha else "RGB")
+        thumb.thumbnail((width, _THUMB_MAX_HEIGHT), Image.Resampling.LANCZOS)
+        buf = io.BytesIO()
+        thumb.save(buf, format="WEBP", quality=_WEBP_QUALITY, method=_WEBP_METHOD)
+        return buf.getvalue()
+
+
 # ---------------------------------------------------------------------------
 # Public helper
 # ---------------------------------------------------------------------------
@@ -59,6 +89,7 @@ def maybe_serve_webp(
     safe_root: Path | str,
     filename: str,
     accept_header: str | None,
+    width: int | None = None,
 ) -> Response:
     """Return a WebP response if the client accepts it, otherwise the original PNG.
 
@@ -73,6 +104,9 @@ def maybe_serve_webp(
         rejects path-traversal attempts.
     accept_header:
         Value of the ``Accept`` request header (may be *None*).
+    width:
+        Optional thumbnail width from :data:`THUMBNAIL_WIDTHS`. WebP clients
+        get the image scaled down to it; other clients get the original PNG.
 
     Returns
     -------
@@ -84,7 +118,11 @@ def maybe_serve_webp(
     ------
     werkzeug.exceptions.NotFound
         If the resolved file does not exist or escapes *safe_root*.
+    ValueError
+        If *width* is not one of :data:`THUMBNAIL_WIDTHS`.
     """
+    if width is not None and width not in THUMBNAIL_WIDTHS:
+        raise ValueError(f"unsupported thumbnail width: {width}")
     root_str = str(safe_root)
 
     if not _client_accepts_webp(accept_header):
@@ -107,7 +145,8 @@ def maybe_serve_webp(
     mtime = stat.st_mtime_ns
     size = stat.st_size
 
-    etag = _make_etag(safe_path, mtime, size)
+    variant = "webp" if width is None else f"webp-w{width}"
+    etag = _make_etag(safe_path, mtime, size, variant)
     response = Response(mimetype="image/webp")
     response.set_etag(etag)
     response.vary.add("Accept")
@@ -121,7 +160,10 @@ def maybe_serve_webp(
         response.make_conditional(request)
         return response
 
-    response.set_data(_encode_webp(safe_path, mtime, size))
+    if width is None:
+        response.set_data(_encode_webp(safe_path, mtime, size))
+    else:
+        response.set_data(_encode_webp_thumbnail(safe_path, mtime, size, width))
     response.make_conditional(request)
     return response
 
@@ -151,9 +193,9 @@ def _client_accepts_webp(accept_header: str | None) -> bool:
     return "image/webp" in accept_header
 
 
-def _make_etag(path: str, mtime: int, size: int) -> str:
-    """Produce a stable ETag string from *path*, *mtime*, and the literal ``"webp"``."""
-    raw = f"{path}:{mtime}:{size}:webp"
+def _make_etag(path: str, mtime: int, size: int, variant: str = "webp") -> str:
+    """Produce a stable ETag string from *path*, *mtime*, *size* and *variant*."""
+    raw = f"{path}:{mtime}:{size}:{variant}"
     # sha256 used purely for cache-key fingerprinting (not security-sensitive),
     # but we use it instead of sha1 to keep SonarCloud quiet (rule S4790).
     return hashlib.sha256(raw.encode()).hexdigest()[:40]

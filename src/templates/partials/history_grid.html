@@ -44,7 +44,7 @@
                data-lightbox-sub="{{ img.mtime_str }} • {{ img.size_str }}"
                data-lightbox-source="{{ source_text }}">
                 <div class="img-skeleton" aria-hidden="true"></div>
-                <img class="history-image" src="{{ url_for('history.history_image', filename=img.filename) }}" alt="History from {{ img.mtime_str }}" loading="lazy" decoding="async">
+                <img class="history-image" src="{{ url_for('history.history_image', filename=img.filename, w=thumb_width) }}" alt="History from {{ img.mtime_str }}" loading="lazy" decoding="async">
             </a>
             <div class="history-card-body">
                 <div class="history-meta">
