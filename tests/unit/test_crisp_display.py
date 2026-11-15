@@ -381,7 +381,9 @@ def test_manager_crisps_flagged_frames_and_saves_crisp_preview(
 
     assert driver.dithered == [False]
     preview = Image.open(device_config_dev.processed_image_file)
-    assert preview.getpixel((140, 140))[:3] == (0, 0, 255)
+    # Stored as an exact six-colour palette PNG.
+    assert preview.mode == "P"
+    assert preview.convert("RGB").getpixel((140, 140)) == (0, 0, 255)
     # The raw render is kept as it was.
     current = Image.open(device_config_dev.current_image_file)
     assert current.getpixel((140, 140))[:3] == (144, 202, 249)
@@ -446,8 +448,8 @@ def test_manager_with_mock_display_ignores_crisp_flag(
 
     dm = DisplayManager(device_config_dev)
     dm.display_image(_ui_frame(), image_settings=[CRISP_IMAGE_SETTING])
-    preview = Image.open(device_config_dev.processed_image_file)
-    assert preview.getpixel((140, 140))[:3] == (144, 202, 249)
+    preview = Image.open(device_config_dev.processed_image_file).convert("RGB")
+    assert preview.getpixel((140, 140)) == (144, 202, 249)
 
 
 def test_manager_handles_odd_config_and_declining_display(
