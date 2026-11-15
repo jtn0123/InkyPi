@@ -9,7 +9,7 @@ import logging
 import os
 from typing import Any, NoReturn
 
-from flask import Blueprint, abort, request, send_file
+from flask import Blueprint, Response, abort, request, send_file
 
 from utils.api_responses import content_disposition
 from utils.app_utils import handle_request_files, parse_form, resolve_path
@@ -73,7 +73,9 @@ def _plugins_dir() -> str:
     return resolve_path("plugins")
 
 
-def _cacheable_send_file(path: str, ttl_env: str = "INKYPI_RENDER_CACHE_TTL_S") -> Any:
+def _cacheable_send_file(
+    path: str, ttl_env: str = "INKYPI_RENDER_CACHE_TTL_S"
+) -> Response:
     safe_path = os.path.realpath(path)
     if not os.path.isfile(safe_path):
         abort(404)

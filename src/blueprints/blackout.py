@@ -37,9 +37,10 @@ from typing import Any
 from urllib.parse import urlsplit
 
 from flask import Blueprint, current_app, redirect, request, url_for
+from flask.typing import ResponseReturnValue
 
 from utils import blackout
-from utils.api_responses import json_error, json_success
+from utils.api_responses import JsonResponse, json_error, json_success
 from utils.env_flags import TRUTHY
 
 logger = logging.getLogger(__name__)
@@ -103,7 +104,7 @@ def _push(name: str, command: Any) -> str:
     return "queued" if getattr(refresh_task, "running", False) else "done"
 
 
-def _apply(turn_on: bool) -> Any:
+def _apply(turn_on: bool) -> ResponseReturnValue:
     device_config = current_app.config["DEVICE_CONFIG"]
     current = blackout.get_state(device_config)
     changed = current["active"] != turn_on
@@ -136,7 +137,7 @@ def _apply(turn_on: bool) -> Any:
 
 
 @blackout_bp.route("/api/blackout", methods=["GET", "POST", "DELETE"])
-def api_blackout() -> Any:
+def api_blackout() -> ResponseReturnValue:
     """Turn blackout on, or off with ``?off=1`` / ``DELETE``."""
     if request.method == "GET":
         reason = _cross_site_reason()
@@ -154,7 +155,7 @@ def api_blackout() -> Any:
 
 
 @blackout_bp.before_app_request
-def _refuse_panel_writes_during_blackout() -> Any:
+def _refuse_panel_writes_during_blackout() -> JsonResponse | None:
     if request.method != "POST" or request.endpoint not in _PANEL_ENDPOINTS:
         return None
     device_config = current_app.config.get("DEVICE_CONFIG")

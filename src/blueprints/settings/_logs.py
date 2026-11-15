@@ -3,9 +3,9 @@
 import io
 import re
 from collections.abc import Mapping
-from typing import Any
 
 from flask import Response, current_app, jsonify, request
+from flask.typing import ResponseReturnValue
 
 from blueprints.settings import logger, settings_bp
 from services import logs, updates
@@ -118,7 +118,7 @@ def _filter_log_lines(lines: list[str], contains: str, level: str) -> list[str]:
 
 
 @settings_bp.route("/api/logs", methods=["GET"])
-def api_logs() -> Response | tuple[Any, int]:
+def api_logs() -> ResponseReturnValue:
     """JSON logs API with server-side filter, level selection and limits."""
     try:
         if not _rate_limit_ok(request.remote_addr):

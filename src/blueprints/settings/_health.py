@@ -8,7 +8,8 @@ from collections.abc import Callable, Generator
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from flask import Response, current_app, request
+from flask import current_app, request
+from flask.typing import ResponseReturnValue
 
 from blueprints.settings import settings_bp
 from utils.api_responses import json_error, json_internal_error, json_success
@@ -124,7 +125,7 @@ def _filter_health_by_window(health: dict[str, Any], window_min: int) -> dict[st
 
 
 @settings_bp.route("/api/health/plugins", methods=["GET"])
-def health_plugins() -> tuple[Any, int] | Response:
+def health_plugins() -> ResponseReturnValue:
     try:
         rt = current_app.config["REFRESH_TASK"]
         health = rt.get_health_snapshot() if hasattr(rt, "get_health_snapshot") else {}
@@ -140,7 +141,7 @@ def health_plugins() -> tuple[Any, int] | Response:
 
 
 @settings_bp.route("/api/health/system", methods=["GET"])
-def health_system() -> tuple[Any, int] | Response:
+def health_system() -> ResponseReturnValue:
     try:
         data: dict[str, Any] = {}
         try:
@@ -168,7 +169,7 @@ def health_system() -> tuple[Any, int] | Response:
 
 
 @settings_bp.route("/api/progress/stream", methods=["GET"])
-def progress_stream() -> Response | tuple[Any, int]:
+def progress_stream() -> ResponseReturnValue:
     if not _progress_stream_enabled():
         return json_error("Progress SSE disabled", status=404)
 

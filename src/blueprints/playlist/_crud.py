@@ -3,6 +3,7 @@
 from typing import Any
 
 from flask import current_app, request
+from flask.typing import ResponseReturnValue
 
 from utils.api_responses import json_error, json_success
 from utils.backend_errors import (
@@ -68,7 +69,7 @@ def _parse_playlist_update_payload(
 
 
 @playlist_bp.route("/create_playlist", methods=["POST"])
-def create_playlist() -> Any:
+def create_playlist() -> ResponseReturnValue:
     device_config = current_app.config["DEVICE_CONFIG"]
     playlist_manager = device_config.get_playlist_manager()
 
@@ -149,7 +150,7 @@ def _apply_cycle_override(
 
 
 @playlist_bp.route("/update_playlist/<string:playlist_name>", methods=["PUT"])
-def update_playlist(playlist_name: str) -> Any:
+def update_playlist(playlist_name: str) -> ResponseReturnValue:
     device_config = current_app.config["DEVICE_CONFIG"]
     playlist_manager = device_config.get_playlist_manager()
 
@@ -232,7 +233,7 @@ def update_playlist(playlist_name: str) -> Any:
 
 
 @playlist_bp.route("/delete_playlist/<string:playlist_name>", methods=["DELETE"])
-def delete_playlist(playlist_name: str) -> Any:
+def delete_playlist(playlist_name: str) -> ResponseReturnValue:
     device_config = current_app.config["DEVICE_CONFIG"]
     playlist_manager = device_config.get_playlist_manager()
 
@@ -277,7 +278,7 @@ def delete_playlist(playlist_name: str) -> Any:
 
 
 @playlist_bp.route("/update_device_cycle", methods=["PUT"])
-def update_device_cycle() -> Any:
+def update_device_cycle() -> ResponseReturnValue:
     device_config = current_app.config["DEVICE_CONFIG"]
     refresh_task = current_app.config["REFRESH_TASK"]
     parsed, parse_error = parse_device_cycle_request(request.get_json(silent=True))
@@ -302,7 +303,7 @@ def update_device_cycle() -> Any:
 
 
 @playlist_bp.route("/reorder_plugins", methods=["POST"])
-def reorder_plugins() -> Any:
+def reorder_plugins() -> ResponseReturnValue:
     device_config = current_app.config["DEVICE_CONFIG"]
     playlist_manager = device_config.get_playlist_manager()
 

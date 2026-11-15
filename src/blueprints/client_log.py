@@ -30,6 +30,7 @@ from collections import deque
 from typing import Any
 
 from flask import Blueprint, Response
+from flask.typing import ResponseReturnValue
 
 from utils.api_responses import json_error, reissue_json_error
 from utils.client_endpoint import enforce_size_and_rate
@@ -232,7 +233,7 @@ def _emit(report: dict[str, object]) -> None:
 
 
 @client_log_bp.route("/api/client-log", methods=["POST"])
-def receive_client_log() -> tuple[Response, int] | Response | Any:
+def receive_client_log() -> ResponseReturnValue:
     """Accept a single entry OR an array of entries and log each as WARNING.
 
     * Single object payload: legacy shape, still supported (JTN-481).
@@ -312,6 +313,6 @@ def receive_client_log() -> tuple[Response, int] | Response | Any:
 
 
 @client_log_bp.route("/api/client-log", methods=["GET"])
-def receive_client_log_get() -> tuple[Response, int] | Response | Any:
+def receive_client_log_get() -> ResponseReturnValue:
     """Explicitly reject GET to provide a clear error instead of 405 from Flask."""
     return json_error("Method not allowed", status=405)

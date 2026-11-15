@@ -4,6 +4,7 @@ from collections.abc import Mapping
 from typing import Any, cast
 
 from flask import current_app, jsonify, request
+from flask.typing import ResponseReturnValue
 
 from plugins.plugin_registry import get_plugin_instance
 from refresh_task import ManualRefresh
@@ -15,7 +16,7 @@ from services.direct_render import (
     internal_failure_outcome,
     known_failure_outcome,
 )
-from utils.api_responses import json_error, json_success
+from utils.api_responses import JsonResponse, json_error, json_success
 from utils.backend_errors import ClientInputError, route_error_for
 from utils.fallback_image import render_error_image
 from utils.form_utils import sanitize_log_field
@@ -94,7 +95,7 @@ def _update_now_direct(
     plugin_settings: dict[str, Any],
     device_config: Any,
     display_manager: Any,
-) -> Any:
+) -> JsonResponse:
     outcome = _direct_render_outcome(
         plugin_id, plugin_settings, device_config, display_manager
     )
@@ -162,7 +163,7 @@ def _push_update_now_fallback(
 
 
 @plugin_bp.route("/api/job/<job_id>", methods=["GET"])
-def job_status(job_id: str) -> tuple[Any, int]:
+def job_status(job_id: str) -> ResponseReturnValue:
     """Poll the status of an asynchronous render job."""
     queue = get_job_queue()
     info = queue.get_status(job_id)
@@ -208,7 +209,7 @@ def _run_update_now(
 
 
 @plugin_bp.route("/update_now", methods=["POST"])
-def update_now() -> Any:
+def update_now() -> ResponseReturnValue:
     """Render a plugin image and push it to the display.
 
     When the client sends ``X-Async: true`` (or ``?async=1``), the render is

@@ -9,7 +9,7 @@ from typing import Any, cast
 
 from model import Playlist
 from refresh_task import schedule
-from utils.api_responses import json_error
+from utils.api_responses import JsonResponse, json_error
 
 from ._common import _CODE_VALIDATION, _MSG_TIME_OVERLAP, logger
 
@@ -56,7 +56,7 @@ def _default_overlap_warning(
 
 def _check_playlist_overlap(
     new_start: int, new_end: int, playlists: Any, exclude_name: str | None = None
-) -> Any | None:
+) -> JsonResponse | None:
     """Check for time window overlap with existing playlists.
 
     Returns an error response if an overlap is found, or None if clear.

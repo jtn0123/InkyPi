@@ -4,6 +4,7 @@ import os
 from typing import Any
 
 from flask import abort, current_app, send_from_directory
+from flask.typing import ResponseReturnValue
 
 from utils import history_index
 from utils.api_responses import content_disposition
@@ -21,7 +22,7 @@ from ._common import (
 
 
 @plugin_bp.route("/images/<plugin_id>/<path:filename>", methods=["GET"])
-def image(plugin_id: str, filename: str) -> Any:
+def image(plugin_id: str, filename: str) -> ResponseReturnValue:
     # Reject null-byte / absolute path inputs up front (defence in depth).
     if (
         not plugin_id
@@ -102,7 +103,7 @@ def image(plugin_id: str, filename: str) -> Any:
     endpoint="plugin_latest_image",
     methods=["GET"],
 )
-def latest_plugin_image(plugin_id: str) -> Any:
+def latest_plugin_image(plugin_id: str) -> ResponseReturnValue:
     """Serve the most recent history image for a given plugin_id.
 
     Any instance of the plugin counts. Used by the plugin page to show
@@ -145,7 +146,7 @@ def _find_latest_plugin_refresh_time(device_config: Any, plugin_id: str) -> str 
     endpoint="plugin_instance_image",
     methods=["GET"],
 )
-def instance_image(plugin_id: str, instance_name: str) -> Any:
+def instance_image(plugin_id: str, instance_name: str) -> ResponseReturnValue:
     """Serve the latest image of one playlist instance, without rendering.
 
     A page view must never run plugin code in a web thread: there it has no

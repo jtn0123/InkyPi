@@ -5,11 +5,12 @@ from typing import Any
 from zoneinfo import available_timezones
 
 from flask import current_app, redirect, render_template, request
+from flask.typing import ResponseReturnValue
 
 from app_setup.logging_setup import configure_log_timezone
 from blueprints.settings import logger, settings_bp
 from display.rendering_settings import SCREEN_RENDERING_KEY, SCREEN_RENDERING_MODES
-from utils.api_responses import json_error, json_success
+from utils.api_responses import JsonResponse, json_error, json_success
 from utils.backend_errors import ClientInputError, route_error_boundary
 from utils.time_utils import calculate_seconds
 
@@ -82,12 +83,12 @@ def _validated_isolation_plugin_id(registered_ids: set[Any]) -> str:
     return normalized_plugin_id
 
 
-def plugin_isolation() -> Any:
+def plugin_isolation() -> ResponseReturnValue:
     _, isolated, _ = _isolation_state()
     return json_success(isolated_plugins=sorted(set(isolated)))
 
 
-def add_plugin_isolation() -> Any:
+def add_plugin_isolation() -> ResponseReturnValue:
     with route_error_boundary(
         "add plugin isolation",
         logger=logger,
@@ -104,7 +105,7 @@ def add_plugin_isolation() -> Any:
         return json_success(isolated_plugins=sorted(set(isolated)))
 
 
-def remove_plugin_isolation() -> Any:
+def remove_plugin_isolation() -> ResponseReturnValue:
     with route_error_boundary(
         "remove plugin isolation",
         logger=logger,
@@ -132,7 +133,7 @@ settings_bp.add_url_rule(
 
 
 @settings_bp.route("/settings/safe_reset", methods=["POST"])
-def safe_reset() -> Any:
+def safe_reset() -> ResponseReturnValue:
     with route_error_boundary(
         "safe reset",
         logger=logger,
@@ -160,7 +161,7 @@ def safe_reset() -> Any:
 
 
 @settings_bp.route("/settings", methods=["GET"])
-def settings_page() -> Any:
+def settings_page() -> ResponseReturnValue:
     device_config = current_app.config["DEVICE_CONFIG"]
     timezones = sorted(available_timezones())
     return render_template(
@@ -172,7 +173,7 @@ def settings_page() -> Any:
 
 
 @settings_bp.route("/settings/diagnostics", methods=["GET"])
-def diagnostics_redirect() -> Any:
+def diagnostics_redirect() -> ResponseReturnValue:
     """Redirect /settings/diagnostics to the Diagnostics accordion on /settings.
 
     Diagnostics is an accordion embedded in the main settings page rather than
@@ -184,7 +185,7 @@ def diagnostics_redirect() -> Any:
 
 
 @settings_bp.route("/settings/backup", methods=["GET"])
-def backup_restore_page() -> Any:
+def backup_restore_page() -> ResponseReturnValue:
     device_config = current_app.config["DEVICE_CONFIG"]
     # For now, reuse the main settings page and anchor to a section; separate template can be added later
     return render_template(
@@ -216,7 +217,7 @@ def _include_export_keys() -> bool:
 @settings_bp.route(
     "/settings/export", methods=["POST"], endpoint="export_settings_post"
 )
-def export_settings() -> Any:
+def export_settings() -> ResponseReturnValue:
     with route_error_boundary(
         "export settings",
         logger=logger,
@@ -306,7 +307,7 @@ def _apply_imported_config(device_config: Any, filtered_cfg: dict[str, Any]) -> 
 
 
 @settings_bp.route("/settings/import", methods=["POST"])
-def import_settings() -> Any:
+def import_settings() -> ResponseReturnValue:
     with route_error_boundary(
         "import settings",
         logger=logger,
@@ -360,7 +361,7 @@ def import_settings() -> Any:
 
 
 @settings_bp.route("/settings/api-keys", methods=["GET"])
-def api_keys_page() -> Any:
+def api_keys_page() -> ResponseReturnValue:
     device_config = current_app.config["DEVICE_CONFIG"]
 
     def mask(value: str | None) -> str | None:
@@ -403,7 +404,7 @@ def api_keys_page() -> Any:
 
 
 @settings_bp.route("/settings/save_api_keys", methods=["POST"])
-def save_api_keys() -> Any:
+def save_api_keys() -> ResponseReturnValue:
     device_config = current_app.config["DEVICE_CONFIG"]
     with route_error_boundary(
         "saving API keys",
@@ -457,7 +458,7 @@ def save_api_keys() -> Any:
 
 
 @settings_bp.route("/settings/delete_api_key", methods=["POST"])
-def delete_api_key() -> Any:
+def delete_api_key() -> ResponseReturnValue:
     device_config = current_app.config["DEVICE_CONFIG"]
     key = request.form.get("key")
     valid_keys = {
@@ -479,7 +480,7 @@ def delete_api_key() -> Any:
         return json_success(message=f"Deleted {key}.")
 
 
-def _field_error(message: str, field: str) -> Any:
+def _field_error(message: str, field: str) -> JsonResponse:
     """Return a 422 validation error response for *field*."""
     return json_error(
         message,
@@ -489,7 +490,7 @@ def _field_error(message: str, field: str) -> Any:
     )
 
 
-def _validate_interval(form_data: dict[str, str]) -> Any | None:
+def _validate_interval(form_data: dict[str, str]) -> JsonResponse | None:
     """Validate and return the parsed interval, or a JSON error response."""
     interval = form_data.get("interval")
     unit = form_data.get("unit")
@@ -513,7 +514,9 @@ def _validate_interval(form_data: dict[str, str]) -> Any | None:
     return None
 
 
-def _validate_device_name(form_data: dict[str, str]) -> tuple[str | None, Any | None]:
+def _validate_device_name(
+    form_data: dict[str, str],
+) -> tuple[str | None, JsonResponse | None]:
     """Validate and normalize the submitted device name."""
     raw_device_name = form_data.get("deviceName", "")
     device_name = raw_device_name.strip()
@@ -538,7 +541,7 @@ def _validate_enum_field(
     allowed: tuple[str, ...],
     *,
     required: bool = True,
-) -> Any | None:
+) -> JsonResponse | None:
     """Validate that *field* is one of *allowed* values.
 
     When *required* is True the field must be present and non-empty.
@@ -560,7 +563,7 @@ def _validate_enum_field(
     return None
 
 
-def _validate_image_settings(form_data: dict[str, str]) -> Any | None:
+def _validate_image_settings(form_data: dict[str, str]) -> JsonResponse | None:
     """Validate numeric image-adjustment fields in *form_data*."""
     import math
 
@@ -590,7 +593,9 @@ def _validate_image_settings(form_data: dict[str, str]) -> Any | None:
     return None
 
 
-def _validate_settings_form(form_data: dict[str, str]) -> tuple[Any | None, str | None]:
+def _validate_settings_form(
+    form_data: dict[str, str],
+) -> tuple[JsonResponse | None, str | None]:
     """Validate settings form data and return any error plus normalized fields."""
     normalized_device_name, err = _validate_device_name(form_data)
     if err:
@@ -673,7 +678,7 @@ def _build_settings_dict(
 
 
 @settings_bp.route("/save_settings", methods=["POST"])
-def save_settings() -> Any:
+def save_settings() -> ResponseReturnValue:
     device_config = current_app.config["DEVICE_CONFIG"]
 
     with route_error_boundary(
@@ -705,27 +710,27 @@ def save_settings() -> Any:
 
 
 # Legacy route aliases used by older UI/tests.
-def device_settings_page() -> Any:
+def device_settings_page() -> ResponseReturnValue:
     return settings_page()
 
 
-def save_device_settings() -> Any:
+def save_device_settings() -> ResponseReturnValue:
     return save_settings()
 
 
-def display_settings_page() -> Any:
+def display_settings_page() -> ResponseReturnValue:
     return settings_page()
 
 
-def save_display_settings() -> Any:
+def save_display_settings() -> ResponseReturnValue:
     return save_settings()
 
 
-def network_settings_page() -> Any:
+def network_settings_page() -> ResponseReturnValue:
     return settings_page()
 
 
-def save_network_settings() -> Any:
+def save_network_settings() -> ResponseReturnValue:
     return save_settings()
 
 

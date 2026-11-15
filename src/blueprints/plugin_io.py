@@ -15,6 +15,7 @@ from datetime import UTC, datetime
 from typing import Any, cast
 
 from flask import Blueprint, Response, current_app, jsonify, request
+from flask.typing import ResponseReturnValue
 
 from services.playlist_workflows import validate_plugin_settings_security
 from utils.api_responses import JsonResponse, content_disposition, json_error
@@ -289,9 +290,7 @@ def _add_import_instances(
 
 
 @plugin_io_bp.route("/api/plugins/import", methods=["POST"])
-def import_plugins() -> (
-    tuple[Response | dict[str, Any], int] | Response | dict[str, Any]
-):
+def import_plugins() -> ResponseReturnValue:
     """Import plugin instances from a JSON body or multipart file upload.
 
     Returns:

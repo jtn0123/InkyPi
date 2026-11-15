@@ -5,6 +5,7 @@ from html import escape
 from typing import Any
 
 from flask import current_app, request
+from flask.typing import ResponseReturnValue
 
 from plugins.plugin_registry import get_plugin_instance
 from refresh_task import PlaylistRefresh
@@ -88,7 +89,7 @@ def _cleanup_plugin_resources(
 
 
 @plugin_bp.route("/delete_plugin_instance", methods=["POST", "DELETE"])
-def delete_plugin_instance() -> Any:
+def delete_plugin_instance() -> ResponseReturnValue:
     device_config = current_app.config[_CONFIG_KEY]
     playlist_manager = device_config.get_playlist_manager()
 
@@ -137,7 +138,7 @@ def delete_plugin_instance() -> Any:
 
 
 @plugin_bp.route("/update_plugin_instance/<string:instance_name>", methods=["PUT"])
-def update_plugin_instance(instance_name: str) -> Any:
+def update_plugin_instance(instance_name: str) -> ResponseReturnValue:
     device_config = current_app.config[_CONFIG_KEY]
     playlist_manager = device_config.get_playlist_manager()
 
@@ -246,7 +247,7 @@ def update_plugin_instance(instance_name: str) -> Any:
 
 
 @plugin_bp.route("/display_plugin_instance", methods=["POST"])
-def display_plugin_instance() -> Any:
+def display_plugin_instance() -> ResponseReturnValue:
     device_config = current_app.config[_CONFIG_KEY]
     refresh_task = current_app.config["REFRESH_TASK"]
     playlist_manager = device_config.get_playlist_manager()
@@ -302,7 +303,9 @@ def display_plugin_instance() -> Any:
     "/plugin_instance/<string:plugin_id>/<string:instance_name>/force_retry",
     methods=["POST"],
 )
-def force_retry_plugin_instance(plugin_id: str, instance_name: str) -> Any:
+def force_retry_plugin_instance(
+    plugin_id: str, instance_name: str
+) -> ResponseReturnValue:
     """Clear the circuit-breaker paused state for a plugin instance.
 
     Allows a paused plugin to be retried on the next scheduler cycle without

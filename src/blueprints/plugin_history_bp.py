@@ -16,6 +16,7 @@ import re
 from typing import Any
 
 from flask import Blueprint, current_app, jsonify, request
+from flask.typing import ResponseReturnValue
 
 from utils.api_responses import json_error
 from utils.plugin_history import compute_diff, get_history
@@ -74,7 +75,7 @@ def _instance_exists(device_config: Any, instance_name: str) -> bool:
 @plugin_history_bp.route(
     "/api/plugins/instance/<string:instance_name>/history", methods=["GET"]
 )
-def plugin_instance_history(instance_name: str) -> Any:
+def plugin_instance_history(instance_name: str) -> ResponseReturnValue:
     """Return recent config-change history for a plugin instance."""
     safe_name = _safe_instance_name(instance_name)
     if safe_name is None:
@@ -99,7 +100,7 @@ def plugin_instance_history(instance_name: str) -> Any:
 @plugin_history_bp.route(
     "/api/plugins/instance/<string:instance_name>/diff", methods=["GET"]
 )
-def plugin_instance_diff(instance_name: str) -> Any:
+def plugin_instance_diff(instance_name: str) -> ResponseReturnValue:
     """Return the diff between the two most-recent history entries."""
     safe_name = _safe_instance_name(instance_name)
     if safe_name is None:
