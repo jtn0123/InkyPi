@@ -101,7 +101,7 @@ def test_jtn_728_reboot_shutdown_journey(
 
     # Keep the test focused on command dispatch, not cooldown timing.
     monkeypatch.setattr(
-        settings_mod._shutdown_limiter, "check", lambda: (True, 0.0), raising=True
+        settings_mod._shutdown_limiter, "acquire", lambda: (True, 0.0), raising=True
     )
     monkeypatch.setattr(
         settings_mod._shutdown_limiter, "record", lambda: None, raising=True

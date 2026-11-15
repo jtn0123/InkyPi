@@ -63,15 +63,14 @@ def shutdown() -> tuple[object, int] | Response:
 
     Rate-limited to one call per 30 seconds to prevent accidental repeats.
     """
-    allowed, retry_after = _mod._shutdown_limiter.check()
+    # Test and reserve the slot in one step, so two requests can't both pass.
+    allowed, retry_after = _mod._shutdown_limiter.acquire()
     if not allowed:
         remaining = int(retry_after)
         return json_error(
             f"Please wait {remaining}s before requesting another reboot/shutdown",
             status=429,
         )
-    # Reserve the slot to prevent concurrent requests
-    _mod._shutdown_limiter.record()
 
     data = request.get_json(silent=True)
     if (
