@@ -62,17 +62,26 @@ def test_load_image_from_path_error_handling() -> None:
         os.unlink(temp_path)
 
 
-def test_get_image_with_bad_url() -> None:
-    """Test get_image handles network errors gracefully."""
+def test_get_image_with_bad_url(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A host that doesn't resolve gives None, without fetching anything."""
+    import socket
+
     from utils.image_utils import get_image
 
-    # Test with invalid URL
+    def _no_such_host(*_args: object, **_kwargs: object) -> None:
+        raise socket.gaierror(socket.EAI_NONAME, "nodename nor servname provided")
+
+    monkeypatch.setattr(socket, "getaddrinfo", _no_such_host)
+    fetch = Mock()
+    monkeypatch.setattr("utils.image_utils.http_get", fetch)
     result = get_image(
         "http://this-domain-does-not-exist-12345.com/image.png", timeout_seconds=1.0
     )
     assert result is None
+    fetch.assert_not_called()
 
 
+@pytest.mark.usefixtures("public_dns")
 def test_get_image_with_non_200_status() -> None:
     """Test get_image handles non-200 HTTP status codes."""
     from utils.image_utils import get_image
@@ -87,6 +96,7 @@ def test_get_image_with_non_200_status() -> None:
         assert result is None
 
 
+@pytest.mark.usefixtures("public_dns")
 def test_get_image_with_invalid_image_data() -> None:
     """Test get_image handles invalid image data in response."""
     from utils.image_utils import get_image
@@ -202,6 +212,7 @@ def test_fetch_and_resize_remote_image_success() -> None:
     assert result.size == (100, 50)
 
 
+@pytest.mark.usefixtures("public_dns")
 def test_fetch_and_resize_remote_image_http_failure() -> None:
     """Test fetch_and_resize_remote_image when HTTP request fails."""
     from utils.image_utils import fetch_and_resize_remote_image
@@ -216,6 +227,7 @@ def test_fetch_and_resize_remote_image_http_failure() -> None:
     assert result is None
 
 
+@pytest.mark.usefixtures("public_dns")
 def test_fetch_and_resize_remote_image_invalid_bytes() -> None:
     """Test fetch_and_resize_remote_image with non-image response body."""
     from utils.image_utils import fetch_and_resize_remote_image
@@ -233,6 +245,7 @@ def test_fetch_and_resize_remote_image_invalid_bytes() -> None:
     assert result is None
 
 
+@pytest.mark.usefixtures("public_dns")
 def test_fetch_and_resize_remote_image_raise_for_status() -> None:
     """Test fetch_and_resize_remote_image when raise_for_status raises."""
     from requests.exceptions import HTTPError
@@ -328,6 +341,7 @@ def test_fetch_and_resize_low_memory_success() -> None:
     )
 
 
+@pytest.mark.usefixtures("public_dns")
 def test_fetch_and_resize_low_memory_cleans_up_on_failure() -> None:
     """The low-memory path should delete the temp file even on error."""
     from utils.image_utils import fetch_and_resize_remote_image
@@ -377,6 +391,7 @@ def test_fetch_and_resize_low_memory_swallows_unlink_oserror() -> None:
     assert result is fake_image
 
 
+@pytest.mark.usefixtures("public_dns")
 def test_fetch_and_resize_low_memory_loader_returns_none() -> None:
     """When loader.from_file returns None (decode failure), we get None back."""
     from utils.image_utils import fetch_and_resize_remote_image
@@ -398,6 +413,7 @@ def test_fetch_and_resize_low_memory_loader_returns_none() -> None:
     assert result is None
 
 
+@pytest.mark.usefixtures("public_dns")
 def test_fetch_and_resize_non_low_memory_decode_failure_returns_none() -> None:
     """Non-low-memory path: from_bytesio returning None logs and returns None."""
     from utils.image_utils import fetch_and_resize_remote_image

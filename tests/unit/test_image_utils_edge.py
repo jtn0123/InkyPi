@@ -47,6 +47,7 @@ def test_get_image_timeout_fallback_success(monkeypatch: pytest.MonkeyPatch) -> 
     assert img.size == (5, 5)
 
 
+@pytest.mark.usefixtures("public_dns")
 def test_get_image_timeout_fallback_failure(monkeypatch: pytest.MonkeyPatch) -> None:
     import utils.image_utils as image_utils
 
@@ -65,6 +66,7 @@ def test_get_image_timeout_fallback_failure(monkeypatch: pytest.MonkeyPatch) -> 
     assert img is None
 
 
+@pytest.mark.usefixtures("public_dns")
 def test_get_image_decode_error(monkeypatch: pytest.MonkeyPatch) -> None:
     import utils.image_utils as image_utils
 
