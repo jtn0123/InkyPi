@@ -176,8 +176,6 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
           os-packages: 'true'
-      - name: Build CSS
-        run: python scripts/build_css.py
       - name: Run tests
         env:
           INKYPI_ENV: dev
@@ -497,8 +495,6 @@ jobs:
           os-packages: 'true'
       - name: Install Playwright Chromium
         run: python -m playwright install --with-deps chromium
-      - name: Build CSS
-        run: python scripts/build_css.py
       - name: Run flake detection
         env:
           INKYPI_VALIDATE_FLAKE: '1'
@@ -558,12 +554,10 @@ jobs:
       - uses: ./.github/actions/setup-python-deps
         with:
           os-packages: 'true'
-      # Same asset step as the `tests` job so mutmut's clean-test run sees the
-      # same tree. (Bundled JS from scripts/build_assets.py is deliberately NOT
-      # built in either job: tests/static/test_debug_console.py asserts the
-      # unbundled <script> tags.)
-      - name: Build CSS
-        run: python scripts/build_css.py
+      # No asset build, as in the `tests` job: main.css is committed (and
+      # tests/unit/test_main_css_current.py checks it), and bundled JS from
+      # scripts/build_assets.py is deliberately absent because
+      # tests/static/test_debug_console.py asserts the unbundled <script> tags.
       - name: Run mutmut
         env:
           INKYPI_ENV: dev
@@ -659,8 +653,6 @@ jobs:
           PYPROFILE
             sudo apparmor_parser -r /tmp/inkypi-headless-shell.apparmor
           fi
-      - name: Build CSS
-        run: python scripts/build_css.py
       - name: Run browser smoke suite
         env:
           BROWSER_SMOKE_ARTIFACT_DIR: runtime/mock_display_output/browser_smoke_failures
@@ -753,8 +745,6 @@ jobs:
           PYPROFILE
             sudo apparmor_parser -r /tmp/inkypi-headless-shell.apparmor
           fi
-      - name: Build CSS
-        run: python scripts/build_css.py
       - name: Run browser suites (shard ${{ matrix.shard }}/2)
         env:
           INKYPI_ENV: dev
