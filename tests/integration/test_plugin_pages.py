@@ -1,4 +1,6 @@
 # pyright: reportMissingImports=false
+import json
+import re
 from typing import Any
 
 from flask.testing import FlaskClient
@@ -241,6 +243,59 @@ def test_plugin_page_instance_preview_shown_when_instance(client: FlaskClient) -
     body = page.data
     # Instance preview image element should be present when instance is specified
     assert b'id="instancePreviewImage"' in body
+
+
+def _boot_instance_image_url(body: str) -> str:
+    match = re.search(r"instanceImageUrl:\s*(null|\"[^\"]*\")", body)
+    assert match, "instanceImageUrl missing from the plugin page boot config"
+    return match.group(1)
+
+
+def _add_ai_text_instance(client: FlaskClient, name: str) -> None:
+    refresh = json.dumps(
+        {
+            "playlist": "Default",
+            "instance_name": name,
+            "refreshType": "interval",
+            "interval": "60",
+            "unit": "minute",
+        }
+    )
+    resp = client.post(
+        "/add_plugin",
+        data={
+            "plugin_id": "ai_text",
+            "title": "T1",
+            "textModel": "gpt-4o",
+            "textPrompt": "Hi",
+            "refresh_settings": refresh,
+        },
+        content_type="multipart/form-data",
+    )
+    assert resp.status_code == 200
+
+
+def test_plugin_page_probes_instance_image_only_after_it_renders(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
+    """/instance_image never renders on demand, so pointing the page at it
+    before the instance has rendered only produced a 404 in the console."""
+    _add_ai_text_instance(client, "Fresh")
+    page = client.get("/plugin/ai_text?instance=Fresh").get_data(as_text=True)
+    assert _boot_instance_image_url(page) == "null"
+
+    instance = device_config_dev.get_playlist_manager().find_plugin("ai_text", "Fresh")
+    instance.latest_refresh_time = "2026-11-14T08:00:00+00:00"
+    page = client.get("/plugin/ai_text?instance=Fresh").get_data(as_text=True)
+    assert _boot_instance_image_url(page) == '"/instance_image/ai_text/Fresh"'
+
+
+def test_saved_settings_page_skips_instance_image_until_it_renders(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
+    _add_ai_text_instance(client, "ai_text_saved_settings")
+    page = client.get("/plugin/ai_text").get_data(as_text=True)
+    assert _boot_instance_image_url(page) == "null"
 
 
 def test_instance_image_history_fallback(

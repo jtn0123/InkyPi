@@ -490,7 +490,10 @@
                 plugin_instance: {{ (plugin_instance or '') | tojson }},
             },
             displayInstanceUrl: {{ url_for("plugin.display_plugin_instance") | tojson }},
-            instanceImageUrl: {% if plugin_instance %}{{ url_for("plugin.plugin_instance_image", plugin_id=plugin.id, instance_name=plugin_instance) | tojson }}{% else %}null{% endif %},
+            {#- /instance_image never renders on demand, so only point at it once
+                this instance has rendered; otherwise the page goes straight to the
+                plugin's latest image instead of logging a 404. -#}
+            instanceImageUrl: {% if plugin_instance and plugin_instance_rendered %}{{ url_for("plugin.plugin_instance_image", plugin_id=plugin.id, instance_name=plugin_instance) | tojson }}{% else %}null{% endif %},
             lastRefresh: {{ (plugin_instance_last_refresh or plugin_latest_refresh or '') | tojson }},
             latestPluginImageUrl: {{ url_for("plugin.plugin_latest_image", plugin_id=plugin.id) | tojson }},
             loadPluginSettings: {{ (((plugin_instance | default('')) != '') or ((plugin_settings | default({})) | length > 0)) | tojson }},
