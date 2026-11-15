@@ -445,6 +445,10 @@ def test_visual_regression(
     so individual regressions are easy to rerun.
     """
     from playwright.sync_api import sync_playwright
+    from tests.integration.browser_helpers import (
+        RequestTracker,
+        wait_for_page_settled,
+    )
 
     with sync_playwright() as p:
         browser = p.chromium.launch()
@@ -458,6 +462,7 @@ def test_visual_regression(
         page = context.new_page()
         try:
             _stub_network(page)
+            requests = RequestTracker(page)
             page.goto(
                 f"{live_server}{page_spec.path}",
                 wait_until="domcontentloaded",
@@ -470,13 +475,10 @@ def test_visual_regression(
             # rules.
             page.add_style_tag(content=_DETERMINISM_CSS)
 
-            # Allow late layout (webfont swap, plugin grid population,
-            # settings tabs) to settle. The existing layout-overlap test
-            # waits 400ms; we wait slightly longer since screenshots are
-            # more sensitive to mid-flight reflow.
-            page.wait_for_timeout(600)
-            # Belt-and-suspenders: wait for fonts to finish loading.
-            page.evaluate("() => document.fonts && document.fonts.ready")
+            # Let late layout (webfont swap, plugin grid population,
+            # settings tabs filled from fetched data) settle: wait for the
+            # page's requests, its entrance animation and its web fonts.
+            wait_for_page_settled(page, requests)
 
             png_bytes = page.screenshot(full_page=False, type="png")
         finally:

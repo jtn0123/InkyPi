@@ -8,8 +8,9 @@ from typing import Any
 
 import pytest
 from PIL import Image
-from playwright.sync_api import Page
+from playwright.sync_api import Page, expect
 from scripts.ui_audit import TOP_LEVEL_ROUTES, discover_plugin_ids
+from tests.integration.browser_helpers import RequestTracker, wait_for_page_settled
 
 REQUIRE_BROWSER_SMOKE = os.getenv("REQUIRE_BROWSER_SMOKE", "").lower() in ("1", "true")
 pytestmark = pytest.mark.skipif(
@@ -253,9 +254,11 @@ def _open_and_check(
     page: Page, base_url: str, route_name: str, route_path: str, screenshot_dir: Path
 ) -> Any:
     runtime = _attach_runtime_collectors(page, base_url)
+    requests = RequestTracker(page)
     page.goto(f"{base_url}{route_path}", wait_until="domcontentloaded", timeout=30000)
     page.wait_for_selector("[data-page-shell]", timeout=10000)
-    page.wait_for_timeout(500)
+    # The checks that follow measure layout and may take screenshots.
+    wait_for_page_settled(page, requests)
     _assert_skip_link_present(page)
     return runtime
 
@@ -482,10 +485,10 @@ def test_jtn_731_history_deep_high_risk_paths(
 
             # Pagination depth with HTMX history grid swaps.
             page.locator("a.btn", has_text="Next").click()
-            page.wait_for_timeout(500)
+            expect(page.locator(".pagination-info")).to_contain_text("Page 2 of 2")
             assert "Page 2 of 2" in page.locator(".pagination-info").inner_text()
             page.locator("a.btn", has_text="Previous").click()
-            page.wait_for_timeout(500)
+            expect(page.locator(".pagination-info")).to_contain_text("Page 1 of 2")
             assert "Page 1 of 2" in page.locator(".pagination-info").inner_text()
 
             # Redisplay path should complete and surface its success toast.

@@ -553,7 +553,9 @@ def _run_click_sweep(
         timeout=30000,
     )
     page.wait_for_selector(sweep.ready_marker, timeout=10000)
-    page.wait_for_timeout(300)
+    # Let the page's start-up requests land before observing, so the DOM
+    # changes they cause are not credited to the first click.
+    collector.requests.wait_until_idle()
     _install_observer(page)
 
     descriptors = _enumerate_candidates(page)
