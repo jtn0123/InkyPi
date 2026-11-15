@@ -298,113 +298,6 @@ def test_inkypi_refresh_task_lazy_start(monkeypatch: pytest.MonkeyPatch) -> None
     mock_rt.start.assert_called_once()
 
 
-def test_read_version_normal(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Any:
-    """Test _read_version reads and strips the VERSION file."""
-    version_file = tmp_path / "VERSION"
-    version_file.write_text("1.2.3\n")
-    import inkypi
-
-    _real_open = open
-
-    def _patched_open(path: Any, *args: Any, **kwargs: Any) -> Any:
-        if "VERSION" in str(path):
-            return _real_open(str(version_file), *args, **kwargs)
-        return _real_open(path, *args, **kwargs)
-
-    monkeypatch.setattr("builtins.open", _patched_open)
-    assert inkypi._read_version() == "1.2.3"
-
-
-def test_read_version_missing_file_falls_back_to_pyproject(
-    monkeypatch: pytest.MonkeyPatch,
-) -> Any:
-    """_read_version falls back to pyproject.toml when VERSION is missing (JTN-624)."""
-    import inkypi
-
-    _real_open = open
-
-    def _patched_open(path: Any, *args: Any, **kwargs: Any) -> Any:
-        if str(path).endswith("VERSION"):
-            raise FileNotFoundError("No such file")
-        return _real_open(path, *args, **kwargs)
-
-    monkeypatch.setattr("builtins.open", _patched_open)
-    result = inkypi._read_version()
-    # Must resolve to the pyproject.toml value, not "unknown" — this prevents
-    # the UI from showing a stale/missing version when VERSION isn't shipped.
-    assert result != "unknown"
-    assert result != "{version}"
-    assert result != ""
-
-
-def test_read_version_missing_both_sources_returns_unknown(
-    monkeypatch: pytest.MonkeyPatch,
-) -> Any:
-    """_read_version returns 'unknown' only when both VERSION and pyproject fail."""
-    import inkypi
-
-    _real_open = open
-
-    def _patched_open(path: Any, *args: Any, **kwargs: Any) -> Any:
-        name = str(path)
-        if name.endswith(("VERSION", "pyproject.toml")):
-            raise FileNotFoundError("No such file")
-        return _real_open(path, *args, **kwargs)
-
-    monkeypatch.setattr("builtins.open", _patched_open)
-    assert inkypi._read_version() == "unknown"
-
-
-def test_read_version_empty_file_falls_back_to_pyproject(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> Any:
-    """Empty VERSION file triggers the pyproject.toml fallback (JTN-624)."""
-    version_file = tmp_path / "VERSION"
-    version_file.write_text("")
-    import inkypi
-
-    _real_open = open
-
-    def _patched_open(path: Any, *args: Any, **kwargs: Any) -> Any:
-        if str(path).endswith("VERSION"):
-            return _real_open(str(version_file), *args, **kwargs)
-        return _real_open(path, *args, **kwargs)
-
-    monkeypatch.setattr("builtins.open", _patched_open)
-    result = inkypi._read_version()
-    # Empty string is a sentinel for "no version" and must trigger fallback,
-    # not be surfaced to the UI.
-    assert result != ""
-    assert result != "unknown"
-
-
-def test_read_version_placeholder_falls_back_to_pyproject(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> Any:
-    """VERSION containing '{version}' placeholder triggers pyproject fallback (JTN-624).
-
-    Regression guard for the python-semantic-release bug where
-    ``build_command = "echo '{version}' > VERSION"`` shipped the literal
-    ``{version}`` token to production because PSR does not expand ``{version}``
-    inside shell commands. See JTN-624.
-    """
-    version_file = tmp_path / "VERSION"
-    version_file.write_text("{version}\n")
-    import inkypi
-
-    _real_open = open
-
-    def _patched_open(path: Any, *args: Any, **kwargs: Any) -> Any:
-        if str(path).endswith("VERSION"):
-            return _real_open(str(version_file), *args, **kwargs)
-        return _real_open(path, *args, **kwargs)
-
-    monkeypatch.setattr("builtins.open", _patched_open)
-    result = inkypi._read_version()
-    assert result != "{version}"
-    assert result != "unknown"
-
-
 def test_version_file_on_disk_is_not_placeholder() -> None:
     """The shipped VERSION file must contain a valid semver, never a placeholder.
 
@@ -414,7 +307,6 @@ def test_version_file_on_disk_is_not_placeholder() -> None:
     broken VERSION file again.
     """
     import re
-    from pathlib import Path
 
     version_path = Path(__file__).resolve().parents[2] / "VERSION"
     assert version_path.exists(), "VERSION file must exist at the repo root"
@@ -445,7 +337,6 @@ def test_pyproject_project_version_matches_semantic_release_version() -> None:
     so this test catches any future drift.
     """
     import tomllib
-    from pathlib import Path
 
     pyproject = Path(__file__).resolve().parents[2] / "pyproject.toml"
     with pyproject.open("rb") as f:

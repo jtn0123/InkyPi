@@ -64,6 +64,7 @@ from plugins.plugin_registry import load_plugins, pop_hot_reload_info
 from refresh_task import RefreshTask
 from utils import blackout, boot_self_test
 from utils.app_utils import generate_startup_image, get_ip_address
+from utils.app_version import read_app_version
 from utils.asset_check import run_boot_check as run_asset_check
 from utils.backend_errors import RefreshTaskUnavailable
 from utils.config_schema import ConfigValidationError
@@ -233,48 +234,6 @@ def _apply_dev_env(args: argparse.Namespace) -> None:
     os.environ["INKYPI_ENV"] = "dev"
     if args.web_only:
         os.environ["INKYPI_NO_REFRESH"] = "1"
-
-
-def _read_version() -> str:
-    """Return the installed application version.
-
-    Resolution order (JTN-624):
-
-    1. ``VERSION`` file at the repo root (canonical; written by the release
-       pipeline and distributed in install tarballs).
-    2. ``[project].version`` from ``pyproject.toml`` as a fallback when
-       ``VERSION`` is missing, empty, or still contains the unexpanded
-       ``{version}`` placeholder that a broken release can leave behind.
-    3. ``"unknown"`` if both sources fail.
-    """
-    repo_root = os.path.join(os.path.dirname(__file__), "..")
-
-    try:
-        version_path = os.path.join(repo_root, "VERSION")
-        with open(version_path) as f:
-            value = f.read().strip()
-        if value and value != "{version}" and value != "0.1.0":
-            return value
-    except Exception:
-        pass
-
-    # Fallback: read [project].version from pyproject.toml. This keeps the UI
-    # accurate even if a release shipped a broken VERSION file (e.g. the
-    # python-semantic-release `echo '{version}'` regression fixed by this
-    # change).
-    try:
-        import tomllib
-
-        pyproject_path = os.path.join(repo_root, "pyproject.toml")
-        with open(pyproject_path, "rb") as f:
-            data = tomllib.load(f)
-        version = data.get("project", {}).get("version")
-        if isinstance(version, str) and version:
-            return version
-    except Exception:
-        pass
-
-    return "unknown"
 
 
 def main(argv: list[str] | None = None) -> Flask:
@@ -573,7 +532,7 @@ def create_app() -> Flask:
         [FileSystemLoader(directory) for directory in template_dirs]
     )
 
-    app.config["APP_VERSION"] = _read_version()
+    app.config["APP_VERSION"] = read_app_version()
     _register_context_processors(app)
 
     device_config = _init_core_services(app)

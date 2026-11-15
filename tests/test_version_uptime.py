@@ -143,29 +143,29 @@ def test_uptime_process_started_at_in_past(client: FlaskClient) -> None:
 
 
 def test_read_app_version_fallback_on_missing_file() -> None:
-    """_read_app_version returns 'unknown' only when VERSION and pyproject both fail.
+    """read_app_version returns 'unknown' only when VERSION and pyproject both fail.
 
     JTN-624: when VERSION is missing, the function now falls back to reading
     ``[project].version`` from pyproject.toml. Only if both sources fail do
     we surface 'unknown' to the UI.
     """
-    from blueprints.version_info import _read_app_version
+    from utils.app_version import read_app_version
 
     with patch("pathlib.Path.read_text", side_effect=FileNotFoundError("no file")):
         with patch("pathlib.Path.open", side_effect=FileNotFoundError("no file")):
-            result = _read_app_version()
+            result = read_app_version()
 
     assert result == "unknown"
 
 
 def test_read_app_version_falls_back_to_pyproject_when_version_missing() -> None:
-    """_read_app_version reads pyproject.toml when VERSION is unavailable (JTN-624)."""
-    from blueprints.version_info import _read_app_version
+    """read_app_version reads pyproject.toml when VERSION is unavailable (JTN-624)."""
+    from utils.app_version import read_app_version
 
     # Simulate VERSION file read failure; pyproject.toml open should succeed
     # and yield a real version string.
     with patch("pathlib.Path.read_text", side_effect=FileNotFoundError("no file")):
-        result = _read_app_version()
+        result = read_app_version()
 
     assert result != "unknown"
     assert result != "{version}"
@@ -187,13 +187,13 @@ def test_read_app_version_rejects_unexpanded_placeholder() -> None:
     """
     import tomllib
 
-    from blueprints.version_info import _read_app_version
+    from utils.app_version import read_app_version
 
     with (
         patch("pathlib.Path.read_text", return_value="{version}\n"),
         patch.object(tomllib, "load", return_value={"project": {"version": "7.7.7"}}),
     ):
-        result = _read_app_version()
+        result = read_app_version()
 
     assert result == "7.7.7"
 
@@ -211,13 +211,13 @@ def test_read_app_version_rejects_bootstrap_placeholder() -> None:
     """
     import tomllib
 
-    from blueprints.version_info import _read_app_version
+    from utils.app_version import read_app_version
 
     with (
         patch("pathlib.Path.read_text", return_value="0.1.0\n"),
         patch.object(tomllib, "load", return_value={"project": {"version": "7.7.7"}}),
     ):
-        result = _read_app_version()
+        result = read_app_version()
 
     assert result == "7.7.7"
 
@@ -231,10 +231,10 @@ def test_read_app_version_accepts_real_version_string() -> None:
     covered indirectly by the ``/api/version/info`` integration test that
     reads the checked-in VERSION.
     """
-    from blueprints.version_info import _read_app_version
+    from utils.app_version import read_app_version
 
     with patch("pathlib.Path.read_text", return_value="9.9.9\n"):
-        result = _read_app_version()
+        result = read_app_version()
 
     assert result == "9.9.9"
 
