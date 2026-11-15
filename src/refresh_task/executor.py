@@ -157,14 +157,18 @@ class RefreshExecutor:
                     attempt,
                 )
                 return None, payload.get("plugin_meta")
+            # A worker tempfile is ours to delete; a plugin's cache file
+            # (``image_path_owned`` False) must stay for the next turn.
+            owned = payload.get("image_path_owned", True) is not False
             try:
                 with Image.open(image_path) as image:
                     result_image = image.copy()
             finally:
-                try:
-                    os.unlink(image_path)
-                except OSError:
-                    pass
+                if owned:
+                    try:
+                        os.unlink(image_path)
+                    except OSError:
+                        pass
             logger.info(
                 "plugin_lifecycle: attempt_success | plugin_id=%s attempt=%s",
                 plugin_id,
