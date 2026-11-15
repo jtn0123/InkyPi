@@ -477,7 +477,7 @@ fi
 # schema and covers update.sh being invoked directly (settings UI, rollback).
 _current_step="preflight"
 _inkypi_maybe_inject_failure "preflight"
-if ! run_update_preflight "$VENV_PATH/bin/python" \
+if ! run_update_preflight "${INKYPI_VENV_PYTHON:-$VENV_PATH/bin/python}" \
     --repo-dir "$SCRIPT_DIR/.." \
     --disk-path "$INSTALL_PATH" \
     --version-file "$SCRIPT_DIR/../VERSION"; then
