@@ -64,7 +64,7 @@ def test_update_nonexistent_playlist_warns(caplog: pytest.LogCaptureFixture) -> 
 
 
 def test_refresh_info_to_from_dict_and_datetime() -> None:
-    now_iso = datetime.utcnow().isoformat()
+    now_iso = datetime.now(UTC).isoformat()
     ri = model.RefreshInfo(
         refresh_type="Manual Update",
         plugin_id="p1",
@@ -93,7 +93,7 @@ def test_playlist_and_plugininstance_basic_operations() -> None:
     assert plugin.get_image_path().endswith("weather_main.png")
 
     # Test should_refresh with no latest refresh -> True
-    now = datetime.utcnow()
+    now = datetime.now(UTC)
     assert plugin.should_refresh(now) is True
 
     # Set latest refresh and test interval-based refresh
@@ -154,8 +154,8 @@ def test_playlist_manager_operations() -> None:
     assert pm.get_playlist("day2") is None
 
     # should_refresh utility
-    assert model.PlaylistManager.should_refresh(None, 10, datetime.utcnow()) is True
-    latest = datetime.utcnow()
+    assert model.PlaylistManager.should_refresh(None, 10, datetime.now(UTC)) is True
+    latest = datetime.now(UTC)
     assert (
         model.PlaylistManager.should_refresh(latest, 10, latest + timedelta(seconds=11))
         is True

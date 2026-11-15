@@ -4,7 +4,6 @@ import glob
 import logging
 import multiprocessing
 import os
-import sys
 import tempfile
 import time
 import traceback
@@ -118,18 +117,19 @@ def sweep_orphan_render_tempfiles(max_age_seconds: int = 3600) -> tuple[int, int
 def _get_mp_context() -> multiprocessing.context.BaseContext:
     """Return the best available multiprocessing start context for this platform.
 
-    Prefers ``forkserver`` on Linux (lower memory overhead on constrained
-    devices such as Pi Zero 2W) then ``fork``, falling back to the Python
-    default when neither is available.  ``forkserver`` requires all arguments
-    to be picklable, which is satisfied by the worker call site.
+    Prefers ``forkserver`` then ``fork``, falling back to the Python default
+    (``spawn`` on Windows) when neither is available. ``forkserver`` requires
+    all arguments to be picklable, which is satisfied by the worker call site.
 
     Returns:
         A ``multiprocessing.context.BaseContext`` instance.
     """
-    # forkserver spawns children from a lean server process, reducing memory
-    # on constrained devices like Pi Zero 2W. It requires picklable arguments,
-    # so we only prefer it on Linux where the production target runs.
-    prefer = ("forkserver", "fork") if sys.platform == "linux" else ("fork",)
+    # forkserver starts children from a lean, single-threaded server process.
+    # That keeps memory down on the Pi Zero 2 W, and it avoids a plain fork()
+    # of this multi-threaded process (web server threads), which can deadlock
+    # the child and which Python warns about. macOS uses it too, so local runs
+    # take the same path as the Pi.
+    prefer = ("forkserver", "fork")
     for method in prefer:
         try:
             return multiprocessing.get_context(method)

@@ -30,12 +30,12 @@ def _make_pattern_regex(pattern: str) -> re.Pattern[str]:
     """Translate the HTML5 `pattern` attribute into a fullmatch Python regex.
 
     HTML5 anchors `pattern` implicitly at both ends; `re.fullmatch` mirrors
-    that. The `\\u####` escapes inside the attribute string are real two-char
-    sequences (`\\` + `u####`); decode them to actual code points so Python's
-    regex engine sees the same character classes the browser sees.
+    that. Python's `re` reads the attribute's `\\u####` and `\\s` escapes the
+    same way the browser does, so the pattern is compiled as written.
+    (Decoding it with `unicode_escape` first turned `\\s` into an invalid
+    string escape, which Python deprecates.)
     """
-    decoded = pattern.encode("utf-8").decode("unicode_escape")
-    return re.compile(decoded, re.S)
+    return re.compile(pattern, re.S)
 
 
 def test_device_name_pattern_rejects_whitespace_only_and_lone_control_chars() -> None:
