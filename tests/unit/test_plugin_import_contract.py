@@ -10,6 +10,7 @@ from pathlib import Path
 from threading import Barrier
 from typing import Any
 from unittest.mock import patch
+from urllib.parse import quote
 
 import pytest
 from flask import Flask
@@ -18,6 +19,7 @@ from werkzeug.test import TestResponse
 
 from config import Config
 from model import Playlist, PlaylistManager, PluginInstance
+from services.playlist_workflows import normalize_instance_name
 
 
 @dataclass(frozen=True)
@@ -227,15 +229,15 @@ def test_collision_names_include_other_playlists_and_prior_imports(
     response = _post(client, _entry(name="Original"), _entry(name="Original"))
     assert response.status_code == 200
     assert response.get_json()["renamed"] == [
-        "Original → Original (imported)",
-        "Original → Original (imported 2)",
+        "Original → Original imported",
+        "Original → Original imported 2",
     ]
     manager = device_config_dev.get_playlist_manager()
     default = manager.get_playlist("Default")
     assert default is not None
     assert [p.name for p in default.plugins] == [
-        "Original (imported)",
-        "Original (imported 2)",
+        "Original imported",
+        "Original imported 2",
     ]
     persisted = json.loads(Path(device_config_dev.config_file).read_text())
     assert persisted["playlist_config"] == manager.to_dict()
@@ -300,8 +302,8 @@ def test_concurrent_imports_resolve_collisions_after_validation(
     default = manager.get_playlist("Default")
     assert default is not None
     assert [plugin.name for plugin in default.plugins] == [
-        "Original (imported)",
-        "Original (imported 2)",
+        "Original imported",
+        "Original imported 2",
     ]
     persisted = json.loads(Path(device_config_dev.config_file).read_text())
     assert persisted["playlist_config"] == manager.to_dict()
@@ -328,3 +330,51 @@ def test_late_addition_rejection_rolls_back_earlier_addition(
     assert response.status_code == 500
     assert response.get_json()["code"] == "internal_error"
     _assert_unchanged(device_config_dev, before)
+
+
+@pytest.mark.parametrize(
+    ("given", "stored"),
+    [
+        ("../../etc/passwd", "etc passwd"),
+        ("Kitchen/Clock", "Kitchen Clock"),
+        ("Clock (imported)", "Clock imported"),
+        ("  -_Weather\tNow\x00!  ", "Weather Now"),
+        ("x" * 100, "x" * 64),
+        ("/../", "year_progress"),  # nothing usable: falls back to the plugin ID
+    ],
+)
+def test_imported_names_follow_the_instance_name_rule(
+    client: FlaskClient, device_config_dev: Config, given: str, stored: str
+) -> None:
+    """A name from the file becomes a file name and a URL, so it is cleaned."""
+    _seed(device_config_dev, default=False)
+    response = _post(client, _entry(name=given))
+    assert response.status_code == 200
+    assert response.get_json()["renamed"] == [f"{given.strip()} → {stored}"]
+
+    manager = device_config_dev.get_playlist_manager()
+    default = manager.get_playlist("Default")
+    assert default is not None
+    [instance] = default.plugins
+    assert instance.name == stored
+    _name, error = normalize_instance_name(instance.name)
+    assert error is None
+    assert instance.get_image_path() == f"year_progress_{stored.replace(' ', '_')}.png"
+    # The history API refuses names outside its own stricter check.
+    history = client.get(f"/api/plugins/instance/{quote(instance.name)}/history")
+    assert history.status_code == 200
+
+
+def test_collision_suffix_keeps_a_long_name_within_the_limit(
+    client: FlaskClient, device_config_dev: Config
+) -> None:
+    _seed(device_config_dev, default=False)
+    long_name = "L" * 64
+    response = _post(client, _entry(name=long_name), _entry(name=long_name))
+    assert response.status_code == 200
+    manager = device_config_dev.get_playlist_manager()
+    default = manager.get_playlist("Default")
+    assert default is not None
+    names = [plugin.name for plugin in default.plugins]
+    assert names == [long_name, "L" * 55 + " imported"]
+    assert all(len(name) <= 64 for name in names)
