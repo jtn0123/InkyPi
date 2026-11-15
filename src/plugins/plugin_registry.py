@@ -209,12 +209,13 @@ def get_plugin_instance(plugin_config: dict[str, Any]) -> Any:
     if instance:
         return instance
 
-    # Lazy load: import and cache on first use
+    # Lazy load: import and cache on first use. The import runs outside the
+    # lock; if another thread cached an instance meanwhile, use that one so
+    # every caller shares a single instance.
     if stored_config:
         instance = cast(Any, _load_single_plugin_instance)(stored_config)
         with _registry_lock:
-            PLUGIN_CLASSES[plugin_id] = instance
-        return instance
+            return PLUGIN_CLASSES.setdefault(plugin_id, instance)
 
     raise ValueError(f"Plugin '{plugin_id}' is not registered.")
 

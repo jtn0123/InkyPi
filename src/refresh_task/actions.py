@@ -103,6 +103,26 @@ def manual_update_timings(metrics: Mapping[str, object] | None) -> Metrics:
     return timings
 
 
+def render_with_metadata(
+    refresh_action: "RefreshAction",
+    plugin: PluginLike,
+    device_config: DeviceConfigLike,
+    current_dt: datetime,
+) -> tuple[Image.Image | None, object]:
+    """Run *refresh_action* and return the image plus this render's metadata.
+
+    Plugin instances are cached and reused, so metadata a plugin left last
+    time (screenshot's "Capture was blank") would otherwise be reported again
+    for a later render that set none. Clear it first.
+    """
+    clear = getattr(plugin, "set_latest_metadata", None)
+    if callable(clear):
+        clear(None)
+    image = refresh_action.execute(plugin, device_config, current_dt)
+    get_metadata = getattr(plugin, "get_latest_metadata", None)
+    return image, get_metadata() if callable(get_metadata) else None
+
+
 @dataclass
 class ManualUpdateRequest:
     request_id: str
