@@ -268,6 +268,53 @@ class TestComputeStats:
         result = compute_stats("/nonexistent/path/xyz123", 3600)
         assert result["total"] == 0
 
+    def test_all_windows_come_from_one_scan(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The dashboard's three windows cost one directory scan, not three."""
+        import os
+
+        import utils.refresh_stats as rs
+
+        now = time.time()
+        ages = {
+            "recent": 600,  # inside every window
+            "hours": 7_200,  # 24h and 7d
+            "days": 3 * 86_400,  # 7d only
+            "old": 10 * 86_400,  # no window
+        }
+        for name, age in ages.items():
+            path = _write_sidecar(
+                tmp_path,
+                f"{name}.json",
+                status="failure" if name == "hours" else "success",
+                plugin_id=name,
+                duration_ms=age // 60,
+                timestamp=now - age,
+            )
+            os.utime(path, (now - age, now - age))
+
+        loads: list[float] = []
+        original_load = rs._load_sidecars
+
+        def counting_load(hdir: str, since: float) -> Any:
+            loads.append(since)
+            return original_load(hdir, since)
+
+        monkeypatch.setattr(rs, "_load_sidecars", counting_load)
+        monkeypatch.setattr(rs, "_now", lambda: now)
+
+        windows = {"last_1h": 3_600, "last_24h": 86_400, "last_7d": 604_800}
+        result = rs.compute_stats_windows(str(tmp_path), windows)
+
+        assert loads == [now - 604_800], "one scan, with the longest cutoff"
+        assert [result[w]["total"] for w in windows] == [1, 2, 3]
+        assert result["last_1h"]["failure"] == 0
+        assert result["last_24h"]["top_failing"] == [{"plugin": "hours", "count": 1}]
+        assert result["last_7d"]["p95_duration_ms"] == 3 * 86_400 // 60
+        assert rs.compute_stats_windows(str(tmp_path), windows) is result
+        assert len(loads) == 1, "a repeat within the TTL is served from cache"
+
 
 # ---------------------------------------------------------------------------
 # Integration test via Flask test client
