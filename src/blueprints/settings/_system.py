@@ -1,4 +1,4 @@
-"""System control route handlers (shutdown, client logging)."""
+"""System control route handler (reboot and shutdown)."""
 
 import subprocess
 
@@ -15,55 +15,6 @@ from utils.rate_limit import CooldownLimiter
 
 # Shutdown rate limiting
 _shutdown_limiter = CooldownLimiter(30)
-
-
-def _sanitize_log_value(value: str, max_len: int = 500) -> str:
-    """Strip control characters from client input to prevent log injection."""
-    return value.replace("\n", "").replace("\r", "").replace("\x00", "")[:max_len]
-
-
-@settings_bp.route("/settings/client_log", methods=["POST"])
-def client_log() -> JsonResponse | Response:
-    """Accept lightweight client logs and emit them to server logs.
-
-    Intended for front-end flows (e.g., browser geolocation) where we need
-    visibility in terminal logs without failing the UX if logging fails.
-    """
-    try:
-        data = request.get_json(silent=True)
-        if not isinstance(data, dict):
-            return json_error("Request body must be a JSON object", status=400)
-        level = str(data.get("level") or "info").lower()
-        message = str(data.get("message") or "")
-        extra = data.get("extra")
-        # Render extra as compact string to avoid noisy logs
-        try:
-            import json as _json
-
-            extra_str = (
-                _json.dumps(extra, separators=(",", ":")) if extra is not None else "{}"
-            )
-        except Exception:
-            extra_str = str(extra)
-
-        level = _sanitize_log_value(level, max_len=20)
-        message = _sanitize_log_value(message)
-        extra_str = _sanitize_log_value(extra_str)
-        line = f"client_log | level={level} msg={message} extra={extra_str}"
-        if level == "debug":
-            logger.debug(line)
-        elif level in ("warn", "warning"):
-            logger.warning(line)
-        elif level in ("err", "error"):
-            logger.error(line)
-        else:
-            logger.info(line)
-        return json_success()
-    except Exception:
-        logger.exception("/settings/client_log failure")
-        return json_internal_error(
-            "client_log", details={"hint": "Check payload shape."}
-        )
 
 
 @settings_bp.route("/shutdown", methods=["POST"])
