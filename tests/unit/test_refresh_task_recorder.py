@@ -5,9 +5,11 @@ from typing import Any
 import pytest
 
 from refresh_task.recorder import RefreshRecorder
+from utils.event_bus import EventBus
+from utils.progress_events import ProgressEventBus
 
 
-class _ProgressBus:
+class _ProgressBus(ProgressEventBus):
     def __init__(self) -> None:
         self.events: list[dict[str, Any]] = []
 
@@ -16,7 +18,7 @@ class _ProgressBus:
         return event
 
 
-class _EventBus:
+class _EventBus(EventBus):
     def __init__(self) -> None:
         self.events: list[tuple[str, dict[str, Any]]] = []
 
@@ -91,6 +93,26 @@ def test_publish_error_can_emit_plugin_failed(device_config_dev: Any) -> None:
             {"plugin": "weather", "plugin_id": "weather", "error": "boom"},
         )
     ]
+
+
+def test_publish_error_masks_keys_in_the_error(device_config_dev: Any) -> None:
+    progress_bus = _ProgressBus()
+    event_bus = _EventBus()
+    recorder = RefreshRecorder(
+        device_config_dev,
+        progress_bus=progress_bus,
+        event_bus=event_bus,
+    )
+
+    recorder.publish_error(
+        plugin_id="weather",
+        error="401 for url: https://api.test/onecall?appid=EVENTKEY55&units=metric",  # gitleaks:allow
+        plugin_failed=True,
+    )
+
+    assert "EVENTKEY55" not in progress_bus.events[0]["error"]
+    assert "units=metric" in progress_bus.events[0]["error"]
+    assert "EVENTKEY55" not in event_bus.events[0][1]["error"]
 
 
 def test_publish_done_emits_progress_and_refresh_complete(

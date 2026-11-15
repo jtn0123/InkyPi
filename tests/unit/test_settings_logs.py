@@ -159,6 +159,20 @@ def test_format_journal_line_strips_internals() -> None:
     assert "1234" not in result
 
 
+def test_format_journal_line_masks_keys_already_in_the_journal() -> None:
+    """Lines written before redaction covered every logger still hold keys."""
+    from blueprints.settings import _format_journal_line
+
+    data = {
+        "PRIORITY": "4",
+        "MESSAGE": "Retrying: /planetary/apod?api_key=OLDJOURNALKEY1&date=2026-04-24",  # gitleaks:allow
+    }
+    result = _format_journal_line("Apr 02 10:00:00", data)
+    assert "OLDJOURNALKEY1" not in result
+    assert result.startswith("Apr 02 10:00:00 [WARNING] Retrying: /planetary/apod?")
+    assert "date=2026-04-24" in result
+
+
 def test_format_journal_line_defaults_to_info() -> None:
     """Missing PRIORITY defaults to INFO level."""
     from blueprints.settings import _format_journal_line

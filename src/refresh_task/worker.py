@@ -16,6 +16,7 @@ from plugins.plugin_registry import get_plugin_instance, load_plugins
 from refresh_task.actions import PluginLike, RefreshAction, StateDelta
 from refresh_task.context import RefreshContext, SupportsRefreshConfig
 from utils.image_utils import FAST_PNG_COMPRESS_LEVEL
+from utils.logging_utils import redact_secrets
 from utils.plugin_errors import (
     PermanentPluginError,
     ProviderReportedPluginError,
@@ -348,7 +349,9 @@ def _execute_refresh_attempt_worker(
             {
                 "ok": False,
                 "error_type": exc.__class__.__name__,
-                "error_message": str(exc),
-                "traceback": traceback.format_exc(),
+                # Both travel to the parent's logs, health and events, and
+                # request errors quote URLs that carry API keys.
+                "error_message": redact_secrets(exc),
+                "traceback": redact_secrets(traceback.format_exc()),
             }
         )

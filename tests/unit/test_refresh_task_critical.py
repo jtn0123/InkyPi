@@ -27,6 +27,8 @@ from refresh_task import (
     _get_mp_context,
     _remote_exception,
 )
+from refresh_task.actions import RefreshAction
+from refresh_task.worker import WorkerPayload
 
 # ---------------------------------------------------------------------------
 # _remote_exception
@@ -182,6 +184,41 @@ class TestExecuteRefreshAttemptWorker:
         assert payload["ok"] is True
         assert payload["image_path"] is None
         assert payload["state_delta"] == {}
+
+    def test_error_payload_masks_keys(self, device_config_dev: Any) -> None:
+        """The message and traceback reach the parent's logs and health."""
+        from refresh_task import _execute_refresh_attempt_worker
+
+        result_queue: queue.Queue[WorkerPayload] = queue.Queue()
+        url = "https://x.test/?api_key=WORKERKEY8"  # gitleaks:allow
+
+        class LeakyAction(RefreshAction):
+            def execute(self, plugin: Any, cfg: Any, dt: Any) -> None:
+                raise ValueError(f"401 for url: {url}")
+
+        with (
+            patch("refresh_task.worker.get_plugin_instance", return_value=MagicMock()),
+            patch(
+                "refresh_task.worker._restore_child_config",
+                return_value=device_config_dev,
+            ),
+        ):
+            _execute_refresh_attempt_worker(
+                result_queue,
+                {"id": "test"},
+                LeakyAction(),
+                device_config_dev,
+                datetime.now(UTC),
+            )
+
+        payload: dict[str, object] = dict(result_queue.get_nowait())
+        assert payload["ok"] is False
+        message = str(payload["error_message"])
+        trace = str(payload["traceback"])
+        assert "WORKERKEY8" not in message
+        assert "401 for url" in message
+        assert "WORKERKEY8" not in trace
+        assert "ValueError" in trace
 
     def test_exception_puts_error_payload(self, device_config_dev: Any) -> None:
         from refresh_task import _execute_refresh_attempt_worker
