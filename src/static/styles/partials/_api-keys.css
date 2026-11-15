@@ -1,56 +1,3 @@
-.api-key-label {
-    background-color: var(--warning);
-    color: var(--on-accent);
-    font-style: normal;
-    font-weight: 500;
-    padding: 8px 12px;
-    border-radius: 8px;
-    font-size: 0.8rem;
-    line-height: 1.2;
-    text-align: center;
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    transition: all 0.2s ease;
-    text-decoration: none;
-    white-space: nowrap;
-    min-height: 32px;
-}
-
-.api-key-label:hover {
-    background-color: var(--warning);
-    transform: translateY(-1px);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
-    color: var(--on-accent);
-}
-
-/* API key icon */
-.api-key-label::before {
-    content: "\26A0";
-    font-size: 14px;
-    opacity: 0.9;
-}
-
-/* API key configured state */
-.api-key-label.configured {
-    background-color: var(--success);
-    pointer-events: none; /* Not clickable when configured */
-}
-
-.api-key-label.configured:hover {
-    background-color: var(--success);
-    transform: none;
-    box-shadow: none;
-}
-
-.api-key-label.configured::before {
-    content: "\2713";
-    font-size: 14px;
-    opacity: 0.9;
-}
-
 /* Inline API Key Indicator */
 .api-key-indicator {
     display: flex;
@@ -447,7 +394,6 @@
 .btn-delete:hover,
 .btn-add:hover,
 .btn-preset:hover,
-.plugin-card:hover,
 .history-card:hover {
   transform: translateY(-1px);
 }
@@ -514,15 +460,6 @@
 .btn-preset:hover {
   color: var(--text);
   border-color: var(--border-strong, var(--surface-border));
-}
-
-.clear-button {
-  background: transparent;
-  border: none;
-  color: var(--muted);
-  cursor: pointer;
-  font-size: 1.2rem;
-  padding: 4px 8px;
 }
 
 .toggle-password-btn {

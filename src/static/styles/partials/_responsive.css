@@ -1,57 +1,5 @@
 /* ── Progress steps mobile ── */
 @media (max-width: 640px) {
-    .enhanced-progress-steps {
-        gap: 6px;
-    }
-
-    .enhanced-step {
-        padding: 6px;
-    }
-
-    .enhanced-step.active,
-    .enhanced-step.failed {
-        padding-left: 7px;
-    }
-
-    .step-indicator {
-        width: 20px;
-        height: 20px;
-        font-size: 0.625rem;
-    }
-
-    .progress-controls {
-        gap: 8px;
-    }
-
-    .enhanced-progress-bar-section {
-        gap: 8px;
-    }
-
-    .operation-status-container {
-        position: fixed;
-        top: auto;
-        bottom: 20px;
-        left: 20px;
-        right: 20px;
-        width: auto;
-        max-height: 50vh;
-    }
-
-    .status-header {
-        padding: 10px 12px;
-    }
-
-    .status-summary {
-        gap: 8px;
-    }
-
-    .operation-item {
-        padding: 6px 8px;
-    }
-
-    .operation-header {
-        gap: 6px;
-    }
 
     .image-container img {
         max-height: 46vh;
@@ -90,10 +38,6 @@
         align-items: stretch;
     }
 
-    .status-divider {
-        display: none;
-    }
-
     .plugins-container {
         grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: 12px;
@@ -121,8 +65,7 @@
     }
 
     .logs-filters,
-    .logs-actions,
-    .history-toolbar {
+.logs-actions {
         flex-direction: column;
         align-items: stretch;
     }
@@ -158,12 +101,6 @@
         min-height: 95vh;
     }
 
-    .app-header {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 12px;
-    }
-
     .api-key-indicator {
         font-size: 0.75rem;
         padding: 6px 10px;
@@ -180,8 +117,7 @@
     }
 
     .workflow-layout,
-    .settings-console-layout,
-    .diagnostics-strip {
+.settings-console-layout {
         grid-template-columns: 1fr;
     }
 
@@ -190,7 +126,6 @@
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
-    .workflow-action-group,
     .inline-action-row {
         flex-direction: column;
     }
@@ -200,12 +135,6 @@
         margin: 5% auto;
         max-height: 90vh;
         overflow-y: auto;
-    }
-
-    /* Responsive icon sizing for mobile */
-    .app-header .app-icon {
-        width: var(--icon-md);
-        height: var(--icon-md);
     }
 
     .header-button.icon {
@@ -219,26 +148,11 @@
         height: var(--icon-lg);
     }
 
-    .section-nav {
-        gap: 6px;
-    }
-
-    .section-nav .status-chip {
-        width: 100%;
-        justify-content: flex-start;
-    }
-
-    .header-identity,
     .header-actions,
-    .logs-actions,
-    .page-intro,
-    .page-summary {
+.logs-actions,
+.page-intro,
+.page-summary {
         width: 100%;
-    }
-
-    .header-identity {
-        flex-wrap: wrap;
-        justify-content: space-between;
     }
 
     .header-actions,
@@ -315,26 +229,13 @@
         justify-content: flex-start;
     }
 
-    /* Better title-row layout on mobile */
-    .title-row {
-        flex-direction: column;
-        gap: 8px;
-        align-items: stretch;
-    }
-
-    .custom-title-input {
-        order: 2;
-    }
 }
 
 /* ── Touch device improvements ── */
 @media (hover: none) and (pointer: coarse) {
     /* Larger touch targets for small interactive elements */
-    .view-toggle,
-    .sort-toggle,
     .btn-delete,
-    .clear-button,
-    .toggle-password-btn {
+.toggle-password-btn {
         min-width: 44px;
         min-height: 44px;
     }

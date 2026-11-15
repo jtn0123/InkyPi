@@ -165,12 +165,6 @@
   line-height: 1.5;
 }
 
-.diagnostics-strip {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-}
-
 .observability-section {
   display: grid;
   gap: 14px;
@@ -281,24 +275,6 @@
   gap: 10px;
   cursor: pointer;
   margin-left: auto;
-}
-
-.toggle-inline-text {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  text-align: right;
-}
-
-.toggle-inline-label {
-  font-size: 0.82rem;
-  font-weight: 500;
-  color: var(--text);
-}
-
-.toggle-inline-hint {
-  font-size: 0.72rem;
-  color: var(--text-3, var(--muted));
 }
 
 .diagnostics-panel {

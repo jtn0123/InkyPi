@@ -2,16 +2,14 @@
 @media print {
   /* Hide non-essential chrome */
   .header,
-  .back-button,
-  .buttons-container,
-  .action-button,
-  .header-button,
-  .response-modal,
-  .modal,
-  .toast-container,
-  #themeToggle,
-  .sort-toggle,
-  .footer {
+.buttons-container,
+.action-button,
+.header-button,
+.response-modal,
+.modal,
+.toast-container,
+#themeToggle,
+.footer {
     display: none !important;
   }
 
@@ -22,10 +20,9 @@
   }
 
   .frame,
-  .page-shell,
-  .settings-section,
-  .plugin-item,
-  .collapsible-content {
+.page-shell,
+.plugin-item,
+.collapsible-content {
     background: var(--bg, #fff) !important;
     border-color: var(--surface-border, #ccc) !important;
     box-shadow: none !important;

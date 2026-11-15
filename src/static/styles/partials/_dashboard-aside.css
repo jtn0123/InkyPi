@@ -156,22 +156,6 @@ a.quick-switch-link.header-button {
   white-space: nowrap;
 }
 
-a.quick-row-link:link,
-a.quick-row-link:visited {
-  color: var(--muted);
-  font-size: 0.78rem;
-  text-decoration: none;
-  padding: 4px 10px;
-  border-radius: var(--border-radius-sm);
-  border: 1px solid var(--surface-border);
-  transition: color 0.15s ease, border-color 0.15s ease;
-}
-
-a.quick-row-link:hover {
-  color: var(--accent);
-  border-color: var(--accent);
-}
-
 .quick-row-btn.is-busy {
   opacity: 0.72;
   cursor: wait;

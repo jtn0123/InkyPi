@@ -9,28 +9,21 @@
         border-radius: 18px;
     }
 
-    .app-header,
-    .header-content,
-    .header-identity,
     .header-actions,
-    .page-intro,
-    .page-summary,
-    .history-toolbar,
-    .playlist-header,
-    .playlist-toolbar,
-    .workflow-action-group,
-    .buttons-container,
-    .inline-action-row,
-    .logs-actions,
-    .logs-filters {
+.page-intro,
+.page-summary,
+.playlist-header,
+.playlist-toolbar,
+.buttons-container,
+.inline-action-row,
+.logs-actions,
+.logs-filters {
         width: 100%;
     }
 
-    .header-content,
-    .app-header,
     .playlist-header,
-    .dashboard-stage-header,
-    .storage-card-head {
+.dashboard-stage-header,
+.storage-card-head {
         flex-direction: column;
         align-items: stretch;
     }
@@ -55,9 +48,8 @@
     }
 
     .header-actions,
-    .playlist-toolbar,
-    .history-toolbar,
-    .logs-actions {
+.playlist-toolbar,
+.logs-actions {
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: 8px;
@@ -219,11 +211,6 @@
 
     .workflow-device-toggle {
         font-size: 0.92rem;
-    }
-
-    .workflow-action-group {
-        display: grid;
-        grid-template-columns: 1fr;
     }
 
     .workflow-help {
@@ -411,16 +398,15 @@
 
     /* ── 36 px minimum touch targets (JTN-223) ── */
     button,
-    .btn,
-    .action-button,
-    .header-button,
-    .icon-button,
-    .chip,
-    a.btn,
-    select,
-    select.form-input,
-    .button-group button,
-    .collapsible-header {
+.btn,
+.action-button,
+.header-button,
+.icon-button,
+.chip,
+a.btn,
+select,
+select.form-input,
+.collapsible-header {
         min-height: 36px;
         min-width: 36px;
     }

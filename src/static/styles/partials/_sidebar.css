@@ -382,10 +382,6 @@
      display:none here; that hid the only instance of the toggle on desktop,
      so it's removed. */
 
-  .shell .app-header nav.header-actions,
-  .shell .app-header .header-identity .header-button.icon.current-page {
-    display: none;
-  }
   .shell .frame {
     margin-top: 12px;
   }
@@ -547,8 +543,7 @@
     font-size: 0.78rem;
   }
 
-  .sidebar-foot #themeToggle,
-  .sidebar-foot .theme-toggle {
+  .sidebar-foot #themeToggle {
     min-width: 36px;
     width: 36px;
     padding-inline: 0;
