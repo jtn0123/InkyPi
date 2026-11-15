@@ -8,6 +8,7 @@ from flask import current_app, redirect, render_template, request
 from flask.typing import ResponseReturnValue
 
 from app_setup.logging_setup import configure_log_timezone
+from blueprints._refresh_loop import wake_refresh_loop
 from blueprints.settings import logger, settings_bp
 from display.rendering_settings import SCREEN_RENDERING_KEY, SCREEN_RENDERING_MODES
 from utils.api_responses import JsonResponse, json_error, json_success
@@ -297,14 +298,9 @@ def _apply_imported_config(device_config: Any, filtered_cfg: dict[str, Any]) -> 
 
     if "timezone" in filtered_cfg:
         configure_log_timezone(device_config.get_config("timezone"))
-    # The refresh loop keeps a snapshot of timezone, resolution and playlists;
-    # rebuild it so the restored settings apply without a restart.
-    refresh_task = current_app.config.get("REFRESH_TASK")
-    if refresh_task is not None:
-        try:
-            refresh_task.signal_config_change()
-        except Exception:
-            logger.exception("Could not notify refresh task after import")
+    # The refresh loop plans its wait from the playlists and interval; wake
+    # it so the restored settings apply without waiting out the old plan.
+    wake_refresh_loop("importing settings")
 
 
 @settings_bp.route("/settings/import", methods=["POST"])
@@ -700,16 +696,20 @@ def save_settings() -> ResponseReturnValue:
         previous_interval_seconds = device_config.get_config(
             "plugin_cycle_interval_seconds"
         )
+        previous_timezone = device_config.get_config("timezone")
         settings, plugin_cycle_interval_seconds = _build_settings_dict(
             form_data, normalized_device_name
         )
         device_config.update_config(settings)
         configure_log_timezone(settings.get("timezone"))
 
-        if plugin_cycle_interval_seconds != previous_interval_seconds:
-            # wake the background thread up to signal interval config change
-            refresh_task = current_app.config["REFRESH_TASK"]
-            refresh_task.signal_config_change()
+        # The loop's wait comes from the interval and from playlist windows,
+        # which are in device time, so either change needs a fresh plan.
+        if (
+            plugin_cycle_interval_seconds != previous_interval_seconds
+            or settings.get("timezone") != previous_timezone
+        ):
+            wake_refresh_loop("saving device settings")
     return json_success(message="Saved settings.")
 
 
