@@ -2,6 +2,25 @@
 
 <!-- version list -->
 
+## v1.8.11 (2026-11-15)
+
+### Bug Fixes
+
+- **render**: Drop unused weather_ny template and jsDelivr from render CSP
+  ([#730](https://github.com/jtn0123/InkyPi/pull/730),
+  [`9fb5e19`](https://github.com/jtn0123/InkyPi/commit/9fb5e19215fb18d94558ca7bced23b473884e0c3))
+
+### Testing
+
+- Reset every rate limiter between tests through one registry
+  ([#728](https://github.com/jtn0123/InkyPi/pull/728),
+  [`b880ac8`](https://github.com/jtn0123/InkyPi/commit/b880ac836e7a4c8142525ff8d8d5b35443742732))
+
+- Wait for the refresh to settle instead of reading results too early
+  ([#729](https://github.com/jtn0123/InkyPi/pull/729),
+  [`1bab6eb`](https://github.com/jtn0123/InkyPi/commit/1bab6eb18e96f4f5af4cb601e1f7bf51599a6e8a))
+
+
 ## v1.8.10 (2026-11-15)
 
 ### Bug Fixes
