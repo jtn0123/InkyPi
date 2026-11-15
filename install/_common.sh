@@ -150,12 +150,37 @@ export UV_CONCURRENT_DOWNLOADS="${UV_CONCURRENT_DOWNLOADS:-4}"
 export UV_CONCURRENT_INSTALLS="${UV_CONCURRENT_INSTALLS:-1}"
 export UV_CONCURRENT_BUILDS="${UV_CONCURRENT_BUILDS:-1}"
 
+# True when the OS sets up zram swap itself. Pi OS Trixie's rpi-swap (through
+# systemd-zram-generator) creates /dev/zram0 at boot. zram-tools would fight it
+# for the device and fail at every boot. The packages are checked as well as
+# /proc/swaps, because zram isn't active in an image-build chroot or before
+# the first boot. INKYPI_PROC_SWAPS lets tests point at a fake swaps file.
+os_provides_zram_swap() {
+  if grep -q "^/dev/zram" "${INKYPI_PROC_SWAPS:-/proc/swaps}" 2>/dev/null; then
+    return 0
+  fi
+  local pkg
+  for pkg in rpi-swap systemd-zram-generator; do
+    if dpkg-query -W -f='${Status}' "$pkg" 2>/dev/null | grep -q "install ok installed"; then
+      return 0
+    fi
+  done
+  return 1
+}
+
 setup_zramswap_service() {
-  # If the OS already provides zram swap (e.g. Pi OS Trixie preinstalls
-  # zram-swap), skip zram-tools — they fight over /dev/zram0 and cause mkswap
-  # to fail.
-  if grep -q "^/dev/zram" /proc/swaps 2>/dev/null; then
-    echo "zram swap already active (likely from preinstalled zram-swap package) — skipping zram-tools install."
+  if os_provides_zram_swap; then
+    echo "zram swap is provided by the OS (rpi-swap / zram-generator) — skipping zram-tools install."
+    # Earlier installs added zram-tools anyway (it was in
+    # debian-requirements.txt), and its zramswap.service then failed at every
+    # boot, leaving systemd "degraded". Disable it for future boots without
+    # stopping it: if it won the race for /dev/zram0 this boot, it is the
+    # live swap, and swapping off mid-update could run the Pi out of memory.
+    if systemctl list-unit-files zramswap.service 2>/dev/null | grep -q "^zramswap.service"; then
+      sudo systemctl disable zramswap.service >/dev/null 2>&1 || true
+      sudo systemctl reset-failed zramswap.service >/dev/null 2>&1 || true
+      echo "Disabled zram-tools' zramswap.service, which conflicts with the OS zram swap."
+    fi
     return 0
   fi
   echo "Enabling and starting zramswap service."

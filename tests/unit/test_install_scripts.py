@@ -265,7 +265,7 @@ class TestInstallScript:
         # boot. Installing zram-tools on top fights over /dev/zram0 and makes
         # `systemctl start zramswap` exit 1. The guard must run before apt-get.
         # JTN-674: setup_zramswap_service() -> None -> None now lives in _common.sh — check combined.
-        guard = 'grep -q "^/dev/zram" /proc/swaps'
+        guard = "if os_provides_zram_swap; then"
         apt_install = "apt-get install -y zram-tools"
         assert guard in self.combined
         assert "skipping zram-tools install" in self.combined
@@ -1920,7 +1920,7 @@ class TestUpdateScript:
         # JTN-667: setup_zramswap_service in update.sh must guard against
         # Trixie's preinstalled zram-swap to avoid /dev/zram0 conflicts.
         # JTN-674: setup_zramswap_service() -> None -> None now lives in _common.sh — check combined.
-        guard = 'grep -q "^/dev/zram" /proc/swaps'
+        guard = "if os_provides_zram_swap; then"
         apt_install = "apt-get install -y zram-tools"
         assert guard in self.combined
         assert "skipping zram-tools install" in self.combined

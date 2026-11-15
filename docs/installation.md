@@ -131,7 +131,7 @@ Trixie images set `arm_64bit=1` explicitly in `/boot/firmware/config.txt`. If yo
 
 ### First-boot install time
 
-A fresh `install.sh` run on a Pi Zero 2 W takes **roughly 15 minutes** end-to-end. The bottleneck is `pip install` building wheels for `numpy`, `Pillow`, and `playwright` on a single Cortex-A53 core. Don't kill the install or assume it's hung — `htop` will show `pip` consuming one core. zramswap (auto-enabled by `install.sh` on Trixie) is critical here; without it the build OOMs.
+A fresh `install.sh` run on a Pi Zero 2 W takes **roughly 15 minutes** end-to-end. The bottleneck is `pip install` building wheels for `numpy`, `Pillow`, and `playwright` on a single Cortex-A53 core. Don't kill the install or assume it's hung — `htop` will show `pip` consuming one core. zram swap is critical here; without it the build OOMs. Pi OS Trixie sets it up with `rpi-swap`, and `install.sh` adds `zram-tools` only on an OS that doesn't.
 
 ### Pre-built wheelhouse (faster first boot — JTN-604)
 
@@ -179,7 +179,7 @@ As of the version that resolves [JTN-592](https://linear.app/jtn0123/issue/JTN-5
 
 ### Pi Zero W vs Pi Zero 2 W
 
-The "[Known Issues during Pi Zero W Installation](./troubleshooting.md#known-issues-during-pi-zero-w-installation)" section in the troubleshooting guide refers to the **original** 32-bit Pi Zero W, not the Pi Zero 2 W. The Zero 2 W is much more capable (4× Cortex-A53, ARMv8) and doesn't hit the same pip install issues — provided zramswap is enabled, which is automatic on InkyPi v0.28.1+.
+The "[Known Issues during Pi Zero W Installation](./troubleshooting.md#known-issues-during-pi-zero-w-installation)" section in the troubleshooting guide refers to the **original** 32-bit Pi Zero W, not the Pi Zero 2 W. The Zero 2 W is much more capable (4× Cortex-A53, ARMv8) and doesn't hit the same pip install issues — provided zram swap is active (`rpi-swap` on Pi OS Trixie; `install.sh` adds `zram-tools` otherwise).
 
 ## Re-editing user-data after first boot (cloud-init runcmd one-shot trap)
 
