@@ -1,8 +1,9 @@
 """refresh_stats — compute rolling refresh aggregates from history sidecar files.
 
 Reads JSON sidecar files written alongside PNG history images and produces
-window-based statistics (1h, 24h, 7d).  Results are cached in-process for
-60 seconds to avoid repeated directory scans on high-frequency polling.
+window-based statistics (1h, 24h, 7d).  All windows come from one directory
+scan, and the combined result is cached in-process for 60 seconds to avoid
+repeated scans on high-frequency polling.
 
 Sidecar schema (subset used here)
 ----------------------------------
@@ -24,6 +25,7 @@ import logging
 import os
 import time
 from collections import Counter
+from collections.abc import Mapping
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -35,15 +37,16 @@ logger = logging.getLogger(__name__)
 _STATUS_FAILURE = "failure"
 
 # ---------------------------------------------------------------------------
-# Cache — one entry per (history_dir, window_seconds) pair
+# Cache — one entry per (history_dir, windows) request
 # ---------------------------------------------------------------------------
 
 _CACHE_TTL_SECONDS = 60
 
 RefreshStatsRecord = dict[str, Any]
 RefreshStatsResult = dict[str, Any]
+_CacheKey = tuple[str, tuple[tuple[str, int], ...]]
 
-_cache: dict[tuple[str, int], tuple[float, RefreshStatsResult]] = {}
+_cache: dict[_CacheKey, tuple[float, dict[str, RefreshStatsResult]]] = {}
 
 
 def _now() -> float:
@@ -98,7 +101,7 @@ def _load_sidecars(history_dir: str, since: float) -> list[RefreshStatsRecord]:
             ts = mtime
         if ts < since:
             continue
-        records.append({**data, "_ts": float(ts)})
+        records.append({**data, "_ts": float(ts), "_mtime": mtime})
 
     return records
 
@@ -151,6 +154,39 @@ def _compute_window(records: list[RefreshStatsRecord]) -> RefreshStatsResult:
     }
 
 
+def _in_window(record: RefreshStatsRecord, since: float) -> bool:
+    """Apply ``_load_sidecars``' cutoff to an already-loaded record."""
+    return bool(record["_mtime"] >= since and record["_ts"] >= since)
+
+
+def compute_stats_windows(
+    history_dir: str, windows: Mapping[str, int]
+) -> dict[str, RefreshStatsResult]:
+    """Return refresh aggregates for each named window, from one directory scan.
+
+    *windows* maps a name to its length in seconds. The sidecars are read once
+    with the longest window's cutoff and bucketed in memory, and the combined
+    result is cached for 60 seconds per (history_dir, windows) request.
+    """
+    window_items = tuple(windows.items())
+    cache_key: _CacheKey = (history_dir, window_items)
+    now = _now()
+
+    cached_at, cached_result = _cache.get(cache_key, (0.0, {}))
+    if now - cached_at < _CACHE_TTL_SECONDS and cached_result:
+        return cached_result
+
+    longest = max((seconds for _, seconds in window_items), default=0)
+    records = _load_sidecars(history_dir, now - longest)
+    result = {
+        name: _compute_window([r for r in records if _in_window(r, now - seconds)])
+        for name, seconds in window_items
+    }
+
+    _cache[cache_key] = (now, result)
+    return result
+
+
 def compute_stats(history_dir: str, window_seconds: int) -> RefreshStatsResult:
     """Return refresh aggregates for the last *window_seconds* seconds.
 
@@ -162,19 +198,7 @@ def compute_stats(history_dir: str, window_seconds: int) -> RefreshStatsResult:
         total, success, failure, success_rate, p50_duration_ms,
         p95_duration_ms, top_failing
     """
-    cache_key = (history_dir, window_seconds)
-    now = _now()
-
-    cached_at, cached_result = _cache.get(cache_key, (0.0, {}))
-    if now - cached_at < _CACHE_TTL_SECONDS and cached_result:
-        return cached_result
-
-    since = now - window_seconds
-    records = _load_sidecars(history_dir, since)
-    result = _compute_window(records)
-
-    _cache[cache_key] = (now, result)
-    return result
+    return compute_stats_windows(history_dir, {"window": window_seconds})["window"]
 
 
 def _clear_cache() -> None:
