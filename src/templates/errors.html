@@ -15,6 +15,7 @@
             description='Browser-side error and warning reports captured from this session. Use this page to diagnose client-side failures.',
             eyebrow='Diagnostics',
             chips=[{
+                'id': 'errorsCountChip',
                 'label': _report_count ~ ' report' ~ ('s' if _report_count != 1 else ''),
                 'variant': 'warn' if reports else 'info',
             }]
@@ -25,7 +26,7 @@
                     data-test-skip-click="true">Clear All</button>
         {% endcall %}
 
-        <div id="errorsEmptyState" {% if reports %}hidden{% endif %} class="empty-state">
+        <div id="errorsEmptyState" tabindex="-1" {% if reports %}hidden{% endif %} class="empty-state">
             <p>No error reports captured in this session.</p>
         </div>
 

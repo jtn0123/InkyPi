@@ -331,7 +331,7 @@
           if (!sdata?.running) {
             clearInterval(state.updateTimer);
             state.updateTimer = null;
-            setTimeout(logs.fetchAndRenderLogs, 500);
+            setTimeout(() => logs.fetchAndRenderLogs(), 500);
             // Silent refresh — the user was just watching the update log
             // stream, they don't need another toast announcing the state.
             await checkForUpdates({ silent: true });

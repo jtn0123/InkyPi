@@ -55,18 +55,29 @@
         return;
       }
       closeClearModal();
-      // Remove all rendered error rows
+      // Remove all rendered error rows, and the table with them.
       const tbody = document.getElementById("errorsTableBody");
       if (tbody) {
         tbody.innerHTML = "";
+        const table = tbody.closest("table");
+        if (table) table.hidden = true;
       }
-      const emptyState = document.getElementById("errorsEmptyState");
-      if (emptyState) {
-        emptyState.hidden = false;
+      const countChip = document.getElementById("errorsCountChip");
+      if (countChip) {
+        countChip.textContent = "0 reports";
+        countChip.classList.replace("warn", "info");
       }
       const clearBtn = document.getElementById("errorsClearBtn");
       if (clearBtn) {
         clearBtn.disabled = true;
+      }
+      // Closing the dialog handed focus back to Clear All, which is now
+      // disabled, so focus would fall to the page body. Move it to the
+      // message that says the list is empty.
+      const emptyState = document.getElementById("errorsEmptyState");
+      if (emptyState) {
+        emptyState.hidden = false;
+        emptyState.focus();
       }
       if (globalThis.showResponseModal) {
         showResponseModal("success", "Error logs cleared.");
