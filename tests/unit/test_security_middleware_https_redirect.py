@@ -24,9 +24,10 @@ import sys
 from typing import Any
 
 import pytest
+from flask import Flask
 
 
-def _reload_inkypi(monkeypatch: pytest.MonkeyPatch, env: Any) -> Any:
+def _reload_inkypi(monkeypatch: pytest.MonkeyPatch, env: Any) -> Flask:
     """Reload the inkypi module with a clean environment.
 
     Mirrors the helper in ``tests/unit/test_inkypi.py`` but local to
@@ -54,8 +55,8 @@ def _reload_inkypi(monkeypatch: pytest.MonkeyPatch, env: Any) -> Any:
     import inkypi  # noqa: F401
 
     mod = importlib.reload(sys.modules["inkypi"])
-    mod.main([])
-    return mod
+    app: Flask = mod.main([])
+    return app
 
 
 # ---------------------------------------------------------------------------
@@ -71,11 +72,10 @@ def test_spoofed_host_is_rejected_not_redirected(
     This is the core regression test for the CodeQL
     py/url-redirection alert #52.
     """
-    mod = _reload_inkypi(
+    app = _reload_inkypi(
         monkeypatch,
         env={"INKYPI_FORCE_HTTPS": "1", "INKYPI_ENV": "production"},
     )
-    app = mod.app
 
     client = app.test_client()
     resp = client.get("/", headers={"Host": "evil.com"})
@@ -93,11 +93,10 @@ def test_spoofed_host_is_rejected_not_redirected(
 
 def test_spoofed_host_with_port_is_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
     """Host header including a port is still rejected when not allow-listed."""
-    mod = _reload_inkypi(
+    app = _reload_inkypi(
         monkeypatch,
         env={"INKYPI_FORCE_HTTPS": "1", "INKYPI_ENV": "production"},
     )
-    app = mod.app
 
     client = app.test_client()
     resp = client.get("/", headers={"Host": "attacker.example:8080"})
@@ -109,11 +108,10 @@ def test_spoofed_host_with_port_is_rejected(monkeypatch: pytest.MonkeyPatch) -> 
 
 def test_allowed_host_still_redirects(monkeypatch: pytest.MonkeyPatch) -> None:
     """A request with an allow-listed host is still upgraded to HTTPS."""
-    mod = _reload_inkypi(
+    app = _reload_inkypi(
         monkeypatch,
         env={"INKYPI_FORCE_HTTPS": "1", "INKYPI_ENV": "production"},
     )
-    app = mod.app
 
     client = app.test_client()
     # Flask's test client defaults Host to "localhost" which is
@@ -128,11 +126,10 @@ def test_default_allowed_hosts_include_inkypi_local(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """``inkypi.local`` is in the default allow-list."""
-    mod = _reload_inkypi(
+    app = _reload_inkypi(
         monkeypatch,
         env={"INKYPI_FORCE_HTTPS": "1", "INKYPI_ENV": "production"},
     )
-    app = mod.app
 
     client = app.test_client()
     resp = client.get("/settings", headers={"Host": "inkypi.local"})
@@ -150,7 +147,7 @@ def test_x_forwarded_proto_https_bypass_still_works(
     to redirect; a request already coming in behind a TLS proxy
     should pass through without a host lookup.
     """
-    mod = _reload_inkypi(
+    app = _reload_inkypi(
         monkeypatch,
         env={
             "INKYPI_FORCE_HTTPS": "1",
@@ -161,7 +158,6 @@ def test_x_forwarded_proto_https_bypass_still_works(
             "INKYPI_ALLOWED_HOSTS": "whatever.example",
         },
     )
-    app = mod.app
 
     client = app.test_client()
     resp = client.get(
@@ -174,7 +170,7 @@ def test_x_forwarded_proto_https_bypass_still_works(
 
 def test_custom_allowed_hosts_env_var(monkeypatch: pytest.MonkeyPatch) -> None:
     """INKYPI_ALLOWED_HOSTS lets operators add their own hostnames."""
-    mod = _reload_inkypi(
+    app = _reload_inkypi(
         monkeypatch,
         env={
             "INKYPI_FORCE_HTTPS": "1",
@@ -182,7 +178,6 @@ def test_custom_allowed_hosts_env_var(monkeypatch: pytest.MonkeyPatch) -> None:
             "INKYPI_ALLOWED_HOSTS": "mypi.example.com,localhost",
         },
     )
-    app = mod.app
 
     client = app.test_client()
     resp = client.get("/settings", headers={"Host": "mypi.example.com"})
@@ -198,11 +193,10 @@ def test_redirect_preserves_path_and_query_string(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """The upgrade redirect must preserve the original path and query string."""
-    mod = _reload_inkypi(
+    app = _reload_inkypi(
         monkeypatch,
         env={"INKYPI_FORCE_HTTPS": "1", "INKYPI_ENV": "production"},
     )
-    app = mod.app
 
     client = app.test_client()
     resp = client.get("/settings?foo=bar&baz=1", headers={"Host": "localhost"})
@@ -214,11 +208,10 @@ def test_redirect_omits_trailing_question_mark_when_no_query(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """A request with no query string must not end the Location in ``?``."""
-    mod = _reload_inkypi(
+    app = _reload_inkypi(
         monkeypatch,
         env={"INKYPI_FORCE_HTTPS": "1", "INKYPI_ENV": "production"},
     )
-    app = mod.app
 
     client = app.test_client()
     resp = client.get("/", headers={"Host": "localhost"})
@@ -235,11 +228,10 @@ def test_redirect_reencodes_path_and_query(monkeypatch: pytest.MonkeyPatch) -> N
     Location header is re-assembled from (hardcoded https scheme,
     allow-listed host, re-quoted path, re-urlencoded query).
     """
-    mod = _reload_inkypi(
+    app = _reload_inkypi(
         monkeypatch,
         env={"INKYPI_FORCE_HTTPS": "1", "INKYPI_ENV": "production"},
     )
-    app = mod.app
 
     client = app.test_client()
     # A path with a space (URL-decoded by Werkzeug) must come back
@@ -254,11 +246,10 @@ def test_redirect_drops_fragment_and_normalises_query(
 ) -> None:
     """Fragments never travel over HTTP so the rebuilt URL must have none,
     and multi-value query strings must round-trip deterministically."""
-    mod = _reload_inkypi(
+    app = _reload_inkypi(
         monkeypatch,
         env={"INKYPI_FORCE_HTTPS": "1", "INKYPI_ENV": "production"},
     )
-    app = mod.app
 
     client = app.test_client()
     resp = client.get("/x?a=1&a=2&b=3", headers={"Host": "localhost"})
@@ -271,11 +262,10 @@ def test_redirect_never_uses_spoofed_host_even_in_path(
 ) -> None:
     """Even if an attacker embeds a hostname-like string in the path, the
     Location header still points at the allow-listed host."""
-    mod = _reload_inkypi(
+    app = _reload_inkypi(
         monkeypatch,
         env={"INKYPI_FORCE_HTTPS": "1", "INKYPI_ENV": "production"},
     )
-    app = mod.app
 
     client = app.test_client()
     resp = client.get("/@evil.com/path", headers={"Host": "localhost"})
@@ -288,11 +278,10 @@ def test_redirect_never_uses_spoofed_host_even_in_path(
 
 def test_allowed_host_ignores_port_suffix(monkeypatch: pytest.MonkeyPatch) -> None:
     """``localhost:5000`` should count as the allow-listed ``localhost``."""
-    mod = _reload_inkypi(
+    app = _reload_inkypi(
         monkeypatch,
         env={"INKYPI_FORCE_HTTPS": "1", "INKYPI_ENV": "production"},
     )
-    app = mod.app
 
     client = app.test_client()
     resp = client.get("/settings", headers={"Host": "localhost:5000"})

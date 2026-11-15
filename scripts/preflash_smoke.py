@@ -106,8 +106,7 @@ def _load_inkypi(
     argv = ["--dev", "--port", "8099"]
     if web_only:
         argv.append("--web-only")
-    inkypi.main(argv)
-    app = inkypi.app
+    app = inkypi.main(argv)
     if app is None:
         raise RuntimeError("Flask app was not initialized")
     return inkypi, app

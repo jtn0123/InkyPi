@@ -3,11 +3,12 @@ import sys
 from typing import Any
 
 import pytest
+from flask import Flask
 
 
 def _reload_inkypi(
     monkeypatch: pytest.MonkeyPatch, argv: Any = None, env: Any = None
-) -> Any:
+) -> Flask:
     if argv is None:
         argv = ["inkypi.py"]
     if env is None:
@@ -24,13 +25,12 @@ def _reload_inkypi(
     import inkypi  # noqa: F401
 
     mod = importlib.reload(sys.modules["inkypi"])
-    mod.main(argv[1:])
-    return mod
+    app: Flask = mod.main(argv[1:])
+    return app
 
 
 def test_csp_enforcement_and_report_only(monkeypatch: pytest.MonkeyPatch) -> None:
-    mod = _reload_inkypi(monkeypatch)
-    app = mod.app
+    app = _reload_inkypi(monkeypatch)
     client = app.test_client()
 
     # Default report-only in env
@@ -57,8 +57,7 @@ def test_csp_nonce_present_and_unique_per_request(
     monkeypatch: pytest.MonkeyPatch,
 ) -> Any:
     """Each request generates a unique nonce that appears in the CSP header."""
-    mod = _reload_inkypi(monkeypatch)
-    app = mod.app
+    app = _reload_inkypi(monkeypatch)
     client = app.test_client()
 
     monkeypatch.setenv("INKYPI_CSP_REPORT_ONLY", "0")
@@ -89,8 +88,8 @@ def test_default_csp_blocks_base_object_and_foreign_framing(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Grade report E4: base-uri, object-src and frame-ancestors are pinned."""
-    mod = _reload_inkypi(monkeypatch, env={"INKYPI_CSP_REPORT_ONLY": "0"})
-    client = mod.app.test_client()
+    app = _reload_inkypi(monkeypatch, env={"INKYPI_CSP_REPORT_ONLY": "0"})
+    client = app.test_client()
     csp = client.get("/healthz").headers.get("Content-Security-Policy", "")
     directives = {d.strip().split(" ", 1)[0]: d.strip() for d in csp.split(";")}
     assert directives["base-uri"] == "base-uri 'none'"
@@ -103,8 +102,7 @@ def test_csp_nonce_not_injected_when_custom_csp_set(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Custom INKYPI_CSP values are used verbatim — no nonce is injected."""
-    mod = _reload_inkypi(monkeypatch, env={"INKYPI_CSP_REPORT_ONLY": "0"})
-    app = mod.app
+    app = _reload_inkypi(monkeypatch, env={"INKYPI_CSP_REPORT_ONLY": "0"})
     client = app.test_client()
 
     monkeypatch.setenv("INKYPI_CSP", "default-src 'none'")
@@ -119,8 +117,7 @@ def test_csp_nonce_not_injected_when_custom_csp_set(
 def test_hsts_only_under_https_or_trusted_proxy(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    mod = _reload_inkypi(monkeypatch, env={"INKYPI_TRUSTED_PROXIES": "127.0.0.1"})
-    app = mod.app
+    app = _reload_inkypi(monkeypatch, env={"INKYPI_TRUSTED_PROXIES": "127.0.0.1"})
     client = app.test_client()
 
     # No HSTS for plain HTTP

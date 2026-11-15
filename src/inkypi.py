@@ -6,6 +6,7 @@ import os
 import sys
 import warnings
 from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from time import perf_counter
@@ -17,18 +18,8 @@ from werkzeug.serving import is_running_from_reloader
 
 from app_setup.asset_helpers import setup_asset_helpers
 from app_setup.blueprints_registry import register_blueprints
-
-# Re-exports for backwards compatibility — some tests and external code
-# import these symbols from `inkypi` directly. Kept here as module-level
-# aliases after the JTN-289 split.
-from app_setup.error_handlers import (
-    register_error_handlers,
-    register_error_handlers as _register_error_handlers,
-)
-from app_setup.health import (
-    register_health_endpoints,
-    register_health_endpoints as _register_health_endpoints,
-)
+from app_setup.error_handlers import register_error_handlers
+from app_setup.health import register_health_endpoints
 from app_setup.http_metrics import setup_http_metrics
 from app_setup.logging_setup import (
     configure_log_timezone,
@@ -37,30 +28,19 @@ from app_setup.logging_setup import (
 )
 from app_setup.schema_validator import register as register_schema_validator
 from app_setup.security_middleware import (
-    _extract_csrf_token_from_request,
-    _generate_csrf_token,
     setup_csp_nonce,
-    setup_csp_nonce as _setup_csp_nonce,
     setup_csrf_protection,
-    setup_csrf_protection as _setup_csrf_protection,
     setup_host_validation,
     setup_https_redirect,
-    setup_https_redirect as _setup_https_redirect,
     setup_rate_limiting,
-    setup_rate_limiting as _setup_rate_limiting,
     setup_secret_key,
-    setup_secret_key as _setup_secret_key,
     setup_security_headers,
-    setup_security_headers as _setup_security_headers,
 )
-from app_setup.signals import (
-    setup_signal_handlers,
-    setup_signal_handlers as _setup_signal_handlers,
-)
+from app_setup.signals import setup_signal_handlers
 from app_setup.smoke import register_smoke_endpoints
 from config import Config
 from display.display_manager import DisplayManager
-from plugins.plugin_registry import load_plugins, pop_hot_reload_info
+from plugins.plugin_registry import load_plugins
 from refresh_task import RefreshTask
 from utils import blackout, boot_self_test
 from utils.app_utils import generate_startup_image, get_ip_address
@@ -73,22 +53,6 @@ from utils.i18n import init_i18n
 from utils.sri import init_sri
 from utils.sse import max_concurrent_streams, web_threads
 
-# Re-exported for tests/unit/test_inkypi.py monkey-patches.
-__all__ = [
-    "pop_hot_reload_info",
-    "_register_error_handlers",
-    "_register_health_endpoints",
-    "_setup_csp_nonce",
-    "_setup_csrf_protection",
-    "_setup_https_redirect",
-    "_setup_rate_limiting",
-    "_setup_secret_key",
-    "_setup_security_headers",
-    "_setup_signal_handlers",
-    "_extract_csrf_token_from_request",
-    "_generate_csrf_token",
-]
-
 # suppress warning from inky library https://github.com/pimoroni/inky/issues/205
 warnings.filterwarnings("ignore", message=".*Busy Wait: Held high.*")
 
@@ -100,10 +64,6 @@ warnings.filterwarnings("ignore", message=".*Busy Wait: Held high.*")
 setup_logging()
 
 logger = logging.getLogger(__name__)
-
-# ---------------------------------------------------------------------------
-# Module-level runtime config (env-derived; main() may overwrite)
-# ---------------------------------------------------------------------------
 
 _DEFAULT_MAX_UPLOAD = 10 * 1024 * 1024
 
@@ -181,31 +141,42 @@ def _get_web_threads() -> int:
     return web_threads()
 
 
-def _env_dev_mode() -> bool:
+@dataclass(frozen=True)
+class RuntimeOptions:
+    """How this process was started: read once, then passed around.
+
+    ``create_app`` stores it in ``app.config["RUNTIME_OPTIONS"]``.
+    """
+
+    dev_mode: bool = False
+    web_only: bool = False
+    fast_dev: bool = False
+    port: int = 80
+    run_once: bool = False
+    config_file: str | None = None
+
+    @classmethod
+    def from_env(cls) -> "RuntimeOptions":
+        """Return the options the environment alone sets (no CLI flags)."""
+        return _options_from(argparse.Namespace())
+
+
+def _options_from(args: argparse.Namespace) -> RuntimeOptions:
+    """Combine CLI flags with the environment; a flag can only turn a mode on."""
     env_mode = (
         os.getenv("INKYPI_ENV", "").strip() or os.getenv("FLASK_ENV", "").strip()
     ).lower()
-    return env_mode in ("dev", "development")
-
-
-DEV_MODE = _env_dev_mode()
-WEB_ONLY = env_bool("INKYPI_NO_REFRESH")
-FAST_DEV = env_bool("INKYPI_FAST_DEV")
-
-
-def _env_port() -> int:
-    env_port = os.getenv("INKYPI_PORT") or os.getenv("PORT")
-    if env_port:
-        try:
-            return int(env_port)
-        except ValueError:
-            return 8080 if DEV_MODE else 80
-    return 8080 if DEV_MODE else 80
-
-
-PORT = _env_port()
-args = None  # Populated by main()
-app: Flask | None = None
+    dev_mode = bool(getattr(args, "dev", False) or env_mode in ("dev", "development"))
+    return RuntimeOptions(
+        dev_mode=dev_mode,
+        web_only=bool(
+            getattr(args, "web_only", False) or env_bool("INKYPI_NO_REFRESH")
+        ),
+        fast_dev=bool(getattr(args, "fast_dev", False) or env_bool("INKYPI_FAST_DEV")),
+        port=_resolve_port(getattr(args, "port", None), dev_mode),
+        run_once=bool(getattr(args, "run_once", False)),
+        config_file=getattr(args, "config", None),
+    )
 
 
 def _resolve_port(cli_port: int | None, dev_mode: bool) -> int:
@@ -221,18 +192,19 @@ def _resolve_port(cli_port: int | None, dev_mode: bool) -> int:
     return 8080 if dev_mode else 80
 
 
-def _apply_dev_env(args: argparse.Namespace) -> None:
+def _apply_dev_env(options: RuntimeOptions) -> None:
     """Persist dev-mode flags to the environment for downstream consumers."""
     os.environ["INKYPI_ENV"] = "dev"
-    if args.web_only:
+    if options.web_only:
         os.environ["INKYPI_NO_REFRESH"] = "1"
 
 
-def main(argv: list[str] | None = None) -> Flask:
-    """Parse CLI arguments and initialise the application."""
+def parse_runtime_options(argv: list[str] | None = None) -> RuntimeOptions:
+    """Parse the command line (plus the environment) into options."""
+    return _options_from(_parse_args(argv))
 
-    global args, DEV_MODE, WEB_ONLY, FAST_DEV, PORT, app
 
+def _parse_args(argv: list[str] | None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="InkyPi Display Server")
     parser.add_argument("--dev", action="store_true", help="Run in development mode")
     parser.add_argument(
@@ -262,32 +234,27 @@ def main(argv: list[str] | None = None) -> Flask:
         ),
     )
     args, _unknown = parser.parse_known_args(argv)
+    return args
 
-    # Infer DEV_MODE from CLI or environment
-    env_mode = (
-        os.getenv("INKYPI_ENV", "").strip() or os.getenv("FLASK_ENV", "").strip()
-    ).lower()
-    DEV_MODE = bool(args.dev or env_mode in ("dev", "development"))
 
-    # Toggle for disabling background refresh thread
-    WEB_ONLY = bool(args.web_only or env_bool("INKYPI_NO_REFRESH"))
+def main(argv: list[str] | None = None) -> Flask:
+    """Parse CLI arguments and initialise the application."""
+    args = _parse_args(argv)
+    options = _options_from(args)
 
     if args.dev:
-        _apply_dev_env(args)
+        _apply_dev_env(options)
 
-    if args.config:
-        Config.config_file = args.config
+    if options.config_file:
+        Config.config_file = options.config_file
 
-    PORT = _resolve_port(args.port, DEV_MODE)
-
-    mode_label = "DEVELOPMENT" if DEV_MODE else "PRODUCTION"
-    logger.info(f"Starting InkyPi in {mode_label} mode on port {PORT}")
+    mode_label = "DEVELOPMENT" if options.dev_mode else "PRODUCTION"
+    logger.info(f"Starting InkyPi in {mode_label} mode on port {options.port}")
     logging.getLogger("waitress.queue").setLevel(logging.ERROR)
-    FAST_DEV = bool(args.fast_dev or env_bool("INKYPI_FAST_DEV"))
 
-    app = create_app()
+    app = create_app(options)
 
-    if DEV_MODE:
+    if options.dev_mode:
         install_dev_log_handler()
 
     return app
@@ -305,7 +272,8 @@ def _init_core_services(app: Flask) -> Config:
     display_manager = DisplayManager(device_config)
     refresh_task = RefreshTask(device_config, display_manager)
 
-    if FAST_DEV:
+    options: RuntimeOptions = app.config["RUNTIME_OPTIONS"]
+    if options.fast_dev:
         try:
             device_config.update_value("plugin_cycle_interval_seconds", 30)
             device_config.update_value("startup", False)
@@ -320,7 +288,7 @@ def _init_core_services(app: Flask) -> Config:
     app.config["DEVICE_CONFIG"] = device_config
     app.config["DISPLAY_MANAGER"] = display_manager
     app.config["REFRESH_TASK"] = refresh_task
-    app.config["WEB_ONLY"] = WEB_ONLY
+    app.config["WEB_ONLY"] = options.web_only
 
     return device_config
 
@@ -341,7 +309,7 @@ def _register_before_request_hooks(app: Flask) -> None:
 
     @app.before_request
     def _ensure_refresh_task_started() -> None:
-        if WEB_ONLY:
+        if app.config.get("WEB_ONLY"):
             return
         if os.environ.get("WERKZEUG_RUN_MAIN") == "true":
             rt = app.config.get("REFRESH_TASK")
@@ -509,13 +477,17 @@ def _register_context_processors(app: Flask) -> None:
         }
 
 
-def create_app() -> Flask:
+def create_app(options: RuntimeOptions | None = None) -> Flask:
     """Build and configure the Flask application.
 
     Middleware, error handlers, health endpoints, and signal handling are
     delegated to focused modules under src/app_setup/ (see JTN-289).
+    Without *options* (tests, tools) the environment decides.
     """
+    if options is None:
+        options = RuntimeOptions.from_env()
     app = Flask(__name__)
+    app.config["RUNTIME_OPTIONS"] = options
     template_dirs = [
         os.path.join(os.path.dirname(__file__), "templates"),
         os.path.join(os.path.dirname(__file__), "plugins"),
@@ -555,7 +527,7 @@ def create_app() -> Flask:
     register_smoke_endpoints(app)
 
     _register_before_request_hooks(app)
-    setup_https_redirect(app, dev_mode=DEV_MODE)
+    setup_https_redirect(app, dev_mode=options.dev_mode)
     # E1: always-on Host allow-list (DNS-rebinding defence). Registered after
     # the HTTPS redirect so it lands first in the before_request chain.
     setup_host_validation(app)
@@ -563,12 +535,12 @@ def create_app() -> Flask:
     setup_csrf_protection(app)
     setup_rate_limiting(app)
     register_error_handlers(app)
-    setup_security_headers(app, dev_mode=DEV_MODE)
+    setup_security_headers(app, dev_mode=options.dev_mode)
     setup_http_metrics(app)
     # JTN-664: dev-only JSON response schema validator. Logs shape drift at
     # WARNING; never mutates the response and never raises. Prod opt-in via
     # INKYPI_STRICT_SCHEMAS=1 for CI-style strict builds.
-    if DEV_MODE or os.getenv("INKYPI_STRICT_SCHEMAS") == "1":
+    if options.dev_mode or os.getenv("INKYPI_STRICT_SCHEMAS") == "1":
         register_schema_validator(app)
     setup_signal_handlers(app)
 
@@ -737,19 +709,22 @@ def _await_display_write(refresh_task_obj: object, timeout: float = 120.0) -> No
 
 if __name__ == "__main__":
     created_app = main()
+    options: RuntimeOptions = created_app.config["RUNTIME_OPTIONS"]
 
-    app = created_app
-
-    if getattr(args, "run_once", False):
+    if options.run_once:
         sys.exit(run_once(created_app))
 
     refresh_task_obj = created_app.config.get("REFRESH_TASK")
-    if not WEB_ONLY and not is_running_from_reloader() and refresh_task_obj is not None:
+    if (
+        not options.web_only
+        and not is_running_from_reloader()
+        and refresh_task_obj is not None
+    ):
         refresh_task_obj.start()
     else:
         logger.info("Web-only mode enabled: background refresh task will not start")
 
-    if not WEB_ONLY:
+    if not options.web_only:
         start_boot_display_tasks(created_app)
 
     try:
@@ -769,10 +744,10 @@ if __name__ == "__main__":
         logger.exception("Failed to notify systemd READY")
 
     try:
-        if DEV_MODE:
+        if options.dev_mode:
             local_ip = get_ip_address()
             if local_ip:
-                logger.info(f"Serving on http://{local_ip}:{PORT}")
+                logger.info(f"Serving on http://{local_ip}:{options.port}")
 
         thread_count = _get_web_threads()
         logger.info(
@@ -783,7 +758,7 @@ if __name__ == "__main__":
         serve(
             created_app,
             host="0.0.0.0",
-            port=PORT,
+            port=options.port,
             threads=thread_count,
             # Keep reading each connection while its request runs so SSE
             # streams can see `waitress.client_disconnected` and free their

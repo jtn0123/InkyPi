@@ -156,11 +156,11 @@ def privileged_client(client: FlaskClient, monkeypatch: pytest.MonkeyPatch) -> A
     monkeypatch.setenv("INKYPI_READONLY_TOKEN", READONLY_TOKEN)
 
     from app_setup.auth import init_auth
-    from inkypi import _setup_csrf_protection
+    from app_setup.security_middleware import setup_csrf_protection
 
     app = client.application
     init_auth(app, app.config["DEVICE_CONFIG"])
-    _setup_csrf_protection(app)
+    setup_csrf_protection(app)
     return client
 
 

@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from flask import Flask
 
 
 def _write_min_device_config(path: Any) -> None:
@@ -58,10 +59,10 @@ def test_secret_key_dev_persisted(
     # Force fresh import with current env
     sys.modules.pop("inkypi", None)
     inkypi = importlib.import_module("inkypi")
-    inkypi.main([])
+    app = inkypi.main([])
 
     # SECRET_KEY should be generated and persisted in .env under PROJECT_DIR
-    secret = inkypi.app.secret_key
+    secret = app.secret_key
     assert isinstance(secret, str) and len(secret) >= 32
 
     # Verify persisted
@@ -96,14 +97,13 @@ def test_secret_key_prod_persisted(
     # Fresh import
     sys.modules.pop("inkypi", None)
     inkypi = importlib.import_module("inkypi")
-    inkypi.main([])
+    app = inkypi.main([])
 
     # Verify we're actually in production mode
-    assert not inkypi.DEV_MODE, f"DEV_MODE should be False but is {inkypi.DEV_MODE}"
-    assert not inkypi.args.dev, f"args.dev should be False but is {inkypi.args.dev}"
+    assert app.config["RUNTIME_OPTIONS"].dev_mode is False
 
     # SECRET_KEY should exist AND be persisted to .env (even in prod now)
-    secret = inkypi.app.secret_key
+    secret = app.secret_key
     assert isinstance(secret, str) and len(secret) >= 32
 
     env_file = tmp_path / ".env"
@@ -114,7 +114,7 @@ def test_secret_key_prod_persisted(
 
 def _reload_inkypi(
     monkeypatch: pytest.MonkeyPatch, argv: Any = None, env: Any = None
-) -> Any:
+) -> Flask:
     if argv is None:
         argv = ["inkypi.py"]
     if env is None:
@@ -140,18 +140,17 @@ def _reload_inkypi(
     import inkypi  # noqa: F401
 
     mod = importlib.reload(sys.modules["inkypi"])
-    mod.main(argv[1:])
-    return mod
+    app: Flask = mod.main(argv[1:])
+    return app
 
 
 def test_secret_key_from_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     # SECRET_KEY present in environment should be used as-is
-    mod = _reload_inkypi(
+    app = _reload_inkypi(
         monkeypatch,
         argv=["inkypi.py", "--dev"],
         env={"SECRET_KEY": "from-env", "PROJECT_DIR": str(tmp_path)},
     )
-    app = getattr(mod, "app", None)
     assert app is not None
     assert app.secret_key == "from-env"
 
@@ -161,8 +160,7 @@ def test_secret_key_persisted_in_dev_env_file(
 ) -> None:
     # No SECRET_KEY in process env; should generate and persist to .env in dev
     env = {"INKYPI_ENV": "dev", "PROJECT_DIR": str(tmp_path)}
-    mod = _reload_inkypi(monkeypatch, argv=["inkypi.py"], env=env)
-    app = getattr(mod, "app", None)
+    app = _reload_inkypi(monkeypatch, argv=["inkypi.py"], env=env)
     assert app is not None
     generated = app.secret_key
     assert isinstance(generated, str) and len(generated) >= 32
@@ -174,8 +172,7 @@ def test_secret_key_persisted_in_dev_env_file(
     assert f"SECRET_KEY={generated}" in content
 
     # Reload; should reuse same key from file
-    mod2 = _reload_inkypi(monkeypatch, argv=["inkypi.py"], env=env)
-    app2 = getattr(mod2, "app", None)
+    app2 = _reload_inkypi(monkeypatch, argv=["inkypi.py"], env=env)
     assert app2 is not None
     assert app2.secret_key == generated
 
@@ -186,14 +183,12 @@ def test_secret_key_stable_in_prod_after_persist(
     # Production mode: if missing, it should generate AND persist to .env
     # so subsequent restarts reuse the same key
     env = {"INKYPI_ENV": "production", "PROJECT_DIR": str(tmp_path)}
-    mod = _reload_inkypi(monkeypatch, argv=["inkypi.py"], env=env)
-    app = getattr(mod, "app", None)
+    app = _reload_inkypi(monkeypatch, argv=["inkypi.py"], env=env)
     assert app is not None
     first = app.secret_key
 
     # Reload — should reuse same key from persisted .env
-    mod2 = _reload_inkypi(monkeypatch, argv=["inkypi.py"], env=env)
-    app2 = getattr(mod2, "app", None)
+    app2 = _reload_inkypi(monkeypatch, argv=["inkypi.py"], env=env)
     assert app2 is not None
     second = app2.secret_key
 
