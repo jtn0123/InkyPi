@@ -2,6 +2,37 @@
 
 <!-- version list -->
 
+## v1.8.23 (2026-11-15)
+
+### Bug Fixes
+
+- **install**: Check vendor JavaScript against pinned hashes
+  ([#752](https://github.com/jtn0123/InkyPi/pull/752),
+  [`ef403dc`](https://github.com/jtn0123/InkyPi/commit/ef403dce5137f8dfbdfbfa19c44eeb343b41eaaf))
+
+### Chores
+
+- **lint**: Make the tests type-check ratchet read the right number
+  ([#750](https://github.com/jtn0123/InkyPi/pull/750),
+  [`2a18a24`](https://github.com/jtn0123/InkyPi/commit/2a18a24553a821b72ddec7a809084e0b8bab419f))
+
+### Continuous Integration
+
+- **linkcheck**: Report store refusals as unverifiable, not broken
+  ([#751](https://github.com/jtn0123/InkyPi/pull/751),
+  [`1a46e51`](https://github.com/jtn0123/InkyPi/commit/1a46e51663900366411918226e17bd0a38a60f32))
+
+### Testing
+
+- Assert the one expected status instead of accepting a 500
+  ([#749](https://github.com/jtn0123/InkyPi/pull/749),
+  [`6d4d958`](https://github.com/jtn0123/InkyPi/commit/6d4d9586374000ed36eb358875aef3e4e7d9c382))
+
+- Report retried tests and fail runs that need too many retries
+  ([#748](https://github.com/jtn0123/InkyPi/pull/748),
+  [`df60024`](https://github.com/jtn0123/InkyPi/commit/df600247a802a11941cde07689b639c74ab366b3))
+
+
 ## v1.8.22 (2026-11-15)
 
 ### Bug Fixes
