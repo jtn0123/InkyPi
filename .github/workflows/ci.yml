@@ -51,15 +51,21 @@ jobs:
             --fail-on='GPL-3.0;AGPL-3.0;GPL-3.0-or-later;AGPL-3.0-or-later;GPL v3;AGPL v3;GPL-3.0-only;AGPL-3.0-only' \
             --format=plain \
             --ignore-packages recurring-ical-events
+      # Restore and save are separate steps so that only main writes the
+      # baseline, under a new key each run. actions/cache never saves over a
+      # key that already exists, so a fixed key froze the baseline at the
+      # first main run that wrote it. Restore takes the newest key with the
+      # prefix.
       - name: Restore benchmark baseline cache
         id: bench-cache
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: /tmp/bench-baseline.json
-          key: benchmark-baseline-${{ runner.os }}-py3.13
-          # Fall back to the previous interpreter's baseline until main
-          # records a py3.13 one; the committed baseline is from faster hardware.
+          key: benchmark-baseline-${{ runner.os }}-py3.13-${{ github.run_id }}
+          # The last entry also matches the old fixed-key cache until main
+          # saves its first per-run baseline.
           restore-keys: |
+            benchmark-baseline-${{ runner.os }}-py3.13-
             benchmark-baseline-${{ runner.os }}-
       - name: Run perf benchmarks
         env:
@@ -101,6 +107,12 @@ jobs:
           if [ "$GITHUB_REF_VALUE" = "refs/heads/main" ]; then
             cp /tmp/bench-current.json /tmp/bench-baseline.json
           fi
+      - name: Save benchmark baseline cache
+        if: github.ref == 'refs/heads/main'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: /tmp/bench-baseline.json
+          key: benchmark-baseline-${{ runner.os }}-py3.13-${{ github.run_id }}
       - name: Upload benchmark artifacts
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

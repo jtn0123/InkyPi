@@ -63,8 +63,9 @@ Every PR runs benchmarks and compares against a cached CI baseline. If any
 benchmark's median time exceeds the baseline by more than the configured
 threshold, CI fails.
 
-- **CI baseline**: cached per-OS via GitHub Actions cache. On pushes to `main`,
-  the current run becomes the new baseline for future PRs.
+- **CI baseline**: cached per-OS via GitHub Actions cache. Each push to `main`
+  saves its run as a new cache entry, and PRs restore the newest one. PRs never
+  write it.
 - **Repo baseline** (`tests/benchmarks/baseline.json`): committed for local
   development use and as a blocking fallback when no CI cache exists.
 - **Threshold**: defaults to +15%. Override via the `BENCHMARK_THRESHOLD_PCT`
