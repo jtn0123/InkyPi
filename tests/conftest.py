@@ -70,6 +70,8 @@ UI_BROWSER_TESTS = {
     "test_sidebar_update_indicator.py",
     # Browser error and console-log reports reach the server with CSRF on.
     "test_client_error_reporting_e2e.py",
+    # Scripted scrolls jump instead of animating under "reduce motion".
+    "test_reduced_motion_scroll.py",
     # JTN-703 two-minute click loop. Still opt-in with SKIP_LOAD=0, which the
     # browser-full CI job sets only on the nightly schedule.
     "test_sustained_load.py",

@@ -42,7 +42,7 @@
           button.scrollIntoView({
             inline: "center",
             block: "nearest",
-            behavior: "smooth",
+            behavior: globalThis.InkyPiTheme?.scrollBehavior() ?? "smooth",
           });
         }
       }
@@ -72,7 +72,10 @@
       // Wait a tick so the now-visible panel lays out before scrolling —
       // otherwise scrollIntoView resolves against a `display:none` target.
       setTimeout(() => {
-        target.scrollIntoView({ behavior: "smooth", block: "start" });
+        target.scrollIntoView({
+          behavior: globalThis.InkyPiTheme?.scrollBehavior() ?? "smooth",
+          block: "start",
+        });
       }, 50);
       return true;
     }
@@ -147,7 +150,10 @@
           logsToggle.setAttribute("aria-expanded", String(isOpen));
           logsToggle.textContent = isOpen ? "Hide live logs" : "Show live logs";
           if (isOpen) {
-            logsPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+            logsPanel.scrollIntoView({
+              behavior: globalThis.InkyPiTheme?.scrollBehavior() ?? "smooth",
+              block: "start",
+            });
           }
         });
       }

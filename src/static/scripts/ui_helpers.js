@@ -56,7 +56,10 @@
   function jumpToSection(sectionId) {
     const section = document.getElementById(sectionId);
     if (!section) return;
-    section.scrollIntoView({ behavior: "smooth", block: "start" });
+    section.scrollIntoView({
+      behavior: globalThis.InkyPiTheme?.scrollBehavior() ?? "smooth",
+      block: "start",
+    });
     section.classList.add("section-focus");
     setTimeout(() => section.classList.remove("section-focus"), 1000);
   }
