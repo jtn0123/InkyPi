@@ -129,7 +129,10 @@ If `tests/` goes down:
 
 1. Confirm the lower count is real by rerunning `mypy tests/` or
    `bash scripts/lint.sh`.
-2. Update `scripts/mypy_tests_baseline.txt` to the new lower integer.
+2. Update `scripts/mypy_tests_baseline.txt` to the new lower integer, taken
+   from a CI lint job rather than a macOS run (the file's header explains
+   why). Edit the single value on its last line and add a history comment
+   above it; `scripts/lint.sh` rejects a file with more than one value.
 3. Prefer paying down errors in clusters: shared fixtures, contract/security
    tests, then browser/integration tests.
 

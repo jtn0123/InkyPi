@@ -80,13 +80,16 @@ load_mypy_baseline() {
         return 1
     fi
 
-    baseline_value="$(
-        awk '
-            /^[[:space:]]*#/ { next }
-            /^[[:space:]]*$/ { next }
-            { print $1; exit }
-        ' "$baseline_file"
-    )"
+    # Exactly one value line is allowed. With two, an edit to the wrong one
+    # silently does nothing, which is how this file once kept a stale floor.
+    local value_lines
+    value_lines="$(grep -cvE '^[[:space:]]*(#|$)' "$baseline_file" || true)"
+    if [ "$value_lines" != "1" ]; then
+        echo "❌ mypy ${label} ratchet baseline must hold exactly one value line, found ${value_lines}: $baseline_file" >&2
+        return 1
+    fi
+
+    baseline_value="$(grep -vE '^[[:space:]]*(#|$)' "$baseline_file" | awk '{ print $1 }')"
 
     if [[ ! "$baseline_value" =~ ^[0-9]+$ ]]; then
         echo "❌ mypy ${label} ratchet baseline is not a non-negative integer: $baseline_file" >&2
