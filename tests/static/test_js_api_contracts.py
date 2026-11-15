@@ -26,24 +26,15 @@ def _plugin_page_source() -> str:
 # --- Progress timing labels ---
 
 
-def test_plugin_and_playlist_progress_keep_ms_metric_labels(
-    client: FlaskClient,
-) -> None:
+def test_plugin_progress_keeps_ms_metric_labels(client: FlaskClient) -> None:
     """Progress summaries keep millisecond timing labels visible in the UI."""
-    plugin_resp = client.get("/static/scripts/plugin_form.js")
-    playlist_resp = client.get("/static/scripts/playlist/progress.js")
-    assert plugin_resp.status_code == 200
-    assert playlist_resp.status_code == 200
-
-    plugin_js = plugin_resp.get_data(as_text=True)
-    playlist_js = playlist_resp.get_data(as_text=True)
+    resp = client.get("/static/scripts/plugin_form.js")
+    assert resp.status_code == 200
+    plugin_js = resp.get_data(as_text=True)
 
     assert "fmtElapsed(elapsedMs)" in plugin_js
     assert "${step.elapsed_ms} ms" in plugin_js
     assert "${label} ${val} ms" in plugin_js
-    assert "formatElapsed(Date.now() - startedAt)" in playlist_js
-    assert "${name} ${ms} ms" in playlist_js
-    assert "${label} ${value} ms" in playlist_js
 
 
 # --- Lightbox ---
@@ -158,7 +149,7 @@ def test_theme_script_exists(client: FlaskClient) -> None:
 def test_playlist_script_handles_invalid_stored_message_json(
     client: FlaskClient,
 ) -> None:
-    resp = client.get("/static/scripts/playlist/progress.js")
+    resp = client.get("/static/scripts/playlist/display.js")
     assert resp.status_code == 200
     js = resp.get_data(as_text=True)
 
@@ -166,23 +157,6 @@ def test_playlist_script_handles_invalid_stored_message_json(
     assert "const { type, text } = JSON.parse(storedMessage);" in js
     assert "try {" in js
     assert 'sessionStorage.removeItem("storedMessage");' in js
-
-
-def test_playlist_progress_restore_strips_saved_timestamps(client: FlaskClient) -> None:
-    resp = client.get("/static/scripts/playlist/progress.js")
-    assert resp.status_code == 200
-    js = resp.get_data(as_text=True)
-
-    assert "stripLeadingTime(String(line))" in js
-
-
-def test_playlist_progress_only_marks_successful_runs_done(client: FlaskClient) -> None:
-    resp = client.get("/static/scripts/playlist/progress.js")
-    assert resp.status_code == 200
-    js = resp.get_data(as_text=True)
-
-    assert "let completedSuccessfully = false;" in js
-    assert 'if (completedSuccessfully) tracker.setStep("Done", 100);' in js
 
 
 def test_csrf_script_preserves_existing_headers_without_empty_object_copy(

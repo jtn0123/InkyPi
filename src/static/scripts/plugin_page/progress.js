@@ -58,7 +58,6 @@
           ctx: context || config.progressContext,
         };
         localStorage.setItem(buildProgressKey(data.ctx, config), JSON.stringify(data));
-        localStorage.setItem("INKYPI_LAST_PROGRESS", JSON.stringify(data));
         syncLastProgressButton();
       } catch (e) {
         console.warn("Failed to save progress snapshot:", e);

@@ -21,7 +21,6 @@
     "openRefreshModal": "openRefreshModal",
     "saveDeviceCycle": "saveDeviceCycle",
     "saveRefreshSettings": "saveRefreshSettings",
-    "showLastProgressGlobal": "showLastProgressGlobal",
     "showThumbnailPreview": "showThumbnailPreview",
     "updatePlaylist": "updatePlaylist",
   };
