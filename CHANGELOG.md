@@ -2,6 +2,15 @@
 
 <!-- version list -->
 
+## v1.8.17 (2026-11-15)
+
+### Bug Fixes
+
+- **ui**: Send browser error reports once, with the CSRF token they need
+  ([#742](https://github.com/jtn0123/InkyPi/pull/742),
+  [`6eb329d`](https://github.com/jtn0123/InkyPi/commit/6eb329df1db254a755311c0d8102cab75b6dea7e))
+
+
 ## v1.8.16 (2026-11-15)
 
 ### Bug Fixes
