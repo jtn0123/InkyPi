@@ -146,8 +146,6 @@ def _get_or_set_request_id() -> str | None:
             # JSON envelope, and that policy applied to every such value except
             # this one. After the charset check above the escape is a no-op, so
             # this is consistency and defence in depth rather than the guard.
-            # Annotated because this module is in the mypy strict subset and
-            # `follow_imports = skip` hides form_utils' `-> str` declaration.
             rid_safe: str = escape(rid_hdr, quote=True)
             g.request_id = rid_safe
             return rid_safe
