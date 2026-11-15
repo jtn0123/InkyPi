@@ -196,3 +196,35 @@ def test_api_keys_page_has_save_button(live_server: str, tmp_path: Path) -> None
             assert save_btn.count() == 1
         finally:
             browser.close()
+
+
+def test_schedule_field_errors_survive_typing(
+    live_server: str, browser_page: Page, tmp_path: Path
+) -> None:
+    """Typing in a field must not delete its error message element.
+
+    The playlist name and interval fields show their errors in
+    ``#instance-error`` / ``#interval-error``. A page-wide input listener once
+    removed every ``.validation-message`` from the field's group on the first
+    keystroke, so a later blur had nowhere to show "required".
+    """
+    from tests.integration.browser_helpers import navigate_and_wait
+
+    page = browser_page
+    rc = navigate_and_wait(page, live_server, "/plugin/clock")
+    page.click('button[data-plugin-subtab-target="schedule"]')
+
+    for field, error in (
+        ("#instance", "#instance-error"),
+        ("#scheduleInterval", "#interval-error"),
+    ):
+        page.fill(field, "5")
+        page.fill(field, "")
+        page.locator(field).blur()
+
+        message = page.locator(error)
+        assert message.count() == 1, f"{error} was removed while typing in {field}"
+        assert message.inner_text().strip(), f"{error} shows no message after blur"
+        assert page.locator(field).get_attribute("aria-invalid") == "true"
+
+    rc.assert_no_errors(str(tmp_path), "schedule_field_errors_survive_typing")
