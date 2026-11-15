@@ -46,7 +46,7 @@ class TestGenerateImageRuntimeError:
     ) -> None:
         flask_app.config["REFRESH_TASK"].running = False
         _add_playlist_with_plugin(device_config_dev)
-        monkeypatch.setattr("utils.time_utils.now_device_tz", _fixed_now, raising=True)
+        monkeypatch.setattr("blueprints.main.now_device_tz", _fixed_now, raising=True)
 
         from plugins import plugin_registry
 
@@ -81,7 +81,7 @@ class TestGenerateImageRuntimeError:
         """A failed generate_image should not consume the rate-limit window."""
         flask_app.config["REFRESH_TASK"].running = False
         _add_playlist_with_plugin(device_config_dev)
-        monkeypatch.setattr("utils.time_utils.now_device_tz", _fixed_now, raising=True)
+        monkeypatch.setattr("blueprints.main.now_device_tz", _fixed_now, raising=True)
 
         from plugins import plugin_registry
 
@@ -133,7 +133,7 @@ class TestPluginConfigNotFound:
     ) -> None:
         flask_app.config["REFRESH_TASK"].running = False
         _add_playlist_with_plugin(device_config_dev)
-        monkeypatch.setattr("utils.time_utils.now_device_tz", _fixed_now, raising=True)
+        monkeypatch.setattr("blueprints.main.now_device_tz", _fixed_now, raising=True)
 
         # Patch get_plugin to return None, simulating missing config
         monkeypatch.setattr(
@@ -163,7 +163,7 @@ class TestManualUpdateFailure:
     ) -> None:
         flask_app.config["REFRESH_TASK"].running = True
         _add_playlist_with_plugin(device_config_dev)
-        monkeypatch.setattr("utils.time_utils.now_device_tz", _fixed_now, raising=True)
+        monkeypatch.setattr("blueprints.main.now_device_tz", _fixed_now, raising=True)
 
         def _failing_manual_update(playlist_refresh: Any) -> None:
             raise RuntimeError("background task crashed")

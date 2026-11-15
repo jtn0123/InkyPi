@@ -12,6 +12,7 @@ from flask import (
     Blueprint,
     Response,
     current_app,
+    has_app_context,
     jsonify,
     render_template,
     request,
@@ -23,7 +24,7 @@ from utils.form_utils import sanitize_log_field
 from utils.http_utils import JsonResponse, json_error, json_internal_error, json_success
 from utils.image_serving import THUMBNAIL_WIDTHS, maybe_serve_webp
 from utils.security_utils import validate_file_path
-from utils.time_utils import get_timezone, now_device_tz
+from utils.time_utils import now_device_tz
 
 logger = logging.getLogger(__name__)
 
@@ -103,13 +104,8 @@ def _now_in_device_tz() -> datetime:
     Safe to call without an app context (falls back to UTC), which keeps
     ``_list_history_images`` usable from unit tests that call it directly.
     """
-    try:
-        device_config = current_app.config.get(_CONFIG_KEY)
-        if device_config:
-            return now_device_tz(device_config)
-        return datetime.now(tz=get_timezone("UTC"))
-    except Exception:
-        return datetime.now(tz=UTC)
+    device_config = current_app.config.get(_CONFIG_KEY) if has_app_context() else None
+    return now_device_tz(device_config)
 
 
 def _day_label(dt: datetime, now: datetime) -> str:

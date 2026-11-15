@@ -1,7 +1,7 @@
 """``/display_next_in_playlist`` and the minute-cached ``/playlist/eta``."""
 
 import threading
-from datetime import UTC, datetime
+from datetime import datetime
 from typing import Any, cast
 
 from flask import current_app, request
@@ -28,13 +28,6 @@ from ._schedule import (
 _ETA_CACHE_MAX_SIZE = 64
 _eta_cache: dict[str, tuple[datetime, dict[str, dict[str, Any]]]] = {}
 _eta_cache_lock = threading.Lock()
-
-
-def _safe_now_device_tz(device_config: Any) -> datetime:
-    try:
-        return cast(datetime, now_device_tz(device_config))  # type: ignore[redundant-cast, unused-ignore]
-    except Exception:
-        return datetime.now(UTC)
 
 
 # Trigger next eligible instance in a specific playlist immediately
@@ -73,7 +66,7 @@ def display_next_in_playlist() -> Any:
             )
 
         # Determine current time and next eligible
-        current_dt = _safe_now_device_tz(device_config)
+        current_dt = now_device_tz(device_config)
 
         # The index advance mutates shared config state; hold the config lock
         # (as /display-next does) so it cannot interleave with the refresh
@@ -125,7 +118,7 @@ def playlist_eta(playlist_name: str) -> Any:
         )
 
     # Cache key is playlist name; invalidate once per minute
-    now = _safe_now_device_tz(device_config)
+    now = now_device_tz(device_config)
     floor_min = now.replace(second=0, microsecond=0)
 
     with _eta_cache_lock:

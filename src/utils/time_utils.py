@@ -22,12 +22,14 @@ def calculate_seconds(interval: int, unit: str) -> int:
 def get_timezone(tz_name: str | None) -> tzinfo:
     """Return a tzinfo for the provided timezone name using zoneinfo.
 
-    Falls back to UTC if the timezone string is invalid or missing.
+    Falls back to UTC if the timezone string is invalid or missing. Never
+    raises: a name longer than the filesystem allows makes ``ZoneInfo``
+    raise ``OSError``.
     """
     try:
         if tz_name:
             return ZoneInfo(str(tz_name))
-    except (ZoneInfoNotFoundError, ValueError) as exc:
+    except (ZoneInfoNotFoundError, ValueError, OSError) as exc:
         logger.warning("Invalid timezone '%s', defaulting to UTC: %s", tz_name, exc)
     return UTC
 
@@ -42,8 +44,14 @@ class TimezoneConfigLike(Protocol):
     def get_config(self, key: str, default: object = None) -> object: ...
 
 
-def now_device_tz(device_config: TimezoneConfigLike) -> datetime:
-    """Return timezone-aware current datetime using device configuration timezone."""
+def now_device_tz(device_config: TimezoneConfigLike | None) -> datetime:
+    """Return "now" in the device's time zone, or in UTC without a config.
+
+    Never raises: an unreadable or invalid time zone gives UTC (and
+    :func:`get_timezone` logs why), so callers need no fallback of their own.
+    """
+    if device_config is None:
+        return datetime.now(UTC)
     try:
         tz_name = device_config.get_config("timezone", default="UTC")
     except Exception:

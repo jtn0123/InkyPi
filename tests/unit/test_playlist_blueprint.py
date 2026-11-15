@@ -3,7 +3,6 @@
 
 import json
 import threading
-from datetime import UTC, datetime
 from types import SimpleNamespace
 from typing import Any
 from unittest.mock import patch
@@ -55,29 +54,6 @@ def _add_plugin_to_playlist(
             "weatherProvider": "OpenMeteo",
         },
     )
-
-
-def test_safe_now_device_tz_falls_back_to_aware_utc(
-    monkeypatch: pytest.MonkeyPatch,
-) -> Any:
-    import blueprints.playlist._display as playlist_mod
-
-    class _FallbackDateTime:
-        @staticmethod
-        def now(tz: Any = None) -> Any:
-            return datetime(2025, 1, 1, 12, 0, 0, tzinfo=tz)
-
-    monkeypatch.setattr(
-        playlist_mod,
-        "now_device_tz",
-        lambda _cfg: (_ for _ in ()).throw(RuntimeError("boom")),
-    )
-    monkeypatch.setattr(playlist_mod, "datetime", _FallbackDateTime)
-
-    current_dt = playlist_mod._safe_now_device_tz(object())
-
-    assert current_dt == datetime(2025, 1, 1, 12, 0, 0, tzinfo=UTC)
-    assert current_dt.tzinfo is UTC
 
 
 # ---------------------------------------------------------------------------

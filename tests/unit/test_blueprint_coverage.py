@@ -174,7 +174,7 @@ def test_next_up_with_active_playlist_and_plugin(
 
     fixed_dt = datetime(2025, 6, 1, 12, 0, 0, tzinfo=UTC)
     monkeypatch.setattr(
-        "utils.time_utils.now_device_tz", lambda _cfg: fixed_dt, raising=False
+        "blueprints.main.now_device_tz", lambda _cfg: fixed_dt, raising=True
     )
 
     # Add a playlist with a clock plugin
