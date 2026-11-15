@@ -12,6 +12,8 @@ from services.direct_render import (
     DirectRenderFailure,
     DirectRenderOutcome,
     execute_direct_render,
+    internal_failure_outcome,
+    known_failure_outcome,
 )
 from utils.backend_errors import ClientInputError, route_error_for
 from utils.fallback_image import render_error_image
@@ -181,9 +183,16 @@ def _run_update_now(
         display_manager = app.config["DISPLAY_MANAGER"]
 
         if refresh_task.running:
-            metrics = refresh_task.manual_update(
-                ManualRefresh(plugin_id, plugin_settings)
-            )
+            try:
+                metrics = refresh_task.manual_update(
+                    ManualRefresh(plugin_id, plugin_settings)
+                )
+            except Exception as error:
+                # Same status, code and message as the synchronous route.
+                # The job record is polled by the browser, so it carries the
+                # safe outcome, never the exception text.
+                outcome = known_failure_outcome(error) or internal_failure_outcome()
+                raise DirectRenderFailure(outcome) from error
             return {
                 "success": True,
                 "message": _MSG_DISPLAY_UPDATED,

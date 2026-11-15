@@ -2,7 +2,6 @@
 
 from .playlist_workflows import (
     AddPluginWorkflowResult,
-    WorkflowError as PlaylistWorkflowError,
     build_playlist_plugin_dict,
     normalize_instance_name,
     prepare_add_plugin_workflow,
@@ -13,11 +12,11 @@ from .plugin_workflows import (
     DEFAULT_PLUGIN_INSTANCE_SUFFIX,
     DEFAULT_PLUGIN_REFRESH_INTERVAL_SECONDS,
     PluginSettingsWorkflowResult,
-    WorkflowError as PluginWorkflowError,
     build_saved_settings_instance_name,
     ensure_playlist,
     save_plugin_settings_workflow,
 )
+from .workflow_errors import WorkflowError
 
 __all__ = [
     "AddPluginWorkflowResult",
@@ -25,8 +24,6 @@ __all__ = [
     "DEFAULT_PLUGIN_INSTANCE_SUFFIX",
     "DEFAULT_PLUGIN_REFRESH_INTERVAL_SECONDS",
     "PluginSettingsWorkflowResult",
-    "PluginWorkflowError",
-    "PlaylistWorkflowError",
     "build_playlist_plugin_dict",
     "build_saved_settings_instance_name",
     "ensure_playlist",
@@ -34,4 +31,5 @@ __all__ = [
     "prepare_add_plugin_workflow",
     "save_plugin_settings_workflow",
     "validate_plugin_refresh_settings",
+    "WorkflowError",
 ]
