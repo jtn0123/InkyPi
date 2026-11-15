@@ -25,9 +25,9 @@ import pytest
 # below explicitly gates on the collection path so retries cannot leak into
 # other suites even if this conftest is imported indirectly.
 #
-# pytest-rerunfailures prints a rerun summary in the terminal report by
-# default (``R`` progress dots and a "rerun" count in the summary line), so
-# CI captures repeated flakes without extra configuration.
+# A retry is not silent: tests/helpers/rerun_budget.py prints every retried
+# test with its first failure (terminal and GitHub job summary) and fails the
+# run when more tests needed a retry than INKYPI_MAX_TEST_RERUNS allows.
 # ---------------------------------------------------------------------------
 
 _INTEGRATION_TESTS_DIR = Path(__file__).resolve().parent

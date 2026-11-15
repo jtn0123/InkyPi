@@ -134,6 +134,9 @@ def pytest_configure(config: Any) -> None:
     if config.getoption("--update-snapshots"):
         os.environ["SNAPSHOT_UPDATE"] = "1"
     _install_process_group_guard()
+    from tests.helpers.rerun_budget import register as register_rerun_budget
+
+    register_rerun_budget(config)
 
 
 def _is_truthy(value: str) -> bool:
