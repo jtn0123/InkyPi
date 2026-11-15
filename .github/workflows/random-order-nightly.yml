@@ -1,0 +1,60 @@
+name: Random order nightly
+
+# Runs the unit and integration suites in a shuffled order (pytest-randomly),
+# so a test that only passes after another one (leaked rate-limiter state,
+# a module global, a cached file) is caught here instead of by chance in a
+# later PR. The PR suite in ci.yml runs in file order and does not shuffle.
+#
+# This gates nothing: a red run is a heads-up. There is no PR trigger.
+#
+# Replaying a failure: the log header prints "Using --randomly-seed=N". Run
+#   pytest -p randomly --randomly-seed=N -m "not container"
+# with the same env as the `Tests` job in ci.yml (see docs/testing.md).
+
+on:
+  schedule:
+    # 04:30 UTC daily: a quiet hour, clear of the other nightly jobs.
+    - cron: '30 4 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: random-order-nightly-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  random-order:
+    name: Tests in random order (pytest-randomly)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Python 3.13 and dependencies
+        uses: ./.github/actions/setup-python-deps
+        with:
+          python-version: '3.13'
+          os-packages: 'true'
+
+      - name: Build CSS
+        run: python scripts/build_css.py
+
+      - name: Run tests in random order
+        env:
+          INKYPI_ENV: dev
+          INKYPI_NO_REFRESH: '1'
+          PYTHONPATH: src
+          # Same browser opt-out as the `Tests` job in ci.yml: no Chromium is
+          # installed here, so the UI/a11y/journey suites are deselected.
+          SKIP_BROWSER: '1'
+          PYTHONFAULTHANDLER: '1'
+        run: |
+          # -p randomly turns on the shuffle that pytest.ini turns off
+          # (`-p no:randomly`). The seed prints in the header of this log; the
+          # run is not -q so the header stays visible. Same selection as ci.yml.
+          timeout --signal=ABRT --kill-after=30s 25m \
+            pytest -p randomly -p no:cacheprovider -m "not container" \
+              -o faulthandler_timeout=110
