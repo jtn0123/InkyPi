@@ -165,7 +165,8 @@ exit                                 # Exit devbox shell and deactivates Python 
 Running commands for the tight edit-refresh loop:
 
 ```bash
-# Start the Flask dev server (full program, auto-reloads Python + templates)
+# Start the dev server (full program; edited page templates show on the next
+# request, Python changes need a restart: Ctrl+C and run it again)
 ./scripts/dev.sh
 # or:  .venv/bin/python src/inkypi.py --dev --web-only     # port 8080
 
@@ -173,7 +174,7 @@ Running commands for the tight edit-refresh loop:
 ./scripts/dev_watch.sh
 #   watches src/static/styles/  → runs scripts/build_css.py
 #   watches src/static/scripts/ → runs scripts/build_assets.py
-#   watches src/templates/      → logs only (Flask auto-reloads templates)
+#   watches src/templates/      → logs only (dev mode re-reads templates)
 # Requires `watchdog` (pip install watchdog). Ctrl+C exits cleanly.
 # One-shot CSS build (no watcher):
 python3 scripts/build_css.py
@@ -185,7 +186,7 @@ python3 scripts/build_css.py
 2. **Check simulated e-ink output**: latest frame is written to `/tmp/inkypi-mock-frame.png` (override with `INKYPI_MOCK_FRAME_PATH`)
 3. **Plugin development**: Copy an existing plugin as template (e.g., `clock/`)
 4. **Configuration**: Edit `src/config/device_dev.json` for display settings
-5. **Hot reload**: You can run via Flask dev server for code reload. When `INKYPI_ENV=dev` or running with `--dev`, plugin modules are reloaded on access so you can iterate without restarting.
+5. **What reloads in dev mode** (`--dev` or `INKYPI_ENV=dev`): a plugin's Python module is reloaded each time the plugin is used (set `INKYPI_NO_HOT_RELOAD=1` to turn this off), and page templates are re-read on the next request. Any other Python change needs a restart.
 
 ```bash
 export FLASK_APP=src.inkypi:create_app
