@@ -57,6 +57,25 @@ def test_changed_or_corrupt_stamp_requires_sync(
     assert doctor.check_environment(stamp, "current") == []
 
 
+def test_release_version_bump_does_not_require_a_resync(
+    doctor: Any, tmp_path: Path
+) -> None:
+    """A release only bumps InkyPi's own version; nothing to reinstall."""
+    (tmp_path / "install").mkdir()
+    requirements = tmp_path / "install/requirements-dev.txt"
+    requirements.write_text("example==1.0 \\\n    --hash=sha256:abc\n")
+    (tmp_path / "pyproject.toml").write_text('[project]\nversion = "1.9.1"\n')
+    (tmp_path / "uv.lock").write_text('name = "inkypi"\nversion = "1.9.1"\n')
+    before = doctor.lock_fingerprint(tmp_path)
+
+    (tmp_path / "pyproject.toml").write_text('[project]\nversion = "1.9.2"\n')
+    (tmp_path / "uv.lock").write_text('name = "inkypi"\nversion = "1.9.2"\n')
+    assert doctor.lock_fingerprint(tmp_path) == before
+
+    requirements.write_text("example==2.0 \\\n    --hash=sha256:def\n")
+    assert doctor.lock_fingerprint(tmp_path) != before
+
+
 def test_current_environment_passes_without_network_or_install() -> None:
     path = Path(__file__).parents[2] / "scripts/dev_environment.py"
     result = subprocess.run(
