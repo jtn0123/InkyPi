@@ -16,8 +16,9 @@ from typing import TYPE_CHECKING, Any, NoReturn, cast
 from uuid import uuid4
 
 from refresh_task.actions import DisplayCommand, ManualUpdateRequest, RefreshAction
+from refresh_task.executor import RefreshExecutor
 from utils import blackout, crash_breadcrumb
-from utils.domain_errors import RefreshTaskUnavailable
+from utils.domain_errors import RefreshLoopBusy, RefreshTaskUnavailable
 
 if TYPE_CHECKING:
     from refresh_task.recorder import RefreshRecorder
@@ -29,12 +30,10 @@ _PLUGIN_TIMEOUT_DEFAULTS_S = {
     # 60s guard, especially when a prompt remix runs first.
     "ai_image": 180.0,
 }
-_MANUAL_WAIT_DEFAULTS_S = {
-    # Wait for the generated image to be saved, not the slow e-paper write.
-    # Keep this slightly above the plugin timeout so the caller sees the
-    # plugin's real result instead of a queue wait timeout.
-    "ai_image": 210.0,
-}
+# Time on top of the render attempts for the steps around them: starting the
+# worker process, handing the image back, and processing and saving it. A Pi
+# Zero 2 W is slow at all of them.
+_MANUAL_WAIT_ALLOWANCE_S = 30.0
 
 
 class CommandQueueMixin:
@@ -49,15 +48,6 @@ class CommandQueueMixin:
         recorder: RefreshRecorder
         _work_started_at: float | None
         _watchdog_stall_logged: bool
-
-        def _update_plugin_health(
-            self,
-            plugin_id: str,
-            instance: str | None,
-            ok: bool,
-            metrics: dict[str, Any] | None,
-            error: str | None,
-        ) -> None: ...
 
     def _complete_manual_request(
         self,
@@ -85,6 +75,7 @@ class CommandQueueMixin:
             manual_request.exception = exception
         if metrics is not None:
             manual_request.metrics = metrics
+        manual_request.started.set()
         manual_request.done.set()
         # Also unblock anyone still waiting on image_saved — e.g. if the
         # refresh failed before the image could be persisted (generate error,
@@ -209,26 +200,26 @@ class CommandQueueMixin:
             self.condition.notify_all()
         return request
 
-    def _handle_manual_update_timeout(
-        self,
-        request: ManualUpdateRequest,
-        refresh_action: Any,
-        wait_s: float,
-    ) -> NoReturn:
-        """Remove the request from the queue and raise a canonical TimeoutError."""
+    def _withdraw_queued_request(self, request: ManualUpdateRequest) -> bool:
+        """Take *request* back off the queue; False if the loop already has it."""
         with self.condition:
             try:
                 self.manual_update_requests.remove(request)
             except ValueError:
-                pass
-        timeout_exc = TimeoutError(f"Manual update timed out after {int(wait_s)}s")
-        self._update_plugin_health(
-            plugin_id=refresh_action.get_plugin_id(),
-            instance=refresh_action.get_refresh_info().get("plugin_instance"),
-            ok=False,
-            metrics=None,
-            error=str(timeout_exc),
-        )
+                return False
+        return True
+
+    def _handle_manual_update_timeout(
+        self,
+        request: ManualUpdateRequest,
+        refresh_action: Any,
+        timeout_exc: Exception,
+    ) -> NoReturn:
+        """Report that the caller stopped waiting, then raise *timeout_exc*.
+
+        No plugin health is recorded: a withdrawn request never ran, and a
+        render still running records its own outcome when it ends.
+        """
         self.recorder.publish_error(
             plugin_id=refresh_action.get_plugin_id(),
             request_id=request.request_id,
@@ -257,35 +248,45 @@ class CommandQueueMixin:
         return "".join(ch if ch.isalnum() else "_" for ch in plugin_id).upper()
 
     @classmethod
-    def _env_seconds_with_precedence(
-        cls,
-        plugin_id: str,
-        env_key: str,
-        defaults: Mapping[str, float],
-    ) -> float:
-        suffix = cls._plugin_env_suffix(plugin_id)
-        specific_key = f"{env_key}_{suffix}"
-        if specific_key in os.environ:
-            return float(os.getenv(specific_key) or "60")
-        if env_key in os.environ:
-            return float(os.getenv(env_key) or "60")
-        return defaults.get(plugin_id, 60.0)
+    def _env_seconds(cls, plugin_id: str, env_key: str) -> float | None:
+        """Seconds from ``<env_key>_<PLUGIN>``, else ``<env_key>``, else None."""
+        for key in (f"{env_key}_{cls._plugin_env_suffix(plugin_id)}", env_key):
+            if key in os.environ:
+                return float(os.getenv(key) or "60")
+        return None
 
     @classmethod
     def _plugin_timeout_seconds(cls, plugin_id: str) -> float:
-        return cls._env_seconds_with_precedence(
-            plugin_id,
-            "INKYPI_PLUGIN_TIMEOUT_S",
-            _PLUGIN_TIMEOUT_DEFAULTS_S,
-        )
+        seconds = cls._env_seconds(plugin_id, "INKYPI_PLUGIN_TIMEOUT_S")
+        if seconds is not None:
+            return seconds
+        return _PLUGIN_TIMEOUT_DEFAULTS_S.get(plugin_id, 60.0)
 
     @classmethod
     def _manual_update_wait_seconds(cls, plugin_id: str) -> float:
-        return cls._env_seconds_with_precedence(
-            plugin_id,
-            "INKYPI_MANUAL_UPDATE_WAIT_S",
-            _MANUAL_WAIT_DEFAULTS_S,
+        """How long a caller waits for the loop, and then for the render.
+
+        By default this covers every attempt the retry policy allows, the
+        pauses between them, and :data:`_MANUAL_WAIT_ALLOWANCE_S`, so the
+        caller hears the render's own result instead of a timeout of its own.
+        """
+        seconds = cls._env_seconds(plugin_id, "INKYPI_MANUAL_UPDATE_WAIT_S")
+        if seconds is not None:
+            return seconds
+        _retries, backoff_ms, attempts = RefreshExecutor.retry_policy()
+        return (
+            attempts * cls._plugin_timeout_seconds(plugin_id)
+            + (attempts - 1) * max(0, backoff_ms) / 1000.0
+            + _MANUAL_WAIT_ALLOWANCE_S
         )
+
+    def manual_update_wait_limit_s(self, plugin_id: str) -> float:
+        """The longest :meth:`manual_update` can block for *plugin_id*.
+
+        One budget to wait for the loop to take the request, one for the
+        render, so a page waiting on the result knows when to stop.
+        """
+        return 2 * max(0.0, self._manual_update_wait_seconds(plugin_id))
 
     def manual_update(self, refresh_action: RefreshAction) -> dict[str, Any] | None:
         """Manually trigger an update by notifying the background refresh loop.
@@ -306,15 +307,28 @@ class CommandQueueMixin:
 
         request = self._enqueue_manual_request(refresh_action)
 
-        wait_s = self._manual_update_wait_seconds(refresh_action.get_plugin_id())
-        # JTN-786: wait for the image to hit disk rather than for the full
+        wait_s = max(
+            0.0, self._manual_update_wait_seconds(refresh_action.get_plugin_id())
+        )
+        # First wait for the loop to finish what it is doing and take this
+        # request. One it never took is withdrawn, so it cannot run later.
+        if not request.started.wait(timeout=wait_s) and self._withdraw_queued_request(
+            request
+        ):
+            self._handle_manual_update_timeout(
+                request, refresh_action, RefreshLoopBusy()
+            )
+        # JTN-786: then wait for the image to hit disk rather than for the full
         # refresh (including the slow e-paper SPI write) to finish.
         # ``image_saved`` is also set by ``_complete_manual_request`` on any
         # terminal outcome, so this wait unblocks on error/cached paths too —
         # the post-wait branches below distinguish them.
-        signalled = request.image_saved.wait(timeout=max(0.0, wait_s))
-        if not signalled:
-            self._handle_manual_update_timeout(request, refresh_action, wait_s)
+        if not request.image_saved.wait(timeout=wait_s):
+            self._handle_manual_update_timeout(
+                request,
+                refresh_action,
+                TimeoutError(f"Manual update timed out after {int(wait_s)}s"),
+            )
 
         # Small grace period: if the display hardware is fast (mock display,
         # cached image, unit tests) ``done`` will fire almost immediately

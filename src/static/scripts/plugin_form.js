@@ -3,8 +3,11 @@
 (function(){
   'use strict';
 
-  // The whole request, including a background render, gives up after this.
+  // The whole request gives up after this, unless the server says how long
+  // its background render can take: then the page waits that long, plus
+  // JOB_GRACE_MS for the job to start and the last poll to land.
   const REQUEST_TIMEOUT_MS = 90000;
+  const JOB_GRACE_MS = 30000;
   // How often to ask /api/job/<id> about a background render. Without the
   // live progress stream, polling also moves the progress bar, so it runs
   // every second. While the stream is reporting steps, polling only has to
@@ -354,7 +357,7 @@
     if (loadingIndicator) loadingIndicator.style.display = 'block';
     progress.start();
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    let timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
     try {
       progress.setStep('Sending…', 30);
       // Update Now renders in the background, so the browser doesn't wait on
@@ -366,6 +369,11 @@
       if (response.status === 202) {
         // Background render: follow it until the job finishes.
         const accepted = await response.json();
+        const jobWaitS = Number(accepted.wait_s);
+        if (Number.isFinite(jobWaitS) && jobWaitS > 0) {
+          clearTimeout(timeoutId);
+          timeoutId = setTimeout(() => controller.abort(), jobWaitS * 1000 + JOB_GRACE_MS);
+        }
         const waker = createWaker();
         liveProgress = attachLiveProgress(
           progress, String(formData.get('plugin_id') || ''), waker.wake

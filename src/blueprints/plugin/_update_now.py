@@ -248,7 +248,14 @@ def update_now() -> ResponseReturnValue:
             # context and the job runs outside it.
             app = cast(Any, current_app)._get_current_object()
             job_id = queue.enqueue(_run_update_now, app, plugin_id, plugin_settings)
-            return jsonify({"job_id": job_id}), 202
+            accepted: dict[str, Any] = {"job_id": job_id}
+            if refresh_task.running:
+                # How long the job can take, so the page waits that long
+                # instead of reporting a timeout while the render goes on.
+                accepted["wait_s"] = float(
+                    refresh_task.manual_update_wait_limit_s(plugin_id)
+                )
+            return jsonify(accepted), 202
 
         # --- Synchronous (legacy) path ---
         if refresh_task.running:

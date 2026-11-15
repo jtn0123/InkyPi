@@ -128,6 +128,9 @@ class ManualUpdateRequest:
     request_id: str
     refresh_action: "RefreshAction"
     done: threading.Event = field(default_factory=threading.Event)
+    # Set when the loop takes the request off the queue, or when it ends
+    # without being taken (the loop stopped). Until then it can be withdrawn.
+    started: threading.Event = field(default_factory=threading.Event)
     # JTN-786: ``image_saved`` fires after the processed image is persisted to
     # disk but before the (slow) e-paper SPI write completes.  ``manual_update``
     # returns as soon as this event is set so the API response is not held

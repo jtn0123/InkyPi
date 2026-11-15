@@ -22,3 +22,11 @@ class RefreshTaskUnavailable(DomainError):
     """The background refresh loop is not running, so nothing can be displayed."""
 
     default_message = "Display refresh service is not running"
+
+
+class RefreshLoopBusy(DomainError):
+    """The loop stayed busy with other work, so the request was withdrawn unrun."""
+
+    default_message = (
+        "The device is still busy with another refresh. Try again shortly."
+    )

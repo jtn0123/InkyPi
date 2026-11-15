@@ -176,11 +176,14 @@ class RefreshTask(
         with self.condition:
             self.running = False
             while self.manual_update_requests:
-                request = self.manual_update_requests.popleft()
-                request.exception = RuntimeError(
-                    "Refresh task stopped before request completed"
+                # Through _complete_manual_request so a caller waiting for the
+                # request to start, or for its image, hears about it too.
+                self._complete_manual_request(
+                    self.manual_update_requests.popleft(),
+                    exception=RuntimeError(
+                        "Refresh task stopped before request completed"
+                    ),
                 )
-                request.done.set()
             self.condition.notify_all()  # Wake the thread to let it exit
         if self.thread:
             logger.info("Stopping refresh task")
