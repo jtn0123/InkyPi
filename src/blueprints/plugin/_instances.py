@@ -221,11 +221,18 @@ def update_plugin_instance(instance_name: str) -> ResponseReturnValue:
             )
 
         before_settings = dict(plugin_instance.settings or {})
+        settings_changed = plugin_settings != before_settings
 
         def _do_update_instance(cfg: Any) -> None:
             plugin_instance.settings = plugin_settings
             if new_refresh_config is not None:
                 plugin_instance.refresh = new_refresh_config
+            if settings_changed:
+                # The cached picture was drawn with the old settings. Mark the
+                # instance never-refreshed so its next playlist turn renders a
+                # new one, instead of reusing that picture until the
+                # instance's own interval (up to a day) runs out.
+                plugin_instance.latest_refresh_time = None
 
         device_config.update_atomic(_do_update_instance)
         history_warning = record_saved_settings_change(
