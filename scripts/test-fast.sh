@@ -1,13 +1,18 @@
 #!/usr/bin/env bash
-# Fast local test loop.
+# Fast local test loop (scripts/test.sh calls this for whole-suite runs).
 #
 # Runs the suite in parallel with pytest-xdist, then re-runs the memory-
-# sensitive tests serially. Measured on an M-series Mac: 10m13s serial ->
-# ~6m30s here.
+# sensitive tests serially. Together the two passes select exactly what CI's
+# tests job runs (`-m "not container"`); tests/unit/test_local_test_runner.py
+# keeps it that way.
 #
 # The split exists because `-m memory` tests assert on this process's resident
 # set size, which is only meaningful when it is not competing with sibling
-# workers — under `-n auto` they fail on load, not on a real leak.
+# workers. Under load they fail on load, not on a real leak.
+#
+# Workers default to 4 (INKYPI_TEST_WORKERS overrides). `-n auto` started one
+# worker per core, and that, or several suites at once, ran a Mac out
+# of memory.
 #
 # CI stays serial on purpose (see .github/workflows/ci.yml — "Keep CI serial
 # while the local pytest-xdist path soaks"), which is why this lives in a
@@ -46,7 +51,8 @@ run_pass() {
 }
 
 echo "==> parallel pass (excluding memory-sensitive tests)"
-run_pass "${TARGET[@]}" -q -m "not container and not memory" -n auto
+run_pass "${TARGET[@]}" -q -m "not container and not memory" \
+    -n "${INKYPI_TEST_WORKERS:-4}" --dist=loadfile
 
 echo "==> serial pass (memory-sensitive tests)"
 run_pass "${TARGET[@]}" -q -m "not container and memory"

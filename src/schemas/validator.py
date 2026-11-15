@@ -1,6 +1,6 @@
 """Hand-rolled TypedDict payload validator.
 
-Extracted from ``tests/contract/test_response_shapes.py`` so that both the
+Extracted from ``tests/contracts/test_response_shapes.py`` so that both the
 contract tests and the dev-mode response-schema middleware (JTN-664) can share
 a single implementation. The validator walks a TypedDict's ``__annotations__``
 and checks:

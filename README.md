@@ -237,7 +237,7 @@ Dev server runs on port 8080. See [CONTRIBUTING.md](./CONTRIBUTING.md) and [deve
 ### Testing
 
 ```bash
-scripts/test.sh                                        # fast local test runner (sharded)
+scripts/test.sh                                        # whole suite, same tests as CI (4 workers)
 scripts/test.sh tests/unit/test_refresh_task_stress.py  # single file
 scripts/preflash_validate.sh                            # hardware-free pre-flash gate
 ```
