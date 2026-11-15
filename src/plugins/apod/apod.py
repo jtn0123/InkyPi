@@ -207,7 +207,10 @@ class Apod(BasePlugin):
             logger.error("NASA API Key not configured")
             raise RuntimeError("NASA API Key not configured.")
 
-        params = {"api_key": api_key}
+        # The key travels in the X-Api-Key header that api.data.gov accepts,
+        # never in the query string, where request URLs reach urllib3 retry
+        # logs, exception messages and proxy logs.
+        params: dict[str, str] = {}
         request_date = "today"
 
         if settings.get("randomizeApod") == "true":
@@ -233,7 +236,7 @@ class Apod(BasePlugin):
             apod_url,
             self._request_timeout(),
         )
-        data = self._fetch_from_api(apod_url, params)
+        data = self._fetch_from_api(apod_url, params, api_key)
         if data is None:
             logger.warning(
                 "NASA APOD API had no usable picture for %s; reading the APOD website",
@@ -305,14 +308,20 @@ class Apod(BasePlugin):
         return image
 
     def _fetch_from_api(
-        self, apod_url: str, params: dict[str, str]
+        self, apod_url: str, params: dict[str, str], api_key: str
     ) -> dict[str, object] | None:
         """Return the API's answer, or None when it has no usable picture."""
         try:
+            # No redirects: requests would replay the X-Api-Key header to
+            # whatever host a redirect names. The API answers directly; a
+            # redirect is treated like any other non-200 and falls back to
+            # the APOD website.
             response = get_http_session().get(
                 f"{apod_url}/planetary/apod",
                 params=params,
+                headers={"X-Api-Key": api_key},
                 timeout=self._request_timeout(),
+                allow_redirects=False,
             )
         except requests.RequestException as exc:
             logger.warning("NASA API request failed: %s", type(exc).__name__)

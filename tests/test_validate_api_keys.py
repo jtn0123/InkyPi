@@ -298,6 +298,19 @@ def test_probe_nasa_ok(requests_mock: Any) -> None:
     assert status == vak.STATUS_OK
 
 
+def test_probe_nasa_sends_key_in_header_not_url(requests_mock: Any) -> None:
+    requests_mock.get(
+        "https://api.nasa.gov/planetary/apod",
+        json={"media_type": "image", "url": "https://example.com/img.jpg"},
+        status_code=200,
+    )
+    vak._probe_nasa("nasa-header-key", timeout=5)
+    sent = requests_mock.last_request
+    assert sent.headers["X-Api-Key"] == "nasa-header-key"
+    assert "nasa-header-key" not in sent.url
+    assert "api_key" not in sent.qs
+
+
 def test_probe_nasa_invalid(requests_mock: Any) -> None:
     requests_mock.get(
         "https://api.nasa.gov/planetary/apod",

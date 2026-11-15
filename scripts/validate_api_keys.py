@@ -134,9 +134,14 @@ def _probe_nasa(key: str, timeout: int) -> tuple[str, str]:
     import requests
 
     url = "https://api.nasa.gov/planetary/apod"
-    params = {"api_key": key, "thumbs": "true"}
+    # Key in the X-Api-Key header, not the query string: on a network error
+    # the exception text (returned below) would otherwise contain it.
+    params = {"thumbs": "true"}
+    headers = {"X-Api-Key": key}
     try:
-        r = requests.get(url, params=params, timeout=timeout)
+        r = requests.get(
+            url, params=params, headers=headers, timeout=timeout, allow_redirects=False
+        )
     except requests.exceptions.ConnectionError as exc:
         return STATUS_NETWORK_ERROR, str(exc)
     except requests.exceptions.Timeout:

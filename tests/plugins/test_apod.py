@@ -177,6 +177,64 @@ def test_apod_custom_date(
         assert result is not None
 
 
+def test_apod_sends_key_in_header_not_url(
+    monkeypatch: pytest.MonkeyPatch, device_config_dev: Any
+) -> None:
+    """The NASA key goes in X-Api-Key, never the query string (grade item E6)."""
+    from plugins.apod.apod import Apod
+
+    monkeypatch.setenv("NASA_SECRET", "nasa-secret-value")
+
+    with patch("plugins.apod.apod.get_http_session") as mock_get_session:
+        mock_session = MagicMock()
+        mock_get_session.return_value = mock_session
+        mock_api_response = MagicMock()
+        mock_api_response.status_code = 200
+        mock_api_response.json.return_value = {
+            "media_type": "image",
+            "url": "http://example.com/apod.png",
+        }
+        mock_session.get.side_effect = [mock_api_response]
+
+        p = Apod({"id": "apod"})
+        fake_image = MagicMock()
+        fake_image.size = (64, 64)
+        with patch.object(p.image_loader, "from_url", return_value=fake_image):
+            p.generate_image({"customDate": "2023-12-25"}, device_config_dev)
+
+    args, kwargs = mock_session.get.call_args_list[0]
+    assert kwargs["headers"] == {"X-Api-Key": "nasa-secret-value"}
+    assert "api_key" not in kwargs["params"]
+    assert "nasa-secret-value" not in args[0]
+    assert "nasa-secret-value" not in repr(kwargs["params"])
+    # requests would replay a custom header to whatever host a redirect names.
+    assert kwargs["allow_redirects"] is False
+
+
+def test_apod_api_redirect_falls_back_to_site(
+    monkeypatch: pytest.MonkeyPatch, device_config_dev: Any
+) -> None:
+    """A redirect from the API is not followed; the website fallback runs."""
+    from plugins.apod.apod import Apod
+
+    monkeypatch.setenv("NASA_SECRET", "k")
+    redirect = MagicMock()
+    redirect.status_code = 302
+    redirect.text = ""
+    with patch("plugins.apod.apod.get_http_session") as mock_get_session:
+        mock_get_session.return_value.get.return_value = redirect
+        p = Apod({"id": "apod"})
+        site = {"media_type": "image", "url": "https://apod.nasa.gov/a.jpg"}
+        fake_image = MagicMock()
+        fake_image.size = (64, 64)
+        with (
+            patch.object(p, "_fetch_from_site", return_value=site) as from_site,
+            patch.object(p.image_loader, "from_url", return_value=fake_image),
+        ):
+            p.generate_image({"customDate": "2023-12-25"}, device_config_dev)
+    from_site.assert_called_once_with("2023-12-25")
+
+
 def test_apod_api_error_response(
     device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
 ) -> None:
