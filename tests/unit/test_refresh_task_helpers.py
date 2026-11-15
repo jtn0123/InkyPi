@@ -75,7 +75,7 @@ def test_select_refresh_action_playlist(
         task, "_determine_next_plugin", fake_determine.__get__(task, RefreshTask)
     )
     action, request_id = task._select_refresh_action(
-        Trigger(None, None, task._get_current_datetime(), None, True)
+        Trigger(None, task._get_current_datetime(), None, True)
     )
     assert request_id is None
     assert isinstance(action, PlaylistRefresh)
@@ -99,7 +99,7 @@ def test_select_refresh_action_nothing_due(
     )
 
     action, request_id = task._select_refresh_action(
-        Trigger(None, None, task._get_current_datetime(), None, True)
+        Trigger(None, task._get_current_datetime(), None, True)
     )
 
     assert action is None
@@ -114,9 +114,7 @@ def test_run_scheduled_tick_with_nothing_due_skips_refresh(
     from refresh_task import RefreshTask
 
     task = RefreshTask(device_config_dev, DisplayManager(device_config_dev))
-    triggers = iter(
-        [Trigger("pm", "latest", task._get_current_datetime(), None, True), None]
-    )
+    triggers = iter([Trigger("pm", task._get_current_datetime(), None, True), None])
     monkeypatch.setattr(task, "_wait_for_trigger", lambda: next(triggers))
     monkeypatch.setattr(
         task, "_determine_next_plugin", lambda pm, current_dt, *, due: (None, None)
@@ -204,7 +202,6 @@ def test_select_refresh_action_manual(device_config_dev: Any) -> None:
     action, request_id = task._select_refresh_action(
         Trigger(
             None,
-            None,
             task._get_current_datetime(),
             ManualUpdateRequest("req-1", manual),
             due=False,
@@ -218,11 +215,15 @@ def test_perform_refresh_skips_when_cached(
     device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     from display.display_manager import DisplayManager
-    from model import RefreshInfo
     from refresh_task import ManualRefresh, RefreshTask
 
     dm = DisplayManager(device_config_dev)
     task = RefreshTask(device_config_dev, dm)
+    # The panel already shows this image, written with today's settings.
+    dm.display_image(
+        Image.new("RGB", device_config_dev.get_resolution(), "white"),
+        image_hash="same",
+    )
 
     dummy_cfg = {"id": "dummy", "class": "Dummy"}
     monkeypatch.setattr(device_config_dev, "get_plugin", lambda pid: dummy_cfg)
@@ -242,10 +243,9 @@ def test_perform_refresh_skips_when_cached(
         dm, "display_image", lambda *a, **k: called.__setitem__("val", True)
     )
 
-    latest = RefreshInfo("Manual Update", "dummy", "2020-01-01T00:00:00", "same")
     action = ManualRefresh("dummy", {})
     info, used_cached, metrics = task._perform_refresh(
-        action, latest, task._get_current_datetime()
+        action, task._get_current_datetime()
     )
     assert used_cached is True
     assert not called["val"]
@@ -362,9 +362,7 @@ def test_run_refresh_without_image_keeps_previous_refresh_info(
 ) -> None:
     """A refresh that yields no frame must not overwrite the last-refresh record."""
     task, completed = _loop_task(device_config_dev, monkeypatch)
-    triggers = iter(
-        [Trigger("pm", "latest", task._get_current_datetime(), None, True), None]
-    )
+    triggers = iter([Trigger("pm", task._get_current_datetime(), None, True), None])
     monkeypatch.setattr(task, "_wait_for_trigger", lambda: next(triggers))
     monkeypatch.setattr(
         task, "_select_refresh_action", lambda *args: (_StubAction(), "req-1")

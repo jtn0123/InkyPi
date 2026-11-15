@@ -22,7 +22,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from PIL import Image
 
-from model import PluginInstance, RefreshInfo
+from model import PluginInstance
 from refresh_task import RefreshTask
 from refresh_task.actions import PlaylistRefresh
 
@@ -34,18 +34,9 @@ from refresh_task.actions import PlaylistRefresh
 def _make_task(device_config_dev: Any) -> Any:
     dm = MagicMock()
     dm.display_image.return_value = {"display_ms": 10, "preprocess_ms": 5}
+    dm.panel_shows.return_value = False
     task = RefreshTask(device_config_dev, dm)
     return task, dm
-
-
-def _empty_refresh_info() -> Any:
-    """A RefreshInfo with no prior image so hash-based caching does not short-circuit."""
-    return RefreshInfo(
-        refresh_type="Manual Update",
-        plugin_id="",
-        refresh_time=None,
-        image_hash=None,
-    )
 
 
 def _make_plugin_instance(
@@ -153,7 +144,7 @@ class TestSubprocessHangTimeout:
         current_dt = datetime(2025, 1, 1, 12, 0, 0, tzinfo=UTC)
 
         with pytest.raises(TimeoutError):
-            task._perform_refresh(refresh_action, current_dt, current_dt)
+            task._perform_refresh(refresh_action, current_dt)
 
         # Circuit breaker must have been incremented
         assert pi.consecutive_failure_count >= 1
@@ -202,7 +193,7 @@ class TestSubprocessHangTimeout:
         monkeypatch.setattr(task, "_push_fallback_image", _tracking_push)
 
         with pytest.raises(TimeoutError):
-            task._perform_refresh(refresh_action, current_dt, current_dt)
+            task._perform_refresh(refresh_action, current_dt)
 
         assert len(fallback_calls) == 1, "Fallback must be pushed once on timeout"
 
@@ -300,7 +291,7 @@ class TestDisplayManagerFailure:
 
         # _perform_refresh should raise the display error
         with pytest.raises(RuntimeError, match="Display hardware fault"):
-            task._perform_refresh(refresh_action, _empty_refresh_info(), current_dt)
+            task._perform_refresh(refresh_action, current_dt)
 
     def test_display_failure_circuit_breaker_incremented(
         self, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
@@ -336,7 +327,7 @@ class TestDisplayManagerFailure:
         current_dt = datetime(2025, 1, 1, 12, 0, 0, tzinfo=UTC)
 
         with pytest.raises(RuntimeError):
-            task._perform_refresh(refresh_action, _empty_refresh_info(), current_dt)
+            task._perform_refresh(refresh_action, current_dt)
 
         # Health record should reflect a failure (counter ≥ 1)
         assert pi.consecutive_failure_count >= 1
@@ -450,7 +441,7 @@ class TestConfigReloadMidRefresh:
 
         # Should complete without raising
         result_info, used_cached, metrics = task._perform_refresh(
-            refresh_action, _empty_refresh_info(), current_dt
+            refresh_action, current_dt
         )
 
         assert reload_triggered.is_set()
@@ -496,7 +487,7 @@ class TestConfigReloadMidRefresh:
         current_dt = datetime(2025, 1, 1, 12, 0, 0, tzinfo=UTC)
 
         result_info, _used_cached, _metrics = task._perform_refresh(
-            refresh_action, _empty_refresh_info(), current_dt
+            refresh_action, current_dt
         )
 
         assert result_info is not None

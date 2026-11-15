@@ -306,9 +306,7 @@ class TestRefreshTaskHooks:
 
         from datetime import UTC, datetime
 
-        task._perform_refresh(
-            action, type("R", (), {"image_hash": None})(), datetime.now(UTC)
-        )
+        task._perform_refresh(action, datetime.now(UTC))
 
         event_types = [e[0] for e in published]
         assert "refresh_started" in event_types
@@ -361,9 +359,7 @@ class TestRefreshTaskHooks:
         from datetime import UTC, datetime
 
         with pytest.raises(RuntimeError, match="plugin boom"):
-            task._perform_refresh(
-                action, type("R", (), {"image_hash": None})(), datetime.now(UTC)
-            )
+            task._perform_refresh(action, datetime.now(UTC))
 
         event_types = [e[0] for e in published]
         assert "plugin_failed" in event_types

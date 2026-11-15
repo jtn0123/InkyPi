@@ -130,7 +130,6 @@ class RefreshCycleMixin:
     def _perform_refresh(
         self,
         refresh_action: RefreshAction,
-        latest_refresh: Any,
         current_dt: datetime,
         request_id: str | None = None,
         manual_request: ManualUpdateRequest | None = None,
@@ -182,7 +181,6 @@ class RefreshCycleMixin:
             turn,
             image,
             plugin_meta,
-            latest_refresh,
             started=started,
             generate_ms=generate_ms,
             tracker=tracker,
@@ -468,7 +466,6 @@ class RefreshCycleMixin:
         turn: _Turn,
         image: Any,
         plugin_meta: Any,
-        latest_refresh: Any,
         *,
         started: float,
         generate_ms: int,
@@ -484,7 +481,12 @@ class RefreshCycleMixin:
         refresh_info.update(
             {"refresh_time": turn.current_dt.isoformat(), "image_hash": image_hash}
         )
-        used_cached = image_hash == latest_refresh.image_hash
+        # Ask what the panel shows, not what the last successful refresh drew:
+        # an error card, a history redisplay or a display-settings change
+        # since then means the panel needs this render even if it matches.
+        used_cached = self.display_pipeline.panel_shows(
+            image_hash, turn.plugin_config.get("image_settings", [])
+        )
         display_duration_ms, preprocess_ms = self._push_or_skip_display(
             used_cached=used_cached,
             image=image,

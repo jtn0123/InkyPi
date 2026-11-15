@@ -333,7 +333,7 @@ class TestLoggingKeepsRawDetail:
 
         with caplog.at_level(logging.ERROR, logger="refresh_task"):
             with pytest.raises(RuntimeError):
-                task._perform_refresh(refresh_action, current_dt, current_dt)
+                task._perform_refresh(refresh_action, current_dt)
 
         # The operator log line must surface the raw class + message so the
         # information isn't actually lost — it's only hidden from the UI.

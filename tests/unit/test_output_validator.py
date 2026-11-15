@@ -265,7 +265,6 @@ def _run_manual_refresh(
     monkeypatch.setattr(dm, "display_image", _fake_display_image)
     result = task._perform_refresh(
         ManualRefresh("ai_text", {}),
-        device_config_dev.get_refresh_info(),
         datetime.now(UTC),
     )
     return task, displayed, result

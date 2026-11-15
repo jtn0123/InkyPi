@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from time import perf_counter
 from typing import Any, Protocol
 
@@ -28,6 +28,10 @@ class SupportsDisplayPipeline(Protocol):
         image_hash: str | None = ...,
     ) -> object: ...
 
+    def panel_shows(
+        self, image_hash: str | None, image_settings: Sequence[object] | None = ...
+    ) -> bool: ...
+
 
 HealthUpdater = Callable[
     [str, str | None, bool, Mapping[str, Any] | None, str | None],
@@ -50,6 +54,16 @@ class DisplayPipeline:
         self.housekeeper = housekeeper
         self.recorder = recorder
         self.update_plugin_health = update_plugin_health
+
+    def panel_shows(self, image_hash: str, image_settings: Sequence[object]) -> bool:
+        """Return whether the panel already shows this render as it would now.
+
+        The display manager answers, since it is the one place that sees
+        every write: an error card or a history redisplay since the last
+        successful refresh, or a display-settings change, means the panel
+        must be written even though the render matches that refresh.
+        """
+        return self.display_manager.panel_shows(image_hash, image_settings)
 
     def push_or_skip_display(
         self,

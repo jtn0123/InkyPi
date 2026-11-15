@@ -27,8 +27,8 @@ MUTANTS: tuple[Mutant, ...] = (
     Mutant(
         name="cache-hit-inverted",
         file="src/refresh_task/refresh_cycle.py",
-        old="        used_cached = image_hash == latest_refresh.image_hash\n",
-        new="        used_cached = image_hash != latest_refresh.image_hash\n",
+        old="        used_cached = self.display_pipeline.panel_shows(\n",
+        new="        used_cached = not self.display_pipeline.panel_shows(\n",
         commands=(
             (
                 str(PYTHON),
@@ -37,6 +37,7 @@ MUTANTS: tuple[Mutant, ...] = (
                 "-q",
                 "tests/unit/test_refresh_task_helpers.py",
                 "tests/unit/test_refresh_policy.py",
+                "tests/integration/test_unchanged_render_skip.py",
             ),
         ),
     ),
@@ -59,8 +60,8 @@ MUTANTS: tuple[Mutant, ...] = (
     Mutant(
         name="unchanged-display-skip-broken",
         file="src/display/display_manager.py",
-        old="        if image_hash == self._last_image_hash:\n",
-        new="        if image_hash != self._last_image_hash:\n",
+        old="        return image_hash == self._last_image_hash and key == self._last_settings_key\n",
+        new="        return image_hash != self._last_image_hash and key == self._last_settings_key\n",
         commands=(
             (
                 str(PYTHON),

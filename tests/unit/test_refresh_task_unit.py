@@ -139,9 +139,7 @@ def test_perform_refresh_calls_execute_with_policy(
     )
 
     refresh = ManualRefresh("dummy", {})
-    # Provide a fake latest_refresh with image_hash to avoid NoneType error
-    fake_latest = type("LR", (), {"image_hash": None})()
-    task._perform_refresh(refresh, fake_latest, __import__("datetime").datetime.now())
+    task._perform_refresh(refresh, __import__("datetime").datetime.now())
     assert "action" in called
     assert called["action"] is refresh
 

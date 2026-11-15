@@ -29,6 +29,7 @@ from utils.fallback_image import render_error_image
 def _make_task(device_config_dev: Any) -> Any:
     dm = MagicMock()
     dm.display_image.return_value = {"display_ms": 10, "preprocess_ms": 5}
+    dm.panel_shows.return_value = False
     task = RefreshTask(device_config_dev, dm)
     return task, dm
 
@@ -169,7 +170,7 @@ class TestFallbackImageOnFailure:
         monkeypatch.setattr(task, "_push_fallback_image", _tracking_push)
 
         with pytest.raises(RuntimeError):
-            task._perform_refresh(refresh_action, current_dt, current_dt)
+            task._perform_refresh(refresh_action, current_dt)
 
         assert len(fallback_calls) == 1, "Fallback push should have been called once"
 
@@ -207,7 +208,7 @@ class TestFallbackImageOnFailure:
         current_dt = datetime(2025, 1, 1, 12, 0, 0, tzinfo=UTC)
 
         with pytest.raises(ValueError):
-            task._perform_refresh(refresh_action, current_dt, current_dt)
+            task._perform_refresh(refresh_action, current_dt)
 
         # display_image should have been called at least once with a PIL Image
         assert dm.display_image.called
@@ -268,7 +269,7 @@ class TestPausedPluginProbeRefresh:
         current_dt = datetime(2026, 11, 12, 12, 0, 0, tzinfo=UTC)
 
         with pytest.raises(RuntimeError):
-            task._perform_refresh(action, current_dt, current_dt)
+            task._perform_refresh(action, current_dt)
 
         # No error card replaces the picture on the panel.
         dm.display_image.assert_not_called()
@@ -298,7 +299,6 @@ class TestPausedPluginProbeRefresh:
             task._perform_refresh(
                 action,
                 current_dt,
-                current_dt,
                 manual_request=ManualUpdateRequest("req-1", action),
             )
 
@@ -317,9 +317,7 @@ class TestPausedPluginProbeRefresh:
         task, dm, pi, action = self._setup(device_config_dev, monkeypatch, Fixed())
         current_dt = datetime(2026, 11, 12, 12, 0, 0, tzinfo=UTC)
 
-        refresh_info, _cached, _metrics = task._perform_refresh(
-            action, device_config_dev.get_refresh_info(), current_dt
-        )
+        refresh_info, _cached, _metrics = task._perform_refresh(action, current_dt)
 
         assert refresh_info is not None
         assert dm.display_image.called

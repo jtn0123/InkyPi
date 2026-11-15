@@ -5,7 +5,7 @@ import json
 import logging
 import os
 import threading
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from time import perf_counter
 from typing import Protocol
 
@@ -103,7 +103,12 @@ class DisplayManager:
             ValueError: If an unsupported display type is specified.
         """
 
+        # What the panel shows now, as far as display_image knows: the hash
+        # of the image it last wrote and the display settings it used. Any
+        # other write (history redisplay, blackout, self-test) clears the
+        # hash, so the next render is always written.
         self._last_image_hash: str | None = None
+        self._last_settings_key: str | None = None
         self._hash_lock = threading.Lock()
         # Serialises driver writes. Callers are meant to go through the
         # refresh loop (RefreshTask.run_display_command), but a panel write
@@ -310,6 +315,44 @@ class DisplayManager:
         logger.info("Crisp conversion took %d ms", (perf_counter() - t0) * 1000)
         return converted
 
+    def _settings_key(self, image_settings: Sequence[object]) -> str:
+        """Fingerprint every setting that changes the frame for the same image.
+
+        Two renders with the same image hash only produce the same panel frame
+        if the orientation, resolution, inversion, device image settings
+        (saturation, contrast, screen rendering...) and the plugin's own image
+        settings are unchanged too.
+        """
+        settings = {
+            "orientation": self.device_config.get_config("orientation"),
+            "resolution": list(self.device_config.get_resolution()),
+            "inverted": bool(self.device_config.get_config("inverted_image")),
+            "device_image_settings": self.device_config.get_config("image_settings"),
+            "image_settings": list(image_settings),
+        }
+        return json.dumps(settings, sort_keys=True, default=str)
+
+    def panel_shows(
+        self, image_hash: str | None, image_settings: Sequence[object] | None = None
+    ) -> bool:
+        """Return whether the panel already shows *image_hash* as it would now.
+
+        True only when the last :meth:`display_image` wrote this image with
+        the current display settings and nothing else has been written since. The
+        refresh loop asks this before pushing a render, instead of comparing
+        with the last successful refresh, which knows nothing about error
+        cards, history redisplays or display-settings changes made since.
+        """
+        if image_hash is None:
+            return False
+        settings_key = self._settings_key(image_settings or [])
+        with self._hash_lock:
+            return self._on_panel(image_hash, settings_key)
+
+    def _on_panel(self, image_hash: str, key: str) -> bool:
+        """Compare with the last write. The caller holds ``_hash_lock``."""
+        return image_hash == self._last_image_hash and key == self._last_settings_key
+
     def _write_panel(self, image: Image.Image, image_settings: list[object]) -> None:
         """Push *image* to the driver, one write at a time."""
         with self._panel_lock:
@@ -354,16 +397,18 @@ class DisplayManager:
             from utils.image_utils import compute_image_hash
 
             image_hash = compute_image_hash(image)
+        settings_key = self._settings_key(image_settings)
         with self._hash_lock:
-            if image_hash == self._last_image_hash:
+            if self._on_panel(image_hash, settings_key):
                 logger.info("Image unchanged, skipping display writes")
                 return {
                     "preprocess_ms": 0,
                     "display_ms": 0,
                     "display_driver": self.display.__class__.__name__,
                 }
-            previous_hash = self._last_image_hash
+            previous = (self._last_image_hash, self._last_settings_key)
             self._last_image_hash = image_hash
+            self._last_settings_key = settings_key
 
         try:
             preprocess_t0 = perf_counter()
@@ -432,7 +477,7 @@ class DisplayManager:
             # Restore the previous hash so the same image can be retried on the
             # next refresh cycle rather than being permanently skipped.
             with self._hash_lock:
-                self._last_image_hash = previous_hash
+                self._last_image_hash, self._last_settings_key = previous
             raise
 
         return {

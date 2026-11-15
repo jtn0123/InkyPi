@@ -237,7 +237,6 @@ class RefreshTask(
                         ):
                             refresh_info, used_cached, metrics = self._perform_refresh(
                                 refresh_action,
-                                trigger.latest_refresh,
                                 trigger.current_dt,
                                 request_id=request_id,
                                 manual_request=manual_request,

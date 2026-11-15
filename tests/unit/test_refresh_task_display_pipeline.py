@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from typing import Any
 
 import pytest
@@ -44,6 +44,11 @@ class _DisplayManager:
         if self.exception is not None:
             raise self.exception
         return self.response
+
+    def panel_shows(
+        self, image_hash: str | None, image_settings: Sequence[object] | None = None
+    ) -> bool:
+        return False
 
 
 def _make_pipeline(device_config_dev: Any, display_manager: _DisplayManager) -> tuple[
