@@ -107,7 +107,6 @@ def test_refresh_cycle_runs_plugin_to_display(
     # Trigger one synchronous refresh tick (no thread needed)
     refresh_info, used_cached, metrics = task._perform_refresh(
         refresh_action,
-        device_config_dev.get_refresh_info(),
         current_dt,
     )
 
@@ -184,7 +183,6 @@ def test_refresh_cycle_handles_plugin_failure(
     with pytest.raises(RuntimeError, match="Simulated plugin crash"):
         task._perform_refresh(
             refresh_action,
-            device_config_dev.get_refresh_info(),
             current_dt,
         )
 
@@ -259,15 +257,14 @@ def test_refresh_cycle_advances_playlist(
 
     task = RefreshTask(device_config_dev, dm)
     current_dt = datetime.now(UTC).astimezone()
-    latest_refresh = device_config_dev.get_refresh_info()
 
     # First tick — should render plugin_a (first in playlist)
     refresh_a = PlaylistRefresh(playlist, pi_a, force=True)
-    task._perform_refresh(refresh_a, latest_refresh, current_dt)
+    task._perform_refresh(refresh_a, current_dt)
 
     # Second tick — should render plugin_b (second in playlist)
     refresh_b = PlaylistRefresh(playlist, pi_b, force=True)
-    task._perform_refresh(refresh_b, latest_refresh, current_dt)
+    task._perform_refresh(refresh_b, current_dt)
 
     assert call_log == [
         "plugin_a",

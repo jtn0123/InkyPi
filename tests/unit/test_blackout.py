@@ -276,7 +276,7 @@ def test_scheduled_refresh_is_skipped_during_blackout(
         return None, None
 
     monkeypatch.setattr(task, "_select_refresh_action", _select)
-    calls = iter([Trigger("pm", "latest", datetime.now(UTC), None, True), None])
+    calls = iter([Trigger("pm", datetime.now(UTC), None, True), None])
     monkeypatch.setattr(task, "_wait_for_trigger", lambda: next(calls))
 
     task._run()

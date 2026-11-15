@@ -23,7 +23,7 @@ import refresh_task.plugin_lookup as plugin_lookup_mod
 import refresh_task.task as task_mod
 import refresh_task.worker as worker_mod
 from display.rendering_settings import CRISP_IMAGE_SETTING, SCREEN_RENDERING_KEY
-from model import PluginInstance, RefreshInfo
+from model import PluginInstance
 from refresh_task import RefreshTask
 from refresh_task.actions import PlaylistRefresh
 
@@ -539,12 +539,6 @@ def test_refresh_through_subprocess_carries_crisp_flag(
 
     refresh_info, used_cached, _metrics = task._perform_refresh(
         PlaylistRefresh(playlist, instance, force=True),
-        RefreshInfo(
-            refresh_type="Manual Update",
-            plugin_id="",
-            refresh_time=None,
-            image_hash=None,
-        ),
         datetime(2026, 11, 12, 12, 0, tzinfo=UTC),
     )
 

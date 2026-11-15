@@ -159,7 +159,6 @@ def test_stop_while_refresh_in_progress(
 
     def fake_perform(
         refresh_action: Any,
-        latest_refresh: Any,
         current_dt: Any,
         request_id: Any = None,
         **kwargs: Any,
@@ -223,7 +222,6 @@ def test_manual_update_queue_ordering(
 
     def fake_perform_refresh(
         refresh_action: Any,
-        latest_refresh: Any,
         current_dt: Any,
         request_id: Any = None,
         **kwargs: Any,
@@ -271,7 +269,6 @@ def test_exception_during_refresh_does_not_crash_task(
 
     def fake_perform(
         refresh_action: Any,
-        latest_refresh: Any,
         current_dt: Any,
         request_id: Any = None,
         **kwargs: Any,

@@ -54,7 +54,6 @@ def test_refresh_scheduler_wait_for_trigger_returns_manual_request() -> None:
 
     assert result == Trigger(
         config.playlist_manager,
-        config.refresh_info,
         current_dt,
         manual_request,
         due=False,

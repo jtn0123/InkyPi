@@ -28,7 +28,7 @@ from PIL import Image
 import refresh_task.plugin_lookup as plugin_lookup_mod
 import refresh_task.task as task_mod
 import refresh_task.worker as worker_mod
-from model import PluginInstance, RefreshInfo
+from model import PluginInstance
 from refresh_task import RefreshTask
 from refresh_task.actions import PlaylistRefresh
 
@@ -119,6 +119,7 @@ def _setup(
 
     display_manager = MagicMock()
     display_manager.display_image.return_value = {"display_ms": 1}
+    display_manager.panel_shows.return_value = False
     task = RefreshTask(device_config_dev, display_manager)
     return task, playlist, instance, marker
 
@@ -133,15 +134,6 @@ def _persisted_refresh_time(device_config_dev: Any) -> Any:
     raise AssertionError("plugin instance missing from persisted config")
 
 
-def _empty_refresh_info() -> RefreshInfo:
-    return RefreshInfo(
-        refresh_type="Manual Update",
-        plugin_id="",
-        refresh_time=None,
-        image_hash=None,
-    )
-
-
 def test_process_isolation_propagates_refresh_time_to_parent(
     device_config_dev: Any, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -149,7 +141,7 @@ def test_process_isolation_propagates_refresh_time_to_parent(
     first = datetime(2026, 10, 2, 12, 0, tzinfo=UTC)
 
     refresh_info, used_cached, metrics = task._perform_refresh(
-        PlaylistRefresh(playlist, instance), _empty_refresh_info(), first
+        PlaylistRefresh(playlist, instance), first
     )
 
     assert _render_count(marker) == 1
@@ -167,13 +159,10 @@ def test_process_isolation_second_cycle_reuses_cached_image(
     task, playlist, instance, marker = _setup(device_config_dev, monkeypatch, tmp_path)
     first = datetime(2026, 10, 2, 12, 0, tzinfo=UTC)
 
-    task._perform_refresh(
-        PlaylistRefresh(playlist, instance), _empty_refresh_info(), first
-    )
+    task._perform_refresh(PlaylistRefresh(playlist, instance), first)
     # Interval is an hour; ten minutes later the cached image must be reused.
     task._perform_refresh(
         PlaylistRefresh(playlist, instance),
-        _empty_refresh_info(),
         first + timedelta(minutes=10),
     )
 
@@ -191,7 +180,7 @@ def test_process_isolation_control_only_plugin_advances_refresh_time(
     first = datetime(2026, 10, 2, 12, 0, tzinfo=UTC)
 
     refresh_info, _used_cached, metrics = task._perform_refresh(
-        PlaylistRefresh(playlist, instance), _empty_refresh_info(), first
+        PlaylistRefresh(playlist, instance), first
     )
 
     assert refresh_info is None
@@ -212,7 +201,6 @@ def test_process_isolation_propagates_settings_written_by_plugin(
     for offset in range(2):
         task._perform_refresh(
             PlaylistRefresh(playlist, instance, force=True),
-            _empty_refresh_info(),
             first + timedelta(minutes=offset),
         )
 
@@ -231,7 +219,6 @@ def test_inprocess_isolation_behaves_identically(
     for offset in (0, 10):
         task._perform_refresh(
             PlaylistRefresh(playlist, instance),
-            _empty_refresh_info(),
             first + timedelta(minutes=offset),
         )
 

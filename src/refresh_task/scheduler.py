@@ -38,7 +38,6 @@ class Trigger(NamedTuple):
     """
 
     playlist_manager: Any
-    latest_refresh: Any
     current_dt: datetime
     manual_request: ManualUpdateRequest | None
     due: bool
@@ -132,9 +131,7 @@ class RefreshScheduler:
             elif self._due(playlist_manager, latest_refresh, current_dt):
                 self.last_attempt = current_dt
                 due = True
-            return Trigger(
-                playlist_manager, latest_refresh, current_dt, manual_request, due
-            )
+            return Trigger(playlist_manager, current_dt, manual_request, due)
 
     def device_interval_seconds(self) -> float:
         """Return the device-wide refresh interval in seconds."""

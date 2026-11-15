@@ -246,7 +246,6 @@ def test_refresh_hashes_image_once(
 ) -> None:
     """A full refresh that pushes to the display hashes the frame exactly once."""
     from display.display_manager import DisplayManager
-    from model import RefreshInfo
     from refresh_task import ManualRefresh, RefreshTask
 
     class DummyPlugin:
@@ -277,9 +276,8 @@ def test_refresh_hashes_image_once(
     monkeypatch.setattr("refresh_task.refresh_cycle.compute_image_hash", counting_hash)
     monkeypatch.setattr(image_utils, "compute_image_hash", counting_hash)
 
-    latest = RefreshInfo("Manual Update", "dummy", "2020-01-01T00:00:00", "stale")
     info, used_cached, _metrics = task._perform_refresh(
-        ManualRefresh("dummy", {}), latest, task._get_current_datetime()
+        ManualRefresh("dummy", {}), task._get_current_datetime()
     )
 
     assert info is not None
