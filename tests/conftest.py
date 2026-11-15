@@ -75,6 +75,8 @@ UI_BROWSER_TESTS = {
     # JTN-703 two-minute click loop. Still opt-in with SKIP_LOAD=0, which the
     # browser-full CI job sets only on the nightly schedule.
     "test_sustained_load.py",
+    # Every dialog traps Tab, closes on Escape and hands focus back.
+    "test_modal_keyboard_e2e.py",
 }
 A11Y_BROWSER_TESTS = {
     "test_a11y_sweep.py",
