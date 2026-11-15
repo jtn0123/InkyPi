@@ -76,8 +76,17 @@ def test_settings_tabs_switch(live_server: str, browser_page: Page) -> None:
             re.compile(r"\bactive\b")
         )
         expect(page.locator("[data-settings-tab].active")).to_have_count(1)
+        # Assistive tech gets the same answer as the eye.
+        expect(page.locator(f'[data-settings-tab="{name}"]')).to_have_attribute(
+            "aria-current", "true"
+        )
+        expect(page.locator("[data-settings-tab][aria-current]")).to_have_count(1)
         panel = page.locator(f'[data-settings-panel="{name}"]')
         expect(panel).to_be_visible()
+        controls = page.locator(f'[data-settings-tab="{name}"]').get_attribute(
+            "aria-controls"
+        )
+        assert controls == panel.get_attribute("id"), f"{name}: aria-controls"
         expect(panel).to_have_attribute("aria-hidden", "false")
         for other in names:
             if other != name:

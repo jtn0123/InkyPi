@@ -57,27 +57,27 @@
         <button type="button" class="settings-mobile-toggle header-button is-secondary" id="settingsMobileNavToggle" aria-expanded="false" aria-controls="settingsSideNav">Sections</button>
         <nav class="settings-side-nav" id="settingsSideNav" role="navigation" aria-label="Settings groups">
             {# Phosphor icons via icon() macro; aria-hidden so the label is the accessible name. #}
-            <button type="button" class="settings-side-link active" data-settings-tab="device">
+            <button type="button" class="settings-side-link active" data-settings-tab="device" aria-controls="settings-panel-device" aria-current="true">
                 {{ icon('monitor', 'settings-side-icon') | safe }}
                 <span>Device</span>
             </button>
-            <button type="button" class="settings-side-link" data-settings-tab="scheduling">
+            <button type="button" class="settings-side-link" data-settings-tab="scheduling" aria-controls="settings-panel-scheduling">
                 {{ icon('clock', 'settings-side-icon') | safe }}
                 <span>Scheduling</span>
             </button>
-            <button type="button" class="settings-side-link" data-settings-tab="image">
+            <button type="button" class="settings-side-link" data-settings-tab="image" aria-controls="settings-panel-image">
                 {{ icon('palette', 'settings-side-icon') | safe }}
                 <span>Image</span>
             </button>
-            <button type="button" class="settings-side-link" data-settings-tab="appearance">
+            <button type="button" class="settings-side-link" data-settings-tab="appearance" aria-controls="settings-panel-appearance">
                 {{ icon('sparkle', 'settings-side-icon') | safe }}
                 <span>Appearance</span>
             </button>
-            <button type="button" class="settings-side-link" data-settings-tab="maintenance">
+            <button type="button" class="settings-side-link" data-settings-tab="maintenance" aria-controls="settings-panel-maintenance">
                 {{ icon('download-simple', 'settings-side-icon') | safe }}
                 <span>Updates</span>
             </button>
-            <button type="button" class="settings-side-link" data-settings-tab="power">
+            <button type="button" class="settings-side-link" data-settings-tab="power" aria-controls="settings-panel-power">
                 {{ icon('power', 'settings-side-icon') | safe }}
                 <span>Power</span>
             </button>
@@ -86,7 +86,7 @@
         <!-- Settings Content -->
         <form class="settings-form settings-form--sticky-save" data-form-state aria-busy="false">
             <div id="settings-container">
-                <section class="settings-console-panel active" data-settings-panel="device">
+                <section class="settings-console-panel active" data-settings-panel="device" id="settings-panel-device">
                 <!-- Basics -->
                 <div class="card card-dense" id="section-basics">
                     <div class="card-head"><h2 class="card-title">Basics</h2></div>
@@ -195,7 +195,7 @@
                 </section>
 
                 <!-- Plugin cycle & system -->
-                <section class="settings-console-panel" data-settings-panel="scheduling">
+                <section class="settings-console-panel" data-settings-panel="scheduling" id="settings-panel-scheduling">
                 <div class="card card-dense" id="section-display-cycle">
                     <div class="card-head"><h2 class="card-title">Display cycle</h2></div>
                     <div class="card-body">
@@ -233,7 +233,7 @@
                 </div>
                 </section>
 
-                <section class="settings-console-panel" data-settings-panel="maintenance">
+                <section class="settings-console-panel" data-settings-panel="maintenance" id="settings-panel-maintenance">
 
                 <!-- Software Update — always visible, top of Updates tab.
                      The "Update available" chip was removed in favour of
@@ -477,7 +477,7 @@
                 <!-- Power & recovery — dedicated tab (matches handoff design:
                      Device / Scheduling / Image / Updates / Power). Tests that
                      drive reboot/shutdown must open the "power" tab first. -->
-                <section class="settings-console-panel" data-settings-panel="power">
+                <section class="settings-console-panel" data-settings-panel="power" id="settings-panel-power">
                 <section class="danger-zone power-danger-zone" id="section-power" aria-labelledby="powerDangerZoneTitle">
                     <div class="danger-zone-body">
                         <span class="danger-zone-label">Danger zone</span>
@@ -495,7 +495,7 @@
                 </section>
 
                 <!-- Image Settings -->
-                <section class="settings-console-panel" data-settings-panel="image">
+                <section class="settings-console-panel" data-settings-panel="image" id="settings-panel-image">
                 <div class="card" id="section-image-settings">
                     <div class="card-head">
                         <div>
@@ -568,7 +568,7 @@
                 <!-- Appearance — aesthetic preset / density / accent hue. Changes
                      apply instantly and persist to localStorage under inkypi_tweaks_v1
                      (shared with the floating tweaks panel). -->
-                <section class="settings-console-panel" data-settings-panel="appearance">
+                <section class="settings-console-panel" data-settings-panel="appearance" id="settings-panel-appearance">
                 <div class="card card-dense" id="section-appearance-aesthetic">
                     <div class="card-head">
                         <div>
