@@ -81,6 +81,8 @@ A11Y_BROWSER_TESTS = {
     "test_axe_a11y.py",
     "test_more_a11y.py",
     "test_playlist_a11y.py",
+    # The status badge passes colour contrast in each state and theme.
+    "test_status_badge_contrast.py",
 }
 MANAGED_API_KEY_ENV_VARS = (
     "OPEN_AI_SECRET",
