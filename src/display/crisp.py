@@ -36,8 +36,10 @@ neighbours:
   decorative gradients (an icon, a chart fill) stay below the threshold and
   are flattened like any other colour.
 
-Only numpy and Pillow are used; an 800x480 frame converts in a few tens of
-milliseconds on a desktop.
+Only numpy and Pillow are used. Analyse a frame once with :class:`Frame` and
+pass it to both :func:`gradient_dominated` and :func:`crisp_image`; an
+800x480 dashboard then takes a few milliseconds on a desktop and roughly
+150-200 ms on a Pi Zero 2 W.
 """
 
 from __future__ import annotations
@@ -135,12 +137,25 @@ def _box3(mask: np.ndarray) -> np.ndarray:
 
 
 def _tiles(values: np.ndarray) -> np.ndarray:
-    """Split ``(height, width, ...)`` into ``(h, w, BLOCK * BLOCK, ...)`` tiles."""
+    """Split ``(height, width)`` into ``(h, w, BLOCK * BLOCK)`` tiles."""
     h, w = values.shape[0] // BLOCK, values.shape[1] // BLOCK
-    rest = values.shape[2:]
     cropped = values[: h * BLOCK, : w * BLOCK]
-    tiles = cropped.reshape(h, BLOCK, w, BLOCK, *rest).swapaxes(1, 2)
-    return tiles.reshape(h, w, BLOCK * BLOCK, *rest)
+    tiles = cropped.reshape(h, BLOCK, w, BLOCK).swapaxes(1, 2)
+    return tiles.reshape(h, w, BLOCK * BLOCK)
+
+
+def _channel_tiles(rgb: np.ndarray) -> np.ndarray:
+    """Split ``(height, width, 3)`` into contiguous ``(3, h, w, BLOCK * BLOCK)``.
+
+    Channels come first so per-tile reductions run along the last, contiguous
+    axis. Reducing a channel-last tile layout across its pixels instead takes
+    several times longer on the Pi Zero 2 W (about 185 ms against 35 ms for
+    an 800x480 frame).
+    """
+    h, w = rgb.shape[0] // BLOCK, rgb.shape[1] // BLOCK
+    planes = rgb[: h * BLOCK, : w * BLOCK].transpose(2, 0, 1)
+    tiles = planes.reshape(3, h, BLOCK, w, BLOCK).transpose(0, 1, 3, 2, 4)
+    return np.ascontiguousarray(tiles).reshape(3, h, w, BLOCK * BLOCK)
 
 
 def _distinct_per_tile(packed: np.ndarray) -> np.ndarray:
@@ -149,30 +164,63 @@ def _distinct_per_tile(packed: np.ndarray) -> np.ndarray:
     return changes + 1
 
 
-def gradient_dominated(image: Image.Image) -> bool:
+class Frame:
+    """One image's pixels in the forms every crisp step reads, computed once.
+
+    The gradient check and the conversion both need the frame as RGB, as
+    packed ``0xRRGGBB`` integers and as distinct colours per tile. Building
+    those costs more than either decision made from them, so the display
+    analyses a frame once and passes the :class:`Frame` to both. The public
+    functions also take a plain image and analyse it themselves.
+    """
+
+    __slots__ = ("distinct", "image", "packed", "rgb")
+
+    def __init__(self, image: Image.Image) -> None:
+        self.image = image.convert("RGB")
+        #: ``uint8`` pixels shaped ``(height, width, 3)``.
+        self.rgb = np.asarray(self.image)
+        packed = self.rgb[..., 0].astype(np.int32) << 16
+        packed |= self.rgb[..., 1].astype(np.int32) << 8
+        packed |= self.rgb[..., 2]
+        #: ``int32`` pixels as ``0xRRGGBB``, shaped ``(height, width)``.
+        self.packed = packed
+        #: Distinct colours in each ``BLOCK x BLOCK`` tile, shaped ``(h, w)``.
+        self.distinct = _distinct_per_tile(packed)
+
+
+def _as_frame(image: Image.Image | Frame) -> Frame:
+    return image if isinstance(image, Frame) else Frame(image)
+
+
+def gradient_dominated(image: Image.Image | Frame) -> bool:
     """True when smooth gradients cover more than ``GRADIENT_SHARE`` of *image*."""
-    rgb = np.asarray(image.convert("RGB"), dtype=np.int32)
-    tiles = _tiles(rgb)
-    if tiles.size == 0:
+    frame = _as_frame(image)
+    if frame.distinct.size == 0:
         return False
-    packed = (rgb[..., 0] << 16) | (rgb[..., 1] << 8) | rgb[..., 2]
-    value_range = (tiles.max(axis=2) - tiles.min(axis=2)).max(axis=2)
-    smooth = (_distinct_per_tile(packed) >= SMOOTH_MIN_COLOURS) & (
-        value_range <= SMOOTH_MAX_RANGE
-    )
+    planes = _channel_tiles(frame.rgb)
+    # uint8 is safe: a tile's maximum is never below its minimum.
+    value_range = (planes.max(axis=3) - planes.min(axis=3)).max(axis=0)
+    smooth = (frame.distinct >= SMOOTH_MIN_COLOURS) & (value_range <= SMOOTH_MAX_RANGE)
     return float(smooth.mean()) > GRADIENT_SHARE
 
 
-def photo_regions(packed: np.ndarray) -> list[tuple[int, int, int, int]]:
+def photo_regions(
+    packed: np.ndarray, distinct: np.ndarray | None = None
+) -> list[tuple[int, int, int, int]]:
     """Return ``(left, top, right, bottom)`` boxes that look photographic.
 
     *packed* is the image as ``0xRRGGBB`` integers, shaped ``(height, width)``.
+    *distinct* is its distinct colours per tile when the caller already has
+    them (:attr:`Frame.distinct`); otherwise they are counted here.
     """
     height, width = packed.shape
     h, w = height // BLOCK, width // BLOCK
     if h == 0 or w == 0:
         return []
-    busy = _distinct_per_tile(packed) >= BUSY_COLOURS
+    if distinct is None:
+        distinct = _distinct_per_tile(packed)
+    busy = distinct >= BUSY_COLOURS
     core = busy & (_box3(busy) >= CORE_NEIGHBOURS)
 
     boxes: list[tuple[int, int, int, int]] = []
@@ -241,7 +289,7 @@ def _settle_edge_blends(u: np.ndarray, counts: np.ndarray, lut: np.ndarray) -> N
 
 
 def crisp_indices(
-    image: Image.Image,
+    image: Image.Image | Frame,
     palette: Palette,
     dither_palette: Palette | None = None,
 ) -> np.ndarray:
@@ -253,14 +301,11 @@ def crisp_indices(
     ``uint8`` array shaped ``(height, width)``.
     """
     black, white, chromatic, hues = _palette_roles(palette)
-    rgb_img = image.convert("RGB")
-    rgb = np.asarray(rgb_img, dtype=np.int32)
-    packed = (rgb[..., 0] << 16) | (rgb[..., 1] << 8) | rgb[..., 2]
+    frame = _as_frame(image)
+    packed = frame.packed
 
     # Rendered UI has few distinct colours, so decide once per colour.
-    colours, inverse, counts = np.unique(
-        packed.ravel(), return_inverse=True, return_counts=True
-    )
+    colours, counts = np.unique(packed, return_counts=True)
     u = np.stack([colours >> 16, (colours >> 8) & 0xFF, colours & 0xFF], axis=1)
     luma = (u @ _LUMA_WEIGHTS) >> 8
     lo = u.min(axis=1)
@@ -277,15 +322,22 @@ def crisp_indices(
         chosen = np.asarray(chromatic, dtype=np.uint8)[best]
         lut[coloured] = np.where(matched, chosen, lut[coloured])
     _settle_edge_blends(u, counts, lut)
-    out = lut[inverse].reshape(packed.shape)
+    # Spread the per-colour decisions back over the pixels through a table
+    # indexed by the 24-bit colour itself, which is several times faster on
+    # the Pi than asking np.unique for the inverse mapping. np.zeros leaves
+    # the 16 MB table as untouched zero pages, so only the pages holding the
+    # frame's colours are ever committed: a few hundred KB for rendered UI.
+    table = np.zeros(1 << 24, dtype=np.uint8)
+    table[colours] = lut
+    out = np.take(table, packed)
 
-    boxes = photo_regions(packed)
+    boxes = photo_regions(packed, frame.distinct)
     if boxes:
         dpal = palette if dither_palette is None else dither_palette
         pal_img = Image.new("P", (1, 1))
         pal_img.putpalette(np.asarray(dpal, dtype=np.uint8).tobytes())
         for left, top, right, bottom in boxes:
-            region = rgb_img.crop((left, top, right, bottom)).quantize(
+            region = frame.image.crop((left, top, right, bottom)).quantize(
                 len(dpal), palette=pal_img, dither=Image.Dither.FLOYDSTEINBERG
             )
             out[top:bottom, left:right] = np.asarray(region, dtype=np.uint8)
@@ -293,11 +345,16 @@ def crisp_indices(
 
 
 def crisp_image(
-    image: Image.Image, palette: Palette, dither_palette: Palette | None = None
+    image: Image.Image | Frame,
+    palette: Palette,
+    dither_palette: Palette | None = None,
 ) -> Image.Image:
     """Return *image* as RGB using only the pure *palette* colours."""
-    lut = np.asarray(palette, dtype=np.uint8).reshape(-1, 3)
-    return Image.fromarray(lut[crisp_indices(image, palette, dither_palette)], "RGB")
+    indices = Image.fromarray(crisp_indices(image, palette, dither_palette), "P")
+    indices.putpalette(np.asarray(palette, dtype=np.uint8).tobytes())
+    # Pillow expands palette indexes in C; indexing a numpy colour table per
+    # pixel took about 80 ms of the conversion on the Pi.
+    return indices.convert("RGB")
 
 
 def exact_palette_image(image: Image.Image, palette: Palette) -> Image.Image:

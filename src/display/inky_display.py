@@ -123,9 +123,10 @@ class InkyDisplay(AbstractDisplay):
         if handoff is None:
             return None
         # Imported here so numpy is only loaded once a frame is converted.
-        from display.crisp import crisp_image, gradient_dominated
+        from display.crisp import Frame, crisp_image, gradient_dominated
 
-        if gradient_dominated(image):
+        frame = Frame(image)
+        if gradient_dominated(frame):
             logger.info("Inky: frame is mostly gradient; leaving it dithered")
             return None
         # Photo regions inside the frame are dithered against the same blend
@@ -137,7 +138,7 @@ class InkyDisplay(AbstractDisplay):
             )
             for meas, pure in zip(handoff.measured, handoff.palette, strict=True)
         ]
-        return crisp_image(image, handoff.palette, blend)
+        return crisp_image(frame, handoff.palette, blend)
 
     def _undithered(self, image: Image.Image) -> Image.Image | None:
         """Return a mode-P frame the driver shows as-is, if *image* allows it.

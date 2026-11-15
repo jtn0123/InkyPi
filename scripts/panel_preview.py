@@ -37,7 +37,7 @@ SRC_DIR = os.path.join(REPO_ROOT, "src")
 if SRC_DIR not in sys.path:
     sys.path.insert(0, SRC_DIR)
 
-from display.crisp import crisp_indices, gradient_dominated  # noqa: E402
+from display.crisp import Frame, crisp_indices, gradient_dominated  # noqa: E402
 
 # Spectra 6 colour order used by inky.inky_e673: black, white, yellow, red,
 # blue, green. IDEAL is the driver's DESATURATED_PALETTE, MEASURED its
@@ -94,9 +94,10 @@ def crisp(image: Image.Image, saturation: float = 0.5) -> np.ndarray:
 
     Like the display layer, a gradient-dominated frame is left dithered.
     """
-    if gradient_dominated(image):
+    frame = Frame(image)
+    if gradient_dominated(frame):
         return current(image, saturation)
-    return crisp_indices(image, IDEAL.astype(int).tolist(), _blend(saturation).tolist())
+    return crisp_indices(frame, IDEAL.astype(int).tolist(), _blend(saturation).tolist())
 
 
 def build_sheet(image: Image.Image) -> Image.Image:
