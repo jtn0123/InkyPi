@@ -170,6 +170,11 @@ class RefreshExecutor:
             # A worker tempfile is ours to delete; a plugin's cache file
             # (``image_path_owned`` False) must stay for the next turn.
             owned = payload.get("image_path_owned", True) is not False
+            if refresh_action is not None:
+                # The worker set this on its own copy of the action; record it
+                # here so the display can copy the cache file instead of
+                # encoding the image again. A tempfile is gone after this read.
+                refresh_action.cached_image_path = None if owned else image_path
             try:
                 with Image.open(image_path) as image:
                     result_image = image.copy()

@@ -173,6 +173,7 @@ class RefreshCycleMixin:
         if image is None:
             return None, False, self._finish_without_image(turn, generate_ms)
 
+        generated = image
         image = self._fit_to_panel(turn, image)
         if image is None:
             return None, False, {}
@@ -184,6 +185,12 @@ class RefreshCycleMixin:
             started=started,
             generate_ms=generate_ms,
             tracker=tracker,
+            # The plugin's cache PNG holds the generated image, so the display
+            # can copy it rather than encode the same pixels again — unless
+            # fitting to the panel produced a different image.
+            source_png=(
+                turn.refresh_action.cached_image_path if image is generated else None
+            ),
         )
 
     def _plugin_config_for(
@@ -470,6 +477,7 @@ class RefreshCycleMixin:
         started: float,
         generate_ms: int,
         tracker: ProgressTracker,
+        source_png: str | None = None,
     ) -> RefreshOutcome:
         """Show the image (unless unchanged) and record the finished turn."""
         image_hash = compute_image_hash(image)
@@ -498,6 +506,7 @@ class RefreshCycleMixin:
             instance_name=turn.instance_name,
             request_id=turn.request_id,
             manual_request=turn.manual_request,
+            source_png=source_png,
         )
 
         request_ms = int((perf_counter() - started) * 1000)
@@ -559,6 +568,7 @@ class RefreshCycleMixin:
         instance_name: str | None,
         request_id: str | None,
         manual_request: ManualUpdateRequest | None,
+        source_png: str | None = None,
     ) -> tuple[int | None, int | None]:
         """Push the image to the display, or skip when the cache is warm.
 
@@ -577,6 +587,7 @@ class RefreshCycleMixin:
                 instance_name=instance_name,
                 request_id=request_id,
                 manual_request=manual_request,
+                source_png=source_png,
             )
         return self.display_pipeline.push_or_skip_display(
             used_cached=used_cached,
@@ -602,6 +613,7 @@ class RefreshCycleMixin:
         instance_name: str | None,
         request_id: str | None,
         manual_request: ManualUpdateRequest | None = None,
+        source_png: str | None = None,
     ) -> tuple[int | None, int | None]:
         """Push image to the display hardware and record benchmark stages."""
         return self.display_pipeline.push_to_display(
@@ -614,6 +626,7 @@ class RefreshCycleMixin:
             instance_name=instance_name,
             request_id=request_id,
             manual_request=manual_request,
+            source_png=source_png,
         )
 
     def _save_benchmark(
