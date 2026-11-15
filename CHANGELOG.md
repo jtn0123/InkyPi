@@ -2,6 +2,24 @@
 
 <!-- version list -->
 
+## v1.8.16 (2026-11-15)
+
+### Bug Fixes
+
+- **ui**: Stop shipping dead page scripts and unused vendor downloads
+  ([#741](https://github.com/jtn0123/InkyPi/pull/741),
+  [`44476e6`](https://github.com/jtn0123/InkyPi/commit/44476e668b5c9ae8405362acc0ecf48746f82e1e))
+
+### Continuous Integration
+
+- Give every workflow job a timeout ([#740](https://github.com/jtn0123/InkyPi/pull/740),
+  [`ae842b6`](https://github.com/jtn0123/InkyPi/commit/ae842b614e378f66a66deb6f198bb1367b878c88))
+
+- **mutation**: Upload only mutmut results and report the score in the run summary
+  ([#732](https://github.com/jtn0123/InkyPi/pull/732),
+  [`e3a71b2`](https://github.com/jtn0123/InkyPi/commit/e3a71b2ff6dab956f47fbafe494d9daff7ad5c09))
+
+
 ## v1.8.15 (2026-11-15)
 
 ### Bug Fixes
