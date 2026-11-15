@@ -1,7 +1,6 @@
 import logging
 from collections.abc import Mapping
 from datetime import UTC, date, datetime, timedelta
-from typing import cast
 
 from PIL import Image
 
@@ -12,7 +11,7 @@ from utils.time_utils import get_timezone
 logger = logging.getLogger(__name__)
 
 
-class Countdown(BasePlugin):  # type: ignore[misc, unused-ignore]
+class Countdown(BasePlugin):
     def validate_settings(self, settings: Mapping[str, object]) -> str | None:
         """Reject invalid countdown dates at save time."""
         raw_date = settings.get("date")
@@ -27,28 +26,25 @@ class Countdown(BasePlugin):  # type: ignore[misc, unused-ignore]
 
     def build_settings_schema(self) -> dict[str, object]:
         tomorrow = (datetime.now(tz=UTC) + timedelta(days=1)).strftime("%Y-%m-%d")
-        return cast(  # type: ignore[redundant-cast, unused-ignore]
-            dict[str, object],
-            schema(
-                section(
-                    "Countdown",
-                    row(
-                        field(
-                            "title",
-                            label="Title",
-                            placeholder="Required title, e.g. Vacation",
-                            required=True,
-                        ),
-                        field("date", "date", label="Target Date", default=tomorrow),
+        return schema(
+            section(
+                "Countdown",
+                row(
+                    field(
+                        "title",
+                        label="Title",
+                        placeholder="Required title, e.g. Vacation",
+                        required=True,
                     ),
-                )
-            ),
+                    field("date", "date", label="Target Date", default=tomorrow),
+                ),
+            )
         )
 
     def generate_settings_template(self) -> dict[str, object]:
         template_params = super().generate_settings_template()
         template_params["style_settings"] = True
-        return cast(dict[str, object], template_params)  # type: ignore[redundant-cast, unused-ignore]
+        return template_params
 
     def generate_image(
         self, settings: Mapping[str, object], device_config: DeviceConfigLike

@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from time import perf_counter
+from typing import Any
 
 from flask import Flask, g, url_for as flask_url_for
 from jinja2 import ChoiceLoader, FileSystemLoader
@@ -442,13 +443,13 @@ def _register_context_processors(app: Flask) -> None:
     static_mtime_cache: dict[str, str] = {}
 
     @app.context_processor
-    def _inject_app_version():  # type: ignore[no-untyped-def]
+    def _inject_app_version() -> dict[str, Any]:
         version = app.config["APP_VERSION"]
         lookup_static_version = _lookup_static_version_factory(
             app, version, static_mtime_cache
         )
 
-        def versioned_url_for(endpoint, **values):  # type: ignore[no-untyped-def]
+        def versioned_url_for(endpoint: str, **values: Any) -> str:
             if endpoint == "static":
                 filename = values.get("filename")
                 if filename:
@@ -460,7 +461,7 @@ def _register_context_processors(app: Flask) -> None:
         return {"app_version": version, "url_for": versioned_url_for}
 
     @app.context_processor
-    def _inject_now_showing_label():  # type: ignore[no-untyped-def]
+    def _inject_now_showing_label() -> dict[str, Any]:
         """Expose sidebar now-playing data derived from refresh_info."""
         device_config = app.config.get("DEVICE_CONFIG")
         if device_config is None:
@@ -468,7 +469,7 @@ def _register_context_processors(app: Flask) -> None:
         return {"now_showing": _compute_now_showing(device_config)}
 
     @app.context_processor
-    def _inject_sidebar_system():  # type: ignore[no-untyped-def]
+    def _inject_sidebar_system() -> dict[str, Any]:
         return {
             "sidebar_system": {
                 "online_label": "online",

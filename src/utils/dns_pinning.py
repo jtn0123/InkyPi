@@ -96,7 +96,7 @@ def _make_patched_getaddrinfo(original: Any) -> Any:
     when the calling thread has no active pins).
     """
 
-    def _patched_getaddrinfo(host, port, *args, **kwargs):  # type: ignore[no-untyped-def]
+    def _patched_getaddrinfo(host: Any, port: Any, *args: Any, **kwargs: Any) -> Any:
         pins = _pin_store()
         key = _normalize_host(host) if pins else None
         ips = pins.get(key) if key else None

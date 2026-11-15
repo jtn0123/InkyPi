@@ -1,6 +1,5 @@
 import logging
 from collections.abc import Mapping
-from typing import cast
 
 from PIL import Image
 
@@ -21,47 +20,44 @@ from .github_stars import stars_generate_image
 logger = logging.getLogger(__name__)
 
 
-class GitHub(BasePlugin):  # type: ignore[misc, unused-ignore]
+class GitHub(BasePlugin):
     def build_settings_schema(self) -> dict[str, object]:
-        return cast(  # type: ignore[redundant-cast, unused-ignore]
-            dict[str, object],
-            schema(
-                section(
-                    "Source",
-                    row(
-                        field(
-                            "githubType",
-                            "select",
-                            label="Metric",
-                            default="contributions",
-                            options=[
-                                option("contributions", "Contributions"),
-                                option("sponsors", "Sponsors"),
-                                option("stars", "Stars"),
-                            ],
-                        ),
-                        field(
-                            "githubUsername",
-                            label="GitHub Username",
-                            placeholder="octocat",
-                            required=True,
-                        ),
-                        field(
-                            "githubRepository",
-                            label="Repository",
-                            placeholder="repository-name",
-                            wrapper_id="repositoryGroup",
-                            visible_if={"field": "githubType", "equals": "stars"},
-                        ),
+        return schema(
+            section(
+                "Source",
+                row(
+                    field(
+                        "githubType",
+                        "select",
+                        label="Metric",
+                        default="contributions",
+                        options=[
+                            option("contributions", "Contributions"),
+                            option("sponsors", "Sponsors"),
+                            option("stars", "Stars"),
+                        ],
+                    ),
+                    field(
+                        "githubUsername",
+                        label="GitHub Username",
+                        placeholder="octocat",
+                        required=True,
+                    ),
+                    field(
+                        "githubRepository",
+                        label="Repository",
+                        placeholder="repository-name",
+                        wrapper_id="repositoryGroup",
+                        visible_if={"field": "githubType", "equals": "stars"},
                     ),
                 ),
-                section(
-                    "Contribution Grid Colors",
-                    widget(
-                        "github-colors",
-                        template="widgets/github_colors.html",
-                        visible_if={"field": "githubType", "equals": "contributions"},
-                    ),
+            ),
+            section(
+                "Contribution Grid Colors",
+                widget(
+                    "github-colors",
+                    template="widgets/github_colors.html",
+                    visible_if={"field": "githubType", "equals": "contributions"},
                 ),
             ),
         )
@@ -74,7 +70,7 @@ class GitHub(BasePlugin):  # type: ignore[misc, unused-ignore]
             "expected_key": "GITHUB_SECRET",
         }
         template_params["style_settings"] = True
-        return cast(dict[str, object], template_params)  # type: ignore[redundant-cast, unused-ignore]
+        return template_params
 
     def generate_image(
         self, settings: Mapping[str, object], device_config: DeviceConfigLike
