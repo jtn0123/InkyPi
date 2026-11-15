@@ -46,7 +46,8 @@ class TestSystemdService:
         assert "RestartSec=60" in self.content
 
     def test_service_resource_limits(self) -> None:
-        assert "CPUQuota=40%" in self.content
+        # One full core: the web UI, refresh pipeline and Chromium share it.
+        assert "CPUQuota=100%" in self.content
 
     def test_service_has_no_memory_caps_in_base_unit(self) -> None:
         # JTN-785: The base unit must NOT hardcode MemoryHigh/MemoryMax.

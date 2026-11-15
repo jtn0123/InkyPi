@@ -26,7 +26,11 @@ WatchdogSec=120
 KillSignal=SIGINT
 StandardOutput=journal
 StandardError=journal
-CPUQuota=40%
+# One full core of the four on a Pi Zero 2 W. The web UI, the refresh
+# pipeline and Chromium all share this quota; at the earlier 40% a photo
+# refresh spent ~31 s before the panel write instead of ~10 s, and the web UI
+# crawled while it ran. A crash loop is bounded by StartLimitBurst above.
+CPUQuota=100%
 # JTN-785: MemoryHigh / MemoryMax are intentionally NOT set in this base unit.
 # install.sh and update.sh detect the device's total RAM at install time and
 # write the appropriate caps to a drop-in at

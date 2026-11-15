@@ -433,8 +433,13 @@ def compute_image_hash(image: Image.Image) -> str:
 # locally (current/processed preview, per-plugin cache, worker hand-off).
 # ``optimize=True`` (level 9 plus filter search) costs seconds of CPU on a
 # Pi Zero 2 W's Cortex-A53 for a few KB saved; level 1 is several times faster.
-# Persisted, user-downloadable PNGs (history snapshots) keep ``optimize=True``.
 FAST_PNG_COMPRESS_LEVEL = 1
+
+# zlib level for history snapshots, which are kept (up to 500) and can be
+# downloaded. Measured on a Pi Zero 2 W with an 800x480 photo: level 6 takes
+# 0.8 s for 439 KB, ``optimize=True`` 6.1 s for 425 KB, level 1 0.3 s for
+# 514 KB. Level 6 keeps the files small without the optimize search.
+HISTORY_PNG_COMPRESS_LEVEL = 6
 
 
 def save_image_atomic(
