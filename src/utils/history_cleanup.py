@@ -9,6 +9,13 @@ Safety guarantees
 - Never follows symbolic links.
 - All paths are validated to lie within the resolved *history_dir*.
 - Paired JSON sidecar files are deleted alongside their PNG counterpart.
+
+Retention policy
+----------------
+:class:`RetentionPolicy` is the single source of the limits, read from the
+``history_cleanup`` block of ``device.json``. The refresh loop applies all of
+it every few refreshes, and ``DisplayManager`` applies its count cap after
+each save (so web-only mode, which has no refresh loop, stays bounded too).
 """
 
 from __future__ import annotations
@@ -17,6 +24,7 @@ import logging
 import os
 import shutil
 import time
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 
 logger = logging.getLogger(__name__)
@@ -24,6 +32,38 @@ logger = logging.getLogger(__name__)
 # Extensions treated as primary history files (others are sidecars / unknown).
 _PRIMARY_EXT = ".png"
 _SIDECAR_EXT = ".json"
+
+DEFAULT_MAX_AGE_DAYS = 30
+DEFAULT_MAX_COUNT = 500
+DEFAULT_MIN_FREE_BYTES = 500_000_000
+
+
+def _non_negative_int(cfg: Mapping[str, object], key: str, default: int) -> int:
+    value = cfg.get(key, default)
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        return default
+    return value
+
+
+@dataclass(frozen=True)
+class RetentionPolicy:
+    """How much display history to keep. ``0`` disables a limit."""
+
+    max_age_days: int = DEFAULT_MAX_AGE_DAYS
+    max_count: int = DEFAULT_MAX_COUNT
+    min_free_bytes: int = DEFAULT_MIN_FREE_BYTES
+
+    @classmethod
+    def from_config(cls, raw: object) -> RetentionPolicy:
+        """Read the ``history_cleanup`` block; a missing or bad value uses its default."""
+        cfg: Mapping[str, object] = raw if isinstance(raw, Mapping) else {}
+        return cls(
+            max_age_days=_non_negative_int(cfg, "max_age_days", DEFAULT_MAX_AGE_DAYS),
+            max_count=_non_negative_int(cfg, "max_count", DEFAULT_MAX_COUNT),
+            min_free_bytes=_non_negative_int(
+                cfg, "min_free_bytes", DEFAULT_MIN_FREE_BYTES
+            ),
+        )
 
 
 @dataclass
@@ -115,9 +155,9 @@ def _collect_png_files(
 
 def cleanup_history(
     history_dir: str,
-    max_age_days: int = 30,
-    max_count: int = 500,
-    min_free_bytes: int = 500_000_000,
+    max_age_days: int = DEFAULT_MAX_AGE_DAYS,
+    max_count: int = DEFAULT_MAX_COUNT,
+    min_free_bytes: int = DEFAULT_MIN_FREE_BYTES,
 ) -> CleanupResult:
     """Delete old history images according to a retention policy.
 
@@ -153,8 +193,9 @@ def cleanup_history(
         logger.debug("history_cleanup: nothing to clean in %s", history_dir)
         return result
 
-    # Sort ascending by mtime so oldest entries are first.
-    entries.sort(key=lambda t: t[0])
+    # Oldest first. Snapshots saved within the same second share an mtime;
+    # their names carry the timestamp, so the path breaks the tie in order.
+    entries.sort()
 
     # --- Pass 1: age-based deletion ---
     if max_age_days > 0:
@@ -211,3 +252,13 @@ def cleanup_history(
             result.remaining_count,
         )
     return result
+
+
+def apply_retention(history_dir: str, policy: RetentionPolicy) -> CleanupResult:
+    """Apply every limit in *policy* to *history_dir*."""
+    return cleanup_history(
+        history_dir,
+        max_age_days=policy.max_age_days,
+        max_count=policy.max_count,
+        min_free_bytes=policy.min_free_bytes,
+    )

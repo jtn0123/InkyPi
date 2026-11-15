@@ -34,6 +34,16 @@
         "screen_rendering": { "type": "string", "enum": ["auto", "dithered"] }
       }
     },
+    "history_cleanup": {
+      "type": "object",
+      "description": "How much display history to keep. 0 turns a limit off.",
+      "additionalProperties": true,
+      "properties": {
+        "max_age_days": { "type": "integer", "minimum": 0 },
+        "max_count": { "type": "integer", "minimum": 0 },
+        "min_free_bytes": { "type": "integer", "minimum": 0 }
+      }
+    },
     "playlist_config": {
       "type": "object",
       "properties": {
@@ -76,4 +86,3 @@
     "refresh_info": { "type": "object" }
   }
 }
-

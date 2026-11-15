@@ -105,8 +105,8 @@ class TestPruneHistory:
         history_dir = str(tmp_path / "history_prune2")
         os.makedirs(history_dir, exist_ok=True)
 
-        # Override max entries to a small number
-        dm.HISTORY_MAX_ENTRIES = 3
+        # The count cap comes from the shared history_cleanup setting
+        device_config_dev.update_value("history_cleanup", {"max_count": 3})
 
         # Create 5 PNG files with sidecars
         for i in range(5):
