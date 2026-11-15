@@ -127,7 +127,7 @@ coverage_suite() {
     rm -f coverage.xml
     export INKYPI_PLUGIN_ISOLATION=none
     export INKYPI_NO_HOT_RELOAD=1
-    # --cov-fail-under=0: this is a 15-file subset, so the global
+    # --cov-fail-under=0: this is a 16-file subset, so the global
     # .coveragerc fail_under (sized for the full suite) would always fail it.
     # scripts/coverage_gate.py below is the real per-file gate; genuine test
     # failures in this run still fail the phase.
@@ -151,7 +151,8 @@ coverage_suite() {
         tests/unit/test_plugin_isolation.py \
         tests/unit/test_upgrade_compatibility.py \
         tests/unit/test_install_scripts.py \
-        tests/unit/test_config_mtime_cache.py
+        tests/unit/test_config_mtime_cache.py \
+        tests/unit/test_skip_display_and_no_image.py
     python scripts/coverage_gate.py --profile preflash coverage.xml
 }
 

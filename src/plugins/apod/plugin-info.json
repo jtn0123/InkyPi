@@ -3,5 +3,6 @@
   "id": "apod",
   "class": "Apod",
   "api_version": "1.0",
-  "version": "1.0.0"
+  "version": "1.0.0",
+  "requires_api_key": true
 }

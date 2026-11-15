@@ -71,6 +71,10 @@ def task(monkeypatch: pytest.MonkeyPatch) -> Any:
     return RefreshTask(device_config, MagicMock())
 
 
+# plugin-info.json for a plugin that implements the hook.
+_HOOKED_CONFIG = {"id": "demo", "skip_display_condition": True}
+
+
 def _skip_reason(
     task: Any,
     monkeypatch: pytest.MonkeyPatch,
@@ -96,7 +100,7 @@ def _skip_reason(
     if action is None:
         action = PlaylistRefresh(_FakePlaylist(), _FakeInstance(settings))
     return task._skip_display_reason(
-        action, {"id": "demo"}, datetime.now(UTC), manual_request
+        action, _HOOKED_CONFIG, datetime.now(UTC), manual_request
     )
 
 
@@ -194,7 +198,7 @@ class TestSkipDecision:
             "refresh_task.plugin_lookup.get_plugin_instance", lambda _cfg: FakePlugin()
         )
         action = PlaylistRefresh(_FakePlaylist(), _FakeInstance({"team": "ABC"}))
-        task._skip_display_reason(action, {"id": "demo"}, datetime.now(UTC))
+        task._skip_display_reason(action, _HOOKED_CONFIG, datetime.now(UTC))
         assert seen == {"team": "ABC"}
 
 

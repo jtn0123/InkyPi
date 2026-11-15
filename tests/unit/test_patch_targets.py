@@ -33,6 +33,9 @@ _ALLOWED_UNREAD_REEXPORTS: dict[str, str] = {
     # inkypi does ``from refresh_task import RefreshTask``; the test patches the
     # package attribute *before* re-importing inkypi, so inkypi binds the mock.
     "refresh_task.RefreshTask": "bound by inkypi when it is re-imported under the patch",
+    # plugin_lookup exists to be this patch point: refresh_cycle and task read
+    # ``plugin_lookup.get_plugin_instance`` at call time.
+    "refresh_task.plugin_lookup.get_plugin_instance": "read as plugin_lookup.get_plugin_instance by refresh_cycle and task",
 }
 
 

@@ -76,7 +76,13 @@ class RefreshCycleMixin:
 
         A hook that raises is treated as "do not skip" — a broken optional hook
         must not be able to stop a plugin from ever displaying.
+
+        The hook runs here, in the main process, so the plugin is only loaded
+        to ask it when ``plugin-info.json`` sets ``skip_display_condition``.
+        Every other plugin's code stays in the render worker.
         """
+        if plugin_config.get("skip_display_condition") is not True:
+            return None
         if manual_request is not None:
             return None
         if not isinstance(refresh_action, PlaylistRefresh):
