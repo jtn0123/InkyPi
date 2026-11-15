@@ -99,7 +99,7 @@ def _run_plain_import_stats() -> dict[str, int]:
             "total_rss_bytes": rss,
         }))
         """)
-    proc = subprocess.run(  # noqa: S603 — fixed argv
+    proc = subprocess.run(  # fixed argv
         [sys.executable, "-c", code],
         env=_startup_env(),
         capture_output=True,
@@ -140,7 +140,7 @@ def _run_tracemalloc() -> dict:
             "allocators": allocators,
         }}))
         """).format(limit=DEFAULT_ALLOCATOR_SAMPLE_LIMIT)
-    proc = subprocess.run(  # noqa: S603 — trusted stdlib-only snippet
+    proc = subprocess.run(  # trusted stdlib-only snippet
         [sys.executable, "-c", code],
         env=_startup_env(),
         capture_output=True,
@@ -172,8 +172,8 @@ def _run_memray() -> dict:
     """
     # Verify memray is actually importable before we try to use it.
     try:
-        import memray  # noqa: F401,PLC0415
-        from memray import FileReader  # noqa: PLC0415
+        import memray  # noqa: F401
+        from memray import FileReader
     except ImportError as exc:
         raise RuntimeError("memray backend requested but not installed") from exc
 
@@ -191,7 +191,7 @@ def _run_memray() -> dict:
             "-c",
             "import inkypi",
         ]
-        proc = subprocess.run(  # noqa: S603 — fixed argv, no shell
+        proc = subprocess.run(  # fixed argv, no shell
             run_cmd,
             env=_startup_env(),
             capture_output=True,
@@ -261,7 +261,7 @@ def _detect_backend(requested: str) -> str:
         return "tracemalloc"
     if requested == "memray":
         try:
-            import memray  # noqa: F401,PLC0415
+            import memray
         except ImportError:
             print(
                 "memory_diff: memray requested but not installed; "
@@ -272,7 +272,7 @@ def _detect_backend(requested: str) -> str:
         return "memray"
     # auto
     try:
-        import memray  # noqa: F401,PLC0415
+        import memray  # noqa: F401
 
         return "memray"
     except ImportError:
@@ -314,7 +314,7 @@ def main(argv: list[str] | None = None) -> int:
     if backend == "memray":
         try:
             result = _run_memray()
-        except Exception as exc:  # noqa: BLE001 — intentional broad fallback
+        except Exception as exc:  # intentional broad fallback
             print(
                 f"memory_diff: memray backend failed ({exc}); "
                 "falling back to tracemalloc",

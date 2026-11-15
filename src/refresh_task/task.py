@@ -128,14 +128,14 @@ class RefreshTask(
         """
         try:
             breadcrumb = crash_breadcrumb.examine_boot()
-        except Exception:  # noqa: BLE001  defensive — startup must not fail
+        except Exception:  # defensive — startup must not fail
             logger.warning("Could not examine previous boot", exc_info=True)
             return
         if breadcrumb is None:
             return
         try:
             self.health_tracker.quarantine_after_crash(breadcrumb)
-        except Exception:  # noqa: BLE001  defensive — startup must not fail
+        except Exception:  # defensive — startup must not fail
             logger.warning("Could not quarantine after crash", exc_info=True)
 
     def start(self) -> None:
@@ -155,7 +155,7 @@ class RefreshTask(
                         deleted,
                         bytes_freed,
                     )
-            except Exception as exc:  # noqa: BLE001  defensive — startup must not fail
+            except Exception as exc:  # defensive — startup must not fail
                 logger.warning("Orphan render tempfile sweep failed: %s", exc)
             self._examine_previous_boot()
             self.thread = threading.Thread(

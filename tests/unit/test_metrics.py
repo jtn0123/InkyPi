@@ -6,7 +6,7 @@ from typing import Any
 
 import pytest
 from flask.testing import FlaskClient
-from prometheus_client import CollectorRegistry, Counter, Gauge  # noqa: F401
+from prometheus_client import CollectorRegistry, Counter, Gauge
 
 # ---------------------------------------------------------------------------
 # Helpers

@@ -353,9 +353,7 @@ class _FakeSession:
         self._responses = list(responses)
         self.calls: list[tuple[str, dict]] = []
 
-    def get(
-        self, url: Any, headers: Any = None, timeout: Any = None
-    ) -> Any:  # noqa: D401 - stub
+    def get(self, url: Any, headers: Any = None, timeout: Any = None) -> Any:  # stub
         self.calls.append((url, dict(headers or {})))
         if not self._responses:
             raise RuntimeError("no more canned responses")

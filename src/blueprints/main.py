@@ -16,6 +16,7 @@ from flask import (
     send_from_directory,
 )
 
+from benchmarks.benchmark_storage import save_refresh_event, save_stage_event
 from refresh_task.health import PluginHealthTracker
 from utils import blackout
 from utils.backend_errors import RefreshTaskUnavailable
@@ -31,17 +32,6 @@ from utils.rate_limiter import CooldownLimiter
 from utils.request_models import parse_plugin_order_request
 
 logger = logging.getLogger(__name__)
-
-try:
-    from benchmarks.benchmark_storage import save_refresh_event, save_stage_event
-except Exception:  # pragma: no cover
-
-    def save_refresh_event(*args, **kwargs):  # type: ignore
-        return None
-
-    def save_stage_event(*args, **kwargs):  # type: ignore
-        return None
-
 
 main_bp = Blueprint("main", __name__)
 

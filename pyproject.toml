@@ -84,6 +84,7 @@ select = [
   "RSE",    # flake8-raise
   "DTZ",    # flake8-datetimez
   "RET",    # flake8-return
+  "RUF100", # unused or unknown noqa codes
 ]
 ignore = [
   "E501",   # line length handled by Black

@@ -19,7 +19,7 @@ import logging
 from typing import Any, Protocol, cast
 
 import pytest
-from flask import Blueprint, Flask  # noqa: E402
+from flask import Blueprint, Flask
 from flask.testing import FlaskClient
 from werkzeug.test import TestResponse
 

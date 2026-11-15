@@ -329,13 +329,13 @@ def _click_one(page: Page, descriptor: dict) -> tuple[dict, dict]:
     locator = page.locator(selector).first
     try:
         locator.click(timeout=2000, force=True, no_wait_after=True)
-    except Exception as exc:  # noqa: BLE001 — we catalogue, don't rethrow
+    except Exception as exc:  # we catalogue, don't rethrow
         # Fall back to element.click() via evaluate — this dispatches a
         # trusted-looking click without Playwright's visibility/viewport
         # assertions, which matches the intent of "did the handler fire?".
         try:
             page.evaluate("(sel) => document.querySelector(sel)?.click()", selector)
-        except Exception as inner:  # noqa: BLE001
+        except Exception as inner:
             return before, {
                 **before,
                 "click_error": f"{exc}; fallback also failed: {inner}",
@@ -344,7 +344,7 @@ def _click_one(page: Page, descriptor: dict) -> tuple[dict, dict]:
     # stable state before we snapshot.
     try:
         page.wait_for_load_state("domcontentloaded", timeout=500)
-    except Exception:  # noqa: BLE001 — no navigation in flight is expected
+    except Exception:  # no navigation in flight is expected
         pass
     page.wait_for_timeout(_CLICK_SETTLE_MS)
     after = _snapshot(page)
@@ -439,7 +439,7 @@ def _close_open_modals(page: Page) -> None:
     """Best-effort close any modal dialogs opened by a click."""
     try:
         page.evaluate(_CLOSE_OPEN_MODALS_JS)
-    except Exception:  # noqa: BLE001 — modal-close is advisory
+    except Exception:  # modal-close is advisory
         pass
 
 

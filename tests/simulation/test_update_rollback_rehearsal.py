@@ -51,7 +51,7 @@ class FakeDevice:
         outer = self
 
         class Handler(BaseHTTPRequestHandler):
-            def do_GET(self) -> None:  # noqa: N802 — BaseHTTPRequestHandler API
+            def do_GET(self) -> None:  # BaseHTTPRequestHandler API
                 if self.path == "/readyz":
                     self.send_response(200 if outer.ready else 503)
                     self.end_headers()

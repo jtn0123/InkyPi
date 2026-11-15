@@ -5,7 +5,7 @@ import sqlite3
 from flask import Response, request
 
 import blueprints.settings as _mod
-from utils.http_utils import json_error, json_internal_error, json_success
+from utils.http_utils import JsonResponse, json_error, json_internal_error, json_success
 from utils.messages import BENCHMARKS_API_DISABLED_ERROR
 
 
@@ -26,8 +26,8 @@ def _parse_benchmark_cursor(raw_cursor: str | None) -> int | None:
     return cursor if cursor > 0 else None
 
 
-@_mod.settings_bp.route("/api/benchmarks/summary", methods=["GET"])  # type: ignore
-def benchmarks_summary() -> tuple[object, int] | Response:
+@_mod.settings_bp.route("/api/benchmarks/summary", methods=["GET"])
+def benchmarks_summary() -> JsonResponse | Response:
     if not _mod._benchmarks_enabled():
         return json_error(BENCHMARKS_API_DISABLED_ERROR, status=404)
     conn = None
@@ -78,8 +78,8 @@ def benchmarks_summary() -> tuple[object, int] | Response:
             conn.close()
 
 
-@_mod.settings_bp.route("/api/benchmarks/refreshes", methods=["GET"])  # type: ignore
-def benchmarks_refreshes() -> tuple[object, int] | Response:
+@_mod.settings_bp.route("/api/benchmarks/refreshes", methods=["GET"])
+def benchmarks_refreshes() -> JsonResponse | Response:
     if not _mod._benchmarks_enabled():
         return json_error(BENCHMARKS_API_DISABLED_ERROR, status=404)
     conn = None
@@ -127,8 +127,8 @@ def benchmarks_refreshes() -> tuple[object, int] | Response:
             conn.close()
 
 
-@_mod.settings_bp.route("/api/benchmarks/plugins", methods=["GET"])  # type: ignore
-def benchmarks_plugins() -> tuple[object, int] | Response:
+@_mod.settings_bp.route("/api/benchmarks/plugins", methods=["GET"])
+def benchmarks_plugins() -> JsonResponse | Response:
     if not _mod._benchmarks_enabled():
         return json_error(BENCHMARKS_API_DISABLED_ERROR, status=404)
     conn = None
@@ -182,8 +182,8 @@ def benchmarks_plugins() -> tuple[object, int] | Response:
             conn.close()
 
 
-@_mod.settings_bp.route("/api/benchmarks/stages", methods=["GET"])  # type: ignore
-def benchmarks_stages() -> tuple[object, int] | Response:
+@_mod.settings_bp.route("/api/benchmarks/stages", methods=["GET"])
+def benchmarks_stages() -> JsonResponse | Response:
     if not _mod._benchmarks_enabled():
         return json_error(BENCHMARKS_API_DISABLED_ERROR, status=404)
     refresh_id = request.args.get("refresh_id")

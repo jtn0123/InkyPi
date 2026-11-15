@@ -212,7 +212,7 @@ def run_boot_check(plugin_ids: Iterable[str]) -> dict[str, Any]:
     """
     try:
         report = check_assets(plugin_ids)
-    except Exception:  # noqa: BLE001 — boot must not fail on a diagnostic
+    except Exception:  # boot must not fail on a diagnostic
         logger.warning("Asset manifest check failed to run", exc_info=True)
         report = {
             "ok": None,

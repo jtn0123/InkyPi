@@ -40,7 +40,7 @@ def _validate_cdn_url(url: str) -> str:
 def compute_sri_from_url(url: str) -> str:
     """Download *url* and return its ``sha384-<base64>`` SRI hash."""
     safe_url = _validate_cdn_url(url)
-    with urllib.request.urlopen(safe_url, timeout=30) as resp:  # noqa: S310
+    with urllib.request.urlopen(safe_url, timeout=30) as resp:
         data = resp.read()
     digest = hashlib.sha384(data).digest()
     return "sha384-" + base64.b64encode(digest).decode("ascii")
