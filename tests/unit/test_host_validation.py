@@ -23,7 +23,7 @@ def _private_csp_report_limiter(monkeypatch: pytest.MonkeyPatch) -> None:
     # The CSP-report endpoint keeps a module-level per-IP limiter; give these
     # tests their own so the POSTs below don't throttle tests that run later.
     from blueprints import csp_report
-    from utils.rate_limiter import SlidingWindowLimiter
+    from utils.rate_limit import SlidingWindowLimiter
 
     monkeypatch.setattr(
         csp_report, "_csp_report_limiter", SlidingWindowLimiter(100_000, 60)

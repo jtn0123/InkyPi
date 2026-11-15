@@ -16,7 +16,7 @@ from flask import Flask
 from flask.testing import FlaskClient
 
 from utils.http_utils import json_success
-from utils.rate_limiter import CooldownLimiter
+from utils.rate_limit import CooldownLimiter
 
 
 class TestAcquire:
@@ -55,12 +55,12 @@ class TestAcquire:
 
     def test_record_restarts_the_cooldown_when_the_action_ends(self) -> None:
         limiter = CooldownLimiter(10)
-        with patch("utils.rate_limiter.time.monotonic", return_value=100.0):
+        with patch("utils.rate_limit.time.monotonic", return_value=100.0):
             assert limiter.acquire()[0] is True
         # The action took 30 s; the cooldown runs from its end.
-        with patch("utils.rate_limiter.time.monotonic", return_value=130.0):
+        with patch("utils.rate_limit.time.monotonic", return_value=130.0):
             limiter.record()
-        with patch("utils.rate_limiter.time.monotonic", return_value=135.0):
+        with patch("utils.rate_limit.time.monotonic", return_value=135.0):
             assert limiter.acquire() == (False, 5.0)
 
     def test_acquire_is_per_key(self) -> None:

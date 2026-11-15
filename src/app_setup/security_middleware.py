@@ -32,12 +32,12 @@ from config import Config
 from utils.env_flags import env_bool
 from utils.http_utils import JsonResponse, json_error
 from utils.rate_limit import (
+    SlidingWindowLimiter,
     TokenBucket,
     make_auth_bucket,
     make_mutating_bucket,
     make_refresh_bucket,
 )
-from utils.rate_limiter import SlidingWindowLimiter
 
 if TYPE_CHECKING:
     from _typeshed.wsgi import WSGIApplication

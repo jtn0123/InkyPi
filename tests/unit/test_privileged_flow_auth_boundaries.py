@@ -77,7 +77,7 @@ def secured_app(device_config_dev: Any, monkeypatch: pytest.MonkeyPatch) -> Any:
     from display.display_manager import DisplayManager
     from plugins.plugin_registry import load_plugins
     from refresh_task import RefreshTask
-    from utils.rate_limiter import SlidingWindowLimiter
+    from utils.rate_limit import SlidingWindowLimiter
 
     monkeypatch.setenv("INKYPI_AUTH_PIN", PIN)
     monkeypatch.setenv("INKYPI_READONLY_TOKEN", READONLY_TOKEN)

@@ -27,7 +27,7 @@ from utils.display_names import (
 from utils.http_utils import JsonResponse, json_error, json_success
 from utils.image_serving import maybe_serve_webp
 from utils.output_validator import fit_image_to_device
-from utils.rate_limiter import CooldownLimiter
+from utils.rate_limit import CooldownLimiter
 from utils.request_models import parse_plugin_order_request
 
 logger = logging.getLogger(__name__)

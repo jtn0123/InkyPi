@@ -1,10 +1,11 @@
-"""Tests for utils.rate_limiter module."""
+"""Tests for the cooldown and sliding-window limiters and the limiter registry
+in utils.rate_limit. Token-bucket tests live in test_rate_limit.py."""
 
 import threading
 from collections import deque
 from unittest.mock import patch
 
-from utils.rate_limiter import CooldownLimiter, SlidingWindowLimiter
+from utils.rate_limit import CooldownLimiter, SlidingWindowLimiter
 
 # ---------------------------------------------------------------------------
 # CooldownLimiter
@@ -35,10 +36,10 @@ class TestCooldownLimiter:
     def test_check_passes_after_window(self) -> None:
         limiter = CooldownLimiter(5)
         # Record at a fixed monotonic time
-        with patch("utils.rate_limiter.time.monotonic", return_value=100.0):
+        with patch("utils.rate_limit.time.monotonic", return_value=100.0):
             limiter.record()
         # Check at time 106 (past the 5s window)
-        with patch("utils.rate_limiter.time.monotonic", return_value=106.0):
+        with patch("utils.rate_limit.time.monotonic", return_value=106.0):
             allowed, retry_after = limiter.check()
         assert allowed is True
         assert retry_after == 0.0
@@ -97,13 +98,13 @@ class TestSlidingWindowLimiter:
     def test_allows_again_after_window(self) -> None:
         limiter = SlidingWindowLimiter(2, 10)
         # Fill at time 100
-        with patch("utils.rate_limiter.time.monotonic", return_value=100.0):
+        with patch("utils.rate_limit.time.monotonic", return_value=100.0):
             limiter.check("ip")
             limiter.check("ip")
             allowed, _ = limiter.check("ip")
             assert allowed is False
         # After window at time 111
-        with patch("utils.rate_limiter.time.monotonic", return_value=111.0):
+        with patch("utils.rate_limit.time.monotonic", return_value=111.0):
             allowed, retry_after = limiter.check("ip")
             assert allowed is True
             assert retry_after == 0.0
@@ -222,8 +223,7 @@ class TestThreadSafety:
 
 
 def test_reset_all_limiters_clears_every_limiter_type() -> None:
-    from utils.rate_limit import TokenBucket
-    from utils.rate_limiter import reset_all_limiters
+    from utils.rate_limit import TokenBucket, reset_all_limiters
 
     cooldown = CooldownLimiter(60)
     window = SlidingWindowLimiter(1, 60)
@@ -247,7 +247,7 @@ def test_registry_does_not_keep_limiters_alive() -> None:
     import gc
     import weakref
 
-    from utils.rate_limiter import _LIMITERS
+    from utils.rate_limit import _LIMITERS
 
     limiter = SlidingWindowLimiter(1, 60)
     ref = weakref.ref(limiter)
@@ -265,7 +265,7 @@ def test_module_level_limiters_are_reset() -> None:
     import blueprints.main as main
     import blueprints.settings as settings
     from app_setup import security_middleware
-    from utils.rate_limiter import _LIMITERS, reset_all_limiters
+    from utils.rate_limit import _LIMITERS, reset_all_limiters
 
     limiters = [
         client_error._rate_limiter,
