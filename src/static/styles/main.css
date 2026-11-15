@@ -10042,11 +10042,6 @@ details[open] > .update-release-notes-toggle::before {
 }
 
 /* Compatibility styles for enhanced UI tests */
-.settings-mode-selector,
-.mode-button,
-.mode-button.active,
-.settings-section.basic-only,
-.settings-section.advanced-only,
 .form-section-title,
 .validation-message,
 .validation-message.error,
@@ -10055,24 +10050,12 @@ details[open] > .update-release-notes-toggle::before {
 .form-input.invalid,
 .form-input.valid,
 .help-icon,
-.setup-wizard,
-.wizard-step,
-.wizard-navigation,
-.wizard-progress,
-.wizard-step-indicator,
-.wizard-step-dot,
-.live-preview-header,
-.live-preview-content,
-.preview-section,
-.preview-current,
-.preview-modified,
 .status-badge,
 .status-badge.success,
 .status-badge.warning,
 .status-badge.error,
 .color-picker:hover,
 .sections-grid,
-[data-theme="dark"] .live-preview-overlay,
 .preview-close,
 .preview-close:hover,
 .enhanced-progress-header,
@@ -10091,17 +10074,11 @@ details[open] > .update-release-notes-toggle::before {
 .form-input[readonly] {
     --compat-placeholder: 1;
 }
-.tooltip{visibility: hidden;}
-.tooltip-text{visibility: visible;}
-.live-preview-overlay{backdrop-filter: blur(4px); background: rgba(0,0,0,0.4);}
 @keyframes slide-in-from-right{from{opacity:0;}to{opacity:1;}}
 @keyframes slide-in-from-bottom{from{opacity:0;}to{opacity:1;}}
 /* @keyframes slideInFromRight */
 /* @keyframes slideInFromBottom */
 /* Enhanced Typography Hierarchy */
-/* Mobile adjustments for live preview */
-.live-preview-overlay{bottom: 20px;}
-.live-preview-content{flex-direction: row;}
 
 /* SVG close icon for modal close buttons */
 .close-icon {

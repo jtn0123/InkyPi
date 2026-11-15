@@ -27,18 +27,6 @@ def _css_block(css: str, selector: str) -> str:
     return match.group("body")
 
 
-def test_main_css_contains_progressive_disclosure_styles(client: FlaskClient) -> None:
-    """Test that main.css contains progressive disclosure styling."""
-    css_content = _read_all_css()
-
-    # Check for progressive disclosure CSS classes
-    assert ".settings-mode-selector" in css_content
-    assert ".mode-button" in css_content
-    assert ".mode-button.active" in css_content
-    assert ".settings-section.basic-only" in css_content
-    assert ".settings-section.advanced-only" in css_content
-
-
 def test_main_css_contains_form_enhancement_styles(client: FlaskClient) -> None:
     """Test that main.css contains form enhancement styling."""
     css_content = _read_all_css()
@@ -68,44 +56,6 @@ def test_main_css_contains_validation_styles(client: FlaskClient) -> None:
     # Check for input validation states
     assert ".form-input.invalid" in css_content
     assert ".form-input.valid" in css_content
-
-
-def test_main_css_contains_tooltip_styles(client: FlaskClient) -> None:
-    """Test that main.css contains tooltip styling."""
-    css_content = _read_all_css()
-
-    # Check for tooltip system
-    assert ".tooltip" in css_content
-    assert ".tooltip-text" in css_content
-    assert ".help-icon" in css_content
-    assert "visibility: hidden" in css_content
-    assert "visibility: visible" in css_content
-
-
-def test_main_css_contains_wizard_styles(client: FlaskClient) -> None:
-    """Test that main.css contains wizard styling."""
-    css_content = _read_all_css()
-
-    # Check for wizard styling
-    assert ".setup-wizard" in css_content
-    assert ".wizard-step" in css_content
-    assert ".wizard-navigation" in css_content
-    assert ".wizard-progress" in css_content
-    assert ".wizard-step-indicator" in css_content
-    assert ".wizard-step-dot" in css_content
-
-
-def test_main_css_contains_live_preview_styles(client: FlaskClient) -> None:
-    """Test that main.css contains live preview styling."""
-    css_content = _read_all_css()
-
-    # Check for live preview system
-    assert ".live-preview-overlay" in css_content
-    assert ".live-preview-header" in css_content
-    assert ".live-preview-content" in css_content
-    assert ".preview-section" in css_content
-    assert ".preview-current" in css_content
-    assert ".preview-modified" in css_content
 
 
 def test_main_css_contains_workflow_and_management_shells(client: FlaskClient) -> None:
@@ -300,36 +250,6 @@ def test_main_css_contains_grid_improvements(client: FlaskClient) -> None:
     assert ".sections-grid.two-col" in css_content
     assert "grid-template-columns" in css_content
     assert "@media (max-width: 900px)" in css_content
-
-
-def test_main_css_contains_preview_overlay_theming(client: FlaskClient) -> None:
-    """Test that main.css contains proper theming for preview overlay."""
-    css_content = _read_all_css()
-
-    # Check for dark theme preview overlay
-    assert '[data-theme="dark"] .live-preview-overlay' in css_content
-    assert "backdrop-filter: blur" in css_content
-    assert "rgba(" in css_content
-
-    # Check for preview close button theming
-    assert ".preview-close" in css_content
-    assert ".preview-close:hover" in css_content
-
-
-def test_main_css_contains_mobile_preview_adjustments(client: FlaskClient) -> None:
-    """Test that main.css contains mobile adjustments for preview."""
-    css_content = _read_all_css()
-
-    # Check for mobile preview adjustments
-    mobile_preview_section = css_content.find(
-        "/* Mobile adjustments for live preview */"
-    )
-    if mobile_preview_section != -1:
-        mobile_section = css_content[
-            mobile_preview_section : mobile_preview_section + 1000
-        ]
-        assert "bottom: 20px" in mobile_section
-        assert "flex-direction: row" in mobile_section
 
 
 def test_main_css_typography_hierarchy(client: FlaskClient) -> None:
