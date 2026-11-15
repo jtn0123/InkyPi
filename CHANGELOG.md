@@ -2,6 +2,107 @@
 
 <!-- version list -->
 
+## v1.9.0 (2026-11-15)
+
+### Bug Fixes
+
+- **a11y**: Give every dialog the same keyboard handling
+  ([#805](https://github.com/jtn0123/InkyPi/pull/805),
+  [`4b2c509`](https://github.com/jtn0123/InkyPi/commit/4b2c509358e548b310f585bebddc2306c420ec49))
+
+- **a11y**: Make the status badge readable and themed; drop a stale waiver
+  ([#807](https://github.com/jtn0123/InkyPi/pull/807),
+  [`4daa99a`](https://github.com/jtn0123/InkyPi/commit/4daa99a47d2b15c3f1bd409eb1053b9338449259))
+
+- **deps**: Bump vendored Chart.js, FullCalendar and Swagger UI
+  ([#792](https://github.com/jtn0123/InkyPi/pull/792),
+  [`242809e`](https://github.com/jtn0123/InkyPi/commit/242809e2bd899a6530a653b117f99b3aee65d82d))
+
+- **dev**: Add prometheus-client to the dev lock
+  ([#809](https://github.com/jtn0123/InkyPi/pull/809),
+  [`09fef66`](https://github.com/jtn0123/InkyPi/commit/09fef668fc1dc0f9b4794734c849f14402ad2b59))
+
+- **plugins**: Report only this render's plugin metadata
+  ([#797](https://github.com/jtn0123/InkyPi/pull/797),
+  [`a4336aa`](https://github.com/jtn0123/InkyPi/commit/a4336aac0325858ec82302ccad319c474d3a48d9))
+
+- **update-now**: Report failures the same way on every path
+  ([#800](https://github.com/jtn0123/InkyPi/pull/800),
+  [`847a909`](https://github.com/jtn0123/InkyPi/commit/847a90981672b5f54e47b60b22d79dac4cba7935))
+
+- **version**: Report the git SHA on the device, not "unknown"
+  ([#795](https://github.com/jtn0123/InkyPi/pull/795),
+  [`ec7a570`](https://github.com/jtn0123/InkyPi/commit/ec7a570043186a246d6dc6c6cf993dc6e26cb2a5))
+
+### Build System
+
+- **types**: State mypy strict mode once, drop the fake strict subset
+  ([#811](https://github.com/jtn0123/InkyPi/pull/811),
+  [`4056f30`](https://github.com/jtn0123/InkyPi/commit/4056f30c1c780bab7ce05a0c6498d214158ff9ae))
+
+### Continuous Integration
+
+- Run the tests weekly on Python 3.14 as an early warning
+  ([#801](https://github.com/jtn0123/InkyPi/pull/801),
+  [`3ded27a`](https://github.com/jtn0123/InkyPi/commit/3ded27ab57235a7a5be4bcb6f50ac01b4a2a35d6))
+
+- Share one setup step and drop duplicate checks
+  ([#802](https://github.com/jtn0123/InkyPi/pull/802),
+  [`d762065`](https://github.com/jtn0123/InkyPi/commit/d762065c228c7e7a953bb1d6a165ca8b6595e4f3))
+
+### Features
+
+- **install**: Sandbox inkypi.service with a systemd hardening drop-in
+  ([#794](https://github.com/jtn0123/InkyPi/pull/794),
+  [`0aa5e12`](https://github.com/jtn0123/InkyPi/commit/0aa5e122ad405955eb2786142a1afd83a3f09be2))
+
+### Performance Improvements
+
+- Keep plugin code out of the main process during refresh
+  ([#789](https://github.com/jtn0123/InkyPi/pull/789),
+  [`043b4cd`](https://github.com/jtn0123/InkyPi/commit/043b4cd289d9911e4410feafdc055ef5b99b773f))
+
+- **plugin**: Index the history sidecars instead of rescanning them
+  ([#799](https://github.com/jtn0123/InkyPi/pull/799),
+  [`e5a0ad4`](https://github.com/jtn0123/InkyPi/commit/e5a0ad4823b60fd73ca1de5ebc55064723040cde))
+
+### Refactoring
+
+- **app**: Pass start-up options instead of module globals
+  ([#798](https://github.com/jtn0123/InkyPi/pull/798),
+  [`f660e41`](https://github.com/jtn0123/InkyPi/commit/f660e41484462e98ab6ae6be14b1c24b597a3fe0))
+
+- **refresh-task**: Call the executor directly, drop the wrappers
+  ([#803](https://github.com/jtn0123/InkyPi/pull/803),
+  [`f4f4e49`](https://github.com/jtn0123/InkyPi/commit/f4f4e4967d983c78051e72a46196bcd09575ef3a))
+
+- **refresh-task**: Split _perform_refresh into named steps
+  ([#806](https://github.com/jtn0123/InkyPi/pull/806),
+  [`f3c5f68`](https://github.com/jtn0123/InkyPi/commit/f3c5f6898b02a96892e23b429c7eec645358aa8f))
+
+- **schedule**: One rule for the next refresh, shared by the loop and the pages
+  ([#796](https://github.com/jtn0123/InkyPi/pull/796),
+  [`34c44b4`](https://github.com/jtn0123/InkyPi/commit/34c44b4685cfe5e3814ef362392144fabd0e29b7))
+
+- **settings**: Move update, log and version-check logic into services
+  ([#804](https://github.com/jtn0123/InkyPi/pull/804),
+  [`fb227ad`](https://github.com/jtn0123/InkyPi/commit/fb227ad7f0511f1d510b8eb99171852438fb4c31))
+
+- **types**: Drop dead type-ignores and redundant casts
+  ([#812](https://github.com/jtn0123/InkyPi/pull/812),
+  [`cbb4a55`](https://github.com/jtn0123/InkyPi/commit/cbb4a554c99aa6cc5ba056e88240b614e564305d))
+
+### Testing
+
+- Keep the app's update check off the real GitHub
+  ([#813](https://github.com/jtn0123/InkyPi/pull/813),
+  [`3f3498e`](https://github.com/jtn0123/InkyPi/commit/3f3498e3a74f7518b03ddccc8afc6feddce59b65))
+
+- **browser**: Wait for conditions instead of fixed sleeps
+  ([#808](https://github.com/jtn0123/InkyPi/pull/808),
+  [`b63ebdf`](https://github.com/jtn0123/InkyPi/commit/b63ebdfd65e4f08f9a9693c73850070268123dbc))
+
+
 ## v1.8.33 (2026-11-15)
 
 ### Bug Fixes
