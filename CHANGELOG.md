@@ -2,6 +2,15 @@
 
 <!-- version list -->
 
+## v1.8.22 (2026-11-15)
+
+### Bug Fixes
+
+- **updates**: Stop retrying a failed version check on every page load
+  ([#747](https://github.com/jtn0123/InkyPi/pull/747),
+  [`169d1e0`](https://github.com/jtn0123/InkyPi/commit/169d1e0186a282a58bf27ec6f9b21046363038c1))
+
+
 ## v1.8.21 (2026-11-15)
 
 ### Performance Improvements
