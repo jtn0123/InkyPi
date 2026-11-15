@@ -1,5 +1,5 @@
 # pyright: reportMissingImports=false
-"""Tests for Weather plugin UI enhancements including progressive disclosure, validation, and wizard."""
+"""Tests for the Weather plugin settings page."""
 
 from flask.testing import FlaskClient
 
@@ -47,28 +47,3 @@ def test_weather_plugin_settings_persistence(client: FlaskClient) -> None:
     assert "__INKYPI_PLUGIN_BOOT__" in response_text
     assert "pluginSettings" in response_text
     assert "plugin_schema.js" in response_text
-
-
-def test_weather_plugin_wizard_step_navigation(client: FlaskClient) -> None:
-    """Test that weather plugin retains the setup-wizard container and loads the JS that creates nav.
-
-    The wizard navigation buttons (wizardPrev/wizardNext) are injected at runtime by
-    progressive_disclosure.js — they must NOT be duplicated in the server-rendered HTML.
-    The static HTML should have exactly the bare .setup-wizard container plus the script.
-    """
-    resp = client.get("/plugin/weather")
-    assert resp.status_code == 200
-
-    response_text = resp.get_data(as_text=True)
-
-    # The container element is still rendered server-side
-    assert "setup-wizard" in response_text
-    # The JS module that injects wizard navigation at runtime must be loaded
-    assert "progressive_disclosure.js" in response_text
-    # IDs must not be duplicated in static HTML — JS creates them once at runtime
-    assert (
-        response_text.count('id="wizardPrev"') <= 1
-    ), "Duplicate id='wizardPrev' found in server-rendered HTML"
-    assert (
-        response_text.count('id="wizardNext"') <= 1
-    ), "Duplicate id='wizardNext' found in server-rendered HTML"

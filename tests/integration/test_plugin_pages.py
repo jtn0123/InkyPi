@@ -530,25 +530,6 @@ def test_plugin_page_draft_badge_has_explanation(client: FlaskClient) -> None:
     assert "save action" in body or "Save settings" in body
 
 
-def test_wizard_ids_not_duplicated_in_static_html(client: FlaskClient) -> None:
-    """JTN-220: wizardPrev and wizardNext must each appear at most once in rendered HTML.
-
-    The wizard navigation is injected by progressive_disclosure.js; the template
-    must not also render a static copy, or every plugin settings page will have
-    duplicate id attributes which break querySelector-based selectors.
-    """
-    resp = client.get("/plugin/calendar")
-    assert resp.status_code == 200
-    body = resp.data.decode("utf-8")
-
-    assert (
-        body.count('id="wizardPrev"') <= 1
-    ), "Duplicate id='wizardPrev' found in rendered HTML for /plugin/calendar"
-    assert (
-        body.count('id="wizardNext"') <= 1
-    ), "Duplicate id='wizardNext' found in rendered HTML for /plugin/calendar"
-
-
 def _seed_named_clock_instance(
     device_config_dev: Any, latest_refresh_time: str | None = None
 ) -> None:

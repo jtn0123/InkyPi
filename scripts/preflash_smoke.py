@@ -273,6 +273,12 @@ def run_cache_smoke() -> None:
     with tempfile.TemporaryDirectory(prefix="inkypi-preflight-cache-") as tmpdir:
         config_path = _write_config(tmpdir)
         _prepare_env(tmpdir, config_path=config_path, web_only=True)
+        # manual_update returns as soon as the image is saved unless the
+        # refresh finishes within this grace window. The smoke asserts on the
+        # full metrics (display_ms), so the default 0.25 s raced the mock
+        # display write on slow CI runners. The cached second refresh still
+        # returns at once: its done event fires straight after image_saved.
+        os.environ["INKYPI_MANUAL_UPDATE_DONE_GRACE_S"] = "30"
         _ensure_src_on_path()
 
         from PIL import Image
