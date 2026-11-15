@@ -2,6 +2,28 @@
 
 <!-- version list -->
 
+## v1.8.33 (2026-11-15)
+
+### Bug Fixes
+
+- Keep API keys out of Chromium's environment for local renders
+  ([#788](https://github.com/jtn0123/InkyPi/pull/788),
+  [`04e6c0b`](https://github.com/jtn0123/InkyPi/commit/04e6c0b928c6fc6bfa6e62caf8f84781b80cf225))
+
+- **install**: Stop zram-tools fighting Pi OS's own zram swap
+  ([#793](https://github.com/jtn0123/InkyPi/pull/793),
+  [`eadf889`](https://github.com/jtn0123/InkyPi/commit/eadf8899953cb8f303432bf8c0e810c8c5a65885))
+
+### Chores
+
+- Make mypy.ini the only list of strict modules ([#791](https://github.com/jtn0123/InkyPi/pull/791),
+  [`d5281f6`](https://github.com/jtn0123/InkyPi/commit/d5281f60ba220e7949ac94fae7ee9001c6240596))
+
+- Track the Docker base image and vendored front-end libraries
+  ([#790](https://github.com/jtn0123/InkyPi/pull/790),
+  [`090c3ac`](https://github.com/jtn0123/InkyPi/commit/090c3ac5416fb3b69192056ba44a16b318202924))
+
+
 ## v1.8.32 (2026-11-15)
 
 ### Bug Fixes
