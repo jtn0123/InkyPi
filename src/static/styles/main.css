@@ -105,7 +105,6 @@ samp {
     --panel-bg: #f0ede8;
     --panel-border: #ddd8d0;
     --subtext: #5f5a54;
-    --frame-lining: #9a9590;
     /* E-ink paper tint behind render thumbnails/previews. Intentionally
        theme-independent — the physical panel is this color in any theme. */
     --eink-paper-bg: #dedbd2;
@@ -274,7 +273,6 @@ samp {
     --panel-bg: #191c1e;
     --panel-border: #262b30;
     --subtext: #a7adb3;
-    --frame-lining: #6f767d;
     --skeleton-base: rgba(228, 230, 232, 0.06);
     --skeleton-highlight: rgba(228, 230, 232, 0.10);
     --error: oklch(70% 0.17 25);
@@ -4994,46 +4992,6 @@ body[data-page="plugin"] .workflow-help p {
   }
 }
 
-/* Playlist plugin thumbnails */
-.plugin-thumb {
-    width: 120px;
-    height: 90px;
-    border: 1px solid var(--surface-border);
-    border-radius: 4px;
-    overflow: hidden;
-    padding: 8px; /* Inner padding to avoid visual clipping on e-ink */
-    background: var(--surface);
-    position: relative;
-    cursor: zoom-in;
-    margin-left: auto;
-    flex: 0 0 120px;
-}
-.plugin-thumb img { width: 100%; height: 100%; object-fit: contain; display:block; background: var(--panel-bg); }
-
-/* Frame-lining preview overlay on thumbnails by selected frame style */
-.plugin-thumb[data-frame-style]::after {
-  content: "";
-  position: absolute;
-  inset: 6px; /* inner padding lining */
-  pointer-events: none;
-}
-.plugin-thumb[data-frame-style="Rectangle"]::after {
-  border: 1.5px solid var(--frame-lining);
-  border-radius: 2px;
-}
-.plugin-thumb[data-frame-style="Top and Bottom"]::after {
-  border-top: 1.5px solid var(--frame-lining);
-  border-bottom: 1.5px solid var(--frame-lining);
-}
-.plugin-thumb[data-frame-style="Corner"]::after {
-  content: "";
-  background:
-    linear-gradient(to right, var(--frame-lining) 0 100%) left top/12px 1.5px no-repeat,
-    linear-gradient(to bottom, var(--frame-lining) 0 100%) left top/1.5px 12px no-repeat,
-    linear-gradient(to right, var(--frame-lining) 0 100%) right bottom/12px 1.2px no-repeat,
-    linear-gradient(to bottom, var(--frame-lining) 0 100%) right bottom/1.2px 12px no-repeat;
-}
-
 /* Plugin thumbnail containers: a <button> that opens the full-size preview,
    so it drops the browser's button padding, background and font. */
 .plugin-thumbnail-container {
@@ -5365,8 +5323,7 @@ body[data-page="plugin"] .workflow-help p {
 
 .pl-item-thumb:empty { display: none; }
 
-.pl-item-thumb .plugin-thumbnail-container,
-.pl-item-thumb .plugin-thumb {
+.pl-item-thumb .plugin-thumbnail-container {
   width: 100%;
   height: 100%;
   margin: 0;

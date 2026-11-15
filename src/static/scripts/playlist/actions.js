@@ -111,30 +111,6 @@
     });
   }
 
-  async function deletePluginInstance(playlistName, pluginId, pluginInstance) {
-    try {
-      const response = await fetch(ns.config.delete_plugin_instance_url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          playlist_name: playlistName,
-          plugin_id: pluginId,
-          plugin_instance: pluginInstance,
-        }),
-      });
-      const result = await handleJsonResponse(response);
-      if (response.ok && result?.success) {
-        location.reload();
-      }
-    } catch (error) {
-      console.error("Error:", error);
-      showResponseModal(
-        "failure",
-        "An error occurred while processing your request."
-      );
-    }
-  }
-
   async function displayNextInPlaylist(name) {
     const card = document.querySelector(
       `[data-playlist-name="${CSS.escape(name)}"]`
@@ -174,7 +150,6 @@
   }
 
   Object.assign(ns, {
-    deletePluginInstance,
     displayNextInPlaylist,
     handlePlaylistActionClick,
     initActionDelegation,

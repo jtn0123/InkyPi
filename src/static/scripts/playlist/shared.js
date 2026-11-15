@@ -14,7 +14,6 @@
   }
 
   ns.constants = ns.constants || {
-    THUMB_PREFETCH_MARGIN: "200px",
     PLAYLIST_NAME_RE: /^[A-Za-z0-9 _-]+$/,
     PLAYLIST_NAME_ERROR:
       "Playlist name can only contain ASCII letters, numbers, spaces, underscores, and hyphens",
@@ -35,7 +34,6 @@
   ns.runtime = ns.runtime || {
     actionDelegationBound: false,
     cardsBound: false,
-    deviceClockTimer: null,
     formControlsBound: false,
     modalLifecycleBound: false,
     mobileSyncBound: false,

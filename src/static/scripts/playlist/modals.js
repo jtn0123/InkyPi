@@ -78,9 +78,6 @@
       case "refreshSettingsModal":
         ns.closeRefreshModal();
         return;
-      case "deviceCycleModal":
-        ns.closeDeviceCycleModal();
-        return;
       case "playlistModal":
         ns.closeModal();
         return;
@@ -216,16 +213,6 @@
 
   function closeModal() {
     setModalOpen("playlistModal", false);
-  }
-
-  function openDeviceCycleModal() {
-    const input = document.getElementById("device_cycle_minutes");
-    if (input) input.value = ns.config.device_cycle_minutes || 60;
-    setModalOpen("deviceCycleModal", true);
-  }
-
-  function closeDeviceCycleModal() {
-    setModalOpen("deviceCycleModal", false);
   }
 
   function openDeletePlaylistModal(name, triggerEl) {
@@ -367,7 +354,6 @@
       if (event.target?.id === "playlistModal") closeModal();
       if (event.target?.id === "refreshSettingsModal") closeRefreshModal();
       if (event.target?.id === "thumbnailPreviewModal") closeThumbnailPreview();
-      if (event.target?.id === "deviceCycleModal") closeDeviceCycleModal();
       if (event.target?.id === "deletePlaylistModal") closeDeletePlaylistModal();
       if (event.target?.id === "deleteInstanceModal") closeDeleteInstanceModal();
       if (event.target?.id === "displayNextConfirmModal") {
@@ -389,7 +375,6 @@
     openCreateModal,
     openDeleteInstanceModal,
     openDeletePlaylistModal,
-    openDeviceCycleModal,
     openDisplayNextConfirmModal,
     openEditModal,
     openModal,
@@ -397,6 +382,5 @@
     setModalOpen,
     showThumbnailPreview,
     syncModalOpenState,
-    closeDeviceCycleModal,
   });
 })(globalThis);

@@ -7,12 +7,9 @@
             create_playlist_url: {{ url_for('playlist.create_playlist') | tojson }},
             delete_playlist_base_url: {{ url_for('playlist.delete_playlist', playlist_name='') | tojson }},
             delete_plugin_instance_url: {{ url_for('plugin.delete_plugin_instance') | tojson }},
-            device_cycle_minutes: {{ device_cycle_minutes | tojson }},
-            device_tz_offset_min: {{ tz_off_min | tojson }},
             display_next_url: {{ url_for('playlist.display_next_in_playlist') | tojson }},
             display_plugin_instance_url: {{ url_for('plugin.display_plugin_instance') | tojson }},
             reorder_url: {{ url_for('playlist.reorder_plugins') | tojson }},
-            update_device_cycle_url: {{ url_for('playlist.update_device_cycle') | tojson }},
             update_instance_base_url: {{ url_for('plugin.update_plugin_instance', instance_name='') | tojson }},
             update_playlist_base_url: {{ url_for('playlist.update_playlist', playlist_name='') | tojson }},
         };
