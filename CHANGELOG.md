@@ -2,6 +2,21 @@
 
 <!-- version list -->
 
+## v1.8.8 (2026-11-15)
+
+### Bug Fixes
+
+- **security**: Send plugin image downloads through the SSRF guard with a size cap
+  ([#724](https://github.com/jtn0123/InkyPi/pull/724),
+  [`adb8084`](https://github.com/jtn0123/InkyPi/commit/adb80848c4f663272b13cdfbf3e1f5b24a5521f8))
+
+### Testing
+
+- **preflash**: Wait for the full refresh in the cache smoke
+  ([#725](https://github.com/jtn0123/InkyPi/pull/725),
+  [`e9167af`](https://github.com/jtn0123/InkyPi/commit/e9167af1327401a751d98e27b48b00899e386738))
+
+
 ## v1.8.7 (2026-11-15)
 
 ### Bug Fixes
