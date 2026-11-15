@@ -169,4 +169,3 @@ ignore_merge_commits = false
 [build-system]
 requires = ["setuptools>=61"]
 build-backend = "setuptools.build_meta"
-
