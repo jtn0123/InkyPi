@@ -139,6 +139,33 @@ def test_unsplash_with_collections(
             assert result is not None
 
 
+def test_unsplash_sends_the_key_in_a_header_not_the_url(
+    device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Request URLs reach retry logs, so the key must not be a query param."""
+    from plugins.unsplash.unsplash import Unsplash
+
+    monkeypatch.setattr(device_config_dev, "load_env_key", lambda key: "test_key")
+
+    with patch("plugins.unsplash.unsplash.get_http_session") as mock_session_fn:
+        mock_api_response = MagicMock()
+        mock_api_response.json.return_value = {
+            "urls": {"full": "http://example.com/photo.png"}
+        }
+        mock_session_fn.return_value.get.return_value = mock_api_response
+
+        with patch(
+            "plugins.unsplash.unsplash.fetch_and_resize_remote_image",
+            return_value=MagicMock(),
+        ):
+            Unsplash({"id": "unsplash"}).generate_image({}, device_config_dev)
+
+        api_call = mock_session_fn.return_value.get.call_args_list[0]
+        assert api_call.kwargs["headers"] == {"Authorization": "Client-ID test_key"}
+        assert "client_id" not in api_call.kwargs["params"]
+        assert "test_key" not in str(api_call.args) + str(api_call.kwargs["params"])
+
+
 def test_unsplash_with_color_filter(
     device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
 ) -> None:

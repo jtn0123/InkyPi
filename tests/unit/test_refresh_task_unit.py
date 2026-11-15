@@ -203,9 +203,83 @@ def test_global_timeout_env_overrides_plugin_default(monkeypatch: Any) -> None:
     assert RefreshTask._manual_update_wait_seconds("ai_image") == 75.0
 
 
+def _fake_process_groups(
+    monkeypatch: pytest.MonkeyPatch, groups: dict[int, int]
+) -> list[tuple[int, int]]:
+    """Answer getpgid from *groups* and record killpg calls.
+
+    Cleanup tests use made-up pids. Left unpatched, getpgid/killpg would act
+    on whatever real process has that pid on the test machine.
+    """
+    killed: list[tuple[int, int]] = []
+
+    def fake_getpgid(pid: int) -> int:
+        if pid in groups:
+            return groups[pid]
+        raise ProcessLookupError(pid)
+
+    monkeypatch.setattr("refresh_task.executor.os.getpgid", fake_getpgid)
+    monkeypatch.setattr(
+        "refresh_task.executor.os.killpg",
+        lambda pgid, sig: killed.append((pgid, sig)),
+    )
+    return killed
+
+
+class _ExitingProc:
+    def __init__(self, pid: int) -> None:
+        self.pid = pid
+
+    def terminate(self) -> None:
+        pass
+
+    def join(self, timeout: Any = None) -> None:
+        pass
+
+    def is_alive(self) -> bool:
+        return False
+
+    def kill(self) -> None:  # pragma: no cover - never alive
+        pass
+
+
+PARENT_PGID = 4000
+
+
+@pytest.mark.parametrize(
+    ("worker_pgid", "why"),
+    [
+        (0, "kernel thread: killpg(0) would kill the parent's own group"),
+        (PARENT_PGID, "worker has not called setsid yet"),
+        (777, "pid belongs to a process in someone else's group"),
+    ],
+)
+def test_cleanup_subprocess_leaves_groups_the_worker_does_not_lead(
+    monkeypatch: pytest.MonkeyPatch, worker_pgid: int, why: str
+) -> None:
+    from refresh_task import RefreshTask
+
+    killed = _fake_process_groups(monkeypatch, {0: PARENT_PGID, 123: worker_pgid})
+    RefreshTask._cleanup_subprocess(_ExitingProc(123), "plugin")
+    assert killed == [], why
+
+
+def test_cleanup_subprocess_kills_the_group_a_setsid_worker_leads(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import signal
+
+    from refresh_task import RefreshTask
+
+    killed = _fake_process_groups(monkeypatch, {0: PARENT_PGID, 123: 123})
+    RefreshTask._cleanup_subprocess(_ExitingProc(123), "plugin")
+    assert killed == [(123, signal.SIGKILL)]
+
+
 def test_cleanup_subprocess_terminates(monkeypatch: pytest.MonkeyPatch) -> Any:
     from refresh_task import RefreshTask
 
+    _fake_process_groups(monkeypatch, {0: PARENT_PGID})
     calls = []
 
     class FakeProc:
@@ -233,6 +307,8 @@ def test_cleanup_subprocess_terminates(monkeypatch: pytest.MonkeyPatch) -> Any:
 
 def test_cleanup_subprocess_escalates_to_kill(monkeypatch: pytest.MonkeyPatch) -> Any:
     from refresh_task import RefreshTask
+
+    _fake_process_groups(monkeypatch, {0: PARENT_PGID})
 
     class StubbornProc:
         pid = 123

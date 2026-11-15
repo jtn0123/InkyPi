@@ -3,20 +3,30 @@ APOD Plugin for InkyPi
 This plugin fetches the Astronomy Picture of the Day (APOD) from NASA's API
 and displays it on the InkyPi device. It supports optional manual date selection or random dates.
 For the API key, set `NASA_SECRET={API_KEY}` in your .env file.
+
+When the API has no usable picture (an error, or the NASA-logo placeholder it
+has returned for every date since the APOD site moved to science.nasa.gov),
+the picture is read from the APOD website instead: the dated page's
+``og:image``, or for today the newest entry of the APOD feed.
 """
 
 import logging
 import os
+import re
 from collections.abc import Mapping
 from datetime import UTC, date, datetime, timedelta
+from html.parser import HTMLParser
 from random import randint
 from typing import cast
+from urllib.parse import urlparse
 
+import requests
 from PIL import Image
 
 from plugins.base_plugin.base_plugin import BasePlugin, DeviceConfigLike
 from plugins.base_plugin.settings_schema import callout, field, schema, section
 from utils.http_client import get_http_session
+from utils.safe_fetch import safe_fetch_bytes
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +35,59 @@ logger = logging.getLogger(__name__)
 # upstream API, so we reject such values at save time rather than letting the
 # bad config persist until ``generate_image`` runs.
 _APOD_MIN_DATE = date(1995, 6, 16)
+
+# The APOD website: dated pages are ``ap{yymmdd}.html`` and redirect to the
+# matching science.nasa.gov article. The feed lists the newest entries first.
+_APOD_SITE_URL = "https://apod.nasa.gov/apod"
+_APOD_FEED_URL = "https://science.nasa.gov/feed/apod-basic/"
+_PAGE_MAX_BYTES = 4 * 1024 * 1024
+
+# Path fragment of the stand-in image the API returns when it has no picture.
+_PLACEHOLDER_PATH_MARKER = "/nasa-logo"
+
+# The APOD landing page; a dated page that lands here has no entry of its own.
+_LANDING_PATH = "/apod/"
+
+# "APOD: 2026 November 14 – Apollo 12 and Surveyor 3 - NASA Science"
+_TITLE_PREFIX = re.compile(r"^APOD:\s*\d{4}\s+\w+\s+\d{1,2}\s*[-\u2013\u2014]\s*")
+_TITLE_SUFFIX = " - NASA Science"
+
+
+class _MetaTags(HTMLParser):
+    """Collect ``<meta property|name=... content=...>`` values (first wins)."""
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.values: dict[str, str] = {}
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if tag != "meta":
+            return
+        attributes = dict(attrs)
+        key = attributes.get("property") or attributes.get("name")
+        content = attributes.get("content")
+        if key and content and key not in self.values:
+            self.values[key] = content
+
+
+def _meta_tags(html: bytes) -> dict[str, str]:
+    parser = _MetaTags()
+    parser.feed(html.decode("utf-8", errors="replace"))
+    parser.close()
+    return parser.values
+
+
+def _is_placeholder(url: object) -> bool:
+    return isinstance(url, str) and _PLACEHOLDER_PATH_MARKER in urlparse(url).path
+
+
+def _clean_title(raw: str | None) -> str | None:
+    if not raw:
+        return None
+    title = _TITLE_PREFIX.sub("", raw.strip())
+    if title.endswith(_TITLE_SUFFIX):
+        title = title[: -len(_TITLE_SUFFIX)]
+    return title.strip() or None
 
 
 class Apod(BasePlugin):
@@ -154,8 +217,12 @@ class Apod(BasePlugin):
             random_date = start + timedelta(days=randint(0, delta_days))
             request_date = random_date.strftime("%Y-%m-%d")
             params["date"] = request_date
-        elif isinstance(settings.get("customDate"), str):
-            request_date = cast(str, settings["customDate"])
+        elif (
+            isinstance(settings.get("customDate"), str)
+            and cast(str, settings["customDate"]).strip()
+        ):
+            # A blank date means today (see validate_settings).
+            request_date = cast(str, settings["customDate"]).strip()
             params["date"] = request_date
 
         apod_url = os.getenv("INKYPI_NASA_API_URL", "https://api.nasa.gov")
@@ -166,23 +233,15 @@ class Apod(BasePlugin):
             apod_url,
             self._request_timeout(),
         )
-        response = get_http_session().get(
-            f"{apod_url}/planetary/apod",
-            params=params,
-            timeout=self._request_timeout(),
-        )
-
-        if response.status_code != 200:
-            logger.error(f"NASA API error: {response.text}")
-            raise RuntimeError("Failed to retrieve NASA APOD.")
-
-        data = cast(dict[str, object], response.json())
-        logger.info(
-            "APOD response: date=%s media_type=%s title=%s",
-            data.get("date"),
-            data.get("media_type"),
-            data.get("title"),
-        )
+        data = self._fetch_from_api(apod_url, params)
+        if data is None:
+            logger.warning(
+                "NASA APOD API had no usable picture for %s; reading the APOD website",
+                request_date,
+            )
+            data = self._fetch_from_site(
+                None if request_date == "today" else request_date
+            )
 
         if data.get("media_type") != "image":
             raise RuntimeError("APOD is not an image today.")
@@ -235,9 +294,107 @@ class Apod(BasePlugin):
                 "title": data.get("title"),
                 "caption": data.get("copyright"),
                 "explanation": data.get("explanation"),
-                "page_url": selected_image_url or data.get("hdurl") or data.get("url"),
+                "page_url": data.get("page_url")
+                or selected_image_url
+                or data.get("hdurl")
+                or data.get("url"),
                 "description_url": data.get("url"),
             }
         )
 
         return image
+
+    def _fetch_from_api(
+        self, apod_url: str, params: dict[str, str]
+    ) -> dict[str, object] | None:
+        """Return the API's answer, or None when it has no usable picture."""
+        try:
+            response = get_http_session().get(
+                f"{apod_url}/planetary/apod",
+                params=params,
+                timeout=self._request_timeout(),
+            )
+        except requests.RequestException as exc:
+            logger.warning("NASA API request failed: %s", type(exc).__name__)
+            return None
+        if response.status_code != 200:
+            logger.error(
+                "NASA API error: HTTP %s %s",
+                response.status_code,
+                str(response.text)[:200],
+            )
+            return None
+        try:
+            data = cast(dict[str, object], response.json())
+        except ValueError:
+            logger.error("NASA API returned a body that is not JSON")
+            return None
+        logger.info(
+            "APOD response: date=%s media_type=%s title=%s",
+            data.get("date"),
+            data.get("media_type"),
+            data.get("title"),
+        )
+        if _is_placeholder(data.get("url")) or _is_placeholder(data.get("hdurl")):
+            logger.warning(
+                "NASA API returned its placeholder image instead of the APOD"
+            )
+            return None
+        return data
+
+    def _fetch_from_site(self, request_date: str | None) -> dict[str, object]:
+        """Read the APOD for *request_date* (None = newest) from the website."""
+        timeout = self._request_timeout()
+        site = os.getenv("INKYPI_APOD_SITE_URL", _APOD_SITE_URL).rstrip("/")
+        try:
+            if request_date is None:
+                page_url, title, entry_date = self._newest_feed_entry(timeout)
+            else:
+                day = date.fromisoformat(request_date)
+                page_url = f"{site}/ap{day:%y%m%d}.html"
+                title, entry_date = None, request_date
+            meta = _meta_tags(
+                safe_fetch_bytes(page_url, max_bytes=_PAGE_MAX_BYTES, timeout=timeout)
+            )
+        except (requests.RequestException, ValueError) as exc:
+            logger.error("APOD website request failed: %s", exc)
+            raise RuntimeError("Failed to retrieve NASA APOD.") from exc
+
+        image_url = meta.get("og:image") or meta.get("twitter:image")
+        landed_on = urlparse(meta.get("og:url", "")).path
+        if not image_url or _is_placeholder(image_url) or landed_on == _LANDING_PATH:
+            logger.error("APOD website has no picture for %s", request_date or "today")
+            raise RuntimeError("Failed to retrieve NASA APOD.")
+        logger.info("APOD website picture: %s", image_url)
+        return {
+            "date": entry_date,
+            "title": title or _clean_title(meta.get("og:title")),
+            "media_type": "image",
+            "url": image_url,
+            "page_url": meta.get("og:url") or page_url,
+        }
+
+    def _newest_feed_entry(self, timeout: float) -> tuple[str, str | None, str | None]:
+        """Return (article URL, title, YYYY-MM-DD) of the newest APOD."""
+        import feedparser
+
+        feed = feedparser.parse(
+            safe_fetch_bytes(
+                os.getenv("INKYPI_APOD_FEED_URL", _APOD_FEED_URL),
+                max_bytes=_PAGE_MAX_BYTES,
+                timeout=timeout,
+            )
+        )
+        entries = feed.get("entries") or []
+        link = entries[0].get("link") if entries else None
+        if not isinstance(link, str) or urlparse(link).scheme != "https":
+            raise ValueError("APOD feed has no entries")
+        entry = entries[0]
+        published = entry.get("published_parsed")
+        entry_date = (
+            f"{published.tm_year:04d}-{published.tm_mon:02d}-{published.tm_mday:02d}"
+            if published
+            else None
+        )
+        title = entry.get("title")
+        return link, title if isinstance(title, str) else None, entry_date

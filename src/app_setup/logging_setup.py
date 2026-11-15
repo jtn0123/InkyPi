@@ -136,6 +136,19 @@ def _build_rotation_formatter(
     return logging.Formatter(fmt=fmt, datefmt=datefmt)
 
 
+def add_redaction_filter(handler: logging.Handler) -> logging.Handler:
+    """Attach the secret-redaction filter to *handler* once and return it.
+
+    The filter has to live on handlers: Python runs a logger's filters only
+    for records logged on that logger, so a filter on the root logger never
+    sees the records that propagate up from ``plugins.*``, ``urllib3`` and
+    every other named logger.
+    """
+    if not any(isinstance(f, SecretRedactionFilter) for f in handler.filters):
+        handler.addFilter(SecretRedactionFilter())
+    return handler
+
+
 def attach_rotating_file_handler(
     log_path: str,
     conf_path: str = _LOGGING_CONF_PATH,
@@ -156,6 +169,7 @@ def attach_rotating_file_handler(
     formatter = _build_rotation_formatter(conf_path, cfg.formatter)
     if formatter is not None:
         handler.setFormatter(formatter)
+    add_redaction_filter(handler)
     logging.getLogger().addHandler(handler)
     return handler
 
@@ -192,9 +206,10 @@ def setup_logging() -> None:
             disable_existing_loggers=False,
         )
 
-    # Attach the secret-redaction filter to the root logger so it applies to
-    # ALL handlers (console, file, dev-mode buffer) and both log formats.
-    logging.getLogger().addFilter(SecretRedactionFilter())
+    # Mask secrets on every handler (console now; the file and dev-mode
+    # handlers attach the filter themselves), for both log formats.
+    for handler in logging.getLogger().handlers:
+        add_redaction_filter(handler)
     install_waitress_disconnect_filter()
 
     # Optional rotating file output — only attached when an explicit path is
@@ -217,6 +232,7 @@ def install_dev_log_handler() -> None:
 
         dev_handler = DevModeLogHandler()
         dev_handler.setLevel(logging.DEBUG)
+        add_redaction_filter(dev_handler)
         logging.getLogger().addHandler(dev_handler)
         logger.info("Dev mode log handler enabled (in-memory buffer)")
     except Exception as e:

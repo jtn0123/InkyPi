@@ -77,7 +77,11 @@ class RefreshExecutor:
         if callable(getpgid) and callable(killpg):
             try:
                 pgid = getpgid(proc.pid)
-                if pgid != getpgid(0):
+                # Only kill a group the worker leads: its setsid() makes the
+                # pgid equal to its pid. Anything else is someone else's
+                # group. A kernel thread reports pgid 0, and killpg(0, ...)
+                # would kill this process's own group (on CI, the runner).
+                if pgid == proc.pid and pgid > 0 and pgid != getpgid(0):
                     killpg(pgid, signal.SIGKILL)  # NOSONAR
             except OSError:
                 pass

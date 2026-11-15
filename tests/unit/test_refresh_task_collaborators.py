@@ -111,3 +111,24 @@ def test_plugin_health_tracker_update_populates_state_before_failure_hook(
         "instance": None,
         "last_error": "boom",
     }
+
+
+def test_plugin_health_tracker_masks_keys_in_last_error(
+    device_config_dev: Any,
+) -> None:
+    """last_error feeds the UI, diagnostics, disabled_reason and webhooks."""
+    tracker = PluginHealthTracker(device_config_dev, {})
+
+    tracker.update(
+        plugin_id="apod",
+        instance=None,
+        ok=False,
+        metrics=None,
+        error="500 for url: https://api.test/apod?api_key=HEALTHKEY31&date=2026-04-24",  # gitleaks:allow
+        on_success=lambda *_args: None,
+        on_failure=lambda *_args: None,
+    )
+
+    last_error = str(tracker.plugin_health["apod"]["last_error"])
+    assert "HEALTHKEY31" not in last_error
+    assert "date=2026-04-24" in last_error

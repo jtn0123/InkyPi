@@ -95,9 +95,43 @@ def pytest_addoption(parser: Any) -> None:
     )
 
 
+def _install_process_group_guard() -> None:
+    """Fail a test that tries to signal the test run's own process group.
+
+    ``os.killpg(0, ...)``, ``os.kill(0, ...)`` and negative pids signal the
+    caller's whole group (or every process). On CI that group includes the
+    runner, so the job died with no log. Refuse them so the test fails
+    visibly instead.
+    """
+    real_killpg = getattr(os, "killpg", None)
+    getpgid = getattr(os, "getpgid", None)
+    if real_killpg is None or getpgid is None:
+        return
+    own_group = getpgid(0)
+    real_kill = os.kill
+
+    def guarded_killpg(pgid: int, sig: int) -> None:
+        if pgid <= 0 or pgid == own_group:
+            raise RuntimeError(
+                f"test called killpg({pgid}, {sig}) on the test run's own group"
+            )
+        real_killpg(pgid, sig)
+
+    def guarded_kill(pid: int, sig: int) -> None:
+        if pid <= 0 and sig != 0:
+            raise RuntimeError(
+                f"test called kill({pid}, {sig}), which signals a whole group"
+            )
+        real_kill(pid, sig)
+
+    os.killpg = guarded_killpg
+    os.kill = guarded_kill
+
+
 def pytest_configure(config: Any) -> None:
     if config.getoption("--update-snapshots"):
         os.environ["SNAPSHOT_UPDATE"] = "1"
+    _install_process_group_guard()
 
 
 def _is_truthy(value: str) -> bool:

@@ -145,7 +145,6 @@ class Unsplash(BasePlugin):
             orientation = None
 
         params: dict[str, object] = {
-            "client_id": access_key,
             "content_filter": content_filter,
             "per_page": 100,
         }
@@ -165,8 +164,13 @@ class Unsplash(BasePlugin):
             params["orientation"] = orientation
 
         try:
+            # The key goes in a header, not the query string: request URLs
+            # end up in urllib3 retry logs and exception messages.
             response = get_http_session().get(
-                url, params=cast(Any, params), timeout=self._request_timeout()
+                url,
+                params=cast(Any, params),
+                headers={"Authorization": f"Client-ID {access_key}"},
+                timeout=self._request_timeout(),
             )
             response.raise_for_status()
             data = cast(dict[str, object], response.json())
