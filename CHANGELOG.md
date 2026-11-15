@@ -2,6 +2,15 @@
 
 <!-- version list -->
 
+## v1.8.14 (2026-11-15)
+
+### Bug Fixes
+
+- **plugin**: Never render a plugin in the web thread to serve a thumbnail
+  ([#735](https://github.com/jtn0123/InkyPi/pull/735),
+  [`b91f8a9`](https://github.com/jtn0123/InkyPi/commit/b91f8a90fb00b72138f96766809cc04fc4868a70))
+
+
 ## v1.8.13 (2026-11-15)
 
 ### Bug Fixes
