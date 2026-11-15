@@ -6,12 +6,8 @@ This guide explains how to run, extend, and understand the test setup.
 
 ### Setup & Running
 
-1) Create a venv and install deps
-```bash
-bash scripts/venv.sh
-. .venv/bin/activate
-python -m pip install -r install/requirements.txt -r install/requirements-dev.txt || true
-```
+1) Set up the environment as in [development.md → Setup](development.md#setup):
+`source scripts/venv.sh` (in each new shell).
 
 2) Run tests
 ```bash
@@ -100,20 +96,6 @@ Notes:
   - Weather: OpenWeatherMap & Open‑Meteo paths mocked
   - AI Text: OpenAI chat completions mocked
   - AI Image: OpenAI image generation mocked
-
----
-
-### OpenAI Image Quality Mapping
-
-To align with current API behavior:
-- `dall-e-3`: quality `standard` or `hd`
-- `gpt-image-1`: quality `standard` or `high`
-
-UI updates:
-- The AI Image settings present `standard/hd` for DALL·E 3 and `standard/high` for GPT Image 1.
-
-Server-side normalization:
-- The app normalizes any input (e.g., `low`, `medium`, `hd`, `high`) to valid values per model before calling the API.
 
 ---
 

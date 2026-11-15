@@ -15,7 +15,7 @@ Developer, CI and device tools. Run them from the repo root. Python scripts add
 | `seed_test_data.py` | Fills a dev install with sample plugin instances, playlists and history images. |
 | `test.sh` / `test-fast.sh` | The test suite, and a faster local loop. |
 | `test_profile.sh` | Runs pytest under a profiler (see `docs/profiling.md`). |
-| `lint.sh` / `format.sh` | The Python and shell lint gate CI runs (ruff, black, mypy, shellcheck), and the auto-fixer. The web scripts are linted by Biome instead: `pre-commit run biome-ci --all-files` (see `docs/development.md`). |
+| `lint.sh` / `format.sh` | The lint gate CI runs (ruff, black, mypy, shellcheck, and locally Biome on the web scripts through the `biome-ci` pre-commit hook; CI's lint job runs Biome in its own step), and the auto-fixer. |
 | `check_shell.sh` | `bash -n` and shellcheck (default severity) on every tracked shell script, found by extension and shebang; `lint.sh` runs it. |
 | `precommit_browser_warning.sh` | Pre-commit hook: runs the browser smoke gate when front-end files change. |
 | `precommit_tool.sh` | Pre-commit hook helper: runs ruff, black or mypy from the repo's `.venv` (or the main checkout's, inside a worktree), so hooks use the same versions as CI. |
@@ -58,7 +58,7 @@ Developer, CI and device tools. Run them from the repo root. Python scripts add
 | `check_links.py` | Re-checks links that the Lychee link checker reported as throttled. |
 | `check_requirements_drift.sh` | Checks that the exported lockfiles match `uv.lock`, and the installer requirement files match their `.in` files and the lock. |
 | `check_install_pins.py` | Run by the drift check: installer requirement files must agree with `uv.lock` and with each other. |
-| `check_vendor_versions.py` | Weekly check that the vendored front-end libraries are current within their major (`vendor-versions.yml`). |
+| `check_vendor_versions.py` | Weekly check that the vendored front-end libraries (downloaded, CDN-loaded, and committed under `src/static/vendor/`) are current within their major (`vendor-versions.yml`). |
 | `mypy_src_baseline.txt`, `mypy_tests_baseline.txt` | The mypy error ratchets used by `lint.sh`. |
 
 ## Install and Pi images

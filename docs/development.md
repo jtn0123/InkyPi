@@ -15,32 +15,28 @@ Works on **macOS**, **Linux**, and **Windows** - no hardware needed!
 <table>
 <tr>
 <td>
-Traditional setup method
+Setup with a virtual environment (macOS, Linux, or WSL2 on Windows)
 
 ```bash
-# 1. Clone and setup
 git clone https://github.com/jtn0123/InkyPi.git
 cd InkyPi
-
-# 2. Quick start (recommended)
-./scripts/dev.sh
-
-# Or manual setup
-python3.13 -m venv .venv  # InkyPi supports Python 3.13 only
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
-
-# 3. Install Python dependencies and vendor assets
-python scripts/dev_environment.py --sync
-bash install/update_vendors.sh
-python src/inkypi.py --dev
+source scripts/venv.sh       # makes .venv on Python 3.13 and installs the
+                             # locked, hash-checked dev requirements
+./scripts/dev.sh --web-only  # web UI only; drop --web-only to also run the
+                             # refresh loop against the mock display
 ```
 
-`scripts/test.sh` checks installed versions against the committed requirements
-before running tests. To inspect the active environment without installing or
-using the network, run `python scripts/dev_environment.py`. If it reports drift,
-run `source scripts/venv.sh` (or `python scripts/dev_environment.py --sync` in an
-already activated environment). Sync installs with `--require-hashes` and records
-a lock fingerprint. Unchanged environments take the check-only fast path.
+`source scripts/venv.sh` is the whole setup: run it in each new shell. It
+creates `.venv` with Python 3.13 if it's missing, activates it, installs
+`install/requirements-dev.txt` with `--require-hashes` when the installed
+packages have drifted, and sets `PYTHONPATH`. An unchanged environment takes a
+check-only fast path. To inspect the environment without installing anything,
+run `python scripts/dev_environment.py`.
+
+The compiled stylesheet (`src/static/styles/main.css`) and the vendored
+htmx/Leaflet files are committed, so nothing else needs building. After editing
+CSS, run `python scripts/build_css.py` (or `./scripts/dev_watch.sh`, below) and
+commit the rebuilt `main.css`.
 
 </td>
 <td>
@@ -90,7 +86,8 @@ the full hook list.
 
 ### Linting the web scripts (Biome)
 
-The web UI's JavaScript (`src/static/scripts/`) is linted by [Biome](https://biomejs.dev).
+The web UI's JavaScript (`src/static/scripts/` and the service worker, `src/static/sw.js`) is
+linted by [Biome](https://biomejs.dev).
 There is no build step and no `package.json`: the pre-commit hook uses Biome's official mirror,
 which installs the pinned Biome into pre-commit's own cache, and CI's lint job installs the same
 version. Biome only lints; its formatter is off, so it never rewrites a file.
@@ -98,6 +95,8 @@ version. Biome only lints; its formatter is off, so it never rewrites a file.
 ```bash
 pre-commit run biome-ci --all-files   # every script, the same check CI runs
 ```
+
+`scripts/lint.sh` runs the same command, so a passing local lint means a passing CI lint job.
 
 [`biome.json`](../biome.json) holds the rules: Biome's recommended `correctness`, `suspicious`
 and `security` rules plus `noUndeclaredVariables` and `noUnusedVariables`, with warnings failing
@@ -165,7 +164,8 @@ exit                                 # Exit devbox shell and deactivates Python 
 Running commands for the tight edit-refresh loop:
 
 ```bash
-# Start the Flask dev server (full program, auto-reloads Python + templates)
+# Start the dev server (full program; edited page templates show on the next
+# request, Python changes need a restart: Ctrl+C and run it again)
 ./scripts/dev.sh
 # or:  .venv/bin/python src/inkypi.py --dev --web-only     # port 8080
 
@@ -173,7 +173,7 @@ Running commands for the tight edit-refresh loop:
 ./scripts/dev_watch.sh
 #   watches src/static/styles/  → runs scripts/build_css.py
 #   watches src/static/scripts/ → runs scripts/build_assets.py
-#   watches src/templates/      → logs only (Flask auto-reloads templates)
+#   watches src/templates/      → logs only (dev mode re-reads templates)
 # Requires `watchdog` (pip install watchdog). Ctrl+C exits cleanly.
 # One-shot CSS build (no watcher):
 python3 scripts/build_css.py
@@ -185,7 +185,7 @@ python3 scripts/build_css.py
 2. **Check simulated e-ink output**: latest frame is written to `/tmp/inkypi-mock-frame.png` (override with `INKYPI_MOCK_FRAME_PATH`)
 3. **Plugin development**: Copy an existing plugin as template (e.g., `clock/`)
 4. **Configuration**: Edit `src/config/device_dev.json` for display settings
-5. **Hot reload**: You can run via Flask dev server for code reload. When `INKYPI_ENV=dev` or running with `--dev`, plugin modules are reloaded on access so you can iterate without restarting.
+5. **What reloads in dev mode** (`--dev` or `INKYPI_ENV=dev`): a plugin's Python module is reloaded each time the plugin is used (set `INKYPI_NO_HOT_RELOAD=1` to turn this off), and page templates are re-read on the next request. Any other Python change needs a restart.
 
 ```bash
 export FLASK_APP=src.inkypi:create_app

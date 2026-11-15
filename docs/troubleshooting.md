@@ -7,17 +7,22 @@ Check the status of the service:
 sudo systemctl status inkypi.service
 ```
 
-If the service is running, this should output `Active: active (running)`:
-```bash
+If the service is running, this should output `Active: active (running)`.
+The paths under `CGroup` point at wherever you cloned InkyPi
+(`/usr/local/inkypi/src` is a link to that checkout's `src`):
+```
 ● inkypi.service - InkyPi App
      Loaded: loaded (/etc/systemd/system/inkypi.service; enabled; preset: enabled)
-     Active: active (running) since Sun 2024-12-22 20:48:53 GMT; 28s ago
-   Main PID: 48333 (bash)
-      Tasks: 6 (limit: 166)
-        CPU: 6.333s
+    Drop-In: /etc/systemd/system/inkypi.service.d
+             └─hardening.conf, memory.conf
+     Active: active (running) since Sun 2026-11-15 15:28:34 EST; 2h 5min ago
+   Main PID: 12341 (python)
+      Tasks: 12 (limit: 367)
+        CPU: 45.316s
      CGroup: /system.slice/inkypi.service
-             ├─48333 bash /usr/local/bin/inkypi -d
-             └─48336 python -u /home/pi/inky/src/inkypi.py -d
+             ├─12341 python -u /home/pi/InkyPi/src/inkypi.py
+             ├─12443 /usr/local/inkypi/venv_inkypi/bin/python -c "from multiprocessing.resource_tracker import main;main(13)"
+             └─12444 /usr/local/inkypi/venv_inkypi/bin/python -c "from multiprocessing.forkserver import main; ..."
 ```
 
 If the service is not running, check the logs for any errors or issues.
@@ -74,13 +79,17 @@ Every frame shown on the panel is kept on the History page. The oldest frames ar
 | `max_age_days` | `30` | Delete frames older than this. |
 | `min_free_bytes` | `500000000` | Delete the oldest frames while the SD card has less free space than this. |
 
-The age and free-space limits are checked every 10 refreshes. To change a limit, add a `history_cleanup` block to `/usr/local/inkypi/src/config/device.json` and restart the service. A value of `0` turns that limit off:
+The age and free-space limits are checked every 10 refreshes. To change a limit, stop the service (`sudo systemctl stop inkypi`), add a `history_cleanup` block to `/usr/local/inkypi/src/config/device.json`, then start it again (`sudo systemctl start inkypi`). The running service writes its in-memory settings back to that file, so an edit made while it runs can be overwritten. A value of `0` turns that limit off:
 
 ```json
 "history_cleanup": { "max_count": 1000, "max_age_days": 60, "min_free_bytes": 500000000 }
 ```
 
 The values must be whole numbers of 0 or more. Any other value stops InkyPi from starting, and the reason is logged as `Config invalid`.
+
+### Uploaded photos
+
+Photos uploaded to the Image Upload plugin are kept in `/usr/local/inkypi/src/static/images/saved/`. On the same schedule, InkyPi deletes any upload that is more than a day old and that no playlist or setting names any more. That covers a photo removed from an instance, and one sent with **Update Now**, which is shown once and never saved. Settings backups don't include photos, so a restored older backup can name a photo that has since been deleted; upload it again.
 
 ## Intermittent Wi-Fi reachability / SSH drops
 
@@ -270,11 +279,16 @@ doesn't, copy these two files off the Pi. Both need `sudo` to read.
 
 ## Run InkyPi Manually
 
-If the InkyPi service is not running, try manually running the startup script to diagnose. This should output the logs to the terminal and make it easier to troubleshoot any errors:
+If the InkyPi service won't start, run InkyPi in the foreground to see its errors in the terminal. Stop the service first: both listen on the same port, so a manual copy started while the service is up fails to bind.
 
 ```bash
-sudo /usr/local/bin/inkypi -d
+sudo systemctl stop inkypi
+sudo /usr/local/bin/inkypi run
 ```
+
+Press Ctrl+C to stop it, then start the service again with `sudo systemctl start inkypi`. If systemd gave up after repeated failures (`start-limit-hit` in `systemctl status`), run `sudo systemctl reset-failed inkypi` first.
+
+The manual run doesn't get the service's sandbox or any `EnvironmentFile` the service loads (such as `/etc/inkypi-security.env` from [auth.md](auth.md)), so a PIN set only there is not applied while it runs.
 
 ## API Key not configured
 

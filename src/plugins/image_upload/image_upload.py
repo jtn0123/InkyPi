@@ -15,7 +15,7 @@ from plugins.base_plugin.settings_schema import (
     section,
     widget,
 )
-from utils.app_utils import resolve_path
+from utils.app_utils import get_upload_dir
 from utils.image_loader import (
     FIT_CONTAIN,
     effective_fit_mode,
@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 
 def _get_upload_dir() -> str:
-    return resolve_path(os.path.join("static", "images", "saved"))
+    return get_upload_dir()
 
 
 class ImageUpload(BasePlugin):
@@ -99,7 +99,19 @@ class ImageUpload(BasePlugin):
             ),
         )
 
-    def open_image(self, img_index: int, image_locations: list[str]) -> Image.Image:
+    def open_image(
+        self,
+        img_index: int,
+        image_locations: list[str],
+        *,
+        size_hint: tuple[int, int] | None = None,
+    ) -> Image.Image:
+        """Load one uploaded image, upright, and detached from its file.
+
+        With *size_hint*, a JPEG is decoded at the smallest built-in scale
+        that still covers the larger side of the panel in both directions, so
+        a 48 MP photo isn't fully decoded just to be shrunk to the panel.
+        """
         if not image_locations:
             raise RuntimeError("No images provided.")
 
@@ -110,10 +122,16 @@ class ImageUpload(BasePlugin):
             logger.error("Image path outside allowed directory: %s", image_path)
             raise RuntimeError("Invalid image file path.") from None
 
-        # Open the image using Pillow
         try:
             with Image.open(image_path) as img:
-                image = img.copy()
+                if size_hint is not None:
+                    # A square box, because EXIF rotation may swap the sides.
+                    side = max(size_hint)
+                    img.draft(None, (side, side))
+                img.load()
+                # Uploads are stored as received, so apply the camera's
+                # orientation here. This always returns a new image.
+                image = ImageOps.exif_transpose(img)
         except (OSError, ValueError) as e:
             logger.error("Failed to read image file: %s", e)
             raise RuntimeError("Failed to read image file.") from e
@@ -139,17 +157,17 @@ class ImageUpload(BasePlugin):
             # Prevent Index out of range issues when file list has changed
             img_index = 0
 
+        dimensions = self.get_oriented_dimensions(device_config)
         if settings.get("randomize") == "true":
             img_index = random.randrange(0, len(image_locations))
-            image = self.open_image(img_index, image_locations)
+            image = self.open_image(img_index, image_locations, size_hint=dimensions)
         else:
-            image = self.open_image(img_index, image_locations)
+            image = self.open_image(img_index, image_locations, size_hint=dimensions)
             img_index = (img_index + 1) % len(image_locations)
 
         # Write the new index back to the device json
         if isinstance(settings, dict):
             settings["image_index"] = img_index
-        dimensions = self.get_oriented_dimensions(device_config)
         fit_mode = effective_fit_mode(
             resolve_fit_mode(settings), image.size, dimensions
         )

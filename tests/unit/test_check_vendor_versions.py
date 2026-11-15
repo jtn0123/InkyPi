@@ -29,7 +29,31 @@ cvv = _load()
 def test_reads_every_vendored_library_from_the_real_files() -> None:
     packages = {pin.package for pin in cvv.all_pins()}
 
-    assert {"chart.js", "fullcalendar", "swagger-ui-dist"} <= packages
+    assert {
+        "chart.js",
+        "fullcalendar",
+        "swagger-ui-dist",
+        "htmx.org",
+        "leaflet",
+    } <= packages
+
+
+def test_reads_committed_library_versions_from_the_files() -> None:
+    # htmx and Leaflet are committed under src/static/vendor/, outside both
+    # pin files, so the weekly check never saw them (F1).
+    pins = {pin.package: pin for pin in cvv.pins_from_committed_files()}
+
+    assert pins["htmx.org"].source == "src/static/vendor/htmx.min.js"
+    assert pins["leaflet"].source == "src/static/vendor/leaflet/leaflet.js"
+    for pin in pins.values():
+        assert cvv._is_stable(pin.version)
+
+
+def test_a_committed_file_without_a_version_fails_loudly() -> None:
+    path = cvv.ROOT / "src" / "static" / "vendor" / "htmx.min.js"
+    renamed = (("htmx.org", path, r"no-such-marker (\d+)"),)
+    with pytest.raises(ValueError, match="no htmx.org version found"):
+        cvv.pins_from_committed_files(renamed)
 
 
 def test_expands_version_variables_in_update_vendors() -> None:

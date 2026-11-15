@@ -489,6 +489,10 @@ def create_app(options: RuntimeOptions | None = None) -> Flask:
         options = RuntimeOptions.from_env()
     app = Flask(__name__)
     app.config["RUNTIME_OPTIONS"] = options
+    # Dev: pick up edited page templates on the next request. Set before
+    # anything builds app.jinja_env, which reads it once. waitress has no
+    # code reloader, so Python edits still need a restart.
+    app.config["TEMPLATES_AUTO_RELOAD"] = options.dev_mode
     template_dirs = [
         os.path.join(os.path.dirname(__file__), "templates"),
         os.path.join(os.path.dirname(__file__), "plugins"),
