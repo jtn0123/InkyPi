@@ -65,7 +65,11 @@ def _run_update(
     """Invoke install/update.sh with the given env overrides.
 
     We inherit the current env (PATH etc.) so bash/python3/systemctl are
-    resolvable if present, then layer the overrides on top.
+    resolvable if present, then layer the overrides on top. The pre-flight
+    runs on the interpreter running these tests, which has the app's
+    dependencies, as the app venv does on a device. Otherwise update.sh would
+    use whatever sits at /usr/local/inkypi/venv_inkypi on the host, or the
+    first python3 on PATH.
     """
     if not shutil.which("bash"):
         pytest.skip("bash is not available on this host")
@@ -73,6 +77,7 @@ def _run_update(
     env.update(
         {
             "INKYPI_LOCKFILE_DIR": str(lockfile_dir),
+            "INKYPI_VENV_PYTHON": sys.executable,
             **env_overrides,
         }
     )
