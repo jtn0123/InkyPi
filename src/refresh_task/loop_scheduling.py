@@ -128,6 +128,10 @@ class SchedulingMixin:
             tick_count=self._tick_count,
             cleanup_interval_ticks=self._CLEANUP_INTERVAL_TICKS,
         )
+        self.housekeeper.maybe_prune_benchmarks(
+            tick_count=self._tick_count,
+            cleanup_interval_ticks=self._CLEANUP_INTERVAL_TICKS,
+        )
 
     def _wait_for_trigger(self) -> Trigger | None:
         """Wait for the next refresh trigger while holding the condition lock.

@@ -151,7 +151,7 @@ One directory per plugin (`<id>/<id>.py`, `plugin-info.json`, templates and asse
 
 ### `src/benchmarks/`
 
-`benchmark_storage.py` writes refresh and stage timings to the SQLite benchmarks database. Writing is best-effort and controlled by `enable_benchmarks` and `benchmark_sample_rate`.
+`benchmark_storage.py` writes refresh and stage timings to the SQLite benchmarks database. Writing is best-effort and controlled by `enable_benchmarks` and `benchmark_sample_rate`. The schema is checked once per database per process, and `prune_benchmarks` (run by the refresh loop's housekeeping) deletes rows older than 30 days.
 
 ### `src/schemas/`
 
