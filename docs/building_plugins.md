@@ -29,17 +29,14 @@ This guide walks you through the process of creating a new plugin for InkyPi.
     - Images can be generated via the Pillow library or rendered from HTML and CSS file, see [See Generating Images by Rendering HTML and CSS](#generating-images-by-rendering-html-and-css) for details.
     - Return a single `PIL.Image` object to be displayed
     - If there are any issues (e.g., missing configuration options or API keys), raise a `RuntimeError` exception with a clear and concise message to be displayed in the web UI.
-- (Optional) If your settings template requires any additional variables, override the default `generate_settings_template` function
-    - In this function, call `BasePlugin`'s `generate_settings_template` method to retrieve the default template parameters. Add any extra key-value pairs needed for your template and return the updated dictionary.
-    - To add the predefined style settings (see the Weather and AI Text plugins in the Web UI) to your plugin settings page, set `style_settings` to True.
-    - Example:
-        ```python
-        def generate_settings_template(self):
-            template_params = super().generate_settings_template()
-            template_params['custom_template_variable'] = self.get_custom_variable()
-            template_params['style_settings'] = True
-            return template_params
-        ```
+- (Optional) Override `generate_settings_template` only to change what the settings page receives. The shared style settings (text colour, background, margins, frame) are shown by default. To hide them, set `style_settings` to `False`:
+    ```python
+    def generate_settings_template(self):
+        template_params = super().generate_settings_template()
+        template_params["style_settings"] = False
+        return template_params
+    ```
+    A custom `settings.html` (see [Custom settings templates](#custom-settings-templates)) can also receive extra variables this way.
 - (Optional) If your plugin needs to cache or store data across refreshes, you can manage this within the `generate_image` function.
     - For example, you can retrieve and update values as follows:
         ```python
@@ -70,15 +67,90 @@ This guide walks you through the process of creating a new plugin for InkyPi.
 - (Optional) `generate_image` may return `None` when your plugin has no image to show at all — it exists for its side effect, such as driving a servo or calling a webhook. The refresh completes and the display is left untouched.
     - This is different from `skip_display_condition`: returning `None` means *"I was never about showing anything"*, while a skip means *"I normally show something, just not this cycle"*.
 
-### 3. Create a Settings Template (Optional)
+### 3. Describe the Settings Form (Optional)
 
-If your plugin requires user configuration through the web UI, you’ll need to define a settings template.
-- In your plugin directory, create a `settings.html` file
-- Inside this file, define HTML input elements for any settings required by your plugin:
-    - The `name` attribute of each input element will be passed as keys in the `settings` argument of the `generate_image` function
-- Any template variables added in `generate_settings_template` function will be accessible in the settings template. This is useful for dynamic content, such as populating options in a dropdown menu.
-- Ensure the settings template visually matches the style of the existing web UI and other plugin templates for consistency.
-- When a plugin is added to a playlist, editing the plugin instance should prepopulate the form with the current settings, and saving changes should update the settings accordingly. 
+Every built-in plugin with options describes its form in Python, with `build_settings_schema`. The shared settings page then renders the form, fills in saved values when you edit an instance, and checks required fields. You don't write HTML or JavaScript for it.
+
+```python
+from plugins.base_plugin.settings_schema import field, option, row, schema, section
+
+
+class Countdown(BasePlugin):
+    # The built-in Countdown form, plus a "Count in" dropdown.
+    def build_settings_schema(self):
+        return schema(
+            section(
+                "Countdown",
+                row(
+                    field("title", label="Title", placeholder="e.g. Vacation", required=True),
+                    field("date", "date", label="Target Date"),
+                ),
+                field(
+                    "units",
+                    "select",
+                    label="Count in",
+                    default="days",
+                    options=[option("days", "Days"), option("weeks", "Weeks")],
+                ),
+            )
+        )
+```
+
+Each field's `name` becomes a key in the `settings` dict passed to `generate_image`. Form values arrive as strings, so convert numbers and checkboxes yourself.
+
+**Building blocks** (all in `plugins/base_plugin/settings_schema.py`):
+
+| Helper | Use |
+|---|---|
+| `schema(*sections)` | The whole form. Return this from `build_settings_schema`. |
+| `section(title, *items, description=...)` | A titled card on the settings page. |
+| `row(*items)` | Puts fields side by side. |
+| `field(name, type="text", label=..., **options)` | One input. See the types and options below. |
+| `option(value, label)` / `option_group(label, *options)` | Choices for `select` and `radio_segment` fields. |
+| `callout(text, tone="info" or "warning", title=...)` | A note or warning box inside a section. |
+| `widget(widget_type, template=..., config=...)` | Embeds a custom partial template for controls the field types can't express (the map picker in Weather, for example). Rarely needed. |
+
+**Field types:**
+- `checkbox`: a toggle. A ticked box sends `"true"`. An unticked box sends nothing unless you pass `submit_unchecked=True`, which makes it send `"false"`. Use `submit_unchecked=True` whenever `default="true"`; otherwise unticking isn't saved and the box comes back ticked. Read the value as `settings.get("name") == "true"`. `checked_value` and `unchecked_value` change the strings sent.
+- `select` and `radio_segment`: take `options=[...]`.
+- `textarea`: takes `rows`.
+- `color`: a colour picker.
+- `hidden`
+- Anything else is a plain `<input>` of that HTML type, such as `text`, `number`, `date`, `time` or `url`.
+
+**Common options:**
+- `label`, `default`, `placeholder` and `hint` (small help text under the field).
+- `required=True`: the save is refused while the field is empty.
+- `min`, `max`, `step` and `pattern`.
+- `visible_if={"field": "mode", "equals": "custom"}`: shows the field only while another field has that value. `operator` can also be `not_equals`, `not_empty`, or `in` with `values=[...]`.
+
+#### Reject bad settings when they are saved
+
+Override `validate_settings` to check values before they are stored. Return a short message to refuse the save; the message is shown to the user. Return `None` to accept it. It runs when settings are saved: adding a plugin to a playlist, editing an instance, or saving plugin settings. It runs after the `required=True` check.
+
+```python
+from datetime import date
+
+
+def validate_settings(self, settings):
+    raw = settings.get("date")
+    value = raw.strip() if isinstance(raw, str) else ""
+    if not value:
+        return "Date is required."
+    try:
+        date.fromisoformat(value)
+    except ValueError:
+        return f"Invalid date: {value!r} (expected YYYY-MM-DD)"
+    return None
+```
+
+Return a message rather than raising. An exception is treated as "validation unavailable", and nothing is saved.
+
+Catching bad input here means the user sees the problem straight away, instead of a failed render on the display hours later. `generate_image` should still cope with missing or odd values, because a preview or an older saved instance may not have been validated.
+
+[`countdown`](../src/plugins/countdown/countdown.py) is a small complete example of both hooks. [`weather`](../src/plugins/weather/weather.py) and [`calendar`](../src/plugins/calendar/calendar.py) show larger forms with conditional fields.
+
+A plugin with no options can skip `build_settings_schema`. Its settings page then shows only the shared style settings.
 
 ### 4. Add an Icon for Your Plugin
 
@@ -91,13 +163,21 @@ If your plugin requires user configuration through the web UI, you’ll need to 
 - Add an object for your plugin using the following structure:
     ```json
     {
-        "display_name": "Clock",    # The name shown in the web UI for the plugin.
-        "id": "clock",              # A unique identifier for the plugin (use lowercase and avoid spaces)
-        "class": "Clock",           # The name of your plugin’s Python class.
-        "repository": ""            # GitHub Repository URL, if the plugin will be published as a third-party plugin.
+        "display_name": "Clock",
+        "id": "clock",
+        "class": "Clock",
+        "api_version": "1.0",
+        "version": "1.0.0",
+        "repository": ""
     }
     ```
-- Plugins will be loaded on startup if the folder contains a `plugin-info.json`
+    - `display_name`: the name shown in the web UI.
+    - `id`: a unique identifier, matching the folder name (lowercase, no spaces).
+    - `class`: the name of your plugin's Python class.
+    - `api_version`: the plugin API it was written for. The loader warns when its major version doesn't match.
+    - `version`: your plugin's own version.
+    - `repository`: the GitHub URL, if it is published as a third-party plugin.
+- A folder is recognised as a plugin when it contains a `plugin-info.json`.
 
 ## Test Your Plugin
 
@@ -109,9 +189,9 @@ If your plugin requires user configuration through the web UI, you’ll need to 
     - Loads correctly on service start.
     - Appears under the "Plugins" section in the web UI with its icon.
     - Generates images for different display sizes and orientations.
-    - Settings template is rendered correctly.
+    - The settings form renders, and saving bad input shows your `validate_settings` message.
     - Generates and displays images with immediate updates and in a playlist.
-    - Setting template is prepopulated and saved correctly when editing an existing playlist
+    - Editing an existing playlist instance shows its saved values, and saving updates them.
 
 To check the image without a Pi or the web UI, render it straight to a PNG:
 
@@ -130,31 +210,26 @@ plugins/{plugin_id}/
     ├── {plugin_id}.py          # Main plugin script
     ├── plugin-info.json        # Plugin manifest file
     ├── icon.png                # Plugin icon
-    ├── settings.html           # Optional: Plugin settings page (if applicable)
+    ├── settings.html           # Rarely needed: custom settings form (prefer build_settings_schema)
     ├── render/                 # Optional: If generating images from html and css files, store them here
     └── {other files/resources} # Any additional files or resources used by the plugin
 ```
 
-## Prepopulating forms for Plugin Instances
+## Custom settings templates
 
-When a plugin is added to a playlist, a "Plugin Instance" is created, and its settings are stored in the `src/config/device.json` file. These settings can be updated from the playlist page, so the form in settings.html should be prepopulated with the existing settings.
+Use a hand-written `settings.html` only when a form really can't be expressed with `build_settings_schema`; no built-in plugin needs one today. If `build_settings_schema` returns a schema, it is used and `settings.html` is ignored.
 
-- The `loadPluginSettings` variable should be checked to ensure the settings page is in "edit" mode.
-- Plugin settings are accessible via the `pluginSettings` object.
-- Example:
-    ```JavaScript
-    document.addEventListener('DOMContentLoaded', () => {     
+- Name each input after the settings key it sets (`name="..."`). Those names become the keys of the `settings` dict.
+- Match the markup and classes of the shared settings page so the form looks consistent.
+- Schema forms are filled in automatically when you edit an instance. A custom template has to do it itself: check `loadPluginSettings` (true in edit mode) and read the saved values from `pluginSettings`:
+    ```javascript
+    document.addEventListener("DOMContentLoaded", () => {
         if (loadPluginSettings) {
-            # Text Input
-            document.getElementById('{textInputElementId}').value = pluginSettings.textInputElementName || '';
+            // Text input
+            document.getElementById("message").value = pluginSettings.message || "";
 
-            # Radio
-            document.querySelector(`input[name="radioElementName"][value="${pluginSettings.radioElementName}"]`).checked = true;
-
-            # Color Input
-            document.getElementById('{colorInputElementId}').value = pluginSettings.colorInputElementName
-
-            ...
+            // Radio
+            document.querySelector(`input[name="mode"][value="${pluginSettings.mode}"]`).checked = true;
         }
     });
     ```
@@ -224,7 +299,7 @@ Once you're done, feel free to add your plugin to the [3rd Party Plugin List](ht
 
 ## Hello World walkthrough
 
-The fastest way to understand the plugin system is to build the smallest possible plugin and watch it appear in the web UI. This walkthrough creates a plugin that draws "Hello, World!" on the display in seven steps.
+The fastest way to understand the plugin system is to build the smallest possible plugin and watch it appear in the web UI. This walkthrough creates a plugin that draws a message on the display, with a one-field settings form, in seven steps.
 
 ### 1. Create the plugin directory
 
@@ -260,12 +335,33 @@ import logging
 from PIL import Image, ImageDraw
 
 from plugins.base_plugin.base_plugin import BasePlugin
+from plugins.base_plugin.settings_schema import field, schema, section
 from utils.app_utils import get_font
 
 logger = logging.getLogger(__name__)
 
 
 class Hello(BasePlugin):
+    def build_settings_schema(self):
+        return schema(
+            section(
+                "Hello World",
+                field(
+                    "message",
+                    label="Message",
+                    default="Hello, World!",
+                    placeholder="Hello, World!",
+                    required=True,
+                ),
+            )
+        )
+
+    def validate_settings(self, settings):
+        message = settings.get("message")
+        if isinstance(message, str) and len(message) > 60:
+            return "Keep the message under 60 characters so it fits on one line."
+        return None
+
     def generate_image(self, settings, device_config):
         dimensions = self.get_oriented_dimensions(device_config)
         width, height = dimensions
@@ -288,24 +384,9 @@ class Hello(BasePlugin):
 
 The class name (`Hello`) must match the `class` field in `plugin-info.json`.
 
-### 4. Add a settings template
+### 4. Check the settings form
 
-Create `src/plugins/hello/settings.html`:
-
-```html
-<div class="form-group">
-  <label for="message">Message</label>
-  <input
-    type="text"
-    id="message"
-    name="message"
-    value="{{ plugin_settings.message or 'Hello, World!' }}"
-    placeholder="Hello, World!"
-  />
-</div>
-```
-
-The `name` attribute (`message`) becomes the key in the `settings` dict passed to `generate_image()`.
+There is no template to write: `build_settings_schema` above gives the plugin a **Message** field, and `validate_settings` refuses messages that won't fit. The field's name (`message`) becomes the key in the `settings` dict passed to `generate_image()`. See [Describe the Settings Form](#3-describe-the-settings-form-optional) for the other field types.
 
 ### 5. Add an icon
 
@@ -332,4 +413,3 @@ docker compose up --build
 5. The next refresh tick will show the message on the (mock) display
 
 That's it — you've built and shipped a plugin. From here, look at the [`year_progress`](../src/plugins/year_progress/) plugin for a slightly richer example using `render_image()` with HTML/CSS templates, or [`weather`](../src/plugins/weather/) for a plugin that calls an external API.
-
