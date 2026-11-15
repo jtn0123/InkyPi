@@ -26,6 +26,7 @@ UI_BROWSER_TESTS = {
     "test_browser_smoke.py",
     "test_e2e_form_workflows.py",
     "test_playlist_interactions.py",
+    "test_playlist_preview_keyboard.py",
     "test_plugin_add_to_playlist_ui.py",
     "test_plugin_draft_add_to_playlist.py",
     "test_weather_autofill.py",
