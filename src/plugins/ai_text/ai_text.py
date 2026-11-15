@@ -162,9 +162,9 @@ class AIText(BasePlugin):
                     logger.error("Google AI API Key not configured")
                     raise RuntimeError("Google AI API Key not configured.")
 
-                from google import genai
+                from utils.google_ai import google_ai_client
 
-                google_client = genai.Client(api_key=api_key)
+                google_client = google_ai_client(api_key)
                 prompt_response = AIText.fetch_text_prompt_google(
                     google_client, text_model, text_prompt
                 )

@@ -248,6 +248,10 @@ def test_ai_image_google_generate_success(
     assert result is not None
     assert isinstance(result, PILImage.Image)
     assert result.size == tuple(device_config_dev.get_resolution())
+    mock_genai.types.HttpOptions.assert_called_once_with(api_version="v1beta")
+    mock_genai.Client.assert_called_once_with(
+        api_key="fake_key", http_options=mock_genai.types.HttpOptions.return_value
+    )
 
 
 def test_ai_image_google_empty_results_raises(

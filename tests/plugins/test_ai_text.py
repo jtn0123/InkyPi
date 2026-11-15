@@ -339,6 +339,11 @@ def test_ai_text_google_success(
 
         mock_client.models.generate_content.assert_called_once()
         assert result is not None
+    # The client must stay on v1beta, where the preview models live.
+    mock_genai.types.HttpOptions.assert_called_once_with(api_version="v1beta")
+    mock_genai.Client.assert_called_once_with(
+        api_key="fake_key", http_options=mock_genai.types.HttpOptions.return_value
+    )
 
 
 def test_ai_text_model_output_is_escaped_not_rendered_as_html(
