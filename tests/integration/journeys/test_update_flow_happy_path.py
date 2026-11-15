@@ -97,8 +97,9 @@ def stub_update_seam(monkeypatch: pytest.MonkeyPatch) -> Iterator[Any]:
     ``_start_update_via_systemd`` and ``_start_update_fallback_thread`` both
     normally kick off a long-running subprocess/thread that mutates real
     state. We replace both with a tiny helper that spawns a daemon thread,
-    briefly holds ``running=True`` so the UI observes the transition, and
-    then clears the state via the production-path helper. This keeps the
+    holds ``running=True`` until the test sets ``release`` (so the test
+    always sees the transition), and then clears the state via the
+    production-path helper. This keeps the
     state-machine contract identical to production (same lock, same
     ``_set_update_state`` call) while removing all I/O.
     """
@@ -107,15 +108,15 @@ def stub_update_seam(monkeypatch: pytest.MonkeyPatch) -> Iterator[Any]:
     from services import updates
 
     started = threading.Event()
+    release = threading.Event()
     finished = threading.Event()
 
     def _fake_runner(*args: Any, **kwargs: Any) -> None:
         def _run() -> None:
-            # Hold "running" briefly so /settings/update_status observably
-            # transitions through running=True. 0.3s is more than enough
-            # given the test polls every 100ms.
+            # Hold "running" until the test has seen it. The timeout only
+            # keeps a failed test from leaving the thread blocked.
             started.set()
-            time.sleep(0.3)
+            release.wait(timeout=_RUNNING_TIMEOUT_S)
             updates._set_update_state(False, None)
             finished.set()
 
@@ -136,7 +137,8 @@ def stub_update_seam(monkeypatch: pytest.MonkeyPatch) -> Iterator[Any]:
     # actually have systemd-run installed.
     monkeypatch.setattr(updates, "_systemd_available", lambda: False, raising=True)
 
-    yield {"started": started, "finished": finished}
+    yield {"started": started, "release": release, "finished": finished}
+    release.set()
 
 
 @pytest.fixture
@@ -269,21 +271,13 @@ def test_update_flow_happy_path(
     ), "POST /settings/update did not dispatch the update runner within 5s"
 
     # -- Step 6: observe the running=True -> running=False transition ------
-    # Depending on thread-scheduling luck the Flask response from
-    # /settings/update may return before or after we first observe
-    # running=True. Try to catch running=True, but don't fail if we only
-    # ever observe the post-transition idle state — the terminal assertion
-    # (running=False after finish) is the load-bearing signal.
-    deadline = time.monotonic() + 2.0
-    saw_running = False
-    while time.monotonic() < deadline:
-        payload = client.get("/settings/update_status").get_json() or {}
-        if payload.get("running"):
-            saw_running = True
-            break
-        if stub_update_seam["finished"].is_set():
-            break
-        time.sleep(0.05)
+    # The fake runner holds running=True until released, so this always
+    # sees the intermediate state instead of depending on thread scheduling.
+    running = _poll_update_status(client, timeout_s=5.0, want_running=True)
+    assert (
+        running.get("running") is True
+    ), f"update_status never reported running=True; got {running!r}"
+    stub_update_seam["release"].set()
 
     # Wait for the fake runner to flip running back to False.
     assert stub_update_seam["finished"].wait(timeout=_RUNNING_TIMEOUT_S), (
@@ -304,17 +298,6 @@ def test_update_flow_happy_path(
         None,
         {},
     ), f"Happy-path must leave last_failure empty; got {final!r}"
-
-    # Soft signal — at least document whether we caught the intermediate
-    # running=True state. We don't hard-assert because inherent thread-
-    # scheduling race can make this flaky on very slow CI boxes. The fake
-    # runner held the flag for 300ms which is ample under normal load.
-    if not saw_running:
-        pytest.skip(  # intentional soft-fail diagnostic
-            "Did not observe intermediate running=True (thread-scheduling "
-            "race). Terminal state is correct; transition was too fast to "
-            "catch in this environment."
-        )
 
     # -- Step 7: failure banner must still be hidden -----------------------
     # After a successful update the banner should remain hidden. The JS

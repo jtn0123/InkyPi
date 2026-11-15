@@ -4,18 +4,18 @@
 Complementary to ``test_jtn_726_refresh_cadence_journey`` (which asserts the
 save flow signals the refresh task). This test drives the end-to-end UI
 round-trip: change -> save toast -> reload shows new value -> diagnostics
-poll reports the new cadence -> ``last_run_ts`` advances by roughly one
-interval after a simulated refresh tick.
+poll reports the new cadence -> the scheduler's due rule, fed from the
+saved config, makes the next refresh due one new interval after the last.
 
-The refresh task is not running in the test fixture, so we simulate its
-effect on ``device_config.refresh_info.refresh_time`` — which is the
-field ``/api/diagnostics`` exposes as ``refresh_task.last_run_ts``.
+The refresh task is not running in the test fixture, so we seed
+``device_config.refresh_info.refresh_time`` (which ``/api/diagnostics``
+exposes as ``refresh_task.last_run_ts``) and call ``schedule.is_due`` with
+fixed times instead of waiting.
 """
 
 from __future__ import annotations
 
 import os
-import time
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -120,29 +120,38 @@ def test_refresh_interval_change_save_persist_cadence_respected(
         == expected_seconds
     ), "diagnostics snapshot and config must agree on the new cadence"
 
-    # ---- Step 4: seed a baseline last_run_ts, wait one interval, and
-    # simulate the next refresh. last_run_ts from /api/diagnostics should
-    # advance by approximately the new cadence.
-    t0 = datetime.now(UTC)
-    device_config_dev.refresh_info.refresh_time = t0.isoformat()
-    before = client.get("/api/diagnostics").get_json() or {}
-    assert before["refresh_task"]["last_run_ts"] == t0.isoformat()
+    # ---- Step 4: seed the last refresh, then ask the scheduler's own
+    # "is a refresh due?" rule, fed from the saved config, at fixed times.
+    # Under the old 5-minute cadence a refresh 2 minutes later would not be
+    # due, so this proves the new interval is what the scheduler uses.
+    from refresh_task import schedule
 
-    # Use a small absolute sleep (matches the 5-minute -> 300s cadence isn't
-    # feasible in tests; we verify monotonic advance by ~interval instead).
-    time.sleep(1.0)
-    t1 = t0 + timedelta(seconds=expected_seconds)
-    device_config_dev.refresh_info.refresh_time = t1.isoformat()
-    after = client.get("/api/diagnostics").get_json() or {}
-    last_run = after["refresh_task"]["last_run_ts"]
-    assert isinstance(last_run, str) and last_run == t1.isoformat()
-    advanced = (
-        datetime.fromisoformat(last_run)
-        - datetime.fromisoformat(before["refresh_task"]["last_run_ts"])
-    ).total_seconds()
-    # Tolerance: within 10% of the expected cadence.
-    assert (
-        abs(advanced - expected_seconds) <= expected_seconds * 0.1
-    ), f"last_run_ts should advance by ~{expected_seconds}s, advanced {advanced}s"
+    # The scheduler only refreshes an active playlist with something in it.
+    # The app's all-day Default playlist starts empty and sets no cycle of
+    # its own, so give it a plugin; the device interval then applies.
+    playlists = device_config_dev.get_playlist_manager()
+    if playlists.get_playlist("Default") is None:
+        playlists.add_playlist("Default", "00:00", "24:00")
+    playlists.add_plugin_to_playlist(
+        "Default",
+        {"plugin_id": "clock", "name": "Clock", "plugin_settings": {}},
+    )
+
+    t0 = datetime.now(UTC).replace(microsecond=0)
+    device_config_dev.refresh_info.refresh_time = t0.isoformat()
+    diag = client.get("/api/diagnostics").get_json() or {}
+    assert diag["refresh_task"]["last_run_ts"] == t0.isoformat()
+
+    def due_at(seconds_after: float) -> bool:
+        return schedule.is_due(
+            playlist_manager=device_config_dev.get_playlist_manager(),
+            latest_refresh=device_config_dev.refresh_info.get_refresh_datetime(),
+            last_attempt=None,
+            now=t0 + timedelta(seconds=seconds_after),
+            device_interval=schedule.device_interval_seconds(device_config_dev),
+        )
+
+    assert not due_at(expected_seconds - 1), "refresh due before the new interval"
+    assert due_at(expected_seconds), "refresh not due once the new interval passed"
 
     collector.assert_no_errors(name="refresh_interval_change")

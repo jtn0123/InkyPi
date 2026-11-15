@@ -22,8 +22,10 @@ import logging
 import os
 import posixpath
 import secrets
+import threading
 import time
-from collections.abc import MutableMapping
+from collections.abc import Callable, Iterator, MutableMapping
+from contextlib import contextmanager
 from typing import TYPE_CHECKING
 
 from flask import Flask, Response, redirect, request, session, url_for
@@ -65,8 +67,92 @@ _READONLY_TOKEN_ALLOWLIST = frozenset(
     }
 )
 
-_MAX_FAILED_ATTEMPTS = 5
-_LOCKOUT_SECONDS = 60
+#: Shortest PIN that doesn't draw a start-up warning.
+MIN_RECOMMENDED_PIN_LENGTH = 6
+#: Key for the device-wide failed-login backoff in ``app.extensions``.
+LOGIN_BACKOFF_KEY = "inkypi_login_backoff"
+
+
+class LoginBackoff:
+    """Pauses PIN logins for everyone after repeated wrong PINs.
+
+    The per-address rate limit doesn't stop a guesser who changes address,
+    and a per-browser count resets when cookies are dropped. This count is
+    for the whole device. The ``pause_after_failures``-th wrong PIN in a row
+    pauses logins for ``base_pause_s``, and each one after that doubles the
+    pause, up to ``max_pause_s``. A right PIN clears the count, and so does
+    ``forget_after_s`` of quiet.
+
+    Logins check their PIN one at a time (:meth:`turn`); otherwise a burst
+    of parallel guesses would all get past the pause check before the first
+    of them was counted.
+
+    With the defaults a 4-digit PIN takes over a year of guessing. The cost
+    is that someone guessing can also keep the owner from logging in until
+    they stop. Sessions that are already logged in are not affected.
+    """
+
+    def __init__(
+        self,
+        *,
+        pause_after_failures: int = 5,
+        base_pause_s: float = 60.0,
+        max_pause_s: float = 3600.0,
+        forget_after_s: float = 86400.0,
+        clock: Callable[[], float] = time.monotonic,
+        turn_timeout_s: float = 5.0,
+    ) -> None:
+        self.pause_after_failures = pause_after_failures
+        self.base_pause_s = base_pause_s
+        self.max_pause_s = max_pause_s
+        self.forget_after_s = forget_after_s
+        self.clock = clock
+        self.turn_timeout_s = turn_timeout_s
+        self.failures = 0
+        self._last_failure_at = 0.0
+        self._paused_until = 0.0
+        self._lock = threading.Lock()
+        self._turn_lock = threading.Lock()
+
+    @contextmanager
+    def turn(self) -> Iterator[bool]:
+        """Wait for this login's turn to check a PIN; yield whether it got one.
+
+        Gives up after ``turn_timeout_s`` so a flood of logins can't hold
+        server threads indefinitely.
+        """
+        admitted = self._turn_lock.acquire(timeout=self.turn_timeout_s)
+        try:
+            yield admitted
+        finally:
+            if admitted:
+                self._turn_lock.release()
+
+    def seconds_left(self) -> float:
+        """Seconds until logins are allowed again (0 when they are)."""
+        with self._lock:
+            return max(0.0, self._paused_until - self.clock())
+
+    def record_failure(self) -> float:
+        """Count a wrong PIN; return the pause it starts (0 for none)."""
+        with self._lock:
+            now = self.clock()
+            if self.failures and now - self._last_failure_at > self.forget_after_s:
+                self.failures = 0
+            self.failures += 1
+            self._last_failure_at = now
+            extra = self.failures - self.pause_after_failures
+            if extra < 0:
+                return 0.0
+            pause = min(self.base_pause_s * 2.0**extra, self.max_pause_s)
+            self._paused_until = now + pause
+            return pause
+
+    def record_success(self) -> None:
+        with self._lock:
+            self.failures = 0
+            self._paused_until = 0.0
+
 
 # Safe HTTP methods eligible for read-only token access
 _SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
@@ -259,7 +345,15 @@ def init_auth(app: Flask, device_config: Config) -> None:
     app.config["AUTH_ENABLED"] = True
     app.config["AUTH_PIN_HASH"] = pin_hash
     app.config["AUTH_PIN_FINGERPRINT"] = _pin_fingerprint(pin, app.secret_key)
+    app.extensions[LOGIN_BACKOFF_KEY] = LoginBackoff()
     logger.info("PIN auth enabled")
+    if len(pin) < MIN_RECOMMENDED_PIN_LENGTH:
+        logger.warning(
+            "PIN auth: the PIN is only %d characters. Use at least %d "
+            "(letters as well as digits if you can); see docs/auth.md",
+            len(pin),
+            MIN_RECOMMENDED_PIN_LENGTH,
+        )
 
     @app.before_request
     def _require_auth() -> Response | WerkzeugResponse | None:

@@ -245,11 +245,12 @@ def test_toggle_reflection(
 
     descriptors = _enumerate(page)
 
-    # Some pages (e.g. /history, /api-keys) legitimately have no toggles —
-    # that's not a failure, just skip cleanly so the test still documents
-    # the coverage intent.
-    if not descriptors:
-        pytest.skip(f"no toggle-like candidates discovered on {sweep.path}")
+    # Every swept page has toggles. Finding none means the page's script
+    # broke before rendering them, so fail instead of skipping.
+    assert descriptors, (
+        f"no toggle-like candidates discovered on {sweep.path}; did the "
+        "page's script fail before rendering them?"
+    )
 
     silent_failures: list[str] = []
     click_errors: list[str] = []

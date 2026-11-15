@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import logging
+import math
 import re
-import time
 from urllib.parse import quote, unquote, urlsplit
 
 from flask import (
@@ -25,6 +25,8 @@ from flask import (
 from werkzeug.wrappers import Response as WerkzeugResponse
 
 from app_setup.auth import (
+    LOGIN_BACKOFF_KEY,
+    LoginBackoff,
     _verify_pin,
     is_session_authenticated,
     mark_session_authenticated,
@@ -34,8 +36,6 @@ logger = logging.getLogger(__name__)
 
 auth_bp = Blueprint("auth", __name__)
 
-_MAX_FAILED_ATTEMPTS = 5
-_LOCKOUT_SECONDS = 60
 _LOGIN_TEMPLATE = "login.html"
 
 # Allow-list of characters permitted in each decoded path segment. Any
@@ -99,26 +99,30 @@ def _safe_next_url(raw: str | None) -> str:
     return safe_path
 
 
-def _is_locked_out() -> bool:
-    """Return True when the session is in the rate-limit lockout window."""
-    lockout_until = session.get("login_lockout_until")
-    if lockout_until is None:
-        return False
-    if time.time() < lockout_until:
-        return True
-    # Lockout expired — reset counters
-    session.pop("login_lockout_until", None)
-    session.pop("login_failed_count", None)
-    return False
+def _login_backoff() -> LoginBackoff:
+    backoff = current_app.extensions.get(LOGIN_BACKOFF_KEY)
+    if not isinstance(backoff, LoginBackoff):
+        backoff = LoginBackoff()
+        current_app.extensions[LOGIN_BACKOFF_KEY] = backoff
+    return backoff
 
 
-def _record_failed_attempt() -> None:
-    """Increment the failure counter and apply lockout when threshold is reached."""
-    count = session.get("login_failed_count", 0) + 1
-    session["login_failed_count"] = count
-    if count >= _MAX_FAILED_ATTEMPTS:
-        session["login_lockout_until"] = time.time() + _LOCKOUT_SECONDS
-        logger.warning("PIN auth: lockout triggered after %d failed attempts", count)
+def _refused_response(message: str, retry_after_s: float, next_url: str) -> Response:
+    body = render_template(_LOGIN_TEMPLATE, error=message, next=next_url)
+    response = Response(body, status=429, mimetype="text/html")
+    response.headers["Retry-After"] = str(math.ceil(retry_after_s))
+    return response
+
+
+def _paused_response(wait_s: float, next_url: str) -> Response:
+    minutes = max(1, math.ceil(wait_s / 60))
+    unit = "minute" if minutes == 1 else "minutes"
+    return _refused_response(
+        "Too many failed attempts. Logins are paused; "
+        f"try again in {minutes} {unit}.",
+        wait_s,
+        next_url,
+    )
 
 
 @auth_bp.route("/login", methods=["GET"])
@@ -140,21 +144,35 @@ def login_post() -> str | Response | WerkzeugResponse:
 
     next_url = _safe_next_url(request.form.get("next"))
 
-    if _is_locked_out():
-        return render_template(
-            _LOGIN_TEMPLATE,
-            error="Too many failed attempts. Please wait 60 seconds and try again.",
-            next=next_url,
+    # One backoff for the whole device, not per browser or address: clearing
+    # cookies or switching address must not buy more guesses. While it runs,
+    # even the right PIN waits; otherwise the pause wouldn't slow guessing.
+    backoff = _login_backoff()
+    with backoff.turn() as admitted:
+        if not admitted:
+            return _refused_response(
+                "Another login is being checked. Try again in a moment.",
+                backoff.turn_timeout_s,
+                next_url,
+            )
+        wait_s = backoff.seconds_left()
+        if wait_s > 0:
+            return _paused_response(wait_s, next_url)
+
+        submitted = request.form.get("pin", "")
+        if _verify_pin(submitted, pin_hash):
+            backoff.record_success()
+            mark_session_authenticated(session, current_app)
+            return redirect(next_url)
+
+        pause_s = backoff.record_failure()
+    if pause_s > 0:
+        logger.warning(
+            "PIN auth: %d failed attempts in a row; logins paused for %d s",
+            backoff.failures,
+            pause_s,
         )
-
-    submitted = request.form.get("pin", "")
-    if _verify_pin(submitted, pin_hash):
-        mark_session_authenticated(session, current_app)
-        session.pop("login_failed_count", None)
-        session.pop("login_lockout_until", None)
-        return redirect(next_url)
-
-    _record_failed_attempt()
+        return _paused_response(pause_s, next_url)
     return render_template(
         _LOGIN_TEMPLATE, error="Incorrect PIN. Please try again.", next=next_url
     )

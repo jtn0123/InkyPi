@@ -6,8 +6,8 @@ Pushover, ntfy.sh, or any other service that accepts an HTTP POST.
 
 ## Configuration
 
-Add a `webhook_urls` list to your device config (typically via the Settings
-page or by editing `device_config.json` directly):
+There is no settings screen for webhooks. Add a `webhook_urls` list to the
+device config file, `/usr/local/inkypi/src/config/device.json` on the Pi:
 
 ```json
 {
@@ -21,6 +21,16 @@ page or by editing `device_config.json` directly):
 You can provide as many URLs as you like.  Leave the list empty (or omit the
 key entirely) to disable webhook notifications.
 
+The service keeps its settings in memory and writes them back to this file
+after refreshes and saves, so an edit made while it runs can be overwritten.
+Stop it first:
+
+```bash
+sudo systemctl stop inkypi
+sudo nano /usr/local/inkypi/src/config/device.json
+sudo systemctl start inkypi
+```
+
 ## Payload
 
 Every webhook receives a JSON body with the following fields:
@@ -31,7 +41,7 @@ Every webhook receives a JSON body with the following fields:
 | `plugin_id` | string | Internal plugin identifier (e.g. `"weather"`) |
 | `instance_name` | string \| null | Human-readable instance name from the playlist |
 | `error` | string | Error message from the last failure |
-| `ts` | string | ISO-8601 timestamp (device timezone, UTC offset included) |
+| `ts` | string | ISO-8601 timestamp in UTC (ends in `+00:00`) |
 
 Example:
 
@@ -55,6 +65,7 @@ Example:
   but never raises an exception or affects the display.
 - **Circuit-breaker aware**: the webhook fires on every consecutive failure,
   including the failure that triggers the circuit breaker (plugin paused).
+  Once a plugin is paused, its occasional retry checks don't send more.
 
 ## Integrating with ntfy.sh
 

@@ -296,44 +296,150 @@ class TestAuthEnabled:
     # Rate-limit / lockout
     # ------------------------------------------------------------------
 
-    def test_lockout_after_five_failures(self, client: FlaskClient) -> None:
-        for _ in range(5):
-            csrf = _get_csrf(client)
-            client.post("/login", data={"pin": "bad", "next": "/", "csrf_token": csrf})
-
-        # 6th attempt — even with correct PIN — should be rejected
+    def _attempt(self, client: FlaskClient, pin: str) -> Any:
         csrf = _get_csrf(client)
-        resp = client.post(
-            "/login",
-            data={"pin": self.PIN, "next": "/", "csrf_token": csrf},
-        )
-        assert resp.status_code == 200
-        data = resp.get_data(as_text=True)
-        assert "Too many failed attempts" in data
-        with client.session_transaction() as sess:
-            assert sess.get("authed") is not True
+        return client.post("/login", data={"pin": pin, "next": "/", "csrf_token": csrf})
 
-    def test_lockout_expires_after_60s(
-        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+    @staticmethod
+    def _backoff(app: Flask) -> Any:
+        from app_setup.auth import LOGIN_BACKOFF_KEY
+
+        return app.extensions[LOGIN_BACKOFF_KEY]
+
+    def test_fifth_wrong_pin_pauses_logins_even_for_the_right_pin(
+        self, client: FlaskClient
     ) -> None:
-        """After lockout window elapses the user can log in again."""
-        # Trigger lockout
+        for _ in range(4):
+            assert self._attempt(client, "bad").status_code == 200
+        paused = self._attempt(client, "bad")
+        assert paused.status_code == 429
+        assert paused.headers["Retry-After"] == "60"
+        assert "Logins are paused; try again in 1 minute." in paused.get_data(
+            as_text=True
+        )
+
+        # While paused, even the right PIN is turned away unchecked.
+        resp = self._attempt(client, self.PIN)
+        assert resp.status_code == 429
+        with client.session_transaction() as sess:
+            assert "auth_at" not in sess
+
+    def test_pause_covers_every_browser_and_address(
+        self, app: Flask, client: FlaskClient
+    ) -> None:
+        """Dropping cookies or changing address doesn't buy more guesses."""
         for _ in range(5):
-            csrf = _get_csrf(client)
-            client.post("/login", data={"pin": "bad", "next": "/", "csrf_token": csrf})
+            self._attempt(client, "bad")
 
-        # Fast-forward time past the lockout window
-        future = time.time() + 61
-        monkeypatch.setattr("blueprints.auth.time.time", lambda: future)
-
-        csrf = _get_csrf(client)
-        resp = client.post(
+        fresh = app.test_client()  # no cookies from the first client
+        csrf = _get_csrf(fresh)
+        resp = fresh.post(
             "/login",
             data={"pin": self.PIN, "next": "/", "csrf_token": csrf},
+            environ_base={"REMOTE_ADDR": "203.0.113.9"},
         )
+        assert resp.status_code == 429
+
+    def test_pauses_double_up_to_an_hour_and_the_right_pin_resets(
+        self, app: Flask, client: FlaskClient
+    ) -> None:
+        backoff = self._backoff(app)
+        now = [1000.0]
+        backoff.clock = lambda: now[0]
+
+        pauses = []
+        for _ in range(12):
+            resp = self._attempt(client, "bad")
+            pauses.append(int(resp.headers.get("Retry-After", "0")))
+            now[0] += 4000  # wait out any pause before the next guess
+        assert pauses == [0, 0, 0, 0, 60, 120, 240, 480, 960, 1920, 3600, 3600]
+
+        assert self._attempt(client, self.PIN).status_code == 302
+        assert backoff.failures == 0
+        client.get("/logout")
+        assert self._attempt(client, "bad").status_code == 200  # free again
+
+    def test_pause_expires_and_the_right_pin_then_works(
+        self, app: Flask, client: FlaskClient
+    ) -> None:
+        backoff = self._backoff(app)
+        now = [1000.0]
+        backoff.clock = lambda: now[0]
+        for _ in range(5):
+            self._attempt(client, "bad")
+        assert self._attempt(client, self.PIN).status_code == 429
+
+        now[0] += 61
+        resp = self._attempt(client, self.PIN)
         assert resp.status_code == 302
         with client.session_transaction() as sess:
-            assert sess.get("authed") is True
+            assert "auth_at" in sess
+
+    def test_parallel_guesses_take_turns_so_the_pause_still_applies(
+        self, app: Flask, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A burst of guesses can't all slip past the pause check at once."""
+        import threading
+
+        import blueprints.auth as auth_bp_mod
+
+        checked: list[str] = []
+
+        def slow_wrong(pin: str, pin_hash: bytes) -> bool:
+            checked.append(pin)
+            time.sleep(0.05)
+            return False
+
+        monkeypatch.setattr(auth_bp_mod, "_verify_pin", slow_wrong)
+
+        burst = 8
+        start = threading.Barrier(burst)
+        statuses: list[int] = []
+
+        def guess(i: int) -> None:
+            c = app.test_client()
+            csrf = _get_csrf(c)
+            start.wait()
+            resp = c.post(
+                "/login", data={"pin": f"g{i}", "next": "/", "csrf_token": csrf}
+            )
+            statuses.append(resp.status_code)
+
+        threads = [threading.Thread(target=guess, args=(i,)) for i in range(burst)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join(timeout=10)
+
+        assert len(checked) == 5
+        assert self._backoff(app).failures == 5
+        assert sorted(statuses) == [200] * 4 + [429] * 4
+
+    def test_login_that_cannot_get_a_turn_is_told_to_retry(
+        self, app: Flask, client: FlaskClient
+    ) -> None:
+        backoff = self._backoff(app)
+        backoff.turn_timeout_s = 0.01
+        with backoff.turn() as admitted:
+            assert admitted
+            resp = self._attempt(client, self.PIN)
+        assert resp.status_code == 429
+        assert resp.headers["Retry-After"] == "1"
+        assert "Another login is being checked" in resp.get_data(as_text=True)
+        assert backoff.failures == 0
+
+    def test_failures_are_forgotten_after_a_quiet_day(
+        self, app: Flask, client: FlaskClient
+    ) -> None:
+        backoff = self._backoff(app)
+        now = [1000.0]
+        backoff.clock = lambda: now[0]
+        for _ in range(4):
+            self._attempt(client, "bad")
+
+        now[0] += 86400 + 1
+        assert self._attempt(client, "bad").status_code == 200
+        assert backoff.failures == 1
 
     # ------------------------------------------------------------------
     # Logout
@@ -354,6 +460,36 @@ class TestAuthEnabled:
 # ---------------------------------------------------------------------------
 # Tests — session lifetime and PIN binding (grade report E4)
 # ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("pin", "warned"), [("1234", True), ("12345", True), ("123456", False)]
+)
+def test_short_pin_is_flagged_at_startup(
+    pin: str,
+    warned: bool,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    caplog.set_level("WARNING", logger="app_setup.auth")
+    _make_auth_app(pin, monkeypatch)
+    flagged = [r for r in caplog.records if "the PIN is only" in r.getMessage()]
+    assert bool(flagged) is warned
+
+
+def test_login_backoff_math() -> None:
+    from app_setup.auth import LoginBackoff
+
+    now = [0.0]
+    backoff = LoginBackoff(clock=lambda: now[0])
+    assert [backoff.record_failure() for _ in range(4)] == [0, 0, 0, 0]
+    assert backoff.seconds_left() == 0
+    assert backoff.record_failure() == 60
+    now[0] += 30
+    assert backoff.seconds_left() == 30
+    backoff.record_success()
+    assert backoff.seconds_left() == 0
+    assert backoff.failures == 0
 
 
 class TestSessionLifetime:
