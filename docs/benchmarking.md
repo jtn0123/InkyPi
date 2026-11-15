@@ -94,6 +94,12 @@ Add benchmarks only if they:
 
 After adding a new benchmark, regenerate the baseline as described above.
 
+#### Removing a benchmark
+
+Delete the test and its entry in `tests/benchmarks/baseline.json`. The gate
+fails when a benchmark in the CI baseline is missing from the run, unless the
+committed baseline no longer lists it either; then it is reported as `RETIRED`.
+
 ### Dashboard
 
 The Settings → Updates → Diagnostics panel reads from the runtime benchmark

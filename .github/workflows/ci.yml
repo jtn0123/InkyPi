@@ -81,9 +81,12 @@ jobs:
           if [ -f /tmp/bench-baseline.json ]; then
             echo "Using CI cached benchmark baseline." | tee /tmp/benchmark-compare.txt
             cp /tmp/bench-baseline.json /tmp/bench-effective-baseline.json
+            # --expected: a benchmark this PR deleted (and removed from the
+            # committed baseline) is retired, not "missing".
             python scripts/benchmark_compare.py \
               --baseline /tmp/bench-effective-baseline.json \
               --current /tmp/bench-current.json \
+              --expected tests/benchmarks/baseline.json \
               | tee -a /tmp/benchmark-compare.txt
           else
             echo "No CI baseline cache found — using repo baseline as blocking fallback." \
