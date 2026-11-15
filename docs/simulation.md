@@ -105,8 +105,12 @@ systemd behaviour does not vary by Python version, so running them across three
 interpreters only triples the cost (it pushed 3.13 past its 20-minute cap). CI
 runs them once in the `Systemd container gates` job; locally, use
 `pytest -m container`.
-If you add another systemd container test, reuse `_cgroup_run_args()` rather
-than hardcoding either recipe.
+If you add another systemd container test, build it from
+`tests/integration/container_support.py`: `cgroup_run_args()` rather than
+hardcoding either recipe, `skip_unless_docker()` as the module mark, and
+`infrastructure_failed()` wherever Docker can't build or boot the container.
+Those skip on a laptop without Docker but fail when CI sets
+`REQUIRE_INSTALL_CRASH_LOOP_TEST=1`, so the gate can't pass by skipping.
 
 ### Local setup (colima)
 

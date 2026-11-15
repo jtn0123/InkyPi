@@ -145,8 +145,9 @@ Running the gate locally:
 
 ```bash
 # Requires a local Docker daemon. The test skips cleanly when Docker is
-# absent; set REQUIRE_INSTALL_CRASH_LOOP_TEST=1 to force-run and fail hard
-# if Docker is missing (useful in CI).
+# absent or can't build or boot the container; set
+# REQUIRE_INSTALL_CRASH_LOOP_TEST=1 to make each of those a failure instead
+# (CI does).
 PYTHONPATH=$(pwd)/src pytest tests/integration/test_install_crash_loop.py -v -s
 ```
 
@@ -158,7 +159,7 @@ The gate runs in under 60 s on a developer laptop and asserts three invariants:
 
 If you are intentionally changing `install.sh`'s `stop_service()` function or `install/inkypi.service`'s `ExecStartPre` guard, expect this test to need updating — and be prepared to explain in the PR description how the Pi-thrash cascade (JTN-609 context) is still prevented.
 
-The gate runs automatically in CI via the `install-crash-loop-gate` job (see `.github/workflows/ci.yml`), which sets `REQUIRE_INSTALL_CRASH_LOOP_TEST=1` so the skip-without-Docker fallback is force-disabled. It is listed in the `ci-gate` required-success loop, so a regression will block merge (JTN-614).
+The gate runs automatically in CI via the `install-crash-loop-gate` job (see `.github/workflows/ci.yml`), which sets `REQUIRE_INSTALL_CRASH_LOOP_TEST=1` so every skip fallback (no Docker, image build failed, container or systemd didn't start) fails instead, for both container modules. It is listed in the `ci-gate` required-success loop, so a regression will block merge (JTN-614).
 
 ---
 

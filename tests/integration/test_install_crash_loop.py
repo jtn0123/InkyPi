@@ -45,8 +45,6 @@ only installs ``systemd`` + ``dbus`` — no InkyPi deps, no arm64 emulation.
 
 from __future__ import annotations
 
-import os
-import shutil
 import subprocess
 import textwrap
 import uuid
@@ -54,46 +52,25 @@ from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
+from tests.integration.container_support import (
+    cgroup_run_args,
+    infrastructure_failed,
+    skip_unless_docker,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SERVICE_UNIT = REPO_ROOT / "install" / "inkypi.service"
 INSTALL_SH = REPO_ROOT / "install" / "install.sh"
 
 
-def _docker_available() -> bool:
-    """Return True if a usable Docker daemon is reachable."""
-    if shutil.which("docker") is None:
-        return False
-    try:
-        result = subprocess.run(
-            ["docker", "info"],
-            capture_output=True,
-            timeout=10,
-            check=False,
-        )
-    except (subprocess.TimeoutExpired, OSError):
-        return False
-    return result.returncode == 0
-
-
-REQUIRE_CRASH_LOOP_TEST = os.getenv("REQUIRE_INSTALL_CRASH_LOOP_TEST", "").lower() in (
-    "1",
-    "true",
-)
-
 pytestmark = [
     pytest.mark.container,
     # The module fixture builds a systemd image (up to 300s) and the boot loop
     # waits up to 180s; pytest-timeout counts fixture setup, so the global
-    # 120s limit in pytest.ini would cut legitimate runs short.
+    # 120s limit in pytest.ini would cut legitimate runs short. Keep this under
+    # the CI job's 20-minute budget so a hang fails with a traceback.
     pytest.mark.timeout(900),
-    pytest.mark.skipif(
-        not REQUIRE_CRASH_LOOP_TEST and not _docker_available(),
-        reason=(
-            "Install crash-loop regression test requires Docker. "
-            "Set REQUIRE_INSTALL_CRASH_LOOP_TEST=1 to force-run (and fail if Docker is missing)."
-        ),
-    ),
+    skip_unless_docker(),
 ]
 
 
@@ -324,7 +301,7 @@ def systemd_image() -> Iterator[str]:
         check=False,
     )
     if build.returncode != 0:
-        pytest.skip(
+        infrastructure_failed(
             "Could not build systemd-capable Docker image "
             f"(exit {build.returncode}): {build.stderr[-400:]}"
         )
@@ -362,41 +339,6 @@ def _ensure_repo_artifacts_present() -> None:
     )
 
 
-def _cgroup_run_args() -> list[str]:
-    """Docker flags that let systemd boot as PID 1, per cgroup version.
-
-    The two hierarchies need opposite things, and getting it wrong does not
-    produce a useful error — systemd exits 255 with no logs at all:
-
-    * **cgroup v1** wants the host hierarchy bind-mounted in at
-      ``/sys/fs/cgroup`` so systemd can create its own subtree.
-    * **cgroup v2** has a single unified hierarchy that a container cannot be
-      handed a writable copy of. systemd needs its *own namespaced* view, which
-      is what ``--cgroupns=host`` grants; adding the v1 bind-mount on top
-      actively breaks it.
-
-    This mattered in practice: the v1 recipe was hardcoded, so on any cgroup v2
-    host — which is every current Docker Desktop, colima and modern Linux
-    distribution — the container died instantly and the test skipped with
-    "systemd did not reach a running state". A skipped regression gate looks
-    exactly like a passing one in CI output.
-
-    Falls back to the v2 arrangement when the version cannot be determined,
-    since v2 is the default everywhere current.
-    """
-    probe = subprocess.run(
-        ["docker", "info", "--format", "{{.CgroupVersion}}"],
-        capture_output=True,
-        text=True,
-        timeout=30,
-        check=False,
-    )
-    version = (probe.stdout or "").strip()
-    if version == "1":
-        return ["-v", "/sys/fs/cgroup:/sys/fs/cgroup:rw"]
-    return ["--cgroupns=host"]
-
-
 def test_install_crash_mid_pip_does_not_restart_loop(systemd_image: str) -> None:
     """Install crash mid-pip must NOT drive the service into a restart loop.
 
@@ -422,7 +364,7 @@ def test_install_crash_mid_pip_does_not_restart_loop(systemd_image: str) -> None
         "/run",
         "--tmpfs",
         "/run/lock",
-        *_cgroup_run_args(),
+        *cgroup_run_args(),
         "-v",
         f"{REPO_ROOT}:/opt/inkypi-src:ro",
         systemd_image,
@@ -431,7 +373,7 @@ def test_install_crash_mid_pip_does_not_restart_loop(systemd_image: str) -> None
         run_cmd, capture_output=True, text=True, timeout=60, check=False
     )
     if start.returncode != 0:
-        pytest.skip(
+        infrastructure_failed(
             "Could not launch systemd-in-docker container "
             f"(exit {start.returncode}): {start.stderr[-400:]}"
         )
@@ -465,7 +407,7 @@ def test_install_crash_mid_pip_does_not_restart_loop(systemd_image: str) -> None
                 continue
             # Any other state — retry briefly in case systemd is still booting.
         if not boot_ok:
-            pytest.skip(
+            infrastructure_failed(
                 "systemd did not reach a running state inside the container; "
                 f"last output: {boot_output[-400:]}"
             )
