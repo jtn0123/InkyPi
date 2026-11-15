@@ -17,8 +17,8 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$REPO_ROOT"
 
 # Versions
-FULLCALENDAR_VERSION="6.1.17"
-CHARTJS_VERSION="4.5.1"
+FULLCALENDAR_VERSION="6.1.22"
+CHARTJS_VERSION="4.6.1"
 
 # Define vendor files: name | url | output path | sha256 of the file.
 # E4: each download must match its pinned hash, so a compromised or
@@ -26,8 +26,8 @@ CHARTJS_VERSION="4.5.1"
 # new hash from the file inside the package's npm tarball (whose sha512
 # integrity the registry publishes), not only from the CDN's copy.
 declare -a VENDORS=(
-  "Chart JS|https://cdn.jsdelivr.net/npm/chart.js@${CHARTJS_VERSION}/dist/chart.umd.min.js|src/static/scripts/chart.js|48444a82d4edcb5bec0f1965faacdde18d9c17db3063d042abada2f705c9f54a"
-  "Fullcalendar JS|https://cdn.jsdelivr.net/npm/fullcalendar@${FULLCALENDAR_VERSION}/index.global.min.js|src/static/scripts/calendar.min.js|f9fa1addb8dea87e99616898f3422e6ddf931f097e80c031c3e0deafbce91074"
+  "Chart JS|https://cdn.jsdelivr.net/npm/chart.js@${CHARTJS_VERSION}/dist/chart.umd.min.js|src/static/scripts/chart.js|87364cc2b2a76a6684929e7d6b80b18a897794db38400caff1fcf1791c6925d2"
+  "Fullcalendar JS|https://cdn.jsdelivr.net/npm/fullcalendar@${FULLCALENDAR_VERSION}/index.global.min.js|src/static/scripts/calendar.min.js|65f927f1802cb35428b9c5e2a8d2276633880a89ee5ea5f9a7727f79892786ea"
 )
 
 sha256_of() {

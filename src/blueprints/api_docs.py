@@ -16,8 +16,8 @@ _SPEC_PATH = os.path.normpath(
     os.path.join(os.path.dirname(__file__), "..", "static", "openapi.json")
 )
 
-_SWAGGER_CSS_URL = "https://unpkg.com/swagger-ui-dist@5.17.14/swagger-ui.css"
-_SWAGGER_JS_URL = "https://unpkg.com/swagger-ui-dist@5.17.14/swagger-ui-bundle.js"
+_SWAGGER_CSS_URL = "https://unpkg.com/swagger-ui-dist@5.35.0/swagger-ui.css"
+_SWAGGER_JS_URL = "https://unpkg.com/swagger-ui-dist@5.35.0/swagger-ui-bundle.js"
 
 
 @api_docs_bp.route("/api/docs", methods=["GET"])
