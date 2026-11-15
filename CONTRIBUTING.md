@@ -15,7 +15,7 @@ git clone https://github.com/jtn0123/InkyPi.git
 cd InkyPi
 
 # Create and activate a virtual environment
-python3 -m venv .venv
+python3.13 -m venv .venv  # InkyPi supports Python 3.13 only
 source .venv/bin/activate
 
 # Install dev dependencies

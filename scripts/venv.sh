@@ -1,7 +1,21 @@
 #!/bin/bash
 
-VENV_DIR=".venv"
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}" 2>/dev/null)" && cd .. && pwd)"
+# This file is sourced from bash and from zsh (the macOS default shell).
+# BASH_SOURCE is bash-only; zsh's equivalent is the %x prompt escape. Under
+# zsh, BASH_SOURCE is empty, and REPO_ROOT used to resolve to the parent of
+# the current directory.
+if [ -n "${BASH_SOURCE[0]:-}" ]; then
+    _inkypi_venv_sh="${BASH_SOURCE[0]}"
+elif [ -n "${ZSH_VERSION:-}" ]; then
+    eval '_inkypi_venv_sh="${(%):-%x}"'
+else
+    _inkypi_venv_sh="$0"
+fi
+REPO_ROOT="$(cd "$(dirname "$_inkypi_venv_sh")/.." && pwd)"
+unset _inkypi_venv_sh
+VENV_DIR="${REPO_ROOT}/.venv"
+# pyproject.toml's requires-python; scripts/dev_environment.py has the same.
+INKYPI_PYTHON_VERSION="3.13"
 SRC_DIR="src"
 SRC_ABS="${REPO_ROOT}/${SRC_DIR}"
 
@@ -37,19 +51,51 @@ if [ "${INKYPI_PYTHONPATH_ONLY:-}" = "1" ]; then
     fi
 fi
 
+# True when the interpreter is the supported Python version. A bare python3
+# is often a newer release (Homebrew's, for one), and a venv built from it
+# installs a different set of wheels than CI and the Pi run.
+inkypi_is_supported_python() {
+    "$1" -c "import sys; sys.exit(sys.version_info[:2] != (${INKYPI_PYTHON_VERSION/./, }))" 2>/dev/null
+}
+
+# Prints the first interpreter on PATH that is the supported version.
+inkypi_find_python() {
+    local candidate
+    for candidate in "python${INKYPI_PYTHON_VERSION}" python3; do
+        if command -v "$candidate" >/dev/null 2>&1 && inkypi_is_supported_python "$candidate"; then
+            command -v "$candidate"
+            return 0
+        fi
+    done
+    return 1
+}
+
 if [ ! -d "$VENV_DIR" ]; then
-    echo "Creating virtual environment in $VENV_DIR..."
-    if ! python3 -m venv "$VENV_DIR"; then
-        echo "Failed to create virtual environment. Ensure python3 is installed."
-        exit 1
+    if ! INKYPI_PYTHON="$(inkypi_find_python)"; then
+        echo "InkyPi needs Python ${INKYPI_PYTHON_VERSION}, and neither python${INKYPI_PYTHON_VERSION} nor python3 on PATH is that version." >&2
+        echo "Install it (for example: brew install python@${INKYPI_PYTHON_VERSION}, or uv python install ${INKYPI_PYTHON_VERSION}) and run this again." >&2
+        if (return 0 2>/dev/null); then return 1; else exit 1; fi
+    fi
+    echo "Creating virtual environment in $VENV_DIR with $INKYPI_PYTHON..."
+    if ! "$INKYPI_PYTHON" -m venv "$VENV_DIR"; then
+        echo "Failed to create virtual environment with $INKYPI_PYTHON." >&2
+        if (return 0 2>/dev/null); then return 1; else exit 1; fi
     fi
 fi
 
 echo "Activating virtual environment..."
 # shellcheck source=/dev/null
 if ! source "$VENV_DIR/bin/activate"; then
-    echo "Failed to activate virtual environment."
-    exit 1
+    echo "Failed to activate virtual environment." >&2
+    if (return 0 2>/dev/null); then return 1; else exit 1; fi
+fi
+
+# A venv made earlier, or by hand, may be on another Python. Its packages can
+# still match the lock, so the drift check below would not notice.
+if ! inkypi_is_supported_python python3; then
+    echo "$VENV_DIR runs $(python3 --version 2>&1), but InkyPi needs Python ${INKYPI_PYTHON_VERSION}." >&2
+    echo "Remove it (deactivate; rm -rf \"$VENV_DIR\") and source scripts/venv.sh again." >&2
+    if (return 0 2>/dev/null); then return 1; else exit 1; fi
 fi
 
 if command -v python3 >/dev/null 2>&1; then

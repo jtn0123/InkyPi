@@ -3,10 +3,12 @@
 import importlib.util
 import subprocess
 import sys
+import tomllib
 from pathlib import Path
 from typing import Any
 
 import pytest
+from packaging.specifiers import SpecifierSet
 
 
 @pytest.fixture
@@ -62,3 +64,42 @@ def test_current_environment_passes_without_network_or_install() -> None:
     )
     assert result.returncode == 0, result.stderr
     assert "matches committed" in result.stdout
+
+
+def test_supported_python_matches_pyproject_and_venv_script(doctor: Any) -> None:
+    root = Path(__file__).parents[2]
+    requires = tomllib.loads((root / "pyproject.toml").read_text())["project"][
+        "requires-python"
+    ]
+    major, minor = doctor.SUPPORTED_PYTHON
+    allowed = SpecifierSet(requires)
+    assert allowed.contains(f"{major}.{minor}.0")
+    assert not allowed.contains(f"{major}.{minor + 1}.0")
+    assert not allowed.contains(f"{major}.{minor - 1}.0")
+    venv_sh = (root / "scripts/venv.sh").read_text()
+    assert f'INKYPI_PYTHON_VERSION="{major}.{minor}"' in venv_sh
+
+
+def test_interpreter_problem_names_both_versions(doctor: Any) -> None:
+    assert doctor.interpreter_problem(doctor.SUPPORTED_PYTHON) == ""
+    major, minor = doctor.SUPPORTED_PYTHON
+    problem = doctor.interpreter_problem((major, minor + 2))
+    assert f"needs Python {major}.{minor}" in problem
+    assert f"is Python {major}.{minor + 2}" in problem
+    assert "rm -rf .venv" in problem
+
+
+def test_sync_refuses_another_python_before_installing(
+    doctor: Any, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    def no_install(*args: object, **kwargs: object) -> None:
+        raise AssertionError("sync must not install into the wrong Python")
+
+    monkeypatch.setattr(doctor.subprocess, "run", no_install)
+    monkeypatch.setattr(doctor, "interpreter_problem", lambda: "wrong python")
+    monkeypatch.setattr(doctor.sys, "argv", ["dev_environment.py", "--sync"])
+    monkeypatch.setattr(doctor.sys, "base_prefix", "/usr")
+    monkeypatch.setattr(doctor.sys, "prefix", "/project/.venv")
+
+    assert doctor.main() == 1
+    assert "wrong python" in capsys.readouterr().err

@@ -14,6 +14,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 LOCK = ROOT / "install/requirements-dev.txt"
 SYNC_COMMAND = "source scripts/venv.sh"
+# pyproject.toml's requires-python. tests/unit/test_dev_environment.py keeps
+# the two in step, and scripts/venv.sh builds the venv with this version.
+SUPPORTED_PYTHON = (3, 13)
 
 
 def lock_fingerprint(root: Path = ROOT) -> str:
@@ -27,6 +30,22 @@ def lock_fingerprint(root: Path = ROOT) -> str:
         digest.update((root / name).read_bytes())
     digest.update(f"{sys.version_info[:2]}:{sys.platform}".encode())
     return digest.hexdigest()
+
+
+def interpreter_problem(version: tuple[int, ...] = sys.version_info[:2]) -> str:
+    """Why this interpreter can't hold the dev environment, or "" if it can.
+
+    The lock pins wheels for the supported version only, so syncing another
+    Python installs a different set of packages than CI and the Pi run.
+    """
+    if tuple(version[:2]) == SUPPORTED_PYTHON:
+        return ""
+    want = ".".join(map(str, SUPPORTED_PYTHON))
+    have = ".".join(map(str, version[:2]))
+    return (
+        f"InkyPi needs Python {want}, but {sys.executable} is Python {have}. "
+        f"Remove the environment (rm -rf .venv) and run: {SYNC_COMMAND}"
+    )
 
 
 def installed_drift(lock: Path = LOCK) -> list[str]:
@@ -76,6 +95,11 @@ def main() -> int:
     args = parser.parse_args()
     if args.sync and sys.prefix == sys.base_prefix:
         print(f"Use a virtual environment. Run: {SYNC_COMMAND}", file=sys.stderr)
+        return 1
+    # Only sync refuses: the check alone also runs under the weekly
+    # next-Python CI job, which installs the same pins on purpose.
+    if args.sync and (problem := interpreter_problem()):
+        print(problem, file=sys.stderr)
         return 1
     fingerprint = lock_fingerprint()
     stamp = Path(sys.prefix) / ".inkypi-dev-lock.json"
