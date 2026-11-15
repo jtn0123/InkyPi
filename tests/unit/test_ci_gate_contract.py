@@ -196,6 +196,19 @@ def test_real_gate_rejects_missing_or_unsuccessful_mandatory_jobs(
     assert f"Required job '{job}' did not succeed" in result.stdout
 
 
+def test_sonar_skips_cancelled_runs_but_not_failed_tests() -> None:
+    """A run cancelled by a newer push has no coverage to report.
+
+    ``always()`` scanned it anyway and posted a 0% coverage quality-gate
+    failure on the PR. ``!cancelled()`` still scans after failed tests, whose
+    coverage is uploaded regardless.
+    """
+    condition = _jobs()["sonarcloud"]["if"]
+    assert isinstance(condition, str)
+    assert "!cancelled()" in condition
+    assert "always()" not in condition
+
+
 @pytest.mark.parametrize("state", ["success", "failure", "skipped", "cancelled"])
 def test_real_gate_preserves_advisory_sonar(state: str) -> None:
     result = _run_gate({"sonarcloud": state})
