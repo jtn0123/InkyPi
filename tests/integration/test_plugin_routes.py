@@ -579,13 +579,15 @@ def _setup_playlist_for_instance(device_config_dev: Any) -> None:
     device_config_dev.write_config()
 
 
-def test_instance_image_generated_from_settings(
+def test_instance_image_never_renders_on_a_miss(
     client: FlaskClient, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
-) -> Any:
-    import io
-    import os
+) -> None:
+    """B3: a page view must not run plugin code in the web thread.
 
-    from PIL import Image
+    With no cached image and no history, the route answers 404 (the pages
+    hide the tile) instead of rendering, and writes nothing.
+    """
+    import os
 
     _setup_playlist_for_instance(device_config_dev)
 
@@ -593,26 +595,22 @@ def test_instance_image_generated_from_settings(
     if os.path.exists(path):
         os.remove(path)
 
-    class _StubPlugin:
-        def generate_image(self, settings: Any, device_config: Any) -> Any:
-            return Image.new("RGB", (10, 10), "blue")
+    calls: list[Any] = []
 
-    monkeypatch.setattr(
-        "blueprints.plugin._images.get_plugin_instance",
-        lambda cfg: _StubPlugin(),
-        raising=True,
-    )
+    def _no_render(cfg: Any) -> Any:
+        calls.append(cfg)
+        raise AssertionError("instance_image must not load a plugin to render")
+
+    monkeypatch.setattr("plugins.plugin_registry.get_plugin_instance", _no_render)
 
     resp = client.get("/instance_image/ai_text/Inst One")
-    assert resp.status_code == 200
-    # Ensure file persisted and served
-    assert os.path.exists(path)
-    img = Image.open(io.BytesIO(resp.data))
-    assert img.getpixel((0, 0)) == (0, 0, 255)
+    assert resp.status_code == 404
+    assert calls == []
+    assert not os.path.exists(path)
 
 
-def test_instance_image_served_from_history_on_generation_failure(
-    client: FlaskClient, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+def test_instance_image_serves_history_on_a_miss(
+    client: FlaskClient, device_config_dev: Any
 ) -> None:
     import io
     import json
@@ -634,16 +632,6 @@ def test_instance_image_served_from_history_on_generation_failure(
     with open(json_path, "w", encoding="utf-8") as fh:
         json.dump({"plugin_id": "ai_text", "plugin_instance": "Inst One"}, fh)
 
-    class _StubPlugin:
-        def generate_image(self, settings: Any, device_config: Any) -> None:
-            raise RuntimeError("fail")
-
-    monkeypatch.setattr(
-        "blueprints.plugin._images.get_plugin_instance",
-        lambda cfg: _StubPlugin(),
-        raising=True,
-    )
-
     resp = client.get("/instance_image/ai_text/Inst One")
     assert resp.status_code == 200
     img = Image.open(io.BytesIO(resp.data))
@@ -651,7 +639,7 @@ def test_instance_image_served_from_history_on_generation_failure(
 
 
 def test_instance_image_uses_latest_matching_history_entry(
-    client: FlaskClient, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+    client: FlaskClient, device_config_dev: Any
 ) -> None:
     import io
     import json
@@ -679,16 +667,6 @@ def test_instance_image_uses_latest_matching_history_entry(
     with open(newer_json_path, "w", encoding="utf-8") as fh:
         json.dump({"plugin_id": "ai_text", "plugin_instance": "Inst One"}, fh)
 
-    class _StubPlugin:
-        def generate_image(self, settings: Any, device_config: Any) -> None:
-            raise RuntimeError("fail")
-
-    monkeypatch.setattr(
-        "blueprints.plugin._images.get_plugin_instance",
-        lambda cfg: _StubPlugin(),
-        raising=True,
-    )
-
     resp = client.get("/instance_image/ai_text/Inst One")
     assert resp.status_code == 200
     img = Image.open(io.BytesIO(resp.data))
@@ -703,9 +681,8 @@ def test_instance_image_busy_renderer_serves_history_without_waiting(
 ) -> None:
     """A preview GET must not park a request thread behind another Chromium.
 
-    While a refresh holds the machine-wide Chromium slot, the in-request
-    render gives up after a short wait and the route serves the latest
-    history image instead.
+    The route never renders, so a refresh holding the machine-wide Chromium
+    slot cannot delay it: it serves the latest history image at once.
     """
     import io
     import json
@@ -735,17 +712,6 @@ def test_instance_image_busy_renderer_serves_history_without_waiting(
         os.path.join(history_dir, "display_000001.json"), "w", encoding="utf-8"
     ) as fh:
         json.dump({"plugin_id": "ai_text", "plugin_instance": "Inst One"}, fh)
-
-    class _ChromiumPlugin:
-        def generate_image(self, settings: Any, device_config: Any) -> Any:
-            with chromium_slot("stub render"):
-                return Image.new("RGB", (10, 10), "blue")
-
-    monkeypatch.setattr(
-        "blueprints.plugin._images.get_plugin_instance",
-        lambda cfg: _ChromiumPlugin(),
-        raising=True,
-    )
 
     held = threading.Event()
     release = threading.Event()

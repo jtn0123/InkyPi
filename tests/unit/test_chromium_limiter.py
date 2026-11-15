@@ -15,7 +15,7 @@ from typing import Any
 
 import pytest
 
-from utils.chromium_limiter import chromium_slot, lock_file_path, slot_wait_limit
+from utils.chromium_limiter import chromium_slot, lock_file_path
 from utils.plugin_errors import ScreenshotBackendError
 
 _SRC_DIR = str(Path(__file__).resolve().parents[2] / "src")
@@ -142,22 +142,6 @@ def test_slot_is_reentrant_within_a_thread() -> None:
             assert not _slot_is_free()
         assert not _slot_is_free()
     assert _slot_is_free()
-
-
-def test_slot_wait_limit_caps_default_wait(
-    isolated_lock_dir: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.setenv("INKYPI_CHROMIUM_LOCK_TIMEOUT_S", "30")
-    proc = _spawn_holder(isolated_lock_dir, "time.sleep(30)")
-    try:
-        started = time.monotonic()
-        with slot_wait_limit(0.2), pytest.raises(ScreenshotBackendError):
-            with chromium_slot("request thread"):
-                pass
-        assert time.monotonic() - started < 5
-    finally:
-        proc.kill()
-        proc.wait()
 
 
 def test_unopenable_lock_file_fails_open(
