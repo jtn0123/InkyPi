@@ -134,6 +134,23 @@
     return true;
   }
 
+  // Picked files live in window.uploadedFiles ({fieldName: [File, ...]}) until
+  // a request carries them, because the file input is cleared after each pick
+  // so the same picker can add more files.
+  function appendUploadedFiles(formData, uploadedFiles){
+    Object.keys(uploadedFiles || {}).forEach(key => {
+      (uploadedFiles[key] || []).forEach(f => formData.append(key, f));
+    });
+  }
+
+  // Routes that store uploads reply with the stored paths (saved_files); the
+  // upload widget swaps its pending files for those paths so the next save
+  // keeps them instead of uploading another copy.
+  function announceSavedUploads(savedFiles){
+    if (!savedFiles || typeof savedFiles !== 'object' || !Object.keys(savedFiles).length) return;
+    document.dispatchEvent(new CustomEvent('inkypi:uploads-saved', { detail: { savedFiles } }));
+  }
+
   async function sendForm({ action, urls, uploadedFiles, onAfterSuccess }){
     const loadingIndicator = $('loadingIndicator');
     const progress = initProgress();
@@ -145,7 +162,7 @@
     let liveProgress = null;
 
     // append uploaded files
-    try { Object.keys(uploadedFiles || {}).forEach(key => { (uploadedFiles[key] || []).forEach(f => formData.append(key, f)); }); } catch(e){ console.warn('Failed to append uploaded files:', e); if (window.showResponseModal) window.showResponseModal('failure', 'Failed to attach uploaded files: ' + (e.message || e)); return { success: false, result: null }; }
+    try { appendUploadedFiles(formData, uploadedFiles); } catch(e){ console.warn('Failed to append uploaded files:', e); if (window.showResponseModal) window.showResponseModal('failure', 'Failed to attach uploaded files: ' + (e.message || e)); return { success: false, result: null }; }
 
     let url = urls.update_now; let method = 'POST'; let clearFormOnSubmit = true;
     if (action === 'add_to_playlist'){
@@ -234,6 +251,7 @@
           if (parts.length){ progress.setStep(parts.join(' • '), 90); }
           if (window.showResponseModal) window.showResponseModal('success', `Success! ${result.message}`);
           success = true;
+          announceSavedUploads(result && result.saved_files);
           // Call the success callback to refresh images
           if (typeof onAfterSuccess === 'function') {
             try { onAfterSuccess(); } catch(e){ console.error('onAfterSuccess callback error:', e); }
@@ -276,8 +294,22 @@
       if (window.showResponseModal) {
         window.showResponseModal('success', `Success! ${msg}`);
       }
+      announceSavedUploads(detail.saved_files);
     } catch (e) {
       console.warn('pluginSettingsSaved handler error:', e);
+    }
+  });
+
+  // The HTMX Save Settings button sends #settingsForm, whose file inputs are
+  // empty by then (see appendUploadedFiles), so add the picked files to the
+  // request here. The button's hx-encoding makes htmx send them multipart.
+  document.addEventListener('htmx:configRequest', (event) => {
+    const detail = event && event.detail;
+    if (!detail || !detail.elt || detail.elt.id !== 'savePluginSettingsBtn' || !detail.formData) return;
+    try {
+      appendUploadedFiles(detail.formData, window.uploadedFiles);
+    } catch (e) {
+      console.warn('Failed to attach uploaded files to save:', e);
     }
   });
 

@@ -36,6 +36,7 @@ from ._common import (
     _MSG_DISPLAY_UPDATED,
     _plugin_form_data,
     _raise_request_model_error,
+    _saved_upload_settings,
     logger,
     plugin_bp,
 )
@@ -151,9 +152,7 @@ def update_plugin_instance(instance_name: str) -> Any:
                 code="validation_error",
                 field="instance_name",
             )
-        parsed, parse_error = parse_plugin_update_instance_request(
-            _plugin_form_data(include_form_for_files=True)
-        )
+        parsed, parse_error = parse_plugin_update_instance_request(_plugin_form_data())
         if parse_error is not None:
             _raise_request_model_error(parse_error)
         if parsed is None:
@@ -241,6 +240,7 @@ def update_plugin_instance(instance_name: str) -> Any:
             history_warning or f"Updated plugin instance {instance_name}.", quote=True
         ),
         warnings=[escape(history_warning, quote=True)] if history_warning else [],
+        saved_files=_saved_upload_settings(plugin_settings),
     )
 
 

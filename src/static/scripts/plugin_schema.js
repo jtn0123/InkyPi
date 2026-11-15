@@ -534,8 +534,12 @@
     const hiddenContainer = widget.querySelector("#hiddenFileInputs");
     if (!fileInput || !fileNames || !hiddenContainer) return;
 
-    const uploadedFiles = globalThis.__INKYPI_UPLOADED_FILES__ || (globalThis.__INKYPI_UPLOADED_FILES__ = {});
-    if (!uploadedFiles["imageFiles[]"]) uploadedFiles["imageFiles[]"] = [];
+    // Picked files wait here until a request sends them. plugin_page.js and
+    // plugin_form.js read this same object (window.uploadedFiles, declared in
+    // plugin.html); a private store here meant no picked file was ever sent.
+    const fieldName = "imageFiles[]";
+    const uploadedFiles = globalThis.uploadedFiles || (globalThis.uploadedFiles = {});
+    if (!uploadedFiles[fieldName]) uploadedFiles[fieldName] = [];
 
     const renderFile = (id, fileName, removeHandler) => {
       const row = document.createElement("div");
@@ -554,30 +558,51 @@
       fileNames.appendChild(row);
     };
 
-    (config["imageFiles[]"] || []).forEach((filePath) => {
-      const fileName = filePath.split("/").pop();
-      renderFile(`existing-${fileName}`, fileName, () => {
-        const row = widget.querySelector(`#existing-${CSS.escape(fileName)}`);
-        if (row) row.remove();
-        const hidden = widget.querySelector(`#hidden-${CSS.escape(fileName)}`);
-        if (hidden) hidden.remove();
+    // Files already on the device are listed by path in hidden inputs, which
+    // the form submits so the server keeps them alongside any new picks.
+    const renderSavedFiles = (filePaths) => {
+      filePaths.forEach((filePath) => {
+        const fileName = filePath.split("/").pop();
+        renderFile(`existing-${fileName}`, fileName, () => {
+          const row = widget.querySelector(`#existing-${CSS.escape(fileName)}`);
+          if (row) row.remove();
+          const hidden = widget.querySelector(`#hidden-${CSS.escape(fileName)}`);
+          if (hidden) hidden.remove();
+        });
+        const hidden = createHiddenInput(fieldName, filePath);
+        hidden.id = `hidden-${fileName}`;
+        hiddenContainer.appendChild(hidden);
       });
-      const hidden = createHiddenInput("imageFiles[]", filePath);
-      hidden.id = `hidden-${fileName}`;
-      hiddenContainer.appendChild(hidden);
-    });
+    };
+
+    renderSavedFiles(config[fieldName] || []);
+
+    const removePendingFile = (fileName) => {
+      uploadedFiles[fieldName] = uploadedFiles[fieldName].filter((item) => item.name !== fileName);
+      const row = widget.querySelector(`#added-${CSS.escape(fileName)}`);
+      if (row) row.remove();
+    };
+
+    const addPendingFile = (file) => {
+      if (uploadedFiles[fieldName].some((item) => item.name === file.name)) return;
+      uploadedFiles[fieldName].push(file);
+      renderFile(`added-${file.name}`, file.name, () => removePendingFile(file.name));
+    };
 
     fileInput.addEventListener("change", () => {
-      Array.from(fileInput.files || []).forEach((file) => {
-        if (uploadedFiles["imageFiles[]"].some((item) => item.name === file.name)) return;
-        uploadedFiles["imageFiles[]"].push(file);
-        renderFile(`added-${file.name}`, file.name, () => {
-          uploadedFiles["imageFiles[]"] = uploadedFiles["imageFiles[]"].filter((item) => item.name !== file.name);
-          const row = widget.querySelector(`#added-${CSS.escape(file.name)}`);
-          if (row) row.remove();
-        });
-      });
+      for (const file of Array.from(fileInput.files || [])) addPendingFile(file);
       fileInput.value = "";
+    });
+
+    // After a save stores the picked files, list the stored copies as saved
+    // files so the next save keeps them rather than uploading them again.
+    document.addEventListener("inkypi:uploads-saved", (event) => {
+      const savedPaths = event.detail?.savedFiles?.[fieldName];
+      if (!widget.isConnected || !Array.isArray(savedPaths)) return;
+      uploadedFiles[fieldName] = [];
+      fileNames.replaceChildren();
+      hiddenContainer.replaceChildren();
+      renderSavedFiles(savedPaths);
     });
   }
 

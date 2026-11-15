@@ -18,6 +18,7 @@ from ._common import (
     _ERR_INTERNAL,
     _PLUGIN_ID,
     _plugin_form_data,
+    _saved_upload_settings,
     logger,
     plugin_bp,
 )
@@ -110,8 +111,14 @@ def _render_plugin_form_error(
     return resp
 
 
-def _render_plugin_form_success(message: str) -> Any:
-    """Return an HTMX success partial; fires ``pluginSettingsSaved`` toast event."""
+def _render_plugin_form_success(
+    message: str, saved_files: dict[str, Any] | None = None
+) -> Any:
+    """Return an HTMX success partial; fires ``pluginSettingsSaved`` toast event.
+
+    ``saved_files`` maps each uploaded file field to its stored path(s) so the
+    page can list them as saved (see ``_saved_upload_settings``).
+    """
     html = render_template(
         "partials/plugin_form_errors.html",
         error=None,
@@ -121,7 +128,7 @@ def _render_plugin_form_success(message: str) -> Any:
     resp.headers["Content-Type"] = "text/html; charset=utf-8"
     # HX-Trigger lets the existing toast JS fire without a duplicate modal path
     resp.headers["HX-Trigger"] = json.dumps(
-        {"pluginSettingsSaved": {"message": message}}
+        {"pluginSettingsSaved": {"message": message, "saved_files": saved_files or {}}}
     )
     return resp
 
@@ -161,10 +168,12 @@ def _save_plugin_settings_common(
         return json_error(error.message, **error.as_json_kwargs())
 
     success_message = result.message
+    saved_files = _saved_upload_settings(plugin_settings)
     if htmx:
-        return _render_plugin_form_success(success_message)
+        return _render_plugin_form_success(success_message, saved_files)
     return json_success(
         message=success_message,
         instance_name=result.instance_name,
         warnings=result.warnings,
+        saved_files=saved_files,
     )
