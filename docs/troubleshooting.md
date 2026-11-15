@@ -64,6 +64,24 @@ sudo journalctl --vacuum-size=50M
 
 The InkyPi install and update scripts automatically enable persistent journald storage and apply `50M` caps for both `SystemMaxUse` and `RuntimeMaxUse` when no explicit journald settings already exist.
 
+## Display history retention
+
+Every frame shown on the panel is kept on the History page. The oldest frames are deleted once any of these limits is reached:
+
+| Key | Default | Meaning |
+|---|---|---|
+| `max_count` | `500` | Keep at most this many frames. Applied after every save. |
+| `max_age_days` | `30` | Delete frames older than this. |
+| `min_free_bytes` | `500000000` | Delete the oldest frames while the SD card has less free space than this. |
+
+The age and free-space limits are checked every 10 refreshes. To change a limit, add a `history_cleanup` block to `/usr/local/inkypi/src/config/device.json` and restart the service. A value of `0` turns that limit off:
+
+```json
+"history_cleanup": { "max_count": 1000, "max_age_days": 60, "min_free_bytes": 500000000 }
+```
+
+The values must be whole numbers of 0 or more. Any other value stops InkyPi from starting, and the reason is logged as `Config invalid`.
+
 ## Intermittent Wi-Fi reachability / SSH drops
 
 If the Pi appears online but drops SSH or misses pings intermittently, check whether Wi-Fi power saving is enabled on `wlan0`:
@@ -297,7 +315,7 @@ in addition to the libraries that are normally installed for Inky screens.
 
 ### Screen not updating
 
-Verify SPI configuration using `ls /dev/sp*`.  There should be two entries for _spidev0.0_ and _spidev0.1_.  
+Verify SPI configuration using `ls /dev/sp*`.  There should be two entries for _spidev0.0_ and _spidev0.1_.
 
 If only the first is visible, check _/boot/firmware/config.txt_. The regular install of InkyPi adds `dtoverlay=spi0-0cs` to the this file.  If it is there, either delete it (for default behaviour) or specifically add `dtoverlay=spi0-2cs`.
 

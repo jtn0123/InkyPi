@@ -14,6 +14,7 @@ from PIL import Image
 from display.abstract_display import AbstractDisplay, DeviceConfigLike
 from display.mock_display import MockDisplay
 from display.rendering_settings import CRISP_IMAGE_SETTING, SCREEN_RENDERING_KEY
+from utils.history_cleanup import RetentionPolicy, cleanup_history
 from utils.image_utils import (
     FAST_PNG_COMPRESS_LEVEL,
     HISTORY_PNG_COMPRESS_LEVEL,
@@ -139,10 +140,6 @@ class DisplayManager:
         else:
             raise ValueError(f"Unsupported display type: {display_type}")
 
-    # Maximum number of history snapshots to keep. Oldest entries beyond this
-    # limit are pruned after each new save. Override via INKYPI_HISTORY_MAX_ENTRIES.
-    HISTORY_MAX_ENTRIES = int(os.getenv("INKYPI_HISTORY_MAX_ENTRIES", "500") or "500")
-
     # Approximate count of history entries to avoid scanning the directory on
     # every save.  Reset to None to force a recount on the next prune cycle.
     _history_count_estimate: int | None = None
@@ -151,17 +148,31 @@ class DisplayManager:
     _history_increment_count = 0
     _history_lock = threading.RLock()
 
+    def _history_max_entries(self) -> int:
+        """The history count cap from ``history_cleanup.max_count`` (0 = no cap).
+
+        The refresh loop's periodic cleanup reads the same setting, so there
+        is one limit to change, not two that override each other.
+        """
+        device_config = getattr(self, "device_config", None)
+        get_config = getattr(device_config, "get_config", None)
+        raw = get_config("history_cleanup") if callable(get_config) else None
+        return RetentionPolicy.from_config(raw).max_count
+
     def _prune_history(self, history_dir: str) -> None:
-        """Remove oldest history entries when the total exceeds HISTORY_MAX_ENTRIES.
+        """Remove the oldest history entries beyond the configured count cap.
 
         Uses an in-memory count estimate to skip the directory scan when the
         count is clearly below the limit.  The estimate is refreshed whenever
         an actual scan is performed or every _RECOUNT_INTERVAL increments.
         """
+        max_entries = self._history_max_entries()
+        if max_entries <= 0:
+            return
         with self._history_lock:
             if (
                 self._history_count_estimate is not None
-                and self._history_count_estimate < self.HISTORY_MAX_ENTRIES
+                and self._history_count_estimate < max_entries
             ):
                 self._history_count_estimate += 1
                 self._history_increment_count += 1
@@ -169,34 +180,12 @@ class DisplayManager:
                 if self._history_increment_count < self._RECOUNT_INTERVAL:
                     return
                 self._history_increment_count = 0
-            try:
-                png_files: list[str] = sorted(
-                    (f for f in os.listdir(history_dir) if f.endswith(".png")),
-                    key=lambda name: (
-                        os.path.getmtime(os.path.join(history_dir, name)),
-                        name,
-                    ),
-                )
-                self._history_count_estimate = len(png_files)
-                excess = len(png_files) - self.HISTORY_MAX_ENTRIES
-                if excess <= 0:
-                    return
-                for name in png_files[:excess]:
-                    base = name.rsplit(".", 1)[0]
-                    for ext in (".png", ".json"):
-                        path = os.path.join(history_dir, base + ext)
-                        try:
-                            os.remove(path)
-                        except FileNotFoundError:
-                            pass
-                self._history_count_estimate = len(png_files) - excess
-                logger.info(
-                    "Pruned %d old history entries (max %d)",
-                    excess,
-                    self.HISTORY_MAX_ENTRIES,
-                )
-            except OSError:
-                logger.debug("Could not prune history directory", exc_info=True)
+            # Age and free-space limits are left to the refresh loop's
+            # periodic cleanup; a save only needs the count cap.
+            result = cleanup_history(
+                history_dir, max_age_days=0, max_count=max_entries, min_free_bytes=0
+            )
+            self._history_count_estimate = result.remaining_count
 
     def _save_history_entry(
         self,

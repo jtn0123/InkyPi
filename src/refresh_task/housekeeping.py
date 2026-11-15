@@ -10,7 +10,7 @@ from typing import Protocol
 from PIL import Image
 
 from utils.fallback_image import render_error_image
-from utils.history_cleanup import cleanup_history
+from utils.history_cleanup import RetentionPolicy, apply_retention
 
 logger = logging.getLogger(__name__)
 
@@ -62,15 +62,10 @@ class RefreshHousekeeper:
         if tick_count % cleanup_interval_ticks != 0:
             return
         try:
-            raw_cfg = self.device_config.get_config("history_cleanup") or {}
-            cfg = raw_cfg if isinstance(raw_cfg, Mapping) else {}
-            history_dir = self.device_config.history_image_dir
-            cleanup_history(
-                history_dir,
-                max_age_days=int(cfg.get("max_age_days", 30)),
-                max_count=int(cfg.get("max_count", 500)),
-                min_free_bytes=int(cfg.get("min_free_bytes", 500_000_000)),
+            policy = RetentionPolicy.from_config(
+                self.device_config.get_config("history_cleanup")
             )
+            apply_retention(self.device_config.history_image_dir, policy)
         except Exception:
             logger.exception("history_cleanup: unexpected error during cleanup")
 
