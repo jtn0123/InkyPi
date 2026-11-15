@@ -1,0 +1,46 @@
+name: Pre-flash (macOS, weekly)
+
+# Checks scripts/preflash_validate.sh still works on the owner's Mac. Not part
+# of CI's ci-gate: hosted macOS runners can sit queued for hours (on #711 six
+# attempts were cancelled after 15 minutes with no runner), and the
+# pi-runtime, browser and install-idempotency phases skip on macOS anyway.
+#
+# It has its own workflow so the weekly trigger starts only this job. As a
+# second cron on ci.yml it started the whole CI suite again every Sunday,
+# soak and mutation nightlies included.
+on:
+  schedule:
+    - cron: '0 3 * * 0'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  preflash-validate-macos:
+    name: Pre-flash validate (macos-latest, weekly)
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # Installs into .venv, which scripts/preflash_validate.sh requires.
+      - uses: ./.github/actions/setup-python-deps
+      - name: Run pre-flash validation
+        env:
+          INKYPI_VALIDATE_INSTALL: '1'
+          INKYPI_VALIDATE_PI_RUNTIME: '1'
+          INKYPI_VALIDATE_STRESS: '1'
+          INKYPI_VALIDATE_HEAVY_PLUGINS: '1'
+          INKYPI_VALIDATE_BENCH_THRESHOLDS: '1'
+          INKYPI_VALIDATE_COLD_BOOT: '1'
+          INKYPI_VALIDATE_CACHE: '1'
+          INKYPI_VALIDATE_ISOLATION: '1'
+          INKYPI_VALIDATE_BROWSER_RENDER: '1'
+          INKYPI_VALIDATE_INSTALL_IDEMPOTENCY: '1'
+          INKYPI_VALIDATE_FAULTS: '1'
+          INKYPI_VALIDATE_UPGRADE_COMPAT: '1'
+          INKYPI_VALIDATE_FS_PERMS: '1'
+          INKYPI_VALIDATE_RECOVERY: '1'
+          INKYPI_VALIDATE_API_CONTRACT: '1'
+        run: |
+          scripts/preflash_validate.sh

@@ -16,6 +16,7 @@ Developer, CI and device tools. Run them from the repo root. Python scripts add
 | `test.sh` / `test-fast.sh` | The test suite, and a faster local loop. |
 | `test_profile.sh` | Runs pytest under a profiler (see `docs/profiling.md`). |
 | `lint.sh` / `format.sh` | The lint gate CI runs (ruff, black, mypy, shellcheck), and the auto-fixer. |
+| `check_shell.sh` | `bash -n` and shellcheck (default severity) on every tracked shell script, found by extension and shebang; `lint.sh` runs it. |
 | `precommit_browser_warning.sh` | Pre-commit hook: runs the browser smoke gate when front-end files change. |
 | `precommit_tool.sh` | Pre-commit hook helper: runs ruff, black or mypy from the repo's `.venv` (or the main checkout's, inside a worktree), so hooks use the same versions as CI. |
 | `extract_strings.py` | Extracts translatable strings into `translations/`. |
@@ -53,7 +54,7 @@ Developer, CI and device tools. Run them from the repo root. Python scripts add
 | `benchmark_compare.py` | Compares pytest-benchmark output against a stored baseline. |
 | `memory_diff.py`, `format_memory_diff.py` | Startup memory profile for the per-PR memory diff comment. |
 | `mutation_check.py`, `mutation_summary.py` | A small hand-written mutant check, and the summary for mutmut shards. |
-| `check_licenses.sh` | Checks dependency licences. |
+| `check_licenses.sh` | Checks dependency licences with the `pip-licenses` pinned in `install/requirements-dev.txt` (installs nothing; run it from the dev venv). |
 | `check_links.py` | Re-checks links that the Lychee link checker reported as throttled. |
 | `check_requirements_drift.sh` | Checks that the exported lockfile matches `uv.lock`. |
 | `check_vendor_versions.py` | Weekly check that the vendored front-end libraries are current within their major (`vendor-versions.yml`). |

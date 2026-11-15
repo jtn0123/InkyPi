@@ -11,17 +11,30 @@ import pytest
 import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
+CI_WORKFLOW = ROOT / ".github/workflows/ci.yml"
+#: The weekly macOS pre-flash. Hosted macOS runners can stay queued for hours,
+#: so it reports from its own workflow instead of holding PRs or turning the
+#: nightly gate red.
+MACOS_WORKFLOW = ROOT / ".github/workflows/preflash-macos-weekly.yml"
 ADVISORY_JOBS = {"sonarcloud"}
 EVENT_ONLY_JOBS = {"soak-nightly", "mutation-nightly"}
-#: Scheduled jobs deliberately left out of the gate. Hosted macOS runners can
-#: stay queued for hours, so the weekly macOS pre-flash reports on its own
-#: instead of holding PRs or turning the nightly gate red.
-UNGATED_JOBS = {"preflash-validate-macos"}
+
+
+def _workflow(path: Path) -> dict[object, object]:
+    data = yaml.safe_load(path.read_text())
+    assert isinstance(data, dict)
+    return data
+
+
+def _triggers(workflow: dict[object, object]) -> dict[str, object]:
+    # PyYAML reads GitHub's `on:` key as the YAML 1.1 boolean True.
+    triggers = workflow.get("on", workflow.get(True))
+    assert isinstance(triggers, dict)
+    return {str(key): value for key, value in triggers.items()}
 
 
 def _jobs() -> dict[str, dict[str, object]]:
-    data = yaml.safe_load((ROOT / ".github/workflows/ci.yml").read_text())
-    assert isinstance(data, dict)
+    data = _workflow(CI_WORKFLOW)
     jobs = data["jobs"]
     assert isinstance(jobs, dict)
     result: dict[str, dict[str, object]] = {}
@@ -114,7 +127,7 @@ def test_gate_dependencies_and_success_loop_cover_mandatory_jobs() -> None:
     gate = jobs["ci-gate"]
     mandatory = _mandatory_jobs(jobs)
     conditional = {name for name, job in jobs.items() if job.get("if")}
-    assert conditional == EVENT_ONLY_JOBS | ADVISORY_JOBS | UNGATED_JOBS | {"ci-gate"}
+    assert conditional == EVENT_ONLY_JOBS | ADVISORY_JOBS | {"ci-gate"}
     assert gate["if"] == "always()"
     assert set(_needs(gate)) == mandatory | ADVISORY_JOBS | EVENT_ONLY_JOBS
     loops = _gate_loops(gate)
@@ -125,21 +138,32 @@ def test_gate_dependencies_and_success_loop_cover_mandatory_jobs() -> None:
     assert sorted(nightly) == sorted(EVENT_ONLY_JOBS)
 
 
-def test_ungated_jobs_stay_out_of_the_gate_and_off_pull_requests() -> None:
-    """An ungated job must not hold the gate, and must not run on every PR.
+def test_ci_has_a_single_schedule() -> None:
+    """Every CI job runs on each schedule event, so a second cron reran the
+    whole suite (soak and mutation nightlies included) every Sunday."""
+    schedule = _triggers(_workflow(CI_WORKFLOW))["schedule"]
+    assert isinstance(schedule, list)
+    assert len(schedule) == 1, schedule
+
+
+def test_macos_preflash_runs_weekly_outside_ci() -> None:
+    """The macOS pre-flash must not hold the gate, and must not run on every PR.
 
     Running on pull_request while ungated would quietly drop a check people
     believe is enforced; keeping it scheduled makes its status honest.
     """
-    jobs = _jobs()
-    needs = set(_needs(jobs["ci-gate"]))
-    for name in UNGATED_JOBS:
-        assert name in jobs
-        assert name not in needs
-        condition = jobs[name]["if"]
-        assert isinstance(condition, str)
-        assert "pull_request" not in condition
-        assert "github.event.schedule" in condition
+    assert not any(
+        "macos" in str(job.get("runs-on", "")) for job in _jobs().values()
+    ), "macOS jobs belong in preflash-macos-weekly.yml, outside ci-gate"
+    workflow = _workflow(MACOS_WORKFLOW)
+    assert set(_triggers(workflow)) == {"schedule", "workflow_dispatch"}
+    jobs = workflow["jobs"]
+    assert isinstance(jobs, dict)
+    job = jobs["preflash-validate-macos"]
+    assert isinstance(job, dict)
+    assert job["runs-on"] == "macos-latest"
+    runs = [step.get("run", "") for step in job["steps"]]
+    assert any("scripts/preflash_validate.sh" in run for run in runs)
 
 
 def test_linux_preflash_stays_required() -> None:

@@ -88,13 +88,13 @@ git restore -- <changed-file>
    config test keeps it honest.
 
 3. Open a PR with the change. The nightly job will pick up the new path on its
-   next Sunday run.
+   next run (daily, 09:00 UTC).
 
 ## CI schedule
 
-The `mutation-nightly` job in `.github/workflows/ci.yml` runs on scheduled
-workflow events and can be started manually with `workflow_dispatch`. It will
-never trigger on a push or pull request.
+The `mutation-nightly` job in `.github/workflows/ci.yml` runs on CI's one
+scheduled event (daily, 09:00 UTC) and can be started manually with
+`workflow_dispatch`. It will never trigger on a push or pull request.
 
 The job is sharded by package so each package has its own runtime budget:
 
