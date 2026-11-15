@@ -17,7 +17,6 @@ the start limit is reached in seconds rather than the production 60 s cadence.
 
 from __future__ import annotations
 
-import shutil
 import subprocess
 import textwrap
 import uuid
@@ -26,40 +25,24 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from tests.integration.container_support import (
+    cgroup_run_args,
+    infrastructure_failed,
+    skip_unless_docker,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 INSTALL_DIR = REPO_ROOT / "install"
 
 pytestmark = [
     pytest.mark.container,
-    # Image build alone may take up to 900s; pytest-timeout counts fixture
-    # setup, so override the global 120s limit from pytest.ini.
-    pytest.mark.timeout(1200),
-    pytest.mark.skipif(
-        shutil.which("docker") is None
-        or subprocess.run(
-            ["docker", "info"], capture_output=True, timeout=30, check=False
-        ).returncode
-        != 0,
-        reason="requires a running Docker daemon",
-    ),
+    # The image build may take up to 600s; pytest-timeout counts fixture
+    # setup, so override the global 120s limit from pytest.ini. Keep this
+    # under the CI job's 20-minute budget: a hang then fails with a traceback
+    # instead of the runner cancelling the job with no output.
+    pytest.mark.timeout(900),
+    skip_unless_docker(),
 ]
-
-
-def _cgroup_run_args() -> list[str]:
-    """See test_install_crash_loop._cgroup_run_args — same v1/v2 split."""
-    probe = subprocess.run(
-        ["docker", "info", "--format", "{{.CgroupVersion}}"],
-        capture_output=True,
-        text=True,
-        timeout=30,
-        check=False,
-    )
-    return (
-        ["-v", "/sys/fs/cgroup:/sys/fs/cgroup:rw"]
-        if (probe.stdout or "").strip() == "1"
-        else ["--cgroupns=host"]
-    )
 
 
 @pytest.fixture(scope="module")
@@ -86,11 +69,11 @@ def systemd_image() -> Iterator[str]:
         input=dockerfile,
         capture_output=True,
         text=True,
-        timeout=900,
+        timeout=600,
         check=False,
     )
     if build.returncode != 0:
-        pytest.skip(f"could not build systemd image: {build.stderr[-400:]}")
+        infrastructure_failed(f"could not build systemd image: {build.stderr[-400:]}")
     yield tag
     subprocess.run(["docker", "rmi", "-f", tag], capture_output=True, check=False)
 
@@ -134,7 +117,7 @@ def container(systemd_image: str) -> Iterator[Container]:
             "/run",
             "--tmpfs",
             "/run/lock",
-            *_cgroup_run_args(),
+            *cgroup_run_args(),
             "-v",
             f"{INSTALL_DIR}:/opt/inkypi-install:ro",
             systemd_image,
@@ -145,7 +128,7 @@ def container(systemd_image: str) -> Iterator[Container]:
         check=False,
     )
     if start.returncode != 0:
-        pytest.skip(f"could not launch container: {start.stderr[-400:]}")
+        infrastructure_failed(f"could not launch container: {start.stderr[-400:]}")
 
     ctr = Container(name)
     # `is-system-running --wait` answers empty (and non-zero) if it is asked
@@ -159,7 +142,7 @@ def container(systemd_image: str) -> Iterator[Container]:
     if state not in {"running", "degraded"}:
         diagnostics = ctr.exec("journalctl -n 30 --no-pager 2>&1 || true").stdout
         subprocess.run(["docker", "rm", "-f", name], capture_output=True, check=False)
-        pytest.skip(
+        infrastructure_failed(
             f"systemd did not boot inside the container: {state!r}\n{diagnostics[-600:]}"
         )
 
