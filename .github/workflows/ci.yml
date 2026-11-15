@@ -756,19 +756,42 @@ jobs:
             exit 0
           fi
           exit "$rc"
-      - name: Show mutation results
+      # Report the score on the run page, and keep only mutmut's own result
+      # files. Uploading the whole mutants/ tree (a ~100 MB copy of the repo
+      # that tests write into) failed the nightly when a file vanished while
+      # it was being zipped. The summary never fails the job: mutmut's exit
+      # status above already decides that.
+      - name: Summarise mutation results
         if: always()
+        env:
+          LABEL: ${{ matrix.label }}
         run: |
-          mutmut results || true
+          mkdir -p mutation-report
+          mutmut results > mutation-report/results.txt 2>&1 || true
+          mutmut export-cicd-stats || true
+          if [ -f mutants/mutmut-cicd-stats.json ]; then
+            cp mutants/mutmut-cicd-stats.json mutation-report/
+          fi
+          python scripts/mutation_summary.py \
+            mutation-report/mutmut-cicd-stats.json "$LABEL" | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "Surviving and unchecked mutants: $(wc -l < mutation-report/results.txt)"
       - name: Upload mutation results
         if: always()
+        continue-on-error: true
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: mutmut-cache-${{ matrix.label }}
-          path: mutants/
+          name: mutmut-results-${{ matrix.label }}
+          # Results plus the mutated copies of the four mutated packages, so
+          # `mutmut results` / `mutmut show <id>` work after extracting the
+          # artifact into a checkout (see docs/mutation_testing.md).
+          path: |
+            mutation-report/
+            mutants/**/*.meta
+            mutants/src/app_setup/**/*.py
+            mutants/src/blueprints/**/*.py
+            mutants/src/utils/**/*.py
+            mutants/src/refresh_task/**/*.py
           if-no-files-found: ignore
-          # Preserve hidden test inputs if the isolated tree contains them.
-          include-hidden-files: true
 
   browser-smoke:
     name: Browser smoke (tabs + plugins)

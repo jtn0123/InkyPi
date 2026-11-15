@@ -114,8 +114,16 @@ CI sets `SKIP_BROWSER=1` and excludes container tests for this backend mutation
 pass. Browser and container tests have their own CI jobs. Run without
 `PYTHONPATH=src`: mutmut sets up the isolated imports itself.
 
-Results are uploaded as `mutmut-cache-<shard>` artifacts containing `mutants/`
-and can be downloaded from the GitHub Actions run summary.
+Each shard writes its mutation score and a table of results (killed,
+survived, not run and so on) to the run's summary page, using
+`scripts/mutation_summary.py`. The `mutmut-results-<shard>` artifact holds
+`mutation-report/results.txt` (the `mutmut results` listing of surviving and
+unchecked mutants), the `mutmut-cicd-stats.json` counts, and the parts of
+the `mutants/` tree that mutmut needs to show a mutant: the per-file `.meta`
+results and the mutated copies of the four packages. Extract it at the root
+of a checkout of the same commit, then run `mutmut results` and
+`mutmut show <id>` without running anything. The upload is best-effort and
+never fails the job.
 
 Each shard stops mutmut after 100 minutes (inside the job's 120-minute cap) and
 keeps the partial results, with a `Mutation budget reached` notice in the run
