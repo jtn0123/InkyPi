@@ -1,3 +1,4 @@
+import io
 import json
 import os
 import re
@@ -130,6 +131,48 @@ def test_history_image_route_serves_png(
     resp = client.get(f"/history/image/{name}")
     assert resp.status_code == 200
     assert resp.headers.get("Content-Type", "").startswith("image/")
+
+
+def test_history_grid_uses_thumbnails_and_links_full_size(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
+    """Grid images load the small variant; the lightbox and download stay full."""
+    d = device_config_dev.history_image_dir
+    os.makedirs(d, exist_ok=True)
+    name = "display_20250101_000800.png"
+    Image.new("RGB", (800, 480), "white").save(os.path.join(d, name))
+
+    body = client.get("/history").data.decode("utf-8")
+    img_srcs = re.findall(r'class="history-image" src="([^"]+)"', body)
+    assert img_srcs == [f"/history/image/{name}?w=480"]
+    assert f'href="/history/image/{name}"' in body
+    assert f'href="/history/image/{name}?' not in body
+
+    thumb = client.get(img_srcs[0], headers={"Accept": "image/webp"})
+    assert thumb.status_code == 200
+    assert thumb.mimetype == "image/webp"
+    with Image.open(io.BytesIO(thumb.data)) as img:
+        assert img.size == (480, 288)
+
+    full = client.get(f"/history/image/{name}", headers={"Accept": "image/webp"})
+    with Image.open(io.BytesIO(full.data)) as img:
+        assert img.size == (800, 480)
+    assert full.headers["ETag"] != thumb.headers["ETag"]
+
+
+@pytest.mark.parametrize("width", ["123", "abc", "", "-480", "480.0"])
+def test_history_image_rejects_unsupported_thumbnail_widths(
+    client: FlaskClient, device_config_dev: Any, width: str
+) -> None:
+    d = device_config_dev.history_image_dir
+    os.makedirs(d, exist_ok=True)
+    name = "display_20250101_000900.png"
+    Image.new("RGB", (800, 480), "white").save(os.path.join(d, name))
+
+    resp = client.get(
+        f"/history/image/{name}?w={width}", headers={"Accept": "image/webp"}
+    )
+    assert resp.status_code == 400
 
 
 def test_history_security_blocks_path_traversal_on_delete(client: FlaskClient) -> None:

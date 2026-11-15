@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import io
 import os
 import time
 from pathlib import Path
@@ -267,3 +268,94 @@ def test_matching_webp_revalidation_skips_the_encode(
     assert stale.status_code == 200
     assert stale.data[8:12] == b"WEBP"
     assert len(calls) == 1
+
+
+def test_thumbnail_scales_down_with_its_own_etag(tmp_path: Path) -> None:
+    from flask import Flask
+
+    from utils.image_serving import maybe_serve_webp
+
+    Image.new("RGB", (800, 480), (10, 20, 30)).save(tmp_path / "big.png")
+    app = Flask(__name__)
+    with app.test_request_context("/"):
+        full = maybe_serve_webp(tmp_path, "big.png", "image/webp")
+        thumb = maybe_serve_webp(tmp_path, "big.png", "image/webp", width=480)
+
+    with Image.open(io.BytesIO(thumb.get_data())) as img:
+        assert img.format == "WEBP"
+        assert img.size == (480, 288)
+    assert full.get_etag() != thumb.get_etag()
+
+
+def test_thumbnail_never_upscales(tmp_path: Path) -> None:
+    from flask import Flask
+
+    from utils.image_serving import maybe_serve_webp
+
+    _make_png(tmp_path)  # 4x4
+    app = Flask(__name__)
+    with app.test_request_context("/"):
+        thumb = maybe_serve_webp(tmp_path, "test.png", "image/webp", width=480)
+    with Image.open(io.BytesIO(thumb.get_data())) as img:
+        assert img.size == (4, 4)
+
+
+def test_palette_thumbnail_is_resampled_not_nearest(tmp_path: Path) -> None:
+    """A two-colour stripe pattern must average to grey, not alias to one colour."""
+    from flask import Flask
+
+    from utils.image_serving import maybe_serve_webp
+
+    stripes = Image.new("P", (960, 10))
+    stripes.putpalette([0, 0, 0, 255, 255, 255])
+    stripes.putdata([x % 2 for _ in range(10) for x in range(960)])
+    stripes.save(tmp_path / "stripes.png")
+    app = Flask(__name__)
+    with app.test_request_context("/"):
+        thumb = maybe_serve_webp(tmp_path, "stripes.png", "image/webp", width=480)
+    with Image.open(io.BytesIO(thumb.get_data())) as img:
+        assert img.size == (480, 5)
+        mid = img.convert("L").getpixel((240, 2))
+    assert isinstance(mid, int | float)
+    assert 64 < mid < 192, f"expected an averaged grey, got {mid}"
+
+
+def test_thumbnail_rejects_unlisted_widths(tmp_path: Path) -> None:
+    from flask import Flask
+
+    from utils.image_serving import maybe_serve_webp
+
+    _make_png(tmp_path)
+    app = Flask(__name__)
+    with app.test_request_context("/"), pytest.raises(ValueError):
+        maybe_serve_webp(tmp_path, "test.png", "image/webp", width=123)
+
+
+def test_matching_thumbnail_revalidation_skips_the_encode(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from flask import Flask, Response, request
+
+    import utils.image_serving as image_serving
+
+    Image.new("RGB", (800, 480), (10, 20, 30)).save(tmp_path / "big.png")
+    app = Flask(__name__)
+
+    @app.route("/image")
+    def image() -> Response:
+        return image_serving.maybe_serve_webp(
+            tmp_path, "big.png", request.headers.get("Accept"), width=480
+        )
+
+    client = app.test_client()
+    etag = client.get("/image", headers={"Accept": "image/webp"}).headers["ETag"]
+
+    def _fail(*_args: object) -> bytes:
+        raise AssertionError("a matching revalidation must not encode")
+
+    monkeypatch.setattr(image_serving, "_encode_webp_thumbnail", _fail)
+    monkeypatch.setattr(image_serving, "_encode_webp", _fail)
+    unchanged = client.get(
+        "/image", headers={"Accept": "image/webp", "If-None-Match": etag}
+    )
+    assert unchanged.status_code == 304

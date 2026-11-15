@@ -21,7 +21,7 @@ from werkzeug.exceptions import BadRequest
 
 from utils.form_utils import sanitize_log_field
 from utils.http_utils import JsonResponse, json_error, json_internal_error, json_success
-from utils.image_serving import maybe_serve_webp
+from utils.image_serving import THUMBNAIL_WIDTHS, maybe_serve_webp
 from utils.security_utils import validate_file_path
 from utils.time_utils import get_timezone, now_device_tz
 
@@ -32,6 +32,10 @@ history_bp = Blueprint("history", __name__)
 # Sonar S1192 — duplicate string constants
 _CONFIG_KEY = "DEVICE_CONFIG"
 _ERR_INVALID_FILENAME = "invalid filename"
+_ERR_INVALID_WIDTH = "invalid thumbnail width"
+#: Width of the History grid thumbnails. The lightbox and download links
+#: still use the full-size image.
+_GRID_THUMB_WIDTH = 480
 _ERR_FILE_NOT_FOUND = "File not found"
 _ERR_INVALID_JSON = "Invalid JSON payload"
 _ERR_BODY_NOT_OBJECT = "Request body must be a JSON object"
@@ -454,6 +458,7 @@ def history_page() -> Response | str:
         "images": images,
         "groups": _group_images_by_day(images),
         "thumb_ratio": _panel_thumb_ratio(device_config),
+        "thumb_width": _GRID_THUMB_WIDTH,
         "storage": _storage_context(history_dir),
         "metrics": _latest_metrics(device_config),
         "page": page,
@@ -478,8 +483,16 @@ def history_image(filename: str) -> Response | JsonResponse:
         _resolve_history_path(history_dir, filename)
     except ValueError:
         return json_error(_ERR_INVALID_FILENAME, status=400)
+    width: int | None = None
+    raw_width = request.args.get("w")
+    if raw_width is not None:
+        if not raw_width.isdigit() or int(raw_width) not in THUMBNAIL_WIDTHS:
+            return json_error(_ERR_INVALID_WIDTH, status=400)
+        width = int(raw_width)
     if filename.lower().endswith(".png"):
-        return maybe_serve_webp(history_dir, filename, request.headers.get("Accept"))
+        return maybe_serve_webp(
+            history_dir, filename, request.headers.get("Accept"), width=width
+        )
     return send_from_directory(history_dir, filename)
 
 
