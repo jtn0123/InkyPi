@@ -2,6 +2,20 @@
 
 <!-- version list -->
 
+## v1.8.5 (2026-11-15)
+
+### Bug Fixes
+
+- **settings**: Restore playlists when importing a backup
+  ([#719](https://github.com/jtn0123/InkyPi/pull/719),
+  [`2dc3981`](https://github.com/jtn0123/InkyPi/commit/2dc3981ed5576e447ab3b713c78580e8c7ae03ab))
+
+### Continuous Integration
+
+- Dump stack traces when the test job hangs ([#718](https://github.com/jtn0123/InkyPi/pull/718),
+  [`ae34f01`](https://github.com/jtn0123/InkyPi/commit/ae34f01875cf6928bafff2ca4a43c45ba5f3ed75))
+
+
 ## v1.8.4 (2026-11-15)
 
 ### Bug Fixes
