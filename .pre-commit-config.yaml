@@ -74,6 +74,16 @@ repos:
   # Run the lightweight browser smoke gate automatically for staged frontend files.
   - repo: local
     hooks:
+      # main.css is committed and CI no longer rebuilds it
+      # (tests/unit/test_main_css_current.py fails when it is stale). When a
+      # stylesheet partial changes, rebuild it; pre-commit then stops the
+      # commit so the rebuilt main.css can be staged with the partial.
+      - id: build-css
+        name: rebuild main.css from the partials
+        language: system
+        entry: scripts/precommit_tool.sh python scripts/build_css.py
+        pass_filenames: false
+        files: ^src/static/styles/(_imports\.css|partials/)
       - id: browser-smoke-gate
         name: Browser smoke gate (frontend changes)
         language: script
