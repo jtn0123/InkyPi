@@ -20,14 +20,16 @@ SUPPORTED_PYTHON = (3, 13)
 
 
 def lock_fingerprint(root: Path = ROOT) -> str:
+    """Fingerprint what ``--sync`` installs: the dev requirements and Python.
+
+    pyproject.toml and uv.lock are left out on purpose. Every release bumps
+    InkyPi's own version in both, which made each checkout look out of sync
+    (and scripts/test.sh refuse to run) though no dependency had changed.
+    The requirements file is exported with --no-emit-project, so it carries
+    no project version, and CI's drift check keeps it in step with uv.lock.
+    """
     digest = hashlib.sha256()
-    for name in (
-        "pyproject.toml",
-        "uv.lock",
-        "install/requirements-dev.txt",
-    ):
-        digest.update(name.encode())
-        digest.update((root / name).read_bytes())
+    digest.update((root / LOCK.relative_to(ROOT)).read_bytes())
     digest.update(f"{sys.version_info[:2]}:{sys.platform}".encode())
     return digest.hexdigest()
 
