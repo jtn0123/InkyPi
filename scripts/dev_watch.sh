@@ -42,8 +42,8 @@ Install it with one of:
   pip install watchdog
   .venv/bin/pip install watchdog
 
-(watchdog is listed in install/requirements-dev.in but is not part of the
-compiled lockfile; installing the single package is the quickest fix.)
+(watchdog is in pyproject.toml's dev dependency group, so
+`source scripts/venv.sh` installs it along with the other dev tools.)
 
 Then re-run ./scripts/dev_watch.sh
 EOF

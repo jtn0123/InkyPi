@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import re
 import time
+import tomllib
 from pathlib import Path
 from typing import Any
 
@@ -238,10 +239,11 @@ class TestDispatcherBehavior:
 
 
 class TestWatchdogDependencyDeclared:
-    def test_watchdog_in_requirements_dev_in(self) -> None:
-        req_in = (REPO_ROOT / "install" / "requirements-dev.in").read_text()
+    def test_watchdog_in_the_dev_dependency_group(self) -> None:
+        pyproject = tomllib.loads((REPO_ROOT / "pyproject.toml").read_text())
+        dev = pyproject["dependency-groups"]["dev"]
         # Tolerate any version constraint — we just want it present.
-        assert re.search(r"^watchdog[>=<~!\s]", req_in, re.MULTILINE), (
-            "watchdog should be declared in install/requirements-dev.in "
+        assert any(re.match(r"watchdog[>=<~!\s]", req) for req in dev), (
+            "watchdog should be in pyproject.toml's dev dependency group "
             "so contributors know it's an expected dev dependency"
         )

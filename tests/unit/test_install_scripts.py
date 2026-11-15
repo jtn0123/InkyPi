@@ -3,6 +3,7 @@
 
 import re
 import sys
+import tomllib
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
@@ -2921,10 +2922,12 @@ class TestMemoryDiffWorkflow:
         assert "memray" in capture
         assert "tracemalloc" in capture
 
-    def test_memray_listed_in_requirements_dev_in(self) -> None:
-        content = (INSTALL_DIR / "requirements-dev.in").read_text()
-        assert "memray" in content, (
-            "memray must be declared in install/requirements-dev.in so the "
+    def test_memray_listed_in_the_dev_dependency_group(self) -> None:
+        pyproject = tomllib.loads((INSTALL_DIR.parent / "pyproject.toml").read_text())
+        assert any(
+            req.startswith("memray") for req in pyproject["dependency-groups"]["dev"]
+        ), (
+            "memray must be in pyproject.toml's dev dependency group so the "
             "memory-diff workflow can install it from the lockfile."
         )
 

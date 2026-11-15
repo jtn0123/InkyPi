@@ -31,7 +31,7 @@ falls into one of three cases:
 
 - It ships its own types. Nothing to do.
 - A stub package exists (mypy says "Library stubs not installed for ...").
-  Pin it in `install/requirements-dev.in` next to `types-requests`,
+  Pin it in the `dev` dependency group in `pyproject.toml` next to `types-requests`,
   `types-PyYAML`, `types-psutil`, `types-jsonschema` and `types-waitress`,
   matched to the library's version, and regenerate the lock.
 - Neither exists (mypy says "missing library stubs or py.typed marker", or

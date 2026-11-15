@@ -3,9 +3,8 @@ name = "inkypi"
 version = "1.9.0"
 description = "InkyPi — e-ink dashboard for Raspberry Pi"
 requires-python = ">=3.13,<3.14"
-# Runtime dependencies mirror install/requirements.in during the uv-lock migration
-# window (JTN-616). The source of truth is this pyproject.toml + uv.lock; the
-# install/requirements.txt file is regenerated from uv.lock via `uv export`.
+# Runtime dependencies. The source of truth is this pyproject.toml + uv.lock;
+# install/requirements.txt is exported from uv.lock via `uv export` (JTN-616).
 dependencies = [
   "flask>=3.1,<4",
   "python-dotenv>=1.2,<2",
@@ -28,6 +27,65 @@ dependencies = [
   "jsonschema>=4.26,<5",
   "astral>=3.2,<4",
   "prometheus-client>=0.26,<1",
+]
+
+[dependency-groups]
+# Dev, test and CI tools. They are locked in uv.lock with the runtime
+# dependencies, so Dependabot's uv updates cover them too, and
+# install/requirements-dev.txt is exported from the lock (runtime + dev):
+#   uv export --format requirements.txt --group dev --no-emit-project \
+#     --output-file install/requirements-dev.txt
+# scripts/check_requirements_drift.sh fails CI when the export is stale.
+dev = [
+  "uv==0.13.4",
+  # Testing
+  "pytest>=9.1,<10",
+  "pytest-xdist>=3.8,<4",
+  "pytest-cov>=7.1,<8",
+  "pytest-benchmark>=5.3,<6",
+  # Flakiness retry for integration tests only (tests/integration/conftest.py);
+  # unit tests must not retry. 16.x is the first release supporting pytest 9.
+  "pytest-rerunfailures>=16.7,<17",
+  # Per-test hang protection (pytest.ini `timeout`).
+  "pytest-timeout>=2.4,<3",
+  "requests-mock>=1.12,<2",
+  "freezegun>=1.5,<2",
+  "hypothesis>=6.168,<7",
+  # Type checking. Without types-PyYAML mypy aborts the whole tests/ run, so
+  # the stubs are required, not a nicety. The runtime-library stubs match the
+  # versions in [project.dependencies]; mypy.ini lists the imports that have
+  # no types anywhere.
+  "mypy>=2.3,<3",
+  "types-PyYAML==6.0.12.20260906",
+  "types-requests==2.33.0.20260906",
+  "types-jsonschema==4.26.0.20261006",
+  "types-psutil==7.2.2.20261111",
+  "types-waitress==3.0.1.20260724",
+  # Linting / formatting
+  "black>=26.0,<27",
+  "ruff>=0.16,<1",
+  # `watchmedo` for scripts/dev_watch.sh. 7.x matches watch patterns against
+  # the full path, which dev_watch.sh's **/ patterns rely on.
+  "watchdog>=7.1,<8",
+  # Browser / E2E testing. Playwright ships no 32-bit ARM builds; the marker
+  # keeps the Pi entries in required-environments resolvable.
+  "playwright>=1.63,<2; platform_machine != 'armv6l' and platform_machine != 'armv7l'",
+  # Safe XML parsing in tests and scripts.
+  "defusedxml>=0.7,<1",
+  # Audit / compliance
+  "pip-audit>=2.10,<3",
+  "cyclonedx-bom>=8.0,<9",
+  "pre-commit>=4.6,<5",
+  # Matches the pin in .github/workflows/release.yml.
+  "python-semantic-release==10.7.0",
+  # Patched floor for python-semantic-release's GitPython.
+  "GitPython>=3.1.59,<4",
+  "pip-licenses>=5.5,<6",
+  # Mutation testing (optional, slow: `mutmut run`).
+  "mutmut>=3.8,<4",
+  # Memory profiling for the per-PR memory diff (Linux wheels only;
+  # tracemalloc is the fallback elsewhere).
+  "memray>=1.20,<2; sys_platform == 'linux'",
 ]
 
 [tool.uv]

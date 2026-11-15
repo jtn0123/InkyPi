@@ -2,19 +2,21 @@
 
 Runtime dependencies are declared in `pyproject.toml`, resolved universally in
 `uv.lock`, and exported with hashes to `install/requirements.txt`. Dev and CI
-dependencies use `install/requirements-dev.in` and a universal,
-hash-pinned `install/requirements-dev.txt`.
+tools are the `dev` group under `[dependency-groups]` in the same file, locked
+in the same `uv.lock`, and exported (runtime + dev) to
+`install/requirements-dev.txt`. Dependabot's `uv` updates cover both.
 
 ## Updating runtime dependencies
 
-Edit `[project.dependencies]` when changing a version range. Keep the legacy
-`install/requirements.in` reference and duplicated runtime ranges in
-`install/requirements-dev.in` aligned. To update a package within its range:
+Edit `[project.dependencies]` when changing a version range. To update a
+package within its range:
 
 ```bash
 uv lock --upgrade-package openai
 uv export --format requirements.txt --no-dev --no-emit-project \
     --output-file install/requirements.txt
+uv export --format requirements.txt --group dev --no-emit-project \
+    --output-file install/requirements-dev.txt
 bash scripts/check_requirements_drift.sh
 ```
 
@@ -25,34 +27,30 @@ append packages or hashes manually to the generated requirements file.
 
 ## Updating dev dependencies
 
-Edit `install/requirements-dev.in`, then resolve universally for Python 3.13,
-the only supported interpreter. Universal mode preserves Linux-only `memray`
-and libcst's Python 3.13-specific YAML backend even when run on a Mac:
+Edit the `dev` list under `[dependency-groups]` in `pyproject.toml`, then lock
+and export:
 
 ```bash
-uv --no-config pip compile --universal --python-version 3.13 --fork-strategy fewest \
-    --prerelease disallow --upgrade --generate-hashes \
-    install/requirements-dev.in -o install/requirements-dev.txt
+uv lock --upgrade-package ruff
+uv export --format requirements.txt --group dev --no-emit-project \
+    --output-file install/requirements-dev.txt
 ```
 
-Use `--upgrade-package <name>` instead of `--upgrade` for a targeted refresh.
-`--no-config` keeps dev compilation independent of the runtime ARM32 Pi wheel
-requirements in `pyproject.toml`: Playwright only supports desktop/64-bit Linux
-developer hosts. Runtime resolution retains all Pi targets. uv 0.13.4 is pinned
-in the dev input and CI/release compiler steps for consistent resolution.
+The lock must satisfy `required-environments`, which includes the 32-bit ARM
+Pis. A dev tool with no build for them (Playwright) carries a
+`platform_machine` marker so those environments skip it. uv 0.13.4 is pinned in
+the dev group and the CI/release steps for consistent resolution.
 
-A platform-specific pip-compile run omits conditional dependencies and must not
-replace this universal file. `scripts/check_requirements_drift.sh` re-resolves
-against the committed pins to detect missing dependencies without upgrading.
-Commit both dev files. Verify that the runtime and dev pins can be installed
-together, run `pip check`, and run the test and strict mypy gates.
+`scripts/check_requirements_drift.sh` fails when either export no longer
+matches `uv.lock`. Commit `pyproject.toml`, `uv.lock` and both exports together,
+then run `pip check` and the test and strict mypy gates.
 
 ## Compatibility constraints
 
 - `pydantic-core` follows Pydantic's exact pin. Google GenAI currently caps
   `websockets` below 17. Upgrade through their parent libraries.
 - Requests type stubs are explicitly pinned to a version validated by mypy.
-- Python Semantic Release is pinned in both the dev input and release workflow.
+- Python Semantic Release is pinned in both the dev group and release workflow.
   Its v10 changelog uses update mode and the `<!-- version list -->` marker;
   keep that marker above the existing releases. The parser options preserve
   the previous squash-commit behavior.

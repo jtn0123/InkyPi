@@ -13,10 +13,6 @@ and macOS arm64/x86_64) from a single resolution.
    `uv.lock` via `uv export`. This is the file consumed by `install/install.sh`
    with `--require-hashes` (preserves the JTN-516 supply-chain guarantee).
 
-During the migration window (JTN-616), `install/requirements.in` is retained as
-a legacy reference. It is **not** the source of truth any longer — edit
-`pyproject.toml` instead.
-
 ## How to Regenerate
 
 After changing a dependency in `pyproject.toml`:
@@ -60,9 +56,8 @@ regenerates the file is different.
 
 ## Dev Requirements
 
-`install/requirements-dev.in` remains the source for dev/CI dependencies. It is
-compiled with `uv --no-config pip compile --universal --python-version 3.13` rather than
-platform-specific pip-compile. This preserves conditional dependencies across
-Linux/macOS on Python 3.13 (the only supported interpreter), including Linux-only memray and libcst's
-Python 3.13 YAML backend. See [Dependency Management](dependencies.md) for the
-full command. The drift check validates both runtime and dev outputs.
+Dev and CI tools are the `dev` group under `[dependency-groups]` in
+`pyproject.toml`, locked in the same `uv.lock`, and exported with
+`uv export --group dev` to `install/requirements-dev.txt`. See
+[Dependency Management](dependencies.md) for the full command. The drift check
+validates both exports.
