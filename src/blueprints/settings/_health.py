@@ -11,6 +11,7 @@ from typing import Any
 from flask import Response, current_app, request
 
 import blueprints.settings as _mod
+from utils.env_flags import env_bool
 from utils.http_utils import json_error, json_internal_error, json_success
 from utils.progress_events import get_progress_bus, to_sse
 from utils.sse import (
@@ -50,12 +51,7 @@ def _release_progress_stream() -> None:
 
 
 def _progress_stream_enabled() -> bool:
-    return os.getenv("INKYPI_PROGRESS_SSE_ENABLED", "true").strip().lower() in (
-        "1",
-        "true",
-        "yes",
-        "on",
-    )
+    return env_bool("INKYPI_PROGRESS_SSE_ENABLED", default=True)
 
 
 def _progress_stream_last_seq(latest_seq: int) -> int:

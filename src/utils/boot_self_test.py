@@ -31,13 +31,13 @@ on the first boot after the blackout is lifted.
 from __future__ import annotations
 
 import logging
-import os
 import time
 from collections.abc import Mapping
 from datetime import UTC, datetime
 from typing import Any
 
 from utils import crash_breadcrumb
+from utils.env_flags import env_bool
 
 logger = logging.getLogger(__name__)
 
@@ -61,8 +61,6 @@ _BARS: tuple[tuple[str, tuple[int, int, int]], ...] = (
     ("Orange", (255, 128, 0)),
 )
 
-_TRUTHY = frozenset({"1", "true", "yes", "on"})
-
 
 def last_result() -> dict[str, Any] | None:
     """The recorded outcome of the most recent self-test, if any."""
@@ -71,7 +69,7 @@ def last_result() -> dict[str, Any] | None:
 
 def skip_reason(device_config: Any) -> str | None:
     """Why the self-test is disabled on this device, or ``None`` if enabled."""
-    if os.getenv(SKIP_ENV, "").strip().lower() in _TRUTHY:
+    if env_bool(SKIP_ENV):
         return f"{SKIP_ENV} is set"
     if device_config.get_config(CONFIG_KEY, default=True) is False:
         return f"{CONFIG_KEY} is false in device config"

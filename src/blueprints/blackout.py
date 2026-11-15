@@ -39,13 +39,13 @@ from urllib.parse import urlsplit
 from flask import Blueprint, current_app, redirect, request, url_for
 
 from utils import blackout
+from utils.env_flags import TRUTHY
 from utils.http_utils import json_error, json_success
 
 logger = logging.getLogger(__name__)
 
 blackout_bp = Blueprint("blackout", __name__)
 
-_TRUTHY = frozenset({"1", "true", "yes", "on"})
 _TRUSTED_FETCH_SITES = frozenset({"none", "same-origin"})
 
 #: Endpoints that push a frame to the panel on request. During blackout they
@@ -148,7 +148,7 @@ def api_blackout() -> Any:
                 status=403,
             )
     turn_on = request.method != "DELETE" and (
-        request.args.get("off", "").strip().lower() not in _TRUTHY
+        request.args.get("off", "").strip().lower() not in TRUTHY
     )
     return _apply(turn_on)
 
