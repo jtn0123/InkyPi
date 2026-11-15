@@ -29,7 +29,8 @@ The test is **skipped by default** — 2 minutes of wall-time is too much
 for the hot-loop fast suite. Opt in by setting ``SKIP_LOAD=0`` (or any
 other falsy value) in the environment before running pytest. The
 repo-wide ``SKIP_UI`` / ``SKIP_BROWSER`` gates still apply: no browser,
-no load test.
+no load test. CI's ``browser-full`` job sets ``SKIP_LOAD=0`` on the nightly
+schedule, so it runs once a day rather than on every PR.
 
 Example local run::
 
@@ -186,6 +187,14 @@ def _percentile(values: list[float], pct: float) -> float:
     return ordered[rank]
 
 
+# The loop alone fills pytest.ini's global 120 s timeout; allow for the
+# server, the browser and the final page loads on top of it.
+@pytest.mark.timeout(int(_LOOP_DURATION_S) + 120)
+# The loop navigates several times a second, faster than an evicted SSE stream
+# winds down (it checks once a second), so the two-stream cap answers 503 and
+# the dashboard falls back to polling. That is the cap working as designed
+# (utils/sse.py); any other client log still fails the test.
+@pytest.mark.expected_client_logs(r"^SSE connection lost, falling back to polling$")
 def test_sustained_handler_load(live_server: str, browser_page: Page) -> None:
     """Click for ~2 minutes across three pages; assert no degradation.
 

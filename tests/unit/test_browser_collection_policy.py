@@ -2,6 +2,7 @@
 
 import ast
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -252,3 +253,57 @@ def test_untargeted_browser_module_never_demands_a_browser(
     )
     result = policy.pytest_ignore_collect(integration / "test_click_sweep.py", config)
     assert result is None
+
+
+def _drives_a_browser(path: Path) -> bool:
+    """True if the module imports Playwright or a test takes the ``page`` fixture."""
+    for node in ast.walk(ast.parse(path.read_text())):
+        if isinstance(node, ast.ImportFrom):
+            modules = [node.module or ""]
+        elif isinstance(node, ast.Import):
+            modules = [alias.name for alias in node.names]
+        else:
+            modules = []
+        if any(m.split(".")[0] == "playwright" for m in modules):
+            return True
+        if (
+            isinstance(node, ast.FunctionDef)
+            and node.name.startswith("test_")
+            and any(arg.arg == "page" for arg in node.args.args)
+        ):
+            return True
+    return False
+
+
+def test_every_browser_module_is_selected_by_a_browser_lane() -> None:
+    """A browser test no CI lane selects never runs anywhere.
+
+    The CI ``tests`` job sets SKIP_BROWSER=1, so a browser module runs only if
+    ``browser-full`` selects it (listed in UI_BROWSER_TESTS / A11Y_BROWSER_TESTS,
+    which tag it ``browser``, or marked ``journey``) or ``browser-smoke`` names
+    it in ci.yml. test_sustained_load.py sat outside all three for months.
+    """
+    repo_root = Path(policy.__file__).resolve().parents[1]
+    ci = (repo_root / ".github" / "workflows" / "ci.yml").read_text()
+    named_in_ci = {Path(p).name for p in re.findall(r"tests/integration/\S+\.py", ci)}
+    listed = policy.UI_BROWSER_TESTS | policy.A11Y_BROWSER_TESTS
+    orphans = [
+        str(path.relative_to(repo_root))
+        for path in sorted((repo_root / "tests" / "integration").rglob("test_*.py"))
+        if _drives_a_browser(path)
+        and path.name not in listed
+        and path.name not in named_in_ci
+        and "pytest.mark.journey" not in path.read_text()
+    ]
+    assert orphans == [], (
+        "browser tests that no CI lane runs; add them to UI_BROWSER_TESTS in "
+        f"tests/conftest.py: {orphans}"
+    )
+
+
+def test_listed_browser_modules_exist() -> None:
+    """A stale name in the browser lists would hide a renamed module."""
+    repo_root = Path(policy.__file__).resolve().parents[1]
+    present = {p.name for p in (repo_root / "tests").rglob("test_*.py")}
+    missing = sorted((policy.UI_BROWSER_TESTS | policy.A11Y_BROWSER_TESTS) - present)
+    assert missing == []
