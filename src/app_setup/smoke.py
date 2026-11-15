@@ -112,7 +112,7 @@ def register_smoke_endpoints(app: Flask) -> None:
         try:
             plugin = get_plugin_instance(plugin_config)
             image = plugin.generate_image({}, device_config)
-        except Exception as exc:  # noqa: BLE001 — surface class for debugging only
+        except Exception as exc:  # surface class for debugging only
             logger.exception("smoke render failed for plugin %s", plugin_id)
             return json_error(
                 f"render failed: {type(exc).__name__}",

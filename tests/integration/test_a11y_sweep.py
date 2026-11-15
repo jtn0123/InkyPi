@@ -141,7 +141,7 @@ def _run_axe_on_page(page: Page, url: str, marker: str | None) -> dict[str, Any]
     if marker:
         try:
             page.wait_for_selector(marker, timeout=_MARKER_TIMEOUT_MS)
-        except Exception:  # noqa: BLE001 — marker absence is not fatal
+        except Exception:  # marker absence is not fatal
             pass
     page.wait_for_timeout(_SETTLE_MS)
     page.add_script_tag(content=_AXE_JS_PATH.read_text(encoding="utf-8"))

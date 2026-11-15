@@ -39,7 +39,7 @@ def get_state(device_config: Any) -> dict[str, Any]:
     """Return ``{"active": bool, "since": iso | None}`` for *device_config*."""
     try:
         raw = device_config.get_config(CONFIG_KEY, default=None)
-    except Exception:  # noqa: BLE001 — a config read must never break a refresh
+    except Exception:  # a config read must never break a refresh
         logger.debug("blackout: could not read state", exc_info=True)
         raw = None
     if not isinstance(raw, dict):

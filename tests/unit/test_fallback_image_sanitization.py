@@ -218,9 +218,7 @@ class TestRenderErrorImageSanitised:
         captured: list[str] = []
         original_text = ImageDraw.ImageDraw.text
 
-        def _capture(
-            self, xy: Any, text: Any, *args: Any, **kwargs: Any
-        ) -> Any:  # noqa: ANN001
+        def _capture(self, xy: Any, text: Any, *args: Any, **kwargs: Any) -> Any:
             captured.append(text)
             return original_text(self, xy, text, *args, **kwargs)
 
@@ -251,9 +249,7 @@ class TestRenderErrorImageSanitised:
         captured: list[str] = []
         original_text = ImageDraw.ImageDraw.text
 
-        def _capture(
-            self, xy: Any, text: Any, *args: Any, **kwargs: Any
-        ) -> Any:  # noqa: ANN001
+        def _capture(self, xy: Any, text: Any, *args: Any, **kwargs: Any) -> Any:
             captured.append(text)
             return original_text(self, xy, text, *args, **kwargs)
 

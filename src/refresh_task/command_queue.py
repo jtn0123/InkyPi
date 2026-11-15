@@ -128,7 +128,7 @@ class CommandQueueMixin:
         try:
             with crash_breadcrumb.trail("display_command", command=command.name):
                 result = command.run(self.display_manager)
-        except Exception as exc:  # noqa: BLE001 — reported to the caller
+        except Exception as exc:  # reported to the caller
             logger.warning(
                 "Display command %s failed: %s", command.name, exc, exc_info=True
             )

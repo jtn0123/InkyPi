@@ -66,7 +66,7 @@ def _pre_restore_backup(
     scripts_dir = os.path.dirname(os.path.abspath(__file__))
     sys.path.insert(0, scripts_dir)
     try:
-        import backup_config  # noqa: PLC0415
+        import backup_config
     finally:
         sys.path.pop(0)
 
@@ -174,7 +174,7 @@ def run_restore(
     try:
         safety_path = _pre_restore_backup(config_dir, instances_dir)
         print(f"Safety backup saved to: {safety_path}")
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         print(f"Warning: could not create safety backup: {exc}", file=sys.stderr)
 
     # Extract

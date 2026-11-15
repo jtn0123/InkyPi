@@ -10,7 +10,7 @@ from flask import Flask
 from flask.testing import FlaskClient
 
 pytest.importorskip("freezegun")
-from freezegun import freeze_time  # noqa: E402
+from freezegun import freeze_time
 
 
 def test_playlist_rotation_respects_device_timezone_freeze(

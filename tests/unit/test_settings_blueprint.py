@@ -443,7 +443,7 @@ class TestHealthAPIs:
         """When psutil is unavailable, system health returns None fields."""
         import blueprints.settings as mod
 
-        _original = mod.health_system  # noqa: F841 — kept for potential future use
+        _original = mod.health_system  # kept for potential future use
 
         # Patch psutil import to fail within the route
         import builtins

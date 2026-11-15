@@ -184,13 +184,13 @@ def _click_toggle(page: Page, descriptor: dict) -> tuple[dict | None, dict | Non
     # `<input type="checkbox">` flips `checked` then fires `click`/`change`.
     try:
         page.evaluate("(sel) => document.querySelector(sel)?.click()", selector)
-    except Exception:  # noqa: BLE001
+    except Exception:
         # Last-ditch: try Playwright's own click with force=True.
         try:
             page.locator(selector).first.click(
                 timeout=2000, force=True, no_wait_after=True
             )
-        except Exception:  # noqa: BLE001
+        except Exception:
             return before, None
     page.wait_for_timeout(_CLICK_SETTLE_MS)
     after = _state(page, marker)

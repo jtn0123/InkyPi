@@ -98,7 +98,7 @@ def _build_retry(
     """Build a retry policy without binding it to a specific caller profile."""
     # Retry idempotent methods on common transient failures.  ``urllib3`` is
     # imported lazily to keep it off the startup path (JTN-606).
-    from urllib3.util.retry import Retry as _Retry  # noqa: F811
+    from urllib3.util.retry import Retry as _Retry
 
     return _Retry(
         total=total,
@@ -132,8 +132,8 @@ def _build_env_retry() -> Retry:
 
 def _build_session(*, headers: dict[str, str], retry: Retry) -> requests.Session:
     # ``requests`` / HTTPAdapter are imported lazily — see module docstring.
-    import requests  # noqa: F811
-    from requests.adapters import HTTPAdapter  # noqa: F811
+    import requests
+    from requests.adapters import HTTPAdapter
 
     s = requests.Session()
     adapter = HTTPAdapter(
@@ -268,7 +268,7 @@ def http_get(
     """
     # Lazy import: see module docstring (JTN-606).  ``requests`` is only
     # loaded when an HTTP call is actually made.
-    import requests  # noqa: F811
+    import requests
 
     # Check cache first (unless streaming or caching disabled)
     if use_cache and not stream:

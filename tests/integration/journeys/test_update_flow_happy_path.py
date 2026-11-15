@@ -296,7 +296,7 @@ def test_update_flow_happy_path(
     # scheduling race can make this flaky on very slow CI boxes. The fake
     # runner held the flag for 300ms which is ample under normal load.
     if not saw_running:
-        pytest.skip(  # noqa: PT017 — intentional soft-fail diagnostic
+        pytest.skip(  # intentional soft-fail diagnostic
             "Did not observe intermediate running=True (thread-scheduling "
             "race). Terminal state is correct; transition was too fast to "
             "catch in this environment."

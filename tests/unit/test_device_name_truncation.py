@@ -69,7 +69,7 @@ def _make_config(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, name: str) -> 
     The ``config`` module is imported lazily inside the helper so the
     module-level import graph of this test file stays clean.
     """
-    import config as config_mod  # noqa: PLC0415 — lazy on purpose (S7788)
+    import config as config_mod  # lazy on purpose (S7788)
 
     config_file = tmp_path / "config" / "device.json"
     _write_cfg(str(config_file), name=name)

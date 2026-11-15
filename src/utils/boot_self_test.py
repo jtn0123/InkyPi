@@ -108,7 +108,7 @@ def make_test_pattern(width: int, height: int, version: str) -> Any:
         from utils.app_utils import get_font
 
         font = get_font("Jost", max(12, label_h // 2))
-    except Exception:  # noqa: BLE001 — a missing font must not fail the test
+    except Exception:  # a missing font must not fail the test
         logger.debug("self-test: font unavailable, using default", exc_info=True)
     draw.text(
         (width / 2, height - label_h / 2), text, fill=(0, 0, 0), font=font, anchor="mm"
@@ -156,7 +156,7 @@ def run(
         if restore:
             try:
                 display_manager.restore_last_frame()
-            except Exception as exc:  # noqa: BLE001 — the test itself passed
+            except Exception as exc:  # the test itself passed
                 logger.warning("self-test: could not restore previous frame: %s", exc)
                 metrics["restore_error"] = type(exc).__name__
         return metrics
@@ -166,7 +166,7 @@ def run(
         metrics = refresh_task.run_display_command(
             "boot_self_test", _command, timeout=_COMMAND_TIMEOUT_SECONDS
         )
-    except Exception as exc:  # noqa: BLE001 — recorded, never raised
+    except Exception as exc:  # recorded, never raised
         logger.error("Boot self-test FAILED: %s: %s", type(exc).__name__, exc)
         return _record(version, "fail", error=f"{type(exc).__name__}: {exc}"[:500])
 

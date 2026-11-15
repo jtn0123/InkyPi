@@ -114,7 +114,7 @@ def test_jtn_728_reboot_shutdown_journey(
 
     def _fake_run(
         cmd: Any, check: Any = True
-    ) -> Any:  # noqa: FBT002 - signature mirrors subprocess.run
+    ) -> Any:  # signature mirrors subprocess.run
         calls.append(list(cmd))
 
         class _Result:

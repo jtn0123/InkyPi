@@ -30,7 +30,7 @@ from flask.testing import FlaskClient
 # sys.path via SRC_ABS. TypedDict subclasses from ``typing`` expose their
 # total-ness on the class itself.
 from benchmarks.benchmark_storage import _ensure_schema
-from schemas.responses import (  # noqa: E402  (sys.path set up by conftest)
+from schemas.responses import (  # sys.path set up by conftest
     BenchmarksPluginsResponse,
     BenchmarksRefreshesResponse,
     BenchmarksStagesResponse,
@@ -53,7 +53,7 @@ from schemas.responses import (  # noqa: E402  (sys.path set up by conftest)
     UptimeResponse,
     VersionInfoResponse,
 )
-from schemas.validator import validate_typeddict  # noqa: E402
+from schemas.validator import validate_typeddict
 
 
 def assert_shape(payload: Any, schema: Any) -> None:
