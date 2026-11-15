@@ -17,7 +17,7 @@ from typing import Any
 
 from flask import Blueprint, current_app, jsonify, request
 
-from utils.http_utils import json_error
+from utils.api_responses import json_error
 from utils.plugin_history import compute_diff, get_history
 
 logger = logging.getLogger(__name__)

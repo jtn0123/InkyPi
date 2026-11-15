@@ -39,8 +39,8 @@ from urllib.parse import urlsplit
 from flask import Blueprint, current_app, redirect, request, url_for
 
 from utils import blackout
+from utils.api_responses import json_error, json_success
 from utils.env_flags import TRUTHY
-from utils.http_utils import json_error, json_success
 
 logger = logging.getLogger(__name__)
 

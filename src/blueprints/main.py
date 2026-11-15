@@ -20,13 +20,13 @@ from benchmarks.benchmark_storage import save_refresh_event, save_stage_event
 from refresh_task import schedule
 from refresh_task.health import PluginHealthTracker
 from utils import blackout
+from utils.api_responses import APIError, JsonResponse, json_error, json_success
 from utils.backend_errors import mapped_render_errors
 from utils.display_names import (
     friendly_instance_label,
     instance_suffix_label,
     is_auto_instance_name,
 )
-from utils.http_utils import APIError, JsonResponse, json_error, json_success
 from utils.image_serving import maybe_serve_webp
 from utils.output_validator import fit_image_to_device
 from utils.rate_limit import CooldownLimiter

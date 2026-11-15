@@ -31,9 +31,9 @@ from typing import Any
 
 from flask import Blueprint, Response
 
+from utils.api_responses import json_error, reissue_json_error
 from utils.client_endpoint import enforce_size_and_rate
 from utils.form_utils import sanitize_log_field
-from utils.http_utils import json_error, reissue_json_error
 from utils.rate_limit import TokenBucket
 
 logger = logging.getLogger(__name__)

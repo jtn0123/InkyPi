@@ -121,7 +121,7 @@ def test_error_handlers_api_error(monkeypatch: pytest.MonkeyPatch) -> None:
     app = _reload_inkypi(monkeypatch, argv=["inkypi.py"], env={})
     assert app is not None
 
-    from utils.http_utils import APIError
+    from utils.api_responses import APIError
 
     def _raise_api_error() -> None:
         raise APIError(

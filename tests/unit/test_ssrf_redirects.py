@@ -113,10 +113,10 @@ class Router:
 
 @pytest.fixture
 def http_get_router(monkeypatch: pytest.MonkeyPatch) -> Any:
-    """Route ``utils.http_utils.http_get``'s session through a Router."""
-    from utils import http_utils
+    """Route ``utils.http_transport.http_get``'s session through a Router."""
+    from utils import http_transport
 
-    http_utils._reset_shared_session_for_tests()
+    http_transport._reset_shared_session_for_tests()
 
     def _install(routes: dict[str, FakeResp]) -> Router:
         router = Router(routes)
@@ -136,7 +136,7 @@ def http_get_router(monkeypatch: pytest.MonkeyPatch) -> Any:
 
 
 def test_redirect_to_private_ip_is_blocked(http_get_router: Any) -> None:
-    from utils.http_utils import safe_http_get
+    from utils.safe_fetch import safe_http_get
 
     router = http_get_router(
         {"https://public.example.com/a": _redirect("http://192.168.1.1/admin")}
@@ -150,7 +150,7 @@ def test_redirect_to_private_ip_is_blocked(http_get_router: Any) -> None:
 def test_redirect_to_hostname_resolving_private_is_blocked(
     http_get_router: Any,
 ) -> None:
-    from utils.http_utils import safe_http_get
+    from utils.safe_fetch import safe_http_get
 
     http_get_router(
         {"https://public.example.com/a": _redirect("http://loop.example.com/")}
@@ -162,7 +162,7 @@ def test_redirect_to_hostname_resolving_private_is_blocked(
 def test_redirect_to_public_host_is_followed_and_pinned(
     http_get_router: Any, _table_dns: list[str]
 ) -> None:
-    from utils.http_utils import safe_http_get
+    from utils.safe_fetch import safe_http_get
 
     final = FakeResp(200, b"ok")
     router = http_get_router(
@@ -184,7 +184,7 @@ def test_redirect_to_public_host_is_followed_and_pinned(
 
 
 def test_relative_redirect_resolves_against_current_url(http_get_router: Any) -> None:
-    from utils.http_utils import safe_http_get
+    from utils.safe_fetch import safe_http_get
 
     final = FakeResp(200, b"ok")
     router = http_get_router(
@@ -199,7 +199,7 @@ def test_relative_redirect_resolves_against_current_url(http_get_router: Any) ->
 
 
 def test_too_many_redirects_fails(http_get_router: Any) -> None:
-    from utils.http_utils import MAX_GUARDED_REDIRECTS, safe_http_get
+    from utils.safe_fetch import MAX_GUARDED_REDIRECTS, safe_http_get
 
     routes = {
         f"https://public.example.com/{i}": _redirect(f"/{i + 1}")
@@ -212,7 +212,7 @@ def test_too_many_redirects_fails(http_get_router: Any) -> None:
 
 
 def test_allow_redirects_false_returns_redirect_response(http_get_router: Any) -> None:
-    from utils.http_utils import safe_http_get
+    from utils.safe_fetch import safe_http_get
 
     redirect = _redirect("http://192.168.1.1/")
     http_get_router({"https://public.example.com/a": redirect})
@@ -221,7 +221,7 @@ def test_allow_redirects_false_returns_redirect_response(http_get_router: Any) -
 
 
 def test_cross_origin_redirect_drops_credentials(http_get_router: Any) -> None:
-    from utils.http_utils import safe_http_get
+    from utils.safe_fetch import safe_http_get
 
     router = http_get_router(
         {
@@ -372,7 +372,7 @@ def test_allow_lan_still_blocks_loopback_and_link_local(url: str) -> None:
 
 
 def test_read_capped_rejects_declared_oversize_without_reading() -> None:
-    from utils.http_utils import ResponseTooLargeError, read_capped
+    from utils.safe_fetch import ResponseTooLargeError, read_capped
 
     resp = FakeResp(200, b"x" * 10, headers={"Content-Length": "1000"})
     resp.iter_content = None  # type: ignore[assignment,method-assign]
@@ -381,7 +381,7 @@ def test_read_capped_rejects_declared_oversize_without_reading() -> None:
 
 
 def test_read_capped_rejects_streamed_oversize() -> None:
-    from utils.http_utils import ResponseTooLargeError, read_capped
+    from utils.safe_fetch import ResponseTooLargeError, read_capped
 
     oversized = FakeResp(200, b"x" * 300, chunk=64)
     with pytest.raises(ResponseTooLargeError):
@@ -390,7 +390,7 @@ def test_read_capped_rejects_streamed_oversize() -> None:
 
 
 def test_safe_fetch_bytes_rejects_oversized_body(http_get_router: Any) -> None:
-    from utils.http_utils import ResponseTooLargeError, safe_fetch_bytes
+    from utils.safe_fetch import ResponseTooLargeError, safe_fetch_bytes
 
     resp = FakeResp(200, b"y" * 5000, chunk=1000)
     http_get_router({"https://public.example.com/big": resp})
@@ -416,7 +416,7 @@ def _saved_resolver() -> object:
 
 
 def test_pinned_dns_restores_resolver_when_threads_exit_out_of_order() -> None:
-    from utils import dns_pinning, http_utils
+    from utils import dns_pinning
 
     original = socket.getaddrinfo
     a_entered, b_entered, a_exited = (threading.Event() for _ in range(3))
@@ -424,7 +424,7 @@ def test_pinned_dns_restores_resolver_when_threads_exit_out_of_order() -> None:
 
     def thread_a() -> None:
         try:
-            with http_utils.pinned_dns("a.example.com", (PUBLIC_A,)):
+            with dns_pinning.pinned_dns("a.example.com", (PUBLIC_A,)):
                 a_entered.set()
                 _wait(b_entered, "thread b to enter")
         except BaseException as exc:  # pragma: no cover - surfaced below
@@ -435,7 +435,7 @@ def test_pinned_dns_restores_resolver_when_threads_exit_out_of_order() -> None:
     def thread_b() -> None:
         try:
             _wait(a_entered, "thread a to enter")
-            with http_utils.pinned_dns("b.example.com", (PUBLIC_B,)):
+            with dns_pinning.pinned_dns("b.example.com", (PUBLIC_B,)):
                 b_entered.set()
                 _wait(a_exited, "thread a to exit")
         except BaseException as exc:  # pragma: no cover - surfaced below
@@ -453,7 +453,7 @@ def test_pinned_dns_restores_resolver_when_threads_exit_out_of_order() -> None:
     assert _saved_resolver() is None
 
     # A later pin must wrap the original resolver, not a leaked wrapper.
-    with http_utils.pinned_dns("c.example.com", (PUBLIC_A,)):
+    with dns_pinning.pinned_dns("c.example.com", (PUBLIC_A,)):
         assert _saved_resolver() is original
     assert socket.getaddrinfo is original
 
@@ -559,7 +559,7 @@ def test_rss_redirect_to_private_blocked(monkeypatch: pytest.MonkeyPatch) -> Non
 
 def test_rss_oversized_feed_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
     from plugins.rss import rss as rss_mod
-    from utils.http_utils import ResponseTooLargeError
+    from utils.safe_fetch import ResponseTooLargeError
 
     monkeypatch.setattr(rss_mod, "MAX_FEED_BYTES", 64)
     rss, _ = _rss(

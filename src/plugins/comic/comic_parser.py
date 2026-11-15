@@ -5,7 +5,7 @@ from typing import Any, TypedDict
 
 import feedparser
 
-from utils.http_utils import http_get
+from utils.http_transport import http_get
 
 
 def _match(pattern: str, text: str) -> str:

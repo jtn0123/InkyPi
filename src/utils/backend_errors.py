@@ -7,9 +7,9 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from typing import Any
 
+from utils.api_responses import APIError
 from utils.blackout import BLOCKED_MESSAGE, BlackoutActiveError
 from utils.domain_errors import DomainError, RefreshTaskUnavailable
-from utils.http_utils import APIError
 from utils.plugin_errors import (
     MANUAL_UPDATE_TIMEOUT_MSG,
     SCREENSHOT_BACKEND_UNAVAILABLE_MSG,

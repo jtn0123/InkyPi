@@ -72,7 +72,7 @@ def validate_url_with_ips(
 
     The returned IP tuple is the exact set of addresses the URL's hostname
     resolved to at validation time.  Callers should pin DNS to these IPs for
-    the subsequent HTTP fetch (see :func:`utils.http_utils.pinned_dns`) to
+    the subsequent HTTP fetch (see :func:`utils.dns_pinning.pinned_dns`) to
     mitigate DNS-rebinding SSRF where an attacker-controlled DNS server flips
     the answer to a private IP between validation and the actual request
     (JTN-656).

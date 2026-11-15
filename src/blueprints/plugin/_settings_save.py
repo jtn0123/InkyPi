@@ -7,9 +7,9 @@ from flask import current_app, make_response, render_template, request
 
 from plugins.plugin_registry import get_plugin_instance
 from services.plugin_workflows import save_plugin_settings_workflow
+from utils.api_responses import json_error, json_success
 from utils.backend_errors import ClientInputError
 from utils.form_utils import sanitize_log_field, validate_plugin_required_fields
-from utils.http_utils import json_error, json_success
 from utils.plugin_history import record_change as _record_plugin_change
 from utils.request_models import parse_plugin_settings_form_request
 

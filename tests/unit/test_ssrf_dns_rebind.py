@@ -5,7 +5,7 @@
 subsequent HTTP fetch resolves DNS *again* inside ``urllib3``.  A hostile
 authoritative server can flip the second answer to a private IP.  The
 mitigation introduced in JTN-656 pins DNS (via
-``utils.http_utils.pinned_dns``) to the IPs observed at validation time so
+``utils.dns_pinning.pinned_dns``) to the IPs observed at validation time so
 the fetch socket connects to exactly one of the vetted addresses.
 
 These tests simulate the rebind by swapping ``socket.getaddrinfo`` between
@@ -98,12 +98,12 @@ def test_validate_url_with_ips_literal_ip_shortcuts_dns(
 def test_pinned_dns_forces_getaddrinfo_to_return_pinned_ip(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from utils import http_utils
+    from utils import dns_pinning
 
     # Baseline resolver always claims a private IP — rebind in effect.
     monkeypatch.setattr(socket, "getaddrinfo", lambda *a, **kw: _ainfo("192.168.10.5"))
 
-    with http_utils.pinned_dns("example.com", ("93.184.216.34",)):
+    with dns_pinning.pinned_dns("example.com", ("93.184.216.34",)):
         result = socket.getaddrinfo("example.com", 443)
 
     assert (
@@ -114,7 +114,7 @@ def test_pinned_dns_forces_getaddrinfo_to_return_pinned_ip(
 def test_pinned_dns_does_not_affect_other_hostnames(
     monkeypatch: pytest.MonkeyPatch,
 ) -> Any:
-    from utils import http_utils
+    from utils import dns_pinning
 
     seen: dict[str, int] = {}
 
@@ -124,7 +124,7 @@ def test_pinned_dns_does_not_affect_other_hostnames(
 
     monkeypatch.setattr(socket, "getaddrinfo", real_resolver)
 
-    with http_utils.pinned_dns("pinned.example.com", ("93.184.216.34",)):
+    with dns_pinning.pinned_dns("pinned.example.com", ("93.184.216.34",)):
         other = socket.getaddrinfo("other.example.net", 80)
 
     assert other[0][4][0] == "8.8.8.8"
@@ -134,10 +134,10 @@ def test_pinned_dns_does_not_affect_other_hostnames(
 def test_pinned_dns_restores_previous_resolver_on_exit(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from utils import http_utils
+    from utils import dns_pinning
 
     monkeypatch.setattr(socket, "getaddrinfo", lambda *a, **kw: _ainfo("192.168.10.5"))
-    with http_utils.pinned_dns("example.com", ("93.184.216.34",)):
+    with dns_pinning.pinned_dns("example.com", ("93.184.216.34",)):
         pass
     # After exit the pin is removed — outer resolver takes over again
     result = socket.getaddrinfo("example.com", 80)
@@ -157,9 +157,9 @@ def test_safe_http_get_pins_ip_across_dns_rebind(
     ``safe_http_get`` must use the IP resolved at validation time, not the
     private IP the second resolution would return.
     """
-    from utils import http_utils
+    from utils import http_transport, safe_fetch
 
-    http_utils._reset_shared_session_for_tests()
+    http_transport._reset_shared_session_for_tests()
 
     resolver = _RebindingResolver(first="93.184.216.34", rebound="169.254.169.254")
     monkeypatch.setattr(socket, "getaddrinfo", resolver)
@@ -190,7 +190,7 @@ def test_safe_http_get_pins_ip_across_dns_rebind(
 
     monkeypatch.setattr(requests.Session, "get", fake_session_get, raising=True)
 
-    http_utils.safe_http_get("https://example.com/data")
+    safe_fetch.safe_http_get("https://example.com/data")
 
     assert seen_sockaddrs, "fetch step was not exercised"
     fetched_ip = seen_sockaddrs[0][0]
@@ -207,10 +207,10 @@ def test_fetch_and_resize_remote_image_pins_across_rebind(
     monkeypatch: pytest.MonkeyPatch,
 ) -> Any:
     """fetch_and_resize_remote_image must not be tricked by a DNS flip."""
-    import utils.http_utils as http_utils
+    import utils.http_transport as http_transport
     import utils.image_utils as image_utils
 
-    http_utils._reset_shared_session_for_tests()
+    http_transport._reset_shared_session_for_tests()
 
     resolver = _RebindingResolver(first="93.184.216.34", rebound="127.0.0.1")
     monkeypatch.setattr(socket, "getaddrinfo", resolver)
@@ -244,10 +244,10 @@ def test_fetch_and_resize_remote_image_pins_across_rebind(
 
 def test_get_image_pins_across_rebind(monkeypatch: pytest.MonkeyPatch) -> Any:
     """get_image must resolve through the pinned IP even if DNS flips."""
-    import utils.http_utils as http_utils
+    import utils.http_transport as http_transport
     import utils.image_utils as image_utils
 
-    http_utils._reset_shared_session_for_tests()
+    http_transport._reset_shared_session_for_tests()
 
     resolver = _RebindingResolver(first="93.184.216.34", rebound="10.0.0.5")
     monkeypatch.setattr(socket, "getaddrinfo", resolver)
@@ -277,12 +277,12 @@ def test_safe_http_get_rejects_private_ip_even_when_first_resolution_is_private(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """If the *first* DNS answer is already private, validation rejects it."""
-    from utils import http_utils
+    from utils import safe_fetch
 
     monkeypatch.setattr(socket, "getaddrinfo", lambda *a, **kw: _ainfo("192.168.1.1"))
 
     try:
-        http_utils.safe_http_get("http://evil.example.com/x")
+        safe_fetch.safe_http_get("http://evil.example.com/x")
     except ValueError as exc:
         assert "private" in str(exc).lower() or "loopback" in str(exc).lower()
     else:  # pragma: no cover - regression guard
@@ -300,9 +300,9 @@ def test_image_album_immich_uses_pinned_ip_across_rebind(
     """ImageAlbum + Immich must pin DNS for the base URL across the fetch."""
     from unittest.mock import MagicMock
 
-    import utils.http_utils as http_utils
+    import utils.http_transport as http_transport
 
-    http_utils._reset_shared_session_for_tests()
+    http_transport._reset_shared_session_for_tests()
 
     resolver = _RebindingResolver(first="93.184.216.34", rebound="127.0.0.1")
     monkeypatch.setattr(socket, "getaddrinfo", resolver)

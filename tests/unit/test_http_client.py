@@ -30,10 +30,13 @@ def test_get_http_session_singleton() -> None:
 
 
 def test_session_has_user_agent() -> None:
-    import utils.http_utils as http_utils
+    import utils.http_transport as http_transport
 
     session = get_http_session()
-    assert session.headers.get("User-Agent") == http_utils.DEFAULT_HEADERS["User-Agent"]
+    assert (
+        session.headers.get("User-Agent")
+        == http_transport.DEFAULT_HEADERS["User-Agent"]
+    )
 
 
 def test_session_has_retry_strategy() -> None:

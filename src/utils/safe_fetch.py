@@ -4,8 +4,6 @@ Every hop of a guarded fetch is validated with
 :func:`utils.security_utils.validate_url_with_ips` and fetched while DNS is
 pinned (:mod:`utils.dns_pinning`) to the vetted IPs; bodies can be streamed
 under a byte cap.
-
-Re-exported from :mod:`utils.http_utils`, which remains the public import path.
 """
 
 from __future__ import annotations
@@ -28,7 +26,7 @@ if TYPE_CHECKING:  # pragma: no cover — type hints only
     import requests
 
 # Keeps the pre-split logger name so log filters and output are unchanged.
-logger = logging.getLogger("utils.http_utils")
+logger = logging.getLogger(__name__)
 
 
 # ---- Redirect-safe guarded fetch (SSRF mitigation) -------------------------

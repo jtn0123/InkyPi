@@ -291,7 +291,7 @@ specific justification**.
   the next maintainer no signal about whether the suppression is still valid.
 - Suppressing a rule across an entire file or module unless every site has
   been audited and the rationale is documented in the policy section.
-- Suppressing alerts in `src/blueprints/**` or `src/utils/http_utils.py`
+- Suppressing alerts in `src/blueprints/**` or `src/utils/api_responses.py`
   without coordinating with the JTN-318 cleanup; those files are still being
   hardened against raw exception strings in API responses.
 

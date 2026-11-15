@@ -15,8 +15,9 @@ from PIL.Image import Resampling
 
 from utils.browser_env import browser_environment
 from utils.chromium_limiter import chromium_slot
-from utils.http_utils import guarded_fetch, http_get
+from utils.http_transport import http_get
 from utils.plugin_errors import ScreenshotBackendError
+from utils.safe_fetch import guarded_fetch
 from utils.security_utils import validate_url_with_ips
 
 # ImageEnhance / ImageFilter / ImageOps are imported lazily from the
@@ -147,7 +148,7 @@ def _stream_to_disk(url: str, timeout: float, pinned_ips: tuple[str, ...]) -> st
     """Download *url* to a temporary file via streaming and return its path.
 
     *pinned_ips* are the addresses already vetted for *url*; any redirect
-    target is validated and pinned by :func:`utils.http_utils.guarded_fetch`.
+    target is validated and pinned by :func:`utils.safe_fetch.guarded_fetch`.
     The caller is responsible for deleting the file when done.  The response
     is wrapped in ``contextlib.closing`` so the underlying connection is
     returned to the pool promptly even on low-memory devices.

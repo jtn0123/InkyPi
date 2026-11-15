@@ -9,7 +9,7 @@ from flask import Response, current_app, jsonify, request
 
 from blueprints.settings import logger, settings_bp
 from services import logs, updates
-from utils.http_utils import json_error
+from utils.api_responses import json_error
 from utils.rate_limit import SlidingWindowLimiter
 from utils.time_utils import now_device_tz
 

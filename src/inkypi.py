@@ -327,7 +327,7 @@ def _register_before_request_hooks(app: Flask) -> None:
     @app.before_request
     def _attach_request_id() -> None:
         try:
-            from utils.http_utils import _get_or_set_request_id
+            from utils.api_responses import _get_or_set_request_id
 
             _get_or_set_request_id()
         except Exception:

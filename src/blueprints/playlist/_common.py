@@ -10,7 +10,7 @@ from typing import Any
 
 from flask import Blueprint
 
-from utils.http_utils import json_error
+from utils.api_responses import json_error
 from utils.request_models import CODE_VALIDATION, RequestModelError
 
 # Both names are pinned to the pre-split module path ``blueprints.playlist``

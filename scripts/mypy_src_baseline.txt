@@ -35,7 +35,7 @@
 #     Pillow 12 but are slated for removal, and the pin allows <13.
 #
 # The rest were annotations narrower than the values they described:
-# json_error's dict fallback (named JsonResponse in utils/http_utils), werkzeug
+# json_error's dict fallback (named JsonResponse in utils/api_responses), werkzeug
 # vs flask Response from redirect(), and `-> Image` naming the PIL module
 # rather than Image.Image.
 

@@ -7,7 +7,7 @@ from typing import Any
 from dotenv import dotenv_values
 from flask import Blueprint, Response, render_template, request
 
-from utils.http_utils import json_error, json_internal_error, json_success
+from utils.api_responses import json_error, json_internal_error, json_success
 from utils.request_models import parse_api_keys_save_request
 
 logger = logging.getLogger(__name__)

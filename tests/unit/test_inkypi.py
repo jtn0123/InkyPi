@@ -339,7 +339,7 @@ def test_pyproject_project_version_matches_semantic_release_version() -> None:
 
 
 def _register_json_error_routes(app: Flask) -> Any:
-    from utils.http_utils import APIError
+    from utils.api_responses import APIError
 
     @app.route("/cause_api_error")
     def cause_api_error() -> None:
@@ -455,7 +455,7 @@ def test_csp_headers_default_and_overrides(monkeypatch: pytest.MonkeyPatch) -> N
 
 
 def _register_request_id_routes(app: Flask) -> Any:
-    from utils.http_utils import APIError, json_success
+    from utils.api_responses import APIError, json_success
 
     @app.route("/raise_api_error")
     def _raise_api_error() -> None:

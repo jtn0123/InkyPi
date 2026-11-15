@@ -15,10 +15,10 @@ from services.direct_render import (
     internal_failure_outcome,
     known_failure_outcome,
 )
+from utils.api_responses import json_error, json_success
 from utils.backend_errors import ClientInputError, route_error_for
 from utils.fallback_image import render_error_image
 from utils.form_utils import sanitize_log_field
-from utils.http_utils import json_error, json_success
 from utils.output_validator import fit_image_to_device
 from utils.request_models import RequestModelError, parse_plugin_update_now_request
 

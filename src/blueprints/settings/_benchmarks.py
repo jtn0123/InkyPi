@@ -6,8 +6,13 @@ import time
 from flask import Response, current_app, request
 
 from blueprints.settings import logger, settings_bp
+from utils.api_responses import (
+    JsonResponse,
+    json_error,
+    json_internal_error,
+    json_success,
+)
 from utils.env_flags import env_bool
-from utils.http_utils import JsonResponse, json_error, json_internal_error, json_success
 from utils.messages import BENCHMARKS_API_DISABLED_ERROR
 
 

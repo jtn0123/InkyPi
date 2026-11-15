@@ -15,7 +15,7 @@ import pytest
 from flask import Flask
 from flask.testing import FlaskClient
 
-from utils.http_utils import json_success
+from utils.api_responses import json_success
 from utils.rate_limit import CooldownLimiter
 
 

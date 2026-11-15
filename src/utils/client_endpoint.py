@@ -13,7 +13,7 @@ from typing import Any
 
 from flask import request
 
-from utils.http_utils import JsonResponse, json_error
+from utils.api_responses import JsonResponse, json_error
 from utils.rate_limit import TokenBucket
 
 

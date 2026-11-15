@@ -5,7 +5,12 @@ import subprocess
 from flask import Response, request
 
 from blueprints.settings import logger, settings_bp
-from utils.http_utils import JsonResponse, json_error, json_internal_error, json_success
+from utils.api_responses import (
+    JsonResponse,
+    json_error,
+    json_internal_error,
+    json_success,
+)
 from utils.rate_limit import CooldownLimiter
 
 # Shutdown rate limiting

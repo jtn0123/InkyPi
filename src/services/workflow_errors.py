@@ -17,7 +17,7 @@ class WorkflowError:
     details: dict[str, Any] | None = None
 
     def as_json_kwargs(self) -> dict[str, Any]:
-        """Return keyword arguments compatible with ``utils.http_utils.json_error``."""
+        """Return keyword arguments compatible with ``utils.api_responses.json_error``."""
         payload: dict[str, Any] = {"status": self.status, "code": self.code}
         details: dict[str, Any] = dict(self.details or {})
         if self.field is not None:

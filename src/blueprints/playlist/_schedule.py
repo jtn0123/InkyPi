@@ -9,7 +9,7 @@ from typing import Any, cast
 
 from model import Playlist
 from refresh_task import schedule
-from utils.http_utils import json_error
+from utils.api_responses import json_error
 
 from ._common import _CODE_VALIDATION, _MSG_TIME_OVERLAP, logger
 

@@ -22,11 +22,7 @@ from plugins.base_plugin.settings_schema import (
     section,
 )
 from utils.http_client import get_http_session
-from utils.http_utils import (
-    fetch_feed_bytes,
-    private_feeds_allowed,
-    safe_fetch_bytes,
-)
+from utils.safe_fetch import fetch_feed_bytes, private_feeds_allowed, safe_fetch_bytes
 
 logger = logging.getLogger(__name__)
 
@@ -164,7 +160,7 @@ class Rss(BasePlugin):
         """Replace each item's feed-supplied image URL with a ``data:`` URI.
 
         Only the items about to be rendered are passed in. Every fetch goes
-        through :func:`utils.http_utils.safe_fetch_bytes` (scheme check,
+        through :func:`utils.safe_fetch.safe_fetch_bytes` (scheme check,
         private/loopback/link-local rejection with per-hop DNS pinning, size
         cap). Images that fail the guard, time out, exceed a cap or do not
         decode are dropped. Once the overall time budget is spent the

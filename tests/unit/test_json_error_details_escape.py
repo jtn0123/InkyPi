@@ -9,7 +9,7 @@ from __future__ import annotations
 import pytest
 from flask import Flask, Response
 
-from utils.http_utils import json_error
+from utils.api_responses import json_error
 
 
 @pytest.fixture

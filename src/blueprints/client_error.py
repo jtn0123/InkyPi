@@ -15,7 +15,7 @@ from typing import Any
 
 from flask import Blueprint, Response, request
 
-from utils.http_utils import json_error
+from utils.api_responses import json_error
 from utils.rate_limit import TokenBucket
 
 logger = logging.getLogger(__name__)

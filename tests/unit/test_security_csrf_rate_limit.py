@@ -13,7 +13,7 @@ def csrf_app() -> Any:
     """Minimal Flask app with CSRF protection matching inkypi.py."""
     from collections import defaultdict, deque
 
-    from utils.http_utils import json_error
+    from utils.api_responses import json_error
 
     app = Flask(__name__)
     app.secret_key = "test-csrf-secret"

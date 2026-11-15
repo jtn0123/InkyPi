@@ -32,8 +32,8 @@ import logging
 
 from flask import Flask, Response, current_app, request
 
+from utils.api_responses import JsonResponse, json_error
 from utils.env_flags import env_bool
-from utils.http_utils import JsonResponse, json_error
 
 logger = logging.getLogger(__name__)
 

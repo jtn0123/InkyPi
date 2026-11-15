@@ -14,7 +14,7 @@ from typing import Any
 from flask import Blueprint, Response, render_template
 
 from blueprints.client_log import get_captured_reports, reset_captured_reports
-from utils.http_utils import json_success
+from utils.api_responses import json_success
 
 logger = logging.getLogger(__name__)
 

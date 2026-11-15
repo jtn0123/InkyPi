@@ -1,7 +1,4 @@
-"""Per-thread DNS pinning for SSRF-validated fetches (JTN-656).
-
-Re-exported from :mod:`utils.http_utils`, which remains the public import path.
-"""
+"""Per-thread DNS pinning for SSRF-validated fetches (JTN-656)."""
 
 from __future__ import annotations
 
