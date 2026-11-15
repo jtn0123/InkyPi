@@ -1,4 +1,4 @@
-"""Flask-independent outcome policy for direct manual renders."""
+"""Outcome policy for direct manual renders (needs no request or app context)."""
 
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -7,13 +7,11 @@ from typing import Any
 
 from PIL import Image
 
-from utils.plugin_errors import (
-    MANUAL_UPDATE_TIMEOUT_MSG,
-    SCREENSHOT_BACKEND_UNAVAILABLE_MSG,
-    ScreenshotBackendError,
-    URLValidationError,
-)
+from utils.backend_errors import route_error_for
+from utils.plugin_errors import URLValidationError
 from utils.progress import track_progress
+
+INTERNAL_ERROR_MSG = "An internal error occurred"
 
 
 @dataclass(frozen=True)
@@ -32,6 +30,42 @@ class DirectRenderFailure(RuntimeError):
     def __init__(self, outcome: DirectRenderOutcome) -> None:
         super().__init__(outcome.message)
         self.outcome = outcome
+
+
+def known_failure_outcome(error: BaseException) -> DirectRenderOutcome | None:
+    """Return the outcome for a failure every display route reports alike.
+
+    :func:`utils.backend_errors.route_error_for` owns that mapping (blackout,
+    a stopped loop, a rejected URL, a provider refusal, chromium down, a
+    timeout). Its messages are module constants or ``safe_message()``, so no
+    exception text reaches a response. None means *error* is not one of them.
+    """
+    mapped = route_error_for(error)
+    if mapped is None:
+        return None
+    return DirectRenderOutcome(
+        False,
+        mapped.message,
+        mapped.status,
+        None if mapped.code is None else str(mapped.code),
+        dict(mapped.details or {}),
+    )
+
+
+def internal_failure_outcome() -> DirectRenderOutcome:
+    """Return the outcome for a failure with no safe, specific message."""
+    return DirectRenderOutcome(False, INTERNAL_ERROR_MSG, 500, "internal_error")
+
+
+def _render_failure_outcome(error: Exception) -> DirectRenderOutcome:
+    known = known_failure_outcome(error)
+    if known is not None:
+        return known
+    if isinstance(error, RuntimeError):
+        # A plugin that gave up. Its text goes to the log and the error card
+        # on the panel, not into the response.
+        return DirectRenderOutcome(False, INTERNAL_ERROR_MSG, 400, "plugin_error")
+    return internal_failure_outcome()
 
 
 def execute_direct_render(
@@ -56,37 +90,11 @@ def execute_direct_render(
             generating = False
             display(image)
         except Exception as error:
-            if not generating:
-                outcome = DirectRenderOutcome(
-                    False, "An internal error occurred", 500, "internal_error"
-                )
-            elif isinstance(error, URLValidationError):
-                outcome = DirectRenderOutcome(
-                    False,
-                    error.safe_message(),
-                    422,
-                    "validation_error",
-                    {"field": "url"},
-                )
-            elif isinstance(error, ScreenshotBackendError):
-                outcome = DirectRenderOutcome(
-                    False,
-                    SCREENSHOT_BACKEND_UNAVAILABLE_MSG,
-                    503,
-                    "backend_unavailable",
-                )
-            elif isinstance(error, TimeoutError):
-                outcome = DirectRenderOutcome(
-                    False, MANUAL_UPDATE_TIMEOUT_MSG, 504, "manual_update_timeout"
-                )
-            elif isinstance(error, RuntimeError):
-                outcome = DirectRenderOutcome(
-                    False, "An internal error occurred", 400, "plugin_error"
-                )
-            else:
-                outcome = DirectRenderOutcome(
-                    False, "An internal error occurred", 500, "internal_error"
-                )
+            outcome = (
+                _render_failure_outcome(error)
+                if generating
+                else internal_failure_outcome()
+            )
             fallback(error, not isinstance(error, URLValidationError))
             return outcome
         try:

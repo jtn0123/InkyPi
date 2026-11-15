@@ -18,6 +18,7 @@ from refresh_task.job_queue import (
     get_job_queue,
     reset_job_queue,
 )
+from services.direct_render import INTERNAL_ERROR_MSG
 
 
 class _FakeClock:
@@ -64,7 +65,7 @@ class TestJobQueue:
 
     def test_job_error_status(self) -> None:
         def _fail() -> None:
-            raise ValueError("boom")
+            raise ValueError("/secret/path boom")
 
         q = JobQueue()
         jid = q.enqueue(_fail)
@@ -74,7 +75,11 @@ class TestJobQueue:
                 break
             time.sleep(0.05)
         assert info["status"] == STATUS_ERROR
-        assert "boom" in info["error"]
+        # The browser polls this, so an untyped failure's text stays in the log.
+        assert info["error"] == INTERNAL_ERROR_MSG
+        assert info["code"] == "internal_error"
+        assert info["http_status"] == 500
+        assert "boom" not in str(info)
         q.shutdown()
 
     def test_unknown_job_id(self) -> None:

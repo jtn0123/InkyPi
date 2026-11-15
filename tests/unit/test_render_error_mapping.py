@@ -133,6 +133,54 @@ def test_render_failure_maps_the_same_on_every_route(
         assert body["error"] == BLOCKED_MESSAGE
 
 
+@pytest.mark.parametrize(
+    ("make_error", "status", "code"),
+    [f[1:] for f in _FAILURES]
+    + [(lambda: RuntimeError(_SECRET), 500, "internal_error")],
+    ids=[f[0] for f in _FAILURES] + ["unmapped"],
+)
+def test_queued_update_now_reports_what_the_synchronous_route_does(
+    client: FlaskClient,
+    flask_app: Flask,
+    monkeypatch: pytest.MonkeyPatch,
+    make_error: Callable[[], BaseException],
+    status: int,
+    code: str,
+) -> None:
+    # The plugin page sends "Update now" as a queued job and shows the job's
+    # error. With the refresh loop running (the normal case on the Pi) that
+    # error used to be the raw exception text.
+    from refresh_task.job_queue import get_job_queue, reset_job_queue
+
+    rt = flask_app.config["REFRESH_TASK"]
+    monkeypatch.setattr(rt, "running", True)
+
+    def _fail(_action: Any) -> None:
+        raise make_error()
+
+    monkeypatch.setattr(rt, "manual_update", _fail)
+    reset_job_queue()
+    try:
+        synchronous = client.post("/update_now", data={"plugin_id": "clock"})
+        accepted = client.post(
+            "/update_now", data={"plugin_id": "clock"}, headers={"X-Async": "true"}
+        )
+        assert accepted.status_code == 202
+        job_id = accepted.get_json()["job_id"]
+        get_job_queue().shutdown(wait=True)
+        job = client.get(f"/api/job/{job_id}").get_json()
+    finally:
+        reset_job_queue()
+
+    body = synchronous.get_json()
+    assert job["status"] == "error"
+    assert synchronous.status_code == job["http_status"] == status
+    assert body["code"] == job["code"] == code
+    assert job["error"] == body["error"]
+    assert job.get("details") == body.get("details")
+    assert _SECRET not in str(job)
+
+
 def test_blackout_message_tells_the_user_why() -> None:
     mapped = route_error_for(BlackoutActiveError())
     assert isinstance(mapped, ConflictRouteError)

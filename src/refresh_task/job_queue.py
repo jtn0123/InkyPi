@@ -16,7 +16,7 @@ from collections.abc import Callable
 from concurrent.futures import Future, ThreadPoolExecutor
 from time import monotonic
 
-from services.direct_render import DirectRenderFailure
+from services.direct_render import DirectRenderFailure, internal_failure_outcome
 
 logger = logging.getLogger(__name__)
 
@@ -158,11 +158,17 @@ class JobQueue:
             return result
         except Exception as exc:
             logger.exception("Job %s failed", entry.job_id)
-            entry.error = str(exc)
-            if isinstance(exc, DirectRenderFailure):
-                entry.error_code = exc.outcome.code
-                entry.error_status = exc.outcome.status
-                entry.error_details = exc.outcome.details
+            # The status is served to the browser, so only a typed failure's
+            # safe outcome goes into it. Anything else is logged above.
+            outcome = (
+                exc.outcome
+                if isinstance(exc, DirectRenderFailure)
+                else internal_failure_outcome()
+            )
+            entry.error = outcome.message
+            entry.error_code = outcome.code
+            entry.error_status = outcome.status
+            entry.error_details = outcome.details
             entry.status = STATUS_ERROR
             entry.finished_at = self._clock()
             raise

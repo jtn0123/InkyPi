@@ -8,7 +8,12 @@ from flask.testing import FlaskClient
 from PIL import Image
 
 from refresh_task.job_queue import reset_job_queue
-from utils.plugin_errors import ScreenshotBackendError, URLValidationError
+from utils.plugin_errors import (
+    PROVIDER_REJECTED_MSG,
+    ProviderReportedPluginError,
+    ScreenshotBackendError,
+    URLValidationError,
+)
 
 
 @pytest.mark.parametrize(
@@ -19,6 +24,7 @@ from utils.plugin_errors import ScreenshotBackendError, URLValidationError
         ("url", 422, "validation_error"),
         ("backend", 503, "backend_unavailable"),
         ("timeout", 504, "manual_update_timeout"),
+        ("provider", 400, "provider_rejected"),
         ("runtime", 400, "plugin_error"),
         ("unexpected", 500, "internal_error"),
         ("display", 500, "internal_error"),
@@ -48,6 +54,7 @@ def test_direct_request_and_queued_job_match(
                 "url": URLValidationError("sensitive URL"),
                 "backend": ScreenshotBackendError("sensitive renderer path"),
                 "timeout": TimeoutError("sensitive process details"),
+                "provider": ProviderReportedPluginError("sensitive upstream body"),
                 "runtime": RuntimeError("sensitive provider key"),
                 "unexpected": ValueError("sensitive traceback"),
             }
@@ -105,6 +112,9 @@ def test_direct_request_and_queued_job_match(
             assert queued["code"] == body["code"] == code
             assert queued["error"] == body["error"]
             assert "sensitive" not in str(queued) + str(body)
+            if case == "provider":
+                # The provider's safe summary, not "An internal error occurred".
+                assert body["error"] == PROVIDER_REJECTED_MSG
             assert fallbacks == [case != "url", case != "url"]
     finally:
         reset_job_queue()

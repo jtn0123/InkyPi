@@ -14,6 +14,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from plugins.plugin_registry import get_plugin_instance
+from services.workflow_errors import WorkflowError
 from utils.form_utils import sanitize_log_field, validate_plugin_required_fields
 from utils.plugin_history import record_change as _record_plugin_change
 
@@ -27,27 +28,6 @@ DEFAULT_PLUGIN_NOT_FOUND_MESSAGE = "Plugin not found"
 DEFAULT_PLUGIN_VALIDATION_MESSAGE = (
     "Settings validation failed. Please check your input."
 )
-
-
-@dataclass(frozen=True, slots=True)
-class WorkflowError:
-    """Structured error returned by service workflows."""
-
-    message: str
-    status: int = 400
-    code: str = "validation_error"
-    field: str | None = None
-    details: dict[str, Any] | None = None
-
-    def as_json_kwargs(self) -> dict[str, Any]:
-        """Return keyword arguments compatible with ``utils.http_utils.json_error``."""
-        payload: dict[str, Any] = {"status": self.status, "code": self.code}
-        details: dict[str, Any] = dict(self.details or {})
-        if self.field is not None:
-            details.setdefault("field", self.field)
-        if details:
-            payload["details"] = details
-        return payload
 
 
 @dataclass(slots=True)

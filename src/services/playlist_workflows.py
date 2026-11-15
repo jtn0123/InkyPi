@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from services.plugin_workflows import validate_plugin_for_save
+from services.workflow_errors import WorkflowError
 from utils.form_utils import sanitize_log_field
 from utils.messages import PLAYLIST_NAME_REQUIRED_ERROR
 from utils.time_utils import calculate_seconds
@@ -21,26 +22,6 @@ _INSTANCE_NAME_RE = re.compile(r"^[A-Za-z0-9 _-]+$")
 _MAX_INSTANCE_NAME_LEN = 64
 _MAX_REFRESH_INTERVAL = 999
 _MSG_INVALID_PLAYLIST_REQUEST = "Invalid playlist request"
-
-
-@dataclass(frozen=True, slots=True)
-class WorkflowError:
-    """Structured error returned by service workflows."""
-
-    message: str
-    status: int = 400
-    code: str = _CODE_VALIDATION
-    field: str | None = None
-    details: dict[str, Any] | None = None
-
-    def as_json_kwargs(self) -> dict[str, Any]:
-        payload: dict[str, Any] = {"status": self.status, "code": self.code}
-        details: dict[str, Any] = dict(self.details or {})
-        if self.field is not None:
-            details.setdefault("field", self.field)
-        if details:
-            payload["details"] = details
-        return payload
 
 
 @dataclass(slots=True)
@@ -228,14 +209,9 @@ def validate_plugin_settings_security(
             status=503,
             code="backend_unavailable",
         )
-    error = validate_plugin_for_save(
+    return validate_plugin_for_save(
         plugin_obj, plugin_settings, sanitize_log_field(plugin_id)
     )
-    if error is not None:
-        return WorkflowError(
-            error.message, status=error.status, code=error.code, field=error.field
-        )
-    return None
 
 
 def build_playlist_plugin_dict(
