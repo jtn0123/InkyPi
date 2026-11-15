@@ -31,20 +31,16 @@
   function initThumbnailPreviewHandlers() {
     document.querySelectorAll(".plugin-thumbnail-container").forEach((box) => {
       if (box.dataset.playlistPreviewBound === "1") return;
+      // The thumbnail is a <button>, so Enter and Space open it too.
       box.addEventListener("click", (event) => {
         const target = event.currentTarget;
         ns.showThumbnailPreview(
           target.dataset.thumbnailPlugin,
           target.dataset.thumbnailDisplayName,
           target.dataset.thumbnailInstance,
-          target.dataset.thumbnailInstanceLabel
+          target.dataset.thumbnailInstanceLabel,
+          target
         );
-      });
-
-      box.addEventListener("keydown", (event) => {
-        if (event.key !== "Enter" && event.key !== " ") return;
-        event.preventDefault();
-        box.click();
       });
       box.dataset.playlistPreviewBound = "1";
     });

@@ -93,7 +93,8 @@
     pluginId,
     pluginName,
     instanceName,
-    instanceLabel
+    instanceLabel,
+    triggerEl
   ) {
     const img = document.getElementById("thumbnailPreviewImage");
     const info = document.getElementById("thumbnailPreviewInfo");
@@ -109,7 +110,9 @@
     } else {
       info.textContent = `Plugin: ${pluginName}`;
     }
-    setModalOpen("thumbnailPreviewModal", true);
+    // Focus goes back to the thumbnail that opened it, even after a mouse
+    // click (which doesn't focus a button in every browser).
+    setModalOpen("thumbnailPreviewModal", true, triggerEl);
   }
 
   function closeThumbnailPreview() {

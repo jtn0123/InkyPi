@@ -35,6 +35,8 @@ def test_playlist_accessibility_with_axe(
             "name": "Clock A",
             "plugin_settings": {},
             "refresh": {"interval": 300},
+            # Shown before, so the row has its preview thumbnail button.
+            "latest_refresh_time": "2025-01-01T07:55:00+00:00",
         }
     )
     device_config_dev.refresh_info = RefreshInfo(

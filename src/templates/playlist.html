@@ -130,20 +130,21 @@
                                box that looked broken in the light theme. #}
                             {% if plugin_instance.latest_refresh_time %}
                             <div class="pl-item-thumb">
-                                <div class="plugin-thumbnail-container lightboxable"
-                                     data-thumbnail-plugin="{{ plugin_instance.plugin_id }}"
-                                     data-thumbnail-display-name="{{ (plugins.get(plugin_instance.plugin_id, {}).display_name or plugin_instance.plugin_id) }}"
-                                     data-thumbnail-instance="{{ plugin_instance.name }}"
-                                     data-thumbnail-instance-label="{{ pi_label }}">
-                                    <div class="img-skeleton" aria-hidden="true"></div>
+                                <button type="button" class="plugin-thumbnail-container lightboxable"
+                                        aria-label="Preview {{ pi_label }}"
+                                        title="View full size"
+                                        data-thumbnail-plugin="{{ plugin_instance.plugin_id }}"
+                                        data-thumbnail-display-name="{{ (plugins.get(plugin_instance.plugin_id, {}).display_name or plugin_instance.plugin_id) }}"
+                                        data-thumbnail-instance="{{ plugin_instance.name }}"
+                                        data-thumbnail-instance-label="{{ pi_label }}">
+                                    <span class="img-skeleton" aria-hidden="true"></span>
                                     <img
                                         src="{{ url_for('plugin.plugin_instance_image', plugin_id=plugin_instance.plugin_id, instance_name=plugin_instance.name) }}"
                                         alt="{{ pi_label }} preview"
                                         class="plugin-thumbnail"
-                                        title="Click to view full size"
                                         loading="lazy"
                                     >
-                                </div>
+                                </button>
                             </div>
                             {% endif %}
 

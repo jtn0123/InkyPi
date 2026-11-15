@@ -5034,12 +5034,32 @@ body[data-page="plugin"] .workflow-help p {
     linear-gradient(to bottom, var(--frame-lining) 0 100%) right bottom/1.2px 12px no-repeat;
 }
 
-/* Plugin thumbnail containers */
+/* Plugin thumbnail containers: a <button> that opens the full-size preview,
+   so it drops the browser's button padding, background and font. */
 .plugin-thumbnail-container {
   position: relative;
+  display: block;
+  padding: 0;
   border: 2px solid transparent;
   border-radius: var(--border-radius-sm);
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: zoom-in;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.plugin-thumbnail-container:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+/* The placeholder sits over the image until it loads (page.js then hides it),
+   so the image keeps its place at the top of the button. */
+.plugin-thumbnail-container .img-skeleton {
+  position: absolute;
+  inset: 0;
+  display: block;
 }
 
 .plugin-thumbnail-container:hover {
@@ -5235,7 +5255,6 @@ body[data-page="plugin"] .workflow-help p {
     align-items: flex-start;
     gap: 8px;
 }
-
 
 /* =============== Refined playlist row (.pl-item) ===============
    5-col grid: drag · icon tile · main · inline thumb · actions.
