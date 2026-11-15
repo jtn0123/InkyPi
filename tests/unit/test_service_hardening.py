@@ -177,9 +177,12 @@ def _writable_dirs(tmp_path: Path) -> list[Path]:
 def test_every_runtime_write_location_is_writable(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    # utils.paths holds the defaults; Config's class attributes can be
+    # reassigned at runtime (inkypi.py --config), so don't read those.
     from benchmarks.benchmark_storage import _get_db_path
     from blueprints.settings import _update_target_version_path
     from config import Config
+    from utils import paths
     from utils.app_utils import resolve_path
     from utils.plugin_history import _history_dir
 
@@ -187,19 +190,19 @@ def test_every_runtime_write_location_is_writable(
     monkeypatch.setenv("PROJECT_DIR", "/usr/local/inkypi")
 
     class _DefaultConfig:
-        BASE_DIR = Config.BASE_DIR
+        BASE_DIR = paths.BASE_DIR
 
         def get_config(self, _key: str, default: object = None) -> object:
             return default
 
-    config_dir = os.path.dirname(Config.config_file)
+    config_dir = os.path.join(paths.BASE_DIR, "config")
     written = {
-        "device.json": Config.config_file,
+        "device.json": os.path.join(config_dir, "device.json"),
         "plugin history": _history_dir(config_dir),
-        "current image": Config.current_image_file,
-        "processed image": Config.processed_image_file,
-        "plugin images": Config.plugin_image_dir,
-        "history images": Config.history_image_dir,
+        "current image": paths.CURRENT_IMAGE_FILE,
+        "processed image": paths.PROCESSED_IMAGE_FILE,
+        "plugin images": paths.PLUGIN_IMAGE_DIR,
+        "history images": paths.HISTORY_IMAGE_DIR,
         "uploads": resolve_path(os.path.join("static", "images", "saved")),
         "benchmarks.db": _get_db_path(_DefaultConfig()),
         "update target": _update_target_version_path(),
