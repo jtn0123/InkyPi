@@ -6,13 +6,13 @@ requests, and edge cases without deadlocks or race conditions.
 
 import os
 import threading
-import time
 from collections.abc import Iterator
 from typing import Any
 
 import psutil
 import pytest
 from PIL import Image
+from tests.helpers.waiting import wait_until
 
 from display.display_manager import DisplayManager
 from refresh_task import ManualRefresh, RefreshTask
@@ -21,16 +21,6 @@ from refresh_task import ManualRefresh, RefreshTask
 # competing for memory with sibling workers, so these are excluded from the
 # parallel run (scripts/test-fast.sh) and executed serially instead.
 pytestmark = pytest.mark.memory
-
-
-def wait_until(predicate: Any, timeout: Any = 1.0, interval: Any = 0.01) -> Any:
-    """Poll until a condition becomes true."""
-    deadline = time.monotonic() + timeout
-    while time.monotonic() < deadline:
-        if predicate():
-            return True
-        time.sleep(interval)
-    return predicate()
 
 
 @pytest.fixture

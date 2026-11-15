@@ -1,12 +1,12 @@
 import logging
 import sqlite3
-import time
 from collections.abc import Callable
 from typing import Any
 
 import pytest
 from flask.testing import FlaskClient
 from PIL import Image
+from tests.helpers.waiting import wait_until
 
 from display.display_manager import DisplayManager
 from refresh_task import ManualRefresh, RefreshTask
@@ -24,12 +24,12 @@ def _health_when(
     the outcome a moment later, after the display write. Reading the health
     snapshot straight after the call can therefore see the previous state.
     """
-    deadline = time.monotonic() + timeout
-    while True:
-        entry: dict[str, Any] = refresh_task.get_health_snapshot()[plugin_id]
-        if settled(entry) or time.monotonic() >= deadline:
-            return entry
-        time.sleep(0.01)
+    wait_until(
+        lambda: settled(refresh_task.get_health_snapshot()[plugin_id]),
+        timeout=timeout,
+    )
+    entry: dict[str, Any] = refresh_task.get_health_snapshot()[plugin_id]
+    return entry
 
 
 class GoodPlugin:
@@ -75,26 +75,32 @@ def test_benchmark_lock_does_not_wedge_manual_update(
 
     refresh_task.start()
     try:
+
+        def _failure_logged() -> bool:
+            return any(
+                "Failed to save refresh benchmark event" in rec.getMessage()
+                and rec.exc_info is not None
+                and isinstance(rec.exc_info[1], sqlite3.OperationalError)
+                for rec in caplog.records
+            )
+
         with caplog.at_level(logging.DEBUG, logger="refresh_task.recorder"):
             metrics = refresh_task.manual_update(ManualRefresh("good", {}))
-        assert metrics is not None
-        # The locked write was really attempted for this refresh ...
-        assert len(lock_calls) == 1
-        assert lock_calls[0]["plugin_id"] == "good"
-        # ... and the failure was logged rather than propagated.
-        assert any(
-            "Failed to save refresh benchmark event" in rec.getMessage()
-            and rec.exc_info is not None
-            and isinstance(rec.exc_info[1], sqlite3.OperationalError)
-            for rec in caplog.records
-        )
+            assert metrics is not None
+            # The benchmark save runs after the display push, which can
+            # finish after manual_update returns.
+            # The locked write was really attempted for this refresh ...
+            assert wait_until(lambda: len(lock_calls) == 1), lock_calls
+            assert lock_calls[0]["plugin_id"] == "good"
+            # ... and the failure was logged rather than propagated.
+            assert wait_until(_failure_logged)
         assert refresh_task.running is True
         assert refresh_task.thread is not None
         assert refresh_task.thread.is_alive()
 
         # The worker is not wedged: a second refresh still completes.
         assert refresh_task.manual_update(ManualRefresh("good", {})) is not None
-        assert len(lock_calls) == 2
+        assert wait_until(lambda: len(lock_calls) == 2), lock_calls
     finally:
         refresh_task.stop()
 
