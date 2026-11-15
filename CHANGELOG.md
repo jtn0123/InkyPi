@@ -2,6 +2,15 @@
 
 <!-- version list -->
 
+## v1.8.19 (2026-11-15)
+
+### Performance Improvements
+
+- **stats**: Build the dashboard's three stats windows from one scan
+  ([#745](https://github.com/jtn0123/InkyPi/pull/745),
+  [`03f4d39`](https://github.com/jtn0123/InkyPi/commit/03f4d3986775efc7745ebfa0fd96bdfbd1080b0b))
+
+
 ## v1.8.18 (2026-11-15)
 
 ### Bug Fixes
