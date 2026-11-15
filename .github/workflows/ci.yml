@@ -212,6 +212,9 @@ jobs:
           # The UI/a11y/journey suites run in `browser-full`; smoke, plugin
           # snapshots and visual regression run in `browser-smoke`.
           SKIP_BROWSER: '1'
+          # Process-wide (not only while a test runs), so the SIGABRT below
+          # dumps every thread even if the hang is at session teardown.
+          PYTHONFAULTHANDLER: '1'
         run: |
           # Keep CI serial while the local pytest-xdist path soaks.
           # Note: tests/snapshots/ are collected here but skip automatically
@@ -222,7 +225,17 @@ jobs:
           # `Container tests` job below: they boot systemd as PID 1, which does
           # not vary by Python version, so running them across the matrix only
           # triples the cost. Including them pushed 3.13 past the 20-minute cap.
-          pytest --cov --cov-report=xml -q -m "not container"
+          #
+          # Hang diagnostics: a hung run used to reach timeout-minutes, ignore
+          # the cancel, get force-killed and lose its whole log (runs
+          # 43345263063 and 43668709714). Stop it ourselves first: SIGABRT
+          # makes faulthandler print every thread's stack and the step fails
+          # normally, so the log survives. A normal run takes 7-10 minutes.
+          # faulthandler_timeout also dumps stacks for a single test stuck
+          # where pytest-timeout's signal can't reach it (blocked in C code).
+          timeout --signal=ABRT --kill-after=30s 16m \
+            pytest --cov --cov-report=xml -q -m "not container" \
+              -o faulthandler_timeout=110
       - name: Upload coverage
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
