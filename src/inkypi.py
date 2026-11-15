@@ -129,16 +129,13 @@ def _format_sidebar_refresh_time(
     if refresh_dt is None:
         return None
 
-    try:
-        from utils.time_utils import now_device_tz
+    from utils.time_utils import now_device_tz
 
-        now_dt = (
-            now_device_tz(device_config)
-            if device_config is not None
-            else datetime.now(refresh_dt.tzinfo)
-        )
-    except Exception:
-        now_dt = datetime.now(refresh_dt.tzinfo)
+    now_dt = (
+        now_device_tz(device_config)
+        if device_config is not None
+        else datetime.now(refresh_dt.tzinfo)
+    )
 
     refresh_local = refresh_dt.astimezone(now_dt.tzinfo)
     diff_seconds = (now_dt - refresh_local).total_seconds()

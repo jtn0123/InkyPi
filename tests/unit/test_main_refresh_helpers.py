@@ -234,7 +234,7 @@ def test_annotate_refresh_schedule_handles_missing_refresh_time(
     monkeypatch: Any,
 ) -> None:
     fixed_now = datetime(2025, 1, 1, 8, 0, tzinfo=UTC)
-    monkeypatch.setattr("blueprints.main._current_dt", lambda cfg: fixed_now)
+    monkeypatch.setattr("blueprints.main.now_device_tz", lambda cfg: fixed_now)
 
     cfg = _device_with_playlist(900, playlist=None)
     payload: dict[str, Any] = {"playlist": None, "refresh_time": None}
@@ -251,7 +251,7 @@ def test_annotate_refresh_schedule_handles_missing_refresh_time(
 
 def test_annotate_refresh_schedule_projects_next_refresh(monkeypatch: Any) -> None:
     fixed_now = datetime(2025, 1, 1, 7, 57, tzinfo=UTC)
-    monkeypatch.setattr("blueprints.main._current_dt", lambda cfg: fixed_now)
+    monkeypatch.setattr("blueprints.main.now_device_tz", lambda cfg: fixed_now)
 
     playlist = SimpleNamespace(cycle_interval_seconds=300)  # 5-minute override
     pm = SimpleNamespace(get_playlist=lambda name: playlist)
@@ -284,7 +284,7 @@ def test_annotate_refresh_schedule_converts_next_to_device_timezone(
     # Simulate a device running in a non-UTC timezone (America/New_York).
     ny = ZoneInfo("America/New_York")
     fixed_now = datetime(2025, 1, 1, 2, 57, tzinfo=ny)
-    monkeypatch.setattr("blueprints.main._current_dt", lambda cfg: fixed_now)
+    monkeypatch.setattr("blueprints.main.now_device_tz", lambda cfg: fixed_now)
 
     cfg = _device_with_playlist(900, playlist=None)
     payload: dict[str, Any] = {

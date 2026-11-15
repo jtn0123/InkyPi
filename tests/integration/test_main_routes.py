@@ -128,7 +128,7 @@ def test_dashboard_refresh_cell_renders_forward_eta(
     client: FlaskClient, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setattr(
-        "blueprints.main._current_dt",
+        "blueprints.main.now_device_tz",
         lambda _device_config: datetime(2025, 1, 1, 7, 57, tzinfo=UTC),
         raising=True,
     )
@@ -458,7 +458,7 @@ def test_refresh_info_endpoint_includes_next_refresh_schedule(
     client: FlaskClient, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setattr(
-        "blueprints.main._current_dt",
+        "blueprints.main.now_device_tz",
         lambda _device_config: datetime(2025, 1, 1, 7, 57, tzinfo=UTC),
         raising=True,
     )

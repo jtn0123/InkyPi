@@ -29,6 +29,7 @@ from utils.image_serving import maybe_serve_webp
 from utils.output_validator import fit_image_to_device
 from utils.rate_limiter import CooldownLimiter
 from utils.request_models import parse_plugin_order_request
+from utils.time_utils import now_device_tz
 
 logger = logging.getLogger(__name__)
 
@@ -44,18 +45,6 @@ except Exception:  # pragma: no cover
 
 
 main_bp = Blueprint("main", __name__)
-
-
-def _current_dt(device_config: Any) -> datetime:
-    try:
-        from utils import time_utils
-
-        current_dt = time_utils.now_device_tz(device_config)
-        if isinstance(current_dt, datetime):
-            return current_dt
-    except Exception:
-        logger.warning("Could not read the device time zone; using UTC", exc_info=True)
-    return datetime.now(UTC)
 
 
 def _device_cycle_minutes(device_config: Any) -> int:
@@ -143,7 +132,7 @@ def _annotate_refresh_schedule(payload: Any, device_config: Any) -> Any:
     if not isinstance(payload, dict):
         return payload
 
-    now_dt = _current_dt(device_config)
+    now_dt = now_device_tz(device_config)
     cycle_minutes = _playlist_cycle_minutes(device_config, payload.get("playlist"))
     payload["cycle_minutes"] = cycle_minutes
 
@@ -205,7 +194,7 @@ def main_page() -> Any:
     device_config = current_app.config["DEVICE_CONFIG"]
     playlist_manager = device_config.get_playlist_manager()
     # Compute a non-mutating next-up preview for SSR convenience
-    current_dt = _current_dt(device_config)
+    current_dt = now_device_tz(device_config)
 
     try:
         next_up = _peek_next_up(device_config, current_dt)
@@ -420,7 +409,7 @@ def refresh_info() -> Any:
 @main_bp.route("/next-up", methods=["GET"])
 def next_up() -> Any:
     device_config = current_app.config["DEVICE_CONFIG"]
-    current_dt = _current_dt(device_config)
+    current_dt = now_device_tz(device_config)
 
     try:
         payload = _peek_next_up(device_config, current_dt)
@@ -684,7 +673,7 @@ def _show_next_plugin() -> JsonResponse:
     playlist_manager = device_config.get_playlist_manager()
 
     # Determine current time
-    current_dt = _current_dt(device_config)
+    current_dt = now_device_tz(device_config)
 
     # Pick next eligible and commit index change. The index advance is held
     # under the config lock so it cannot interleave with the refresh thread
