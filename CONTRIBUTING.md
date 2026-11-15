@@ -186,7 +186,7 @@ Private helpers (`_*` functions) longer than ~5 lines or with non-obvious intent
 4. Ensure all tests pass:
    - Backend-only changes: `scripts/test.sh`
    - **Frontend changes** (`src/static/**`, `src/templates/**`): `scripts/test.sh browser-smoke`
-5. Run lint: `scripts/lint.sh`, plus `pre-commit run biome-ci --all-files` if you changed `src/static/scripts/`
+5. Run lint: `scripts/lint.sh` (it runs Biome on the web scripts too)
 6. Open a PR against `main`
 
 ### PR Checklist
