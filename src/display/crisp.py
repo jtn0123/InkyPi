@@ -361,13 +361,26 @@ def exact_palette_image(image: Image.Image, palette: Palette) -> Image.Image:
     """Mode-P copy of an image whose every pixel is already a *palette* colour.
 
     The caller must have checked that, and *palette* must not repeat a colour;
-    indices follow the order of *palette*. Every pixel is then at distance zero
-    from exactly one entry, so Pillow's nearest-colour quantize, run in C, is
-    exact. It takes about 11 ms for an 800x480 frame on the Pi Zero 2 W, where
-    a numpy lookup took 73 ms.
+    indices follow the order of *palette*.
+
+    Pillow's quantize does the mapping in C: about 15 ms for an 800x480 frame
+    on the Pi Zero 2 W, where a numpy lookup takes 90 ms. Its colour cache can
+    merge palette colours only a few levels apart, though, so the result is
+    checked against the image and the exact numpy lookup is used if it
+    differs. Panel palettes, whose colours are far apart, never need it.
     """
+    rgb = image.convert("RGB")
+    palette_bytes = bytes(v for colour in palette for v in colour)
     pal_img = Image.new("P", (1, 1))
-    pal_img.putpalette(bytes(v for colour in palette for v in colour))
-    return image.convert("RGB").quantize(
-        len(palette), palette=pal_img, dither=Image.Dither.NONE
-    )
+    pal_img.putpalette(palette_bytes)
+    frame = rgb.quantize(len(palette), palette=pal_img, dither=Image.Dither.NONE)
+    if frame.convert("RGB").tobytes() == rgb.tobytes():
+        return frame
+    pixels = np.asarray(rgb, dtype=np.uint32)
+    packed = (pixels[..., 0] << 16) | (pixels[..., 1] << 8) | pixels[..., 2]
+    pal_packed = np.array([(r << 16) | (g << 8) | b for r, g, b in palette])
+    order = np.argsort(pal_packed)
+    indices = order[np.searchsorted(pal_packed[order], packed)].astype(np.uint8)
+    frame = Image.fromarray(indices, "P")
+    frame.putpalette(palette_bytes)
+    return frame

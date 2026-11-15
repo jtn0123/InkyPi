@@ -398,13 +398,25 @@ def test_panel_preview_script_builds_sheet(tmp_path: Path) -> None:
     assert sheet.width == 800 * 3 + 2 * module.GUTTER
 
 
-def test_exact_palette_image_follows_palette_order() -> None:
-    """Indexes follow *palette*, whichever position black and white hold."""
-    palette = [SPECTRA6[i] for i in (3, 1, 5, 0, 2, 4)]
+@pytest.mark.parametrize(
+    "palette",
+    [
+        [SPECTRA6[i] for i in (3, 1, 5, 0, 2, 4)],
+        # Colours a level apart share a slot in Pillow's colour cache, so
+        # quantize alone would merge them; the exact lookup takes over.
+        [(100, 100, 100), (101, 101, 101), (0, 0, 0), (102, 102, 102)],
+    ],
+    ids=["panel", "near-greys"],
+)
+def test_exact_palette_image_follows_palette_order(
+    palette: list[tuple[int, int, int]],
+) -> None:
+    """Indexes follow *palette*, whichever position each colour holds."""
     rng = np.random.default_rng(7)
     indices = rng.integers(0, len(palette), size=(37, 53), dtype=np.uint8)
     rgb = np.asarray(palette, dtype=np.uint8)[indices]
     frame = crisp.exact_palette_image(Image.fromarray(rgb, "RGB"), palette)
     assert frame.mode == "P"
     np.testing.assert_array_equal(np.asarray(frame), indices)
+    assert frame.palette is not None
     assert len(frame.palette.colors) == len(palette)
