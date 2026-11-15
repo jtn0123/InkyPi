@@ -77,22 +77,41 @@ get_os_version() {
 # are no longer supported. Fail fast, before any apt/pip/service work, with
 # an actionable message instead of a confusing pip resolver error later.
 #
+# Usage: require_supported_python [MIN]
+#   MIN is a "major.minor" floor such as "3.14"; it defaults to
+#   INKYPI_MIN_PYTHON. do_update.sh passes the *target* release's floor so a
+#   release that needs a newer Python is refused before checkout.
 # INKYPI_PYTHON_BIN overrides the interpreter probed (tests only).
 INKYPI_MIN_PYTHON="3.13"
 
 require_supported_python() {
   local py="${INKYPI_PYTHON_BIN:-python3}"
-  local found
+  local min="${1:-$INKYPI_MIN_PYTHON}"
+  local found hint
+  if ! [[ "$min" =~ ^[0-9]+\.[0-9]+$ ]]; then
+    min="$INKYPI_MIN_PYTHON"
+  fi
+  if [ "$min" = "3.13" ]; then
+    hint="Please upgrade to Raspberry Pi OS Trixie (Debian 13), which ships Python 3.13."
+  else
+    hint="Please upgrade Raspberry Pi OS to a release whose python3 is ${min} or newer."
+  fi
   if ! command -v "$py" >/dev/null 2>&1; then
-    echo_error "ERROR: $py was not found. InkyPi requires Python ${INKYPI_MIN_PYTHON}+ — please upgrade to Raspberry Pi OS Trixie (Debian 13)." >&2
+    echo_error "ERROR: $py was not found. InkyPi requires Python ${min}+. ${hint}" >&2
     return 1
   fi
   found=$("$py" -c 'import sys; print("%d.%d" % sys.version_info[:2])' 2>/dev/null || echo "unknown")
-  if ! "$py" -c 'import sys; sys.exit(0 if sys.version_info[:2] >= (3, 13) else 1)' >/dev/null 2>&1; then
-    echo_error "ERROR: system python3 is ${found}, but InkyPi requires Python ${INKYPI_MIN_PYTHON}+. Please upgrade to Raspberry Pi OS Trixie (Debian 13), which ships Python 3.13." >&2
+  if ! "$py" -c "import sys; sys.exit(0 if sys.version_info[:2] >= (${min%%.*}, ${min#*.}) else 1)" >/dev/null 2>&1; then
+    echo_error "ERROR: system python3 is ${found}, but InkyPi requires Python ${min}+. ${hint}" >&2
     return 1
   fi
-  echo_success "\tPython ${found} meets the ${INKYPI_MIN_PYTHON}+ requirement"
+  echo_success "\tPython ${found} meets the ${min}+ requirement"
+}
+
+# Print the lower bound of ``requires-python`` from a pyproject.toml read on
+# stdin (">=3.13,<3.14" -> "3.13"). Prints nothing when there is no bound.
+python_floor_from_pyproject() {
+  sed -nE 's/^requires-python[[:space:]]*=[[:space:]]*"[^0-9]*([0-9]+\.[0-9]+).*/\1/p' | head -n 1
 }
 
 # ---------------------------------------------------------------------------

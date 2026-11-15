@@ -47,9 +47,14 @@ def _git(repo: Path, *args: str) -> str:
     ).stdout.strip()
 
 
-def _make_repo(root: Path, *, v2_has_version: bool = True) -> None:
+def _make_repo(
+    root: Path, *, v2_has_version: bool = True, v2_python_floor: str | None = None
+) -> None:
     """Two tags; HEAD left at v0.0.1. The stub update.sh drops a marker so a
-    test can tell whether do_update.sh got as far as delegating."""
+    test can tell whether do_update.sh got as far as delegating.
+
+    *v2_python_floor* gives v0.0.2 a pyproject.toml with that
+    ``requires-python`` floor."""
     subprocess.run(
         ["git", "init", "-q", "-b", "main", str(root)], check=True, capture_output=True
     )
@@ -70,6 +75,10 @@ def _make_repo(root: Path, *, v2_has_version: bool = True) -> None:
         (root / "VERSION").write_text("0.0.2\n")
     else:
         (root / "VERSION").unlink()
+    if v2_python_floor is not None:
+        (root / "pyproject.toml").write_text(
+            f'[project]\nname = "inkypi"\nrequires-python = ">={v2_python_floor}"\n'
+        )
     _git(root, "add", "-A")
     _git(root, "commit", "-q", "-m", "v0.0.2")
     _git(root, "tag", "v0.0.2")
@@ -114,6 +123,8 @@ def _do_update(
             "INKYPI_LOCKFILE_DIR": str(device["state"]),
             "PROJECT_DIR": str(device["proj"]),
             "INKYPI_VENV_PYTHON": sys.executable,
+            # The system-Python gate probes this instead of the host python3.
+            "INKYPI_PYTHON_BIN": sys.executable,
             "INKYPI_UPDATE_MIN_FREE_MB": "1",
         }
     )
@@ -162,6 +173,40 @@ class TestDoUpdatePreflight:
         _make_repo(device["repo"], v2_has_version=False)
         proc = _do_update(device, "v0.0.2")
         _assert_aborted_untouched(device, proc, "target VERSION is empty or missing")
+
+    def test_target_needing_newer_python_aborts_before_checkout(
+        self, device: dict[str, Path]
+    ) -> None:
+        """B9: the floor comes from the *target's* pyproject.toml, so a release
+        that needs a newer Python is refused while the old code is still on
+        disk, not after update.sh has already been switched in."""
+        _make_repo(device["repo"], v2_python_floor="99.0")
+        proc = _do_update(device, "v0.0.2")
+        _assert_aborted_untouched(device, proc, "v0.0.2 needs Python 99.0+")
+        assert "requires Python 99.0+" in proc.stderr
+
+    def test_target_within_python_floor_passes(self, device: dict[str, Path]) -> None:
+        floor = f"{sys.version_info.major}.{sys.version_info.minor}"
+        _make_repo(device["repo"], v2_python_floor=floor)
+        proc = _do_update(device, "v0.0.2")
+        assert proc.returncode == 0, proc.stdout + proc.stderr
+        assert f"meets the {floor}+ requirement" in proc.stdout
+        assert _git(device["repo"], "describe", "--tags") == "v0.0.2"
+
+    def test_old_system_python_aborts_before_checkout(
+        self, device: dict[str, Path], tmp_path: Path
+    ) -> None:
+        """Without a floor in the target, the default (3.13) still applies:
+        a Bookworm-era 3.11 keeps its current version and code."""
+        fake = tmp_path / "python3.11"
+        fake.write_text(
+            "#!/bin/sh\n" 'case "$2" in *print*) echo 3.11 ;; *) exit 1 ;; esac\n'
+        )
+        fake.chmod(0o755)
+        _make_repo(device["repo"])
+        proc = _do_update(device, "v0.0.2", {"INKYPI_PYTHON_BIN": str(fake)})
+        _assert_aborted_untouched(device, proc, "v0.0.2 needs Python 3.13+")
+        assert "Trixie" in proc.stderr
 
     def test_low_disk_aborts_before_checkout(self, device: dict[str, Path]) -> None:
         _make_repo(device["repo"])
