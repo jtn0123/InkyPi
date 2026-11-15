@@ -1,17 +1,59 @@
 name: Release
 
+# Release only a commit CI has passed. A push used to start this workflow
+# alongside CI, so a version (and its wheelhouse and Pi image) could ship from
+# a commit whose checks then failed.
+#
+# CI on main cancels its run for a commit as soon as a newer commit lands, so
+# during a burst of merges only the last commit's run completes. Its release
+# includes every commit since the last tag. To retry after a flaky failure,
+# re-run the failed CI jobs: a successful re-run starts this workflow again.
 on:
-  push:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
     branches: [main]
 
 permissions:
   contents: write
 
 jobs:
+  gate:
+    name: Check that main is the commit CI passed
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # Pull-request and scheduled CI runs complete here too; only a passing
+    # run for a push to main may release.
+    if: >-
+      github.repository == 'jtn0123/InkyPi' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main'
+    outputs:
+      current: ${{ steps.check.outputs.current }}
+    steps:
+      - name: Compare main with the tested commit
+        id: check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          TESTED_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          main_sha=$(gh api "repos/${REPO}/commits/main" --jq .sha)
+          if [ "${main_sha}" = "${TESTED_SHA}" ]; then
+            echo "current=true" >> "$GITHUB_OUTPUT"
+          else
+            # A newer commit landed after this run started (a cancelled run
+            # never gets here). Its own CI run releases both commits.
+            echo "current=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=Release deferred::main is now ${main_sha}, not the tested ${TESTED_SHA}; CI on the newer commit will release it."
+          fi
+
   release:
+    needs: gate
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    if: github.repository == 'jtn0123/InkyPi'
+    if: needs.gate.outputs.current == 'true'
     outputs:
       released: ${{ steps.resolve_tag.outputs.released }}
       tag: ${{ steps.resolve_tag.outputs.tag }}
@@ -19,9 +61,23 @@ jobs:
       group: release
       cancel-in-progress: false
     steps:
+      # Check out the branch, not the SHA: semantic-release commits the
+      # version bump on top and pushes it, which needs a branch that tracks
+      # origin/main.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: main
           fetch-depth: 0
+
+      - name: Confirm main is still the tested commit
+        env:
+          TESTED_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          actual=$(git rev-parse HEAD)
+          if [ "${actual}" != "${TESTED_SHA}" ]; then
+            echo "::error title=Release aborted::main moved to ${actual} after the gate checked ${TESTED_SHA}; CI on the newer commit will release it."
+            exit 1
+          fi
 
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:

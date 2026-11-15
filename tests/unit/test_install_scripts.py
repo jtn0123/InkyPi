@@ -1646,6 +1646,36 @@ class TestReleaseWorkflow:
         assert "needs.release.outputs.released == 'true'" in self.content
         assert "tag: ${{ needs.release.outputs.tag }}" in self.content
 
+    def test_release_runs_only_after_ci_passes_on_main(self) -> None:
+        workflow = yaml.safe_load(self.content)
+        # PyYAML reads the bare ``on`` key as the boolean True.
+        triggers = workflow[True]
+        assert set(triggers) == {"workflow_run"}, "a push must not start a release"
+        run = triggers["workflow_run"]
+        assert run["workflows"] == ["CI"]
+        assert run["types"] == ["completed"]
+        assert run["branches"] == ["main"]
+        ci = yaml.safe_load(
+            (REPO_ROOT / ".github" / "workflows" / "ci.yml").read_text()
+        )
+        assert ci["name"] == "CI", "workflow_run matches the CI workflow by name"
+
+        gate = workflow["jobs"]["gate"]["if"]
+        assert "github.event.workflow_run.conclusion == 'success'" in gate
+        assert "github.event.workflow_run.event == 'push'" in gate
+        assert "github.event.workflow_run.head_branch == 'main'" in gate
+
+    def test_release_publishes_only_the_tested_commit(self) -> None:
+        workflow = yaml.safe_load(self.content)
+        release = workflow["jobs"]["release"]
+        assert release["needs"] == "gate"
+        assert release["if"] == "needs.gate.outputs.current == 'true'"
+        checkout, confirm = release["steps"][:2]
+        assert checkout["with"]["ref"] == "main"
+        assert checkout["with"]["fetch-depth"] == 0
+        assert "github.event.workflow_run.head_sha" in confirm["env"]["TESTED_SHA"]
+        assert "exit 1" in confirm["run"]
+
 
 class TestInstallationDocPreBuiltImage:
     """JTN-533: docs/installation.md must surface the pre-built image path."""

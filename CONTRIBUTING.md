@@ -147,6 +147,11 @@ on `main`** and is what `python-semantic-release` parses to decide the next
 version. A PR title that doesn't match a recognized type will silently skip
 the release bump. The PR Title Lint check enforces this pre-merge.
 
+The Release workflow runs when CI passes on `main`, and only for the commit CI
+tested. When several PRs merge in a row, CI finishes only for the last one, and
+that release includes them all. If CI on `main` fails, nothing is released until
+it passes; re-running a flaky job is enough to retry.
+
 Recognized types:
 
 - `feat:` — new feature (→ minor bump)
