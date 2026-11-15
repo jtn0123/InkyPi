@@ -15,7 +15,7 @@ from plugins.base_plugin.settings_schema import (
     section,
     widget,
 )
-from utils.app_utils import resolve_path
+from utils.app_utils import get_upload_dir
 from utils.image_loader import (
     FIT_CONTAIN,
     effective_fit_mode,
@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 
 def _get_upload_dir() -> str:
-    return resolve_path(os.path.join("static", "images", "saved"))
+    return get_upload_dir()
 
 
 class ImageUpload(BasePlugin):

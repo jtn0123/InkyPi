@@ -82,6 +82,10 @@ The age and free-space limits are checked every 10 refreshes. To change a limit,
 
 The values must be whole numbers of 0 or more. Any other value stops InkyPi from starting, and the reason is logged as `Config invalid`.
 
+### Uploaded photos
+
+Photos uploaded to the Image Upload plugin are kept in `/usr/local/inkypi/src/static/images/saved/`. On the same schedule, InkyPi deletes any upload that is more than a day old and that no playlist or setting names any more. That covers a photo removed from an instance, and one sent with **Update Now**, which is shown once and never saved. Settings backups don't include photos, so a restored older backup can name a photo that has since been deleted; upload it again.
+
 ## Intermittent Wi-Fi reachability / SSH drops
 
 If the Pi appears online but drops SSH or misses pings intermittently, check whether Wi-Fi power saving is enabled on `wlan0`:
