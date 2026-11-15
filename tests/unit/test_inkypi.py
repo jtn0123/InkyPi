@@ -215,6 +215,7 @@ def test_inkypi_startup_image_generation(monkeypatch: pytest.MonkeyPatch) -> Non
         patch("display.display_manager.DisplayManager") as mock_dm_class,
         patch("config.Config") as mock_config_class,
     ):
+
         # Mock the config and display manager
         mock_config = MagicMock()
         mock_config.get_config.return_value = True  # startup enabled
@@ -326,9 +327,9 @@ def test_version_file_on_disk_is_not_placeholder() -> None:
         "pipeline is not updating it. See JTN-624."
     )
     # Must be a PEP 440 / semver-ish version (e.g. 0.47.0, 1.2.3-rc.1).
-    assert re.match(r"^\d+\.\d+\.\d+([.\-+][0-9A-Za-z.\-]+)?$", content), (
-        f"VERSION '{content}' is not a valid version string"
-    )
+    assert re.match(
+        r"^\d+\.\d+\.\d+([.\-+][0-9A-Za-z.\-]+)?$", content
+    ), f"VERSION '{content}' is not a valid version string"
 
 
 def test_pyproject_project_version_matches_semantic_release_version() -> None:
@@ -451,9 +452,9 @@ def test_csp_headers_default_and_overrides(monkeypatch: pytest.MonkeyPatch) -> N
     client = app.test_client()
 
     r = client.get("/healthz")
-    assert "Content-Security-Policy" in r.headers, (
-        "CSP enforcement header missing in production mode"
-    )
+    assert (
+        "Content-Security-Policy" in r.headers
+    ), "CSP enforcement header missing in production mode"
     assert "default-src" in r.headers["Content-Security-Policy"]
 
     # Explicit report-only override via env
