@@ -173,6 +173,40 @@ def test_failed_save_restores_live_and_disk_state(
     assert refresh.to_dict() == before["refresh_info"]
 
 
+@pytest.mark.parametrize("operation", ["atomic", "config", "value"])
+def test_save_refuses_a_config_the_loader_would_reject(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, operation: str
+) -> None:
+    """A value the schema rejects never reaches disk.
+
+    The render worker and the next start both reload the file through the
+    schema, so writing such a value broke every render and stopped the
+    service from starting.
+    """
+    from copy import deepcopy
+
+    from utils.config_schema import ConfigValidationError
+
+    cfg = _make_config(tmp_path, monkeypatch)
+    cfg.write_config()
+    before = deepcopy(cfg.config)
+    disk_before = Path(cfg.config_file).read_bytes()
+
+    saves = {
+        "atomic": lambda: cfg.update_atomic(
+            lambda data: data.update({"orientation": "sideways"})
+        ),
+        "config": lambda: cfg.update_config({"orientation": "sideways"}),
+        "value": lambda: cfg.update_value("orientation", "sideways", write=True),
+    }
+    with pytest.raises(ConfigValidationError):
+        saves[operation]()
+
+    assert cfg.config == before
+    assert Path(cfg.config_file).read_bytes() == disk_before
+    assert type(cfg)().get_config("orientation") == "horizontal"
+
+
 def test_callback_saving_helper_does_not_commit_before_callback_succeeds(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

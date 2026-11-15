@@ -54,7 +54,8 @@ class TestDisplayManagerInit:
         import display.display_manager as dm_mod
 
         cfg = config_mod.Config()
-        cfg.update_value("display_type", "unknown_display", write=True)
+        # In memory only: saving a display type the schema rejects now fails.
+        cfg.update_value("display_type", "unknown_display")
 
         with pytest.raises(ValueError, match="Unsupported display type"):
             dm_mod.DisplayManager(cfg)
