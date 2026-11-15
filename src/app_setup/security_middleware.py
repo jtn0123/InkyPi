@@ -15,7 +15,6 @@ import logging
 import os
 import secrets
 import socket
-from collections.abc import Callable
 from time import perf_counter
 from typing import TYPE_CHECKING, Any, Protocol, cast
 from urllib.parse import quote, urlencode, urlunsplit
@@ -517,15 +516,7 @@ def _emit_request_timing_log(response: Response) -> None:
     if t0 is None:
         return
     elapsed_ms = int((perf_counter() - t0) * 1000)
-    # Emit on the "inkypi" logger so existing monkey-patches in
-    # tests/unit/test_inkypi.py catch it without modification.
-    import sys
-
-    inkypi_mod = sys.modules.get("inkypi")
-    timing_logger = (
-        getattr(inkypi_mod, "logger", None) if inkypi_mod is not None else None
-    ) or logging.getLogger("inkypi")
-    timing_logger.info(
+    logging.getLogger("inkypi").info(
         "HTTP %s %s -> %s in %sms",
         request.method,
         request.path,
@@ -585,23 +576,9 @@ def _apply_csp_header(response: Response, *, dev_mode: bool) -> None:
 
 def _apply_hot_reload_header(response: Response, *, dev_mode: bool) -> None:
     """Surface the dev-mode plugin hot-reload status as a response header."""
-    # Resolve the symbol from the inkypi module so monkey-patches in
-    # tests/unit/test_inkypi.py affect the call here too.
-    import sys
+    from plugins.plugin_registry import pop_hot_reload_info
 
-    inkypi_mod = sys.modules.get("inkypi")
-    pop_fn: Callable[[], dict[str, Any] | None] | None = None
-    if inkypi_mod is not None:
-        candidate = getattr(inkypi_mod, "pop_hot_reload_info", None)
-        if callable(candidate):
-            pop_fn = cast(Callable[[], dict[str, Any] | None], candidate)
-
-    if pop_fn is None:
-        from plugins.plugin_registry import pop_hot_reload_info
-
-        pop_fn = pop_hot_reload_info
-
-    info = pop_fn()
+    info = pop_hot_reload_info()
     if info and dev_mode:
         reloaded = info.get("reloaded")
         response.headers.setdefault(

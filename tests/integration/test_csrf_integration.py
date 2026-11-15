@@ -3,7 +3,7 @@
 
 The standard test ``client`` fixture intentionally omits CSRF enforcement so
 that other integration tests are not burdened with token bookkeeping.  These
-tests register the **real** ``_setup_csrf_protection`` middleware on a
+tests register the **real** ``setup_csrf_protection`` middleware on a
 dedicated app instance to verify it end-to-end.
 """
 
@@ -19,12 +19,13 @@ def csrf_client(client: FlaskClient) -> Any:
     """Client with the production CSRF middleware registered on the existing test app.
 
     The standard ``client`` fixture omits CSRF enforcement.  This fixture
-    imports and applies the real ``_setup_csrf_protection`` from ``inkypi.py``
+    imports and applies the real ``setup_csrf_protection`` from
+    ``app_setup.security_middleware``
     so that tests exercise the actual production middleware end-to-end.
     """
-    from inkypi import _setup_csrf_protection
+    from app_setup.security_middleware import setup_csrf_protection
 
-    _setup_csrf_protection(client.application)
+    setup_csrf_protection(client.application)
     return client
 
 

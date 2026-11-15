@@ -28,8 +28,6 @@ TESTS = ROOT / "tests"
 # Targets that are effective even though the module never reads the name
 # itself. Each entry must say where the real lookup happens.
 _ALLOWED_UNREAD_REEXPORTS: dict[str, str] = {
-    # security_middleware resolves it with getattr(inkypi_mod, "pop_hot_reload_info").
-    "inkypi.pop_hot_reload_info": "looked up via getattr on the inkypi module",
     # inkypi does ``from refresh_task import RefreshTask``; the test patches the
     # package attribute *before* re-importing inkypi, so inkypi binds the mock.
     "refresh_task.RefreshTask": "bound by inkypi when it is re-imported under the patch",

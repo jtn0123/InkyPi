@@ -91,15 +91,19 @@ class TestRunOnce:
 
 
 class TestRunOnceFlag:
-    def test_flag_is_accepted_and_defaults_off(
+    def test_flag_is_accepted_and_defaults_off(self) -> None:
+        assert inkypi.parse_runtime_options(["--web-only"]).run_once is False
+        assert inkypi.parse_runtime_options(["--web-only", "--run-once"]).run_once
+
+    def test_main_passes_the_options_to_create_app(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        monkeypatch.setattr(inkypi, "create_app", lambda: MagicMock())
-        inkypi.main(["--web-only"])
-        assert inkypi.args.run_once is False
-
-        inkypi.main(["--web-only", "--run-once"])
-        assert inkypi.args.run_once is True
+        for name in ("INKYPI_ENV", "FLASK_ENV", "INKYPI_NO_REFRESH", "INKYPI_FAST_DEV"):
+            monkeypatch.delenv(name, raising=False)
+        seen: list[Any] = []
+        monkeypatch.setattr(inkypi, "create_app", lambda options: seen.append(options))
+        inkypi.main(["--web-only", "--run-once", "--port", "9000"])
+        assert seen == [inkypi.RuntimeOptions(web_only=True, run_once=True, port=9000)]
 
     def test_help_documents_the_exit_status_contract(self) -> None:
         """The exit status is the whole point for a cron caller."""

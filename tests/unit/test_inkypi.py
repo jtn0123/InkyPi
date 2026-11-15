@@ -11,7 +11,7 @@ from flask import Flask, abort
 
 def _reload_inkypi(
     monkeypatch: pytest.MonkeyPatch, argv: Any = None, env: Any = None
-) -> Any:
+) -> Flask:
     if argv is None:
         argv = ["inkypi.py"]
     if env is None:
@@ -32,37 +32,40 @@ def _reload_inkypi(
     import inkypi  # noqa: F401
 
     mod = importlib.reload(sys.modules["inkypi"])
-    mod.main(argv[1:])
-    return mod
+    app: Flask = mod.main(argv[1:])
+    return app
+
+
+def _options(app: Flask) -> Any:
+    """Return the RuntimeOptions main() stored on the app."""
+    return app.config["RUNTIME_OPTIONS"]
 
 
 def test_inkypi_dev_mode_and_blueprints(monkeypatch: pytest.MonkeyPatch) -> None:
-    mod = _reload_inkypi(monkeypatch, argv=["inkypi.py", "--dev"], env={})
+    app = _reload_inkypi(monkeypatch, argv=["inkypi.py", "--dev"], env={})
 
-    assert getattr(mod, "DEV_MODE", False) is True
-    assert getattr(mod, "PORT", None) == 8080
+    assert _options(app).dev_mode is True
+    assert _options(app).port == 8080
 
     # Verify Flask app and blueprints are ready
-    app = getattr(mod, "app", None)
     assert app is not None
     for bp_name in ["main", "settings", "plugin", "playlist"]:
         assert bp_name in app.blueprints
 
 
 def test_inkypi_prod_mode_port_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
-    mod = _reload_inkypi(
+    app = _reload_inkypi(
         monkeypatch,
         argv=["inkypi.py"],
         env={"INKYPI_ENV": "production", "PORT": "1234"},
     )
 
-    assert getattr(mod, "DEV_MODE", True) is False
-    assert getattr(mod, "PORT", None) == 1234
+    assert _options(app).dev_mode is False
+    assert _options(app).port == 1234
 
 
 def test_inkypi_web_only_flag(monkeypatch: pytest.MonkeyPatch) -> None:
-    mod = _reload_inkypi(monkeypatch, argv=["inkypi.py", "--dev", "--web-only"], env={})
-    app = getattr(mod, "app", None)
+    app = _reload_inkypi(monkeypatch, argv=["inkypi.py", "--dev", "--web-only"], env={})
     assert isinstance(app, Flask)
     # Ensure refresh task does not start in web-only when running as __main__ is simulated by test harness
     rt = app.config["REFRESH_TASK"]
@@ -71,8 +74,7 @@ def test_inkypi_web_only_flag(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_inkypi_fast_dev(monkeypatch: pytest.MonkeyPatch) -> None:
-    mod = _reload_inkypi(monkeypatch, argv=["inkypi.py", "--dev", "--fast-dev"], env={})
-    app = getattr(mod, "app", None)
+    app = _reload_inkypi(monkeypatch, argv=["inkypi.py", "--dev", "--fast-dev"], env={})
     assert isinstance(app, Flask)
     cfg = app.config["DEVICE_CONFIG"]
     assert cfg.get_config("plugin_cycle_interval_seconds") == 30
@@ -90,78 +92,77 @@ def test_inkypi_config_file_cli(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_inkypi_port_cli(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test that --port CLI flag sets the port."""
-    mod = _reload_inkypi(monkeypatch, argv=["inkypi.py", "--port", "3000"], env={})
-    assert getattr(mod, "PORT", None) == 3000
+    app = _reload_inkypi(monkeypatch, argv=["inkypi.py", "--port", "3000"], env={})
+    assert _options(app).port == 3000
 
 
 def test_inkypi_port_env_inkypi_port(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test that INKYPI_PORT environment variable sets the port."""
-    mod = _reload_inkypi(monkeypatch, argv=["inkypi.py"], env={"INKYPI_PORT": "4000"})
-    assert getattr(mod, "PORT", None) == 4000
+    app = _reload_inkypi(monkeypatch, argv=["inkypi.py"], env={"INKYPI_PORT": "4000"})
+    assert _options(app).port == 4000
 
 
 def test_inkypi_port_env_port_fallback(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test that PORT environment variable is used as fallback."""
-    mod = _reload_inkypi(monkeypatch, argv=["inkypi.py"], env={"PORT": "5000"})
-    assert getattr(mod, "PORT", None) == 5000
+    app = _reload_inkypi(monkeypatch, argv=["inkypi.py"], env={"PORT": "5000"})
+    assert _options(app).port == 5000
 
 
 def test_inkypi_port_invalid_env(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test that invalid port in environment falls back to default."""
-    mod = _reload_inkypi(
+    app = _reload_inkypi(
         monkeypatch, argv=["inkypi.py"], env={"INKYPI_PORT": "invalid"}
     )
-    assert getattr(mod, "PORT", None) == 80  # Production mode default
+    assert _options(app).port == 80  # Production mode default
 
 
 def test_inkypi_dev_mode_env_vars(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test various ways to set dev mode via environment variables."""
     # Test INKYPI_ENV=dev
-    mod = _reload_inkypi(monkeypatch, argv=["inkypi.py"], env={"INKYPI_ENV": "dev"})
-    assert getattr(mod, "DEV_MODE", False) is True
+    app = _reload_inkypi(monkeypatch, argv=["inkypi.py"], env={"INKYPI_ENV": "dev"})
+    assert _options(app).dev_mode is True
 
     # Test INKYPI_ENV=development
-    mod = _reload_inkypi(
+    app = _reload_inkypi(
         monkeypatch, argv=["inkypi.py"], env={"INKYPI_ENV": "development"}
     )
-    assert getattr(mod, "DEV_MODE", False) is True
+    assert _options(app).dev_mode is True
 
     # Test FLASK_ENV=dev
-    mod = _reload_inkypi(monkeypatch, argv=["inkypi.py"], env={"FLASK_ENV": "dev"})
-    assert getattr(mod, "DEV_MODE", False) is True
+    app = _reload_inkypi(monkeypatch, argv=["inkypi.py"], env={"FLASK_ENV": "dev"})
+    assert _options(app).dev_mode is True
 
     # Test FLASK_ENV=development
-    mod = _reload_inkypi(
+    app = _reload_inkypi(
         monkeypatch, argv=["inkypi.py"], env={"FLASK_ENV": "development"}
     )
-    assert getattr(mod, "DEV_MODE", False) is True
+    assert _options(app).dev_mode is True
 
 
 def test_inkypi_web_only_env_vars(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test web-only mode via environment variables."""
     # Test INKYPI_NO_REFRESH=1
-    mod = _reload_inkypi(
+    app = _reload_inkypi(
         monkeypatch, argv=["inkypi.py"], env={"INKYPI_NO_REFRESH": "1"}
     )
-    assert getattr(mod, "WEB_ONLY", False) is True
+    assert _options(app).web_only is True
 
     # Test INKYPI_NO_REFRESH=true
-    mod = _reload_inkypi(
+    app = _reload_inkypi(
         monkeypatch, argv=["inkypi.py"], env={"INKYPI_NO_REFRESH": "true"}
     )
-    assert getattr(mod, "WEB_ONLY", False) is True
+    assert _options(app).web_only is True
 
     # Test INKYPI_NO_REFRESH=yes
-    mod = _reload_inkypi(
+    app = _reload_inkypi(
         monkeypatch, argv=["inkypi.py"], env={"INKYPI_NO_REFRESH": "yes"}
     )
-    assert getattr(mod, "WEB_ONLY", False) is True
+    assert _options(app).web_only is True
 
 
 def test_inkypi_fast_dev_env_vars(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test fast dev mode via environment variables."""
-    mod = _reload_inkypi(monkeypatch, argv=["inkypi.py"], env={"INKYPI_FAST_DEV": "1"})
-    app = getattr(mod, "app", None)
+    app = _reload_inkypi(monkeypatch, argv=["inkypi.py"], env={"INKYPI_FAST_DEV": "1"})
     assert isinstance(app, Flask)
     cfg = app.config["DEVICE_CONFIG"]
     assert cfg.get_config("plugin_cycle_interval_seconds") == 30
@@ -169,96 +170,77 @@ def test_inkypi_fast_dev_env_vars(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_inkypi_prod_mode_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test production mode defaults."""
-    mod = _reload_inkypi(monkeypatch, argv=["inkypi.py"], env={})
-    assert getattr(mod, "DEV_MODE", True) is False  # Should default to False
-    assert getattr(mod, "PORT", None) == 80  # Production default port
+    app = _reload_inkypi(monkeypatch, argv=["inkypi.py"], env={})
+    assert _options(app).dev_mode is False  # Should default to False
+    assert _options(app).port == 80  # Production default port
 
 
 def test_inkypi_max_content_length_env(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test MAX_CONTENT_LENGTH environment variable handling."""
-    mod = _reload_inkypi(
+    app = _reload_inkypi(
         monkeypatch, argv=["inkypi.py"], env={"MAX_CONTENT_LENGTH": "5242880"}
     )  # 5MB
-    app = getattr(mod, "app", None)
     assert app is not None
     assert app.config["MAX_CONTENT_LENGTH"] == 5242880
 
 
 def test_inkypi_max_content_length_invalid_env(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test invalid MAX_CONTENT_LENGTH falls back to default."""
-    mod = _reload_inkypi(
+    app = _reload_inkypi(
         monkeypatch, argv=["inkypi.py"], env={"MAX_CONTENT_LENGTH": "invalid"}
     )
-    app = getattr(mod, "app", None)
     assert app is not None
     assert app.config["MAX_CONTENT_LENGTH"] == 10 * 1024 * 1024  # Default 10MB
 
 
 def test_inkypi_max_upload_bytes_env(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test MAX_UPLOAD_BYTES environment variable as fallback."""
-    mod = _reload_inkypi(
+    app = _reload_inkypi(
         monkeypatch, argv=["inkypi.py"], env={"MAX_UPLOAD_BYTES": "2097152"}
     )  # 2MB
-    app = getattr(mod, "app", None)
     assert app is not None
     assert app.config["MAX_CONTENT_LENGTH"] == 2097152
 
 
 def test_inkypi_startup_image_generation(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Test startup image generation and display logic."""
-    with (
-        patch("utils.app_utils.generate_startup_image") as mock_generate,
-        patch("display.display_manager.DisplayManager") as mock_dm_class,
-        patch("config.Config") as mock_config_class,
-    ):
+    """With no refresh loop, the boot tasks draw the startup image directly."""
+    app = _reload_inkypi(monkeypatch, argv=["inkypi.py"], env={})
+    inkypi = sys.modules["inkypi"]
+    image = object()
+    generate = MagicMock(return_value=image)
+    monkeypatch.setattr(inkypi, "generate_startup_image", generate)
+    monkeypatch.setattr(inkypi.blackout, "is_active", lambda _cfg: False)
+    config = MagicMock()
+    config.get_config.return_value = True  # startup enabled
+    config.get_resolution.return_value = (400, 300)
+    display = MagicMock()
+    app.config.update(DEVICE_CONFIG=config, DISPLAY_MANAGER=display, REFRESH_TASK=None)
 
-        # Mock the config and display manager
-        mock_config = MagicMock()
-        mock_config.get_config.return_value = True  # startup enabled
-        mock_config.get_resolution.return_value = (400, 300)
-        mock_config_class.return_value = mock_config
+    inkypi.run_boot_display_tasks(app)
 
-        mock_dm = MagicMock()
-        mock_dm_class.return_value = mock_dm
-
-        mod = _reload_inkypi(monkeypatch, argv=["inkypi.py"], env={})
-
-        # Mock the WEB_ONLY check
-        mod.WEB_ONLY = False
-
-        # Simulate the startup logic from the main block
-        if not mod.WEB_ONLY and mock_config.get_config("startup") is True:
-            from utils.app_utils import generate_startup_image
-
-            img = generate_startup_image(mock_config.get_resolution())
-            mock_dm.display_image(img)
-            mock_config.update_value("startup", False, write=True)
-
-        # Verify the calls were made
-        mock_generate.assert_called_once_with((400, 300))
-        mock_dm.display_image.assert_called_once()
-        mock_config.update_value.assert_called_once_with("startup", False, write=True)
+    generate.assert_called_once_with((400, 300))
+    display.display_image.assert_called_once_with(image)
+    config.update_value.assert_called_once_with("startup", False, write=True)
 
 
 def test_inkypi_local_ip_detection(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test local IP detection in dev mode."""
     # This test would need to be run differently since socket is imported in __main__
     # For now, just verify dev mode is set correctly
-    mod = _reload_inkypi(monkeypatch, argv=["inkypi.py", "--dev"], env={})
-    assert mod.DEV_MODE is True
+    app = _reload_inkypi(monkeypatch, argv=["inkypi.py", "--dev"], env={})
+    assert _options(app).dev_mode is True
 
 
 def test_inkypi_local_ip_detection_failure(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test graceful handling when IP detection fails."""
     # Since socket import happens in __main__, we just verify dev mode works
-    mod = _reload_inkypi(monkeypatch, argv=["inkypi.py", "--dev"], env={})
-    assert mod.DEV_MODE is True
+    app = _reload_inkypi(monkeypatch, argv=["inkypi.py", "--dev"], env={})
+    assert _options(app).dev_mode is True
 
 
 def test_inkypi_error_handlers_exist(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test that error handlers are registered in the Flask app."""
-    mod = _reload_inkypi(monkeypatch, argv=["inkypi.py"], env={})
-    app = getattr(mod, "app", None)
+    app = _reload_inkypi(monkeypatch, argv=["inkypi.py"], env={})
     assert app is not None
 
     # Check that error handlers are registered
@@ -269,8 +251,7 @@ def test_inkypi_error_handlers_exist(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_inkypi_security_headers(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test that security headers are set."""
-    mod = _reload_inkypi(monkeypatch, argv=["inkypi.py"], env={})
-    app = getattr(mod, "app", None)
+    app = _reload_inkypi(monkeypatch, argv=["inkypi.py"], env={})
     assert app is not None
 
     resp = app.test_client().get("/healthz")
@@ -284,14 +265,13 @@ def test_inkypi_refresh_task_lazy_start(monkeypatch: pytest.MonkeyPatch) -> None
     """Test lazy refresh task start in Flask dev server."""
     monkeypatch.setenv("WERKZEUG_RUN_MAIN", "true")
 
-    mod = _reload_inkypi(monkeypatch, argv=["inkypi.py"], env={})
-    app = getattr(mod, "app", None)
+    app = _reload_inkypi(monkeypatch, argv=["inkypi.py"], env={})
     assert app is not None
 
     mock_rt = MagicMock()
     mock_rt.running = False
     app.config["REFRESH_TASK"] = mock_rt
-    mod.WEB_ONLY = False
+    app.config["WEB_ONLY"] = False
 
     response = app.test_client().get("/healthz")
     assert response.status_code == 200
@@ -375,8 +355,7 @@ def _register_json_error_routes(app: Flask) -> Any:
 
 
 def test_error_handlers_json_and_html(monkeypatch: pytest.MonkeyPatch) -> None:
-    mod = _reload_inkypi(monkeypatch, argv=["inkypi.py"], env={})
-    app = getattr(mod, "app", None)
+    app = _reload_inkypi(monkeypatch, argv=["inkypi.py"], env={})
     assert app is not None
 
     _register_json_error_routes(app)
@@ -414,8 +393,7 @@ def test_error_handlers_json_and_html(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_readyz_states(monkeypatch: pytest.MonkeyPatch) -> None:
-    mod = _reload_inkypi(monkeypatch, argv=["inkypi.py"], env={})
-    app = getattr(mod, "app", None)
+    app = _reload_inkypi(monkeypatch, argv=["inkypi.py"], env={})
     assert app is not None
     client = app.test_client()
 
@@ -442,8 +420,7 @@ def test_readyz_states(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_csp_headers_default_and_overrides(monkeypatch: pytest.MonkeyPatch) -> None:
     # Default in production: CSP is enforced (not report-only) -> None -> None
-    mod = _reload_inkypi(monkeypatch, argv=["inkypi.py"], env={})
-    app = getattr(mod, "app", None)
+    app = _reload_inkypi(monkeypatch, argv=["inkypi.py"], env={})
     assert app is not None
     client = app.test_client()
 
@@ -486,8 +463,7 @@ def _register_request_id_routes(app: Flask) -> Any:
 
 
 def test_request_id_propagates_in_json_error(monkeypatch: pytest.MonkeyPatch) -> None:
-    mod = _reload_inkypi(monkeypatch, argv=["inkypi.py"], env={})
-    app = getattr(mod, "app", None)
+    app = _reload_inkypi(monkeypatch, argv=["inkypi.py"], env={})
     assert app is not None
 
     _register_request_id_routes(app)
@@ -507,8 +483,7 @@ def test_request_id_propagates_in_json_error(monkeypatch: pytest.MonkeyPatch) ->
 
 
 def test_request_id_propagates_in_json_success(monkeypatch: pytest.MonkeyPatch) -> None:
-    mod = _reload_inkypi(monkeypatch, argv=["inkypi.py"], env={})
-    app = getattr(mod, "app", None)
+    app = _reload_inkypi(monkeypatch, argv=["inkypi.py"], env={})
     assert app is not None
 
     _register_request_id_routes(app)
@@ -530,13 +505,12 @@ def test_request_id_propagates_in_json_success(monkeypatch: pytest.MonkeyPatch) 
 
 def test_hot_reload_header_emitted_in_dev(monkeypatch: pytest.MonkeyPatch) -> None:
     # Ensure DEV mode
-    mod = _reload_inkypi(monkeypatch, argv=["inkypi.py", "--dev"], env={})
-    app = getattr(mod, "app", None)
+    app = _reload_inkypi(monkeypatch, argv=["inkypi.py", "--dev"], env={})
     assert app is not None
 
-    # Monkeypatch the imported function within inkypi module
+    # The middleware imports it from the registry when a response goes out.
     monkeypatch.setattr(
-        "inkypi.pop_hot_reload_info",
+        "plugins.plugin_registry.pop_hot_reload_info",
         lambda: {"plugin_id": "foo", "reloaded": True},
         raising=True,
     )
@@ -556,8 +530,7 @@ def test_request_timing_log_emitted(
     monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
 ) -> None:
     # Enable timing logs and run in dev to avoid production headers affecting path
-    mod = _reload_inkypi(monkeypatch, argv=["inkypi.py", "--dev"], env={})
-    app = getattr(mod, "app", None)
+    app = _reload_inkypi(monkeypatch, argv=["inkypi.py", "--dev"], env={})
     assert app is not None
 
     # Turn on timing via env
@@ -575,8 +548,7 @@ def test_request_timing_log_emitted(
         except Exception:
             messages.append(str(msg))
 
-    monkeypatch.setattr(mod, "logger", logging.getLogger("inkypi"), raising=True)
-    monkeypatch.setattr(mod.logger, "info", _spy_info, raising=True)
+    monkeypatch.setattr(logging.getLogger("inkypi"), "info", _spy_info)
 
     client = app.test_client()
     resp = client.get("/healthz")
@@ -634,12 +606,11 @@ def test_secret_key_persisted_in_production(monkeypatch: pytest.MonkeyPatch) -> 
 
 def test_https_redirect_when_enabled(monkeypatch: pytest.MonkeyPatch) -> None:
     """INKYPI_FORCE_HTTPS=1 in production mode should 301-redirect HTTP to HTTPS."""
-    mod = _reload_inkypi(
+    app = _reload_inkypi(
         monkeypatch,
         argv=["inkypi.py"],
         env={"INKYPI_FORCE_HTTPS": "1", "INKYPI_ENV": "production"},
     )
-    app = getattr(mod, "app", None)
     assert app is not None
 
     client = app.test_client()
@@ -650,12 +621,11 @@ def test_https_redirect_when_enabled(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_no_redirect_when_disabled(monkeypatch: pytest.MonkeyPatch) -> None:
     """Without INKYPI_FORCE_HTTPS, HTTP requests should not be redirected."""
-    mod = _reload_inkypi(
+    app = _reload_inkypi(
         monkeypatch,
         argv=["inkypi.py"],
         env={"INKYPI_ENV": "production"},
     )
-    app = getattr(mod, "app", None)
     assert app is not None
 
     client = app.test_client()
@@ -665,12 +635,11 @@ def test_no_redirect_when_disabled(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_no_redirect_in_dev_mode(monkeypatch: pytest.MonkeyPatch) -> None:
     """Even with INKYPI_FORCE_HTTPS=1, dev mode should skip the redirect."""
-    mod = _reload_inkypi(
+    app = _reload_inkypi(
         monkeypatch,
         argv=["inkypi.py"],
         env={"INKYPI_FORCE_HTTPS": "1", "INKYPI_ENV": "dev"},
     )
-    app = getattr(mod, "app", None)
     assert app is not None
 
     client = app.test_client()
@@ -680,7 +649,7 @@ def test_no_redirect_in_dev_mode(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_no_redirect_when_already_https(monkeypatch: pytest.MonkeyPatch) -> None:
     """Requests with X-Forwarded-Proto: https should not be redirected."""
-    mod = _reload_inkypi(
+    app = _reload_inkypi(
         monkeypatch,
         argv=["inkypi.py"],
         env={
@@ -689,7 +658,6 @@ def test_no_redirect_when_already_https(monkeypatch: pytest.MonkeyPatch) -> None
             "INKYPI_TRUSTED_PROXIES": "127.0.0.1",
         },
     )
-    app = getattr(mod, "app", None)
     assert app is not None
 
     client = app.test_client()

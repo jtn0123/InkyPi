@@ -9,7 +9,7 @@ from flask import Flask
 
 def _reload_inkypi(
     monkeypatch: pytest.MonkeyPatch, argv: Any = None, env: Any = None
-) -> Any:
+) -> Flask:
     if argv is None:
         argv = ["inkypi.py"]
     if env is None:
@@ -37,16 +37,15 @@ def _reload_inkypi(
     import inkypi  # noqa: F401
 
     mod = importlib.reload(sys.modules["inkypi"])
-    mod.main(argv[1:])
-    return mod
+    app: Flask = mod.main(argv[1:])
+    return app
 
 
 def test_create_app_before_request_starts_refresh(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     # Simulate dev mode but set WERKZEUG_RUN_MAIN so before_request will attempt to start
-    mod = _reload_inkypi(monkeypatch, argv=["inkypi.py", "--dev"], env={})
-    app = getattr(mod, "app", None)
+    app = _reload_inkypi(monkeypatch, argv=["inkypi.py", "--dev"], env={})
     assert isinstance(app, Flask)
 
     # Ensure refresh task exists and is initially not running
@@ -70,8 +69,7 @@ def test_create_app_before_request_web_only_skip(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Test that before_request skips refresh task start when WEB_ONLY is True."""
-    mod = _reload_inkypi(monkeypatch, argv=["inkypi.py", "--dev", "--web-only"], env={})
-    app = getattr(mod, "app", None)
+    app = _reload_inkypi(monkeypatch, argv=["inkypi.py", "--dev", "--web-only"], env={})
     assert isinstance(app, Flask)
 
     # Mock refresh task
@@ -110,19 +108,17 @@ def test_fast_dev_mode_config_exception_handling(
                 patch("plugins.plugin_registry.load_plugins"),
             ):
 
-                mod = _reload_inkypi(
+                app = _reload_inkypi(
                     monkeypatch, argv=["inkypi.py", "--dev", "--fast-dev"], env={}
                 )
 
                 # Should not raise exception, should handle gracefully
-                app = getattr(mod, "app", None)
                 assert app is not None
 
 
 def test_error_handlers_api_error(monkeypatch: pytest.MonkeyPatch) -> None:
     """APIError is rendered as structured JSON even for HTML clients."""
-    mod = _reload_inkypi(monkeypatch, argv=["inkypi.py"], env={})
-    app = getattr(mod, "app", None)
+    app = _reload_inkypi(monkeypatch, argv=["inkypi.py"], env={})
     assert app is not None
 
     from utils.http_utils import APIError
@@ -154,8 +150,7 @@ def test_error_handlers_consult_wants_json(
     (``app_setup.error_handlers``), and the Accept header is set to the
     opposite preference so the patched value is what decides the outcome.
     """
-    mod = _reload_inkypi(monkeypatch, argv=["inkypi.py"], env={})
-    app = getattr(mod, "app", None)
+    app = _reload_inkypi(monkeypatch, argv=["inkypi.py"], env={})
     assert app is not None
 
     monkeypatch.setattr(
@@ -175,8 +170,7 @@ def test_error_handlers_consult_wants_json(
 
 def test_error_handlers_coverage(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test that error handler code paths are covered."""
-    mod = _reload_inkypi(monkeypatch, argv=["inkypi.py"], env={})
-    app = getattr(mod, "app", None)
+    app = _reload_inkypi(monkeypatch, argv=["inkypi.py"], env={})
     assert app is not None
 
     # Test that error handlers are registered by checking that they exist
@@ -196,8 +190,7 @@ def test_error_handlers_coverage(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_security_headers_coverage(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test that security headers code paths are covered."""
-    mod = _reload_inkypi(monkeypatch, argv=["inkypi.py"], env={})
-    app = getattr(mod, "app", None)
+    app = _reload_inkypi(monkeypatch, argv=["inkypi.py"], env={})
     assert app is not None
 
     resp = app.test_client().get("/healthz")
@@ -209,8 +202,7 @@ def test_security_headers_coverage(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_security_headers_basic(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test basic security headers are set."""
-    mod = _reload_inkypi(monkeypatch, argv=["inkypi.py"], env={})
-    app = getattr(mod, "app", None)
+    app = _reload_inkypi(monkeypatch, argv=["inkypi.py"], env={})
     assert app is not None
 
     resp = app.test_client().get("/healthz")
@@ -222,10 +214,9 @@ def test_security_headers_basic(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_security_headers_hsts_conditions(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test HSTS header conditions are covered."""
-    mod = _reload_inkypi(
+    app = _reload_inkypi(
         monkeypatch, argv=["inkypi.py"], env={"INKYPI_TRUSTED_PROXIES": "127.0.0.1"}
     )
-    app = getattr(mod, "app", None)
     assert app is not None
 
     resp = app.test_client().get("/healthz")
@@ -250,34 +241,19 @@ def test_security_headers_hsts_conditions(monkeypatch: pytest.MonkeyPatch) -> No
 
 
 def test_startup_image_generation_execution(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Test that startup image generation code path is covered."""
-    # This test ensures the startup image generation logic is executed
-    # by simulating the conditions that trigger it
-    with monkeypatch.context() as m:
-        m.setattr(
-            "utils.app_utils.generate_startup_image",
-            MagicMock(return_value=MagicMock()),
-        )
-        m.setattr("werkzeug.serving.is_running_from_reloader", lambda: False)
+    """With startup turned off, the boot tasks leave the panel alone."""
+    app = _reload_inkypi(monkeypatch, argv=["inkypi.py"], env={})
+    inkypi = sys.modules["inkypi"]
+    generate = MagicMock()
+    monkeypatch.setattr(inkypi, "generate_startup_image", generate)
+    monkeypatch.setattr(inkypi.blackout, "is_active", lambda _cfg: False)
+    config = MagicMock()
+    config.get_config.return_value = False  # startup already shown
+    display = MagicMock()
+    app.config.update(DEVICE_CONFIG=config, DISPLAY_MANAGER=display, REFRESH_TASK=None)
 
-        mod = _reload_inkypi(monkeypatch, argv=["inkypi.py"], env={})
-        app = getattr(mod, "app", None)
-        assert app is not None
+    inkypi.run_boot_display_tasks(app)
 
-        # Mock components
-        dm_mock = MagicMock()
-        config_mock = MagicMock()
-        config_mock.get_config.return_value = True  # startup enabled
-        config_mock.get_resolution.return_value = (400, 300)
-        config_mock.update_value = MagicMock()
-
-        app.config["DISPLAY_MANAGER"] = dm_mock
-        app.config["DEVICE_CONFIG"] = config_mock
-
-        # Simulate the startup logic
-        if not mod.WEB_ONLY and config_mock.get_config("startup") is True:
-            from utils.app_utils import generate_startup_image
-
-            img = generate_startup_image(config_mock.get_resolution())
-            dm_mock.display_image(img)
-            config_mock.update_value("startup", False, write=True)
+    generate.assert_not_called()
+    display.display_image.assert_not_called()
+    config.update_value.assert_not_called()
