@@ -1,97 +1,78 @@
 // Forward uncaught JS errors and unhandled promise rejections to /api/client-error.
-// Features:
-//   - 25% sampling to avoid flooding the server with noise
-//   - Uses navigator.sendBeacon when available (works during page unload)
-//   - Self-disables after 5 consecutive send failures (no logging loop)
+// Loaded early (not deferred, right after csrf.js) so later scripts' errors count.
+//   - At most one report every 5 s, so an error loop cannot flood the Pi
+//   - Sends with keepalive fetch: it survives page unload like sendBeacon, but
+//     can carry the X-CSRFToken header the server requires
+//   - Stops after 5 failed sends (no logging loop)
 (function () {
   "use strict";
 
   const ENDPOINT = "/api/client-error";
-  const SAMPLE_RATE = 0.25; // report 25% of errors
+  const THROTTLE_MS = 5000;
   const MAX_FAILURES = 5;
+  const FIELD_MAX = 2048; // matches the server-side per-field cap
+  let lastReport = -Infinity;
   let failures = 0;
-  let disabled = false;
 
-  function shouldSample() {
-    // NOSONAR — Math.random is intentional: this is non-security log sampling.
-    // Sonar rule javascript:S2245 (insecure RNG) is a false positive here.
-    return Math.random() < SAMPLE_RATE; // NOSONAR
+  function cap(value) {
+    return String(value || "").slice(0, FIELD_MAX);
   }
 
-  function getCsrfToken() {
-    const meta = document.querySelector('meta[name="csrf-token"]');
-    return meta ? meta.getAttribute("content") : "";
+  function rejectionMessage(reason) {
+    if (reason instanceof Error) {
+      return reason.message || "Unhandled promise rejection";
+    }
+    if (typeof reason === "string") {
+      return reason;
+    }
+    return "Unhandled promise rejection";
   }
 
   function onSendFailure() {
     failures += 1;
-    if (failures >= MAX_FAILURES) {
-      disabled = true;
-    }
   }
 
   function send(payload) {
-    if (disabled) return;
-    if (!shouldSample()) return;
+    if (failures >= MAX_FAILURES) return;
+    const now = Date.now();
+    if (now - lastReport < THROTTLE_MS) return;
+    lastReport = now;
     try {
-      const body = JSON.stringify(payload);
-      if (navigator.sendBeacon) {
-        // sendBeacon works during page unload; CSRF token embedded in body
-        // because sendBeacon does not support custom headers.
-        const blob = new Blob([body], { type: "application/json" });
-        const ok = navigator.sendBeacon(ENDPOINT, blob);
-        if (!ok) {
+      fetch(ENDPOINT, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRFToken": globalThis.InkyPiCsrf?.getToken() || "",
+        },
+        body: JSON.stringify(payload),
+        keepalive: true,
+      }).then(function (res) {
+        if (!res.ok && res.status !== 429) {
           onSendFailure();
         }
-      } else {
-        const csrfToken = getCsrfToken();
-        fetch(ENDPOINT, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-CSRFToken": csrfToken,
-          },
-          body: body,
-          keepalive: true,
-        }).then(function (res) {
-          if (!res.ok && res.status !== 429) {
-            onSendFailure();
-          }
-        }).catch(function () {
-          onSendFailure();
-        });
-      }
+      }, onSendFailure);
     } catch {
-      // Never let the reporter itself throw — record a soft failure so the
-      // self-disable counter still kicks in if something is fundamentally broken.
+      // Never let the reporter itself throw.
       onSendFailure();
     }
   }
 
   globalThis.addEventListener("error", function (event) {
     send({
-      message: (event.message || "Uncaught error").slice(0, 2048),
-      source: (event.filename || "").slice(0, 2048),
+      message: cap(event.message || "Uncaught error"),
+      source: cap(event.filename),
       line: event.lineno || 0,
       column: event.colno || 0,
-      url: location.pathname.slice(0, 2048),
+      url: cap(location.pathname),
     });
   });
 
   globalThis.addEventListener("unhandledrejection", function (event) {
     const reason = event.reason;
-    let message;
-    if (reason instanceof Error) {
-      message = reason.message || "Unhandled promise rejection";
-    } else if (typeof reason === "string") {
-      message = reason;
-    } else {
-      message = "Unhandled promise rejection";
-    }
     send({
-      message: message.slice(0, 2048),
-      stack: (reason instanceof Error && reason.stack ? reason.stack : "").slice(0, 2048),
-      url: location.pathname.slice(0, 2048),
+      message: cap(rejectionMessage(reason)),
+      stack: cap(reason instanceof Error ? reason.stack : ""),
+      url: cap(location.pathname),
     });
   });
 })();

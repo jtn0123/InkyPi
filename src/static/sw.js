@@ -1,4 +1,4 @@
-const CACHE_NAME = "inkypi-shell-v25";
+const CACHE_NAME = "inkypi-shell-v26";
 
 // Mirrors _PUBLIC_STATIC_DIRS in src/app_setup/auth.py. Other /static/
 // subtrees (e.g. images/) can hold private display images and require login,
@@ -9,7 +9,7 @@ const SHELL_ASSETS = [
   "/static/styles/main.css",
   "/static/scripts/theme.js",
   "/static/scripts/csrf.js",
-  "/static/scripts/client_errors.js",
+  "/static/scripts/client_error_reporter.js",
   "/static/scripts/form_validator.js",
   "/static/scripts/response_modal.js",
   "/static/scripts/ui_helpers.js",

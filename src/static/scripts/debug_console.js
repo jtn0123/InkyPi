@@ -162,55 +162,45 @@
     document.body.appendChild(_panel);
   }
 
-  // Intercept errors that fire before DOMContentLoaded
+  function _errorText(evt) {
+    return evt.error && evt.error.message
+      ? evt.error.message
+      : evt.message || "Uncaught error";
+  }
+
+  function _rejectionText(reason) {
+    if (reason instanceof Error) return reason.message || "Unhandled promise rejection";
+    if (typeof reason === "string") return reason;
+    return "Unhandled promise rejection";
+  }
+
+  // Errors that fire before the panel exists are held here, then flushed once
+  // on DOMContentLoaded. After that they go straight to the panel, which keeps
+  // only the newest MAX_ENTRIES, so nothing grows while a tab stays open.
   var _earlyErrors = [];
-  var _origOnerror = window.onerror;
+  var _ready = false;
 
-  window.onerror = function (msg, src, line, col, err) {
-    var text = err && err.message ? err.message : (typeof msg === "string" ? msg : "Uncaught error");
-    _earlyErrors.push(text);
-    if (_origOnerror) return _origOnerror.apply(this, arguments);
-  };
+  function _capture(text) {
+    if (_ready) {
+      _addEntry(text);
+    } else if (_earlyErrors.push(text) > MAX_ENTRIES) {
+      _earlyErrors.shift();
+    }
+  }
 
-  var _origOnUnhandled = window.onunhandledrejection;
+  window.addEventListener("error", function (evt) {
+    _capture(_errorText(evt));
+  });
+
   window.addEventListener("unhandledrejection", function (evt) {
-    var reason = evt.reason;
-    var text =
-      reason instanceof Error
-        ? reason.message || "Unhandled promise rejection"
-        : typeof reason === "string"
-        ? reason
-        : "Unhandled promise rejection";
-    _earlyErrors.push(text);
+    _capture(_rejectionText(evt.reason));
   });
 
   document.addEventListener("DOMContentLoaded", function () {
     _buildUI();
-    // Flush errors captured before DOM was ready
-    _earlyErrors.forEach(function (msg) {
-      _addEntry(msg);
-    });
+    _ready = true;
+    _earlyErrors.forEach(_addEntry);
     _earlyErrors = [];
-
-    // Forward future errors
-    window.addEventListener("error", function (evt) {
-      var text =
-        evt.error && evt.error.message
-          ? evt.error.message
-          : evt.message || "Uncaught error";
-      _addEntry(text);
-    });
-
-    window.addEventListener("unhandledrejection", function (evt) {
-      var reason = evt.reason;
-      var text =
-        reason instanceof Error
-          ? reason.message || "Unhandled promise rejection"
-          : typeof reason === "string"
-          ? reason
-          : "Unhandled promise rejection";
-      _addEntry(text);
-    });
   });
 
   // Expose for testing only

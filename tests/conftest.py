@@ -68,6 +68,8 @@ UI_BROWSER_TESTS = {
     # Sidebar update indicator + quick-update modal flow (shows on update
     # available, click opens modal, confirm POSTs, cancel no-POST, hash nav).
     "test_sidebar_update_indicator.py",
+    # Browser error and console-log reports reach the server with CSRF on.
+    "test_client_error_reporting_e2e.py",
 }
 A11Y_BROWSER_TESTS = {
     "test_a11y_sweep.py",

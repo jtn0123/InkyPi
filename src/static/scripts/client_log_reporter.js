@@ -7,7 +7,8 @@
 //   - Coalesces reports within a 500ms window into a single batched POST
 //     so bursts of errors consume only one server-side rate-limit token.
 //   - Splits across multiple POSTs if batch exceeds the server cap (50).
-//   - Falls back to navigator.sendBeacon for the tail flush on page unload.
+//   - Flushes the tail on page unload with a keepalive fetch, which outlives
+//     the page like sendBeacon but can carry the X-CSRFToken header.
 //   - Self-disables after 10 consecutive send failures (raised from 5 now
 //     that the server capacity is higher — JTN-711).
 (function () {
@@ -51,11 +52,6 @@
     return Math.random() < SAMPLE_RATE; // NOSONAR
   }
 
-  function getCsrfToken() {
-    const meta = document.querySelector('meta[name="csrf-token"]');
-    return meta ? meta.getAttribute("content") : "";
-  }
-
   function onSendFailure() {
     failures += 1;
     if (failures >= MAX_FAILURES) {
@@ -84,39 +80,25 @@
     };
   }
 
-  function postBatch(entries, useBeacon) {
+  function postBatch(entries) {
     if (entries.length === 0) return;
     // Server accepts both single-object and array payloads. Always use an
     // array here — it keeps the code path uniform and the server parses
     // either shape in one token.
-    const body = JSON.stringify(entries);
     try {
-      if (useBeacon && navigator.sendBeacon) {
-        // sendBeacon works during page unload; CSRF token embedded in body
-        // because sendBeacon does not support custom headers.
-        const blob = new Blob([body], { type: "application/json" });
-        const ok = navigator.sendBeacon(ENDPOINT, blob);
-        if (ok === false) {
+      fetch(ENDPOINT, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRFToken": globalThis.InkyPiCsrf?.getToken() || "",
+        },
+        body: JSON.stringify(entries),
+        keepalive: true,
+      }).then(function (res) {
+        if (!res.ok && res.status !== 429) {
           onSendFailure();
         }
-      } else {
-        const csrfToken = getCsrfToken();
-        fetch(ENDPOINT, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-CSRFToken": csrfToken,
-          },
-          body: body,
-          keepalive: true,
-        }).then(function (res) {
-          if (!res.ok && res.status !== 429) {
-            onSendFailure();
-          }
-        }).catch(function () {
-          onSendFailure();
-        });
-      }
+      }, onSendFailure);
     } catch {
       // Never let the reporter itself throw — record a soft failure so the
       // self-disable counter still kicks in if something is fundamentally broken.
@@ -124,7 +106,7 @@
     }
   }
 
-  function flush(useBeacon) {
+  function flush() {
     if (flushTimer !== null) {
       clearTimeout(flushTimer);
       flushTimer = null;
@@ -135,7 +117,7 @@
     // accumulated more than the server cap.
     while (pending.length > 0) {
       const chunk = pending.splice(0, BATCH_MAX);
-      postBatch(chunk, !!useBeacon);
+      postBatch(chunk);
     }
   }
 
@@ -143,7 +125,7 @@
     if (flushTimer !== null) return;
     flushTimer = setTimeout(function () {
       flushTimer = null;
-      flush(false);
+      flush();
     }, BATCH_WINDOW_MS);
   }
 
@@ -155,7 +137,7 @@
       // If we've already hit the server cap in a single burst, flush now
       // and avoid waiting the remaining window.
       if (pending.length >= BATCH_MAX) {
-        flush(false);
+        flush();
         return;
       }
       scheduleFlush();
@@ -164,14 +146,10 @@
     }
   }
 
-  // Flush any pending reports on page unload using sendBeacon so nothing
-  // is lost when the user navigates away mid-coalesce-window.
-  window.addEventListener("pagehide", function () {
-    flush(true);
-  });
-  window.addEventListener("beforeunload", function () {
-    flush(true);
-  });
+  // Flush any pending reports on page unload so nothing is lost when the
+  // user navigates away mid-coalesce-window.
+  window.addEventListener("pagehide", flush);
+  window.addEventListener("beforeunload", flush);
 
   console.warn = function () {
     // Call original first — never suppress existing console output.

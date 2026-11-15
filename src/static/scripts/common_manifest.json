@@ -8,12 +8,8 @@
     "defer": false
   },
   {
-    "path": "client_errors.js",
-    "defer": false
-  },
-  {
     "path": "client_error_reporter.js",
-    "defer": true
+    "defer": false
   },
   {
     "path": "client_log_reporter.js",

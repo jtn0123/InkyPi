@@ -219,52 +219,6 @@ class TestCSRFProtection:
         assert resp.status_code == 403
 
 
-class TestClientErrorsJsCSRF:
-    """JTN-257: Structural tests verifying client_errors.js includes CSRF token support."""
-
-    def test_client_errors_js_reads_csrf_meta_tag(self) -> None:
-        """client_errors.js must include getCsrfToken() reading the csrf-token meta tag."""
-        import os
-
-        js_path = os.path.join(
-            os.path.dirname(__file__),
-            "..",
-            "..",
-            "src",
-            "static",
-            "scripts",
-            "client_errors.js",
-        )
-        with open(os.path.abspath(js_path)) as fh:
-            source = fh.read()
-        assert (
-            'meta[name="csrf-token"]' in source
-        ), "client_errors.js must query the csrf-token meta tag"
-        assert (
-            "_csrf_token" in source
-        ), "client_errors.js must include _csrf_token in the request body"
-        assert (
-            "getCsrfToken" in source
-        ), "client_errors.js must define a getCsrfToken helper"
-
-    def test_client_errors_js_fetch_sends_x_csrftoken_header(self) -> None:
-        """fetch() fallback in client_errors.js must send X-CSRFToken header."""
-        import os
-
-        js_path = os.path.join(
-            os.path.dirname(__file__),
-            "..",
-            "..",
-            "src",
-            "static",
-            "scripts",
-            "client_errors.js",
-        )
-        with open(os.path.abspath(js_path)) as fh:
-            source = fh.read()
-        assert "X-CSRFToken" in source, "fetch() fallback must send X-CSRFToken header"
-
-
 class TestRateLimiting:
     def test_rate_limit_allows_within_threshold(self, csrf_app: Any) -> None:
         client = csrf_app.test_client()

@@ -34,12 +34,9 @@
     if (cancelBtn) cancelBtn.disabled = true;
 
     try {
-      var csrfMeta = document.querySelector('meta[name="csrf-token"]');
-      var csrfToken = csrfMeta ? csrfMeta.getAttribute("content") : "";
-
       var resp = await fetch(clearUrl, {
         method: "POST",
-        headers: { "X-CSRFToken": csrfToken },
+        headers: { "X-CSRFToken": globalThis.InkyPiCsrf?.getToken() || "" },
       });
       var result = await resp.json();
       if (!resp.ok) {

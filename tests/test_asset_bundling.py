@@ -135,7 +135,7 @@ class TestBuildAssetsScript:
         manifest = json.loads((dist / "manifest.json").read_text())
         js_content = (dist / manifest["common.js"]).read_text(encoding="utf-8")
         # Each file in JS_MANIFEST should be referenced in the bundle
-        for expected_file in ["theme.js", "csrf.js", "client_errors.js"]:
+        for expected_file in ["theme.js", "csrf.js", "client_error_reporter.js"]:
             assert (
                 expected_file in js_content
             ), f"Expected '{expected_file}' marker in JS bundle"

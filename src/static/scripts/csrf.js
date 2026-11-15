@@ -1,5 +1,6 @@
 // Auto-inject CSRF token into all mutating fetch requests.
-// Reads the token from <meta name="csrf-token"> set in base.html.
+// Reads the token from <meta name="csrf-token"> set in base.html, and exposes
+// that reader as globalThis.InkyPiCsrf.getToken() for scripts that need it.
 (function () {
   "use strict";
   const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
@@ -34,6 +35,8 @@
       init.headers["X-CSRFToken"] = token;
     }
   }
+
+  globalThis.InkyPiCsrf = Object.freeze({ getToken: getCsrfToken });
 
   window.fetch = function (resource, init) {
     const requestInit = init || {};
