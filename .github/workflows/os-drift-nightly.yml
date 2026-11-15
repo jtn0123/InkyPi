@@ -277,6 +277,7 @@ jobs:
     needs: [drift-check, install-sim]
     if: failure() && github.event_name == 'schedule'
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: read
       issues: write

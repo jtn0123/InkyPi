@@ -18,6 +18,7 @@ jobs:
   scan:
     name: Trivy filesystem scan
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     permissions:
       contents: read
       security-events: write

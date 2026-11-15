@@ -10,6 +10,7 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     if: github.repository == 'jtn0123/InkyPi'
     outputs:
       released: ${{ steps.resolve_tag.outputs.released }}

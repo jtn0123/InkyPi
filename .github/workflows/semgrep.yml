@@ -18,6 +18,7 @@ jobs:
   semgrep:
     name: Semgrep scan
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     permissions:
       contents: read
       security-events: write

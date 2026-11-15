@@ -1023,6 +1023,7 @@ jobs:
     name: CI gate (all checks pass)
     needs: [lint, shellcheck, lockfile-drift, tests, sonarcloud, smoke, smoke-matrix, coverage-gate, security, browser-smoke, browser-full, install-smoke-memcap, install-matrix, install-crash-loop-gate, preflash-validate, flake-detection, soak-nightly, mutation-nightly]
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     if: always()
     steps:
       - name: Check all required jobs passed
