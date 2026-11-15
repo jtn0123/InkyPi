@@ -116,6 +116,9 @@ def plugin_page(plugin_id: str) -> Any:
                 template_params["plugin_instance_last_refresh"] = (
                     plugin_instance.latest_refresh_time
                 )
+            template_params["plugin_instance_rendered"] = bool(
+                plugin_instance.latest_refresh_time
+            )
         else:
             # Try to pre-populate from a saved settings instance on Default playlist
             default_playlist = playlist_manager.get_playlist("Default")
@@ -127,6 +130,9 @@ def plugin_page(plugin_id: str) -> Any:
                 if saved_instance:
                     template_params["plugin_settings"] = saved_instance.settings
                     template_params["plugin_instance"] = saved_instance_name
+                    template_params["plugin_instance_rendered"] = bool(
+                        saved_instance.latest_refresh_time
+                    )
 
         template_params["playlists"] = playlist_manager.get_playlist_names()
 

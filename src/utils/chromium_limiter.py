@@ -106,21 +106,6 @@ def _open_lock_file(path: str) -> int | None:
         return None
 
 
-@contextmanager
-def slot_wait_limit(timeout_s: float) -> Iterator[None]:
-    """Cap how long :func:`chromium_slot` may wait on the current thread.
-
-    For callers that must not sit on a busy renderer for the full default
-    wait, e.g. a web request thread that has a cheaper fallback to serve.
-    """
-    previous = getattr(_local, "wait_limit", None)
-    _local.wait_limit = max(0.0, timeout_s)
-    try:
-        yield
-    finally:
-        _local.wait_limit = previous
-
-
 def _acquire_lock(fd: int, path: str, purpose: str, wait_s: float) -> None:
     """Poll for the exclusive flock on *fd*, raising once *wait_s* elapses."""
     started = time.monotonic()
@@ -191,11 +176,7 @@ def chromium_slot(
         yield
         return
 
-    if timeout_s is None:
-        wait_limit = getattr(_local, "wait_limit", None)
-        wait_s = _wait_timeout_s() if wait_limit is None else wait_limit
-    else:
-        wait_s = max(0.0, timeout_s)
+    wait_s = _wait_timeout_s() if timeout_s is None else max(0.0, timeout_s)
     try:
         _acquire_lock(fd, path, purpose, wait_s)
         with _held_fds_lock:

@@ -6,8 +6,6 @@ from typing import Any
 
 from flask import abort, current_app, send_from_directory
 
-from plugins.plugin_registry import get_plugin_instance
-from utils.chromium_limiter import slot_wait_limit
 from utils.form_utils import sanitize_log_field
 from utils.http_utils import content_disposition
 from utils.security_utils import validate_file_path
@@ -21,12 +19,6 @@ from ._common import (
     logger,
     plugin_bp,
 )
-
-#: A preview GET renders in the request thread on a cache miss. When another
-#: headless browser already holds the machine-wide Chromium slot, give up fast
-#: and serve the history fallback instead of parking a server thread for the
-#: limiter's full default wait.
-_INSTANCE_IMAGE_RENDER_WAIT_S = 3.0
 
 
 @plugin_bp.route("/images/<plugin_id>/<path:filename>", methods=["GET"])
@@ -227,36 +219,33 @@ def _find_latest_plugin_refresh_time(device_config: Any, plugin_id: str) -> str 
     methods=["GET"],
 )
 def instance_image(plugin_id: str, instance_name: str) -> Any:
-    device_config = current_app.config[_CONFIG_KEY]
-    playlist_manager = device_config.get_playlist_manager()
+    """Serve the latest image of one playlist instance, without rendering.
 
-    # Resolve expected image path
+    A page view must never run plugin code in a web thread: there it has no
+    process isolation, no plugin timeout and no health tracking, it can spend
+    a paid API call (AI image/text), and a playlist page of thumbnails could
+    tie up the server's few request threads. The refresh loop writes this
+    file atomically whenever the instance is displayed. Until then, serve the
+    instance's newest history image, else 404, which the pages handle (the
+    playlist hides the tile; the plugin page falls back to the plugin's
+    latest image).
+    """
+    device_config = current_app.config[_CONFIG_KEY]
+
     try:
         path = device_config.get_plugin_image_path(plugin_id, instance_name)
-        os.makedirs(os.path.dirname(path), exist_ok=True)
     except Exception:
         return (_ERR_NOT_FOUND, 404)
-
-    # Serve if already exists
     if os.path.exists(path):
         return _cacheable_send_file(path)
 
-    # Try to generate and persist
     try:
-        plugin_inst = playlist_manager.find_plugin(plugin_id, instance_name)
-        if not plugin_inst:
+        playlist_manager = device_config.get_playlist_manager()
+        if not playlist_manager.find_plugin(plugin_id, instance_name):
             return (_ERR_NOT_FOUND, 404)
-        plugin_config = device_config.get_plugin(plugin_id)
-        if not plugin_config:
-            return (_ERR_NOT_FOUND, 404)
-        plugin = get_plugin_instance(plugin_config)
-        with slot_wait_limit(_INSTANCE_IMAGE_RENDER_WAIT_S):
-            image = plugin.generate_image(plugin_inst.settings, device_config)
-        image.save(path)
-        return _cacheable_send_file(path)
     except Exception:
-        # Fallback to most recent matching history image
-        hist = _find_history_image(device_config, plugin_id, instance_name)
-        if hist and os.path.exists(hist):
-            return _cacheable_send_file(hist)
         return (_ERR_NOT_FOUND, 404)
+    hist = _find_history_image(device_config, plugin_id, instance_name)
+    if hist and os.path.exists(hist):
+        return _cacheable_send_file(hist)
+    return (_ERR_NOT_FOUND, 404)

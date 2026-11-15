@@ -130,9 +130,11 @@
     const img = document.getElementById("thumbnailPreviewImage");
     const info = document.getElementById("thumbnailPreviewInfo");
     if (!img || !info) return;
-    img.src = `/plugin_instance_image/${encodeURIComponent(
-      playlistName
-    )}/${encodeURIComponent(pluginId)}/${encodeURIComponent(instanceName)}`;
+    // Same URL the thumbnail itself loads (plugin.plugin_instance_image).
+    // Instances are keyed by plugin and name, not by playlist.
+    img.src = `/instance_image/${encodeURIComponent(
+      pluginId
+    )}/${encodeURIComponent(instanceName)}`;
     const label = instanceLabel || instanceName;
     if (label && label !== pluginName) {
       info.textContent = `Plugin: ${pluginName} | Instance: ${label}`;
