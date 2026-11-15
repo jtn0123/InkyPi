@@ -2,6 +2,19 @@
 
 <!-- version list -->
 
+## v1.8.3 (2026-11-15)
+
+### Bug Fixes
+
+- **apod**: Read the picture from the APOD website when the API fails
+  ([#715](https://github.com/jtn0123/InkyPi/pull/715),
+  [`25d106f`](https://github.com/jtn0123/InkyPi/commit/25d106f001ae96698f3c4da90f0aee7eb58c35d4))
+
+- **security**: Redact API keys from every log output
+  ([#717](https://github.com/jtn0123/InkyPi/pull/717),
+  [`cfba888`](https://github.com/jtn0123/InkyPi/commit/cfba888b3f64ffe8f65e2a75cfd094ad49f82d10))
+
+
 ## v1.8.2 (2026-11-15)
 
 ### Performance Improvements
