@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+from typing import Any
 
 import pytest
 from playwright.sync_api import Page
@@ -123,3 +124,85 @@ def test_last_progress_card_persistent_in_aside(
     ), "#closeProgressBtn should be removed (card is always visible now)"
 
     rc.assert_no_errors(str(tmp_path), "plugin_last_progress_persistent_card")
+
+
+@pytest.fixture
+def upload_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """Store Image Upload files in a temp folder, not src/static/images/saved."""
+    import plugins.image_upload.image_upload as image_upload_mod
+    import utils.app_utils as app_utils
+
+    saved = tmp_path / "saved"
+    saved.mkdir()
+    real_resolve_path = app_utils.resolve_path
+    target = os.path.join("static", "images", "saved")
+    monkeypatch.setattr(
+        app_utils,
+        "resolve_path",
+        lambda p: str(saved) if os.fspath(p) == target else real_resolve_path(p),
+    )
+    monkeypatch.setattr(image_upload_mod, "_get_upload_dir", lambda: str(saved))
+    return saved
+
+
+def _pick_image(page: Page, tmp_path: Path, name: str = "garden.png") -> None:
+    from PIL import Image
+
+    picked = tmp_path / name
+    Image.new("RGB", (40, 30), "white").save(picked)
+    page.set_input_files("#imageUpload", str(picked))
+    page.wait_for_selector(f"[id='added-{name}']", timeout=5000)
+
+
+def test_image_upload_update_display_sends_picked_files(
+    live_server: str, browser_page: Page, tmp_path: Path, upload_dir: Path
+) -> None:
+    page = browser_page
+    rc = navigate_and_wait(page, live_server, "/plugin/image_upload")
+    _pick_image(page, tmp_path)
+
+    sent: list[bytes] = []
+
+    def fake_update_now(route: Any) -> None:
+        sent.append(route.request.post_data_buffer or b"")
+        route.fulfill(
+            status=200,
+            content_type="application/json",
+            body='{"success": true, "message": "Display updated"}',
+        )
+
+    page.route("**/update_now", fake_update_now)
+    page.locator("[data-plugin-action='update_now']").first.click()
+    page.wait_for_selector(".toast-content", timeout=10000)
+
+    assert sent, "Update display never sent a request"
+    assert b'name="imageFiles[]"; filename="garden.png"' in sent[0]
+    rc.assert_no_errors(str(tmp_path), "image_upload_update_now")
+
+
+def test_image_upload_save_stores_picked_files(
+    live_server: str, browser_page: Page, tmp_path: Path, upload_dir: Path
+) -> None:
+    page = browser_page
+    rc = navigate_and_wait(page, live_server, "/plugin/image_upload")
+    _pick_image(page, tmp_path)
+
+    with page.expect_request(lambda r: "/save_plugin_settings" in r.url) as req_info:
+        page.locator("#savePluginSettingsBtn").click()
+    request = req_info.value
+    assert "multipart/form-data" in (request.headers.get("content-type") or "")
+    assert b'name="imageFiles[]"; filename="garden.png"' in (
+        request.post_data_buffer or b""
+    )
+
+    # Once saved, the widget lists the stored copy as a saved image and drops
+    # the pending file, so the next save keeps it instead of re-uploading it.
+    hidden = page.locator("#hiddenFileInputs input[name='imageFiles[]']")
+    hidden.first.wait_for(state="attached", timeout=10000)
+    stored = Path(hidden.first.get_attribute("value") or "")
+    assert stored.parent == upload_dir
+    assert stored.name.endswith("_garden.png")
+    assert stored.is_file()
+    assert page.locator("[id='added-garden.png']").count() == 0
+    assert page.evaluate("() => window.uploadedFiles['imageFiles[]'].length") == 0
+    rc.assert_no_errors(str(tmp_path), "image_upload_save")

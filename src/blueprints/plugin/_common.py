@@ -45,15 +45,27 @@ def _raise_request_model_error(error: RequestModelError) -> NoReturn:
     )
 
 
-def _plugin_form_data(*, include_form_for_files: bool = False) -> dict[str, Any]:
+def _plugin_form_data() -> dict[str, Any]:
+    """Return the submitted settings with uploaded files saved to disk.
+
+    Paths of files that were already uploaded arrive as ordinary form fields
+    under the same name as the file input (``imageFiles[]``). Passing the form
+    to ``handle_request_files`` keeps those paths and adds the new files after
+    them; without it, picking one more image would drop every earlier one.
+    """
     form_data = parse_form(request.form)
-    file_args: tuple[Any, ...]
-    if include_form_for_files:
-        file_args = (request.files, request.form)
-    else:
-        file_args = (request.files,)
-    form_data.update(handle_request_files(*file_args))
+    form_data.update(handle_request_files(request.files, request.form))
     return form_data
+
+
+def _saved_upload_settings(settings: dict[str, Any]) -> dict[str, Any]:
+    """Return the saved paths for each file field this request uploaded to.
+
+    The page sends picked files on every save until it learns their stored
+    paths, so persisting routes hand these back; the upload widget then lists
+    them as saved files instead of uploading another copy next time.
+    """
+    return {key: settings[key] for key in request.files if key in settings}
 
 
 def _plugins_dir() -> str:

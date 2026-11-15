@@ -97,6 +97,7 @@
                         hx-post="{{ url_for('plugin.save_plugin_settings') }}"
                         hx-headers='{{ {"X-CSRFToken": csrf_token()} | tojson }}'
                         hx-include="#settingsForm"
+                        hx-encoding="multipart/form-data"
                         hx-target="#plugin-form-errors"
                         hx-swap="innerHTML"
                         hx-disabled-elt="this">Save settings</button>
