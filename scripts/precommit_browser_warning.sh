@@ -1,19 +1,31 @@
 #!/usr/bin/env bash
-# precommit_browser_warning.sh — run the browser smoke gate when frontend files
-# are staged.
+# precommit_browser_warning.sh — run the browser smoke gate before pushing
+# front-end changes.
 #
-# Install via .pre-commit-config.yaml (see repo root) or run manually.
-# This hook exits non-zero when the smoke suite fails so frontend changes
-# cannot be committed without the lightweight browser gate passing first.
+# .pre-commit-config.yaml runs this at the pre-push stage, and only when the
+# commits being pushed touch src/static/ or src/templates/ (the hook's
+# `files` pattern). It can also be run by hand. A failing smoke suite blocks
+# the push. Without Playwright Chromium the gate is skipped with a message:
+# CI's browser-smoke job still runs it on every pull request.
 
 set -euo pipefail
 
-# Check whether any staged file is under src/static/ or src/templates/
-if ! git diff --cached --name-only | grep -qE '^src/(static|templates)/'; then
+cd "$(git rev-parse --show-toplevel)"
+
+# The repo's .venv (or, in a git worktree, the main checkout's), as the other
+# Python hooks use.
+if ! scripts/precommit_tool.sh python - <<'PY' >/dev/null 2>&1
+from playwright.sync_api import sync_playwright
+
+with sync_playwright() as playwright:
+    playwright.chromium.launch().close()
+PY
+then
+  echo "Skipping the browser smoke gate: Playwright Chromium isn't available."
+  echo "Install it with: python -m playwright install chromium"
+  echo "(CI's browser-smoke job still runs the gate on every pull request.)"
   exit 0
 fi
 
-echo "Running browser smoke gate for staged frontend changes..."
+echo "Running the browser smoke gate for front-end changes..."
 ./scripts/test.sh browser-smoke
-
-exit 0
