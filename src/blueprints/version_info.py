@@ -36,11 +36,29 @@ _PROCESS_START_TIME: float = time.monotonic()
 _PROCESS_START_DATETIME: datetime = datetime.now(UTC)
 
 
+# src/blueprints/version_info.py -> the checkout root.
+_REPO_ROOT: Path = Path(__file__).resolve().parents[2]
+
+
 def _run_git(*args: str) -> str:
-    """Run a git command and return stdout, or 'unknown' on any error."""
+    """Run a git command in the checkout; return stdout, or 'unknown' on any error.
+
+    Git runs in the checkout explicitly: the service's working directory
+    (/run/inkypi) is not a repository. The service also runs as root while the
+    checkout belongs to the user who installed it, which git refuses as
+    "dubious ownership"; ``safe.directory`` on the command line trusts only
+    this one repository.
+    """
     try:
         result = subprocess.run(
-            ["git", *args],
+            [
+                "git",
+                "-c",
+                f"safe.directory={_REPO_ROOT}",
+                "-C",
+                str(_REPO_ROOT),
+                *args,
+            ],
             capture_output=True,
             text=True,
             timeout=1,
