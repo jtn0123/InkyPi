@@ -85,8 +85,7 @@ def save_plugin_settings_alias(plugin_id: str) -> Any:
 def _is_htmx_request() -> bool:
     """Return True when the current request originated from HTMX (JTN-506)."""
     try:
-        header_value = request.headers.get("HX-Request", "")
-        return isinstance(header_value, str) and header_value.lower() == "true"
+        return request.headers.get("HX-Request", "").lower() == "true"
     except RuntimeError:
         # Outside an active request context
         return False

@@ -33,6 +33,14 @@ logger = logging.getLogger(__name__)
 _DEFAULT_SCREENSHOT_TIMEOUT_S = 30
 _MAX_SCREENSHOT_TIMEOUT_S = 60
 
+
+def _screenshot_timeout_seconds(timeout_ms: int | None) -> float:
+    """Seconds to give the browser: the caller's value, or the default, capped."""
+    if not timeout_ms:
+        return _DEFAULT_SCREENSHOT_TIMEOUT_S
+    return min(timeout_ms / 1000, _MAX_SCREENSHOT_TIMEOUT_S)
+
+
 # Common prefix for all screenshot failure log messages.
 _SCREENSHOT_ERROR_PREFIX = "Failed to take screenshot:"
 
@@ -805,10 +813,7 @@ def _remote_screenshot_once(
                 "--force-webrtc-ip-handling-policy=disable_non_proxied_udp",
                 "--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE 127.0.0.1",
             ]
-            timeout = min(
-                (timeout_ms / 1000) if timeout_ms else _DEFAULT_SCREENSHOT_TIMEOUT_S,
-                _MAX_SCREENSHOT_TIMEOUT_S,
-            )
+            timeout = _screenshot_timeout_seconds(timeout_ms)
             result, transient = _run_browser_subprocess(
                 command, timeout, attempt, options
             )

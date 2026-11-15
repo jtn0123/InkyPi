@@ -47,13 +47,10 @@ def playlists() -> Any:
     except Exception:
         metrics = None
     # compute device current time string and cycle info per playlist
-    try:
-        now = now_device_tz(device_config)
-        now_str = now.strftime("%Y-%m-%d %H:%M:%S %Z")
-        tz_off_min = int((now.utcoffset() or timedelta(0)).total_seconds() // 60)
-    except Exception:
-        now_str = ""
-        tz_off_min = 0
+    # now_device_tz never raises; a bad time zone falls back to UTC.
+    now = now_device_tz(device_config)
+    now_str = now.strftime("%Y-%m-%d %H:%M:%S %Z")
+    tz_off_min = int((now.utcoffset() or timedelta(0)).total_seconds() // 60)
     device_interval = schedule.device_interval_seconds(device_config)
     device_cycle_minutes = schedule.cycle_minutes(device_interval)
 
@@ -112,7 +109,7 @@ def playlists() -> Any:
         playlist_timing = {}
 
     try:
-        paused_status = _paused_status(playlist_manager, now_device_tz(device_config))
+        paused_status = _paused_status(playlist_manager, now)
     except Exception:
         paused_status = {}
 

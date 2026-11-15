@@ -443,22 +443,17 @@ def test_ai_image_openai_safe_rewrite_reports_retry_rejection(
     assert mock_client.chat.completions.create.call_count == 1
 
 
-def test_ai_image_raises_when_provider_returns_no_image(
+def test_ai_image_raises_when_provider_image_does_not_decode(
     device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """AI image generation should not return None on a falsy provider response."""
+    """A provider response that decodes to nothing raises; it never returns None."""
     from plugins.ai_image.ai_image import AIImage
 
     p = AIImage({"id": "ai_image"})
     monkeypatch.setattr(device_config_dev, "load_env_key", lambda key: "fake_key")
 
-    with (
-        patch("plugins.ai_image.ai_image.OpenAI") as mock_openai,
-        patch.object(AIImage, "fetch_image", return_value=None),
-    ):
-        mock_openai.return_value = MagicMock()
-
-        with pytest.raises(RuntimeError, match="Failed to generate image"):
+    with patch.object(p.image_loader, "from_bytesio", return_value=None):
+        with pytest.raises(RuntimeError, match="Failed to decode generated image"):
             p.generate_image(
                 {
                     "textPrompt": "a cat",

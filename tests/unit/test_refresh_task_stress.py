@@ -219,25 +219,28 @@ def test_manual_update_queue_ordering(
     dm = DisplayManager(device_config_dev)
     task = RefreshTask(device_config_dev, dm)
 
-    processed_order = []
-    monkeypatch.setattr(
-        task,
-        "_perform_refresh",
-        lambda refresh_action, latest_refresh, current_dt, request_id=None, **kwargs: (
-            processed_order.append(refresh_action.get_plugin_id())
-            or (
-                {
-                    "refresh_type": "Manual Update",
-                    "plugin_id": refresh_action.get_plugin_id(),
-                    "refresh_time": current_dt.isoformat(),
-                    "image_hash": refresh_action.get_plugin_id(),
-                },
-                False,
-                {"request_ms": 1},
-            )
-        ),
-        raising=True,
-    )
+    processed_order: list[str] = []
+
+    def fake_perform_refresh(
+        refresh_action: Any,
+        latest_refresh: Any,
+        current_dt: Any,
+        request_id: Any = None,
+        **kwargs: Any,
+    ) -> tuple[dict[str, Any], bool, dict[str, int]]:
+        processed_order.append(refresh_action.get_plugin_id())
+        return (
+            {
+                "refresh_type": "Manual Update",
+                "plugin_id": refresh_action.get_plugin_id(),
+                "refresh_time": current_dt.isoformat(),
+                "image_hash": refresh_action.get_plugin_id(),
+            },
+            False,
+            {"request_ms": 1},
+        )
+
+    monkeypatch.setattr(task, "_perform_refresh", fake_perform_refresh, raising=True)
 
     try:
         task.start()

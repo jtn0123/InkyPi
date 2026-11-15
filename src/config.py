@@ -254,9 +254,9 @@ class Config:
         # the INKYPI_ENV check (step 3).  Only treat config_file as an explicit override
         # when it has been changed from the original default (e.g. by CLI or a subclass).
         _base_default = os.path.join(base_dir, "config", _DEVICE_JSON)
-        class_override = cast(str, getattr(type(self), "config_file", ""))
+        class_override = getattr(type(self), "config_file", None)
         if (
-            class_override is not None
+            isinstance(class_override, str)
             and class_override != _base_default
             and os.path.isfile(class_override)
         ):

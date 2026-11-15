@@ -102,7 +102,7 @@ def _iter_progress_events(
 
 
 def _filter_health_by_window(health: dict[str, Any], window_min: int) -> dict[str, Any]:
-    if not isinstance(health, dict) or window_min <= 0:
+    if window_min <= 0:
         return health
     cutoff = datetime.now(UTC) - timedelta(minutes=window_min)
     filtered: dict[str, Any] = {}

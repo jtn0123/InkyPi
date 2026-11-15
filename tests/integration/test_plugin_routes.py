@@ -7,6 +7,19 @@ from flask.testing import FlaskClient
 # pyright: reportMissingImports=false
 
 
+def _wait_for_job(client: FlaskClient, job_id: str) -> Any:
+    """Poll /api/job/<id> until it is done or failed, for at most ~5s."""
+    import time
+
+    data = client.get(f"/api/job/{job_id}").get_json()
+    for _ in range(50):
+        if data["status"] in ("done", "error"):
+            break
+        time.sleep(0.1)
+        data = client.get(f"/api/job/{job_id}").get_json()
+    return data
+
+
 def test_plugin_page_not_found(client: FlaskClient) -> None:
     resp = client.get("/plugin/unknown")
     assert resp.status_code == 404
@@ -344,12 +357,7 @@ def test_update_now_async_poll_completes(
     job_id = resp.get_json()["job_id"]
 
     # Poll until done — must finish before monkeypatch cleanup
-    for _ in range(50):
-        poll = client.get(f"/api/job/{job_id}")
-        data = poll.get_json()
-        if data["status"] in ("done", "error"):
-            break
-        time.sleep(0.1)
+    data = _wait_for_job(client, job_id)
 
     assert data["status"] == "done"
     assert data["result"]["success"] is True
@@ -382,12 +390,7 @@ def test_update_now_async_poll_error(
     assert resp.status_code == 202
     job_id = resp.get_json()["job_id"]
 
-    for _ in range(50):
-        poll = client.get(f"/api/job/{job_id}")
-        data = poll.get_json()
-        if data["status"] in ("done", "error"):
-            break
-        time.sleep(0.1)
+    data = _wait_for_job(client, job_id)
 
     assert data["status"] == "error"
     assert "not found" in data["error"]
@@ -404,7 +407,6 @@ def test_update_now_async_plugin_not_found(
     client: FlaskClient, flask_app: Flask
 ) -> None:
     """Plugin not found is reported via the job error status."""
-    import time
 
     refresh_task = flask_app.config["REFRESH_TASK"]
     refresh_task.running = False
@@ -417,12 +419,7 @@ def test_update_now_async_plugin_not_found(
     assert resp.status_code == 202
     job_id = resp.get_json()["job_id"]
 
-    for _ in range(50):
-        poll = client.get(f"/api/job/{job_id}")
-        data = poll.get_json()
-        if data["status"] in ("done", "error"):
-            break
-        time.sleep(0.1)
+    data = _wait_for_job(client, job_id)
 
     assert data["status"] == "error"
     assert "not found" in data["error"]

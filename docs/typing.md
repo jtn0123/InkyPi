@@ -2,7 +2,12 @@
 
 InkyPi uses [mypy](https://mypy.readthedocs.io/) in **strict mode for every
 module**: `strict = True` sits once in the `[mypy]` section of `mypy.ini`, plus
-`warn_unreachable`, which strict leaves out. `src/` must stay at zero errors;
+`warn_unreachable` and five error codes strict leaves out: `redundant-expr`,
+`truthy-bool`, `possibly-undefined`, `deprecated` and `ignore-without-code`.
+When one fires on a guard, first ask whether the annotation is honest: a value
+read from JSON or the network should be typed `object` and keep its
+`isinstance` check, not be `cast` to the shape it is hoped to have and then
+re-checked. `src/` must stay at zero errors;
 `tests/` is ratcheted against a checked-in baseline so new test typing debt
 cannot slip in while the backlog is paid down.
 

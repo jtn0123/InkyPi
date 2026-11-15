@@ -333,13 +333,9 @@ class Calendar(BasePlugin):
             "font_scale": font_scale,
         }
 
-        image = self.render_image(
+        return self.render_image(
             dimensions, "calendar.html", "calendar.css", template_params
         )
-
-        if not image:
-            raise RuntimeError("Failed to take screenshot, please check logs.")
-        return image
 
     def fetch_ics_events(
         self,

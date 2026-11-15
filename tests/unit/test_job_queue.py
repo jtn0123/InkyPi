@@ -40,6 +40,17 @@ def _reset_singleton() -> Iterator[Any]:
     reset_job_queue()
 
 
+def _wait_for_status(q: JobQueue, jid: str, status: str) -> dict[str, object]:
+    """Poll the job until it reaches *status*, for at most ~2.5s; return its info."""
+    info = q.get_status(jid)
+    for _ in range(50):
+        if info["status"] == status:
+            break
+        time.sleep(0.05)
+        info = q.get_status(jid)
+    return info
+
+
 class TestJobQueue:
     """Core JobQueue behaviour."""
 
@@ -54,11 +65,7 @@ class TestJobQueue:
         q = JobQueue()
         jid = q.enqueue(lambda: "hello")
         # Wait for completion
-        for _ in range(50):
-            info = q.get_status(jid)
-            if info["status"] == STATUS_DONE:
-                break
-            time.sleep(0.05)
+        info = _wait_for_status(q, jid, STATUS_DONE)
         assert info["status"] == STATUS_DONE
         assert info["result"] == "hello"
         q.shutdown()
@@ -69,11 +76,7 @@ class TestJobQueue:
 
         q = JobQueue()
         jid = q.enqueue(_fail)
-        for _ in range(50):
-            info = q.get_status(jid)
-            if info["status"] == STATUS_ERROR:
-                break
-            time.sleep(0.05)
+        info = _wait_for_status(q, jid, STATUS_ERROR)
         assert info["status"] == STATUS_ERROR
         # The browser polls this, so an untyped failure's text stays in the log.
         assert info["error"] == INTERNAL_ERROR_MSG
@@ -118,11 +121,7 @@ class TestJobQueue:
         info = q.get_status(jid)
         assert info["status"] == STATUS_RUNNING
         proceed.set()
-        for _ in range(50):
-            info = q.get_status(jid)
-            if info["status"] == STATUS_DONE:
-                break
-            time.sleep(0.05)
+        info = _wait_for_status(q, jid, STATUS_DONE)
         assert info["status"] == STATUS_DONE
         q.shutdown()
 
@@ -132,11 +131,7 @@ class TestJobQueue:
 
         q = JobQueue()
         jid = q.enqueue(_add, 1, 2, extra=10)
-        for _ in range(50):
-            info = q.get_status(jid)
-            if info["status"] == STATUS_DONE:
-                break
-            time.sleep(0.05)
+        info = _wait_for_status(q, jid, STATUS_DONE)
         assert info["result"] == 13
         q.shutdown()
 
@@ -145,11 +140,7 @@ class TestJobQueue:
         q = JobQueue(completed_ttl_seconds=10.0, clock=clock)
 
         jid = q.enqueue(lambda: "done")
-        for _ in range(50):
-            info = q.get_status(jid)
-            if info["status"] == STATUS_DONE:
-                break
-            time.sleep(0.05)
+        info = _wait_for_status(q, jid, STATUS_DONE)
 
         assert info["status"] == STATUS_DONE
         clock.advance(10.0)
@@ -168,11 +159,7 @@ class TestJobQueue:
         for _idx in range(3):
             jid = q.enqueue(lambda: "done")
             job_ids.append(jid)
-            for _ in range(50):
-                info = q.get_status(jid)
-                if info["status"] == STATUS_DONE:
-                    break
-                time.sleep(0.05)
+            info = _wait_for_status(q, jid, STATUS_DONE)
             assert info["status"] == STATUS_DONE
             clock.advance(1.0)
 
@@ -208,11 +195,7 @@ class TestJobQueue:
             for _idx in range(2):
                 jid = q.enqueue(lambda: "done")
                 done_job_ids.append(jid)
-                for _ in range(50):
-                    info = q.get_status(jid)
-                    if info["status"] == STATUS_DONE:
-                        break
-                    time.sleep(0.05)
+                info = _wait_for_status(q, jid, STATUS_DONE)
                 assert info["status"] == STATUS_DONE
                 clock.advance(1.0)
 

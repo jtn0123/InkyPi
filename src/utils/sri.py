@@ -108,9 +108,7 @@ def cdn_sri(key: str) -> str:
     absent so that missing entries never crash the page.
     """
     manifest = _load_cdn_manifest()
-    entry = manifest.get(key, {})
-    integrity = entry.get("integrity", "")
-    return integrity if isinstance(integrity, str) else ""
+    return manifest.get(key, {}).get("integrity", "")
 
 
 # ---------------------------------------------------------------------------

@@ -489,7 +489,6 @@ class AIImage(BasePlugin):
             f"Settings: provider={provider}, model={image_model}, quality={image_quality}, orientation={orientation}"
         )
 
-        image: ImageType | None = None
         try:
             if provider == "google":
                 image = self._generate_google_image(
@@ -509,13 +508,9 @@ class AIImage(BasePlugin):
                     safe_rewrite_blocked_prompt,
                 )
 
-            if image:
-                logger.info(
-                    f"AI image generated successfully: {image.size[0]}x{image.size[1]}"
-                )
-            else:
-                logger.error("Image generation completed without returning an image")
-                raise RuntimeError("Failed to generate image")
+            logger.info(
+                f"AI image generated successfully: {image.size[0]}x{image.size[1]}"
+            )
 
         except RuntimeError:
             raise

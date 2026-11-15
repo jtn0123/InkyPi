@@ -374,9 +374,9 @@ class TestInstallScript:
         # JTN-674: the regex lives in install.sh main body; check combined.
         regex_versions = set()
         for line in self.combined.splitlines():
-            m = re.search(r"\^\(([0-9|]+)\)\$", line)
-            if m:
-                for part in m.group(1).split("|"):
+            alternation = re.search(r"\^\(([0-9|]+)\)\$", line)
+            if alternation:
+                for part in alternation.group(1).split("|"):
                     if part.strip().isdigit():
                         regex_versions.add(int(part.strip()))
 
