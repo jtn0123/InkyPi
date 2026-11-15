@@ -2,6 +2,15 @@
 
 <!-- version list -->
 
+## v1.8.18 (2026-11-15)
+
+### Bug Fixes
+
+- **ui**: Stop shipping CSS for components that no longer exist
+  ([#743](https://github.com/jtn0123/InkyPi/pull/743),
+  [`6a8ee47`](https://github.com/jtn0123/InkyPi/commit/6a8ee475bb7128021b7f44efbf961284284f59ef))
+
+
 ## v1.8.17 (2026-11-15)
 
 ### Bug Fixes
