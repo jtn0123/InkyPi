@@ -29,6 +29,8 @@ def test_all_pages_load_without_js_errors(
 ) -> None:
     page = browser_page
     rc = navigate_and_wait(page, live_server, path)
+    # Deliberate: watch the loaded page for a second so errors from timers
+    # and late handlers are caught too, not just those from start-up fetches.
     page.wait_for_timeout(1000)
     rc.assert_no_errors(name=f"page_load_{label}")
 
@@ -83,5 +85,6 @@ def test_browser_back_forward(live_server: str, browser_page: Page) -> None:
 def test_plugin_page_loads_without_errors(live_server: str, browser_page: Page) -> None:
     page = browser_page
     rc = navigate_and_wait(page, live_server, "/plugin/clock")
+    # Deliberate: watch the loaded page for a second (see above).
     page.wait_for_timeout(1000)
     rc.assert_no_errors(name="plugin_page_clock")

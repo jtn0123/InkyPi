@@ -14,6 +14,7 @@ pytestmark = pytest.mark.skipif(
 )
 
 from tests.integration.browser_helpers import (  # noqa: E402
+    is_response_to,
     navigate_and_wait,
     prepare_playlist,
 )
@@ -41,17 +42,22 @@ def test_create_playlist_via_form(
     new_btn = page.locator("#newPlaylistBtn")
     new_btn.wait_for(state="visible", timeout=5000)
     new_btn.click()
-    page.wait_for_timeout(500)
 
     # Fill playlist form fields
     name_input = page.locator("#playlist_name")
     name_input.wait_for(state="visible", timeout=3000)
     name_input.fill("Test Playlist")
 
-    # Save
+    # Save. On success the page reloads itself (the stub above can't stop a
+    # real location.reload()), so wait for the reloaded page too.
     save_btn = page.locator("#saveButton")
-    save_btn.click()
-    page.wait_for_timeout(500)
+    with page.expect_event("domcontentloaded"):
+        with page.expect_response(
+            is_response_to("POST", "/create_playlist")
+        ) as response_info:
+            save_btn.click()
+        assert response_info.value.ok, f"create_playlist: {response_info.value.status}"
+    rc.requests.wait_until_idle()
 
     rc.assert_no_errors(str(tmp_path), "create_playlist")
 
@@ -67,7 +73,6 @@ def test_edit_playlist_opens_modal(
     edit_btn = page.locator(".edit-playlist-btn").first
     edit_btn.wait_for(state="visible", timeout=5000)
     edit_btn.click()
-    page.wait_for_timeout(500)
 
     # Verify modal is visible
     modal = page.locator("#playlistModal")
@@ -87,7 +92,6 @@ def test_edit_playlist_opens_modal_mobile(
     edit_btn = page.locator(".edit-playlist-btn").first
     edit_btn.wait_for(state="visible", timeout=5000)
     edit_btn.click()
-    page.wait_for_timeout(500)
 
     modal = page.locator("#playlistModal")
     modal.wait_for(state="visible", timeout=3000)
@@ -130,17 +134,21 @@ def test_delete_playlist_modal(
     delete_btn = page.locator('[data-playlist-name="Deletable"] .delete-playlist-btn')
     delete_btn.wait_for(state="visible", timeout=5000)
     delete_btn.click()
-    page.wait_for_timeout(500)
 
     # Verify delete modal is visible
     modal = page.locator("#deletePlaylistModal")
     modal.wait_for(state="visible", timeout=3000)
     assert modal.is_visible(), "Delete playlist modal should be visible"
 
-    # Click confirm delete
+    # Click confirm delete; the page reloads once the delete succeeds.
     confirm_btn = modal.locator("#confirmDeletePlaylistBtn")
-    confirm_btn.click()
-    page.wait_for_timeout(500)
+    with page.expect_event("domcontentloaded"):
+        with page.expect_response(
+            is_response_to("DELETE", "/delete_playlist/", prefix=True)
+        ) as response_info:
+            confirm_btn.click()
+        assert response_info.value.ok, f"delete_playlist: {response_info.value.status}"
+    rc.requests.wait_until_idle()
 
     rc.assert_no_errors(str(tmp_path), "delete_playlist_modal")
 
@@ -158,16 +166,22 @@ def test_delete_instance_modal(
     delete_btn = page.locator(".delete-instance-btn").first
     delete_btn.wait_for(state="visible", timeout=5000)
     delete_btn.click()
-    page.wait_for_timeout(500)
 
     # Verify delete instance modal is visible
     modal = page.locator("#deleteInstanceModal")
     modal.wait_for(state="visible", timeout=3000)
     assert modal.is_visible(), "Delete instance modal should be visible"
 
-    # Click confirm delete
+    # Click confirm delete; the page reloads once the delete succeeds.
     confirm_btn = modal.locator("#confirmDeleteInstanceBtn")
-    confirm_btn.click()
-    page.wait_for_timeout(500)
+    with page.expect_event("domcontentloaded"):
+        with page.expect_response(
+            is_response_to("POST", "/delete_plugin_instance")
+        ) as response_info:
+            confirm_btn.click()
+        assert (
+            response_info.value.ok
+        ), f"delete_plugin_instance: {response_info.value.status}"
+    rc.requests.wait_until_idle()
 
     rc.assert_no_errors(str(tmp_path), "delete_instance_modal")

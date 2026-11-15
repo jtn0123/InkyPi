@@ -2,16 +2,22 @@
 from __future__ import annotations
 
 import os
+import re
 from typing import Any
 
 import pytest
-from playwright.sync_api import Page
+from playwright.sync_api import Page, expect
 from tests.integration.browser_helpers import navigate_and_wait, prepare_playlist
 
 pytestmark = pytest.mark.skipif(
     os.getenv("SKIP_UI", "").lower() in ("1", "true"),
     reason="UI interactions skipped by env",
 )
+
+# The chevron rotates over a 0.2 s CSS transition, so its computed transform
+# passes through in-between matrices before it reaches the end state.
+_ICON_UNROTATED = re.compile(r"^(none|matrix\(1, 0, 0, 1, 0, 0\))$")
+_ICON_ROTATED_180 = "matrix(-1, 0, 0, -1, 0, 0)"
 
 
 def test_playlist_card_toggle(
@@ -29,18 +35,15 @@ def test_playlist_card_toggle(
     initial_visible = body.is_visible()
     if initial_visible:
         toggle.click()
-        page.wait_for_timeout(500)
-        assert not body.is_visible(), "Body should be hidden after collapsing"
+        expect(body, "Body should be hidden after collapsing").to_be_hidden()
 
     # Expand
     toggle.click()
-    page.wait_for_timeout(500)
-    assert body.is_visible(), "Playlist card body should be visible after expand"
+    expect(body, "Playlist card body should be visible after expand").to_be_visible()
 
     # Collapse
     toggle.click()
-    page.wait_for_timeout(500)
-    assert not body.is_visible(), "Playlist card body should be hidden after collapse"
+    expect(body, "Playlist card body should be hidden after collapse").to_be_hidden()
 
 
 def test_settings_tabs_switch(live_server: str, browser_page: Page) -> None:
@@ -53,7 +56,10 @@ def test_settings_tabs_switch(live_server: str, browser_page: Page) -> None:
 
     if tab_count > 1:
         tabs.nth(1).click()
-        page.wait_for_timeout(300)
+        expect(
+            tabs.nth(1).and_(page.locator(".active, [aria-selected='true']")),
+            "Clicked tab should become active",
+        ).to_have_count(1)
         is_active = tabs.nth(1).evaluate(
             "el => el.classList.contains('active') || el.getAttribute('aria-selected') === 'true'"
         )
@@ -113,7 +119,8 @@ def test_plugin_style_accordion_chevron_flips(
 
     # Expand and verify the 180deg rotation is applied.
     header.click()
-    page.wait_for_timeout(300)
+    expect(header).to_have_attribute("aria-expanded", "true")
+    expect(icon).to_have_css("transform", _ICON_ROTATED_180)
     assert header.get_attribute("aria-expanded") == "true"
     transform_expanded = icon.evaluate("el => getComputedStyle(el).transform")
     # A 180deg rotation serialises as matrix(-1, 0, 0, -1, 0, 0).
@@ -125,7 +132,8 @@ def test_plugin_style_accordion_chevron_flips(
 
     # Collapse again and confirm the rotation is cleared.
     header.click()
-    page.wait_for_timeout(300)
+    expect(header).to_have_attribute("aria-expanded", "false")
+    expect(icon).to_have_css("transform", _ICON_UNROTATED)
     assert header.get_attribute("aria-expanded") == "false"
     transform_collapsed_again = icon.evaluate("el => getComputedStyle(el).transform")
     assert transform_collapsed_again in ("none", "matrix(1, 0, 0, 1, 0, 0)")
@@ -177,13 +185,14 @@ def test_playlist_toggle_is_not_noop_if_visible_on_desktop(
             }
         }
         """)
-    page.wait_for_timeout(200)
 
     before_expanded = toggle.get_attribute("aria-expanded")
     before_visible = body.is_visible()
+    assert before_expanded is not None, "setup should have set aria-expanded"
 
     toggle.click()
-    page.wait_for_timeout(300)
+    # The handler flips aria-expanded and the body's visibility together.
+    expect(toggle).not_to_have_attribute("aria-expanded", before_expanded)
 
     after_expanded = toggle.get_attribute("aria-expanded")
     after_visible = body.is_visible()

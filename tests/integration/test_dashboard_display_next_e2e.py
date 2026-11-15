@@ -2,11 +2,12 @@
 from __future__ import annotations
 
 import os
+import re
 from pathlib import Path
 from typing import Any
 
 import pytest
-from playwright.sync_api import Page
+from playwright.sync_api import Page, expect
 
 pytestmark = pytest.mark.skipif(
     os.getenv("SKIP_UI", "").lower() in ("1", "true"),
@@ -17,6 +18,17 @@ from tests.integration.browser_helpers import (  # noqa: E402
     navigate_and_wait,
     prepare_playlist,
 )
+
+
+def _wait_for_display_next_handled(page: Page) -> None:
+    """Wait for the Display Next click handler to finish with its response.
+
+    The handler marks the button ``loading`` as soon as it is clicked and
+    clears it once the request has been answered and handled.
+    """
+    expect(page.locator("#displayNextBtn")).not_to_have_class(
+        re.compile(r"(^|\s)loading(\s|$)")
+    )
 
 
 def test_display_next_button_exists(
@@ -62,7 +74,7 @@ def test_display_next_sends_request(
     display_next = page.locator("#displayNextBtn, button:has-text('Display next')")
     display_next.first.wait_for(state="visible", timeout=5000)
     display_next.first.click()
-    page.wait_for_timeout(1000)
+    _wait_for_display_next_handled(page)
 
     calls = page.evaluate("() => window.__fetchCalls || []")
     display_next_calls = [
@@ -102,7 +114,7 @@ def test_display_next_no_js_errors(
     display_next = page.locator("#displayNextBtn, button:has-text('Display next')")
     display_next.first.wait_for(state="visible", timeout=5000)
     display_next.first.click()
-    page.wait_for_timeout(1500)
+    _wait_for_display_next_handled(page)
 
     rc.assert_no_errors(str(tmp_path), "display_next_no_errors")
 

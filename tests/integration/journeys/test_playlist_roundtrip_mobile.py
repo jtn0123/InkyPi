@@ -206,7 +206,8 @@ def test_playlist_roundtrip_mobile_create_reorder_delete_persist(
         # Each ArrowUp fires its own POST /reorder_plugins. Wait for each
         # response before the next keypress so the two writes cannot reach
         # the server out of order (a fixed sleep did not guarantee that).
-        for _ in range(2):
+        reorder_presses = 2
+        for _ in range(reorder_presses):
             with page.expect_response(
                 lambda r: "/reorder_plugins" in r.url and r.status == 200
             ):
@@ -236,6 +237,21 @@ def test_playlist_roundtrip_mobile_create_reorder_delete_persist(
             f"Backend did not persist reorder: {backend_reordered!r} != "
             f"{expected_reordered!r}"
         )
+
+        # Each reorder save reports back with a success toast. At phone width
+        # the toast stack sits over the delete modal's confirm button until
+        # the toasts close themselves 5 s later, so whether the confirm tap
+        # beat the toasts' slide-in was a race. Wait for both toasts, then
+        # close them as a user would.
+        saved_toasts = page.locator(".toast-container .toast.success.show")
+        expect(saved_toasts).to_have_count(reorder_presses)
+        for toast_id in saved_toasts.evaluate_all(
+            "(toasts) => toasts.map((toast) => toast.id)"
+        ):
+            page.locator(f"#{toast_id}").get_by_role(
+                "button", name="Close notification"
+            ).click()
+        expect(page.locator(".toast-container .toast")).to_have_count(0)
 
         # Step 5: delete middle item via the UI.
         middle_name = expected_reordered[1]

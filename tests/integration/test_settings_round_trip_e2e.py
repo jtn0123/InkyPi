@@ -11,7 +11,19 @@ pytestmark = pytest.mark.skipif(
     reason="UI interactions skipped by env",
 )
 
-from tests.integration.browser_helpers import navigate_and_wait  # noqa: E402
+from tests.integration.browser_helpers import (  # noqa: E402
+    is_response_to,
+    navigate_and_wait,
+)
+
+
+def _click_save(page: Page) -> None:
+    """Click Save and wait for the settings POST to succeed."""
+    save_btn = page.locator("#saveSettingsBtn")
+    save_btn.scroll_into_view_if_needed()
+    with page.expect_response(is_response_to("POST", "/save_settings")) as info:
+        save_btn.click()
+    assert info.value.ok, f"POST /save_settings returned {info.value.status}"
 
 
 def test_change_device_name_persists(live_server: str, browser_page: Page) -> None:
@@ -24,10 +36,7 @@ def test_change_device_name_persists(live_server: str, browser_page: Page) -> No
     name_input.fill("")
     name_input.fill("TestInkyDevice")
 
-    save_btn = page.locator("#saveSettingsBtn")
-    save_btn.scroll_into_view_if_needed()
-    save_btn.click()
-    page.wait_for_timeout(2000)
+    _click_save(page)
 
     # Reload and verify persistence
     navigate_and_wait(page, live_server, "/settings")
@@ -49,10 +58,7 @@ def test_change_timezone_persists(live_server: str, browser_page: Page) -> None:
     tz_input.fill("")
     tz_input.fill("US/Eastern")
 
-    save_btn = page.locator("#saveSettingsBtn")
-    save_btn.scroll_into_view_if_needed()
-    save_btn.click()
-    page.wait_for_timeout(2000)
+    _click_save(page)
 
     navigate_and_wait(page, live_server, "/settings")
     tz_input = page.locator("#timezone")
@@ -73,10 +79,7 @@ def test_image_slider_values_persist(live_server: str, browser_page: Page) -> No
         slider.dispatchEvent(new Event('change', { bubbles: true }));
     }""")
 
-    save_btn = page.locator("#saveSettingsBtn")
-    save_btn.scroll_into_view_if_needed()
-    save_btn.click()
-    page.wait_for_timeout(2000)
+    _click_save(page)
 
     navigate_and_wait(page, live_server, "/settings")
     page.locator("#saturation").wait_for(state="attached", timeout=5000)
@@ -97,10 +100,7 @@ def test_orientation_persists(live_server: str, browser_page: Page) -> None:
     vertical_radio.scroll_into_view_if_needed()
     vertical_radio.check()
 
-    save_btn = page.locator("#saveSettingsBtn")
-    save_btn.scroll_into_view_if_needed()
-    save_btn.click()
-    page.wait_for_timeout(2000)
+    _click_save(page)
 
     navigate_and_wait(page, live_server, "/settings")
     vertical_radio = page.locator("input[name='orientation'][value='vertical']")

@@ -11,7 +11,10 @@ pytestmark = pytest.mark.skipif(
     reason="UI interactions skipped by env",
 )
 
-from tests.integration.browser_helpers import navigate_and_wait  # noqa: E402
+from tests.integration.browser_helpers import (  # noqa: E402
+    is_response_to,
+    navigate_and_wait,
+)
 
 
 def test_api_keys_page_loads(live_server: str, browser_page: Page) -> None:
@@ -47,8 +50,9 @@ def test_api_key_input_and_save(live_server: str, browser_page: Page) -> None:
     )
 
     save_btn = page.locator("#saveApiKeysBtn")
-    save_btn.click()
-    page.wait_for_timeout(2000)
+    with page.expect_response(is_response_to("POST", "/api-keys/save")) as info:
+        save_btn.click()
+    assert info.value.ok, f"POST /api-keys/save returned {info.value.status}"
 
     assert len(save_responses) > 0, "Save should fire a request"
 

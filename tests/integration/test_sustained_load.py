@@ -174,6 +174,7 @@ def _collect_candidates(page: Page, live_server: str, sweep: LoadPage) -> list[d
         timeout=30_000,
     )
     page.wait_for_selector(sweep.ready_marker, timeout=10_000)
+    # Deliberate pacing: a fixed pause, not a wait for idle, keeps the load steady.
     page.wait_for_timeout(200)
     return page.evaluate(_ENUMERATE_JS, list(_SKIP_SELECTORS))
 
@@ -241,6 +242,7 @@ def test_sustained_handler_load(live_server: str, browser_page: Page) -> None:
                 page.wait_for_load_state("domcontentloaded", timeout=500)
             except Exception:  # most clicks don't navigate
                 pass
+            # Deliberate pacing: a fixed pause per click keeps the click rate steady.
             page.wait_for_timeout(_CLICK_SETTLE_MS)
             click_latencies_ms.append((time.monotonic() - t0) * 1000.0)
             total_clicks += 1

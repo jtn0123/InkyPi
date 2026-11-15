@@ -159,10 +159,14 @@ def test_playlist_roundtrip_create_reorder_delete_persist(
         )
         third_item = page.locator(third_item_sel)
         third_item.focus()
-        third_item.press("ArrowUp")
-        page.wait_for_timeout(300)
-        third_item.press("ArrowUp")
-        page.wait_for_timeout(500)  # allow fetch POST /reorder_plugins to complete
+        # Each ArrowUp fires its own POST /reorder_plugins. Wait for each
+        # response before the next keypress so the two writes cannot reach
+        # the server out of order.
+        for _ in range(2):
+            with page.expect_response(
+                lambda r: "/reorder_plugins" in r.url and r.status == 200
+            ):
+                third_item.press("ArrowUp")
 
         expected_reordered = [
             expected_initial[2],
@@ -203,12 +207,14 @@ def test_playlist_roundtrip_create_reorder_delete_persist(
         confirm_modal = page.locator("#deleteInstanceModal")
         confirm_modal.wait_for(state="visible", timeout=3000)
         # Wait for the DELETE fetch to actually return before polling
-        # persistence. The UI performs a real location.reload() on success.
-        with page.expect_response(
-            lambda r: "/delete_plugin_instance" in r.url and r.status == 200,
-            timeout=5000,
-        ):
-            page.locator("#confirmDeleteInstanceBtn").click()
+        # persistence. The UI performs a real location.reload() on success;
+        # wait for that page to load too.
+        with page.expect_navigation(wait_until="load"):
+            with page.expect_response(
+                lambda r: "/delete_plugin_instance" in r.url and r.status == 200,
+                timeout=5000,
+            ):
+                page.locator("#confirmDeleteInstanceBtn").click()
 
         expected_after_delete = [
             expected_reordered[0],
@@ -239,7 +245,9 @@ def test_playlist_roundtrip_create_reorder_delete_persist(
         if not page.url.endswith("/playlist"):
             page.goto(f"{live_server}/playlist", wait_until="domcontentloaded")
         page.wait_for_selector("[data-page-shell]", timeout=10000)
-        page.wait_for_timeout(300)
+        # Let the reloaded page's own requests finish, so the clear below
+        # only drops failures from the discarded document.
+        rc.requests.wait_until_idle()
 
         # This journey intentionally triggers two navigations: the app's
         # location.reload() after delete, and the explicit final reload below.

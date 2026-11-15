@@ -13,7 +13,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 import pytest
-from tests.integration.browser_helpers import stub_leaflet
+from tests.integration.browser_helpers import is_response_to, stub_leaflet
 
 pytestmark = pytest.mark.skipif(
     os.getenv("SKIP_UI", "").lower() in ("1", "true"),
@@ -106,8 +106,8 @@ def test_playlist_keyboard_reorder(
 
             # Focus first item and press ArrowDown to reorder
             items.nth(0).focus()
-            items.nth(0).press("ArrowDown")
-            page.wait_for_timeout(500)
+            with page.expect_response(is_response_to("POST", "/reorder_plugins")):
+                items.nth(0).press("ArrowDown")
 
             # Verify reorder request was fired
             assert len(reorder_requests) > 0, "Reorder request should have been sent"
@@ -123,7 +123,7 @@ def test_playlist_delete_modal(
     monkeypatch.setattr("utils.time_utils.now_device_tz", _fixed_now, raising=True)
     _prepare_playlist(device_config_dev)
 
-    from playwright.sync_api import sync_playwright
+    from playwright.sync_api import expect, sync_playwright
 
     with sync_playwright() as p:
         browser = p.chromium.launch()
@@ -157,12 +157,13 @@ def test_playlist_delete_modal(
 
             # Verify delete modal appeared
             modal = page.locator("#deletePlaylistModal")
-            page.wait_for_timeout(300)
-            assert modal.is_visible(), "Delete playlist modal should be visible"
+            expect(modal, "Delete playlist modal should be visible").to_be_visible()
 
             # Confirm delete
-            page.locator("#confirmDeletePlaylistBtn").click()
-            page.wait_for_timeout(500)
+            with page.expect_response(
+                is_response_to("DELETE", "/delete_playlist/", prefix=True)
+            ):
+                page.locator("#confirmDeletePlaylistBtn").click()
 
             # Verify DELETE request was sent
             assert any(
@@ -180,7 +181,7 @@ def test_playlist_delete_instance_modal(
     monkeypatch.setattr("utils.time_utils.now_device_tz", _fixed_now, raising=True)
     _prepare_playlist(device_config_dev)
 
-    from playwright.sync_api import sync_playwright
+    from playwright.sync_api import expect, sync_playwright
 
     with sync_playwright() as p:
         browser = p.chromium.launch()
@@ -214,12 +215,13 @@ def test_playlist_delete_instance_modal(
 
             # Verify delete instance modal appeared
             modal = page.locator("#deleteInstanceModal")
-            page.wait_for_timeout(300)
-            assert modal.is_visible(), "Delete instance modal should be visible"
+            expect(modal, "Delete instance modal should be visible").to_be_visible()
 
             # Confirm delete
-            page.locator("#confirmDeleteInstanceBtn").click()
-            page.wait_for_timeout(500)
+            with page.expect_response(
+                is_response_to("POST", "/delete_plugin_instance")
+            ):
+                page.locator("#confirmDeleteInstanceBtn").click()
 
             # Verify POST request was sent
             assert any(

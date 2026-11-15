@@ -35,7 +35,10 @@ pytestmark = pytest.mark.skipif(
     reason="UI interactions skipped by env",
 )
 
-from tests.integration.browser_helpers import navigate_and_wait  # noqa: E402
+from tests.integration.browser_helpers import (  # noqa: E402
+    is_response_to,
+    navigate_and_wait,
+)
 
 # ---------------------------------------------------------------------------
 # Per-field helpers
@@ -160,11 +163,16 @@ def _save_settings(page: Page) -> None:
     _expand_all_collapsibles(page)
     save_btn = page.locator("#saveSettingsBtn")
     save_btn.wait_for(state="attached", timeout=5000)
+    if save_btn.is_disabled():
+        # Save stays disabled until a field differs from what was loaded, and
+        # clicking a disabled button does nothing, so no request will come.
+        # The restore step hits this when the test already left the baseline.
+        return
     # Click via evaluate so visibility checks don't trip us up if the
     # button lives outside the active settings side-nav section.
-    page.evaluate("document.getElementById('saveSettingsBtn').click()")
-    # Wait for the POST to complete.
-    page.wait_for_timeout(1500)
+    with page.expect_response(is_response_to("POST", "/save_settings")) as info:
+        page.evaluate("document.getElementById('saveSettingsBtn').click()")
+    assert info.value.ok, f"POST /save_settings returned {info.value.status}"
 
 
 # ---------------------------------------------------------------------------

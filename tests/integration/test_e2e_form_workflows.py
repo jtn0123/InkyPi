@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 from playwright.sync_api import Page
+from tests.integration.browser_helpers import is_response_to
 
 REQUIRE_BROWSER_SMOKE = os.getenv("REQUIRE_BROWSER_SMOKE", "").lower() in ("1", "true")
 pytestmark = pytest.mark.skipif(
@@ -81,12 +82,10 @@ def test_settings_save_submit(live_server: str, tmp_path: Path) -> None:
                 timeout=5000,
             )
 
-            # Click Save after making a valid change.
+            # Click Save after making a valid change, and wait for the reply.
             save_btn.scroll_into_view_if_needed()
-            save_btn.click()
-
-            # Wait for the save request to complete
-            page.wait_for_timeout(2000)
+            with page.expect_response(is_response_to("POST", "/save_settings")):
+                save_btn.click()
 
             # Should have gotten a response (200 or 422 for validation)
             assert len(save_responses) > 0, "Save request was never sent"

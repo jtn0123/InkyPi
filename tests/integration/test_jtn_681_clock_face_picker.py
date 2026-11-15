@@ -19,7 +19,7 @@ from __future__ import annotations
 import os
 
 import pytest
-from playwright.sync_api import Page
+from playwright.sync_api import Page, expect
 from tests.integration.browser_helpers import stub_leaflet
 
 pytestmark = pytest.mark.skipif(
@@ -40,7 +40,11 @@ def test_clock_face_picker_applies_selected_and_updates_colors(
         timeout=30000,
     )
     page.wait_for_selector("#settingsForm", timeout=10000)
-    page.wait_for_timeout(300)
+    # The picker marks the saved face as selected when the page loads.
+    expect(
+        page.locator("#clock-face-selection .image-option.selected"),
+        "on load, one clock-face button should be marked .selected",
+    ).to_have_count(1)
 
     # Initial state: the hidden input should match the default face AND the
     # matching `.image-option` should carry the `.selected` class. Prior to
