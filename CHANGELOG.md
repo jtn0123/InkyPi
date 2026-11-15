@@ -2,6 +2,15 @@
 
 <!-- version list -->
 
+## v1.8.21 (2026-11-15)
+
+### Performance Improvements
+
+- **history**: Load small thumbnails in the History grid
+  ([#746](https://github.com/jtn0123/InkyPi/pull/746),
+  [`2aa92fa`](https://github.com/jtn0123/InkyPi/commit/2aa92fa5423b818350f934a02dd3f1f7b61ce82f))
+
+
 ## v1.8.20 (2026-11-15)
 
 ### Performance Improvements
