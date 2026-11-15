@@ -44,6 +44,10 @@ CPUQuota=100%
 # still SSH in during memory crunch. Positive value makes the kernel more
 # likely to kill inkypi first. See install/inkypi.service history.
 OOMScoreAdjust=500
+# E3: the filesystem sandbox (ProtectSystem=strict and friends) lives in a
+# drop-in, /etc/systemd/system/inkypi.service.d/hardening.conf, because its
+# writable paths depend on where this device's checkout lives. install.sh and
+# update.sh write it; see install_hardening_dropin in install/_common.sh.
 
 [Install]
 WantedBy=multi-user.target

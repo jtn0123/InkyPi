@@ -80,10 +80,14 @@ def test_inkypi_fast_dev(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_inkypi_config_file_cli(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test that --config CLI flag sets the config file path."""
+    from config import Config
+
+    # inkypi.py assigns the class attribute; restore it so later tests in
+    # the run don't inherit /path/to/config.json.
+    monkeypatch.setattr(Config, "config_file", Config.config_file)
     _mod = _reload_inkypi(
         monkeypatch, argv=["inkypi.py", "--config", "/path/to/config.json"], env={}
     )
-    from config import Config
 
     assert Config.config_file == "/path/to/config.json"
 

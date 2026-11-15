@@ -141,6 +141,23 @@ a third-party page cannot black out your frame.
   `INKYPI_SKIP_BOOT_SELF_TEST=1` (or `"boot_self_test": false` in
   `device.json`) to skip it.
 
+## "Read-only file system" errors
+
+The service runs in a sandbox that makes most of the filesystem read-only to
+it (see [Service sandbox](security.md#service-sandbox)). If the log shows
+`Read-only file system` or `EROFS` for a path InkyPi should be able to write,
+check which drop-ins apply:
+
+```bash
+systemctl cat inkypi.service
+```
+
+To allow one more path, add it in a separate drop-in such as
+`/etc/systemd/system/inkypi.service.d/zz-local.conf` (the installer rewrites
+`hardening.conf`), then run
+`sudo systemctl daemon-reload && sudo systemctl restart inkypi`. Please also
+report the path, so the installer can allow it for everyone.
+
 ## Restart the InkyPi Service
 
 ```bash

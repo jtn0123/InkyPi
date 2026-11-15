@@ -73,7 +73,8 @@ The remaining code-quality items come from a local grade report
       closures and copied helpers, badge colours, leaked bundle globals,
       one-off breakpoints.
 - [ ] **C5 / D4** — JS tests assert on source text instead of behaviour.
-- [ ] **E3** — The service runs as root with no systemd hardening.
+- [ ] **E3** — The service still runs as root. A systemd sandbox now limits
+      what it can write (`hardening.conf`); an unprivileged user is still open.
 - [ ] **E5** — Updates trust release files; tags are not signed or verified.
 - [ ] **G3** — The forkserver preloads the whole web app, not what workers need.
 - [ ] **I4** — CI duplicates installs and checks.
