@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any, cast
+from typing import IO, TYPE_CHECKING, Any, cast
 
 from utils.dns_pinning import pinned_dns
 from utils.http_transport import (
@@ -196,14 +196,8 @@ def safe_http_get(
     )
 
 
-def read_capped(resp: Any, max_bytes: int, *, chunk_size: int = 65536) -> bytes:
-    """Read a streamed response body, raising if it exceeds *max_bytes*.
-
-    A declared ``Content-Length`` above the cap is rejected before any body
-    is read; otherwise the body is accumulated chunk by chunk and the read
-    stops as soon as the running total passes the cap, so an endless or
-    lying server cannot exhaust memory.
-    """
+def _reject_declared_oversize(resp: Any, max_bytes: int) -> None:
+    """Raise if *resp* declares a ``Content-Length`` above *max_bytes*."""
     declared = _response_header(resp, "Content-Length")
     if isinstance(declared, (str, int)):
         try:
@@ -214,6 +208,17 @@ def read_capped(resp: Any, max_bytes: int, *, chunk_size: int = 65536) -> bytes:
             raise ResponseTooLargeError(
                 f"Response too large: {declared_len} bytes exceeds {max_bytes}"
             )
+
+
+def read_capped(resp: Any, max_bytes: int, *, chunk_size: int = 65536) -> bytes:
+    """Read a streamed response body, raising if it exceeds *max_bytes*.
+
+    A declared ``Content-Length`` above the cap is rejected before any body
+    is read; otherwise the body is accumulated chunk by chunk and the read
+    stops as soon as the running total passes the cap, so an endless or
+    lying server cannot exhaust memory.
+    """
+    _reject_declared_oversize(resp, max_bytes)
     buf = bytearray()
     for chunk in resp.iter_content(chunk_size=chunk_size):
         if not chunk:
@@ -224,6 +229,78 @@ def read_capped(resp: Any, max_bytes: int, *, chunk_size: int = 65536) -> bytes:
                 f"Response too large: exceeds {max_bytes} bytes"
             )
     return bytes(buf)
+
+
+def copy_capped(
+    resp: Any, out: IO[bytes], max_bytes: int, *, chunk_size: int = 65536
+) -> int:
+    """Stream a response body into *out*, raising if it exceeds *max_bytes*.
+
+    The file-backed twin of :func:`read_capped` for callers that must not hold
+    the body in memory: the same ``Content-Length`` pre-check applies, and
+    writing stops as soon as the running total passes the cap. Returns the
+    number of bytes written.
+    """
+    _reject_declared_oversize(resp, max_bytes)
+    written = 0
+    for chunk in resp.iter_content(chunk_size=chunk_size):
+        if not chunk:
+            continue
+        written += len(chunk)
+        if written > max_bytes:
+            raise ResponseTooLargeError(
+                f"Response too large: exceeds {max_bytes} bytes"
+            )
+        out.write(chunk)
+    return written
+
+
+def open_guarded_stream(
+    url: str,
+    *,
+    timeout: float | tuple[float, float] | None = None,
+    headers: dict[str, str] | None = None,
+    allow_lan: bool = False,
+    session: Any = None,
+    max_redirects: int = MAX_GUARDED_REDIRECTS,
+) -> Any:
+    """Open an SSRF-guarded streaming GET of *url* and return the response.
+
+    Every hop is validated and DNS-pinned (see :func:`guarded_fetch`) and
+    credentials are dropped on a cross-origin redirect. The caller owns the
+    returned response: check its status, read it with :func:`read_capped` or
+    :func:`copy_capped`, and close it. Responses are never cached.
+
+    *session* lets callers keep using the shared plugin session from
+    :func:`utils.http_client.get_http_session`; without it :func:`http_get`
+    and its session are used. Raises ``ValueError`` when a hop fails
+    validation.
+    """
+    base_headers: dict[str, str] = dict(headers or {})
+    effective_timeout = _resolve_timeout(
+        timeout, CONNECT_TIMEOUT_SECONDS, READ_TIMEOUT_SECONDS
+    )
+
+    def _fetch(hop_url: str) -> Any:
+        hop_headers = _hop_headers(base_headers, url, hop_url) or None
+        if session is None:
+            return http_get(
+                hop_url,
+                headers=hop_headers,
+                timeout=effective_timeout,
+                stream=True,
+                allow_redirects=False,
+                use_cache=False,
+            )
+        return session.get(
+            hop_url,
+            headers=hop_headers,
+            timeout=effective_timeout,
+            stream=True,
+            allow_redirects=False,
+        )
+
+    return guarded_fetch(url, _fetch, max_redirects=max_redirects, allow_lan=allow_lan)
 
 
 def safe_fetch_bytes(
@@ -249,31 +326,14 @@ def safe_fetch_bytes(
     """
     from contextlib import closing
 
-    base_headers: dict[str, str] = dict(headers or {})
-    effective_timeout = _resolve_timeout(
-        timeout, CONNECT_TIMEOUT_SECONDS, READ_TIMEOUT_SECONDS
+    resp = open_guarded_stream(
+        url,
+        timeout=timeout,
+        headers=headers,
+        allow_lan=allow_lan,
+        session=session,
+        max_redirects=max_redirects,
     )
-
-    def _fetch(hop_url: str) -> Any:
-        hop_headers = _hop_headers(base_headers, url, hop_url) or None
-        if session is None:
-            return http_get(
-                hop_url,
-                headers=hop_headers,
-                timeout=effective_timeout,
-                stream=True,
-                allow_redirects=False,
-                use_cache=False,
-            )
-        return session.get(
-            hop_url,
-            headers=hop_headers,
-            timeout=effective_timeout,
-            stream=True,
-            allow_redirects=False,
-        )
-
-    resp = guarded_fetch(url, _fetch, max_redirects=max_redirects, allow_lan=allow_lan)
     with closing(resp):
         resp.raise_for_status()
         return read_capped(resp, max_bytes)

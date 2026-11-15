@@ -1,6 +1,25 @@
+import socket
 from typing import Any
 
 import pytest
+
+
+@pytest.fixture(autouse=True)
+def _public_dns(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Resolve test hostnames to a public address so the SSRF guard passes offline."""
+
+    def _resolve(host: Any, port: Any = 0, *args: Any, **kwargs: Any) -> Any:
+        return [
+            (
+                socket.AF_INET,
+                socket.SOCK_STREAM,
+                socket.IPPROTO_TCP,
+                "",
+                ("93.184.216.34", port),
+            )
+        ]
+
+    monkeypatch.setattr(socket, "getaddrinfo", _resolve)
 
 
 def test_apod_decode_failure(
@@ -62,15 +81,27 @@ def test_unsplash_decode_failure(
         def raise_for_status(self) -> None:
             pass  # No error
 
-    monkeypatch.setattr("requests.get", lambda *a, **k: R(), raising=True)
+    # The plugin talks to the API through the shared plugin session; patching
+    # ``requests.get`` instead let this test reach the real Unsplash API.
+    class Session:
+        def get(self, url: str, **kwargs: Any) -> Any:
+            return R()
+
+    monkeypatch.setattr("plugins.unsplash.unsplash.get_http_session", Session)
 
     # Make grab_image return None (decode failure path)
+    grabbed: list[str] = []
+
+    def _grab_image(url: str, *a: Any, **k: Any) -> None:
+        grabbed.append(url)
+
     monkeypatch.setattr(
-        "plugins.unsplash.unsplash.grab_image", lambda *a, **k: None, raising=True
+        "plugins.unsplash.unsplash.grab_image", _grab_image, raising=True
     )
 
-    with pytest.raises(RuntimeError):
+    with pytest.raises(RuntimeError, match="Failed to load image"):
         u.generate_image({}, device_config_dev)
+    assert grabbed == ["https://example.com/x.jpg"]
 
 
 def test_image_url_decode_failure(
