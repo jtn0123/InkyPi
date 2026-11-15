@@ -156,6 +156,35 @@ class TestRequirementsLockfile:
         )
         assert pin in content, f"{pin} is missing from requirements-dev.txt"
 
+    def test_dev_requirements_include_every_app_requirement(self) -> None:
+        """The dev environment can run the app's code, not only the tests.
+
+        ``scripts/dev_environment.py --sync`` installs only the dev lock, so a
+        package in requirements.in but not in requirements-dev.in leaves local
+        venvs unable to import it. CI hides the gap because it installs both
+        locks. Linux-only hardware packages are exempt: they don't install on
+        a developer's Mac.
+        """
+
+        def specs(path: Path) -> dict[str, str]:
+            found = {}
+            for raw in path.read_text().splitlines():
+                line = raw.split("#", 1)[0].strip()
+                if not line or line.startswith("-"):
+                    continue
+                req = Requirement(line)
+                if req.marker is not None and "linux" in str(req.marker):
+                    continue
+                found[canonicalize_name(req.name)] = str(req.specifier)
+            return found
+
+        app = specs(INSTALL_DIR / "requirements.in")
+        dev = specs(INSTALL_DIR / "requirements-dev.in")
+        missing = sorted(set(app) - set(dev))
+        assert not missing, f"add to install/requirements-dev.in: {missing}"
+        differ = {n: (app[n], dev[n]) for n in app if app[n] != dev[n]}
+        assert not differ, f"app vs dev constraints differ: {differ}"
+
     def test_requirements_in_exists(self) -> None:
         """Source .in files must be committed alongside lockfiles."""
         assert (INSTALL_DIR / "requirements.in").exists(), (
