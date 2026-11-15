@@ -13,6 +13,7 @@ from typing import Any, BinaryIO, cast
 from PIL import Image
 from PIL.Image import Resampling
 
+from utils.browser_env import browser_environment
 from utils.chromium_limiter import chromium_slot
 from utils.http_utils import guarded_fetch, http_get
 from utils.plugin_errors import ScreenshotBackendError
@@ -494,6 +495,11 @@ def write_bytes_atomic(data: bytes, path: str) -> None:
     _replace_atomically(path, lambda fh: fh.write(data))
 
 
+def _playwright_env() -> dict[str, str | float | bool]:
+    """``browser_environment()`` in the value type Playwright's ``launch`` declares."""
+    return dict(browser_environment())
+
+
 def _playwright_screenshot_html(
     html_file_path: str, dimensions: tuple[int, int]
 ) -> Image.Image | None:
@@ -514,7 +520,10 @@ def _playwright_screenshot_html(
                         "--allow-file-access-from-files",
                         "--enable-local-file-accesses",
                         "--disable-web-security",
-                    ]
+                    ],
+                    # Web security is off for trusted templates; keep the
+                    # app's API keys out of the browser's environment.
+                    env=_playwright_env(),
                 )
             except Exception:
                 logger.warning(
@@ -871,8 +880,10 @@ def _take_screenshot_once(
             (timeout_ms / 1000) if timeout_ms else _DEFAULT_SCREENSHOT_TIMEOUT_S,
             _MAX_SCREENSHOT_TIMEOUT_S,
         )
+        # Web security is off for local templates, so the browser gets an
+        # allowlisted environment, not the app's (which holds the API keys).
         result, hard_fail_transient = _run_browser_subprocess(
-            command, timeout_seconds, attempt
+            command, timeout_seconds, attempt, {"env": browser_environment()}
         )
         if result is None:
             return None, hard_fail_transient
