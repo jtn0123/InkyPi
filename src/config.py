@@ -10,7 +10,7 @@ from contextlib import contextmanager
 from copy import deepcopy
 from typing import Any, cast
 
-from dotenv import load_dotenv, set_key, unset_key
+from dotenv import dotenv_values, set_key, unset_key
 
 from model import PlaylistManager, RefreshInfo
 from utils.config_schema import validate_device_config
@@ -647,12 +647,24 @@ class Config:
         return os.path.join(project_dir, ".env")
 
     def load_env_key(self, key: str) -> str | None:
-        """Loads an environment variable from the managed .env and returns its value."""
-        load_dotenv(dotenv_path=self.get_env_file_path(), override=True)
+        """Return *key* from the managed .env, else from the process environment.
+
+        Reads only this one value. Loading the whole file into ``os.environ``
+        would let any entry in it (``OPENAI_BASE_URL``, ``HTTPS_PROXY``)
+        reconfigure the libraries the app uses, and would keep a key deleted
+        from the file working until the next restart.
+        """
+        value = dotenv_values(self.get_env_file_path()).get(key)
+        if value is not None:
+            return value
         return os.getenv(key)
 
     def set_env_key(self, key: str, value: str) -> bool:
-        """Safely set/update a key in the managed .env file and current process env."""
+        """Safely set or update a key in the managed .env file.
+
+        The value is not copied into ``os.environ``: ``load_env_key`` reads the
+        file, and a copy there would outlive the key's removal from the file.
+        """
         env_path = self.get_env_file_path()
         # Ensure directory exists and file is present with safe permissions
         os.makedirs(os.path.dirname(env_path), exist_ok=True)
@@ -684,7 +696,6 @@ class Config:
                 lines.append(f"{key}={value}")
             with open(env_path, "w") as f:
                 f.write("\n".join(lines) + "\n")
-        os.environ[key] = value
         return True
 
     def unset_env_key(self, key: str) -> bool:

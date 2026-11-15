@@ -333,8 +333,12 @@ class TestExportSettings:
         assert "env_keys" not in data["data"]
 
     def test_export_with_keys(
-        self, client: FlaskClient, device_config_dev: Any
+        self,
+        client: FlaskClient,
+        device_config_dev: Any,
+        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
+        monkeypatch.setitem(client.application.config, "AUTH_ENABLED", True)
         resp = client.post("/settings/export", json={"include_keys": True})
         assert resp.status_code == 200
         data = resp.get_json()

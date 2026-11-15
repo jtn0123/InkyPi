@@ -261,10 +261,10 @@ def save_apikeys() -> ResponseReturnValue:
             if _is_internal_key(key)
         ]
         if write_env_file(env_path, internal_entries + valid_entries):
-            # Keys are persisted in .env; plugins reload via
-            # device_config.load_env_key() which calls load_dotenv().
-            # Do NOT inject into os.environ to avoid leaking secrets
-            # in process memory (/proc/<pid>/environ).
+            # Keys are persisted in .env; plugins read each one from the
+            # file through device_config.load_env_key(). Do NOT inject into
+            # os.environ: that leaks secrets to child processes and
+            # /proc/<pid>/environ, and lets entries reconfigure libraries.
             return json_success(
                 f"Saved {len(valid_entries)} API key(s). Some plugins may require restart to pick up changes."
             )

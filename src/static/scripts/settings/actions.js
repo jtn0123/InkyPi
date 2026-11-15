@@ -405,7 +405,7 @@
         );
         const data = await resp.json();
         if (!resp.ok || !data.success) {
-          showResponseModal("failure", "Export failed");
+          showResponseModal("failure", data.error || "Export failed");
           return;
         }
         const blob = new Blob([JSON.stringify(data.data, null, 2)], {

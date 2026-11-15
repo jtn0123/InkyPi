@@ -1,9 +1,9 @@
 """The environment a headless browser gets: enough to run, and no secrets.
 
-``Config.load_env_key`` loads API keys from ``.env`` into the app's own
-environment, and a child process inherits all of it by default. Local renders
-run Chromium on plugin HTML with web security turned off, so Chromium gets an
-allowlisted environment instead of the app's.
+The app's own environment can hold secrets (a systemd drop-in such as the
+PIN, a developer's shell), and a child process inherits all of it by default.
+Local renders run Chromium on plugin HTML with web security turned off, so
+Chromium gets an allowlisted environment instead of the app's.
 """
 
 from __future__ import annotations
