@@ -76,6 +76,8 @@ UI_BROWSER_TESTS = {
     "test_client_error_reporting_e2e.py",
     # Scripted scrolls jump instead of animating under "reduce motion".
     "test_reduced_motion_scroll.py",
+    # "Increase contrast" switches every theme to the high-contrast colours.
+    "test_high_contrast_mode.py",
     # JTN-703 two-minute click loop. Still opt-in with SKIP_LOAD=0, which the
     # browser-full CI job sets only on the nightly schedule.
     "test_sustained_load.py",
