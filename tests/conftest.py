@@ -427,10 +427,23 @@ def reset_utils_singletons() -> Iterator[Any]:
     _reset_http_session()
     _reset_http_cache()
     _reset_i18n()
+    _reset_version_check_cache()
     yield
     _reset_http_session()
     _reset_http_cache()
     _reset_i18n()
+    _reset_version_check_cache()
+
+
+def _reset_version_check_cache() -> None:
+    """Forget cached GitHub version checks, including cached failures.
+
+    Only when the settings package is already loaded: importing it here would
+    change import order for tests that check what loads lazily.
+    """
+    settings_mod = sys.modules.get("blueprints.settings")
+    if settings_mod is not None:
+        settings_mod._reset_version_cache()
 
 
 @pytest.fixture()

@@ -1,6 +1,7 @@
 # pyright: reportMissingImports=false
 """Tests for the /api/version endpoint in blueprints.settings."""
 
+import threading
 import time
 from collections.abc import Iterator
 from typing import Any
@@ -26,13 +27,9 @@ def reset_version_cache() -> Iterator[Any]:
     """Reset _VERSION_CACHE before each test so tests are independent."""
     import blueprints.settings as settings_mod
 
-    settings_mod._VERSION_CACHE["latest"] = None
-    settings_mod._VERSION_CACHE["checked_at"] = 0.0
-    settings_mod._VERSION_CACHE["release_notes"] = None
+    settings_mod._reset_version_cache()
     yield
-    settings_mod._VERSION_CACHE["latest"] = None
-    settings_mod._VERSION_CACHE["checked_at"] = 0.0
-    settings_mod._VERSION_CACHE["release_notes"] = None
+    settings_mod._reset_version_cache()
 
 
 @pytest.fixture(autouse=True)
@@ -242,3 +239,107 @@ def test_api_version_includes_release_notes(
     data = resp.get_json()
     assert "release_notes" in data
     assert "Feature X" in data["release_notes"]
+
+
+# ---------------------------------------------------------------------------
+# Failed checks are remembered, and only one request asks GitHub at a time
+# ---------------------------------------------------------------------------
+
+
+def test_failed_check_is_not_retried_on_every_page_load(client: FlaskClient) -> None:
+    """While GitHub is unreachable, each page load must not wait on it again."""
+    with patch(
+        "blueprints.settings.http_get", side_effect=Exception("network error")
+    ) as mock_get:
+        first = client.get("/api/version").get_json()
+        second = client.get("/api/version").get_json()
+
+    assert mock_get.call_count == 1
+    for data in (first, second):
+        assert data["latest"] is None
+        assert data["check_succeeded"] is False
+        assert data["check_error"] == "Couldn't reach GitHub: network error"
+
+
+def test_failed_check_is_retried_after_the_failure_ttl(client: FlaskClient) -> None:
+    import blueprints.settings as settings_mod
+
+    with patch("blueprints.settings.http_get", side_effect=Exception("down")):
+        client.get("/api/version")
+    settings_mod._VERSION_CACHE["failed_at"] = (
+        time.time() - settings_mod._VERSION_FAILURE_TTL - 1
+    )
+
+    with patch(
+        "blueprints.settings.http_get", return_value=_mock_github_response("v2.0.0")
+    ) as mock_get:
+        data = client.get("/api/version").get_json()
+
+    assert mock_get.call_count == 1
+    assert data["latest"] == "2.0.0"
+    assert data["check_error"] is None
+    assert settings_mod._VERSION_CACHE["failed_at"] == 0.0
+
+
+def test_forced_check_ignores_a_cached_failure(client: FlaskClient) -> None:
+    with patch("blueprints.settings.http_get", side_effect=Exception("down")):
+        client.get("/api/version")
+
+    with patch(
+        "blueprints.settings.http_get", return_value=_mock_github_response("v2.0.0")
+    ) as mock_get:
+        data = client.get("/api/version?force=1").get_json()
+
+    assert mock_get.call_count == 1
+    assert data["latest"] == "2.0.0"
+
+
+def test_non_stable_release_tag_is_also_remembered(client: FlaskClient) -> None:
+    with patch(
+        "blueprints.settings.http_get",
+        return_value=_mock_github_response("v3.0.0-rc1"),
+    ) as mock_get:
+        client.get("/api/version")
+        data = client.get("/api/version").get_json()
+
+    assert mock_get.call_count == 1
+    assert data["latest"] is None
+    assert "not a stable X.Y.Z tag" in data["check_error"]
+
+
+def test_concurrent_check_answers_from_cache_instead_of_waiting() -> None:
+    """A second request must not hold another server thread on a slow GitHub call."""
+    import blueprints.settings as settings_mod
+
+    settings_mod._VERSION_CACHE["latest"] = "1.0.0"
+    settings_mod._VERSION_CACHE["checked_at"] = (
+        time.time() - settings_mod._VERSION_CACHE_TTL - 1
+    )
+    entered = threading.Event()
+    release = threading.Event()
+    calls = 0
+
+    def slow_get(*_args: Any, **_kwargs: Any) -> Any:
+        nonlocal calls
+        calls += 1
+        entered.set()
+        assert release.wait(5), "test never released the slow GitHub call"
+        return _mock_github_response("v2.0.0")
+
+    results: list[str | None] = []
+    with patch("blueprints.settings.http_get", side_effect=slow_get):
+        first = threading.Thread(
+            target=lambda: results.append(settings_mod._check_latest_version())
+        )
+        first.start()
+        assert entered.wait(5)
+        started = time.monotonic()
+        concurrent = settings_mod._check_latest_version()
+        elapsed = time.monotonic() - started
+        release.set()
+        first.join(5)
+
+    assert concurrent == "1.0.0", "the stale cached answer, without waiting"
+    assert elapsed < 1.0
+    assert calls == 1
+    assert results == ["2.0.0"]
