@@ -577,16 +577,20 @@
 
     renderSavedFiles(config[fieldName] || []);
 
+    const removePendingFile = (fileName) => {
+      uploadedFiles[fieldName] = uploadedFiles[fieldName].filter((item) => item.name !== fileName);
+      const row = widget.querySelector(`#added-${CSS.escape(fileName)}`);
+      if (row) row.remove();
+    };
+
+    const addPendingFile = (file) => {
+      if (uploadedFiles[fieldName].some((item) => item.name === file.name)) return;
+      uploadedFiles[fieldName].push(file);
+      renderFile(`added-${file.name}`, file.name, () => removePendingFile(file.name));
+    };
+
     fileInput.addEventListener("change", () => {
-      Array.from(fileInput.files || []).forEach((file) => {
-        if (uploadedFiles[fieldName].some((item) => item.name === file.name)) return;
-        uploadedFiles[fieldName].push(file);
-        renderFile(`added-${file.name}`, file.name, () => {
-          uploadedFiles[fieldName] = uploadedFiles[fieldName].filter((item) => item.name !== file.name);
-          const row = widget.querySelector(`#added-${CSS.escape(file.name)}`);
-          if (row) row.remove();
-        });
-      });
+      for (const file of Array.from(fileInput.files || [])) addPendingFile(file);
       fileInput.value = "";
     });
 

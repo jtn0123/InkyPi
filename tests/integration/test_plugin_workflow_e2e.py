@@ -186,14 +186,18 @@ def test_image_upload_save_stores_picked_files(
     page = browser_page
     rc = navigate_and_wait(page, live_server, "/plugin/image_upload")
     _pick_image(page, tmp_path)
+    # A second pick that is removed again before saving must not be sent.
+    _pick_image(page, tmp_path, "beach.png")
+    page.locator("[id='added-beach.png'] .remove-btn").click()
+    assert page.locator("[id='added-beach.png']").count() == 0
 
     with page.expect_request(lambda r: "/save_plugin_settings" in r.url) as req_info:
         page.locator("#savePluginSettingsBtn").click()
     request = req_info.value
+    body = request.post_data_buffer or b""
     assert "multipart/form-data" in (request.headers.get("content-type") or "")
-    assert b'name="imageFiles[]"; filename="garden.png"' in (
-        request.post_data_buffer or b""
-    )
+    assert b'name="imageFiles[]"; filename="garden.png"' in body
+    assert b'filename="beach.png"' not in body
 
     # Once saved, the widget lists the stored copy as a saved image and drops
     # the pending file, so the next save keeps it instead of re-uploading it.
