@@ -6,6 +6,7 @@ import os
 import time
 from pathlib import Path
 
+import pytest
 from PIL import Image
 
 # ---------------------------------------------------------------------------
@@ -220,3 +221,49 @@ def test_conditional_revalidation_is_variant_specific(tmp_path: Path) -> None:
         )
         assert other.status_code == 200
         assert other.headers["ETag"] != etag
+
+
+def test_matching_webp_revalidation_skips_the_encode(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A still-valid ETag is answered 304 before any WebP encoding happens."""
+    from flask import Flask, Response, request
+
+    import utils.image_serving as image_serving
+
+    _make_png(tmp_path)
+    app = Flask(__name__)
+
+    @app.route("/image")
+    def image() -> Response:
+        return image_serving.maybe_serve_webp(
+            tmp_path, "test.png", request.headers.get("Accept")
+        )
+
+    client = app.test_client()
+    etag = client.get("/image", headers={"Accept": "image/webp"}).headers["ETag"]
+
+    real_encode = image_serving._encode_webp
+    calls: list[tuple[str, int, int]] = []
+
+    def _counting_encode(path: str, mtime: int, size: int) -> bytes:
+        calls.append((path, mtime, size))
+        return real_encode(path, mtime, size)
+
+    monkeypatch.setattr(image_serving, "_encode_webp", _counting_encode)
+    unchanged = client.get(
+        "/image", headers={"Accept": "image/webp", "If-None-Match": etag}
+    )
+    assert unchanged.status_code == 304
+    assert unchanged.data == b""
+    assert unchanged.headers["ETag"] == etag
+    assert "Accept" in unchanged.vary
+    assert unchanged.headers["Cache-Control"] == "no-cache"
+    assert calls == []
+
+    stale = client.get(
+        "/image", headers={"Accept": "image/webp", "If-None-Match": '"stale"'}
+    )
+    assert stale.status_code == 200
+    assert stale.data[8:12] == b"WEBP"
+    assert len(calls) == 1

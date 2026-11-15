@@ -18,6 +18,7 @@ from pathlib import Path
 from flask import Response, request, send_from_directory
 from PIL import Image
 from werkzeug.exceptions import NotFound
+from werkzeug.http import is_resource_modified
 
 # `safe_join` lives in werkzeug.security and is only re-exported by
 # werkzeug.utils, which does not list it in __all__.
@@ -106,14 +107,21 @@ def maybe_serve_webp(
     mtime = stat.st_mtime_ns
     size = stat.st_size
 
-    webp_bytes = _encode_webp(safe_path, mtime, size)
-
     etag = _make_etag(safe_path, mtime, size)
-    response = Response(webp_bytes, mimetype="image/webp")
+    response = Response(mimetype="image/webp")
     response.set_etag(etag)
     response.vary.add("Accept")
     response.headers["Cache-Control"] = "no-cache"
     response.headers["Content-Disposition"] = content_disposition("inline", filename)
+    # The ETag comes from the file's stat, so a revalidation that still
+    # matches can be answered 304 without paying for a WebP encode.
+    if request.method in ("GET", "HEAD") and not is_resource_modified(
+        request.environ, etag=etag
+    ):
+        response.make_conditional(request)
+        return response
+
+    response.set_data(_encode_webp(safe_path, mtime, size))
     response.make_conditional(request)
     return response
 
