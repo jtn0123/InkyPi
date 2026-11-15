@@ -38,14 +38,20 @@ def reset_all_limiters() -> None:
 
 
 class CooldownLimiter:
-    """Fixed-window cooldown that arms only after a successful action.
+    """Fixed-window cooldown that a failed action doesn't spend.
 
     Usage:
         limiter = CooldownLimiter(10)  # 10-second cooldown
-        allowed, retry_after = limiter.check()
+        allowed, retry_after = limiter.acquire()
         if allowed:
-            do_action()
-            limiter.record()
+            if do_action():
+                limiter.record()  # the cooldown runs from the end
+            else:
+                limiter.reset()  # a failed attempt costs nothing
+
+    ``acquire`` claims the slot in the same step as the test, so two
+    requests that arrive together can't both pass. A separate ``check``
+    then ``record`` leaves a gap the length of the action between them.
     """
 
     def __init__(self, cooldown_seconds: float) -> None:
@@ -60,13 +66,29 @@ class CooldownLimiter:
         *retry_after* is 0.0 when allowed.
         """
         with self._lock:
-            last = self._timestamps.get(key)
-            if last is None:
-                return True, 0.0
-            elapsed = time.monotonic() - last
-            if elapsed >= self._cooldown:
-                return True, 0.0
-            return False, self._cooldown - elapsed
+            return self._check_locked(key, time.monotonic())
+
+    def acquire(self, key: str = "global") -> tuple[bool, float]:
+        """Test and, if allowed, arm the cooldown in one step.
+
+        Returns what :meth:`check` would have. Follow an allowed acquire
+        with :meth:`record` on success or :meth:`reset` on failure.
+        """
+        with self._lock:
+            now = time.monotonic()
+            allowed, retry_after = self._check_locked(key, now)
+            if allowed:
+                self._timestamps[key] = now
+            return allowed, retry_after
+
+    def _check_locked(self, key: str, now: float) -> tuple[bool, float]:
+        last = self._timestamps.get(key)
+        if last is None:
+            return True, 0.0
+        elapsed = now - last
+        if elapsed >= self._cooldown:
+            return True, 0.0
+        return False, self._cooldown - elapsed
 
     def record(self, key: str = "global") -> None:
         """Arm the cooldown (call after a successful action)."""

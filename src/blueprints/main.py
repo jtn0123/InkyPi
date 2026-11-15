@@ -8,7 +8,6 @@ from uuid import uuid4
 
 from flask import (
     Blueprint,
-    Response,
     current_app,
     jsonify,
     render_template,
@@ -25,7 +24,7 @@ from utils.display_names import (
     instance_suffix_label,
     is_auto_instance_name,
 )
-from utils.http_utils import json_error, json_success
+from utils.http_utils import JsonResponse, json_error, json_success
 from utils.image_serving import maybe_serve_webp
 from utils.output_validator import fit_image_to_device
 from utils.rate_limiter import CooldownLimiter
@@ -518,7 +517,7 @@ def _display_next_direct(
     playlist: Any,
     current_dt: datetime,
     benchmark_id: str,
-) -> tuple[int | None, Response | dict[str, Any] | tuple[Any, int] | None]:
+) -> tuple[int | None, JsonResponse | None]:
     """Execute a direct display update (dev path, no background task).
 
     Returns ``(generate_ms, error_response)``.  When *error_response* is not
@@ -659,14 +658,25 @@ def _persist_dev_refresh_event(
 
 @main_bp.route("/display-next", methods=["POST"])
 def display_next() -> Any:
-    allowed, retry_after = _display_next_limiter.check()
+    # Claim the cooldown before refreshing, not after: a refresh takes many
+    # seconds on a Pi Zero, and a double click used to start two of them.
+    allowed, retry_after = _display_next_limiter.acquire()
     if not allowed:
         remaining = math.ceil(retry_after)
         return json_error(
             f"Please wait {remaining}s before refreshing again.",
             status=429,
         )
+    response = _show_next_plugin()
+    if response[1] < 400:
+        _display_next_limiter.record()  # the cooldown runs from the end
+    else:
+        _display_next_limiter.reset()  # a failed attempt costs no cooldown
+    return response
 
+
+def _show_next_plugin() -> JsonResponse:
+    """Advance the active playlist and show its next plugin."""
     device_config = current_app.config["DEVICE_CONFIG"]
     refresh_task = current_app.config["REFRESH_TASK"]
     display_manager = current_app.config["DISPLAY_MANAGER"]
@@ -721,8 +731,6 @@ def display_next() -> Any:
     except Exception:
         logger.exception("display_next failed")
         return json_error("An internal error occurred", status=500)
-
-    _display_next_limiter.record()
 
     if via_refresh_task:
         # This refresh's own timings; refresh_info may still describe the
