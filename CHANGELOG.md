@@ -2,6 +2,31 @@
 
 <!-- version list -->
 
+## v1.8.13 (2026-11-15)
+
+### Bug Fixes
+
+- **display**: Don't repeat the panel write when the driver raises TypeError
+  ([#737](https://github.com/jtn0123/InkyPi/pull/737),
+  [`eeb0b7a`](https://github.com/jtn0123/InkyPi/commit/eeb0b7ad0d1bbf3a61366518a709065df95ef029))
+
+### Documentation
+
+- Stop promising wheel-hash and HTTP-cache behaviour the code doesn't have
+  ([#734](https://github.com/jtn0123/InkyPi/pull/734),
+  [`12117b9`](https://github.com/jtn0123/InkyPi/commit/12117b9d43c8fa87a8f56672570745c758bd2d0d))
+
+- **troubleshooting**: Add a "When an update fails" recovery guide
+  ([#733](https://github.com/jtn0123/InkyPi/pull/733),
+  [`86da2d5`](https://github.com/jtn0123/InkyPi/commit/86da2d544c2ec95224658daa20b7ddaeb2feb259))
+
+### Testing
+
+- Stop comic and image tests from hitting the real network
+  ([#736](https://github.com/jtn0123/InkyPi/pull/736),
+  [`1062a43`](https://github.com/jtn0123/InkyPi/commit/1062a43fd6eab40c71e1adf90810b733cd5ed466))
+
+
 ## v1.8.12 (2026-11-15)
 
 ### Bug Fixes
