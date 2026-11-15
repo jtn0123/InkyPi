@@ -822,6 +822,7 @@ class _VersionCache(TypedDict):
     checked_at: float
     release_notes: str | None
     last_error: str | None
+    failed_at: float
 
 
 _VERSION_CACHE: _VersionCache = {
@@ -831,8 +832,25 @@ _VERSION_CACHE: _VersionCache = {
     # Surface why the last check failed so the UI can distinguish "on latest"
     # from "we never managed to reach GitHub." Cleared on a successful fetch.
     "last_error": None,
+    "failed_at": 0.0,
 }
 _VERSION_CACHE_TTL = 3600  # 1 hour
+# Every page load asks for the version (the sidebar update indicator). When
+# GitHub is unreachable each attempt can hold a server thread for ~20 s (5 s
+# timeout plus transport retries) and the Pi only has a few, so a failed
+# check is remembered for this long instead of being retried on every load.
+_VERSION_FAILURE_TTL = 600  # 10 minutes
+# Only one request at a time talks to GitHub; see _check_latest_version.
+_VERSION_CHECK_LOCK = threading.Lock()
+
+
+def _reset_version_cache() -> None:
+    """Forget every cached version-check result. Intended for tests."""
+    _VERSION_CACHE["latest"] = None
+    _VERSION_CACHE["checked_at"] = 0.0
+    _VERSION_CACHE["release_notes"] = None
+    _VERSION_CACHE["last_error"] = None
+    _VERSION_CACHE["failed_at"] = 0.0
 
 
 def _semver_gt(a: str, b: str) -> bool:
@@ -851,18 +869,36 @@ def _check_latest_version(force_refresh: bool = False) -> str | None:
     short human-readable reason so the UI can report it to the user instead
     of silently claiming "on latest".
 
+    A success is cached for an hour and a failure for ten minutes. While one
+    request is asking GitHub, other non-forced requests answer from the cache
+    straight away instead of tying up another server thread on the same call.
+
     When ``force_refresh`` is True the cache is bypassed — this is what the
     "Check for updates" button needs so a manual click always hits GitHub.
     """
-    now = time.time()
-    if (
-        not force_refresh
-        and _VERSION_CACHE["latest"]
-        and (now - float(_VERSION_CACHE["checked_at"] or 0)) < _VERSION_CACHE_TTL
-    ):
+    if force_refresh:
+        _VERSION_CHECK_LOCK.acquire()
+    else:
+        now = time.time()
         cached_latest = _VERSION_CACHE["latest"]
-        if cached_latest is not None:
+        if (
+            cached_latest
+            and (now - float(_VERSION_CACHE["checked_at"] or 0)) < _VERSION_CACHE_TTL
+        ):
             return cached_latest
+        failed_at = float(_VERSION_CACHE["failed_at"] or 0)
+        if failed_at and (now - failed_at) < _VERSION_FAILURE_TTL:
+            return None
+        if not _VERSION_CHECK_LOCK.acquire(blocking=False):
+            return cached_latest
+    try:
+        return _fetch_latest_version(time.time())
+    finally:
+        _VERSION_CHECK_LOCK.release()
+
+
+def _fetch_latest_version(now: float) -> str | None:
+    """Ask GitHub for the latest release and record the outcome in the cache."""
     try:
         resp = http_get(
             f"https://api.github.com/repos/{_GITHUB_REPO}/releases/latest",
@@ -882,6 +918,7 @@ def _check_latest_version(force_refresh: bool = False) -> str | None:
                 raw_body if isinstance(raw_body, str) else None
             )
             _VERSION_CACHE["last_error"] = None
+            _VERSION_CACHE["failed_at"] = 0.0
             return latest
         # Response decoded but the tag isn't a stable X.Y.Z release (e.g. a
         # pre-release tag like v1.2.3-rc1). That's not a network failure, it
@@ -897,12 +934,14 @@ def _check_latest_version(force_refresh: bool = False) -> str | None:
             f"Latest GitHub release ({tag!r}) is not a stable X.Y.Z tag — "
             "nothing to auto-install yet."
         )
+        _VERSION_CACHE["failed_at"] = now
     except Exception as exc:
         # Bubble up a short reason to the client. Log at INFO so it lands in
         # the in-app log panel without spamming errors on every check.
         reason = str(exc) or exc.__class__.__name__
         logger.info("Version check via GitHub API failed: %s", reason)
         _VERSION_CACHE["last_error"] = f"Couldn't reach GitHub: {reason}"
+        _VERSION_CACHE["failed_at"] = now
     return None
 
 
