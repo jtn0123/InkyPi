@@ -217,21 +217,23 @@ def test_save_settings_checks_required_fields_before_sending(
     """An empty required field stops Save settings, names the field and focuses it."""
     page = browser_page
     navigate_and_wait(page, live_server, "/plugin/rss")
-    sent: list[str] = []
-    page.on(
-        "request",
-        lambda req: (
-            sent.append(req.url) if "/save_plugin_settings" in req.url else None
-        ),
-    )
+    # htmx runs htmx:confirm, then htmx:beforeSend and xhr.send() in the same
+    # task as the click, so once the toast shows this flag is final.
+    page.evaluate("""() => {
+          window.__saveSent = false;
+          document.addEventListener("htmx:beforeSend", () => {
+            window.__saveSent = true;
+          });
+        }""")
 
     page.locator("#settingsForm [name='title']").fill("")
     page.locator("#savePluginSettingsBtn").click()
 
     expect(page.locator(".toast.error .toast-content")).to_contain_text("Title")
     expect(page.locator("#settingsForm [name='title']")).to_be_focused()
-    page.wait_for_timeout(300)
-    assert sent == [], "Save settings sent a form with an empty required field"
+    assert (
+        page.evaluate("() => window.__saveSent") is False
+    ), "Save settings sent a form with an empty required field"
 
 
 def test_save_settings_shows_the_error_the_server_sends(
