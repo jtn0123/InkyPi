@@ -2,12 +2,17 @@ import logging
 import os
 import re
 import tempfile
-from typing import Any
 
 from dotenv import dotenv_values
 from flask import Blueprint, Response, render_template, request
+from flask.typing import ResponseReturnValue
 
-from utils.api_responses import json_error, json_internal_error, json_success
+from utils.api_responses import (
+    JsonResponse,
+    json_error,
+    json_internal_error,
+    json_success,
+)
 from utils.request_models import parse_api_keys_save_request
 
 logger = logging.getLogger(__name__)
@@ -86,7 +91,7 @@ def _has_invalid_control_chars(value: str) -> bool:
 
 def _validate_api_key_entry(
     entry: object, existing_values: dict[str, str]
-) -> tuple[str | None, str, Response | dict[str, Any] | tuple[Any, int] | None]:
+) -> tuple[str | None, str, JsonResponse | None]:
     """Validate a single API key entry dict and resolve its value.
 
     Returns ``(key, value, None)`` on success, or ``(None, None, error_response)``
@@ -222,7 +227,7 @@ def apikeys_page() -> Response | str:
 
 
 @apikeys_bp.route("/api-keys/save", methods=["POST"])
-def save_apikeys() -> tuple[Response | dict[str, Any], int] | Response | dict[str, Any]:
+def save_apikeys() -> ResponseReturnValue:
     """Save API keys to .env file."""
     try:
         parsed, parse_error = parse_api_keys_save_request(request.get_json(silent=True))

@@ -7,6 +7,7 @@ the API-key presence resolution used to render the settings template.
 from typing import Any
 
 from flask import abort, current_app, render_template, request
+from flask.typing import ResponseReturnValue
 
 from plugins.plugin_registry import get_plugin_instance
 from utils.api_responses import json_error, json_success
@@ -74,7 +75,7 @@ def _resolve_api_key_presence(
 
 
 @plugin_bp.route("/plugin/<plugin_id>", methods=["GET"])
-def plugin_page(plugin_id: str) -> Any:
+def plugin_page(plugin_id: str) -> ResponseReturnValue:
     device_config = current_app.config[_CONFIG_KEY]
     playlist_manager = device_config.get_playlist_manager()
 
@@ -154,7 +155,7 @@ def plugin_page(plugin_id: str) -> Any:
 
 
 @plugin_bp.route("/plugin/ai_image/random_prompt", methods=["POST"])
-def ai_image_random_prompt() -> Any:
+def ai_image_random_prompt() -> ResponseReturnValue:
     """Generate a prompt suggestion for the AI Image plugin."""
     device_config = current_app.config[_CONFIG_KEY]
     data = request.get_json(silent=True) or {}
@@ -207,7 +208,7 @@ def ai_image_random_prompt() -> Any:
 
 
 @plugin_bp.route("/plugins", methods=["GET"])
-def plugins_page() -> Any:
+def plugins_page() -> ResponseReturnValue:
     device_config = current_app.config[_CONFIG_KEY]
     plugins = device_config.get_plugins()
 

@@ -101,6 +101,10 @@ If `tests/` goes down:
 ## Coding guidelines for typed modules
 
 - Avoid `Any` unless truly unavoidable; prefer `object` or a narrow union.
+- Route handlers return `flask.typing.ResponseReturnValue`, or something
+  narrower such as `Response` or `str`. Helpers that build a `json_error` or
+  `json_success` reply return `utils.api_responses.JsonResponse`, and
+  `JsonResponse | None` when `None` means "no error".
 - Prefer `collections.abc.Callable`, `Sequence`, `Mapping` over their
   `typing` counterparts for argument types.
 - Use `cast()` sparingly — only when mypy cannot infer a type that you know is

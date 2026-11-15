@@ -3,7 +3,8 @@
 import json
 from typing import Any
 
-from flask import current_app, make_response, render_template, request
+from flask import Response, current_app, make_response, render_template, request
+from flask.typing import ResponseReturnValue
 
 from plugins.plugin_registry import get_plugin_instance
 from services.plugin_workflows import save_plugin_settings_workflow
@@ -25,7 +26,7 @@ from ._common import (
 
 
 @plugin_bp.route("/save_plugin_settings", methods=["POST"])
-def save_plugin_settings() -> Any:
+def save_plugin_settings() -> ResponseReturnValue:
     device_config = current_app.config[_CONFIG_KEY]
     playlist_manager = device_config.get_playlist_manager()
     htmx = _is_htmx_request()
@@ -61,7 +62,7 @@ def save_plugin_settings() -> Any:
 
 
 @plugin_bp.route("/plugin/<string:plugin_id>/save", methods=["POST"])
-def save_plugin_settings_alias(plugin_id: str) -> Any:
+def save_plugin_settings_alias(plugin_id: str) -> ResponseReturnValue:
     """Backward-compatible route alias for plugin settings save."""
     device_config = current_app.config[_CONFIG_KEY]
     playlist_manager = device_config.get_playlist_manager()
@@ -93,7 +94,7 @@ def _is_htmx_request() -> bool:
 
 def _render_plugin_form_error(
     message: str, status: int = 400, field: str | None = None
-) -> Any:
+) -> Response:
     """Return an HTML error partial for the plugin settings form (JTN-506).
 
     HTMX swaps error content into ``#plugin-form-errors``; Flask clients that
@@ -112,7 +113,7 @@ def _render_plugin_form_error(
 
 def _render_plugin_form_success(
     message: str, saved_files: dict[str, Any] | None = None
-) -> Any:
+) -> Response:
     """Return an HTMX success partial; fires ``pluginSettingsSaved`` toast event.
 
     ``saved_files`` maps each uploaded file field to its stored path(s) so the
@@ -137,7 +138,7 @@ def _save_plugin_settings_common(
     plugin_settings: dict[str, Any],
     device_config: Any,
     playlist_manager: Any,
-) -> Any:
+) -> ResponseReturnValue:
     htmx = _is_htmx_request()
     result = save_plugin_settings_workflow(
         plugin_id,

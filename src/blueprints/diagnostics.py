@@ -28,6 +28,7 @@ from pathlib import Path
 from typing import Any
 
 from flask import Blueprint, current_app, jsonify, request
+from flask.typing import ResponseReturnValue
 
 from utils import blackout, boot_self_test, crash_breadcrumb
 from utils.api_responses import json_error
@@ -383,7 +384,7 @@ def _blackout_state() -> dict[str, Any]:
 
 
 @diagnostics_bp.route("/api/diagnostics", methods=["GET"])
-def api_diagnostics() -> Any:
+def api_diagnostics() -> ResponseReturnValue:
     """Return a consolidated system + application diagnostics payload.
 
     Response shape (stable — downstream UIs consume this):

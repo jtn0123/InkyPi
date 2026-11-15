@@ -18,6 +18,7 @@ from flask import (
     request,
     send_from_directory,
 )
+from flask.typing import ResponseReturnValue
 from werkzeug.exceptions import BadRequest
 
 from utils.api_responses import (
@@ -60,20 +61,20 @@ _ERRCODE_INVALID_FILENAME = "invalid_filename"
 _ERRCODE_FILE_NOT_FOUND = "file_not_found"
 
 
-def _filename_error_response(code: str) -> tuple[Any, int]:
+def _filename_error_response(code: str) -> JsonResponse:
     """Map helper error codes to standard ``json_error`` responses.
 
     All messages are module-level constants — no request data is interpolated.
     """
     if code == _ERRCODE_INVALID_JSON:
-        return cast(tuple[Any, int], json_error(_ERR_INVALID_JSON, status=400))
+        return json_error(_ERR_INVALID_JSON, status=400)
     if code == _ERRCODE_BODY_NOT_OBJECT:
-        return cast(tuple[Any, int], json_error(_ERR_BODY_NOT_OBJECT, status=400))
+        return json_error(_ERR_BODY_NOT_OBJECT, status=400)
     if code == _ERRCODE_FILENAME_REQUIRED:
-        return cast(tuple[Any, int], json_error(_ERR_FILENAME_REQUIRED, status=400))
+        return json_error(_ERR_FILENAME_REQUIRED, status=400)
     if code == _ERRCODE_FILE_NOT_FOUND:
-        return cast(tuple[Any, int], json_error(_ERR_FILE_NOT_FOUND, status=404))
-    return cast(tuple[Any, int], json_error(_ERR_INVALID_FILENAME, status=400))
+        return json_error(_ERR_FILE_NOT_FOUND, status=404)
+    return json_error(_ERR_INVALID_FILENAME, status=400)
 
 
 def _timestamp_from_history_filename(filename: str) -> float:
@@ -498,7 +499,7 @@ def history_image(filename: str) -> Response | JsonResponse:
 
 
 @history_bp.route("/history/redisplay", methods=["POST"])
-def history_redisplay() -> tuple[dict[str, Any], int] | Any:
+def history_redisplay() -> ResponseReturnValue:
     device_config = current_app.config[_CONFIG_KEY]
     display_manager = current_app.config["DISPLAY_MANAGER"]
     refresh_task = current_app.config.get("REFRESH_TASK")
@@ -535,7 +536,7 @@ def history_redisplay() -> tuple[dict[str, Any], int] | Any:
 
 
 @history_bp.route("/history/delete", methods=["POST"])
-def history_delete() -> tuple[dict[str, Any], int] | Any:
+def history_delete() -> ResponseReturnValue:
     device_config = current_app.config[_CONFIG_KEY]
     history_dir = device_config.history_image_dir
     try:
@@ -582,7 +583,7 @@ def history_delete() -> tuple[dict[str, Any], int] | Any:
 
 
 @history_bp.route("/history/clear", methods=["POST"])
-def history_clear() -> tuple[dict[str, Any], int] | Any:
+def history_clear() -> ResponseReturnValue:
     device_config = current_app.config[_CONFIG_KEY]
     history_dir = device_config.history_image_dir
     try:
@@ -714,7 +715,7 @@ def history_export_csv() -> Response:
 
 
 @history_bp.route("/history/storage", methods=["GET"])
-def history_storage() -> tuple[Any, int]:
+def history_storage() -> ResponseReturnValue:
     """Return storage stats for the filesystem containing the history directory.
 
     Values returned: free_gb, total_gb, used_gb, pct_free

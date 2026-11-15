@@ -5,6 +5,7 @@ from datetime import datetime
 from typing import Any
 
 from flask import current_app, request
+from flask.typing import ResponseReturnValue
 
 from refresh_task import PlaylistRefresh, manual_update_timings, schedule
 from utils.api_responses import json_success
@@ -34,7 +35,7 @@ _eta_cache_lock = threading.Lock()
 
 # Trigger next eligible instance in a specific playlist immediately
 @playlist_bp.route("/display_next_in_playlist", methods=["POST"])
-def display_next_in_playlist() -> Any:
+def display_next_in_playlist() -> ResponseReturnValue:
     device_config = current_app.config["DEVICE_CONFIG"]
     refresh_task = current_app.config["REFRESH_TASK"]
     playlist_manager = device_config.get_playlist_manager()
@@ -103,7 +104,7 @@ def display_next_in_playlist() -> Any:
 
 
 @playlist_bp.route("/playlist/eta/<string:playlist_name>", methods=["GET"])
-def playlist_eta(playlist_name: str) -> Any:
+def playlist_eta(playlist_name: str) -> ResponseReturnValue:
     """Return per-instance ETA for the named playlist.
 
     Cached per minute to keep route lightweight.

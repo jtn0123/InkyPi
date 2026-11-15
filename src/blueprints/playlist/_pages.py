@@ -5,6 +5,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from flask import current_app, has_app_context, redirect, render_template, url_for
+from flask.typing import ResponseReturnValue
 
 from refresh_task import schedule
 from refresh_task.health import PluginHealthTracker
@@ -20,12 +21,12 @@ from ._schedule import (
 
 
 @playlist_bp.route("/playlists", methods=["GET"])
-def playlists_redirect() -> Any:
+def playlists_redirect() -> ResponseReturnValue:
     return redirect(url_for("playlist.playlists"))
 
 
 @playlist_bp.route("/playlist", methods=["GET"])
-def playlists() -> Any:
+def playlists() -> ResponseReturnValue:
     device_config = current_app.config["DEVICE_CONFIG"]
     playlist_manager = device_config.get_playlist_manager()
     refresh_info = device_config.get_refresh_info()

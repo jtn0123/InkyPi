@@ -11,9 +11,9 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Any
 
 from flask import Blueprint, Response, request
+from flask.typing import ResponseReturnValue
 
 from utils.api_responses import json_error
 from utils.rate_limit import TokenBucket
@@ -53,7 +53,7 @@ def _strip_newlines(value: str) -> str:
 
 
 @client_error_bp.route("/api/client-error", methods=["POST"])
-def receive_client_error() -> Any:
+def receive_client_error() -> ResponseReturnValue:
     """Accept a browser JS error report and emit it as a WARNING log entry.
 
     Returns 204 on success so the browser-side script has a cheap ack with
@@ -102,6 +102,6 @@ def receive_client_error() -> Any:
 
 
 @client_error_bp.route("/api/client-error", methods=["GET"])
-def receive_client_error_get() -> Any:
+def receive_client_error_get() -> ResponseReturnValue:
     """Explicitly reject GET to provide a clear error instead of 405 from Flask."""
     return json_error("Method not allowed", status=405)

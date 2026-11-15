@@ -15,6 +15,7 @@ from flask import (
     send_file,
     send_from_directory,
 )
+from flask.typing import ResponseReturnValue
 
 from benchmarks.benchmark_storage import save_refresh_event, save_stage_event
 from refresh_task import schedule
@@ -184,7 +185,7 @@ def _is_dev_mode() -> bool:
 
 
 @main_bp.route("/", methods=["GET"])
-def main_page() -> Any:
+def main_page() -> ResponseReturnValue:
     device_config = current_app.config["DEVICE_CONFIG"]
     playlist_manager = device_config.get_playlist_manager()
     # Compute a non-mutating next-up preview for SSR convenience
@@ -232,7 +233,7 @@ def main_page() -> Any:
 
 
 @main_bp.route("/preview", methods=["GET"])
-def preview_image() -> Any:
+def preview_image() -> ResponseReturnValue:
     device_config = current_app.config["DEVICE_CONFIG"]
     # Prefer processed image; fall back to current raw image if missing
     path = device_config.processed_image_file
@@ -248,7 +249,7 @@ def preview_image() -> Any:
 
 
 @main_bp.route("/dev/mock-frame", methods=["GET"])
-def dev_mock_frame() -> Any:
+def dev_mock_frame() -> ResponseReturnValue:
     """Serve the latest simulated mock-display frame in dev mode only."""
     if not _is_dev_mode():
         return ("Not found", 404)
@@ -271,7 +272,7 @@ def dev_mock_frame() -> Any:
 
 
 @main_bp.route("/api/screenshot", methods=["GET"])
-def screenshot() -> Any:
+def screenshot() -> ResponseReturnValue:
     """Return the current display image as PNG or WebP (JTN-450).
 
     Prefer the processed image; fall back to current_image_file.  Supports
@@ -311,7 +312,7 @@ def screenshot() -> Any:
 
 
 @main_bp.route("/api/current_image", methods=["GET"])
-def get_current_image() -> Any:
+def get_current_image() -> ResponseReturnValue:
     """Serve current_image.png with conditional request support (If-Modified-Since) for polling."""
     device_config = current_app.config["DEVICE_CONFIG"]
     image_path = device_config.current_image_file
@@ -387,7 +388,7 @@ def _annotate_instance_labels(payload: Any) -> Any:
 
 
 @main_bp.route("/refresh-info", methods=["GET"])
-def refresh_info() -> Any:
+def refresh_info() -> ResponseReturnValue:
     device_config = current_app.config["DEVICE_CONFIG"]
     try:
         info = device_config.get_refresh_info().to_dict()
@@ -403,7 +404,7 @@ def refresh_info() -> Any:
 
 
 @main_bp.route("/next-up", methods=["GET"])
-def next_up() -> Any:
+def next_up() -> ResponseReturnValue:
     device_config = current_app.config["DEVICE_CONFIG"]
     current_dt = now_device_tz(device_config)
 
@@ -418,7 +419,7 @@ def next_up() -> Any:
 
 
 @main_bp.route("/api/plugin_order", methods=["POST"])
-def save_plugin_order() -> Any:
+def save_plugin_order() -> ResponseReturnValue:
     """Save custom plugin order from dashboard drag-and-drop."""
     device_config = current_app.config["DEVICE_CONFIG"]
     parsed, parse_error = parse_plugin_order_request(request.get_json(silent=True))
@@ -445,7 +446,7 @@ def save_plugin_order() -> Any:
 
 
 @main_bp.route("/sw.js", methods=["GET"])
-def service_worker() -> Any:
+def service_worker() -> ResponseReturnValue:
     """Serve the service worker from the origin root.
 
     Service workers must be registered from the origin root to control all
@@ -464,7 +465,7 @@ def service_worker() -> Any:
 
 # Serve static assets from src/static for test and dev environments
 @main_bp.route("/static/<path:filename>", methods=["GET"])
-def static_files(filename: str) -> Any:
+def static_files(filename: str) -> ResponseReturnValue:
     try:
         static_dir = os.path.abspath(
             os.path.join(os.path.dirname(__file__), "..", "static")
@@ -643,7 +644,7 @@ def _persist_dev_refresh_event(
 
 
 @main_bp.route("/display-next", methods=["POST"])
-def display_next() -> Any:
+def display_next() -> ResponseReturnValue:
     # Claim the cooldown before refreshing, not after: a refresh takes many
     # seconds on a Pi Zero, and a double click used to start two of them.
     allowed, retry_after = _display_next_limiter.acquire()
@@ -752,7 +753,7 @@ def _show_next_plugin() -> JsonResponse:
 
 
 @main_bp.route("/refresh", methods=["POST"])
-def refresh_alias() -> Any:
+def refresh_alias() -> ResponseReturnValue:
     """Backward-compatible alias for manual display advance."""
     return display_next()
 

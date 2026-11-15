@@ -9,9 +9,10 @@ from collections.abc import Mapping
 from typing import Any, cast
 
 from flask import current_app, request
+from flask.typing import ResponseReturnValue
 
 from services.playlist_workflows import prepare_add_plugin_workflow
-from utils.api_responses import json_error, json_success
+from utils.api_responses import JsonResponse, json_error, json_success
 from utils.app_utils import handle_request_files, parse_form
 from utils.backend_errors import OperationFailedError, route_error_boundary
 
@@ -20,7 +21,7 @@ from ._common import _CODE_VALIDATION, logger, playlist_bp
 
 def _form_parse_error(
     message: str, *, status: int = 400, field: str = "refresh_settings"
-) -> tuple[None, None, None, Any]:
+) -> tuple[None, None, None, JsonResponse]:
     """Build a ``(None, None, None, error_response)`` tuple for form parsing."""
     return (
         None,
@@ -34,7 +35,7 @@ def _form_parse_error(
 
 def _parse_refresh_settings_json(
     raw_refresh: Any,
-) -> tuple[dict[str, Any] | None, tuple[None, None, None, Any] | None]:
+) -> tuple[dict[str, Any] | None, tuple[None, None, None, JsonResponse] | None]:
     """Decode *raw_refresh* into a dict.
 
     Returns ``(refresh_settings, error_tuple)``.  On success the error is
@@ -53,7 +54,9 @@ def _parse_refresh_settings_json(
 
 def _parse_add_plugin_form(
     form: Mapping[str, Any], files: Any
-) -> tuple[str | None, dict[str, Any] | None, dict[str, Any] | None, Any]:
+) -> tuple[
+    str | None, dict[str, Any] | None, dict[str, Any] | None, JsonResponse | None
+]:
     """Parse and validate the add_plugin form data.
 
     Returns ``(plugin_id, plugin_settings, refresh_settings, error_response)``.
@@ -74,7 +77,7 @@ def _parse_add_plugin_form(
 
 
 @playlist_bp.route("/add_plugin", methods=["POST"])
-def add_plugin() -> Any:
+def add_plugin() -> ResponseReturnValue:
     device_config = current_app.config["DEVICE_CONFIG"]
     playlist_manager = device_config.get_playlist_manager()
 

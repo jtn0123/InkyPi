@@ -6,11 +6,10 @@ one route module uses.
 """
 
 import logging
-from typing import Any
 
 from flask import Blueprint
 
-from utils.api_responses import json_error
+from utils.api_responses import JsonResponse, json_error
 from utils.request_models import CODE_VALIDATION, RequestModelError
 
 # Both names are pinned to the pre-split module path ``blueprints.playlist``
@@ -37,7 +36,7 @@ DEFAULT_PLAYLIST_NAME = "Default"
 _MSG_CANNOT_DELETE_DEFAULT = "Cannot delete the default playlist"
 
 
-def _request_model_error_response(error: RequestModelError) -> Any:
+def _request_model_error_response(error: RequestModelError) -> JsonResponse:
     return json_error(
         error.message,
         status=error.status,
