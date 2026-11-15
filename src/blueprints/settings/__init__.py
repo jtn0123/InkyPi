@@ -20,7 +20,7 @@ from utils.env_flags import env_bool
 from utils.http_utils import http_get
 from utils.logging_utils import log_datetime_from_timestamp, redact_secrets
 from utils.progress_events import get_progress_bus
-from utils.rate_limiter import CooldownLimiter, SlidingWindowLimiter
+from utils.rate_limit import CooldownLimiter, SlidingWindowLimiter
 from utils.time_utils import get_timezone, now_device_tz
 
 # Try to import cysystemd for journal reading (Linux only)

@@ -364,7 +364,7 @@ def reset_rate_limiters() -> Iterator[None]:
     results depend on test order. The registry reaches all of them, including
     any added later, without naming each one here.
     """
-    from utils.rate_limiter import reset_all_limiters
+    from utils.rate_limit import reset_all_limiters
 
     reset_all_limiters()
     yield
@@ -529,7 +529,7 @@ def flask_app(device_config_dev: Any, monkeypatch: pytest.MonkeyPatch) -> Any:
     from display.display_manager import DisplayManager
     from plugins.plugin_registry import load_plugins
     from refresh_task import RefreshTask
-    from utils.rate_limiter import SlidingWindowLimiter
+    from utils.rate_limit import SlidingWindowLimiter
 
     monkeypatch.setenv("SECRET_KEY", "test-secret-key-for-csrf")
     monkeypatch.setenv("INKYPI_RATE_LIMIT_AUTH", "100000/60")
