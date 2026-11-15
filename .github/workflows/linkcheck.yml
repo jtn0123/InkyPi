@@ -5,6 +5,8 @@ on:
     paths:
       - 'README.md'
       - 'docs/**'
+      - 'scripts/check_links.py'
+      - '.github/workflows/linkcheck.yml'
   schedule:
     - cron: '0 5 * * *'
 
