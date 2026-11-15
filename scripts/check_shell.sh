@@ -10,7 +10,7 @@
 # default (strictest) severity. scripts/lint.sh runs this, so CI's lint job
 # and a local lint run check the same files the same way.
 #
-# shellcheck is required when CI is set. Locally a missing shellcheck is a
+# CI requires the shellcheck binary. Locally a missing binary is only a
 # warning, and the bash -n pass still runs.
 set -uo pipefail
 
