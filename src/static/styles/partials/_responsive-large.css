@@ -69,8 +69,7 @@
 
 /* ── Landscape mobile ── */
 @media (max-height: 500px) and (orientation: landscape) {
-    .modal-content,
-    .response-modal-content {
+    .modal-content {
         max-height: 85vh;
         overflow-y: auto;
     }

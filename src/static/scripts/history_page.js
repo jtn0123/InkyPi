@@ -1,12 +1,4 @@
 (function () {
-  function getOpenHistoryModal() {
-    return [
-      document.getElementById("deleteHistoryModal"),
-      document.getElementById("clearHistoryModal"),
-      document.getElementById("lightboxModal"),
-    ].find((modal) => modal && !modal.hidden);
-  }
-
   // Module-scope helpers — hoisted from createHistoryPage (JTN-281).
   function setHidden(node, hidden) {
     if (!node) return;
@@ -400,20 +392,6 @@
       document.getElementById("clearHistoryModal")?.addEventListener("inkypi:modal-dismiss", closeClearModal);
       document.getElementById("deleteHistoryModal")?.addEventListener("inkypi:modal-dismiss", closeDeleteModal);
       document.getElementById("lightboxModal")?.addEventListener("inkypi:modal-dismiss", closeLightbox);
-
-      document.addEventListener("keydown", (event) => {
-        if (event.key !== "Escape") return;
-        const openModal = getOpenHistoryModal();
-        if (!openModal) return;
-        event.preventDefault();
-        if (openModal.id === "deleteHistoryModal") {
-          closeDeleteModal();
-        } else if (openModal.id === "clearHistoryModal") {
-          closeClearModal();
-        } else if (openModal.id === "lightboxModal") {
-          closeLightbox();
-        }
-      });
     }
 
     function init() {

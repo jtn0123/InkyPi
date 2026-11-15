@@ -167,7 +167,6 @@ def test_second_validation_mobile_and_feedback_polish_contracts() -> None:
     assert ".brand-host" in css and "display: none" in css
     assert "bottom: 20px" in css and ".toast-container" in css
     assert "--modal-overlay-destructive" in css
-    assert "body.success-failure-modal-open .toast-container" in css
     assert "overflow-x: clip" in css
     assert "env(safe-area-inset-bottom, 0px) + 16px" in css
     assert (

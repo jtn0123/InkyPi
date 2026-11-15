@@ -12,12 +12,18 @@ def _read_script(name: str) -> str:
     return (_SCRIPTS_DIR / name).read_text(encoding="utf-8")
 
 
-def test_history_page_script_handles_escape_for_open_modals() -> None:
+def test_history_page_dialogs_close_through_the_shared_helper() -> None:
+    # InkyPiModalFocus handles Escape and fires inkypi:modal-dismiss on the
+    # dialog; each history dialog must listen for it. A page-level Escape
+    # handler would never run: the helper stops the key first.
     content = _read_script("history_page.js")
 
-    assert 'event.key !== "Escape"' in content
-    assert "deleteHistoryModal" in content
-    assert "clearHistoryModal" in content
+    for modal_id in ("deleteHistoryModal", "clearHistoryModal", "lightboxModal"):
+        assert (
+            f'getElementById("{modal_id}")?.addEventListener("inkypi:modal-dismiss"'
+            in content
+        ), modal_id
+    assert 'event.key !== "Escape"' not in content
 
 
 # Every custom dialog goes through the shared InkyPiModalFocus helper, which
@@ -79,16 +85,6 @@ def test_settings_page_device_action_modals_manage_focus() -> None:
 
     assert "InkyPiModalFocus.activate" in content
     assert "InkyPiModalFocus.deactivate" in content
-
-
-def test_response_modal_restores_focus_to_trigger() -> None:
-    """The shared response modal should restore focus after dismissal."""
-    content = _read_script("response_modal.js")
-
-    assert "lastResponseModalTrigger" in content
-    assert "responseModalClose" in content
-    assert "success-failure-modal-open" in content
-    assert "is-visible" in content
 
 
 def test_plugin_workflow_panels_do_not_hide_content_from_assistive_tech() -> None:

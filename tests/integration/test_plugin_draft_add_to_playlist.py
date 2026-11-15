@@ -186,28 +186,22 @@ def test_draft_add_to_playlist_click_surfaces_failure_if_schedule_panel_missing(
         )
 
         # Poll for the observable failure feedback rather than sleeping a
-        # fixed 400ms. The fallback path renders either a toast or the
-        # response modal — wait for either to surface the expected copy.
+        # fixed 400ms: the failure shows as a toast.
         page.wait_for_function(
             """() => {
                 const toast = document.querySelector('.toast-container .toast');
-                const toastText = toast ? (toast.textContent || '') : '';
-                const modal = document.getElementById('responseModal');
-                const modalText = modal ? (modal.textContent || '') : '';
-                const combined = toastText + '\\n' + modalText;
-                return combined.includes('scheduling controls')
-                    || combined.includes('refresh the page');
+                const text = toast ? (toast.textContent || '') : '';
+                return text.includes('scheduling controls')
+                    || text.includes('refresh the page');
             }""",
             timeout=5000,
         )
 
-        # A visible toast or response modal must surface actionable feedback —
-        # not a silent no-op. JTN-633.
+        # The toast must surface actionable feedback, not a silent no-op.
+        # JTN-633.
         feedback = page.evaluate("""() => {
                 const toast = document.querySelector('.toast-container .toast');
-                if (toast) return toast.textContent || '';
-                const m = document.getElementById('responseModal');
-                return m ? (m.textContent || '') : '';
+                return toast ? (toast.textContent || '') : '';
             }""")
         assert (
             "scheduling controls" in feedback or "refresh the page" in feedback

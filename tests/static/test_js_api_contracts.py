@@ -100,8 +100,7 @@ def test_response_modal_script_exists(client: FlaskClient) -> None:
         "function dismissStaleErrors()",
         "function showToast(status, message, duration = TOAST_DURATION_MS)",
         "function closeToast(toastId)",
-        "function showResponseModal(status, message, useToast = true)",
-        "function closeResponseModal()",
+        "function showResponseModal(status, message)",
         "async function handleJsonResponse(response, options = {})",
         "function getErrorMessage(status, endpoint)",
         "function showError(message, duration)",
@@ -168,15 +167,6 @@ def test_csrf_script_preserves_existing_headers_without_empty_object_copy(
 
     assert "init.headers = init.headers ? { ...init.headers } : {};" in js
     assert "{ ...(init.headers || {}) }" not in js
-
-
-def test_history_page_script_uses_outer_scope_modal_helper(client: FlaskClient) -> None:
-    resp = client.get("/static/scripts/history_page.js")
-    assert resp.status_code == 200
-    js = resp.get_data(as_text=True)
-
-    assert "function getOpenHistoryModal()" in js
-    assert "const openModal = getOpenHistoryModal();" in js
 
 
 def test_plugin_page_script_uses_globalthis_for_plugin_hooks(
