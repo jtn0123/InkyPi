@@ -26,9 +26,10 @@ PYTHONPATH=$(pwd)/src pytest --cov=src --cov-report=term-missing
 Notes:
 - `scripts/test.sh` is the recommended fast local path.
 - `scripts/preflash_validate.sh` is the recommended hardware-free pre-flash gate.
-- With no args it shards the main local suite across 4 lanes (`core`, `plugins-a`, `plugins-b`, `plugins-c`) and uses `PYTEST_LANE_WORKERS=2` per lane by default.
-- It runs serial for a single explicit test file and uses `pytest -n 4 --dist=loadfile -q` for broader explicit targets.
-- The default fast path keeps Playwright-backed UI/a11y suites explicit so normal local runs avoid browser startup overhead.
+- With no args it runs `scripts/test-fast.sh`: the same tests as CI's `tests` job (`-m "not container"`), everything except the `memory` tests on 4 xdist workers (`INKYPI_TEST_WORKERS` overrides), then the `memory` tests serially. `tests/unit/test_local_test_runner.py` keeps the two passes matched to CI.
+- Keep it to one run at a time, with 4 workers or fewer: `-n auto` or several suites at once has run the Mac out of memory.
+- It runs a single explicit test file serially, and hands any other targets to `scripts/test-fast.sh`.
+- Browser suites are skipped (`SKIP_BROWSER=1`) unless you target a single browser test file; they run in CI's `browser-smoke` and `browser-full` jobs.
 - Use `PYTHONPATH=$(pwd)/src pytest -q` for serial debugging or when investigating xdist-only issues.
 - Coverage runs remain serial for now while the parallel local path soaks.
 - `scripts/test_profile.sh` profiles the slowest tests with `--durations=25` and defaults to `tests/plugins`.

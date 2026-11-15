@@ -36,7 +36,8 @@ This starts the web UI on port 8080 without requiring e-ink display hardware.
 ## Running Tests
 
 ```bash
-# Fast iteration — skip browser/Playwright tests (headless Chromium not required)
+# Whole suite, same tests as CI minus the browser ones (4 workers, then the
+# memory tests serially; headless Chromium not required)
 scripts/test.sh
 
 # Run a specific test file
@@ -45,8 +46,8 @@ scripts/test.sh tests/unit/test_inkypi.py -v
 # Run with coverage
 SKIP_BROWSER=1 .venv/bin/python -m pytest tests/ --cov=src --cov-report=term-missing
 
-# Fast parallel run (~6.5 min vs ~10 min serial); takes any pytest args
-scripts/test-fast.sh
+# The runner behind scripts/test.sh; takes any pytest args.
+# INKYPI_TEST_WORKERS sets the worker count (default 4; don't go higher).
 scripts/test-fast.sh tests/unit -k weather
 ```
 

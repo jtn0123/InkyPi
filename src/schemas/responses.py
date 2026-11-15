@@ -3,7 +3,7 @@
 These describe the canonical successful JSON responses the UI consumes.
 They are used by:
 
-* ``tests/contract/test_response_shapes.py`` to assert routes keep returning
+* ``tests/contracts/test_response_shapes.py`` to assert routes keep returning
   the documented shape (prevents silent drift breaking the UI).
 * ``mypy`` as optional producer-side annotations.
 
