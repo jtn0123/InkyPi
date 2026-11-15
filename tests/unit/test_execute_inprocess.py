@@ -75,7 +75,9 @@ class TestExecuteInprocessSuccess:
             ),
             patch.dict(os.environ, {"INKYPI_PLUGIN_ISOLATION": "none"}),
         ):
-            img, meta = task._execute_inprocess(action, {"id": "p"}, datetime.now(UTC))
+            img, meta = task.executor.execute_inprocess(
+                action, {"id": "p"}, datetime.now(UTC)
+            )
 
         assert img is expected_img
         assert meta == {"foo": "bar"}
@@ -100,7 +102,7 @@ class TestExecuteInprocessSuccess:
         with patch(
             "refresh_task.plugin_lookup.get_plugin_instance", return_value=FakePlugin()
         ):
-            task._execute_inprocess(action, {"id": "p"}, datetime.now(UTC))
+            task.executor.execute_inprocess(action, {"id": "p"}, datetime.now(UTC))
 
         assert RefreshTask._zombie_thread_count == before
 
@@ -143,7 +145,9 @@ class TestExecuteInprocessTimeout:
             ),
         ):
             with pytest.raises(TimeoutError, match="timed out"):
-                task._execute_inprocess(action, {"id": "slow"}, datetime.now(UTC))
+                task.executor.execute_inprocess(
+                    action, {"id": "slow"}, datetime.now(UTC)
+                )
 
     def test_timeout_sets_cancel_event_via_zombie_decrement(
         self, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
@@ -184,7 +188,7 @@ class TestExecuteInprocessTimeout:
             ),
         ):
             with pytest.raises(TimeoutError):
-                task._execute_inprocess(
+                task.executor.execute_inprocess(
                     action, {"id": "event_check"}, datetime.now(UTC)
                 )
 
@@ -272,7 +276,9 @@ class TestExecuteInprocessTimeout:
             ),
         ):
             with pytest.raises(TimeoutError):
-                task._execute_inprocess(action2, {"id": "slow2"}, datetime.now(UTC))
+                task.executor.execute_inprocess(
+                    action2, {"id": "slow2"}, datetime.now(UTC)
+                )
 
         assert RefreshTask._zombie_thread_count == before + 1
 
@@ -313,7 +319,7 @@ class TestExecuteInprocessTimeout:
             ),
         ):
             with pytest.raises(TimeoutError):
-                task._execute_inprocess(
+                task.executor.execute_inprocess(
                     action, {"id": "slow_finish"}, datetime.now(UTC)
                 )
 
@@ -374,7 +380,7 @@ class TestCancelEventCooperative:
             ),
         ):
             with pytest.raises(TimeoutError):
-                task._execute_inprocess(
+                task.executor.execute_inprocess(
                     action, {"id": "cooperative"}, datetime.now(UTC)
                 )
 
@@ -418,7 +424,9 @@ class TestExecuteInprocessError:
             ),
         ):
             with pytest.raises(ValueError, match="plugin error"):
-                task._execute_inprocess(action, {"id": "broken"}, datetime.now(UTC))
+                task.executor.execute_inprocess(
+                    action, {"id": "broken"}, datetime.now(UTC)
+                )
 
     def test_zombie_count_unchanged_on_plugin_error(
         self, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
@@ -452,7 +460,9 @@ class TestExecuteInprocessError:
             ),
         ):
             with pytest.raises(RuntimeError):
-                task._execute_inprocess(action, {"id": "boom"}, datetime.now(UTC))
+                task.executor.execute_inprocess(
+                    action, {"id": "boom"}, datetime.now(UTC)
+                )
 
         assert RefreshTask._zombie_thread_count == before
 

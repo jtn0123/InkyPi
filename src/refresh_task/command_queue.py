@@ -22,9 +22,7 @@ from utils.domain_errors import RefreshTaskUnavailable
 if TYPE_CHECKING:
     from refresh_task.recorder import RefreshRecorder
 
-# Moved out of task.py; keeps the original logger name so log records, level
-# configuration and log-capturing tests see exactly what they did before.
-logger = logging.getLogger("refresh_task.task")
+logger = logging.getLogger(__name__)
 
 _PLUGIN_TIMEOUT_DEFAULTS_S = {
     # OpenAI/Google image generation routinely takes longer than the generic

@@ -10,7 +10,11 @@ from PIL import Image
 
 from display.display_manager import DisplayManager
 from plugins.plugin_registry import load_plugins
-from refresh_task import ManualRefresh, RefreshTask, task as refresh_task_mod
+from refresh_task import (
+    ManualRefresh,
+    RefreshTask,
+    loop_scheduling,
+)
 
 
 def test_manual_update_triggers_display_and_refresh_info(
@@ -162,7 +166,7 @@ def test_refresh_task_system_stats_logging_no_getloadavg(
     def fake_logger(msg: Any) -> None:
         logged["msg"] = msg
 
-    monkeypatch.setattr(refresh_task_mod.logger, "info", fake_logger)
+    monkeypatch.setattr(loop_scheduling.logger, "info", fake_logger)
 
     task.log_system_stats()
 

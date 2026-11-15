@@ -107,7 +107,7 @@ class TestSubprocessHangTimeout:
             ),
         ):
             with pytest.raises(TimeoutError, match="timed out"):
-                task._execute_with_policy(
+                task.executor.execute_with_policy(
                     action,
                     {"id": "chaos_plugin"},
                     datetime.now(UTC),

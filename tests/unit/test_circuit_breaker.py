@@ -347,7 +347,7 @@ class TestCircuitBreakerScheduler:
         from model import RefreshInfo
 
         monkeypatch.setenv("PLUGIN_FAILURE_THRESHOLD", "5")
-        caplog.set_level(logging.INFO, logger="refresh_task.task")
+        caplog.set_level(logging.INFO, logger="refresh_task")
         task = _make_task(device_config_dev)
 
         current_dt = datetime(2025, 1, 1, 12, 0, 0, tzinfo=UTC)

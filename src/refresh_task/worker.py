@@ -268,7 +268,7 @@ def _execute_refresh_attempt_worker(
     """
     # JTN-S2: become a session leader so any chromium subprocess spawned
     # below shares the worker's session/process group.  When the parent
-    # times the worker out and calls ``_cleanup_subprocess``, that
+    # times the worker out and calls ``cleanup_subprocess``, that
     # cleanup ``killpg``-s the whole session — collecting chromium plus
     # its zygote/renderer/utility descendants in one syscall.  Without
     # this, chromium descendants get reparented to PID 1 and leak.
@@ -347,7 +347,7 @@ def _execute_refresh_attempt_worker(
         # clock at 800x480 is ~89 KB), so this manifested on every single
         # render.  Passing a filesystem path keeps the queue payload < 1 KB
         # and sidesteps the pipe buffer entirely.  Parent deletes the file
-        # after reading in task.py::_handle_process_result.
+        # after reading in RefreshExecutor.handle_process_result_payload.
         with tempfile.NamedTemporaryFile(
             suffix=_RENDER_TEMPFILE_SUFFIX,
             prefix=_RENDER_TEMPFILE_PREFIX,

@@ -73,7 +73,7 @@ class _EventuallySucceedingPlugin:
 
 
 class TestPermanentPluginErrorInProcess:
-    """``_execute_inprocess`` must not retry ``PermanentPluginError``."""
+    """``execute_inprocess`` must not retry ``PermanentPluginError``."""
 
     def test_permanent_error_runs_exactly_one_attempt(
         self, device_config_dev: Any, caplog: pytest.LogCaptureFixture
@@ -105,7 +105,9 @@ class TestPermanentPluginErrorInProcess:
             ),
         ):
             try:
-                task._execute_inprocess(action, {"id": "image_url"}, datetime.now(UTC))
+                task.executor.execute_inprocess(
+                    action, {"id": "image_url"}, datetime.now(UTC)
+                )
             except PermanentPluginError as exc:
                 assert "Invalid URL" in str(exc)
             else:  # pragma: no cover
@@ -142,7 +144,7 @@ class TestPermanentPluginErrorInProcess:
                 },
             ),
         ):
-            image, _meta = task._execute_inprocess(
+            image, _meta = task.executor.execute_inprocess(
                 action, {"id": "image_url"}, datetime.now(UTC)
             )
 
@@ -173,7 +175,7 @@ class TestPermanentPluginErrorInProcess:
                 },
             ),
         ):
-            image, _meta = task._execute_inprocess(
+            image, _meta = task.executor.execute_inprocess(
                 action, {"id": "image_url"}, datetime.now(UTC)
             )
 
@@ -188,13 +190,13 @@ class TestPermanentPluginErrorInProcess:
 
 
 class TestPermanentPluginErrorPolicy:
-    """``_execute_with_policy`` must re-raise ``PermanentPluginError`` after one attempt.
+    """``execute_with_policy`` must re-raise ``PermanentPluginError`` after one attempt.
 
     The autouse ``disable_plugin_process_isolation`` conftest fixture pins
     ``INKYPI_PLUGIN_ISOLATION=none`` so the policy layer delegates to
-    ``_execute_inprocess``.  These tests explicitly switch back to the
+    ``execute_inprocess``.  These tests explicitly switch back to the
     subprocess-style code path by setting the env var to ``"process"`` and
-    mocking ``_run_subprocess_attempt`` so no real child process is spawned.
+    mocking ``run_subprocess_attempt`` so no real child process is spawned.
     """
 
     def test_policy_skips_retry_on_permanent_error(self, device_config_dev: Any) -> Any:
@@ -217,7 +219,9 @@ class TestPermanentPluginErrorPolicy:
             )
 
         with (
-            patch.object(task, "_run_subprocess_attempt", side_effect=_fake_attempt),
+            patch.object(
+                task.executor, "run_subprocess_attempt", side_effect=_fake_attempt
+            ),
             patch.dict(
                 os.environ,
                 {
@@ -228,7 +232,7 @@ class TestPermanentPluginErrorPolicy:
             ),
         ):
             try:
-                task._execute_with_policy(
+                task.executor.execute_with_policy(
                     action, {"id": "image_url"}, datetime.now(UTC)
                 )
             except PermanentPluginError as exc:
@@ -262,7 +266,9 @@ class TestPermanentPluginErrorPolicy:
             return success_image, None
 
         with (
-            patch.object(task, "_run_subprocess_attempt", side_effect=_fake_attempt),
+            patch.object(
+                task.executor, "run_subprocess_attempt", side_effect=_fake_attempt
+            ),
             patch.dict(
                 os.environ,
                 {
@@ -272,7 +278,7 @@ class TestPermanentPluginErrorPolicy:
                 },
             ),
         ):
-            image, _meta = task._execute_with_policy(
+            image, _meta = task.executor.execute_with_policy(
                 action, {"id": "image_url"}, datetime.now(UTC)
             )
 

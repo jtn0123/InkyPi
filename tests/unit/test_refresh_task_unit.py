@@ -6,6 +6,8 @@ from typing import Any
 import pytest
 from PIL import Image
 
+from refresh_task.executor import RefreshExecutor
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -111,7 +113,7 @@ def test_manual_refresh_uses_execute(
 def test_perform_refresh_calls_execute_with_policy(
     device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
 ) -> Any:
-    """Ensure _perform_refresh delegates to _execute_with_policy."""
+    """Ensure _perform_refresh delegates to the executor's execute_with_policy."""
     from display.display_manager import DisplayManager
     from refresh_task import ManualRefresh, RefreshTask
 
@@ -131,8 +133,8 @@ def test_perform_refresh_calls_execute_with_policy(
         return img, {}
 
     monkeypatch.setattr(
-        RefreshTask,
-        "_execute_with_policy",
+        RefreshExecutor,
+        "execute_with_policy",
         fake_execute_with_policy,
     )
 
@@ -150,16 +152,14 @@ def test_perform_refresh_calls_execute_with_policy(
 
 
 def test_timeout_msg() -> None:
-    from refresh_task import RefreshTask
 
-    msg = RefreshTask._timeout_msg("weather", 30.0)
+    msg = RefreshExecutor.timeout_msg("weather", 30.0)
     assert msg == "Plugin 'weather' timed out after 30s"
 
 
 def test_timeout_msg_truncates_float() -> None:
-    from refresh_task import RefreshTask
 
-    msg = RefreshTask._timeout_msg("clock", 10.7)
+    msg = RefreshExecutor.timeout_msg("clock", 10.7)
     assert "10s" in msg
 
 
@@ -257,10 +257,9 @@ PARENT_PGID = 4000
 def test_cleanup_subprocess_leaves_groups_the_worker_does_not_lead(
     monkeypatch: pytest.MonkeyPatch, worker_pgid: int, why: str
 ) -> None:
-    from refresh_task import RefreshTask
 
     killed = _fake_process_groups(monkeypatch, {0: PARENT_PGID, 123: worker_pgid})
-    RefreshTask._cleanup_subprocess(_ExitingProc(123), "plugin")
+    RefreshExecutor.cleanup_subprocess(_ExitingProc(123), "plugin")
     assert killed == [], why
 
 
@@ -269,15 +268,12 @@ def test_cleanup_subprocess_kills_the_group_a_setsid_worker_leads(
 ) -> None:
     import signal
 
-    from refresh_task import RefreshTask
-
     killed = _fake_process_groups(monkeypatch, {0: PARENT_PGID, 123: 123})
-    RefreshTask._cleanup_subprocess(_ExitingProc(123), "plugin")
+    RefreshExecutor.cleanup_subprocess(_ExitingProc(123), "plugin")
     assert killed == [(123, signal.SIGKILL)]
 
 
 def test_cleanup_subprocess_terminates(monkeypatch: pytest.MonkeyPatch) -> Any:
-    from refresh_task import RefreshTask
 
     _fake_process_groups(monkeypatch, {0: PARENT_PGID})
     calls = []
@@ -300,13 +296,12 @@ def test_cleanup_subprocess_terminates(monkeypatch: pytest.MonkeyPatch) -> Any:
             calls.append("kill")
 
     proc = FakeProc()
-    RefreshTask._cleanup_subprocess(proc, "test_plugin")
+    RefreshExecutor.cleanup_subprocess(proc, "test_plugin")
     assert "terminate" in calls
     assert not proc.is_alive()
 
 
 def test_cleanup_subprocess_escalates_to_kill(monkeypatch: pytest.MonkeyPatch) -> Any:
-    from refresh_task import RefreshTask
 
     _fake_process_groups(monkeypatch, {0: PARENT_PGID})
 
@@ -327,14 +322,12 @@ def test_cleanup_subprocess_escalates_to_kill(monkeypatch: pytest.MonkeyPatch) -
             self._kill_count += 1
 
     proc = StubbornProc()
-    RefreshTask._cleanup_subprocess(proc, "stubborn")
+    RefreshExecutor.cleanup_subprocess(proc, "stubborn")
     assert proc._kill_count >= 1
 
 
 def test_handle_process_result_success(tmp_path: Path) -> None:
     import queue
-
-    from refresh_task import RefreshTask
 
     img = Image.new("RGB", (100, 100), "red")
     png_path = tmp_path / "rendered.png"
@@ -346,7 +339,9 @@ def test_handle_process_result_success(tmp_path: Path) -> None:
     class FakeProc:
         exitcode = 0
 
-    result_img, meta = RefreshTask._handle_process_result(q, FakeProc(), "test", 1)
+    result_img, meta = RefreshExecutor.handle_process_result_payload(
+        q, FakeProc(), "test", 1
+    )
     assert result_img is not None
     assert meta == {"key": "val"}
     # _handle_process_result must unlink the tempfile after reading.
@@ -356,15 +351,15 @@ def test_handle_process_result_success(tmp_path: Path) -> None:
 def test_handle_process_result_error() -> None:
     import queue
 
-    from refresh_task import RefreshTask
-
     q = queue.Queue()
     q.put({"ok": False, "error_type": "ValueError", "error_message": "bad input"})
 
     class FakeProc:
         exitcode = 1
 
-    result_img, exc = RefreshTask._handle_process_result(q, FakeProc(), "test", 1)
+    result_img, exc = RefreshExecutor.handle_process_result_payload(
+        q, FakeProc(), "test", 1
+    )
     assert result_img is None
     assert isinstance(exc, Exception)
 
@@ -417,7 +412,9 @@ def test_manual_update_returns_after_image_saved_not_display(
         img = Image.new("RGB", device_config_dev.get_resolution(), "white")
         return img, {}
 
-    monkeypatch.setattr(RefreshTask, "_execute_with_policy", fake_execute_with_policy)
+    monkeypatch.setattr(
+        RefreshExecutor, "execute_with_policy", fake_execute_with_policy
+    )
 
     # Keep the manual-update cap at its default 60s — the point of the test
     # is that we return in well under 60s despite the 90s display sleep.
@@ -461,7 +458,7 @@ def test_manual_update_still_surfaces_generate_errors(
     def boom(self, action: Any, cfg: Any, dt: Any, request_id: Any = None) -> None:
         raise RuntimeError("generate failed")
 
-    monkeypatch.setattr(RefreshTask, "_execute_with_policy", boom)
+    monkeypatch.setattr(RefreshExecutor, "execute_with_policy", boom)
 
     try:
         task.start()
@@ -476,12 +473,10 @@ def test_handle_process_result_empty_queue_raises() -> None:
 
     import pytest
 
-    from refresh_task import RefreshTask
-
     q = queue.Queue()
 
     class FakeProc:
         exitcode = 1
 
     with pytest.raises(RuntimeError, match="exited with code"):
-        RefreshTask._handle_process_result(q, FakeProc(), "test", 1)
+        RefreshExecutor.handle_process_result_payload(q, FakeProc(), "test", 1)

@@ -270,7 +270,9 @@ class TestRefreshTaskHooks:
 
         img = Image.new("RGB", device_config_dev.get_resolution(), "white")
 
-        monkeypatch.setattr(task, "_execute_with_policy", lambda *a, **kw: (img, {}))
+        monkeypatch.setattr(
+            task.executor, "execute_with_policy", lambda *a, **kw: (img, {})
+        )
         monkeypatch.setattr(task, "_push_to_display", lambda *a, **kw: (10, 5))
         monkeypatch.setattr(task, "_save_benchmark", lambda *a, **kw: None)
         monkeypatch.setattr(task, "_update_plugin_health", lambda **kw: None)
@@ -331,7 +333,7 @@ class TestRefreshTaskHooks:
         def _fail(*a: Any, **kw: Any) -> None:
             raise RuntimeError("plugin boom")
 
-        monkeypatch.setattr(task, "_execute_with_policy", _fail)
+        monkeypatch.setattr(task.executor, "execute_with_policy", _fail)
 
         from refresh_task.actions import PlaylistRefresh
 

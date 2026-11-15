@@ -331,7 +331,7 @@ class TestLoggingKeepsRawDetail:
         refresh_action = PlaylistRefresh(playlist, pi)
         current_dt = datetime(2025, 1, 1, 12, 0, 0, tzinfo=UTC)
 
-        with caplog.at_level(logging.ERROR, logger="refresh_task.task"):
+        with caplog.at_level(logging.ERROR, logger="refresh_task"):
             with pytest.raises(RuntimeError):
                 task._perform_refresh(refresh_action, current_dt, current_dt)
 

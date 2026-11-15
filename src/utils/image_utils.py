@@ -749,7 +749,7 @@ def _run_browser_subprocess(
     session/process group (no ``start_new_session``).  The worker calls
     ``os.setsid()`` at startup, so chromium and all its zygote/renderer
     descendants share the worker's pgid.  When the parent times the
-    worker out, ``RefreshTask._cleanup_subprocess`` does
+    worker out, ``RefreshExecutor.cleanup_subprocess`` does
     ``killpg(worker.pid, SIGKILL)`` and the entire chromium tree goes
     with it in one syscall.  The per-attempt SIGKILL below only signals
     chromium itself; descendants are caught by the worker-level

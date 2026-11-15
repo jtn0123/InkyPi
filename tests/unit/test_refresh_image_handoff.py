@@ -22,8 +22,9 @@ import pytest
 from PIL import Image
 
 from model import PluginInstance
-from refresh_task import PlaylistRefresh, RefreshTask
+from refresh_task import PlaylistRefresh
 from refresh_task.actions import RefreshAction
+from refresh_task.executor import RefreshExecutor
 
 NOW = datetime(2025, 1, 1, 12, 30, tzinfo=UTC)
 
@@ -171,7 +172,7 @@ def test_parent_deletes_only_files_it_owns(
     result_queue: queue.Queue[Any] = queue.Queue()
     result_queue.put(payload)
 
-    image, _meta = RefreshTask._handle_process_result(
+    image, _meta = RefreshExecutor.handle_process_result_payload(
         result_queue, _ExitedProc(), "handoff", 1
     )
 

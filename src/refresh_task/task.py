@@ -1,7 +1,8 @@
 """RefreshTask — main coordinator for display refresh operations.
 
-``RefreshTask`` owns the thread lifecycle, the refresh loop and the plugin
-execution/isolation wrappers. The rest of its behaviour lives in mixins:
+``RefreshTask`` owns the thread lifecycle and the refresh loop. Plugins run
+through ``self.executor`` (:class:`refresh_task.executor.RefreshExecutor`),
+which owns isolation, retries and timeouts. The rest lives in mixins:
 
 * :mod:`refresh_task.loop_scheduling` — trigger waits, next-plugin selection,
   the watchdog stall gate, history cleanup and system stats.
@@ -13,13 +14,12 @@ execution/isolation wrappers. The rest of its behaviour lives in mixins:
 import logging
 import threading
 from collections import deque
-from collections.abc import Callable, Mapping
-from datetime import datetime
+from collections.abc import Callable
 from time import monotonic
-from typing import Any, ClassVar, cast
+from typing import Any, ClassVar
 
 from refresh_task import plugin_lookup, recorder as refresh_recorder
-from refresh_task.actions import ManualUpdateRequest, RefreshAction
+from refresh_task.actions import ManualUpdateRequest
 from refresh_task.command_queue import CommandQueueMixin
 from refresh_task.context import RefreshContext
 from refresh_task.display_pipeline import DisplayPipeline
@@ -108,7 +108,6 @@ class RefreshTask(
             get_plugin_instance=lambda cfg: plugin_lookup.get_plugin_instance(cfg),
             mp_context_factory=lambda: _get_mp_context(),
         )
-        self._executor_run_subprocess_attempt = self.executor.run_subprocess_attempt
         self._tick_count: int = 0
         self.watchdog_thread: threading.Thread | None = None
         # Monotonic timestamp of the moment the current refresh started, or
@@ -260,114 +259,8 @@ class RefreshTask(
                 if result is not None:
                     self._complete_manual_request(result[-1], exception=e)
 
-    @staticmethod
-    def _timeout_msg(plugin_id: str, timeout_s: float) -> str:
-        """Return a canonical timeout error message string."""
-        return RefreshExecutor.timeout_msg(plugin_id, timeout_s)
-
-    @staticmethod
-    def _cleanup_subprocess(proc: Any, plugin_id: str) -> None:
-        """Terminate a subprocess that is still alive after its timeout."""
-        RefreshExecutor.cleanup_subprocess(proc, plugin_id)
-
-    @staticmethod
-    def _handle_process_result(
-        result_queue: Any,
-        proc: Any,
-        plugin_id: str,
-        attempt: int,
-    ) -> tuple[Any, Any]:
-        """Read and validate the result queue from a finished subprocess."""
-        return RefreshExecutor.handle_process_result_payload(
-            result_queue,
-            proc,
-            plugin_id,
-            attempt,
-        )
-
-    def _run_subprocess_attempt(
-        self,
-        refresh_action: RefreshAction,
-        plugin_config: Mapping[str, Any],
-        current_dt: datetime,
-        plugin_id: str,
-        timeout_s: float,
-        attempt: int,
-    ) -> tuple[Any, Any]:
-        """Spawn a subprocess for one plugin execution attempt."""
-        return self._executor_run_subprocess_attempt(
-            refresh_action,
-            plugin_config,
-            current_dt,
-            plugin_id,
-            timeout_s,
-            attempt,
-        )
-
-    def _execute_with_policy(
-        self,
-        refresh_action: RefreshAction,
-        plugin_config: Mapping[str, Any],
-        current_dt: datetime,
-        request_id: str | None = None,
-    ) -> tuple[Any, Any]:
-        """Run a plugin with the configured retry and isolation policy."""
-        original_runner = self.executor.run_subprocess_attempt
-        cast(Any, self.executor).run_subprocess_attempt = self._run_subprocess_attempt
-        try:
-            return self.executor.execute_with_policy(
-                refresh_action,
-                plugin_config,
-                current_dt,
-                request_id=request_id,
-            )
-        finally:
-            cast(Any, self.executor).run_subprocess_attempt = original_runner
-
     # Class-level counter tracking threads that timed out but could not be stopped.
     # Python threads cannot be force-killed; the cancel event is internal
     # lifecycle bookkeeping that lets the worker decrement this count on exit.
     _zombie_thread_count: ClassVar[int] = 0
     _zombie_thread_lock: ClassVar[threading.Lock] = threading.Lock()
-
-    @staticmethod
-    def _make_inprocess_worker(
-        refresh_action: RefreshAction,
-        plugin_config: Mapping[str, Any],
-        device_config: Any,
-        current_dt: datetime,
-        plugin_id: str,
-    ) -> tuple[Callable[[], None], dict[str, Any], threading.Event]:
-        """Return a ``(worker_fn, result_holder, cancel_event)`` tuple."""
-        return RefreshExecutor.make_inprocess_worker_for(
-            refresh_action=refresh_action,
-            plugin_config=plugin_config,
-            device_config=device_config,
-            current_dt=current_dt,
-            plugin_id=plugin_id,
-            zombie_owner=RefreshTask,
-            get_plugin_instance=lambda cfg: plugin_lookup.get_plugin_instance(cfg),
-        )
-
-    @staticmethod
-    def _handle_thread_timeout(
-        plugin_id: str, timeout_s: float, cancel_event: threading.Event
-    ) -> TimeoutError:
-        """Mark a timed-out worker thread as a zombie and return a TimeoutError."""
-        return RefreshExecutor.handle_thread_timeout_for(
-            plugin_id,
-            timeout_s,
-            cancel_event,
-            zombie_owner=RefreshTask,
-        )
-
-    def _execute_inprocess(
-        self,
-        refresh_action: RefreshAction,
-        plugin_config: Mapping[str, Any],
-        current_dt: datetime,
-    ) -> tuple[Any, Any]:
-        """Run a plugin directly in the current process."""
-        return self.executor.execute_inprocess(
-            refresh_action, plugin_config, current_dt
-        )
