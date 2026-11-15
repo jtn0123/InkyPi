@@ -322,16 +322,16 @@ class TestImportNameCollision:
         assert body["imported"] == 1
         assert len(body["renamed"]) == 1
         assert "Clock One" in body["renamed"][0]
-        assert "(imported)" in body["renamed"][0]
+        assert body["renamed"][0] == "Clock One → Clock One imported"
 
         pm = device_config_dev.get_playlist_manager()
-        assert pm.find_plugin("clock", "Clock One (imported)") is not None
+        assert pm.find_plugin("clock", "Clock One imported") is not None
 
     def test_import_double_collision_increments_suffix(
         self, client: FlaskClient, device_config_dev: Any
     ) -> None:
         _add_plugin_instance(device_config_dev, name="Widget")
-        _add_plugin_instance(device_config_dev, name="Widget (imported)", settings={})
+        _add_plugin_instance(device_config_dev, name="Widget imported", settings={})
 
         payload = {
             "version": 1,
@@ -346,7 +346,7 @@ class TestImportNameCollision:
         assert body["imported"] == 1
 
         pm = device_config_dev.get_playlist_manager()
-        assert pm.find_plugin("clock", "Widget (imported 2)") is not None
+        assert pm.find_plugin("clock", "Widget imported 2") is not None
 
 
 # ---------------------------------------------------------------------------

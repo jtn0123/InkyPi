@@ -18,7 +18,10 @@ from flask import Blueprint, Response, current_app, jsonify, request
 from flask.typing import ResponseReturnValue
 
 from blueprints._refresh_loop import wake_refresh_loop
-from services.playlist_workflows import validate_plugin_settings_security
+from services.playlist_workflows import (
+    clean_instance_name,
+    validate_plugin_settings_security,
+)
 from utils.api_responses import JsonResponse, content_disposition, json_error
 from utils.form_utils import sanitize_log_field
 
@@ -192,6 +195,8 @@ class _ImportInstance:
     plugin_id: str
     name: str
     settings: dict[str, Any]
+    # The name as written in the file, when cleaning it changed it.
+    original_name: str = ""
 
 
 def _prepare_import_instances(
@@ -235,20 +240,27 @@ def _prepare_import_instances(
                     details={"field": field},
                 ),
             )
-        name = str(instance.get("name", "")).strip() or plugin_id
-        prepared.append(_ImportInstance(plugin_id, name, settings))
+        # The file's names are untrusted: a name becomes part of the image
+        # file name and the history page URL, so it must follow the same
+        # rule as a name typed into the app.
+        raw_name = str(instance.get("name", "")).strip()
+        name = clean_instance_name(raw_name, plugin_id)
+        original = raw_name if raw_name and raw_name != name else ""
+        prepared.append(_ImportInstance(plugin_id, name, settings, original))
     return prepared, skipped, None
 
 
 def _unique_import_name(name: str, existing_names: set[str]) -> str:
     if name not in existing_names:
         return name
-    candidate = f"{name} (imported)"
     suffix = 1
-    while candidate in existing_names:
+    while True:
+        tail = " imported" if suffix == 1 else f" imported {suffix}"
+        base = clean_instance_name(name, name, max_len=64 - len(tail))
+        candidate = f"{base}{tail}"
+        if candidate not in existing_names:
+            return candidate
         suffix += 1
-        candidate = f"{name} (imported {suffix})"
-    return candidate
 
 
 def _add_import_instances(
@@ -272,8 +284,9 @@ def _add_import_instances(
             raise RuntimeError("Could not create import playlist")
         for instance in prepared:
             name = _unique_import_name(instance.name, existing_names)
-            if name != instance.name:
-                renamed.append(f"{instance.name} → {name}")
+            given = instance.original_name or instance.name
+            if name != given:
+                renamed.append(f"{given} → {name}")
             added = playlist.add_plugin(
                 {
                     "plugin_id": instance.plugin_id,

@@ -24,6 +24,7 @@ logger = logging.getLogger(__name__)
 
 _CODE_VALIDATION = "validation_error"
 _INSTANCE_NAME_RE = re.compile(r"^[A-Za-z0-9 _-]+$")
+_INSTANCE_NAME_DISALLOWED_RE = re.compile(r"[^A-Za-z0-9 _-]+")
 _MAX_INSTANCE_NAME_LEN = 64
 _MAX_REFRESH_INTERVAL = 999
 _MSG_INVALID_PLAYLIST_REQUEST = "Invalid playlist request"
@@ -61,6 +62,26 @@ def _failure(
             details=details,
         ),
     )
+
+
+def clean_instance_name(raw_name: object, fallback: str, max_len: int = 0) -> str:
+    """Turn any text into a name that passes ``normalize_instance_name``.
+
+    For names the user didn't type in this app's form, such as a plugin
+    import. Each run of other characters becomes a space (so "a/b" reads
+    "a b" and "../x" reads "x"), spaces collapse, and the name starts with a
+    letter or digit, as the history page's own name check requires. An
+    empty result falls back to *fallback*, cleaned the same way. *max_len*
+    shortens the limit, to leave room for a suffix.
+    """
+    limit = min(max_len or _MAX_INSTANCE_NAME_LEN, _MAX_INSTANCE_NAME_LEN)
+    for candidate in (raw_name, fallback):
+        text = candidate if isinstance(candidate, str) else ""
+        text = " ".join(_INSTANCE_NAME_DISALLOWED_RE.sub(" ", text).split())
+        text = text.lstrip(" _-")[:limit].rstrip()
+        if text:
+            return text
+    return "Imported"[:limit]
 
 
 def normalize_instance_name(
