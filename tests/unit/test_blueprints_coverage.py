@@ -66,7 +66,7 @@ def test_next_up_no_next_plugin(
 
     pm = device_config_dev.get_playlist_manager()
 
-    # Create a playlist but mock peek_next_plugin to return None
+    # Create a playlist but mock the peek to return None
     if not pm.get_playlist("Default"):
         pm.add_playlist("Default", "00:00", "24:00")
 
@@ -75,14 +75,13 @@ def test_next_up_no_next_plugin(
     def mock_peek_next(*args: Any, **kwargs: Any) -> Any:
         return None
 
-    with patch.object(playlist, "peek_next_plugin", side_effect=mock_peek_next):
-        with patch.object(
-            playlist, "peek_next_eligible_plugin", side_effect=mock_peek_next
-        ):
-            resp = client.get("/next-up")
-            assert resp.status_code == 200
-            data = resp.get_json()
-            assert data == {}
+    with patch.object(
+        playlist, "peek_next_eligible_plugin", side_effect=mock_peek_next
+    ):
+        resp = client.get("/next-up")
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data == {}
 
 
 def test_next_up_with_exception(client: FlaskClient, device_config_dev: Any) -> None:

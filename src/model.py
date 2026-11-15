@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -380,67 +381,61 @@ class Playlist:
 
         return self.plugins[self.current_plugin_index]
 
-    def peek_next_plugin(self) -> PluginInstance | None:
-        """Returns the next plugin instance without mutating the current index.
+    def _next_eligible_index(
+        self,
+        current_time: datetime,
+        skip: Callable[[PluginInstance], bool] | None = None,
+    ) -> int | None:
+        """Index of the next eligible instance after the current one, or None.
 
-        If the index is unset or invalid, returns the first plugin as the next candidate.
+        Pure: reads ``current_plugin_index`` once and never writes it, so a
+        caller that only wants to know what comes next (the dashboard's
+        "Next up") cannot disturb the refresh thread's position. Scans each
+        slot at most once, starting after the current index (or at 0 when the
+        index is unset or out of range). ``skip`` drops candidates that are
+        show-eligible but should not run this turn, such as paused instances.
         """
-        if not self.plugins:
+        plugins = self.plugins
+        count = len(plugins)
+        if count == 0:
             return None
-
-        if self.current_plugin_index is None:
-            return self.plugins[0]
-
-        if not (0 <= self.current_plugin_index < len(self.plugins)):
-            return self.plugins[0]
-
-        next_index = (self.current_plugin_index + 1) % len(self.plugins)
-        return self.plugins[next_index]
+        current = self.current_plugin_index
+        start = 0 if current is None or not (0 <= current < count) else current + 1
+        for offset in range(count):
+            index = (start + offset) % count
+            candidate = plugins[index]
+            if not candidate.is_show_eligible(current_time):
+                continue
+            if skip is not None and skip(candidate):
+                continue
+            return index
+        return None
 
     def get_next_eligible_plugin(self, current_time: datetime) -> PluginInstance | None:
         """Advance to and return the next eligible plugin based on current_time.
 
-        Tries up to N plugins (size of list) to find one that is_show_eligible.
-        Mutates current_plugin_index similarly to get_next_plugin.
-        Returns None if no eligible plugin is found.
+        Tries each plugin at most once to find one that is_show_eligible, and
+        moves current_plugin_index to it. Returns None, leaving the index
+        unchanged, if no plugin is eligible.
         """
-        if not self.plugins:
+        index = self._next_eligible_index(current_time)
+        if index is None:
             return None
-
-        original_index = self.current_plugin_index
-        attempts = 0
-        while attempts < len(self.plugins):
-            # compute next index like get_next_plugin without committing first
-            if self.current_plugin_index is None:
-                next_index = 0
-            else:
-                if not (0 <= self.current_plugin_index < len(self.plugins)):
-                    next_index = 0
-                else:
-                    next_index = (self.current_plugin_index + 1) % len(self.plugins)
-
-            candidate = self.plugins[next_index]
-            if candidate.is_show_eligible(current_time):
-                self.current_plugin_index = next_index
-                return candidate
-
-            # advance and try again
-            self.current_plugin_index = next_index
-            attempts += 1
-
-        # none eligible; restore index
-        self.current_plugin_index = original_index
-        return None
+        self.current_plugin_index = index
+        return self.plugins[index]
 
     def peek_next_eligible_plugin(
-        self, current_time: datetime
+        self,
+        current_time: datetime,
+        skip: Callable[[PluginInstance], bool] | None = None,
     ) -> PluginInstance | None:
-        """Return next eligible plugin without changing current_plugin_index."""
-        saved = self.current_plugin_index
-        try:
-            return self.get_next_eligible_plugin(current_time)
-        finally:
-            self.current_plugin_index = saved
+        """Return the next eligible plugin without changing current_plugin_index.
+
+        Never writes the index, so it is safe to call without the config lock
+        while the refresh thread advances the playlist.
+        """
+        index = self._next_eligible_index(current_time, skip)
+        return None if index is None else self.plugins[index]
 
     @staticmethod
     def _reorder_identity(item: object) -> tuple[str, str] | None:

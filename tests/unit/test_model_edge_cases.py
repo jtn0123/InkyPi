@@ -196,6 +196,71 @@ class TestPeekNextEligiblePlugin:
         assert result is None
         assert pl.current_plugin_index == original_index
 
+    def test_never_writes_the_index_even_temporarily(self) -> None:
+        """B4: the dashboard peeks without the config lock, so a temporary
+        write-and-restore could undo the refresh thread's advance."""
+        writes: list[Any] = []
+
+        class RecordingPlaylist(Playlist):
+            def __setattr__(self, name: str, value: Any) -> None:
+                if name == "current_plugin_index":
+                    writes.append(value)
+                super().__setattr__(name, value)
+
+        pl = RecordingPlaylist(
+            name="Test",
+            start_time="00:00",
+            end_time="24:00",
+            plugins=[
+                _plugin_dict("a"),
+                _plugin_dict("b", snooze_until=_future_snooze()),
+                _plugin_dict("c"),
+            ],
+            current_plugin_index=0,
+        )
+        writes.clear()
+        result = pl.peek_next_eligible_plugin(datetime.now(UTC))
+        assert result is not None and result.plugin_id == "c"
+        assert writes == []
+
+    def test_skip_predicate_passes_over_candidates(self) -> None:
+        plugins = [_plugin_dict("a"), _plugin_dict("b"), _plugin_dict("c")]
+        pl = _make_playlist("00:00", "24:00", plugins=plugins, index=0)
+        result = pl.peek_next_eligible_plugin(
+            datetime.now(UTC), skip=lambda inst: inst.plugin_id == "b"
+        )
+        assert result is not None and result.plugin_id == "c"
+        assert pl.current_plugin_index == 0
+
+    def test_skip_wraps_around_to_the_current_slot(self) -> None:
+        plugins = [_plugin_dict("a"), _plugin_dict("b")]
+        pl = _make_playlist("00:00", "24:00", plugins=plugins, index=0)
+        result = pl.peek_next_eligible_plugin(
+            datetime.now(UTC), skip=lambda inst: inst.plugin_id == "b"
+        )
+        assert result is not None and result.plugin_id == "a"
+
+    def test_skip_everything_returns_none(self) -> None:
+        plugins = [_plugin_dict("a"), _plugin_dict("b")]
+        pl = _make_playlist("00:00", "24:00", plugins=plugins, index=1)
+        assert (
+            pl.peek_next_eligible_plugin(datetime.now(UTC), skip=lambda _: True) is None
+        )
+        assert pl.current_plugin_index == 1
+
+    def test_peek_matches_the_advance(self) -> None:
+        plugins = [
+            _plugin_dict("a"),
+            _plugin_dict("b", snooze_until=_future_snooze()),
+            _plugin_dict("c"),
+        ]
+        for index in (None, 0, 1, 2, 7):
+            pl = _make_playlist("00:00", "24:00", plugins=plugins, index=index)
+            now = datetime.now(UTC)
+            peeked = pl.peek_next_eligible_plugin(now)
+            advanced = pl.get_next_eligible_plugin(now)
+            assert peeked is advanced, index
+
 
 # ---------------------------------------------------------------------------
 # Playlist.reorder_plugins()
