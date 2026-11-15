@@ -16,7 +16,7 @@ import uuid
 
 import pytest
 from flask.testing import FlaskClient
-from playwright.sync_api import Page
+from playwright.sync_api import Page, expect
 
 pytestmark = [
     pytest.mark.journey,
@@ -65,8 +65,6 @@ def test_api_key_add_edit_delete_roundtrip(
         # ---- Step 1: navigate to /api-keys (generic mode) ----
         page = browser_page
         rc = navigate_and_wait(page, live_server, "/api-keys")
-        # Stub window.alert/confirm so JS `confirm()` in deleteRow doesn't hang.
-        page.evaluate("window.confirm = () => true;" "window.alert = () => undefined;")
         # Prevent the post-save reload from racing Playwright — we'll reload
         # explicitly so we control timing.
         page.evaluate("window.location.reload = () => {};")
@@ -149,13 +147,14 @@ def test_api_key_add_edit_delete_roundtrip(
         # And the underlying value matches the edit.
         assert _read_env_keys(env_path).get(key_name) == _FAKE_KEY_VALUE_EDITED
 
-        # ---- Step 11+12: delete via the UI. The confirm() dialog is stubbed
-        # to return true above, so clicking the delete button removes the row
-        # immediately; we then save to persist the deletion.
+        # ---- Step 11+12: delete via the UI. Delete asks first in the page's
+        # own dialog; confirming removes the row, and Save persists that.
         target_row = page.locator(
             f".apikey-row[data-existing='true']:has(.apikey-key[value='{key_name}'])"
         ).first
         target_row.locator(".btn-delete").click()
+        page.locator("#confirmApiKeyBtn").click()
+        expect(target_row).to_have_count(0)
         with page.expect_response(
             lambda r: "/api-keys/save" in r.url and r.request.method == "POST"
         ) as del_info:
