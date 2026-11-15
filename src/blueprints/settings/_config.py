@@ -41,14 +41,17 @@ _ALLOWED_IMPORT_CONFIG_KEYS = frozenset(
     }
 )
 
-_ALLOWED_IMPORT_ENV_KEYS = frozenset(
+# The provider keys plugins read; a keyed backup exports and imports exactly
+# these, so a restore brings back every key a plugin needs.
+_BACKUP_ENV_KEYS = frozenset(
     {
-        "OPEN_AI_SECRET",
-        "OPEN_WEATHER_MAP_SECRET",
-        "NASA_SECRET",
-        "UNSPLASH_ACCESS_KEY",
         "GITHUB_SECRET",
         "GOOGLE_AI_SECRET",
+        "IMMICH_KEY",
+        "NASA_SECRET",
+        "OPEN_AI_SECRET",
+        "OPEN_WEATHER_MAP_SECRET",
+        "UNSPLASH_ACCESS_KEY",
     }
 )
 
@@ -165,6 +168,7 @@ def settings_page() -> ResponseReturnValue:
         device_settings=device_config.get_config(),
         timezones=timezones,
         active_nav="settings",
+        pin_enabled=bool(current_app.config.get("AUTH_ENABLED")),
     )
 
 
@@ -189,6 +193,7 @@ def backup_restore_page() -> ResponseReturnValue:
         device_settings=device_config.get_config(),
         timezones=sorted(available_timezones()),
         active_nav="settings",
+        pin_enabled=bool(current_app.config.get("AUTH_ENABLED")),
     )
 
 
@@ -220,6 +225,14 @@ def export_settings() -> ResponseReturnValue:
         hint="Check config readability.",
     ):
         include_keys = _include_export_keys()
+        if include_keys and not current_app.config.get("AUTH_ENABLED"):
+            # Without a PIN every page is open to the whole network, so a
+            # keyed backup would hand every stored API key to any device on it.
+            return json_error(
+                "Set a PIN before including API keys in a backup. Without one, "
+                "anyone on your network could download them.",
+                status=403,
+            )
         device_config = current_app.config["DEVICE_CONFIG"]
 
         # Build export object with config plus env keys when requested
@@ -227,16 +240,8 @@ def export_settings() -> ResponseReturnValue:
             "config": device_config.get_config(),
         }
         if include_keys:
-            # Include known API keys and possibly other keys
             keys = {}
-            for k in (
-                "OPEN_AI_SECRET",
-                "OPEN_WEATHER_MAP_SECRET",
-                "NASA_SECRET",
-                "UNSPLASH_ACCESS_KEY",
-                "GITHUB_SECRET",
-                "GOOGLE_AI_SECRET",
-            ):
+            for k in sorted(_BACKUP_ENV_KEYS):
                 try:
                     v = device_config.load_env_key(k)
                 except Exception:
@@ -331,7 +336,7 @@ def import_settings() -> ResponseReturnValue:
         env_keys = payload.get("env_keys") or {}
         if isinstance(env_keys, dict):
             for k, v in env_keys.items():
-                if k not in _ALLOWED_IMPORT_ENV_KEYS or v is None:
+                if k not in _BACKUP_ENV_KEYS or v is None:
                     continue
                 try:
                     device_config.set_env_key(k, str(v))

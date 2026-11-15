@@ -87,6 +87,7 @@ class TestExportEdge:
         monkeypatch: pytest.MonkeyPatch,
     ) -> Any:
         """One key raising during export → others still exported."""
+        monkeypatch.setitem(client.application.config, "AUTH_ENABLED", True)
 
         call_count = 0
         original = device_config_dev.load_env_key

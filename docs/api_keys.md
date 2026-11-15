@@ -46,10 +46,16 @@ over SSH:
 sudo nano /usr/local/inkypi/.env
 ```
 
-`.env` holds API keys only. It isn't loaded when the service starts, so
-`INKYPI_*` settings belong in a systemd drop-in instead
+`.env` holds API keys only. The app reads each key from it when a plugin
+needs one and never loads the file into its environment, so other settings
+in it (`INKYPI_*`, `HTTPS_PROXY`, `OPENAI_BASE_URL`) have no effect. Put
+`INKYPI_*` settings in a systemd drop-in instead
 (`sudo systemctl edit inkypi`, then `Environment=NAME=value` under
 `[Service]`).
+
+**Backups.** Settings → Backup can include your API keys, but only when a PIN
+is set (see [auth.md](auth.md)). Without a PIN every page is open to anything
+on your network, so a backup with keys in it would be too.
 
 ## OpenAI Key
 

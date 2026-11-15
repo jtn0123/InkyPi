@@ -22,7 +22,8 @@ def test_export_excludes_api_keys_by_default(
 def test_export_includes_api_keys_when_opted_in(
     client: FlaskClient, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    # Arrange env keys
+    # A PIN is set (the login guard itself is covered by the auth tests).
+    monkeypatch.setitem(client.application.config, "AUTH_ENABLED", True)
     device_config_dev.set_env_key("OPEN_AI_SECRET", "sk-test")
     device_config_dev.set_env_key("OPEN_WEATHER_MAP_SECRET", "owm")
 
@@ -36,6 +37,50 @@ def test_export_includes_api_keys_when_opted_in(
     env_keys = payload.get("env_keys")
     assert env_keys and env_keys.get("OPEN_AI_SECRET") == "sk-test"
     assert env_keys.get("OPEN_WEATHER_MAP_SECRET") == "owm"
+
+
+def test_export_refuses_api_keys_without_a_pin(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
+    """With no PIN every page is open to the network, so keys stay home."""
+    device_config_dev.set_env_key("OPEN_AI_SECRET", "sk-do-not-leak")
+
+    resp = client.post("/settings/export", json={"include_keys": True})
+
+    assert resp.status_code == 403
+    body = resp.get_json()
+    assert body["success"] is False
+    assert "PIN" in body["error"]
+    assert "sk-do-not-leak" not in resp.get_data(as_text=True)
+
+
+def test_a_keyed_backup_round_trips_every_plugin_key(
+    client: FlaskClient, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Every key a plugin reads goes out in the backup and comes back in."""
+    monkeypatch.setitem(client.application.config, "AUTH_ENABLED", True)
+    device_config_dev.set_env_key("IMMICH_KEY", "immich-1")
+
+    exported = client.post("/settings/export", json={"include_keys": True})
+    env_keys = exported.get_json()["data"]["env_keys"]
+    assert env_keys == {"IMMICH_KEY": "immich-1"}
+
+    device_config_dev.unset_env_key("IMMICH_KEY")
+    resp = client.post("/settings/import", json={"env_keys": env_keys})
+    assert resp.status_code == 200
+    assert device_config_dev.load_env_key("IMMICH_KEY") == "immich-1"
+
+
+@pytest.mark.parametrize("pin_enabled", [True, False])
+def test_the_include_keys_switch_needs_a_pin(
+    client: FlaskClient, monkeypatch: pytest.MonkeyPatch, pin_enabled: bool
+) -> None:
+    monkeypatch.setitem(client.application.config, "AUTH_ENABLED", pin_enabled)
+    html = client.get("/settings").get_data(as_text=True)
+    start = html.index('id="includeKeys"')
+    switch = html[start : html.index(">", start)]
+    assert ("disabled" in switch) is not pin_enabled
+    assert ("Needs a PIN" in html) is not pin_enabled
 
 
 def test_export_excludes_api_keys_when_opted_out(client: FlaskClient) -> None:
