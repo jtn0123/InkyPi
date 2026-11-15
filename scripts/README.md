@@ -57,6 +57,7 @@ Developer, CI and device tools. Run them from the repo root. Python scripts add
 | `check_links.py` | Re-checks links that the Lychee link checker reported as throttled. |
 | `check_requirements_drift.sh` | Checks that the exported lockfile matches `uv.lock`. |
 | `mypy_src_baseline.txt`, `mypy_tests_baseline.txt` | The mypy error ratchets used by `lint.sh`. |
+| `mypy_strict_files.py` | Prints the strict mypy subset from `mypy.ini` for `lint.sh`. |
 
 ## Install and Pi images
 
