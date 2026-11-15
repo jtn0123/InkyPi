@@ -7570,7 +7570,8 @@ body[data-page="settings"] .settings-device-name {
 #deletePlaylistModal,
 #deleteInstanceModal,
 #deleteHistoryModal,
-#clearHistoryModal {
+#clearHistoryModal,
+#confirmApiKeyModal {
     background-color: var(--modal-overlay-destructive, rgba(5, 8, 12, 0.82));
 }
 

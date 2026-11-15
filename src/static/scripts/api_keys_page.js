@@ -328,8 +328,52 @@
       }
     }
 
-    async function deleteKey(keyName) {
-      if (!confirm(`Delete the ${keyName} API key? This cannot be undone.`)) return;
+    // Ask in the page's own dialog, not window.confirm(): that one ignores the
+    // theme, and headless browsers answer it "no" without showing it. Cancel
+    // has focus, so Enter on a stray keypress does not delete anything.
+    function askToConfirm({ title, message, confirmLabel }, triggerEl) {
+      const modal = document.getElementById("confirmApiKeyModal");
+      const okBtn = document.getElementById("confirmApiKeyBtn");
+      if (!modal || !okBtn) return Promise.resolve(false);
+      document.getElementById("confirmApiKeyTitle").textContent = title;
+      document.getElementById("confirmApiKeyText").textContent = message;
+      okBtn.textContent = confirmLabel;
+      return new Promise((resolve) => {
+        const listening = new AbortController();
+        const finish = (answer) => {
+          listening.abort();
+          modal.hidden = true;
+          modal.classList.remove("is-open");
+          document.body.classList.remove("modal-open");
+          globalThis.InkyPiModalFocus?.deactivate(modal);
+          resolve(answer);
+        };
+        const on = (el, handler) =>
+          el?.addEventListener("click", handler, { signal: listening.signal });
+        on(okBtn, () => finish(true));
+        on(document.getElementById("cancelApiKeyBtn"), () => finish(false));
+        on(document.getElementById("closeConfirmApiKeyBtn"), () => finish(false));
+        on(modal, (event) => {
+          if (event.target === modal) finish(false);
+        });
+        modal.hidden = false;
+        modal.classList.add("is-open");
+        document.body.classList.add("modal-open");
+        globalThis.InkyPiModalFocus?.activate(modal, triggerEl, () => finish(false));
+        document.getElementById("cancelApiKeyBtn")?.focus();
+      });
+    }
+
+    async function deleteKey(keyName, triggerEl) {
+      const confirmed = await askToConfirm(
+        {
+          title: "Delete API key",
+          message: `Delete the ${keyName} API key? This cannot be undone.`,
+          confirmLabel: "Delete",
+        },
+        triggerEl
+      );
+      if (!confirmed) return;
       const data = new FormData();
       data.append("key", keyName);
       try {
@@ -466,12 +510,20 @@
       });
     }
 
-    function deleteRow(rowOrButton) {
+    async function deleteRow(rowOrButton) {
       const row = rowOrButton.closest ? rowOrButton.closest(".apikey-row") : rowOrButton;
       const keyInput = row?.querySelector(".apikey-key");
       const deletedKey = keyInput ? keyInput.value.trim() : "";
       if (row?.dataset.existing === "true" && deletedKey) {
-        if (!confirm(`Remove ${deletedKey}? Save to apply.`)) return;
+        const confirmed = await askToConfirm(
+          {
+            title: "Remove API key",
+            message: `Remove ${deletedKey}? It is deleted when you save.`,
+            confirmLabel: "Remove",
+          },
+          rowOrButton.closest ? rowOrButton : null
+        );
+        if (!confirmed) return;
       }
       markDirty();
       row?.remove();
@@ -675,7 +727,7 @@
         if (action === "add-row") {
           addRow();
         } else if (action === "delete-key") {
-          deleteKey(actionEl.dataset.keyName);
+          deleteKey(actionEl.dataset.keyName, actionEl);
         } else if (action === "delete-row") {
           deleteRow(actionEl);
         } else if (action === "add-preset") {

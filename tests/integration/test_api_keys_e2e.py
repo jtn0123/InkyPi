@@ -4,7 +4,7 @@ from __future__ import annotations
 import os
 
 import pytest
-from playwright.sync_api import Page
+from playwright.sync_api import Dialog, Page, Request
 
 pytestmark = pytest.mark.skipif(
     os.getenv("SKIP_UI", "").lower() in ("1", "true"),
@@ -87,3 +87,108 @@ def test_api_key_managed_fields_exist(live_server: str, browser_page: Page) -> N
     ), "Managed API keys page should have provider input fields"
 
     rc.assert_no_errors(name="api_key_managed_fields")
+
+
+def _store_nasa_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Put NASA_SECRET in the test .env. setenv makes teardown remove the copy
+    that load_dotenv puts in os.environ."""
+    env_file = os.path.join(os.environ["PROJECT_DIR"], ".env")
+    with open(env_file, "w", encoding="utf-8") as fh:
+        fh.write("NASA_SECRET=test-nasa-key\n")
+    monkeypatch.setenv("NASA_SECRET", "test-nasa-key")
+
+
+def _record_native_dialogs(page: Page) -> list[str]:
+    """Dismiss and record any alert/confirm/prompt the page opens."""
+    seen: list[str] = []
+
+    def dismiss(dialog: Dialog) -> None:
+        seen.append(dialog.message)
+        dialog.dismiss()
+
+    page.on("dialog", dismiss)
+    return seen
+
+
+def test_removing_a_saved_key_row_asks_in_the_page_dialog(
+    live_server: str, browser_page: Page, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Escape keeps the row and returns focus; Remove takes it out and arms Save."""
+    from playwright.sync_api import expect
+
+    _store_nasa_key(monkeypatch)
+    page = browser_page
+    rc = navigate_and_wait(page, live_server, "/api-keys")
+    native_dialogs = _record_native_dialogs(page)
+
+    row = page.locator('.apikey-row:has(.apikey-key[value="NASA_SECRET"])')
+    delete_btn = row.locator('[data-api-action="delete-row"]')
+    modal = page.locator("#confirmApiKeyModal")
+
+    delete_btn.click()
+    expect(modal).to_be_visible()
+    expect(page.locator("#confirmApiKeyText")).to_have_text(
+        "Remove NASA_SECRET? It is deleted when you save."
+    )
+    expect(page.locator("#cancelApiKeyBtn")).to_be_focused()
+    page.keyboard.press("Escape")
+    expect(modal).to_be_hidden()
+    expect(row).to_have_count(1)
+    expect(delete_btn).to_be_focused()
+    expect(page.locator("#saveApiKeysBtn")).to_be_disabled()
+
+    delete_btn.click()
+    page.locator("#confirmApiKeyBtn").click()
+    expect(modal).to_be_hidden()
+    expect(row).to_have_count(0)
+    expect(page.locator("#saveApiKeysBtn")).to_be_enabled()
+    assert native_dialogs == [], native_dialogs
+    rc.assert_no_errors(name="api_key_remove_row_dialog")
+
+
+def test_deleting_a_managed_key_asks_first_and_cancel_sends_nothing(
+    live_server: str, browser_page: Page, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Cancel sends no request; Delete posts the key name and reports success."""
+    from playwright.sync_api import expect
+
+    _store_nasa_key(monkeypatch)
+    page = browser_page
+    rc = navigate_and_wait(page, live_server, "/settings/api-keys")
+    native_dialogs = _record_native_dialogs(page)
+    deletes: list[str | None] = []
+
+    def record_delete(request: Request) -> None:
+        if request.url.endswith("/settings/delete_api_key"):
+            deletes.append(request.post_data)
+
+    page.on("request", record_delete)
+
+    page.locator('[data-api-action="reveal-input"][data-input-id="nasa-input"]').click()
+    delete_btn = page.locator(
+        '[data-api-action="delete-key"][data-key-name="NASA_SECRET"]'
+    )
+    modal = page.locator("#confirmApiKeyModal")
+
+    delete_btn.click()
+    expect(modal).to_be_visible()
+    expect(page.locator("#confirmApiKeyText")).to_have_text(
+        "Delete the NASA_SECRET API key? This cannot be undone."
+    )
+    page.locator("#cancelApiKeyBtn").click()
+    expect(modal).to_be_hidden()
+    page.wait_for_timeout(200)
+    assert deletes == [], "Cancel must not send the delete request"
+
+    delete_btn.click()
+    with page.expect_response(
+        is_response_to("POST", "/settings/delete_api_key")
+    ) as info:
+        page.locator("#confirmApiKeyBtn").click()
+    assert info.value.ok, f"delete returned {info.value.status}"
+    assert len(deletes) == 1 and "NASA_SECRET" in (deletes[0] or "")
+    expect(page.locator(".toast.success .toast-content")).to_have_text(
+        "Success! Deleted NASA_SECRET."
+    )
+    assert native_dialogs == [], native_dialogs
+    rc.assert_no_errors(name="api_key_delete_managed_dialog")
