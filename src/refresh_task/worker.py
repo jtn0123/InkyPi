@@ -12,7 +12,12 @@ from datetime import datetime
 from typing import TYPE_CHECKING, NotRequired, Protocol, TypedDict, cast
 
 from plugins.plugin_registry import get_plugin_instance, load_plugins
-from refresh_task.actions import PluginLike, RefreshAction, StateDelta
+from refresh_task.actions import (
+    PluginLike,
+    RefreshAction,
+    StateDelta,
+    render_with_metadata,
+)
 from refresh_task.context import RefreshContext, SupportsRefreshConfig
 from utils.image_utils import FAST_PNG_COMPRESS_LEVEL
 from utils.logging_utils import redact_secrets
@@ -300,11 +305,9 @@ def _execute_refresh_attempt_worker(
             get_plugin_instance,
         )
         plugin = plugin_loader(plugin_config)
-        image = refresh_action.execute(plugin, child_config, current_dt)
-        plugin_meta = None
-        if hasattr(plugin, "get_latest_metadata"):
-            metadata_getter = cast(Callable[[], object], plugin.get_latest_metadata)
-            plugin_meta = metadata_getter()
+        image, plugin_meta = render_with_metadata(
+            refresh_action, plugin, child_config, current_dt
+        )
         state_delta = _collect_state_delta(refresh_action)
         if image is None:
             # A control-only plugin produced no image on purpose — a completed

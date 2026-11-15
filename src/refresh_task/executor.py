@@ -14,7 +14,7 @@ from typing import Any, Protocol, cast
 
 from PIL import Image
 
-from refresh_task.actions import RefreshAction, StateDelta
+from refresh_task.actions import RefreshAction, StateDelta, render_with_metadata
 from refresh_task.context import RefreshContext
 from refresh_task.recorder import RefreshRecorder
 from refresh_task.worker import (
@@ -322,10 +322,9 @@ class RefreshExecutor:
         ) -> None:
             try:
                 plugin = get_plugin_instance(dict(plugin_config))
-                image = refresh_action.execute(plugin, device_config, current_dt)
-                meta = None
-                if hasattr(plugin, "get_latest_metadata"):
-                    meta = plugin.get_latest_metadata()
+                image, meta = render_with_metadata(
+                    refresh_action, plugin, device_config, current_dt
+                )
                 holder["image"] = image
                 holder["meta"] = meta
             except Exception as exc:
