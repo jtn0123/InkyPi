@@ -150,7 +150,7 @@ class TestUploadRenderRespectsFitMode:
                 return default
 
         plugin = ImageUpload({"id": "image_upload"})
-        plugin.open_image = lambda _i, _locs: source  # type: ignore[method-assign]
+        plugin.open_image = lambda _i, _locs, **_kw: source  # type: ignore[method-assign]
         return plugin.generate_image(
             {"imageFiles[]": ["a.png"], **settings}, FakeDeviceConfig()
         )

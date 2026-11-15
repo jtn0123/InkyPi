@@ -43,6 +43,45 @@ def test_open_image_success(tmp_path: Path) -> None:
     assert isinstance(img, Image.Image)
 
 
+def _save_jpeg(path: Path, size: tuple[int, int], orientation: int = 1) -> None:
+    exif = Image.Exif()
+    exif[0x0112] = orientation
+    Image.new("RGB", size, (0, 0, 255)).save(path, "JPEG", exif=exif.tobytes())
+
+
+def test_open_image_applies_exif_orientation(tmp_path: Path) -> None:
+    # Uploads are stored as received, so the plugin must turn the photo upright.
+    p = tmp_path / "phone.jpg"
+    _save_jpeg(p, (40, 20), orientation=6)
+    u = image_upload_mod.ImageUpload({"id": "image_upload"})
+    img = u.open_image(0, [str(p)])
+    assert img.size == (20, 40)
+
+
+def test_open_image_size_hint_decodes_big_jpeg_smaller(tmp_path: Path) -> None:
+    p = tmp_path / "big.jpg"
+    _save_jpeg(p, (4000, 3000), orientation=6)
+    u = image_upload_mod.ImageUpload({"id": "image_upload"})
+    img = u.open_image(0, [str(p)], size_hint=(800, 480))
+    # Decoded at half scale, not 4000x3000, and still covers the panel's
+    # larger side in both directions after the EXIF rotation.
+    assert img.size == (1500, 2000)
+
+
+def test_generate_image_shows_a_rotated_upload_upright(tmp_path: Path) -> None:
+    # A portrait photo (stored landscape plus EXIF 6) on a portrait panel
+    # fills it with no padding, as it would if it were stored upright.
+    p = tmp_path / "portrait.jpg"
+    _save_jpeg(p, (200, 100), orientation=6)
+    u = image_upload_mod.ImageUpload({"id": "image_upload"})
+    img = u.generate_image(
+        {"imageFiles[]": [str(p)], "fitMode": "contain", "backgroundColor": "#ff0000"},
+        DummyDeviceConfig(resolution=(100, 200)),
+    )
+    assert img.size == (100, 200)
+    assert img.getpixel((50, 2))[:3] != (255, 0, 0)
+
+
 def test_open_image_no_images() -> None:
     u = image_upload_mod.ImageUpload({"id": "image_upload"})
     with pytest.raises(RuntimeError):

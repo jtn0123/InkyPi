@@ -204,40 +204,29 @@ def parse_form(request_form: Any) -> dict[str, Any]:
 
 
 def _process_uploaded_file(extension: str, file_path: str, content: bytes) -> None:
-    """Persist an uploaded file, applying type-specific validation.
+    """Persist an uploaded file exactly as received.
 
-    - PDFs are written as-is.
-    - JPEG files are EXIF-transposed before saving.
-    - All other images are verified by the decoder before writing.
+    Images are checked by the decoder first (``verify()`` reads the headers
+    without decoding pixels). Nothing is decoded or re-encoded here: a large
+    phone photo would otherwise take hundreds of MB in the web process, and
+    the image would lose quality. EXIF orientation stays in the file and is
+    applied when the photo is rendered.
 
     Raises RuntimeError on invalid image content.
     """
-    if extension == "pdf":
-        with open(file_path, "wb") as out:
-            out.write(content)
-        return
+    if extension != "pdf":
+        from PIL import Image
 
-    from PIL import Image, ImageOps
+        from utils.image_loader import _ensure_heif_opener
 
-    from utils.image_loader import _ensure_heif_opener
-
-    _ensure_heif_opener()
-    if extension in {"jpg", "jpeg"}:
-        try:
-            with Image.open(BytesIO(content)) as opened:
-                img = ImageOps.exif_transpose(opened)
-                img.save(file_path)
-        except (OSError, ValueError) as e:
-            raise RuntimeError("Invalid image upload") from e
-    else:
-        # Verify decoder can read it before persisting.
+        _ensure_heif_opener()
         try:
             with Image.open(BytesIO(content)) as img_verify:
                 img_verify.verify()
         except (OSError, ValueError) as e:
             raise RuntimeError("Invalid image upload") from e
-        with open(file_path, "wb") as out:
-            out.write(content)
+    with open(file_path, "wb") as out:
+        out.write(content)
 
 
 _ALLOWED_FILE_EXTENSIONS = {
@@ -387,12 +376,17 @@ def _rewind_file_stream(file: Any) -> None:
         logger.debug("Failed to rewind file stream", exc_info=True)
 
 
+def get_upload_dir() -> str:
+    """Return the folder uploaded files are saved in."""
+    return resolve_path(os.path.join("static", "images", "saved"))
+
+
 def _save_uploaded_file(
     file: Any, file_name: str, extension: str, content: bytes
 ) -> str:
     """Persist the uploaded file and return its path on disk."""
     safe_name = os.path.basename(file_name)
-    file_save_dir = resolve_path(os.path.join("static", "images", "saved"))
+    file_save_dir = get_upload_dir()
     os.makedirs(file_save_dir, exist_ok=True)
     # Prefix with timestamp to avoid silent overwrites from duplicate filenames
     unique_name = f"{int(time.time())}_{safe_name}"

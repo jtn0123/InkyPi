@@ -477,26 +477,27 @@ def test_handle_request_files_no_extension_skipped(
     assert "file" not in result
 
 
-def test_handle_request_files_jpeg_exif_rotation(
+def test_handle_request_files_keeps_jpeg_bytes_and_orientation(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """JPEG uploads should have EXIF rotation applied via exif_transpose."""
+    """A JPEG upload is stored exactly as sent, EXIF orientation included.
+
+    Decoding, rotating and re-encoding it here cost hundreds of MB for a big
+    phone photo inside the web process; the plugin rotates it at render time.
+    """
     monkeypatch.setenv("SRC_DIR", str(tmp_path))
-    # Create a valid JPEG image
+    exif = Image.Exif()
+    exif[0x0112] = 6  # shown rotated 90 degrees clockwise
     bio = BytesIO()
-    Image.new("RGB", (20, 10), "blue").save(bio, format="JPEG")
+    Image.new("RGB", (20, 10), "blue").save(bio, format="JPEG", exif=exif.tobytes())
     content = bio.getvalue()
 
-    f = FakeFile("photo.jpg", content)
-    files = FakeFiles([("file", f)])
+    result = app_utils.handle_request_files(
+        FakeFiles([("file", FakeFile("photo.jpg", content))])
+    )
 
-    result = app_utils.handle_request_files(files)
-    assert "file" in result
-    saved_path = result["file"]
-    assert os.path.exists(saved_path)
-    # Verify it's a valid image
-    with Image.open(saved_path) as img:
-        assert img.size[0] > 0
+    with open(result["file"], "rb") as fh:
+        assert fh.read() == content
 
 
 def test_handle_request_files_pdf_saved_as_is(

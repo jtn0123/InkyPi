@@ -101,3 +101,15 @@ def test_commit_message_hook_is_installed_by_default() -> None:
     config = yaml.safe_load(CONFIG.read_text())
     assert "commit-msg" in config["default_install_hook_types"]
     assert re.search(r"stages: \[commit-msg\]", CONFIG.read_text())
+
+
+def test_build_css_hook_runs_when_a_partial_changes() -> None:
+    # main.css is committed and CI doesn't rebuild it, so editing a partial
+    # must rebuild it before the commit lands.
+    hook = _hooks()["build-css"]
+    assert hook["entry"] == "scripts/precommit_tool.sh python scripts/build_css.py"
+    assert hook["pass_filenames"] is False
+    files = re.compile(hook["files"])
+    assert files.search("src/static/styles/partials/_reset.css")
+    assert files.search("src/static/styles/_imports.css")
+    assert not files.search("src/static/styles/main.css")

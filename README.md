@@ -224,14 +224,9 @@ The web UI's "Update" button uses the same path. For branch tracking, use `git p
 
 ## Development
 
-```bash
-python3.13 -m venv .venv  # InkyPi supports Python 3.13 only
-source .venv/bin/activate
-pip install -r install/requirements-dev.txt
-.venv/bin/python src/inkypi.py --dev --web-only
-```
-
-Dev server runs on port 8080. See [CONTRIBUTING.md](./CONTRIBUTING.md) and [development.md](./docs/development.md) for full details.
+Set up and start the dev server (port 8080) with the steps in
+[development.md → Setup](./docs/development.md#setup). See
+[CONTRIBUTING.md](./CONTRIBUTING.md) for the PR process.
 
 ### Testing
 

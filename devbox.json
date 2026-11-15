@@ -23,7 +23,7 @@
         "python src/inkypi.py --dev",
       ],
       "test": [
-        "pytest",
+        "bash scripts/test.sh",
       ],
     },
   },

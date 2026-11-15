@@ -9,8 +9,10 @@ from typing import Protocol, cast
 
 from PIL import Image
 
+from utils.app_utils import get_upload_dir
 from utils.fallback_image import render_error_image
 from utils.history_cleanup import RetentionPolicy, apply_retention
+from utils.upload_cleanup import prune_unreferenced_uploads
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +24,7 @@ class SupportsHousekeeping(Protocol):
     processed_image_file: str
     current_image_file: str
 
-    def get_config(self, key: str, default: object = ...) -> object: ...
+    def get_config(self, key: str | None = None, default: object = ...) -> object: ...
 
     def get_resolution(self) -> tuple[int, int]: ...
 
@@ -68,6 +70,24 @@ class RefreshHousekeeper:
             apply_retention(self.device_config.history_image_dir, policy)
         except Exception:
             logger.exception("history_cleanup: unexpected error during cleanup")
+
+    def maybe_prune_uploads(
+        self, *, tick_count: int, cleanup_interval_ticks: int
+    ) -> None:
+        """Delete uploaded photos no setting refers to, without raising."""
+        if tick_count % cleanup_interval_ticks != 0:
+            return
+        try:
+            snapshots: list[object] = [self.device_config.get_config()]
+            # The live playlists too, in case a change isn't written yet.
+            get_manager = getattr(self.device_config, "get_playlist_manager", None)
+            if callable(get_manager):
+                snapshots.append(get_manager().to_dict())
+            # Every reference is collected before anything is deleted, so a
+            # failure here (say, a concurrent edit) deletes nothing.
+            prune_unreferenced_uploads(get_upload_dir(), snapshots)
+        except Exception:
+            logger.exception("upload_cleanup: unexpected error during cleanup")
 
     def maybe_prune_benchmarks(
         self, *, tick_count: int, cleanup_interval_ticks: int

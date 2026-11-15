@@ -61,8 +61,6 @@ jobs:
           pip install -r install/requirements.txt -r install/requirements-dev.txt
       - name: Install Playwright Chromium
         run: python -m playwright install --with-deps chromium
-      - name: Build CSS
-        run: python scripts/build_css.py
       - name: Regenerate baselines
         env:
           REQUIRE_BROWSER_SMOKE: '1'

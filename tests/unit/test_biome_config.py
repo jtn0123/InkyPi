@@ -89,6 +89,16 @@ def test_hook_and_ci_lint_the_same_files() -> None:
     hook = _hook_repo()["hooks"][0]
     assert re.match(hook["files"], "src/static/scripts/playlist/form.js")
     assert not re.match(hook["files"], "tests/fixtures/async_refresh_probe.js")
+    # The service worker sits outside scripts/ and is linted too.
+    assert "src/static/sw.js" in includes
+    assert re.match(hook["files"], "src/static/sw.js")
+
+
+def test_local_lint_runs_biome_like_ci() -> None:
+    # A green scripts/lint.sh must mean a green CI lint job, which runs Biome.
+    lint = (REPO_ROOT / "scripts" / "lint.sh").read_text()
+    assert "pre-commit run biome-ci --all-files" in lint
+    assert "BIOME_EXIT -ne 0" in lint
 
 
 def test_declared_globals_are_published() -> None:

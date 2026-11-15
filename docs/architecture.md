@@ -127,14 +127,14 @@ Logic the blueprints call directly, kept out of the route modules:
 
 The background refresh loop. `RefreshTask` (`task.py`) owns the thread, the loop in `_run`, and the plugin execution wrappers; the rest of its behaviour is split into mixins and helpers:
 
-- `loop_scheduling.py` (`SchedulingMixin`) — trigger waits, next-plugin selection, the watchdog stall gate, history cleanup and system stats.
+- `loop_scheduling.py` (`SchedulingMixin`) — trigger waits, next-plugin selection, the watchdog stall gate, history and upload cleanup, and system stats.
 - `command_queue.py` (`CommandQueueMixin`) — `manual_update()`, `run_display_command()`, and per-plugin timeouts.
 - `refresh_cycle.py` (`RefreshCycleMixin`) — one refresh, `_perform_refresh`, from generate through display and record.
 - `health_hooks.py` (`PluginHealthMixin`) and `health.py` (`PluginHealthTracker`) — success/failure counts, the circuit breaker, probe retries and crash quarantine.
 - `executor.py` (`RefreshExecutor`) — retry, timeout and isolation policy (an attempt stopped at its time limit is not retried: a second try doubles the wait, and for an AI image the bill); `worker.py` — the child-process entry point and `_get_mp_context`; `context.py` — the picklable `RefreshContext` the child rebuilds `Config` from.
 - `actions.py` — `RefreshAction` and its subclasses (`PlaylistRefresh`, `ManualRefresh`, `DisplayCommand`) and the `ManualUpdateRequest` queue entry.
 - `scheduler.py` (`RefreshScheduler`) — the condition wait and watchdog cadence; `schedule.py` — pure next-due maths used by the scheduler and next-plugin selection.
-- `display_pipeline.py` (`DisplayPipeline`) — the display push, cache skip and image-saved signal; `housekeeping.py` (`RefreshHousekeeper`) — history cleanup, history metadata and the fallback image push; `recorder.py` (`RefreshRecorder`) — progress events, SSE events and benchmark writes.
+- `display_pipeline.py` (`DisplayPipeline`) — the display push, cache skip and image-saved signal; `housekeeping.py` (`RefreshHousekeeper`) — history cleanup, deleting unused uploads (`utils/upload_cleanup.py`), history metadata and the fallback image push; `recorder.py` (`RefreshRecorder`) — progress events, SSE events and benchmark writes.
 - `plugin_lookup.py` — the single place the loop resolves `get_plugin_instance`; `job_queue.py` — the thread pool behind async `/update_now`.
 
 ### `src/plugins/`
