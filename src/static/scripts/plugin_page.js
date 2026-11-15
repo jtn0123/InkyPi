@@ -701,7 +701,10 @@
       setPluginSubtab(id);
       try {
         const scrollTarget = document.getElementById("scheduleForm") || panel;
-        scrollTarget.scrollIntoView({ behavior: "smooth", block: "start" });
+        scrollTarget.scrollIntoView({
+          behavior: globalThis.InkyPiTheme?.scrollBehavior() ?? "smooth",
+          block: "start",
+        });
       } catch {
         // scrollIntoView can throw if the panel was detached between the
         // lookup above and this call; the subtab switch itself already

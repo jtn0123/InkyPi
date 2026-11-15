@@ -198,7 +198,10 @@
       firstInvalid.focus();
       if (typeof firstInvalid.scrollIntoView === "function") {
         try {
-          firstInvalid.scrollIntoView({ block: "center", behavior: "smooth" });
+          firstInvalid.scrollIntoView({
+            block: "center",
+            behavior: globalThis.InkyPiTheme?.scrollBehavior() ?? "smooth",
+          });
         } catch {
           firstInvalid.scrollIntoView();
         }

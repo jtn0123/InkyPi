@@ -92,11 +92,26 @@
     document.documentElement.setAttribute("data-theme", earlyTheme);
   } catch (e) {}
 
+  // Scrolls the app starts itself (jumping to a section, revealing a panel)
+  // follow the system "reduce motion" setting. The stylesheet's
+  // prefers-reduced-motion rule can't do it: an explicit
+  // scrollIntoView({ behavior: "smooth" }) overrides CSS.
+  function scrollBehavior() {
+    try {
+      return window.matchMedia("(prefers-reduced-motion: reduce)").matches
+        ? "auto"
+        : "smooth";
+    } catch (e) {
+      return "smooth";
+    }
+  }
+
   window.InkyPiTheme = {
     applyTheme,
     getPreferredTheme,
     getStoredTheme,
     init,
+    scrollBehavior,
     toggleTheme,
   };
   window.toggleDarkMode = toggleTheme;
