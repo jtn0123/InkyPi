@@ -9,12 +9,17 @@ Covers:
 * Both plain-text (str) and JSON formatter output
 * record.args (positional tuple and keyword dict)
 * Extra attributes attached by callers
+* Tracebacks, credential query parameters and Client-ID headers
+* setup_logging() masks records from child loggers on every handler
 """
 
 from __future__ import annotations
 
+import io
 import json
 import logging
+import sys
+from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
@@ -108,6 +113,47 @@ class TestRedactHelper:
         assert "192.168.1.1" in result
         assert "TOPSECRETKEY123" not in result
 
+    @pytest.mark.parametrize(
+        ("text", "secret", "kept"),
+        [
+            (
+                "GET /planetary/apod?api_key=NASAKEY1234567890XYZ&date=2026-04-24",  # gitleaks:allow
+                "NASAKEY1234567890XYZ",
+                "date=2026-04-24",
+            ),
+            (
+                "onecall?lat=1&lon=2&appid=OWMAPPID12345&units=metric",  # gitleaks:allow
+                "OWMAPPID12345",
+                "units=metric",
+            ),
+            (
+                "photos/random?client_id=UNSPLASHKEY987&per_page=100",  # gitleaks:allow
+                "UNSPLASHKEY987",
+                "per_page=100",
+            ),
+            (
+                "maps/api?key=GOOGLEKEY555&zoom=3",  # gitleaks:allow
+                "GOOGLEKEY555",
+                "zoom=3",
+            ),
+            (
+                "{'Authorization': 'Client-ID UNSPLASHKEY987'}",  # gitleaks:allow
+                "UNSPLASHKEY987",
+                "Authorization",
+            ),
+        ],
+        ids=["api_key", "appid", "client_id", "key-param", "client-id-header"],
+    )
+    def test_keys_in_urls_and_headers(self, text: str, secret: str, kept: str) -> None:
+        result = _redact(text)
+        assert secret not in result
+        assert kept in result
+        assert "***REDACTED***" in result
+
+    def test_ordinary_words_named_key_are_kept(self) -> None:
+        text = "Missing key 'urls' in the response; press any key"
+        assert _redact(text) == text
+
 
 # ---------------------------------------------------------------------------
 # Filter applied to LogRecord
@@ -165,6 +211,46 @@ class TestSecretRedactionFilter:
         record = _apply(_make_record("Password: hunter2"))
         assert "hunter2" not in record.msg
         assert "***REDACTED***" in record.msg
+
+    def test_secret_inside_a_non_string_arg_redacted(self) -> None:
+        # requests puts the full URL in the exception, which is logged via %s.
+        url = "https://x.test/?api_key=FROMEXC123"  # gitleaks:allow
+        exc = RuntimeError(f"401 for url: {url}")
+        record = _apply(_make_record("Request failed: %s", args=(exc,)))
+        assert "FROMEXC123" not in record.getMessage()
+        assert record.getMessage().startswith("Request failed: 401 for url:")
+
+    def test_secret_split_across_template_and_arg_redacted(self) -> None:
+        record = _apply(_make_record("url=/apod?api_key=%s", args=("SPLITKEY77",)))
+        assert "SPLITKEY77" not in record.getMessage()
+
+    def test_traceback_redacted(self) -> None:
+        try:
+            raise ValueError("https://x.test/?appid=TRACEKEY42")  # gitleaks:allow
+        except ValueError:
+            record = _make_record("boom")
+            record.exc_info = sys.exc_info()
+        _apply(record)
+        formatted = logging.Formatter().format(record)
+        assert "TRACEKEY42" not in formatted
+        assert "ValueError" in formatted
+
+    def test_preformatted_traceback_redacted(self) -> None:
+        record = _make_record("boom")
+        record.exc_text = "Traceback...\nValueError: token=PREFORMATTED9"
+        _apply(record)
+        assert "PREFORMATTED9" not in record.exc_text
+
+    def test_stack_info_redacted(self) -> None:
+        record = _make_record("boom")
+        record.stack_info = "Stack (most recent call last):\n  password=STACKPW"
+        _apply(record)
+        assert "STACKPW" not in record.stack_info
+
+    def test_bad_format_args_are_left_for_the_handler(self) -> None:
+        record = _make_record("count=%d", args=("not a number",))
+        assert SecretRedactionFilter().filter(record) is True
+        assert record.args == ("not a number",)
 
 
 # ---------------------------------------------------------------------------
@@ -228,6 +314,16 @@ class TestJsonFormatterOutput:
         assert "eyJhbGciOiJSUzI1NiJ9" not in data["msg"]
         assert "***REDACTED***" in data["msg"]
 
+    def test_exception_message_redacted_in_json_without_filter(self) -> None:
+        try:
+            raise RuntimeError("401 https://x.test/?api_key=JSONEXC1")  # gitleaks:allow
+        except RuntimeError:
+            record = _make_record("boom")
+            record.exc_info = sys.exc_info()
+        line = JsonFormatter().format(record)
+        assert "JSONEXC1" not in line
+        assert json.loads(line)["exc_type"] == "RuntimeError"
+
     def test_hex_key_in_json_redacted(self) -> None:
         hex_key = "deadbeef" * 4  # 32 chars
         record = _make_record(f"loaded config key={hex_key}")
@@ -241,27 +337,123 @@ class TestJsonFormatterOutput:
 # ---------------------------------------------------------------------------
 
 
-class TestSetupLoggingWiresFilter:
-    def test_root_logger_has_redaction_filter_after_setup(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        monkeypatch.setenv("INKYPI_LOG_FORMAT", "json")
-        root = logging.getLogger()
-        saved_handlers = root.handlers[:]
-        saved_filters = root.filters[:]
-        saved_level = root.level
-        root.handlers = []
-        root.filters = []
-        try:
-            from app_setup.logging_setup import setup_logging
+@pytest.fixture
+def clean_root_logger(monkeypatch: pytest.MonkeyPatch) -> Iterator[logging.Logger]:
+    """Give setup_logging() an empty root logger and restore it afterwards."""
+    monkeypatch.delenv("INKYPI_LOG_FILE", raising=False)
+    root = logging.getLogger()
+    saved_handlers = root.handlers[:]
+    saved_filters = root.filters[:]
+    saved_level = root.level
+    root.handlers = []
+    root.filters = []
+    try:
+        yield root
+    finally:
+        for handler in root.handlers:
+            if handler not in saved_handlers:
+                handler.close()
+        root.handlers = saved_handlers
+        root.filters = saved_filters
+        root.level = saved_level
 
-            setup_logging()
-            filter_types = [type(f) for f in logging.getLogger().filters]
-            assert SecretRedactionFilter in filter_types
-        finally:
-            root.handlers = saved_handlers
-            root.filters = saved_filters
-            root.level = saved_level
+
+def _capture_console(root: logging.Logger) -> io.StringIO:
+    stream = io.StringIO()
+    for handler in root.handlers:
+        if isinstance(handler, logging.StreamHandler):
+            handler.setStream(stream)
+    return stream
+
+
+def _has_redaction(handler: logging.Handler) -> bool:
+    return any(isinstance(f, SecretRedactionFilter) for f in handler.filters)
+
+
+class TestSetupLoggingWiresFilter:
+    @pytest.mark.parametrize("log_format", ["json", "plain"])
+    def test_every_handler_has_the_filter(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        clean_root_logger: logging.Logger,
+        log_format: str,
+    ) -> None:
+        monkeypatch.setenv("INKYPI_LOG_FORMAT", log_format)
+        from app_setup.logging_setup import setup_logging
+
+        setup_logging()
+        setup_logging()  # a second call must not stack filters
+
+        assert clean_root_logger.handlers
+        for handler in clean_root_logger.handlers:
+            redaction = [
+                f for f in handler.filters if isinstance(f, SecretRedactionFilter)
+            ]
+            assert len(redaction) == 1
+
+    @pytest.mark.parametrize("log_format", ["json", "plain"])
+    def test_child_logger_secrets_never_reach_the_console(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        clean_root_logger: logging.Logger,
+        log_format: str,
+    ) -> None:
+        """Records from named loggers skip root-logger filters; the handler
+        filter must still mask them (the NASA key leaked this way)."""
+        monkeypatch.setenv("INKYPI_LOG_FORMAT", log_format)
+        from app_setup.logging_setup import setup_logging
+
+        setup_logging()
+        stream = _capture_console(clean_root_logger)
+
+        logging.getLogger("urllib3.connectionpool").warning(
+            "Retrying after connection broken by '%s': %s",
+            "ReadTimeoutError",
+            "/planetary/apod?api_key=CHILDKEY123456&date=2026-04-24",  # gitleaks:allow
+        )
+        try:
+            raise RuntimeError(
+                "401 Client Error for url: https://api.test/onecall?appid=EXCKEY98765"  # gitleaks:allow
+            )
+        except RuntimeError:
+            logging.getLogger("plugins.weather").exception("Weather refresh failed")
+
+        output = stream.getvalue()
+        assert "Retrying after connection broken" in output
+        assert "Weather refresh failed" in output
+        assert "CHILDKEY123456" not in output
+        assert "EXCKEY98765" not in output
+        assert "date=2026-04-24" in output
+
+    def test_rotating_file_handler_has_the_filter(
+        self, clean_root_logger: logging.Logger, tmp_path: Path
+    ) -> None:
+        from app_setup.logging_setup import attach_rotating_file_handler
+
+        handler = attach_rotating_file_handler(str(tmp_path / "inkypi.log"))
+        assert _has_redaction(handler)
+
+        logging.getLogger("plugins.unsplash").warning(
+            "GET /photos/random?client_id=FILEKEY4242"  # gitleaks:allow
+        )
+        handler.flush()
+        written = (tmp_path / "inkypi.log").read_text()
+        assert "GET /photos/random" in written
+        assert "FILEKEY4242" not in written
+
+    def test_dev_mode_handler_has_the_filter(
+        self, clean_root_logger: logging.Logger
+    ) -> None:
+        from app_setup.logging_setup import install_dev_log_handler
+        from blueprints.settings import DevModeLogHandler
+
+        install_dev_log_handler()
+
+        dev_handlers = [
+            h for h in clean_root_logger.handlers if isinstance(h, DevModeLogHandler)
+        ]
+        assert len(dev_handlers) == 1
+        assert _has_redaction(dev_handlers[0])
 
     def test_expected_sse_disconnect_filter_drops_waitress_noise(self) -> None:
         from app_setup.logging_setup import ExpectedSSEDisconnectFilter
@@ -277,25 +469,3 @@ class TestSetupLoggingWiresFilter:
         assert flt.filter(progress) is False
         assert flt.filter(events) is False
         assert flt.filter(other) is True
-
-    def test_root_logger_has_redaction_filter_plain_text(
-        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-    ) -> None:
-        """Filter is wired for plain-text mode too."""
-        monkeypatch.delenv("INKYPI_LOG_FORMAT", raising=False)
-        root = logging.getLogger()
-        saved_handlers = root.handlers[:]
-        saved_filters = root.filters[:]
-        saved_level = root.level
-        root.handlers = []
-        root.filters = []
-        try:
-            from app_setup.logging_setup import setup_logging
-
-            setup_logging()
-            filter_types = [type(f) for f in logging.getLogger().filters]
-            assert SecretRedactionFilter in filter_types
-        finally:
-            root.handlers = saved_handlers
-            root.filters = saved_filters
-            root.level = saved_level

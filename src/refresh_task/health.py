@@ -8,6 +8,7 @@ from collections.abc import Callable, Mapping
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Any, Protocol, cast
 
+from utils.logging_utils import redact_secrets
 from utils.metrics import (
     record_refresh_failure,
     record_refresh_success,
@@ -218,7 +219,8 @@ class PluginHealthTracker:
             on_success(plugin_instance, plugin_id, instance)
             return
 
-        msg = error or "unknown error"
+        # last_error is shown in the UI, diagnostics and webhook payloads.
+        msg = redact_secrets(error or "unknown error")
         entry["status"] = "red"
         entry["last_failure_at"] = now_iso
         entry["last_error"] = msg

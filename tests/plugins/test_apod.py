@@ -5,6 +5,7 @@ from unittest.mock import MagicMock, patch
 from urllib.parse import urlparse
 
 import pytest
+import requests
 from flask.testing import FlaskClient
 
 
@@ -195,10 +196,15 @@ def test_apod_api_error_response(
         mock_response.text = "Internal Server Error"
         mock_session.get.return_value = mock_response
 
+        # The APOD website fallback is unreachable too.
+        site_fetch = MagicMock(side_effect=requests.ConnectionError("offline"))
+        monkeypatch.setattr("plugins.apod.apod.safe_fetch_bytes", site_fetch)
+
         p = Apod({"id": "apod"})
 
         with pytest.raises(RuntimeError, match="Failed to retrieve NASA APOD"):
             p.generate_image({}, device_config_dev)
+        site_fetch.assert_called_once()
 
 
 def test_apod_hdurl_preference_on_non_low_resource(

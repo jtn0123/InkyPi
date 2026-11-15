@@ -17,7 +17,7 @@ from flask import (
 )
 
 from utils.http_utils import http_get
-from utils.logging_utils import log_datetime_from_timestamp
+from utils.logging_utils import log_datetime_from_timestamp, redact_secrets
 from utils.progress_events import get_progress_bus
 from utils.rate_limiter import CooldownLimiter, SlidingWindowLimiter
 from utils.time_utils import get_timezone, now_device_tz
@@ -211,7 +211,9 @@ def _clamp_int(value: str | None, default: int, min_value: int, max_value: int) 
 def _format_journal_line(formatted_ts: str, data: dict[str, Any]) -> str:
     priority = str(data.get("PRIORITY", "6"))
     level = _PRIORITY_TO_LEVEL.get(priority, "INFO")
-    msg = (data.get("MESSAGE", "") or "").rstrip()
+    # Journal entries written before redaction reached every logger, or by
+    # other processes in the unit, can still hold keys.
+    msg = redact_secrets((data.get("MESSAGE", "") or "").rstrip())
     return f"{formatted_ts} [{level}] {msg}"
 
 
