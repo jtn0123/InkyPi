@@ -74,6 +74,23 @@ class _MockDeviceConfig:
 _INDEX_FILE = "_index.json"
 
 
+def _missing_vendor_files() -> list[str]:
+    """Vendored scripts listed in install/update_vendors.sh that are absent.
+
+    They are gitignored (a fresh clone or worktree has none). Plugin
+    templates load them, so without them a chart or calendar renders blank
+    instead of failing.
+    """
+    try:
+        text = (Path(REPO_ROOT) / "install" / "update_vendors.sh").read_text(
+            encoding="utf-8"
+        )
+    except OSError:
+        return []
+    paths = re.findall(r'^\s*"[^|"]+\|[^|"]+\|([^|"]+)\|', text, flags=re.M)
+    return [path for path in paths if not (Path(REPO_ROOT) / path).is_file()]
+
+
 def _response_key(url: str) -> str:
     """File name for a recorded response: host and path, query left out."""
     parts = urlsplit(url)
@@ -296,6 +313,15 @@ def main() -> None:
     print(f"[dry-run] Canvas   : {args.width}x{args.height} ({args.orientation})")
     print(f"[dry-run] Timezone : {args.timezone}")
     print(f"[dry-run] Output   : {output_path}")
+
+    missing_vendor = _missing_vendor_files()
+    if missing_vendor:
+        print(
+            f"[dry-run] WARNING: missing {', '.join(missing_vendor)}; charts and "
+            "calendars will render blank. Fetch them with: "
+            "bash install/update_vendors.sh",
+            file=sys.stderr,
+        )
 
     # Discover plugin metadata
     plugin_config = _discover_plugin_config(plugin_id)

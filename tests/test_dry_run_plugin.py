@@ -374,3 +374,34 @@ def test_replay_missing_directory_exits(dry_run_mod: Any, tmp_path: Path) -> Non
 
     with pytest.raises(SystemExit, match="--replay directory not found"):
         dry_run_mod._start_replay(requests.Session(), tmp_path / "nope")
+
+
+# ── vendored-asset warning ───────────────────────────────────────────────────
+
+
+def test_missing_vendor_files_lists_only_absent_ones(
+    dry_run_mod: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (tmp_path / "install").mkdir()
+    (tmp_path / "install" / "update_vendors.sh").write_text(
+        "declare -a VENDORS=(\n"
+        '  "Chart JS|https://cdn.example/chart.js|src/static/scripts/chart.js|abc"\n'
+        '  "Cal JS|https://cdn.example/cal.js|src/static/scripts/calendar.min.js|def"\n'
+        ")\n"
+    )
+    (tmp_path / "src" / "static" / "scripts").mkdir(parents=True)
+    (tmp_path / "src" / "static" / "scripts" / "chart.js").write_text("x")
+    monkeypatch.setattr(dry_run_mod, "REPO_ROOT", str(tmp_path))
+
+    assert dry_run_mod._missing_vendor_files() == ["src/static/scripts/calendar.min.js"]
+
+
+def test_missing_vendor_files_reads_the_real_vendor_list(dry_run_mod: Any) -> None:
+    """The parser must keep matching install/update_vendors.sh's format."""
+    repo = Path(dry_run_mod.REPO_ROOT)
+    text = (repo / "install" / "update_vendors.sh").read_text()
+    import re
+
+    listed = re.findall(r'^\s*"[^|"]+\|[^|"]+\|([^|"]+)\|', text, flags=re.M)
+    assert "src/static/scripts/chart.js" in listed
+    assert set(dry_run_mod._missing_vendor_files()) <= set(listed)
