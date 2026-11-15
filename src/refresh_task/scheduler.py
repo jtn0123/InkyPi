@@ -10,7 +10,7 @@ from collections.abc import Callable, Mapping
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, Protocol
 
-from services import schedule
+from refresh_task import schedule
 
 if TYPE_CHECKING:
     from refresh_task.actions import ManualUpdateRequest

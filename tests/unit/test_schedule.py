@@ -10,8 +10,8 @@ from typing import Any
 import pytest
 
 from model import Playlist, PlaylistManager, RefreshInfo
+from refresh_task import schedule
 from refresh_task.scheduler import RefreshScheduler
-from services import schedule
 
 NOW = datetime(2026, 11, 14, 12, 0, 30, tzinfo=UTC)
 HOUR = 3600.0

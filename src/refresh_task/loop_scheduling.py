@@ -16,8 +16,8 @@ from typing import TYPE_CHECKING, Any, cast
 from model import PlaylistManager
 from refresh_task.actions import ManualUpdateRequest, PlaylistRefresh, RefreshAction
 from refresh_task.context import RefreshContext
+from refresh_task.schedule import effective_cycle_seconds
 from refresh_task.scheduler import RefreshScheduler
-from services.schedule import effective_cycle_seconds
 from utils.time_utils import now_device_tz
 
 if TYPE_CHECKING:
