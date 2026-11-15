@@ -2,6 +2,21 @@
 
 <!-- version list -->
 
+## v1.8.10 (2026-11-15)
+
+### Bug Fixes
+
+- **apod**: Send the NASA key in the X-Api-Key header, not the URL
+  ([#727](https://github.com/jtn0123/InkyPi/pull/727),
+  [`828a030`](https://github.com/jtn0123/InkyPi/commit/828a030831f4332cecf48789cf27489b98bcbee0))
+
+### Continuous Integration
+
+- Move the macOS pre-flash out of the required gate to a weekly job
+  ([#726](https://github.com/jtn0123/InkyPi/pull/726),
+  [`62a67e7`](https://github.com/jtn0123/InkyPi/commit/62a67e79f0187b2376883c9b0d3ad380d0cb6c61))
+
+
 ## v1.8.9 (2026-11-15)
 
 ### Bug Fixes
