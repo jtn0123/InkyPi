@@ -298,7 +298,7 @@ def disable_plugin_process_isolation(monkeypatch: pytest.MonkeyPatch) -> None:
     failures.  On Linux the ``spawn``/``forkserver`` multiprocessing start
     methods require all arguments to be picklable and do **not** inherit
     monkey-patches from the test process.  Setting this env var tells
-    ``RefreshTask._execute_with_policy`` to skip the subprocess and call the
+    ``RefreshExecutor.execute_with_policy`` to skip the subprocess and call the
     plugin directly, which is both faster and compatible with monkeypatch.
     """
     monkeypatch.setenv("INKYPI_PLUGIN_ISOLATION", "none")

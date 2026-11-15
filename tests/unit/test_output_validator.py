@@ -261,7 +261,7 @@ def _run_manual_refresh(
         displayed.append(image)
         return {}
 
-    monkeypatch.setattr(task, "_execute_with_policy", _fake_execute_with_policy)
+    monkeypatch.setattr(task.executor, "execute_with_policy", _fake_execute_with_policy)
     monkeypatch.setattr(dm, "display_image", _fake_display_image)
     result = task._perform_refresh(
         ManualRefresh("ai_text", {}),

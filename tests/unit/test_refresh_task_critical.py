@@ -6,7 +6,7 @@ Covers:
 - _get_mp_context()
 - _execute_refresh_attempt_worker()
 - RefreshTask.stop()
-- _execute_with_policy() error/timeout paths
+- RefreshExecutor.execute_with_policy() error/timeout paths
 """
 
 import os
@@ -28,6 +28,7 @@ from refresh_task import (
     _remote_exception,
 )
 from refresh_task.actions import RefreshAction
+from refresh_task.executor import RefreshExecutor
 from refresh_task.worker import WorkerPayload
 
 # ---------------------------------------------------------------------------
@@ -633,8 +634,6 @@ class TestWorkerSessionLeaderCleanup:
         """
         import signal as _signal
 
-        from refresh_task import RefreshTask
-
         killpg_calls: list[tuple[int, int]] = []
         events: list[str] = []
 
@@ -668,7 +667,7 @@ class TestWorkerSessionLeaderCleanup:
                 events.append("kill")
 
         proc = GracefulProc()
-        RefreshTask._cleanup_subprocess(proc, "graceful-plugin")
+        RefreshExecutor.cleanup_subprocess(proc, "graceful-plugin")
 
         assert killpg_calls, (
             "killpg never fired — chromium descendants leak when the "
@@ -858,7 +857,7 @@ class TestExecuteWithPolicyErrors:
             patch.dict(os.environ, {"INKYPI_PLUGIN_ISOLATION": "process"}),
         ):
             try:
-                task._execute_with_policy(
+                task.executor.execute_with_policy(
                     self._mock_action(),
                     {"id": "test"},
                     datetime.now(UTC),
@@ -887,7 +886,7 @@ class TestExecuteWithPolicyErrors:
             patch.dict(os.environ, {"INKYPI_PLUGIN_ISOLATION": "process"}),
         ):
             try:
-                task._execute_with_policy(
+                task.executor.execute_with_policy(
                     self._mock_action(),
                     {"id": "test"},
                     datetime.now(UTC),
@@ -922,7 +921,7 @@ class TestExecuteWithPolicyErrors:
             patch.dict(os.environ, {"INKYPI_PLUGIN_ISOLATION": "process"}),
         ):
             try:
-                task._execute_with_policy(
+                task.executor.execute_with_policy(
                     self._mock_action(),
                     {"id": "test"},
                     datetime.now(UTC),
@@ -959,7 +958,7 @@ class TestExecuteWithPolicyErrors:
             ),
         ):
             try:
-                task._execute_with_policy(
+                task.executor.execute_with_policy(
                     self._mock_action(),
                     {"id": "test"},
                     datetime.now(UTC),

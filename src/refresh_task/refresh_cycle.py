@@ -22,12 +22,11 @@ from utils.progress import ProgressTracker, track_progress
 
 if TYPE_CHECKING:
     from refresh_task.display_pipeline import DisplayPipeline
+    from refresh_task.executor import RefreshExecutor
     from refresh_task.housekeeping import RefreshHousekeeper
     from refresh_task.recorder import RefreshRecorder
 
-# Moved out of task.py; keeps the original logger name so log records, level
-# configuration and log-capturing tests see exactly what they did before.
-logger = logging.getLogger("refresh_task.task")
+logger = logging.getLogger(__name__)
 
 
 class RefreshCycleMixin:
@@ -38,6 +37,7 @@ class RefreshCycleMixin:
         recorder: RefreshRecorder
         housekeeper: RefreshHousekeeper
         display_pipeline: DisplayPipeline
+        executor: RefreshExecutor
 
         def _update_plugin_health(
             self,
@@ -47,14 +47,6 @@ class RefreshCycleMixin:
             metrics: dict[str, Any] | None,
             error: str | None,
         ) -> None: ...
-
-        def _execute_with_policy(
-            self,
-            refresh_action: RefreshAction,
-            plugin_config: Mapping[str, Any],
-            current_dt: datetime,
-            request_id: str | None = None,
-        ) -> tuple[Any, Any]: ...
 
     def _skip_display_reason(
         self,
@@ -226,7 +218,7 @@ class RefreshCycleMixin:
                 step="Generating image",
             )
             try:
-                image, plugin_meta = self._execute_with_policy(
+                image, plugin_meta = self.executor.execute_with_policy(
                     refresh_action,
                     plugin_config,
                     current_dt,

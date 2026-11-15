@@ -25,9 +25,7 @@ if TYPE_CHECKING:
     from refresh_task.health import PluginHealthTracker
     from refresh_task.housekeeping import RefreshHousekeeper
 
-# Moved out of task.py; keeps the original logger name so log records, level
-# configuration and log-capturing tests see exactly what they did before.
-logger = logging.getLogger("refresh_task.task")
+logger = logging.getLogger(__name__)
 
 #: A single refresh may occupy the loop this long before the watchdog heartbeat
 #: treats it as wedged.  Deliberately well clear of the slowest sanctioned
