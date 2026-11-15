@@ -32,7 +32,6 @@ import logging
 import sys
 import time
 import subprocess
-from typing import Any
 
 from ctypes import *
 
@@ -60,7 +59,7 @@ class RaspberryPi:
         self.GPIO_PWR_PIN = gpiozero.LED(self.PWR_PIN)
         self.GPIO_BUSY_PIN = gpiozero.Button(self.BUSY_PIN, pull_up=False)
 
-        self.DEV_SPI: Any = None
+        self.DEV_SPI: CDLL | None = None
 
     def digital_write(self, pin: int, value: int | bool) -> None:
         if pin == self.RST_PIN:
@@ -106,14 +105,19 @@ class RaspberryPi:
     def spi_writebyte2(self, data: bytes | bytearray) -> None:
         self.SPI.writebytes2(data)
 
+    def _dev_spi(self) -> CDLL:
+        if self.DEV_SPI is None:
+            raise RuntimeError("DEV_SPI is used before module_init(cleanup=True)")
+        return self.DEV_SPI
+
     def DEV_SPI_write(self, data: bytes | bytearray) -> None:
-        self.DEV_SPI.DEV_SPI_SendData(data)
+        self._dev_spi().DEV_SPI_SendData(data)
 
     def DEV_SPI_nwrite(self, data: bytes | bytearray) -> None:
-        self.DEV_SPI.DEV_SPI_SendnData(data)
+        self._dev_spi().DEV_SPI_SendnData(data)
 
     def DEV_SPI_read(self) -> int:
-        return int(self.DEV_SPI.DEV_SPI_ReadData())
+        return int(self._dev_spi().DEV_SPI_ReadData())
 
     def module_init(self, cleanup: bool = False) -> int:
         self.GPIO_PWR_PIN.on()
@@ -143,7 +147,7 @@ class RaspberryPi:
                     self.DEV_SPI = CDLL(so_filename)
                     break
             if self.DEV_SPI is None:
-                RuntimeError("Cannot find DEV_Config.so")
+                raise RuntimeError("Cannot find DEV_Config.so")
 
             self.DEV_SPI.DEV_Module_Init()
 
@@ -187,18 +191,19 @@ class JetsonNano:
             "/usr/local/lib",
             "/usr/lib",
         ]
-        self.SPI: Any = None
+        spi: CDLL | None = None
         for find_dir in find_dirs:
             so_filename = os.path.join(find_dir, "sysfs_software_spi.so")
             if os.path.exists(so_filename):
-                self.SPI = ctypes.cdll.LoadLibrary(so_filename)
+                spi = ctypes.cdll.LoadLibrary(so_filename)
                 break
-        if self.SPI is None:
+        if spi is None:
             raise RuntimeError("Cannot find sysfs_software_spi.so")
+        self.SPI = spi
 
         import Jetson.GPIO
 
-        self.GPIO: Any = Jetson.GPIO
+        self.GPIO = Jetson.GPIO
 
     def digital_write(self, pin: int, value: int | bool) -> None:
         self.GPIO.output(pin, value)
@@ -257,8 +262,8 @@ class SunriseX3:
         import spidev
         import Hobot.GPIO
 
-        self.GPIO: Any = Hobot.GPIO
-        self.SPI: Any = spidev.SpiDev()
+        self.GPIO = Hobot.GPIO
+        self.SPI = spidev.SpiDev()
 
     def digital_write(self, pin: int, value: int | bool) -> None:
         self.GPIO.output(pin, value)
@@ -321,7 +326,7 @@ def _read_cpuinfo() -> str:
         return ""
 
 
-implementation: Any
+implementation: RaspberryPi | SunriseX3 | JetsonNano
 
 output = _read_cpuinfo()
 

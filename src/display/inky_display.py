@@ -1,7 +1,7 @@
 import logging
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
-from typing import Any, Literal, cast
+from typing import Literal
 
 from PIL import Image
 
@@ -47,7 +47,9 @@ _HANDOFFS: dict[str, tuple[Literal["palette", "index"], int]] = {
 
 
 def _colours(raw: object, count: int) -> tuple[Colour, ...]:
-    rows = list(cast(Any, raw))[:count]
+    if not isinstance(raw, Iterable):
+        raise TypeError(f"palette is {type(raw).__name__}, not a sequence")
+    rows = list(raw)[:count]
     return tuple((int(r), int(g), int(b)) for r, g, b in rows)
 
 
@@ -93,7 +95,10 @@ class InkyDisplay(AbstractDisplay):
 
     def _handoff(self) -> _Handoff | None:
         """Describe the driver's undithered path, or None if it has none we trust."""
-        driver: Any = getattr(self, "inky_display", None)
+        # The inky library ships no type information.
+        driver = getattr(self, "inky_display", None)
+        if driver is None:
+            return None
         entry = _HANDOFFS.get(type(driver).__module__)
         if entry is None:
             return None

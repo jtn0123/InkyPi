@@ -7,13 +7,18 @@ import logging
 import re
 import time as _time
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING
 
 from services.plugin_workflows import validate_plugin_for_save
 from services.workflow_errors import WorkflowError
 from utils.form_utils import sanitize_log_field
+from utils.json_types import JsonObject
 from utils.messages import PLAYLIST_NAME_REQUIRED_ERROR
 from utils.time_utils import calculate_seconds
+
+if TYPE_CHECKING:
+    from config import Config
+    from model import PlaylistManager
 
 logger = logging.getLogger(__name__)
 
@@ -32,8 +37,8 @@ class AddPluginWorkflowResult:
     message: str
     playlist_name: str | None = None
     instance_name: str | None = None
-    refresh_config: dict[str, Any] = field(default_factory=dict)
-    plugin_dict: dict[str, Any] = field(default_factory=dict)
+    refresh_config: JsonObject = field(default_factory=dict)
+    plugin_dict: JsonObject = field(default_factory=dict)
     error: WorkflowError | None = None
 
 
@@ -43,7 +48,7 @@ def _failure(
     status: int = 400,
     code: str = _CODE_VALIDATION,
     field: str | None = None,
-    details: dict[str, Any] | None = None,
+    details: JsonObject | None = None,
 ) -> AddPluginWorkflowResult:
     return AddPluginWorkflowResult(
         ok=False,
@@ -58,7 +63,9 @@ def _failure(
     )
 
 
-def normalize_instance_name(raw_name: Any) -> tuple[str | None, WorkflowError | None]:
+def normalize_instance_name(
+    raw_name: object,
+) -> tuple[str | None, WorkflowError | None]:
     """Trim and validate a playlist instance name."""
     name = raw_name.strip() if isinstance(raw_name, str) else ""
     if not name:
@@ -83,8 +90,8 @@ def normalize_instance_name(raw_name: Any) -> tuple[str | None, WorkflowError | 
 
 
 def _validate_interval_refresh_settings(
-    refresh_settings: dict[str, Any],
-) -> tuple[dict[str, Any] | None, WorkflowError | None]:
+    refresh_settings: JsonObject,
+) -> tuple[JsonObject | None, WorkflowError | None]:
     unit = refresh_settings.get("unit")
     interval = refresh_settings.get("interval")
     if not unit or unit not in {"minute", "hour", "day"}:
@@ -117,8 +124,8 @@ def _validate_interval_refresh_settings(
 
 
 def _validate_scheduled_refresh_settings(
-    refresh_settings: dict[str, Any],
-) -> tuple[dict[str, Any] | None, WorkflowError | None]:
+    refresh_settings: JsonObject,
+) -> tuple[JsonObject | None, WorkflowError | None]:
     refresh_time = refresh_settings.get("refreshTime")
     if not refresh_time:
         return None, WorkflowError(
@@ -145,8 +152,8 @@ def _validate_scheduled_refresh_settings(
 
 
 def validate_plugin_refresh_settings(
-    refresh_settings: dict[str, Any],
-) -> tuple[dict[str, Any] | None, WorkflowError | None]:
+    refresh_settings: JsonObject,
+) -> tuple[JsonObject | None, WorkflowError | None]:
     """Validate the refresh settings from ``/add_plugin``."""
     refresh_type = refresh_settings.get("refreshType")
     if not refresh_type or refresh_type not in {"interval", "scheduled"}:
@@ -161,7 +168,7 @@ def validate_plugin_refresh_settings(
 
 
 def validate_plugin_settings_security(
-    device_config: Any, plugin_id: str, plugin_settings: dict[str, Any]
+    device_config: Config, plugin_id: str, plugin_settings: JsonObject
 ) -> WorkflowError | None:
     """Run plugin-specific validation for settings that are about to be added."""
     if plugin_id == "ai_image":
@@ -216,10 +223,10 @@ def validate_plugin_settings_security(
 
 def build_playlist_plugin_dict(
     plugin_id: str,
-    plugin_settings: dict[str, Any],
-    refresh_config: dict[str, Any],
+    plugin_settings: JsonObject,
+    refresh_config: JsonObject,
     instance_name: str,
-) -> dict[str, Any]:
+) -> JsonObject:
     """Build the dict passed to ``PlaylistManager.add_plugin_to_playlist``."""
     return {
         "plugin_id": plugin_id,
@@ -231,11 +238,11 @@ def build_playlist_plugin_dict(
 
 def prepare_add_plugin_workflow(
     plugin_id: str,
-    plugin_settings: dict[str, Any],
-    refresh_settings: dict[str, Any],
+    plugin_settings: JsonObject,
+    refresh_settings: JsonObject,
     *,
-    playlist_manager: Any,
-    device_config: Any,
+    playlist_manager: PlaylistManager,
+    device_config: Config,
 ) -> AddPluginWorkflowResult:
     """Validate and execute the add-plugin workflow used by ``/add_plugin``."""
     playlist = refresh_settings.get("playlist")
@@ -256,6 +263,7 @@ def prepare_add_plugin_workflow(
             code=name_err.code,
             field=name_err.field,
         )
+    assert instance_name is not None
 
     existing = playlist_manager.find_plugin(plugin_id, instance_name)
     if existing:
@@ -284,7 +292,6 @@ def prepare_add_plugin_workflow(
             field=security_err.field,
         )
 
-    assert instance_name is not None
     plugin_dict = build_playlist_plugin_dict(
         plugin_id, plugin_settings, refresh_config or {}, instance_name
     )
@@ -292,7 +299,7 @@ def prepare_add_plugin_workflow(
     try:
         add_result: list[bool] = []
 
-        def _do_add(cfg: dict[str, Any]) -> None:
+        def _do_add(cfg: JsonObject) -> None:
             add_result.append(
                 playlist_manager.add_plugin_to_playlist(playlist, plugin_dict)
             )

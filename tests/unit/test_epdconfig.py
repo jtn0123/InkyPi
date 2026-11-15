@@ -191,18 +191,18 @@ def test_module_init_cleanup_mode(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_module_init_cleanup_mode_library_not_found(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Test module initialization when DEV_Config library is not found.
+    """A missing DEV_Config library says so.
 
-    The vendored code has ``RuntimeError(...)`` without ``raise``, so DEV_SPI
-    stays None and the next call (``self.DEV_SPI.DEV_Module_Init()``) raises
-    AttributeError.
+    The vendored code used to build the RuntimeError without raising it, so
+    the next line failed with "'NoneType' object has no attribute
+    'DEV_Module_Init'" instead.
     """
     epdconfig = _load_epdconfig_as_rpi(monkeypatch)
 
     monkeypatch.setattr("os.path.exists", lambda path: False)
     monkeypatch.setattr("subprocess.run", _fake_getconf("64"))
 
-    with pytest.raises(AttributeError):
+    with pytest.raises(RuntimeError, match="Cannot find DEV_Config.so"):
         epdconfig.module_init(cleanup=True)
 
 
@@ -227,20 +227,20 @@ def test_dev_spi_operations(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_dev_spi_operations_no_library(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Test DEV_SPI operations when library is not initialized.
+    """DEV_SPI calls before the library is loaded say what is missing.
 
-    DEV_SPI is not set on the implementation after a normal (non-cleanup)
-    load, so calling DEV_SPI_write etc. raises AttributeError.
+    Only ``module_init(cleanup=True)`` loads DEV_Config, so after a normal
+    load the DEV_SPI functions have nothing to call.
     """
     epdconfig = _load_epdconfig_as_rpi(monkeypatch)
 
-    with pytest.raises(AttributeError):
+    with pytest.raises(RuntimeError, match="before module_init"):
         epdconfig.DEV_SPI_write([0x12])
 
-    with pytest.raises(AttributeError):
+    with pytest.raises(RuntimeError, match="before module_init"):
         epdconfig.DEV_SPI_nwrite([0x34])
 
-    with pytest.raises(AttributeError):
+    with pytest.raises(RuntimeError, match="before module_init"):
         epdconfig.DEV_SPI_read()
 
 

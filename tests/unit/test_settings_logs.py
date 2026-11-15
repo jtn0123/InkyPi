@@ -1,4 +1,5 @@
 from collections.abc import Iterator
+from zoneinfo import ZoneInfo
 
 import pytest
 from flask.testing import FlaskClient
@@ -158,6 +159,17 @@ def test_format_journal_line_strips_internals() -> None:
     assert "1234" not in result
 
 
+def test_format_journal_line_without_a_message() -> None:
+    """An entry with no MESSAGE field still formats, as an empty INFO line."""
+    from services.logs import _format_journal_line
+
+    assert _format_journal_line("Apr 02 10:00:00", {}) == "Apr 02 10:00:00 [INFO] "
+    assert (
+        _format_journal_line("Apr 02 10:00:00", {"MESSAGE": None})
+        == "Apr 02 10:00:00 [INFO] "
+    )
+
+
 def test_format_journal_line_masks_keys_already_in_the_journal() -> None:
     """Lines written before redaction covered every logger still hold keys."""
     from services.logs import _format_journal_line
@@ -236,7 +248,9 @@ def test_dev_mode_log_handler_uses_configured_timezone() -> None:
 def test_device_log_timezone_falls_back_without_app_context() -> None:
     from services import logs
 
-    assert logs._device_log_timezone().key == "UTC"
+    tz = logs._device_log_timezone()
+    assert isinstance(tz, ZoneInfo)
+    assert tz.key == "UTC"
 
 
 # ---------------------------------------------------------------------------

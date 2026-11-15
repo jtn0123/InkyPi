@@ -67,6 +67,23 @@ def _run_mypy(sample: Path) -> str:
     return result.stdout + result.stderr
 
 
+def test_core_packages_may_not_write_any() -> None:
+    """app_setup, display and services keep disallow_any_explicit.
+
+    The list may grow; it should not shrink without a decision to do so.
+    """
+    config = _config()
+    covered = {
+        pattern.strip()
+        for section in config.sections()
+        if section.startswith("mypy-")
+        and config.getboolean(section, "disallow_any_explicit", fallback=False)
+        for pattern in section.removeprefix("mypy-").split(",")
+    }
+
+    assert {"app_setup.*", "display.*", "services.*"} <= covered
+
+
 def test_mypy_actually_reports_strict_errors(tmp_path: Path) -> None:
     """Run mypy with the repo config on an untyped function."""
     sample = tmp_path / "untyped_sample.py"

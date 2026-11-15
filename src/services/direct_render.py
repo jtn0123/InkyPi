@@ -3,11 +3,11 @@
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from time import perf_counter
-from typing import Any
 
 from PIL import Image
 
 from utils.backend_errors import route_error_for
+from utils.json_types import JsonObject
 from utils.plugin_errors import URLValidationError
 from utils.progress import track_progress
 
@@ -20,8 +20,8 @@ class DirectRenderOutcome:
     message: str
     status: int = 200
     code: str | None = None
-    details: dict[str, Any] = field(default_factory=dict)
-    metrics: dict[str, Any] = field(default_factory=dict)
+    details: JsonObject = field(default_factory=dict)
+    metrics: JsonObject = field(default_factory=dict)
 
 
 class DirectRenderFailure(RuntimeError):

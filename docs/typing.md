@@ -40,6 +40,25 @@ falls into one of three cases:
 
 `tests/unit/test_mypy_config.py` fails if the global switch comes back.
 
+## Packages that may not write `Any`
+
+`app_setup`, `display` and `services` also run with `disallow_any_explicit`
+(the last section of `mypy.ini`), so writing `Any` there is an error. Use the
+real type instead: `Config` or `PlaylistManager` imported under
+`TYPE_CHECKING`, a small `Protocol` naming what a function needs from an object
+tests replace with fakes (`services.plugin_workflows.SettingsValidator`),
+`npt.NDArray[np.uint8]` rather than a bare `np.ndarray`, or `object` plus an
+`isinstance` check. A decoded JSON dict whose values are not
+checked yet is `utils.json_types.JsonObject`. Objects from a library with no
+type information are still `Any`, by inference; don't annotate them.
+
+Removing a `cast(Any, ...)` this way can expose a real mismatch. In
+`display_manager.py` it showed `apply_image_enhancement` declaring
+`dict[str, float]` for settings that also hold the screen-rendering mode, and
+in the Waveshare `epdconfig.py` it showed a `RuntimeError` that was built but
+never raised. When a package gets to zero, add it to that section;
+`tests/unit/test_mypy_config.py` checks the list never shrinks.
+
 ## Current CI behavior: clean `src/`, ratcheted `tests/`
 
 `scripts/lint.sh` runs mypy as **two separate invocations**:
@@ -101,6 +120,7 @@ If `tests/` goes down:
 ## Coding guidelines for typed modules
 
 - Avoid `Any` unless truly unavoidable; prefer `object` or a narrow union.
+  For a decoded JSON dict, write `utils.json_types.JsonObject`.
 - Route handlers return `flask.typing.ResponseReturnValue`, or something
   narrower such as `Response` or `str`. Helpers that build a `json_error` or
   `json_success` reply return `utils.api_responses.JsonResponse`, and

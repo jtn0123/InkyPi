@@ -15,8 +15,9 @@ import logging
 import os
 import secrets
 import socket
+from collections.abc import Callable
 from time import perf_counter
-from typing import TYPE_CHECKING, Any, Protocol, cast
+from typing import TYPE_CHECKING, Protocol, cast
 from urllib.parse import quote, urlencode, urlunsplit
 
 from flask import Flask, Response, abort, g, redirect, request, session
@@ -322,7 +323,7 @@ def setup_csrf_protection(app: Flask) -> None:
     """Register CSRF token generation and per-request validation."""
 
     @app.context_processor
-    def _inject_csrf_token() -> dict[str, Any]:
+    def _inject_csrf_token() -> dict[str, Callable[[], str]]:
         return {"csrf_token": _generate_csrf_token}
 
     @app.before_request
@@ -477,7 +478,7 @@ def setup_csp_nonce(app: Flask) -> None:
         g.csp_nonce = secrets.token_urlsafe(16)
 
     @app.context_processor
-    def _inject_csp_nonce() -> dict[str, Any]:
+    def _inject_csp_nonce() -> dict[str, str]:
         return {"csp_nonce": getattr(g, "csp_nonce", "")}
 
 

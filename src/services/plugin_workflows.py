@@ -11,12 +11,17 @@ import logging
 import os
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Protocol
 
 from plugins.plugin_registry import get_plugin_instance
 from services.workflow_errors import WorkflowError
 from utils.form_utils import sanitize_log_field, validate_plugin_required_fields
+from utils.json_types import JsonObject
 from utils.plugin_history import record_change as _record_plugin_change
+
+if TYPE_CHECKING:
+    from config import Config
+    from model import Playlist, PlaylistManager
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +35,16 @@ DEFAULT_PLUGIN_VALIDATION_MESSAGE = (
 )
 
 
+class SettingsValidator(Protocol):
+    """What saving needs from a plugin: its own check of the settings.
+
+    ``BasePlugin`` is one. The required-field check reads more of the plugin
+    (its settings schema), but looks for it rather than assuming it.
+    """
+
+    def validate_settings(self, settings: JsonObject) -> str | None: ...
+
+
 @dataclass(slots=True)
 class PluginSettingsWorkflowResult:
     """Result of saving plugin settings into the Default playlist."""
@@ -40,8 +55,8 @@ class PluginSettingsWorkflowResult:
     playlist_name: str = DEFAULT_PLAYLIST_NAME
     default_playlist_created: bool = False
     plugin_loaded: bool = False
-    before_settings: dict[str, Any] = field(default_factory=dict)
-    after_settings: dict[str, Any] = field(default_factory=dict)
+    before_settings: JsonObject = field(default_factory=dict)
+    after_settings: JsonObject = field(default_factory=dict)
     error: WorkflowError | None = None
     warnings: list[str] = field(default_factory=list)
 
@@ -55,12 +70,12 @@ def build_saved_settings_instance_name(
 
 
 def ensure_playlist(
-    playlist_manager: Any,
+    playlist_manager: PlaylistManager,
     playlist_name: str = DEFAULT_PLAYLIST_NAME,
     *,
     start_time: str | None = None,
     end_time: str | None = None,
-) -> tuple[Any | None, bool]:
+) -> tuple[Playlist | None, bool]:
     """Return ``(playlist, created)`` while creating the playlist if needed."""
     playlist = playlist_manager.get_playlist(playlist_name)
     if playlist is not None:
@@ -77,7 +92,7 @@ def _failure(
     status: int = 400,
     code: str = "validation_error",
     field: str | None = None,
-    details: dict[str, Any] | None = None,
+    details: JsonObject | None = None,
 ) -> PluginSettingsWorkflowResult:
     return PluginSettingsWorkflowResult(
         ok=False,
@@ -93,28 +108,29 @@ def _failure(
 
 
 def _load_plugin_config(
-    device_config: Any, plugin_id: str, plugin_log_id: str
-) -> tuple[Any | None, PluginSettingsWorkflowResult | None]:
+    device_config: Config, plugin_id: str, plugin_log_id: str
+) -> JsonObject | PluginSettingsWorkflowResult:
+    """Return the plugin's config, or the failure to report."""
     try:
         plugin_config = device_config.get_plugin(plugin_id)
     except Exception:
         logger.exception("Plugin lookup failed for %s", plugin_log_id)
-        return None, _failure(
+        return _failure(
             DEFAULT_PLUGIN_NOT_FOUND_MESSAGE,
             status=500,
             code="internal_error",
         )
 
     if not plugin_config:
-        return None, _failure(DEFAULT_PLUGIN_NOT_FOUND_MESSAGE, status=404)
-    return plugin_config, None
+        return _failure(DEFAULT_PLUGIN_NOT_FOUND_MESSAGE, status=404)
+    return plugin_config
 
 
 def _load_plugin_for_validation(
-    plugin_config: Any,
+    plugin_config: JsonObject,
     plugin_log_id: str,
-    get_plugin_instance_fn: Callable[[Any], Any],
-) -> Any | None:
+    get_plugin_instance_fn: Callable[[JsonObject], SettingsValidator],
+) -> SettingsValidator | None:
     try:
         return get_plugin_instance_fn(plugin_config)
     except Exception:
@@ -125,11 +141,11 @@ def _load_plugin_for_validation(
 
 
 def validate_plugin_for_save(
-    plugin: Any | None,
-    plugin_settings: dict[str, Any],
+    plugin: SettingsValidator | None,
+    plugin_settings: JsonObject,
     plugin_log_id: str,
     validate_required_fields_fn: Callable[
-        [Any, dict[str, Any]], str | None
+        [SettingsValidator, JsonObject], str | None
     ] = validate_plugin_required_fields,
 ) -> WorkflowError | None:
     """Distinguish invalid input from validators that cannot execute."""
@@ -157,21 +173,21 @@ def validate_plugin_for_save(
 
 def _persist_plugin_settings(
     *,
-    device_config: Any,
-    playlist_manager: Any,
+    device_config: Config,
+    playlist_manager: PlaylistManager,
     playlist_name: str,
     plugin_id: str,
-    plugin_settings: dict[str, Any],
+    plugin_settings: JsonObject,
     instance_name: str,
     default_refresh_interval_seconds: int,
     plugin_log_id: str,
-) -> tuple[dict[str, Any] | None, bool, PluginSettingsWorkflowResult | None]:
-    before_settings: dict[str, Any] = {}
+) -> tuple[JsonObject | None, bool, PluginSettingsWorkflowResult | None]:
+    before_settings: JsonObject = {}
     created = False
 
     try:
 
-        def _do_save_settings(cfg: dict[str, Any]) -> None:
+        def _do_save_settings(cfg: JsonObject) -> None:
             nonlocal before_settings, created
             playlist, created = ensure_playlist(playlist_manager, playlist_name)
             if playlist is None:
@@ -213,14 +229,12 @@ def _persist_plugin_settings(
 
 def record_saved_settings_change(
     *,
-    device_config: Any,
+    device_config: Config,
     instance_name: str,
-    before_settings: dict[str, Any],
-    after_settings: dict[str, Any],
+    before_settings: JsonObject,
+    after_settings: JsonObject,
     plugin_log_id: str,
-    record_change_fn: (
-        Callable[[str, str, dict[str, Any], dict[str, Any]], bool | None] | None
-    ),
+    record_change_fn: Callable[[str, str, JsonObject, JsonObject], bool | None] | None,
 ) -> str | None:
     if record_change_fn is None:
         return None
@@ -241,16 +255,18 @@ def record_saved_settings_change(
 
 def save_plugin_settings_workflow(
     plugin_id: str,
-    plugin_settings: dict[str, Any],
-    device_config: Any,
-    playlist_manager: Any,
+    plugin_settings: JsonObject,
+    device_config: Config,
+    playlist_manager: PlaylistManager,
     *,
-    get_plugin_instance_fn: Callable[[Any], Any] = get_plugin_instance,
-    validate_required_fields_fn: Callable[[Any, dict[str, Any]], str | None] = (
-        validate_plugin_required_fields
-    ),
+    get_plugin_instance_fn: Callable[
+        [JsonObject], SettingsValidator
+    ] = get_plugin_instance,
+    validate_required_fields_fn: Callable[
+        [SettingsValidator, JsonObject], str | None
+    ] = (validate_plugin_required_fields),
     record_change_fn: (
-        Callable[[str, str, dict[str, Any], dict[str, Any]], bool | None] | None
+        Callable[[str, str, JsonObject, JsonObject], bool | None] | None
     ) = _record_plugin_change,
     default_playlist_name: str = DEFAULT_PLAYLIST_NAME,
     saved_instance_suffix: str = DEFAULT_PLUGIN_INSTANCE_SUFFIX,
@@ -262,11 +278,9 @@ def save_plugin_settings_workflow(
     of Flask responses.
     """
     plugin_log_id = sanitize_log_field(plugin_id)
-    plugin_config, lookup_error = _load_plugin_config(
-        device_config, plugin_id, plugin_log_id
-    )
-    if lookup_error is not None:
-        return lookup_error
+    plugin_config = _load_plugin_config(device_config, plugin_id, plugin_log_id)
+    if isinstance(plugin_config, PluginSettingsWorkflowResult):
+        return plugin_config
 
     plugin = _load_plugin_for_validation(
         plugin_config, plugin_log_id, get_plugin_instance_fn
@@ -285,7 +299,7 @@ def save_plugin_settings_workflow(
     instance_name = build_saved_settings_instance_name(
         plugin_id, suffix=saved_instance_suffix
     )
-    before_settings: dict[str, Any] = {}
+    before_settings: JsonObject = {}
     after_settings = copy.deepcopy(plugin_settings)
     persisted_before_settings, created, persist_error = _persist_plugin_settings(
         device_config=device_config,
