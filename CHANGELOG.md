@@ -2,6 +2,15 @@
 
 <!-- version list -->
 
+## v1.8.28 (2026-11-15)
+
+### Bug Fixes
+
+- **config**: Read every on/off environment variable the same way
+  ([#759](https://github.com/jtn0123/InkyPi/pull/759),
+  [`bee454d`](https://github.com/jtn0123/InkyPi/commit/bee454d4397f7ffd11e6bef54f03a2a9d37531fb))
+
+
 ## v1.8.27 (2026-11-15)
 
 ### Bug Fixes
