@@ -281,7 +281,6 @@ jobs:
 
   smoke:
     name: Install smoke (container)
-    needs: tests
     runs-on: ubuntu-latest
     container: debian:trixie
     timeout-minutes: 15
@@ -376,7 +375,6 @@ jobs:
 
   smoke-matrix:
     name: Runtime smoke matrix (${{ matrix.mode }})
-    needs: tests
     runs-on: ubuntu-latest
     timeout-minutes: 15
     strategy:
@@ -578,7 +576,6 @@ jobs:
 
   security:
     name: Security and SBOM
-    needs: tests
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -616,7 +613,6 @@ jobs:
 
   flake-detection:
     name: Flake detection
-    needs: tests
     runs-on: ubuntu-24.04
     timeout-minutes: 35
     steps:
@@ -807,7 +803,6 @@ jobs:
 
   browser-smoke:
     name: Browser smoke (tabs + plugins)
-    needs: tests
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -914,7 +909,6 @@ jobs:
     # tests took ~11 min on 4 local xdist workers, so 2 shards keep each
     # comfortably inside the timeout.
     name: Browser full (UI + a11y + journeys, shard ${{ matrix.shard }}/2)
-    needs: tests
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
@@ -1027,7 +1021,6 @@ jobs:
     # rollback). Those are excluded from the pytest matrix: systemd behaviour
     # does not vary by Python version, so running them three times only
     # triples the cost — it pushed 3.13 past its 20-minute cap.
-    needs: tests
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
