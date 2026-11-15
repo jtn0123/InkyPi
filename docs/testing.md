@@ -103,20 +103,6 @@ Notes:
 
 ---
 
-### OpenAI Image Quality Mapping
-
-To align with current API behavior:
-- `dall-e-3`: quality `standard` or `hd`
-- `gpt-image-1`: quality `standard` or `high`
-
-UI updates:
-- The AI Image settings present `standard/hd` for DALL·E 3 and `standard/high` for GPT Image 1.
-
-Server-side normalization:
-- The app normalizes any input (e.g., `low`, `medium`, `hd`, `high`) to valid values per model before calling the API.
-
----
-
 ### Simulating the device off-device
 
 `tests/simulation/` runs device-shaped code paths on any machine with bash — no
