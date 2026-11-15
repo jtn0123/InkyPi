@@ -15,6 +15,7 @@ from display.mock_display import MockDisplay
 from display.rendering_settings import CRISP_IMAGE_SETTING, SCREEN_RENDERING_KEY
 from utils.image_utils import (
     FAST_PNG_COMPRESS_LEVEL,
+    HISTORY_PNG_COMPRESS_LEVEL,
     apply_image_enhancement,
     change_orientation,
     resize_image,
@@ -197,7 +198,11 @@ class DisplayManager:
                     # display_*.png, so it must never see a half-written file.
                     tmp_path = os.path.join(history_dir, f".{candidate}.png.tmp")
                     try:
-                        processed_image.save(tmp_path, format="PNG", optimize=True)
+                        processed_image.save(
+                            tmp_path,
+                            format="PNG",
+                            compress_level=HISTORY_PNG_COMPRESS_LEVEL,
+                        )
                         os.replace(tmp_path, candidate_path)
                     except BaseException:
                         with contextlib.suppress(OSError):

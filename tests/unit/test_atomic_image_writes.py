@@ -149,6 +149,30 @@ class TestDisplayManagerPreviewWrites:
             assert kwargs.get("compress_level") == FAST_PNG_COMPRESS_LEVEL
             assert not kwargs.get("optimize")
 
+    def test_history_snapshot_skips_the_optimize_search(
+        self, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """History PNGs use a fixed zlib level: optimize=True cost ~6 s of CPU
+        per photo on a Pi Zero 2 W for a 3% smaller file."""
+        from display.display_manager import DisplayManager
+        from utils.image_utils import HISTORY_PNG_COMPRESS_LEVEL
+
+        dm = DisplayManager(device_config_dev)
+        seen: list[dict[str, Any]] = []
+        real_save = Image.Image.save
+
+        def spy(self: Image.Image, fp: Any, *args: Any, **kwargs: Any) -> Any:
+            if isinstance(fp, str) and ".png.tmp" in fp:
+                seen.append(kwargs)
+            return real_save(self, fp, *args, **kwargs)
+
+        monkeypatch.setattr(Image.Image, "save", spy)
+        dm.display_image(Image.new("RGB", (800, 480), "green"))
+
+        assert len(seen) == 1
+        assert seen[0].get("compress_level") == HISTORY_PNG_COMPRESS_LEVEL
+        assert not seen[0].get("optimize")
+
     def test_supplied_hash_is_not_recomputed(
         self, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
     ) -> None:
