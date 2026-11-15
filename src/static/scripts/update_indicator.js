@@ -110,19 +110,13 @@
       const data = await response.json().catch(() => ({}));
       if (!response.ok || !data.success) {
         const err = (data && data.error) || "Failed to start update";
-        if (typeof window.showResponseModal === "function") {
-          window.showResponseModal("failure", err);
-        } else {
-          alert(err);
-        }
+        window.showResponseModal("failure", err);
         return;
       }
-      if (typeof window.showResponseModal === "function") {
-        window.showResponseModal(
-          "success",
-          data.message || "Update started. Streaming progress on Settings → Updates."
-        );
-      }
+      window.showResponseModal(
+        "success",
+        data.message || "Update started. Streaming progress on Settings → Updates."
+      );
       closeModal(modal);
       // Redirect to settings so the user can watch the log stream take
       // over. On the settings page, actions.js already polls update
@@ -133,9 +127,7 @@
         }, 600);
       }
     } catch {
-      if (typeof window.showResponseModal === "function") {
-        window.showResponseModal("failure", "Failed to start update");
-      }
+      window.showResponseModal("failure", "Failed to start update");
     } finally {
       if (confirmBtn) {
         confirmBtn.disabled = false;

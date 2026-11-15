@@ -94,6 +94,21 @@
         </p>
     </div>
 
+        {# Asked before a key is deleted or a saved row removed. api_keys_page.js
+           fills in the title, text and button label. #}
+        <div id="confirmApiKeyModal" class="modal" role="alertdialog" aria-modal="true" aria-labelledby="confirmApiKeyTitle" aria-describedby="confirmApiKeyText" hidden>
+            <div class="modal-content">
+                <button type="button" id="closeConfirmApiKeyBtn" class="close-button" aria-label="Close">{{ icon('x', 'close-icon') | safe }}</button>
+                <h2 id="confirmApiKeyTitle">Delete API key</h2>
+                <div class="separator"></div>
+                <p id="confirmApiKeyText"></p>
+                <div class="buttons-container">
+                    <button type="button" class="action-button warn" id="confirmApiKeyBtn">Delete</button>
+                    <button type="button" class="action-button" id="cancelApiKeyBtn">Cancel</button>
+                </div>
+            </div>
+        </div>
+
         {% include 'response_modal.html' %}
         </main>
     </div>

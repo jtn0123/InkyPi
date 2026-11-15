@@ -306,8 +306,8 @@ def test_jtn_722_api_key_roundtrip_add_edit_delete(
     navigate_and_wait(page, live_server, "/api-keys")
     assert "JOURNEY_KEY=second-secret" in env_path.read_text(encoding="utf-8")
 
-    page.once("dialog", lambda dialog: dialog.accept())
     page.locator('.apikey-row .btn-delete[data-api-action="delete-row"]').click()
+    page.locator("#confirmApiKeyBtn").click()
     _save_api_keys(page)
 
     navigate_and_wait(page, live_server, "/api-keys")

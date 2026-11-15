@@ -261,11 +261,7 @@ class RefreshSettingsManager {
         const validation = this.validate(formData);
 
         if (!validation.valid) {
-            if (window.showResponseModal) {
-                showResponseModal('failure', `Error! ${validation.error}`);
-            } else {
-                alert(validation.error);
-            }
+            showResponseModal('failure', `Error! ${validation.error}`);
             return;
         }
 
@@ -274,11 +270,7 @@ class RefreshSettingsManager {
             this.close();
         } catch (error) {
             console.error('RefreshSettingsManager: Submit error:', error);
-            if (window.showResponseModal) {
-                showResponseModal('failure', `Error! ${error.message}`);
-            } else {
-                alert(`Error: ${error.message}`);
-            }
+            showResponseModal('failure', `Error! ${error.message}`);
         }
     }
 }

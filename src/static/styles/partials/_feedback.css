@@ -23,7 +23,8 @@
 #deletePlaylistModal,
 #deleteInstanceModal,
 #deleteHistoryModal,
-#clearHistoryModal {
+#clearHistoryModal,
+#confirmApiKeyModal {
     background-color: var(--modal-overlay-destructive, rgba(5, 8, 12, 0.82));
 }
 
