@@ -639,9 +639,9 @@ class TestWorkerSessionLeaderCleanup:
         events: list[str] = []
 
         def fake_getpgid(pid: Any):
-            # Returning a non-zero pgid distinct from getpgid(0) so the
-            # production code's ``pgid != os.getpgid(0) -> Any -> Any`` guard passes.
-            return 99999 if pid != 0 else 1
+            # The worker called setsid(), so it leads its own group (pgid ==
+            # pid) and that group is not the parent's (getpgid(0)).
+            return pid if pid != 0 else 1
 
         def fake_killpg(pgid: Any, sig: Any) -> None:
             killpg_calls.append((pgid, sig))
@@ -675,7 +675,7 @@ class TestWorkerSessionLeaderCleanup:
             "worker exits cleanly on SIGTERM (JTN-S2 regression)"
         )
         pgid, sig = killpg_calls[0]
-        assert pgid == 99999, f"expected killpg on worker pgid 99999; got {pgid}"
+        assert pgid == 12345, f"expected killpg on worker pgid 12345; got {pgid}"
         assert sig == _signal.SIGKILL, (
             f"expected SIGKILL to the group; got {sig}. SIGTERM is "
             "insufficient — chromium renderers ignore it under memory "
