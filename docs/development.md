@@ -15,32 +15,28 @@ Works on **macOS**, **Linux**, and **Windows** - no hardware needed!
 <table>
 <tr>
 <td>
-Traditional setup method
+Setup with a virtual environment (macOS, Linux, or WSL2 on Windows)
 
 ```bash
-# 1. Clone and setup
 git clone https://github.com/jtn0123/InkyPi.git
 cd InkyPi
-
-# 2. Quick start (recommended)
-./scripts/dev.sh
-
-# Or manual setup
-python3.13 -m venv .venv  # InkyPi supports Python 3.13 only
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
-
-# 3. Install Python dependencies and vendor assets
-python scripts/dev_environment.py --sync
-bash install/update_vendors.sh
-python src/inkypi.py --dev
+source scripts/venv.sh       # makes .venv on Python 3.13 and installs the
+                             # locked, hash-checked dev requirements
+./scripts/dev.sh --web-only  # web UI only; drop --web-only to also run the
+                             # refresh loop against the mock display
 ```
 
-`scripts/test.sh` checks installed versions against the committed requirements
-before running tests. To inspect the active environment without installing or
-using the network, run `python scripts/dev_environment.py`. If it reports drift,
-run `source scripts/venv.sh` (or `python scripts/dev_environment.py --sync` in an
-already activated environment). Sync installs with `--require-hashes` and records
-a lock fingerprint. Unchanged environments take the check-only fast path.
+`source scripts/venv.sh` is the whole setup: run it in each new shell. It
+creates `.venv` with Python 3.13 if it's missing, activates it, installs
+`install/requirements-dev.txt` with `--require-hashes` when the installed
+packages have drifted, and sets `PYTHONPATH`. An unchanged environment takes a
+check-only fast path. To inspect the environment without installing anything,
+run `python scripts/dev_environment.py`.
+
+The compiled stylesheet (`src/static/styles/main.css`) and the vendored
+htmx/Leaflet files are committed, so nothing else needs building. After editing
+CSS, run `python scripts/build_css.py` (or `./scripts/dev_watch.sh`, below) and
+commit the rebuilt `main.css`.
 
 </td>
 <td>
