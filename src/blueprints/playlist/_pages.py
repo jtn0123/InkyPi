@@ -2,16 +2,18 @@
 ``format_relative_time`` template filter."""
 
 from datetime import UTC, datetime, timedelta
-from typing import Any, cast
+from typing import Any
 
 from flask import current_app, has_app_context, redirect, render_template, url_for
 
+from refresh_task import schedule
 from refresh_task.health import PluginHealthTracker
 from utils.time_utils import now_device_tz
 
 from ._common import playlist_bp
 from ._schedule import (
     _compute_playlist_rotation_eta,
+    _playlist_next_due,
     _safe_next_index,
     _safe_until_next_min,
 )
@@ -52,13 +54,8 @@ def playlists() -> Any:
     except Exception:
         now_str = ""
         tz_off_min = 0
-    try:
-        device_cycle_minutes = int(
-            int(device_config.get_config("plugin_cycle_interval_seconds", default=3600))
-            // 60
-        )
-    except Exception:
-        device_cycle_minutes = 60
+    device_interval = schedule.device_interval_seconds(device_config)
+    device_cycle_minutes = schedule.cycle_minutes(device_interval)
 
     # Build per-playlist timing metadata: cycle and next refresh (if active)
     try:
@@ -68,41 +65,41 @@ def playlists() -> Any:
             if hasattr(ri_obj, "get_refresh_datetime")
             else None
         )
+        last_playlist = getattr(ri_obj, "playlist", None)
     except Exception:
         last_dt = None
+        last_playlist = None
+    last_attempt = schedule.last_attempt_of(current_app.config.get("REFRESH_TASK"))
     playlist_timing: dict[str, dict[str, int | str | None]] = {}
     rotation_eta: dict[str, dict[str, dict[str, int | str]]] = {}
     try:
         for pl in playlist_manager.playlists:
-            cycle_sec = getattr(pl, "cycle_interval_seconds", None)
-            cycle_min = int(
-                (int(cycle_sec) if cycle_sec else device_cycle_minutes * 60) // 60
-            )
+            cycle_sec = schedule.effective_cycle_seconds(pl, device_interval)
+            cycle_min = schedule.cycle_minutes(cycle_sec)
             item: dict[str, int | str | None] = {
                 "cycle_minutes": cycle_min,
                 "next_in_minutes": None,
                 "next_at": None,
             }
             try:
-                is_active = bool(
-                    last_dt and getattr(ri_obj, "playlist", None) == pl.name
+                next_dt = _playlist_next_due(
+                    pl,
+                    last_refresh=last_dt if isinstance(last_dt, datetime) else None,
+                    last_refresh_playlist=last_playlist,
+                    last_attempt=last_attempt,
+                    cycle_seconds=cycle_sec,
+                    now=now,
                 )
-                if is_active:
-                    # compute next time
-                    next_dt = cast(datetime, last_dt) + timedelta(minutes=cycle_min)
-                    delta_min = int(max(0, (next_dt - now).total_seconds() // 60))
-                    item["next_in_minutes"] = delta_min
-                    try:
-                        item["next_at"] = next_dt.strftime("%Y-%m-%d %H:%M")
-                    except Exception:
-                        item["next_at"] = None
+                if next_dt is not None:
+                    item["next_in_minutes"] = _safe_until_next_min(
+                        next_dt, cycle_min, now
+                    )
+                    item["next_at"] = next_dt.strftime("%Y-%m-%d %H:%M")
                 # Also compute rotation ETA for each plugin in this playlist
                 try:
                     num = len(pl.plugins)
                     next_index = _safe_next_index(pl, num)
-                    until_next_min = _safe_until_next_min(
-                        is_active, cast(datetime | None, last_dt), cycle_min, now
-                    )
+                    until_next_min = _safe_until_next_min(next_dt, cycle_min, now)
                     rotation_eta[pl.name] = _compute_playlist_rotation_eta(
                         pl, next_index, until_next_min, cycle_min, now
                     )

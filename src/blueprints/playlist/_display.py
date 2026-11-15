@@ -2,11 +2,11 @@
 
 import threading
 from datetime import datetime
-from typing import Any, cast
+from typing import Any
 
 from flask import current_app, request
 
-from refresh_task import PlaylistRefresh, manual_update_timings
+from refresh_task import PlaylistRefresh, manual_update_timings, schedule
 from utils.backend_errors import (
     ClientInputError,
     ResourceLookupError,
@@ -20,6 +20,7 @@ from utils.time_utils import now_device_tz
 from ._common import _CODE_VALIDATION, _MSG_PLAYLIST_NOT_FOUND, logger, playlist_bp
 from ._schedule import (
     _compute_playlist_rotation_eta,
+    _playlist_next_due,
     _safe_next_index,
     _safe_until_next_min,
 )
@@ -134,16 +135,11 @@ def playlist_eta(playlist_name: str) -> Any:
         logger=logger,
         hint="Check playlist timing data and refresh info availability.",
     ):
-        # Determine cycle in minutes
-        try:
-            device_cycle_minutes = int(
-                device_config.get_config("plugin_cycle_interval_seconds", default=3600)
-                // 60
-            )
-        except Exception:
-            device_cycle_minutes = 60
-        cycle_sec = getattr(pl, "cycle_interval_seconds", None)
-        cycle_min = int((cycle_sec or device_cycle_minutes * 60) // 60)
+        # The loop's cycle for this playlist
+        cycle_sec = schedule.effective_cycle_seconds(
+            pl, schedule.device_interval_seconds(device_config)
+        )
+        cycle_min = schedule.cycle_minutes(cycle_sec)
 
         # Determine last refresh and which index is next
         try:
@@ -153,21 +149,28 @@ def playlist_eta(playlist_name: str) -> Any:
                 if hasattr(ri_obj, "get_refresh_datetime")
                 else None
             )
+            last_playlist = getattr(ri_obj, "playlist", None)
         except Exception:
             last_dt = None
+            last_playlist = None
 
         try:
             num = len(pl.plugins)
         except Exception:
             num = 0
 
-        is_active = (
-            last_dt is not None and getattr(ri_obj, "playlist", None) == playlist_name
+        next_due = _playlist_next_due(
+            pl,
+            last_refresh=last_dt if isinstance(last_dt, datetime) else None,
+            last_refresh_playlist=last_playlist,
+            last_attempt=schedule.last_attempt_of(
+                current_app.config.get("REFRESH_TASK")
+            ),
+            cycle_seconds=cycle_sec,
+            now=now,
         )
         next_index = _safe_next_index(pl, num)
-        until_next_min = _safe_until_next_min(
-            is_active, cast(datetime | None, last_dt), cycle_min, now
-        )
+        until_next_min = _safe_until_next_min(next_due, cycle_min, now)
         eta_map = _compute_playlist_rotation_eta(
             pl, next_index, until_next_min, cycle_min, now
         )

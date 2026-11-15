@@ -5,6 +5,7 @@ from __future__ import annotations
 import threading
 from collections import deque
 from datetime import UTC, datetime, timedelta
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -57,6 +58,63 @@ def test_effective_cycle_uses_a_valid_playlist_override(
     playlist = _all_day()
     playlist.cycle_interval_seconds = override
     assert schedule.effective_cycle_seconds(playlist, HOUR) == expected
+
+
+class _IntervalConfig:
+    def __init__(self, value: object) -> None:
+        self.value = value
+
+    def get_config(self, key: str, default: object = None) -> object:
+        assert key == "plugin_cycle_interval_seconds"
+        return self.value
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        (900, 900.0),
+        (90.5, 90.5),
+        ("600", 600.0),
+        ("", HOUR),
+        ("soon", HOUR),
+        (None, HOUR),
+        (True, HOUR),
+        (0, HOUR),
+        (-30, HOUR),
+    ],
+)
+def test_device_interval_reads_the_setting_with_the_loops_fallbacks(
+    raw: object, expected: float
+) -> None:
+    assert schedule.device_interval_seconds(_IntervalConfig(raw)) == expected
+
+
+def test_device_interval_survives_a_config_read_failure() -> None:
+    class _Broken:
+        def get_config(self, key: str, default: object = None) -> object:
+            raise RuntimeError("config read failed")
+
+    assert schedule.device_interval_seconds(_Broken()) == HOUR
+
+
+@pytest.mark.parametrize(
+    ("seconds", "minutes"), [(HOUR, 60), (300.0, 5), (90.0, 1), (30.0, 1)]
+)
+def test_cycle_minutes_is_whole_minutes_and_never_zero(
+    seconds: float, minutes: int
+) -> None:
+    assert schedule.cycle_minutes(seconds) == minutes
+
+
+def test_last_attempt_comes_from_the_running_scheduler() -> None:
+    attempt = NOW - timedelta(minutes=3)
+    task = SimpleNamespace(scheduler=SimpleNamespace(last_attempt=attempt))
+
+    assert schedule.last_attempt_of(task) == attempt
+    assert schedule.last_attempt_of(None) is None
+    # A mock task in the web tests mustn't leak a non-datetime into the math.
+    task.scheduler.last_attempt = object()
+    assert schedule.last_attempt_of(task) is None
 
 
 def test_an_override_shorter_than_the_device_interval_is_honoured() -> None:

@@ -15,7 +15,50 @@ from typing import Any
 # this long, so a state the loop cannot act on can never spin it.
 MIN_WAIT_SECONDS = 5.0
 
+# The device interval when plugin_cycle_interval_seconds is unset or unusable.
+DEFAULT_DEVICE_INTERVAL_SECONDS = 60.0 * 60
+
 _MINUTES_PER_DAY = 24 * 60
+
+
+def device_interval_seconds(device_config: Any) -> float:
+    """Return the device-wide refresh interval in seconds.
+
+    Unset, unreadable, zero or negative values mean an hour: zero or less
+    would make the loop spin.
+    """
+    try:
+        raw = device_config.get_config(
+            "plugin_cycle_interval_seconds", default=DEFAULT_DEVICE_INTERVAL_SECONDS
+        )
+    except Exception:
+        return DEFAULT_DEVICE_INTERVAL_SECONDS
+    value = DEFAULT_DEVICE_INTERVAL_SECONDS
+    if isinstance(raw, (int, float)) and not isinstance(raw, bool):
+        value = float(raw)
+    elif isinstance(raw, str):
+        try:
+            value = float(raw or DEFAULT_DEVICE_INTERVAL_SECONDS)
+        except ValueError:
+            pass
+    return value if value > 0 else DEFAULT_DEVICE_INTERVAL_SECONDS
+
+
+def cycle_minutes(cycle_seconds: float) -> int:
+    """Return a cycle in whole minutes for display ("Every N min"), never 0."""
+    return max(1, int(cycle_seconds // 60))
+
+
+def last_attempt_of(refresh_task: object) -> datetime | None:
+    """Return when the running loop last acted on a due refresh, if known.
+
+    Routes predicting the next refresh pass this to :func:`next_due_at`, so
+    after a failed or skipped refresh they show the same time the loop will
+    act, not "Due now" for a whole cycle.
+    """
+    scheduler = getattr(refresh_task, "scheduler", None)
+    value = getattr(scheduler, "last_attempt", None)
+    return value if isinstance(value, datetime) else None
 
 
 def effective_cycle_seconds(playlist: Any, device_interval: float) -> float:
