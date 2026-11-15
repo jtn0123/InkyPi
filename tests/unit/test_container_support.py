@@ -2,17 +2,23 @@
 
 from __future__ import annotations
 
+import subprocess
+
 import pytest
 from tests.integration import container_support
 
 
-def test_infrastructure_failure_skips_when_not_required(monkeypatch):
+def test_infrastructure_failure_skips_when_not_required(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setattr(container_support, "REQUIRED", False)
     with pytest.raises(pytest.skip.Exception, match="no docker"):
         container_support.infrastructure_failed("no docker")
 
 
-def test_infrastructure_failure_fails_when_required(monkeypatch):
+def test_infrastructure_failure_fails_when_required(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setattr(container_support, "REQUIRED", True)
     with pytest.raises(pytest.fail.Exception, match="no docker"):
         container_support.infrastructure_failed("no docker")
@@ -23,8 +29,8 @@ def test_infrastructure_failure_fails_when_required(monkeypatch):
     [(False, False, True), (False, True, False), (True, False, False)],
 )
 def test_docker_mark_only_skips_when_not_required(
-    monkeypatch, required, docker, skipped
-):
+    monkeypatch: pytest.MonkeyPatch, required: bool, docker: bool, skipped: bool
+) -> None:
     monkeypatch.setattr(container_support, "REQUIRED", required)
     monkeypatch.setattr(container_support, "docker_available", lambda: docker)
     mark = container_support.skip_unless_docker()
@@ -39,9 +45,11 @@ def test_docker_mark_only_skips_when_not_required(
         ("", ["--cgroupns=host"]),
     ],
 )
-def test_cgroup_flags_follow_the_cgroup_version(monkeypatch, version, expected):
+def test_cgroup_flags_follow_the_cgroup_version(
+    monkeypatch: pytest.MonkeyPatch, version: str, expected: list[str]
+) -> None:
     class _Probe:
         stdout = version
 
-    monkeypatch.setattr(container_support.subprocess, "run", lambda *a, **k: _Probe())
+    monkeypatch.setattr(subprocess, "run", lambda *a, **k: _Probe())
     assert container_support.cgroup_run_args() == expected
