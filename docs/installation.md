@@ -83,7 +83,7 @@ Use this path when you want the latest main branch, are contributing to
 InkyPi, are on a Pi model other than the Zero 2 W, or want full visibility
 into the install process.
 
-## Flashing Raspberry Pi OS 
+## Flashing Raspberry Pi OS
 
 1. Install the Raspberry Pi Imager from the [official download page](https://www.raspberrypi.com/software/)
 2. Insert the target SD Card into your computer and launch the Raspberry Pi Imager software
@@ -109,7 +109,7 @@ into the install process.
 
 <p float="left">
   <img src="./images/raspberry_pi_imager_general.png" width="250" />
-  <img src="./images/raspberry_pi_imager_options.png" width="250" /> 
+  <img src="./images/raspberry_pi_imager_options.png" width="250" />
   <img src="./images/raspberry_pi_imager_services.png" width="250" />
 </p>
 
@@ -160,11 +160,11 @@ As of the version that resolves [JTN-605](https://linear.app/jtn0123/issue/JTN-6
 
 ### Watching the install via cloud-init
 
-If you're driving an unattended install via cloud-init (e.g. via a `runcmd:` block in `user-data`), redirect the install output so you can watch it after the Pi boots:
+If you're driving an unattended install via cloud-init (e.g. via a `runcmd:` block in `user-data`), redirect the install output so you can watch it after the Pi boots. Replace `vX.Y.Z` with the [latest release tag](https://github.com/jtn0123/InkyPi/releases/latest):
 
 ```yaml
 runcmd:
-- sudo -u <your-user> git clone --branch v0.28.1 --depth 1 https://github.com/jtn0123/InkyPi.git /home/<your-user>/InkyPi
+- sudo -u <your-user> git clone --branch vX.Y.Z --depth 1 https://github.com/jtn0123/InkyPi.git /home/<your-user>/InkyPi
 - chown -R <your-user>:<your-user> /home/<your-user>/InkyPi
 - bash -c 'cd /home/<your-user>/InkyPi/install && ./install.sh > /var/log/inkypi-install.log 2>&1 && touch /var/log/inkypi-install.done || touch /var/log/inkypi-install.failed'
 ```

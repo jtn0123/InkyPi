@@ -8,18 +8,18 @@ InkyPi plugins are third-party or user-written code that fetch external data and
 
 ## Decision
 
-Each plugin invocation is run in a separate child process via Python's `multiprocessing` module (see `src/refresh_task/worker.py`). On Linux (the production target) the `forkserver` start method is preferred because it spawns children from a lean server process rather than duplicating the parent's full heap on every `fork()`. The child serialises its result (PNG bytes + optional metadata) onto a `multiprocessing.Queue` and exits; the parent reads the queue and re-raises any exception as a structured error. The `_get_mp_context()` helper in `worker.py` encapsulates the platform-specific method selection (line 14-24).
+Each plugin invocation is run in a separate child process via Python's `multiprocessing` module (see `src/refresh_task/worker.py`). On Linux (the production target) the `forkserver` start method is preferred because it spawns children from a lean server process rather than duplicating the parent's full heap on every `fork()`. The child writes the image to a PNG tempfile and puts the file path (plus optional metadata and any plugin-state changes) onto a `multiprocessing.Queue` and exits; the parent reads the queue, loads the image, and re-raises any exception as a structured error. Sending the path rather than the bytes keeps the payload below the pipe buffer, which a full PNG would block on (see `_execute_refresh_attempt_worker`). The `_get_mp_context()` helper in `worker.py` encapsulates the platform-specific method selection.
 
 ## Consequences
 
 ### Positive
 - A crashing or OOM-killed plugin cannot take down the web UI.
 - Memory leaks are bounded to a single refresh cycle — the child process is reclaimed by the OS on exit.
-- The circuit breaker in `_update_plugin_health` (task.py) can track consecutive failures and pause a plugin without affecting others.
+- The circuit breaker (`_update_plugin_health` in `src/refresh_task/health_hooks.py`, backed by `PluginHealthTracker` in `health.py`) can track consecutive failures and pause a plugin without affecting others.
 
 ### Negative
 - Subprocess spawn is slower than a direct function call; on a Pi Zero 2 W `forkserver` adds ~200-400 ms of overhead per refresh.
-- Plugin objects must be picklable (or reconstructed from config) to cross the process boundary — `Config` implements `__getstate__`/`__setstate__` for this reason (`src/config.py` lines 90-104).
+- Plugin objects must be picklable (or reconstructed from config) to cross the process boundary — `Config` implements `__getstate__`/`__setstate__` for this reason (`src/config.py`), and the worker rebuilds its `Config` from a picklable `RefreshContext` (`src/refresh_task/context.py`).
 - Debugging is harder because tracebacks must be serialised as strings and re-raised in the parent.
 
 ## Alternatives considered
