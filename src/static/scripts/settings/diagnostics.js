@@ -310,7 +310,7 @@
     return errorText;
   }
 
-  function createDiagnosticsModule({ ui }) {
+  function createDiagnosticsModule({ ui, modals }) {
     let progressES = null;
     let benchmarkRequestSeq = 0;
     let stageRequestSeq = 0;
@@ -552,19 +552,36 @@
       return toggleIsolation("DELETE", "un-isolate");
     }
 
+    // Runs from the confirm dialog. On success the page reloads, so the form
+    // shows the reset values: otherwise the next Save would post the old
+    // interval back and undo the reset. The message survives the reload.
     async function safeReset() {
+      const confirmBtn = document.getElementById("confirmSafeResetBtn");
+      if (confirmBtn?.disabled) return;
+      if (confirmBtn) confirmBtn.disabled = true;
+      let error = "Safe reset failed";
       try {
         const resp = await fetch("/settings/safe_reset", { method: "POST" });
-        const data = await resp.json();
+        const data = await resp.json().catch(() => ({}));
         if (resp.ok && data.success) {
-          showResponseModal("success", data.message || "Safe reset complete");
-          await refreshHealth();
-        } else {
-          showResponseModal("failure", data.error || "Safe reset failed");
+          storeMessageForReload("success", data.message || "Safe reset complete");
+          globalThis.location.reload();
+          return;
         }
+        error = data.error || error;
       } catch (e) {
         console.warn("Safe reset failed:", e);
-        showResponseModal("failure", "Safe reset failed");
+      }
+      if (confirmBtn) confirmBtn.disabled = false;
+      modals.closeSafeResetConfirm();
+      showResponseModal("failure", error);
+    }
+
+    function storeMessageForReload(type, text) {
+      try {
+        sessionStorage.setItem("storedMessage", JSON.stringify({ type, text }));
+      } catch (e) {
+        console.debug("Could not keep the message across the reload:", e);
       }
     }
 
@@ -604,7 +621,17 @@
       document
         .getElementById("benchmarkWindow")
         ?.addEventListener("change", refreshBenchmarks);
-      document.getElementById("safeResetBtn")?.addEventListener("click", safeReset);
+      document
+        .getElementById("safeResetBtn")
+        ?.addEventListener("click", modals.openSafeResetConfirm);
+      document
+        .getElementById("confirmSafeResetBtn")
+        ?.addEventListener("click", safeReset);
+      for (const id of ["cancelSafeResetBtn", "closeSafeResetConfirmModalBtn"]) {
+        document
+          .getElementById(id)
+          ?.addEventListener("click", modals.closeSafeResetConfirm);
+      }
       document
         .getElementById("isolatePluginBtn")
         ?.addEventListener("click", isolatePlugin);

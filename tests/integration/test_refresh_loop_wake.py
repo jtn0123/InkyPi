@@ -186,6 +186,12 @@ def test_changing_the_timezone_wakes_the_loop(
     assert wakes == ["wake"]
 
 
+def test_a_safe_reset_wakes_the_loop(client: FlaskClient, wakes: list[str]) -> None:
+    """Safe reset sets the device interval to an hour."""
+    assert client.post("/settings/safe_reset").status_code == 200
+    assert wakes == ["wake"]
+
+
 def test_saving_unchanged_timing_does_not_wake_the_loop(
     client: FlaskClient, wakes: list[str]
 ) -> None:

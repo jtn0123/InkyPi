@@ -32,6 +32,7 @@ UI_BROWSER_TESTS = {
     "test_weather_image_render.py",
     "test_playlist_crud_e2e.py",
     "test_settings_round_trip_e2e.py",
+    "test_safe_reset_confirm.py",
     "test_plugin_workflow_e2e.py",
     "test_dashboard_display_next_e2e.py",
     "test_dashboard_reliability_e2e.py",

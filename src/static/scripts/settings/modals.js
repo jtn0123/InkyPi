@@ -54,6 +54,18 @@
       setDeviceActionModalOpen("shutdownConfirmModal", false);
     }
 
+    function openSafeResetConfirm(event) {
+      setDeviceActionModalOpen(
+        "safeResetConfirmModal",
+        true,
+        event?.currentTarget
+      );
+    }
+
+    function closeSafeResetConfirm() {
+      setDeviceActionModalOpen("safeResetConfirmModal", false);
+    }
+
     function openRollbackConfirm(event) {
       const btn = document.getElementById("rollbackUpdateBtn");
       const target = btn?.dataset?.prevVersion || "the previous version";
@@ -108,6 +120,9 @@
         } else if (isDeviceActionModalOpen("rollbackConfirmModal")) {
           event.preventDefault();
           closeRollbackConfirm();
+        } else if (isDeviceActionModalOpen("safeResetConfirmModal")) {
+          event.preventDefault();
+          closeSafeResetConfirm();
         }
       });
 
@@ -116,10 +131,12 @@
         const rebootModal = document.getElementById("rebootConfirmModal");
         const shutdownModal = document.getElementById("shutdownConfirmModal");
         const rollbackModal = document.getElementById("rollbackConfirmModal");
+        const safeResetModal = document.getElementById("safeResetConfirmModal");
         if (event.target === whatsNewModal) closeWhatsNew();
         else if (event.target === rebootModal) closeRebootConfirm();
         else if (event.target === shutdownModal) closeShutdownConfirm();
         else if (event.target === rollbackModal) closeRollbackConfirm();
+        else if (event.target === safeResetModal) closeSafeResetConfirm();
       });
     }
 
@@ -127,11 +144,13 @@
       bindGlobalDismissals,
       closeRebootConfirm,
       closeRollbackConfirm,
+      closeSafeResetConfirm,
       closeShutdownConfirm,
       closeWhatsNew,
       isDeviceActionModalOpen,
       openRebootConfirm,
       openRollbackConfirm,
+      openSafeResetConfirm,
       openShutdownConfirm,
       openWhatsNew,
       setDeviceActionModalOpen,

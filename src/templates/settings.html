@@ -693,6 +693,19 @@
         </div>
     </div>
 
+    <div id="safeResetConfirmModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="safeResetConfirmTitle" hidden>
+        <div class="modal-content">
+            <button type="button" id="closeSafeResetConfirmModalBtn" class="close-button" aria-label="Close">{{ icon('x', 'close-icon') | safe }}</button>
+            <h2 id="safeResetConfirmTitle">Safe reset?</h2>
+            <div class="separator"></div>
+            <p>This sets the display cycle to 1 hour, turns off system stats logging and un-isolates every plugin. Your playlists, plugins and other settings are kept. The page reloads afterwards.</p>
+            <div class="buttons-container">
+                <button type="button" class="action-button is-warning" id="confirmSafeResetBtn">Safe reset</button>
+                <button type="button" class="action-button is-secondary" id="cancelSafeResetBtn">Cancel</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Success/Error Modal -->
     {% include 'response_modal.html' %}
     </main>
