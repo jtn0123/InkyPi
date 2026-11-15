@@ -2,6 +2,27 @@
 
 <!-- version list -->
 
+## v1.9.3 (2026-11-15)
+
+### Bug Fixes
+
+- **playlist**: Spin the row that was pressed, and drop the dead progress panel code
+  ([#831](https://github.com/jtn0123/InkyPi/pull/831),
+  [`898cab0`](https://github.com/jtn0123/InkyPi/commit/898cab0a8b1d4708a8fbf56c8e427ea3536885e4))
+
+### Build System
+
+- **mypy**: Lower the tests baseline from 487 to 485
+  ([#833](https://github.com/jtn0123/InkyPi/pull/833),
+  [`3527f85`](https://github.com/jtn0123/InkyPi/commit/3527f85ada2d68704504e47120dfe59390e0dfdf))
+
+### Refactoring
+
+- **types**: No explicit Any in app_setup, display and services
+  ([#830](https://github.com/jtn0123/InkyPi/pull/830),
+  [`35b20e6`](https://github.com/jtn0123/InkyPi/commit/35b20e6f1f99388528a5a0a11c9dff0ba56daeb9))
+
+
 ## v1.9.2 (2026-11-15)
 
 ### Bug Fixes
