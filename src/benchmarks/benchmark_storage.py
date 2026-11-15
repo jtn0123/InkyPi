@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import random
 import sqlite3
@@ -10,6 +11,29 @@ class DeviceConfigLike(Protocol):
     BASE_DIR: str
 
     def get_config(self, key: str, default: Any = None) -> Any: ...
+
+
+logger = logging.getLogger(__name__)
+
+
+class _SaveFailureLog:
+    """Report a broken benchmark DB once, not on every stage of every refresh."""
+
+    def __init__(self) -> None:
+        self.failing = False
+
+    def failed(self, what: str, exc: Exception) -> None:
+        log = logger.debug if self.failing else logger.warning
+        log("Could not save %s benchmark: %s", what, exc)
+        self.failing = True
+
+    def succeeded(self) -> None:
+        if self.failing:
+            logger.info("Benchmarks are being saved again")
+        self.failing = False
+
+
+_save_failures = _SaveFailureLog()
 
 
 def _get_db_path(device_config: DeviceConfigLike) -> str:
@@ -284,9 +308,10 @@ def save_refresh_event(
             conn.commit()
         finally:
             conn.close()
-    except Exception:
-        # Swallow all exceptions to avoid impacting production path
-        pass
+        _save_failures.succeeded()
+    except Exception as exc:
+        # Never fail a refresh over its benchmark, but say why it's missing.
+        _save_failures.failed("a refresh", exc)
 
 
 def save_stage_event(
@@ -326,5 +351,6 @@ def save_stage_event(
             conn.commit()
         finally:
             conn.close()
-    except Exception:
-        pass
+        _save_failures.succeeded()
+    except Exception as exc:
+        _save_failures.failed(f"the {stage} stage", exc)

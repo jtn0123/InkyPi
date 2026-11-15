@@ -55,7 +55,7 @@ def _current_dt(device_config: Any) -> datetime:
         if isinstance(current_dt, datetime):
             return current_dt
     except Exception:
-        pass
+        logger.warning("Could not read the device time zone; using UTC", exc_info=True)
     return datetime.now(UTC)
 
 
@@ -84,7 +84,11 @@ def _playlist_cycle_minutes(device_config: Any, playlist_name: Any) -> int:
         if cycle_seconds:
             return max(1, int(cycle_seconds) // 60)
     except Exception:
-        pass
+        logger.warning(
+            "Playlist %r has an unreadable cycle interval; using the device's",
+            playlist_name,
+            exc_info=True,
+        )
 
     return cycle_minutes
 
@@ -548,10 +552,7 @@ def _display_next_direct(
         return None, json_error("Plugin produced no image to display", status=409)
     generate_ms = int((perf_counter() - _t_gen_start) * 1000)
 
-    try:
-        save_stage_event(device_config, benchmark_id, "generate_image", generate_ms)
-    except Exception:
-        pass
+    save_stage_event(device_config, benchmark_id, "generate_image", generate_ms)
 
     # Display — fitted to the panel exactly as the refresh task would.
     image = fit_image_to_device(image, device_config, plugin_instance.plugin_id)
@@ -612,7 +613,7 @@ def _gather_display_metrics(
         generate_ms = generate_ms or getattr(ri, "generate_ms", None)
         preprocess_ms = getattr(ri, "preprocess_ms", None)
     except Exception:
-        pass
+        logger.warning("Could not read this refresh's timings", exc_info=True)
     return request_ms, display_ms, generate_ms, preprocess_ms
 
 
@@ -634,7 +635,7 @@ def _persist_dev_refresh_event(
             cpu_percent = psutil.cpu_percent(interval=None)
             memory_percent = psutil.virtual_memory().percent
         except Exception:
-            pass
+            logger.debug("CPU and memory figures unavailable", exc_info=True)
         save_refresh_event(
             device_config,
             {
@@ -654,7 +655,7 @@ def _persist_dev_refresh_event(
             },
         )
     except Exception:
-        pass
+        logger.warning("Could not record this refresh's benchmark", exc_info=True)
 
 
 @main_bp.route("/display-next", methods=["POST"])
