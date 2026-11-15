@@ -906,7 +906,9 @@ def _check_latest_version(force_refresh: bool = False) -> str | None:
     return None
 
 
-# Import allowlists for settings import
+# Import allowlists for settings import. ``refresh_info`` is left out on
+# purpose: it records what this screen is showing right now, so restoring a
+# backup's copy would make the dashboard describe a picture that isn't there.
 _ALLOWED_IMPORT_CONFIG_KEYS = frozenset(
     {
         "name",
@@ -915,7 +917,6 @@ _ALLOWED_IMPORT_CONFIG_KEYS = frozenset(
         "timezone",
         "color_mode",
         "playlist_config",
-        "refresh_info",
         "plugins",
         "plugin_cycle_interval_seconds",
         "time_format",

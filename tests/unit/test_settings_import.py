@@ -5,6 +5,7 @@ import io
 import json
 from typing import Any
 
+import pytest
 from flask.testing import FlaskClient
 
 # ---------------------------------------------------------------------------
@@ -145,6 +146,161 @@ class TestImportSettings:
         message = resp.get_json()["message"]
         assert "2 settings" in message
         assert "1 API key" in message
+
+
+def _seed_playlist(device_config: Any, name: str, instance: str) -> None:
+    def apply(_config: dict[str, Any]) -> None:
+        manager = device_config.get_playlist_manager()
+        manager.add_playlist(name, "06:00", "22:00")
+        manager.add_plugin_to_playlist(
+            name,
+            {
+                "plugin_id": "clock",
+                "name": instance,
+                "plugin_settings": {},
+                "refresh": {"interval": 600},
+            },
+        )
+
+    device_config.update_atomic(apply)
+
+
+def _playlist_names_on_disk(device_config: Any) -> list[str]:
+    with open(device_config.config_file, encoding="utf-8") as fh:
+        saved = json.load(fh)
+    return [p["name"] for p in saved["playlist_config"]["playlists"]]
+
+
+class TestImportRestoresPlaylists:
+    def test_export_then_import_round_trips_playlists(
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
+        _seed_playlist(device_config_dev, "Morning", "Kitchen clock")
+        backup = client.get("/settings/export").get_json()["data"]
+
+        # Change the device after the backup was taken.
+        device_config_dev.update_atomic(
+            lambda _c: device_config_dev.get_playlist_manager().delete_playlist(
+                "Morning"
+            )
+        )
+        _seed_playlist(device_config_dev, "Evening", "Hall clock")
+
+        resp = client.post("/settings/import", json=backup)
+        assert resp.status_code == 200, resp.get_json()
+
+        manager = device_config_dev.get_playlist_manager()
+        assert "Morning" in manager.get_playlist_names()
+        assert "Evening" not in manager.get_playlist_names()
+        morning = manager.get_playlist("Morning")
+        assert morning is not None
+        assert [p.name for p in morning.plugins] == ["Kitchen clock"]
+        assert "Morning" in _playlist_names_on_disk(device_config_dev)
+        assert "Evening" not in _playlist_names_on_disk(device_config_dev)
+
+    def test_imported_playlists_survive_the_next_save(
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
+        payload = {
+            "config": {
+                "playlist_config": {
+                    "playlists": [
+                        {
+                            "name": "Imported",
+                            "start_time": "00:00",
+                            "end_time": "24:00",
+                            "plugins": [],
+                        }
+                    ],
+                    "active_playlist": "Imported",
+                }
+            }
+        }
+        resp = client.post("/settings/import", json=payload)
+        assert resp.status_code == 200
+
+        # Any later save serialises from the playlist model; it must not
+        # put the pre-import playlists back.
+        device_config_dev.update_value("name", "After import", write=True)
+        assert _playlist_names_on_disk(device_config_dev) == ["Imported"]
+        assert device_config_dev.get_playlist_manager().active_playlist == "Imported"
+
+    def test_empty_playlist_section_gets_the_default_playlist(
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
+        _seed_playlist(device_config_dev, "Morning", "Kitchen clock")
+        payload: dict[str, Any] = {"config": {"playlist_config": {"playlists": []}}}
+        resp = client.post("/settings/import", json=payload)
+        assert resp.status_code == 200
+        names = device_config_dev.get_playlist_manager().get_playlist_names()
+        assert names == ["Default"]
+
+    def test_non_dict_playlist_section_is_rejected(
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
+        _seed_playlist(device_config_dev, "Morning", "Kitchen clock")
+        payload = {"config": {"name": "Should not apply", "playlist_config": []}}
+        resp = client.post("/settings/import", json=payload)
+        assert resp.status_code == 400
+        assert device_config_dev.get_config("name") == "InkyPi Test"
+        assert (
+            "Morning" in device_config_dev.get_playlist_manager().get_playlist_names()
+        )
+
+    def test_malformed_playlist_rolls_back_the_whole_import(
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
+        _seed_playlist(device_config_dev, "Morning", "Kitchen clock")
+        names_before = device_config_dev.get_playlist_manager().get_playlist_names()
+        payload = {
+            "config": {
+                "name": "Should not apply",
+                "playlist_config": {"playlists": ["not a playlist"]},
+            }
+        }
+        resp = client.post("/settings/import", json=payload)
+        assert resp.status_code == 400
+        assert device_config_dev.get_config("name") == "InkyPi Test"
+        manager = device_config_dev.get_playlist_manager()
+        assert manager.get_playlist_names() == names_before
+        assert _playlist_names_on_disk(device_config_dev) == names_before
+
+    def test_refresh_info_from_backup_is_not_imported(
+        self, client: FlaskClient, device_config_dev: Any
+    ) -> None:
+        before = device_config_dev.get_refresh_info().to_dict()
+        payload = {
+            "config": {
+                "name": "Restored",
+                "refresh_info": {
+                    "refresh_time": "2020-01-01T00:00:00+00:00",
+                    "image_hash": "stale",
+                    "refresh_type": "Playlist",
+                    "plugin_id": "clock",
+                },
+            }
+        }
+        resp = client.post("/settings/import", json=payload)
+        assert resp.status_code == 200
+        assert "1 setting" in resp.get_json()["message"]
+        assert device_config_dev.get_refresh_info().to_dict() == before
+
+    def test_import_notifies_the_refresh_task(
+        self,
+        client: FlaskClient,
+        device_config_dev: Any,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        refresh_task = client.application.config["REFRESH_TASK"]
+        calls: list[str] = []
+        monkeypatch.setattr(
+            refresh_task, "signal_config_change", lambda: calls.append("signal")
+        )
+        resp = client.post(
+            "/settings/import", json={"config": {"timezone": "Europe/London"}}
+        )
+        assert resp.status_code == 200
+        assert calls == ["signal"]
 
 
 # ---------------------------------------------------------------------------
