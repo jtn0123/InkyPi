@@ -2,6 +2,15 @@
 
 <!-- version list -->
 
+## v1.8.9 (2026-11-15)
+
+### Bug Fixes
+
+- **plugins**: Send newly picked Image Upload files and keep saved ones
+  ([#722](https://github.com/jtn0123/InkyPi/pull/722),
+  [`4efe123`](https://github.com/jtn0123/InkyPi/commit/4efe123532ebfa244bb0c44f32f5d11e0c25376b))
+
+
 ## v1.8.8 (2026-11-15)
 
 ### Bug Fixes
