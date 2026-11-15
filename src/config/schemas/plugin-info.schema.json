@@ -9,6 +9,17 @@
     "id": { "type": "string", "pattern": "^[a-z0-9_]+$" },
     "class": { "type": "string" },
     "display_name": { "type": "string" },
+    "api_version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+$" },
+    "version": { "type": "string" },
+    "repository": { "type": "string" },
+    "requires_api_key": {
+      "type": "boolean",
+      "description": "The settings form asks for an API key. The refresh progress step reads this instead of loading the plugin."
+    },
+    "skip_display_condition": {
+      "type": "boolean",
+      "description": "The plugin implements skip_display_condition. The scheduler only loads the plugin in the main process to ask when this is true."
+    },
     "image_settings": {
       "type": "array",
       "description": "Display hints for this plugin's frames, e.g. \"keep-width\" or \"crisp\" (rendered UI: undithered on colour e-ink).",
@@ -16,5 +27,3 @@
     }
   }
 }
-
-

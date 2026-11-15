@@ -140,6 +140,11 @@ class BasePlugin:
             failure.
 
         Note:
+            The scheduler only calls this when the plugin's
+            ``plugin-info.json`` sets ``"skip_display_condition": true``. It
+            runs in the main process before the render worker starts, so keep
+            it quick.
+
             If an implementation fetches data in order to decide and then
             returns ``None``, cache what it fetched in *settings* under a
             plugin-private, JSON-serialisable key so :meth:`generate_image` can

@@ -4,5 +4,6 @@
     "class": "AIText",
     "api_version": "1.0",
     "version": "1.0.0",
-    "image_settings": ["crisp"]
+    "image_settings": ["crisp"],
+    "requires_api_key": true
 }

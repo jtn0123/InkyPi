@@ -48,6 +48,7 @@ This guide walks you through the process of creating a new plugin for InkyPi.
             settings["index"] = settings["index"] + 1
         ```
 - (Optional) If your plugin sometimes has nothing worth showing, implement `skip_display_condition` to yield its playlist turn instead of rendering an empty frame. On an e-ink panel the cheapest refresh is the one that never happens.
+    - Also set `"skip_display_condition": true` in `plugin-info.json`. The scheduler asks the hook in the main process, before the render worker starts, and only loads plugins that set the flag, so keep the hook quick.
     - Return `None` to render normally, or a short reason string to skip this cycle. The reason is recorded against the plugin, so a skip reads as deliberate rather than as a silent failure.
     - Intended for plugins with legitimate quiet periods — a scoreboard out of season, a calendar with no events today, a feed with nothing new.
     - Only playlist refreshes are skipped. A manual **Update Now** always renders, because declining an explicit request looks like a broken button.
@@ -177,6 +178,10 @@ A plugin with no options can skip `build_settings_schema`. Its settings page the
     - `api_version`: the plugin API it was written for. The loader warns when its major version doesn't match.
     - `version`: your plugin's own version.
     - `repository`: the GitHub URL, if it is published as a third-party plugin.
+    - `requires_api_key` (optional): `true` when the settings form asks for an API key. The refresh progress shows "Checking provider credentials" for these plugins.
+    - `skip_display_condition` (optional): `true` when the plugin implements `skip_display_condition` (see above).
+    - `image_settings` (optional): display hints such as `"crisp"`.
+    - `src/config/schemas/plugin-info.schema.json` lists every key, and a unit test checks each built-in plugin against it.
 - A folder is recognised as a plugin when it contains a `plugin-info.json`.
 
 ## Test Your Plugin
