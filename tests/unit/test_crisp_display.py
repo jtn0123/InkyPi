@@ -488,6 +488,12 @@ class _UiPlugin:
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="fork start method is POSIX-only")
+# Forks on purpose so the child inherits the monkeypatched plugin factory;
+# Python warns about forking a process that has threads (pytest-xdist adds
+# some). The worker itself uses forkserver.
+@pytest.mark.filterwarnings(
+    "ignore:This process .* is multi-threaded:DeprecationWarning"
+)
 @pytest.mark.parametrize(
     ("image_settings", "expect_dithered"),
     [([CRISP_IMAGE_SETTING], False), ([], True)],

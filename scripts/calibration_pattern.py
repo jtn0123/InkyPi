@@ -63,12 +63,9 @@ def make_pure_colors(w: int, h: int) -> Image.Image:
         luma = 0.299 * color[0] + 0.587 * color[1] + 0.114 * color[2]
         text_color = "black" if luma > 128 else "white"
         # Center label
-        try:
-            bbox = draw.textbbox((0, 0), label, font=font)
-            tw = bbox[2] - bbox[0]
-            th = bbox[3] - bbox[1]
-        except AttributeError:
-            tw, th = draw.textsize(label, font=font)  # type: ignore[attr-defined]
+        bbox = draw.textbbox((0, 0), label, font=font)
+        tw = bbox[2] - bbox[0]
+        th = bbox[3] - bbox[1]
         tx = x0 + (cell_w - tw) // 2
         ty = y0 + (cell_h - th) // 2
         draw.text((tx, ty), label, fill=text_color, font=font)
@@ -95,11 +92,8 @@ def make_grayscale_ramp(w: int, h: int) -> Image.Image:
         # Label each step with its value
         label = str(v)
         text_color = "white" if v < 128 else "black"
-        try:
-            bbox = draw.textbbox((0, 0), label, font=font)
-            tw = bbox[2] - bbox[0]
-        except AttributeError:
-            tw, _ = draw.textsize(label, font=font)  # type: ignore[attr-defined]
+        bbox = draw.textbbox((0, 0), label, font=font)
+        tw = bbox[2] - bbox[0]
         tx = x0 + (step_w - tw) // 2
         ty = h // 2 - 8
         draw.text((tx, ty), label, fill=text_color, font=font)
@@ -164,11 +158,8 @@ def make_font_resolution(w: int, h: int) -> Image.Image:
         font = _default_font(pt)
         label = f"{pt}pt: {sample}"
         draw.text((margin, y), label, fill="black", font=font)
-        try:
-            bbox = draw.textbbox((0, 0), label, font=font)
-            th = bbox[3] - bbox[1]
-        except AttributeError:
-            _, th = draw.textsize(label, font=font)  # type: ignore[attr-defined]
+        bbox = draw.textbbox((0, 0), label, font=font)
+        th = bbox[3] - bbox[1]
         y += th + 6
         if y > h - margin:
             break
@@ -287,12 +278,9 @@ def _draw_centered_text(
     color: str,
 ) -> None:
     """Draw text centered within the bounding box (x0,y0)-(x1,y1)."""
-    try:
-        bbox = draw.textbbox((0, 0), text, font=font)
-        tw = bbox[2] - bbox[0]
-        th = bbox[3] - bbox[1]
-    except AttributeError:
-        tw, th = draw.textsize(text, font=font)  # type: ignore[attr-defined]
+    bbox = draw.textbbox((0, 0), text, font=font)
+    tw = bbox[2] - bbox[0]
+    th = bbox[3] - bbox[1]
     tx = x0 + ((x1 - x0) - tw) // 2
     ty = y0 + ((y1 - y0) - th) // 2
     draw.text((tx, ty), text, fill=color, font=font)

@@ -32,9 +32,17 @@ from model import PluginInstance, RefreshInfo
 from refresh_task import RefreshTask
 from refresh_task.actions import PlaylistRefresh
 
-pytestmark = pytest.mark.skipif(
-    sys.platform == "win32", reason="fork start method is POSIX-only"
-)
+pytestmark = [
+    pytest.mark.skipif(
+        sys.platform == "win32", reason="fork start method is POSIX-only"
+    ),
+    # These tests fork on purpose (see _setup) so the child inherits the
+    # monkeypatched plugin factory. Python warns about forking a process that
+    # has threads (pytest-xdist adds some); the worker itself uses forkserver.
+    pytest.mark.filterwarnings(
+        "ignore:This process .* is multi-threaded:DeprecationWarning"
+    ),
+]
 
 _PLUGIN_ID = "counting_plugin"
 
