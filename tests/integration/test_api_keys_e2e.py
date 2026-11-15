@@ -177,8 +177,8 @@ def test_deleting_a_managed_key_asks_first_and_cancel_sends_nothing(
     )
     page.locator("#cancelApiKeyBtn").click()
     expect(modal).to_be_hidden()
-    page.wait_for_timeout(200)
-    assert deletes == [], "Cancel must not send the delete request"
+    # Cancel's check is the exactly-one-delete assert below: a request sent
+    # by Cancel would be recorded before the confirmed one.
 
     delete_btn.click()
     with page.expect_response(
@@ -186,7 +186,8 @@ def test_deleting_a_managed_key_asks_first_and_cancel_sends_nothing(
     ) as info:
         page.locator("#confirmApiKeyBtn").click()
     assert info.value.ok, f"delete returned {info.value.status}"
-    assert len(deletes) == 1 and "NASA_SECRET" in (deletes[0] or "")
+    assert len(deletes) == 1, "Cancel must not send the delete request"
+    assert "NASA_SECRET" in (deletes[0] or "")
     expect(page.locator(".toast.success .toast-content")).to_have_text(
         "Success! Deleted NASA_SECRET."
     )
