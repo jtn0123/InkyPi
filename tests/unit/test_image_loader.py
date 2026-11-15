@@ -1,12 +1,33 @@
 # pyright: reportMissingImports=false
 """Tests for utils/image_loader.py — AdaptiveImageLoader."""
 
+import socket
 from io import BytesIO
 from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock, patch
 
+import pytest
 from PIL import Image
+
+_PUBLIC_IP = "93.184.216.34"
+
+
+def _ainfo(ip: str, port: Any = 0) -> list[Any]:
+    """Build a minimal IPv4 addrinfo list for *ip*."""
+    return [(socket.AF_INET, socket.SOCK_STREAM, socket.IPPROTO_TCP, "", (ip, port))]
+
+
+@pytest.fixture(autouse=True)
+def _public_dns(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Resolve every test hostname to a public address, offline.
+
+    ``from_url`` validates the host before fetching, so without this stub the
+    tests would hit real DNS (and fail offline).
+    """
+    monkeypatch.setattr(
+        socket, "getaddrinfo", lambda host, port=0, *a, **kw: _ainfo(_PUBLIC_IP, port)
+    )
 
 
 def _png_bytes(size: Any = (200, 150), color: Any = "red") -> Any:
@@ -427,3 +448,144 @@ def test_from_bytesio_rgba_conversion() -> None:
     assert isinstance(result, Image.Image)
     assert result.mode == "RGB"
     assert result.size == (100, 75)
+
+
+# ---- from_url SSRF guard and size cap ----
+
+
+def _loader(low_resource: bool) -> Any:
+    from utils.image_loader import AdaptiveImageLoader
+
+    with patch("utils.image_loader._is_low_resource_device", return_value=low_resource):
+        return AdaptiveImageLoader()
+
+
+@pytest.mark.parametrize("low_resource", [False, True])
+def test_from_url_rejects_private_address_without_fetching(
+    monkeypatch: pytest.MonkeyPatch, low_resource: bool
+) -> None:
+    """A host that resolves to a private address is refused before any request."""
+    monkeypatch.setattr(
+        socket, "getaddrinfo", lambda host, port=0, *a, **kw: _ainfo("10.0.0.5", port)
+    )
+    session = MagicMock()
+    with patch("utils.image_loader.get_http_session", return_value=session):
+        result = _loader(low_resource).from_url("http://intranet.test/a.png", (10, 10))
+    assert result is None
+    session.get.assert_not_called()
+
+
+def test_from_url_rejects_metadata_ip_literal() -> None:
+    session = MagicMock()
+    with patch("utils.image_loader.get_http_session", return_value=session):
+        result = _loader(False).from_url("http://169.254.169.254/latest", (10, 10))
+    assert result is None
+    session.get.assert_not_called()
+
+
+def test_from_url_allow_lan_accepts_lan_address(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        socket,
+        "getaddrinfo",
+        lambda host, port=0, *a, **kw: _ainfo("192.168.1.20", port),
+    )
+    session = MagicMock()
+    session.get.return_value = _make_session_response(_png_bytes())
+    with patch("utils.image_loader.get_http_session", return_value=session):
+        result = _loader(False).from_url(
+            "http://immich.lan/a.png", (100, 75), allow_lan=True
+        )
+    assert isinstance(result, Image.Image)
+
+
+@pytest.mark.parametrize("low_resource", [False, True])
+def test_from_url_refuses_redirect_to_private_address(low_resource: bool) -> None:
+    """A public host cannot bounce the download to an internal address."""
+    redirect = MagicMock()
+    redirect.status_code = 302
+    redirect.headers = {"Location": "http://127.0.0.1/secret.png"}
+    session = MagicMock()
+    session.get.return_value = redirect
+    with patch("utils.image_loader.get_http_session", return_value=session):
+        result = _loader(low_resource).from_url("http://example.com/a.png", (10, 10))
+    assert result is None
+    assert session.get.call_count == 1
+    assert session.get.call_args[1]["allow_redirects"] is False
+
+
+def test_from_url_follows_public_redirect() -> None:
+    redirect = MagicMock()
+    redirect.status_code = 301
+    redirect.headers = {"Location": "https://cdn.example.org/a.png"}
+    final = _make_session_response(_png_bytes())
+    session = MagicMock()
+    session.get.side_effect = [redirect, final]
+    with patch("utils.image_loader.get_http_session", return_value=session):
+        result = _loader(False).from_url("http://example.com/a.png", (100, 75))
+    assert isinstance(result, Image.Image)
+    assert session.get.call_args_list[1][0][0] == "https://cdn.example.org/a.png"
+
+
+@pytest.mark.parametrize("low_resource", [False, True])
+def test_from_url_rejects_declared_oversize_body(low_resource: bool) -> None:
+    """A Content-Length over the cap is refused before the body is read."""
+    resp = _make_session_response(_png_bytes())
+    resp.headers = {"Content-Length": "2048"}
+    session = MagicMock()
+    session.get.return_value = resp
+    with patch("utils.image_loader.get_http_session", return_value=session):
+        result = _loader(low_resource).from_url(
+            "http://example.com/a.png", (10, 10), max_bytes=1024
+        )
+    assert result is None
+    resp.iter_content.assert_not_called()
+    resp.close.assert_called()
+
+
+@pytest.mark.parametrize("low_resource", [False, True])
+def test_from_url_stops_streamed_body_at_cap(
+    low_resource: bool, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """A body with no Content-Length is cut off once it passes the cap."""
+    import tempfile
+
+    monkeypatch.setattr(tempfile, "tempdir", str(tmp_path))
+    chunks_read = 0
+
+    def _endless(chunk_size: int = 8192) -> Any:
+        nonlocal chunks_read
+        while True:
+            chunks_read += 1
+            yield b"x" * chunk_size
+
+    resp = MagicMock()
+    resp.status_code = 200
+    resp.headers = {}
+    resp.iter_content = _endless
+    session = MagicMock()
+    session.get.return_value = resp
+    with patch("utils.image_loader.get_http_session", return_value=session):
+        result = _loader(low_resource).from_url(
+            "http://example.com/a.png", (10, 10), max_bytes=100_000
+        )
+    assert result is None
+    assert chunks_read < 100
+    resp.close.assert_called()
+    # The low-memory path's temp file is removed even when the cap trips.
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_from_url_http_error_status_returns_none() -> None:
+    import requests
+
+    resp = _make_session_response(b"")
+    resp.status_code = 404
+    resp.raise_for_status.side_effect = requests.HTTPError("404")
+    session = MagicMock()
+    session.get.return_value = resp
+    with patch("utils.image_loader.get_http_session", return_value=session):
+        result = _loader(True).from_url("http://example.com/a.png", (10, 10))
+    assert result is None
+    resp.close.assert_called()

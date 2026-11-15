@@ -10,8 +10,8 @@ keeps working for plugins and blueprints:
   session (retries, timeouts, cache, latency logging).
 * :mod:`utils.dns_pinning` — ``pinned_dns`` (SSRF DNS-rebinding guard).
 * :mod:`utils.safe_fetch` — SSRF-guarded fetches (``guarded_fetch``,
-  ``safe_http_get``, ``safe_fetch_bytes``, ``fetch_feed_bytes``,
-  ``read_capped``).
+  ``safe_http_get``, ``open_guarded_stream``, ``safe_fetch_bytes``,
+  ``fetch_feed_bytes``, ``read_capped``, ``copy_capped``).
 
 Patching note: monkeypatching a name here does not affect code in those
 modules, which looks names up in its own globals. Patch the defining module.
@@ -88,8 +88,10 @@ from utils.safe_fetch import (
     _origin,
     _redirect_target,
     _response_header,
+    copy_capped,
     fetch_feed_bytes,
     guarded_fetch,
+    open_guarded_stream,
     private_feeds_allowed,
     read_capped,
     safe_fetch_bytes,
@@ -169,8 +171,10 @@ __all__ = [
     "_origin",
     "_redirect_target",
     "_response_header",
+    "copy_capped",
     "fetch_feed_bytes",
     "guarded_fetch",
+    "open_guarded_stream",
     "private_feeds_allowed",
     "read_capped",
     "safe_fetch_bytes",

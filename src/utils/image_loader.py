@@ -20,8 +20,21 @@ import requests
 from PIL import Image, ImageOps
 
 from utils.http_client import get_http_session
+from utils.safe_fetch import (
+    ResponseTooLargeError,
+    _close_quietly,
+    copy_capped,
+    open_guarded_stream,
+    read_capped,
+)
 
 logger = logging.getLogger(__name__)
+
+#: Largest remote image body :meth:`AdaptiveImageLoader.from_url` accepts.
+#: Generous on purpose: Wikimedia picture-of-the-day originals and APOD
+#: ``hdurl`` files run to tens of megabytes. The cap exists so a broken or
+#: hostile server cannot fill the Pi's RAM or SD card, not to police size.
+MAX_REMOTE_IMAGE_BYTES = 50 * 1024 * 1024
 
 # HEIF opener registration is deferred until the first image is actually
 # loaded so pi_heif (~3 MB native extension + ~28 ms import time) does not
@@ -177,9 +190,17 @@ class AdaptiveImageLoader:
         timeout_ms: int = 40000,
         resize: bool = True,
         headers: Mapping[str, str] | None = None,
+        *,
+        allow_lan: bool = False,
+        max_bytes: int = MAX_REMOTE_IMAGE_BYTES,
     ) -> Image.Image | None:
         """
         Load an image from a URL and optionally resize it.
+
+        The download goes through the SSRF guard: the URL and every redirect
+        target must resolve to a public address (or a LAN one when
+        *allow_lan* is true), DNS is pinned to the vetted addresses, and the
+        body is cut off once it passes *max_bytes*.
 
         Args:
             url: Image URL to download
@@ -187,6 +208,8 @@ class AdaptiveImageLoader:
             timeout_ms: Request timeout in milliseconds
             resize: Whether to resize the image (default True)
             headers: Optional dict of HTTP headers to include in request
+            allow_lan: Accept URLs that resolve to the local network
+            max_bytes: Largest response body accepted
 
         Returns:
             PIL Image object resized to dimensions, or None on error
@@ -194,11 +217,53 @@ class AdaptiveImageLoader:
         logger.debug(f"Loading image from URL: {url}")
         _ensure_heif_opener()
 
-        if self.is_low_resource:
-            return self._load_from_url_lowmem(
-                url, dimensions, timeout_ms, resize, headers
+        try:
+            response = self._open_url(url, timeout_ms, headers, allow_lan)
+        except ValueError as e:
+            logger.error(f"Rejected image URL {url}: {e}")
+            return None
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Error downloading image from {url}: {e}")
+            return None
+        except Exception as e:
+            logger.error(f"Error opening image URL {url}: {e}")
+            return None
+
+        try:
+            if self.is_low_resource:
+                return self._load_from_url_lowmem(
+                    url, response, dimensions, resize, max_bytes
+                )
+            return self._load_from_url_fast(
+                url, response, dimensions, resize, max_bytes
             )
-        return self._load_from_url_fast(url, dimensions, timeout_ms, resize, headers)
+        finally:
+            _close_quietly(response)
+
+    def _open_url(
+        self,
+        url: str,
+        timeout_ms: int,
+        headers: Mapping[str, str] | None,
+        allow_lan: bool,
+    ) -> Any:
+        """Open a guarded streaming GET of *url* and check its status."""
+        request_headers = dict(self.DEFAULT_HEADERS)
+        if headers:
+            request_headers.update(headers)
+        response = open_guarded_stream(
+            url,
+            timeout=timeout_ms / 1000,
+            headers=request_headers,
+            allow_lan=allow_lan,
+            session=get_http_session(),
+        )
+        try:
+            response.raise_for_status()
+        except BaseException:
+            _close_quietly(response)
+            raise
+        return response
 
     def from_file(
         self, path: str, dimensions: tuple[int, int], resize: bool = True
@@ -274,43 +339,30 @@ class AdaptiveImageLoader:
     def _load_from_url_lowmem(
         self,
         url: str,
+        response: Any,
         dimensions: tuple[int, int],
-        timeout_ms: int,
         resize: bool,
-        headers: Mapping[str, str] | None = None,
+        max_bytes: int,
     ) -> Image.Image | None:
-        """Low-memory URL loading using temp file + draft mode."""
+        """Low-memory URL loading: stream *response* to a temp file, then draft."""
         tmp_path = None
 
         try:
             logger.debug("Using disk-based streaming (low-resource mode)")
 
-            # Merge provided headers with defaults
-            request_headers = dict(self.DEFAULT_HEADERS)
-            if headers:
-                request_headers.update(headers)
-
-            # Create temp file and stream download
             with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp:
                 tmp_path = tmp.name
-
-                session = get_http_session()
-                response = session.get(
-                    url, timeout=timeout_ms / 1000, stream=True, headers=request_headers
+                downloaded_bytes = copy_capped(
+                    response, tmp, max_bytes, chunk_size=8192
                 )
-                response.raise_for_status()
-
-                downloaded_bytes = 0
-                for chunk in response.iter_content(chunk_size=8192):
-                    if chunk:
-                        tmp.write(chunk)
-                        downloaded_bytes += len(chunk)
-
                 logger.debug(f"Downloaded {downloaded_bytes / 1024:.1f}KB to temp file")
 
             # Load from temp file with draft mode
             return self._load_from_file_lowmem(tmp_path, dimensions, resize)
 
+        except ResponseTooLargeError as e:
+            logger.error(f"Image from {url} is too large: {e}")
+            return None
         except requests.exceptions.RequestException as e:
             logger.error(f"Error downloading image from {url}: {e}")
             return None
@@ -377,27 +429,17 @@ class AdaptiveImageLoader:
     def _load_from_url_fast(
         self,
         url: str,
+        response: Any,
         dimensions: tuple[int, int],
-        timeout_ms: int,
         resize: bool,
-        headers: Mapping[str, str] | None = None,
+        max_bytes: int,
     ) -> Image.Image | None:
-        """High-performance URL loading using in-memory processing."""
+        """High-performance URL loading: read *response* into memory."""
         try:
             logger.debug("Using in-memory processing (high-performance mode)")
 
-            # Merge provided headers with defaults
-            request_headers = dict(self.DEFAULT_HEADERS)
-            if headers:
-                request_headers.update(headers)
-
-            session = get_http_session()
-            response = session.get(
-                url, timeout=timeout_ms / 1000, stream=True, headers=request_headers
-            )
-            response.raise_for_status()
-
-            img: Image.Image = Image.open(BytesIO(response.content))
+            body = read_capped(response, max_bytes)
+            img: Image.Image = Image.open(BytesIO(body))
             original_size = img.size
             original_pixels = original_size[0] * original_size[1]
             logger.info(
@@ -416,6 +458,9 @@ class AdaptiveImageLoader:
 
             return img
 
+        except ResponseTooLargeError as e:
+            logger.error(f"Image from {url} is too large: {e}")
+            return None
         except requests.exceptions.RequestException as e:
             logger.error(f"Error downloading image from {url}: {e}")
             return None
