@@ -156,3 +156,42 @@ def test_display_next_direct_fits_a_wrong_size_image(
 
     assert resp.status_code == 200
     assert [img.size for img in shown] == [(800, 480)]
+
+
+@pytest.mark.integration
+def test_display_next_does_not_repeat_the_write_on_a_type_error(
+    client: FlaskClient,
+    device_config_dev: Any,
+    monkeypatch: pytest.MonkeyPatch,
+    flask_app: Flask,
+) -> None:
+    """A TypeError from the driver used to trigger a second full panel write
+    (and a second history entry) without ``history_meta``."""
+    flask_app.config["REFRESH_TASK"].running = False
+    _add_playlist_with_plugin(device_config_dev)
+    monkeypatch.setattr("utils.time_utils.now_device_tz", _fixed_now, raising=True)
+
+    from plugins import plugin_registry
+
+    class _StubPlugin:
+        def generate_image(self, settings: Any, device_config: Any) -> Any:
+            return Image.new("RGB", (800, 480), "white")
+
+    monkeypatch.setattr(
+        plugin_registry, "get_plugin_instance", lambda cfg: _StubPlugin(), raising=True
+    )
+    calls: list[dict[str, Any]] = []
+
+    def _display_image(image: Any, **kwargs: Any) -> None:
+        calls.append(kwargs)
+        raise TypeError("driver fault")
+
+    monkeypatch.setattr(
+        flask_app.config["DISPLAY_MANAGER"], "display_image", _display_image
+    )
+
+    resp = client.post("/display-next")
+
+    assert resp.status_code == 500
+    assert len(calls) == 1
+    assert calls[0]["history_meta"]["plugin_instance"] == "Clock A"

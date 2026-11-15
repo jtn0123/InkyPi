@@ -112,7 +112,9 @@ def test_update_now_returns_500_when_display_raises(
     app = client.application
     display_manager = app.config["DISPLAY_MANAGER"]
 
-    def raise_display(img: Any, image_settings: Any = None) -> None:
+    def raise_display(
+        img: Any, image_settings: Any = None, history_meta: Any = None
+    ) -> None:
         raise RuntimeError("display failure")
 
     monkeypatch.setattr(display_manager, "display_image", raise_display, raising=True)

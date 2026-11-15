@@ -103,3 +103,45 @@ def test_update_now_direct_fits_a_wrong_size_image(
     # Padded, not cropped: white bars either side of the square picture.
     assert shown[0].getpixel((2, h // 2)) == (255, 255, 255)
     assert shown[0].getpixel((w // 2, h // 2)) == (255, 0, 0)
+
+
+def test_update_now_direct_does_not_repeat_the_write_on_a_type_error(
+    client: FlaskClient, monkeypatch: pytest.MonkeyPatch, flask_app: Flask
+) -> None:
+    """A TypeError from the driver used to repeat the panel write without
+    ``history_meta``. Now the picture is tried once, then the error card once."""
+    import plugins.ai_text.ai_text as ai_text_mod
+
+    def fake_generate_image(self: Any, settings: Any, device_config: Any) -> Any:
+        return Image.new("RGB", device_config.get_resolution(), "white")
+
+    monkeypatch.setattr(
+        ai_text_mod.AIText, "generate_image", fake_generate_image, raising=True
+    )
+    calls: list[dict[str, Any]] = []
+
+    def fake_display_image(image: Any, **kwargs: Any) -> None:
+        calls.append(kwargs)
+        raise TypeError("driver fault")
+
+    display_manager = flask_app.config["DISPLAY_MANAGER"]
+    monkeypatch.setattr(
+        display_manager, "display_image", fake_display_image, raising=True
+    )
+    flask_app.config["REFRESH_TASK"].running = False
+
+    resp = client.post(
+        "/update_now",
+        data={
+            "plugin_id": "ai_text",
+            "textPrompt": "hello",
+            "textModel": "gpt-4o",
+            "title": "T",
+        },
+    )
+
+    assert resp.status_code >= 500
+    assert [c["history_meta"].get("error_class") for c in calls] == [
+        None,
+        "TypeError",
+    ]

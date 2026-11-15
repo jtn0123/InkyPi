@@ -556,19 +556,18 @@ def _display_next_direct(
     # Display — fitted to the panel exactly as the refresh task would.
     image = fit_image_to_device(image, device_config, plugin_instance.plugin_id)
     image_settings = plugin_config.get("image_settings", [])
-    try:
-        display_manager.display_image(
-            image,
-            image_settings=image_settings,
-            history_meta={
-                "refresh_type": "Playlist",
-                "plugin_id": plugin_instance.plugin_id,
-                "playlist": playlist.name,
-                "plugin_instance": plugin_instance.name,
-            },
-        )
-    except TypeError:
-        display_manager.display_image(image, image_settings=image_settings)
+    # One write. A TypeError here is a real driver/Pillow fault, so it must
+    # propagate (500) rather than repeat the panel write and history entry.
+    display_manager.display_image(
+        image,
+        image_settings=image_settings,
+        history_meta={
+            "refresh_type": "Playlist",
+            "plugin_id": plugin_instance.plugin_id,
+            "playlist": playlist.name,
+            "plugin_instance": plugin_instance.name,
+        },
+    )
 
     from model import RefreshInfo
 
