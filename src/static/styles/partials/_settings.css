@@ -49,14 +49,6 @@
   padding: 14px 16px 12px;
 }
 
-.settings-console-panel .section-title {
-  margin: 0 0 10px;
-  font-size: 0.88rem;
-  font-weight: 600;
-  letter-spacing: -0.005em;
-  color: var(--text);
-}
-
 .settings-console-panel .collapsible .collapsible-header {
   background: transparent;
   margin: 0;
@@ -188,11 +180,6 @@
    (Longitude sat ~4px below Latitude). Pack each cell's lines to the top. */
 .inline-readonly-grid > .form-group {
   align-content: flex-start;
-}
-
-.toggle-list {
-  display: grid;
-  gap: 10px;
 }
 
 .toggle-item {
@@ -458,8 +445,7 @@
 }
 
 .logs-filters,
-.logs-actions,
-.history-toolbar {
+.logs-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;

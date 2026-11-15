@@ -156,15 +156,6 @@
     min-width: 80px;
 }
 
-.progress-log li .log-content {
-    flex: 1;
-    line-height: 1.4;
-}
-
-.progress-fill-seeded {
-  width: 10%;
-}
-
 /* Enhanced Loading Indicators */
 .loading-indicator {
     display: none;
@@ -188,82 +179,6 @@
     margin-left: 0;
 }
 
-/* New loading states */
-.loading-dots {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-}
-
-.loading-dots::after {
-    content: '';
-    width: 4px;
-    height: 4px;
-    border-radius: 50%;
-    background: currentcolor;
-    animation: loading-dots 1.4s ease-in-out infinite both;
-    animation-delay: 0.16s;
-}
-
-.loading-dots::before {
-    content: '';
-    width: 4px;
-    height: 4px;
-    border-radius: 50%;
-    background: currentcolor;
-    animation: loading-dots 1.4s ease-in-out infinite both;
-}
-
-@keyframes loading-dots {
-    0%, 80%, 100% {
-        transform: scale(0.8);
-        opacity: 0.5;
-    }
-    40% {
-        transform: scale(1);
-        opacity: 1;
-    }
-}
-
-/* Compatibility styles for enhanced UI tests */
-.form-section-title,
-.validation-message,
-.validation-message.error,
-.validation-message.success,
-.validation-message.warning,
-.form-input.invalid,
-.form-input.valid,
-.help-icon,
-.status-badge,
-.status-badge.success,
-.status-badge.warning,
-.status-badge.error,
-.color-picker:hover,
-.sections-grid,
-.preview-close,
-.preview-close:hover,
-.enhanced-progress-header,
-.progress-title-section,
-.progress-subtitle,
-.enhanced-progress-bar-section,
-.enhanced-progress-fill,
-.enhanced-progress-steps,
-.enhanced-step,
-.enhanced-step.active,
-.enhanced-step.completed,
-.enhanced-step.failed,
-.enhanced-progress-details,
-.enhanced-progress-log,
-.log-entry,
-.form-input[readonly] {
-    --compat-placeholder: 1;
-}
-@keyframes slide-in-from-right{from{opacity:0;}to{opacity:1;}}
-@keyframes slide-in-from-bottom{from{opacity:0;}to{opacity:1;}}
-/* @keyframes slideInFromRight */
-/* @keyframes slideInFromBottom */
-/* Enhanced Typography Hierarchy */
-
 /* SVG close icon for modal close buttons */
 .close-icon {
     width: 18px;
@@ -279,8 +194,7 @@
 }
 
 /* The icon macro wraps SVG in a span.close-icon; target that span */
-.close-button .close-icon,
-.progress-close .close-icon {
+.close-button .close-icon {
     width: 16px;
     height: 16px;
 }

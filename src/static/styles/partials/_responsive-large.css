@@ -9,9 +9,8 @@
     }
 
     .header-actions,
-    .playlist-toolbar,
-    .history-toolbar,
-    .logs-actions {
+.playlist-toolbar,
+.logs-actions {
         grid-template-columns: 1fr;
     }
 

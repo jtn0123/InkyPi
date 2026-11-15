@@ -6,10 +6,13 @@ device name) clipped on the right at narrow viewports (< 430px) because
 `.app-title` had no overflow handling and `.title-container` did not
 allow flex children to shrink below their content size.
 
-We assert the CSS now guards against this by:
-- `.app-title` using `text-overflow: ellipsis` with `overflow: hidden`
-  and `white-space: nowrap` so long names truncate cleanly instead of
-  overflowing the header container.
+The dashboard header now shows a fixed "Current display" title in
+`.pageheader`, whose title rule wraps rather than clipping. The old
+`.app-header .app-title` ellipsis rule matched no markup and was removed;
+`test_top_level_tabs_phone_layout` in tests/integration/test_browser_smoke.py
+checks every top-level page for horizontal overflow at phone widths.
+
+We still assert:
 - `.title-container` using `min-width: 0` so the title can actually
   shrink inside a flex row (the default `min-width: auto` prevents
   ellipsis truncation on flex children).
@@ -75,29 +78,6 @@ def _extract_rule(css: str, selector: str) -> str:
             if part.strip().endswith(selector):
                 return match.group(3)
     return ""
-
-
-def test_app_title_truncates_with_ellipsis() -> None:
-    """`.app-title` must not allow long names to clip the header (JTN-340)."""
-    css = _read_all_css()
-    body = _extract_rule(css, ".app-title")
-    assert body, "No `.app-header .app-title` rule found in CSS partials"
-    assert "text-overflow: ellipsis" in body, (
-        "`.app-title` must set `text-overflow: ellipsis` so long device "
-        "names truncate instead of clipping on narrow viewports (JTN-340)."
-    )
-    assert "overflow: hidden" in body, (
-        "`.app-title` must set `overflow: hidden` to pair with "
-        "`text-overflow: ellipsis` (JTN-340)."
-    )
-    assert "white-space: nowrap" in body, (
-        "`.app-title` must set `white-space: nowrap` so ellipsis "
-        "truncation activates on overflow (JTN-340)."
-    )
-    assert "min-width: 0" in body, (
-        "`.app-title` needs `min-width: 0` so flex parents can shrink it "
-        "below its intrinsic content width (JTN-340)."
-    )
 
 
 def test_title_container_allows_shrink() -> None:

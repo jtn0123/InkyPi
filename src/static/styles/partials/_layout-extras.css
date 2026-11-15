@@ -17,17 +17,10 @@
 #undoSnackbar .btn-link { background: none; border: none; color: var(--accent); cursor: pointer; font-weight: 700; }
 
 /* Virtualize large lists with content-visibility */
-.playlist-list, .button-grid, .history-grid {
+.playlist-list,
+.history-grid {
   content-visibility: auto;
   contain-intrinsic-size: 1px 5000px; /* allow fast initial layout */
-}
-
-/* Dashboard header spacer - reserves space where home button would be on other pages */
-.header-nav-spacer {
-  display: inline-block;
-  width: 36px;
-  height: 36px;
-  flex-shrink: 0;
 }
 
 /* Staggered card reveal animation */
@@ -52,12 +45,6 @@
 .plugins-container .icon-button:nth-child(10) { animation-delay: 270ms; }
 .plugins-container .icon-button:nth-child(11) { animation-delay: 300ms; }
 .plugins-container .icon-button:nth-child(12) { animation-delay: 330ms; }
-
-@media (max-width: 768px) {
-  .header-nav-spacer {
-    display: none;
-  }
-}
 
 /* Debug console (JTN-587)
    Floating bottom-left button + slide-up panel that captures client-side JS

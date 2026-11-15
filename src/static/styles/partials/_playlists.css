@@ -38,19 +38,6 @@
     linear-gradient(to bottom, var(--frame-lining) 0 100%) right bottom/1.2px 12px no-repeat;
 }
 
-/* Device frame overlay for playlist thumbnails */
-.device-frame-on .plugin-thumb::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background-image: var(--device-frame-url);
-  background-position: center;
-  background-repeat: no-repeat;
-  background-size: contain;
-  opacity: 0.9;
-}
-
 /* Plugin thumbnail containers */
 .plugin-thumbnail-container {
   position: relative;

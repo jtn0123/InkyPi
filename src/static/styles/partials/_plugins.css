@@ -103,46 +103,7 @@
   border-left: 4px solid var(--accent);
 }
 
-.timing-row { display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
 .latest-refresh { background-color: var(--panel-bg); color: var(--text); padding: 2px 6px; border-radius: 4px; font-size: 0.78em; border:1px solid var(--panel-border); }
-.latest-refresh.nextin:empty { display:none; }
-
-/* Plugin Grid/List View Styles */
-.plugins-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 15px;
-}
-
-.plugins-controls {
-    display: flex;
-    gap: 8px;
-    align-items: center;
-}
-
-.view-toggle,
-.sort-toggle {
-    background: var(--button-bg);
-    border: 1px solid var(--surface-border);
-    border-radius: 4px;
-    padding: 6px 10px;
-    cursor: pointer;
-    font-size: 14px;
-    color: var(--text);
-    transition: all var(--transition-speed);
-}
-
-.view-toggle:hover,
-.sort-toggle:hover {
-    background: var(--button-bg);
-}
-
-.sort-toggle.active {
-    background: var(--success);
-    color: var(--on-accent);
-    border-color: var(--success);
-}
 
 /* Grid View (default) — refined tile with subtle lift */
 .plugins-container {
@@ -217,37 +178,6 @@
     -webkit-box-orient: vertical;
     min-height: 2.4em;
     letter-spacing: -0.005em;
-}
-
-/* List View */
-.plugins-container.list-view {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-}
-
-.plugins-container.list-view .plugin-item {
-    flex-direction: row;
-    justify-content: flex-start;
-    align-items: center;
-    padding: 10px 14px;
-    gap: 12px;
-}
-
-.plugins-container.list-view .plugin-item .icon-image {
-    width: 32px;
-    height: 32px;
-    min-width: 32px;
-    min-height: 32px;
-}
-
-.plugins-container.list-view .plugin-name {
-    margin-top: 0;
-    font-size: 14px;
-    text-align: left;
-    width: auto;
-    padding: 0;
-    white-space: nowrap;
 }
 
 /* Horizontal plugin tile — icon left, name+desc center, chevron right.
@@ -380,22 +310,5 @@
 .plugins-container.sorting .plugin-item.dragging {
     opacity: 0.5;
     cursor: grabbing;
-}
-
-.plugins-container.sorting .plugin-item.drag-over {
-    border-color: var(--primary);
-    border-style: solid;
-    background: var(--primary-bg);
-}
-
-.sort-hint {
-    display: none;
-    font-size: 12px;
-    color: var(--text-secondary);
-    margin-bottom: 10px;
-}
-
-.sort-hint.visible {
-    display: block;
 }
 

@@ -170,16 +170,14 @@
 }
 
 /* Refined metrics strip — a 4-up KPI band, evolves the existing .metric-strip */
-.metric-strip.refined,
-.metrics-strip {
+.metric-strip.refined {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   gap: 10px;
   margin: 14px 0 20px;
 }
 
-.metric-strip.refined .metric-pill,
-.metrics-strip .metric {
+.metric-strip.refined .metric-pill {
   background: var(--surface);
   border: 1px solid var(--surface-border);
   border-radius: var(--border-radius-lg);
@@ -189,8 +187,7 @@
   gap: 4px;
 }
 
-.metric-strip.refined .metric-pill-label,
-.metrics-strip .metric-k {
+.metric-strip.refined .metric-pill-label {
   font-family: var(--font-mono, 'JetBrains Mono'), ui-monospace, monospace;
   font-size: 0.66rem;
   letter-spacing: 0.12em;
@@ -198,20 +195,11 @@
   color: var(--text-3);
 }
 
-.metric-strip.refined .metric-pill-value,
-.metrics-strip .metric-v {
+.metric-strip.refined .metric-pill-value {
   font-size: 1.35rem;
   font-weight: 500;
   letter-spacing: -0.02em;
   color: var(--text);
-}
-
-.metrics-strip .metric-v em {
-  color: var(--text-3);
-  font-style: normal;
-  font-family: var(--font-mono, 'JetBrains Mono'), ui-monospace, monospace;
-  font-size: 0.72rem;
-  margin-left: 4px;
 }
 
 /* Compact variant (History latency band): fixed 4-up so the four stages
@@ -226,37 +214,3 @@
   }
 }
 
-/* Refined underline-tab pattern for in-page section switching */
-.tabline {
-  display: flex;
-  gap: 2px;
-  border-bottom: 1px solid var(--surface-border);
-  margin-bottom: 16px;
-}
-
-.tabline button,
-.tabline a {
-  padding: 9px 14px;
-  font-size: 0.82rem;
-  color: var(--text-secondary);
-  background: transparent;
-  border: 0;
-  border-bottom: 2px solid transparent;
-  margin-bottom: -1px;
-  cursor: pointer;
-  transition: color 0.15s ease, border-color 0.15s ease;
-}
-
-.tabline button:hover,
-.tabline a:hover {
-  color: var(--text);
-}
-
-.tabline button.active,
-.tabline a.active,
-.tabline button[aria-selected="true"],
-.tabline a[aria-selected="true"] {
-  color: var(--text);
-  border-bottom-color: var(--accent);
-  font-weight: 500;
-}

@@ -19,8 +19,7 @@
   box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--accent) 12%, transparent);
 }
 
-.pl-item .drag-handle,
-.pl-item .pl-drag {
+.pl-item .drag-handle {
   grid-area: drag;
   color: var(--text-3);
   opacity: 1;
@@ -422,29 +421,6 @@ a.pl-add-row:hover {
 
 .playlist-header .playlist-toggle-button {
   order: -1;
-}
-
-/* Caret toggle for collapse/expand */
-.pl-caret {
-  color: var(--text-3);
-  padding: 4px;
-  border-radius: var(--border-radius-sm);
-  background: transparent;
-  border: 0;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  transition: color 0.15s ease, background-color 0.15s ease, transform 0.2s ease;
-}
-
-.pl-caret:hover {
-  background: var(--surface-3);
-  color: var(--text);
-}
-
-.pl-caret[aria-expanded="true"] {
-  transform: rotate(90deg);
 }
 
 /* stylelint-enable no-duplicate-selectors */

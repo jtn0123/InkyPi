@@ -77,14 +77,6 @@
     box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 20%, transparent);
 }
 
-/* Form styling for inline layout */
-.form-inline {
-    display: flex;
-    align-items: center;
-    gap: 10px; /* Space between the label and input */
-    width: 100%;
-}
-
 /* Label styling — handoff parity (styles.css:261): 12px/500 muted. R4 took
    this 16→13; R5 is the final 13→12 nudge so .field-label sits in the
    refined 12 / 13 / 14 scale exactly. */
@@ -149,58 +141,6 @@ select.form-input option {
     outline: none;
     border-color: var(--accent);
     box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 20%, transparent);
-}
-
-/* Enhanced form validation states */
-.form-field {
-    position: relative;
-    margin-bottom: 1rem;
-}
-
-/* Handoff parity: error focus ring derives from --error so theme recolors
-   propagate correctly, rather than a hardcoded red rgba. */
-.form-field.has-error .form-input {
-    border-color: var(--error);
-    box-shadow: 0 0 0 2px color-mix(in oklab, var(--error) 20%, transparent);
-}
-
-.form-field.has-error .form-label {
-    color: var(--error);
-}
-
-.form-error {
-    color: var(--error);
-    font-size: 0.875rem;
-    margin-top: 0.25rem;
-    display: flex;
-    align-items: center;
-    gap: 0.25rem;
-}
-
-.form-error::before {
-    content: "\26A0";
-    font-size: 1rem;
-}
-
-/* Handoff parity: tint the focus ring from the --success token rather than a
-   hardcoded green rgba — keeps themes + future recolors consistent. */
-.form-field.has-success .form-input {
-    border-color: var(--success);
-    box-shadow: 0 0 0 2px color-mix(in oklab, var(--success) 20%, transparent);
-}
-
-.form-success {
-    color: var(--success);
-    font-size: 0.875rem;
-    margin-top: 0.25rem;
-    display: flex;
-    align-items: center;
-    gap: 0.25rem;
-}
-
-.form-success::before {
-    content: "\2713";
-    font-size: 1rem;
 }
 
 /* Style the custom file upload button */
@@ -368,8 +308,6 @@ select.form-input option {
 
 .form-group:last-child{margin-bottom: 0;}
 
-.form-field + .form-field{margin-top: 16px;}
-.form-section + .form-section{margin-top: 20px;}
 .sections-grid.two-col{grid-template-columns: 1fr 1fr;}
 
 /* Disabled state for form controls */
@@ -491,12 +429,6 @@ input:disabled, select:disabled, textarea:disabled {
         min-height: 48px;
         flex: 0 0 auto;
         align-self: flex-start;
-    }
-
-    /* Better spacing for form sections */
-    .form-section {
-        padding: 16px;
-        margin-bottom: 16px;
     }
 
     .sections-grid.two-col{grid-template-columns:1fr;}

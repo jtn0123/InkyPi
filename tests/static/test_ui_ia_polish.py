@@ -94,7 +94,6 @@ def test_mobile_shell_has_primary_navigation_replacement() -> None:
 def test_main_css_contains_new_ia_polish_classes(client: FlaskClient) -> None:
     css = _read_all_css()
 
-    assert ".section-nav" in css
     assert ".status-chip" in css
     assert ".loading-panel" in css
     assert ".section-focus" in css

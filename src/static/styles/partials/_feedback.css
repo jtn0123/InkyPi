@@ -362,43 +362,12 @@ body.success-failure-modal-open .toast-container {
     background: var(--panel-bg);
 }
 
-.update-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: var(--spacing-md);
-}
-
-.update-header h3 {
-    margin: 0;
-    font-size: var(--text-lg);
-    font-weight: var(--font-semibold);
-    color: var(--text);
-}
-
 .update-version-row {
     display: flex;
     align-items: center;
     gap: var(--spacing-md);
     flex-wrap: wrap;
     margin-bottom: var(--spacing-md);
-}
-
-/* Handoff parity: unified horizontal update row. Installed / Latest tiles
-   at the left, action buttons at the right via `margin-left:auto` on
-   `.update-actions` (rule below, unchanged). */
-.update-row {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    flex-wrap: wrap;
-    padding: 6px 0 14px;
-    border-bottom: 1px solid var(--surface-border);
-    margin-bottom: 14px;
-}
-
-.update-row .update-actions {
-    margin-left: auto;
 }
 
 .update-release-version {
@@ -555,24 +524,6 @@ details[open] > .update-release-notes-toggle::before {
     gap: var(--spacing-sm);
     flex-wrap: wrap;
     align-items: center;
-}
-
-/* Legacy compatibility */
-.update-version-info {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-xs);
-}
-
-.update-label {
-    color: var(--text-muted);
-    font-size: var(--text-sm);
-}
-
-.update-value {
-    font-weight: var(--font-semibold);
-    font-variant-numeric: tabular-nums;
-    color: var(--text);
 }
 
 /* Form shake animation on blocked submit */

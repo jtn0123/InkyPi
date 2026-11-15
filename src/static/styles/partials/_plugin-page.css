@@ -438,12 +438,6 @@ body[data-page="plugin"] .workflow-help p {
   font-size: 0.76rem;
 }
 
-.workflow-action-group {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-
 .workflow-help {
   margin-top: 0;
 }

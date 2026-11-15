@@ -32,30 +32,11 @@ def test_main_css_contains_form_enhancement_styles(client: FlaskClient) -> None:
     css_content = _read_all_css()
 
     # Check for enhanced form styling
-    assert ".form-section" in css_content
-    assert ".form-section-title" in css_content
-    assert ".form-field" in css_content
     assert ".form-input" in css_content
     assert ".form-label" in css_content
 
     # Check for form input improvements
     assert "min-height: 44px" in css_content
-    assert ".form-input[readonly]" in css_content
-
-
-def test_main_css_contains_validation_styles(client: FlaskClient) -> None:
-    """Test that main.css contains validation styling."""
-    css_content = _read_all_css()
-
-    # Check for validation message styles
-    assert ".validation-message" in css_content
-    assert ".validation-message.error" in css_content
-    assert ".validation-message.success" in css_content
-    assert ".validation-message.warning" in css_content
-
-    # Check for input validation states
-    assert ".form-input.invalid" in css_content
-    assert ".form-input.valid" in css_content
 
 
 def test_main_css_contains_workflow_and_management_shells(client: FlaskClient) -> None:
@@ -108,7 +89,6 @@ def test_main_css_contains_enhanced_button_styles(client: FlaskClient) -> None:
     assert ".action-button" in css_content
     assert ".action-button.is-secondary" in css_content
     assert ".action-button.compact" in css_content
-    assert ".button-group" in css_content
 
 
 def test_main_css_contains_toggle_styles(client: FlaskClient) -> None:
@@ -149,8 +129,6 @@ def test_main_css_contains_animation_styles(client: FlaskClient) -> None:
     css_content = _read_all_css()
 
     # Check for animations
-    assert "@keyframes slideInFromRight" in css_content
-    assert "@keyframes slideInFromBottom" in css_content
     assert "animation:" in css_content
     assert "transition:" in css_content
 
@@ -185,8 +163,6 @@ def test_main_css_contains_spacing_improvements(client: FlaskClient) -> None:
     css_content = _read_all_css()
 
     # Check for spacing system
-    assert ".form-field + .form-field" in css_content
-    assert ".form-section + .form-section" in css_content
     assert "margin-top: 16px" in css_content
     assert "margin-top: 20px" in css_content
 
@@ -215,9 +191,6 @@ def test_main_css_contains_status_badges(client: FlaskClient) -> None:
 
     # Check for status badge system
     assert ".status-badge" in css_content
-    assert ".status-badge.success" in css_content
-    assert ".status-badge.warning" in css_content
-    assert ".status-badge.error" in css_content
 
 
 def test_main_css_contains_color_picker_improvements(client: FlaskClient) -> None:
@@ -226,7 +199,6 @@ def test_main_css_contains_color_picker_improvements(client: FlaskClient) -> Non
 
     # Check for color picker styling
     assert ".color-picker" in css_content
-    assert ".color-picker:hover" in css_content
     assert "border-radius: 8px" in css_content
 
 
@@ -257,88 +229,10 @@ def test_main_css_typography_hierarchy(client: FlaskClient) -> None:
     css_content = _read_all_css()
 
     # Check for typography improvements
-    assert "/* Enhanced Typography Hierarchy */" in css_content
     assert "font-weight: 700" in css_content
     assert "font-weight: 600" in css_content
     assert "letter-spacing:" in css_content
     assert "line-height:" in css_content
-
-
-def test_main_css_contains_enhanced_skeleton_styles(client: FlaskClient) -> None:
-    """Test that main.css contains enhanced skeleton loading styles."""
-    css_content = _read_all_css()
-
-    # Check for plugin-specific skeleton patterns
-    assert ".plugin-skeleton" in css_content
-    assert ".plugin-skeleton-weather" in css_content
-    assert ".plugin-skeleton-calendar" in css_content
-    assert ".plugin-skeleton-image" in css_content
-    assert ".plugin-skeleton-text" in css_content
-
-    # Check for skeleton components
-    assert ".skeleton-weather-header" in css_content
-    assert ".skeleton-weather-icon" in css_content
-    assert ".skeleton-calendar-grid" in css_content
-    assert ".skeleton-image-main" in css_content
-
-    # Check for progress skeleton
-    assert ".progress-skeleton" in css_content
-    assert ".skeleton-progress-steps" in css_content
-    assert ".skeleton-step-indicator" in css_content
-
-
-def test_main_css_contains_enhanced_progress_styles(client: FlaskClient) -> None:
-    """Test that main.css contains enhanced progress display styles."""
-    css_content = _read_all_css()
-
-    # Check for enhanced progress display
-    assert ".enhanced-progress-header" in css_content
-    assert ".progress-title-section" in css_content
-    assert ".progress-subtitle" in css_content
-    assert ".enhanced-progress-bar-section" in css_content
-    assert ".enhanced-progress-fill" in css_content
-
-    # Check for step indicators
-    assert ".enhanced-progress-steps" in css_content
-    assert ".enhanced-step" in css_content
-    assert ".enhanced-step.active" in css_content
-    assert ".enhanced-step.completed" in css_content
-    assert ".enhanced-step.failed" in css_content
-
-    # Check for progress details
-    assert ".enhanced-progress-details" in css_content
-    assert ".enhanced-progress-log" in css_content
-    assert ".log-entry" in css_content
-    assert "var(--primary)" in css_content
-    assert "var(--text-muted)" in css_content
-
-
-def test_main_css_contains_api_validation_styles(client: FlaskClient) -> None:
-    """Test that main.css contains API validation indicator styles."""
-    css_content = _read_all_css()
-
-    # Check for API validation indicators
-    assert ".api-validation-indicator" in css_content
-    assert ".validation-status" in css_content
-    assert ".status-icon" in css_content
-    assert ".status-text" in css_content
-
-    # Check for validation states
-    assert ".validation-status.status-idle" in css_content
-    assert ".validation-status.status-validating" in css_content
-    assert ".validation-status.status-success" in css_content
-    assert ".validation-status.status-error" in css_content
-
-    # Check for validation details
-    assert ".validation-details" in css_content
-    assert ".detail-item" in css_content
-    assert ".detail-label" in css_content
-    assert ".detail-value" in css_content
-
-    # Check for spin animation
-    assert "@keyframes spin" in css_content
-    assert "var(--primary-bg)" in css_content
-    assert "var(--text-muted)" in css_content
 
 
 def test_main_css_contains_top_level_theme_normalization_helpers(
@@ -352,39 +246,6 @@ def test_main_css_contains_top_level_theme_normalization_helpers(
     assert ".playlist-thumbnail-modal" in css_content
     assert ".playlist-thumbnail-content" in css_content
     assert ".playlist-thumbnail-info" in css_content
-
-
-def test_main_css_contains_operation_status_styles(client: FlaskClient) -> None:
-    """Test that main.css contains operation status indicator styles."""
-    css_content = _read_all_css()
-
-    # Check for operation status container
-    assert ".operation-status-container" in css_content
-    assert ".status-header" in css_content
-    assert ".status-summary" in css_content
-    assert ".status-count" in css_content
-    assert ".status-rate" in css_content
-
-    # Check for operation items
-    assert ".operation-item" in css_content
-    assert ".operation-header" in css_content
-    assert ".operation-icon" in css_content
-    assert ".operation-description" in css_content
-    assert ".operation-time" in css_content
-
-    # Check for operation states
-    assert ".operation-item.status-in_progress" in css_content
-    assert ".operation-item.status-completed" in css_content
-    assert ".operation-item.status-failed" in css_content
-    assert ".operation-item.status-cancelled" in css_content
-
-    # Check for operation progress
-    assert ".operation-progress" in css_content
-    assert ".operation-step" in css_content
-    assert ".operation-error" in css_content
-
-    # Check for mobile optimizations
-    assert "@media (max-width: 640px)" in css_content
 
 
 def test_main_css_contains_status_color_variables(client: FlaskClient) -> None:
