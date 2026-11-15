@@ -323,7 +323,7 @@ class TestCdnManifest:
 
     def test_manifest_has_expected_keys(self) -> None:
         manifest = json.loads(CDN_MANIFEST_PATH.read_text(encoding="utf-8"))
-        expected_keys = {"swagger-ui-css", "swagger-ui-bundle", "chart-js"}
+        expected_keys = {"swagger-ui-css", "swagger-ui-bundle"}
         for key in expected_keys:
             assert key in manifest, f"cdn_manifest.json missing key: {key}"
 

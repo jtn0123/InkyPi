@@ -8,10 +8,5 @@
     "url": "https://unpkg.com/swagger-ui-dist@5.17.14/swagger-ui-bundle.js",
     "version": "5.17.14",
     "integrity": "sha384-wmyclcVGX/WhUkdkATwhaK1X1JtiNrr2EoYJ+diV3vj4v6OC5yCeSu+yW13SYJep"
-  },
-  "chart-js": {
-    "url": "https://cdn.jsdelivr.net/npm/chart.js",
-    "version": "4.5.1",
-    "integrity": "sha384-jb8JQMbMoBUzgWatfe6COACi2ljcDdZQ2OxczGA3bGNeWe+6DChMTBJemed7ZnvJ"
   }
 }

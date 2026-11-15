@@ -467,15 +467,29 @@ def test_rendered_plugin_page_carries_restrictive_csp() -> None:
         assert directives[name] == "'none'", name
     # No remote images: RSS thumbnails are fetched server-side (E2).
     assert directives["img-src"].split() == ["file:", "data:", "blob:"]
-    # Scripts: inline + local files + the SRI-pinned Chart.js CDN only.
-    assert directives["script-src"].split() == [
-        "'unsafe-inline'",
-        "file:",
-        "https://cdn.jsdelivr.net",
-    ]
+    # Scripts: inline + local files only; no remote script origin (F2).
+    assert directives["script-src"].split() == ["'unsafe-inline'", "file:"]
 
     head = html.split("</head>", 1)[0]
     csp_at = head.index("Content-Security-Policy")
     for tag in ("<link", "<style", "<script"):
         if tag in head:
             assert head.index(tag) > csp_at, f"{tag} precedes the CSP meta tag"
+
+
+def test_no_plugin_template_loads_a_remote_script() -> None:
+    """The render CSP allows only inline and file: scripts (F2), so a template
+    that points <script src> at the network would silently fail on the Pi.
+    Vendor the library under static/scripts instead."""
+    import re
+
+    src_root = Path(__file__).resolve().parents[2] / "src"
+    remote_script = re.compile(r"<script[^>]*\bsrc=[\"']?(?:https?:)?//", re.I)
+    templates = sorted(src_root.glob("plugins/**/*.html"))
+    assert templates, "no plugin templates found"
+    offenders = [
+        str(path.relative_to(src_root))
+        for path in templates
+        if remote_script.search(path.read_text(encoding="utf-8"))
+    ]
+    assert offenders == []
