@@ -6,8 +6,8 @@ cd "${DEVBOX_PROJECT_ROOT:?Devbox project root is required}"
 source scripts/venv.sh
 shopt -s nullglob
 calendar_files=(src/static/scripts/calendar*)
-select2_files=(src/static/styles/select2*)
-if [[ ${#calendar_files[@]} -eq 0 || ${#select2_files[@]} -eq 0 ]]; then
+chart_files=(src/static/scripts/chart*)
+if [[ ${#calendar_files[@]} -eq 0 || ${#chart_files[@]} -eq 0 ]]; then
     bash install/update_vendors.sh
 fi
 if [[ "$(uname -s)" == Darwin ]] && ! command -v chrome >/dev/null; then

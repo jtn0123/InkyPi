@@ -28,13 +28,6 @@ def test_playlist_script_handles_escape_for_playlist_modals() -> None:
     assert 'event.key !== "Escape"' in content or "event.key !== 'Escape'" in content
 
 
-def test_image_modal_script_handles_escape_and_null_container() -> None:
-    content = _read_script("image_modal.js")
-
-    assert "if (!imageContainer) return;" in content
-    assert "e.key === 'Escape'" in content
-
-
 def test_plugin_page_schedule_modal_handles_escape() -> None:
     """JTN-461: #scheduleModal closes on Escape key."""
     content = _read_script("plugin_page.js")

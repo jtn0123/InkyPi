@@ -9,7 +9,6 @@ const intervals = new Map();
 const lifecycle = {};
 const delayedUrls = new Set();
 const delayedResponses = [];
-let storeState;
 const unhandled = [];
 process.on('unhandledRejection', error => unhandled.push(error));
 const flush = async () => { await new Promise(resolve => setImmediate(resolve)); };
@@ -24,6 +23,12 @@ const nodes = Object.fromEntries([
   addEventListener(name, callback) { this.handlers[name] = callback; },
   setAttribute() {},
 }]));
+// Every preview reload the controller performs, in order.
+const previewSrcs = [];
+Object.defineProperty(nodes.previewImage, 'src', {
+  get() { return previewSrcs.at(-1) || ''; },
+  set(value) { previewSrcs.push(value); },
+});
 const quickSwitchRows = [1, 2].map(version => ({
   dataset: {playlistName: `Morning ${version}`}, active: false,
   classList: {toggle(_name, active) { quickSwitchRows[version - 1].active = active; }},
@@ -50,10 +55,6 @@ const failures = new Set();
 let failureKind = 'http';
 const sandbox = {
   console: {warn() {}}, Date, Intl, Promise, EventSource: Source,
-  InkyPiStore: {createStore(initial) {
-    storeState = {...initial};
-    return {get: key => storeState[key], set: values => Object.assign(storeState, values)};
-  }},
   document: {
     getElementById: id => nodes[id] || null,
     querySelectorAll: selector => selector === '[data-quick-switch-row]' ? quickSwitchRows : [],
@@ -131,6 +132,8 @@ async function main() {
     generation = 2;
     failures.clear();
     await dispatch('refresh_complete');
+    const previewLoadsAfterRecovery = previewSrcs.length;
+    assert.ok(previewLoadsAfterRecovery > 0, 'The newer image hash must reload the preview');
     assert.equal(nodes.heroNowValue.textContent, 'Weather 2');
     assert.equal(nodes.connectivityWarning.hidden, true);
     for (const resolve of delayedResponses) resolve();
@@ -140,12 +143,14 @@ async function main() {
     assert.match(nodes.heroNowMeta.textContent, /Morning 2/);
     assert.equal(nodes.heroNextMeta.textContent, 'Playlist: Next 2');
     assert.equal(nodes.heroRefreshMeta.textContent, 'Generation 2 cadence');
-    assert.equal(storeState.imageHash, 'hash-2');
+    assert.equal(previewSrcs.length, previewLoadsAfterRecovery, 'Earlier responses must not reload an older preview');
     assert.deepEqual(quickSwitchRows.map(row => row.active), [false, true]);
     assert.equal(nodes.connectivityWarning.hidden, true, 'An older failure must not undo current recovery');
     assert.equal(nodes.kpiRefreshes.textContent, '2', 'Earlier stats must not overwrite newer telemetry');
     assert.equal(nodes.kpiStorageFree.textContent, '2.0 GB');
     assert.equal(nodes.todayKpiSub.textContent, 'Last 24h snapshot', 'Earlier telemetry failures must not undo recovery');
+    await dispatch('refresh_complete');
+    assert.equal(previewSrcs.length, previewLoadsAfterRecovery, 'The newer image hash must be remembered');
   } else if (scenario.startsWith('kpi-')) {
     if (scenario !== 'kpi-partial-health') failures.add('/stats');
     if (scenario !== 'kpi-partial') failures.add('/health');

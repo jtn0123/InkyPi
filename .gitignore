@@ -228,7 +228,6 @@ coverage.xml
 !/src/static/scripts/client_error_reporter.js
 !/src/static/scripts/client_log_reporter.js
 !/src/static/scripts/errors_page.js
-!/src/static/scripts/store.js
 !/src/static/scripts/debug_console.js
 !/src/static/scripts/tweaks_panel.js
 !/src/static/scripts/update_indicator.js

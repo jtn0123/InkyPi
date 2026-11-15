@@ -1680,7 +1680,7 @@ class TestUpdateVendorsScript:
 
     install.sh invokes it via `bash "$SCRIPT_DIR/update_vendors.sh"` without
     changing cwd. Vendor destinations are specified relative to the repo root
-    (e.g. `src/static/styles/select2.min.css`), so the script must `cd` to
+    (e.g. `src/static/scripts/chart.js`), so the script must `cd` to
     the repo root itself — otherwise curl writes to `$PWD/src/static/...`,
     which in CI (container WORKDIR=/InkyPi/install) is a non-existent path and
     every download fails with `curl: (23) Failure writing output to destination`.
@@ -1716,7 +1716,7 @@ class TestUpdateVendorsScript:
         # rewrite every destination.
         import re
 
-        # Match lines like: `  "Select2 CSS|https://.../x.css|src/static/..."`
+        # Match lines like: `  "Chart JS|https://.../x.js|src/static/..."`
         vendor_lines = re.findall(
             r'^\s*"[^"|]+\|https?://[^"|]+\|([^"|]+)"', self.content, re.MULTILINE
         )
