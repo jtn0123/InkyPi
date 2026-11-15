@@ -2,6 +2,41 @@
 
 <!-- version list -->
 
+## v1.8.30 (2026-11-15)
+
+### Bug Fixes
+
+- **update**: Refuse an unsupported Python before switching the checkout
+  ([#765](https://github.com/jtn0123/InkyPi/pull/765),
+  [`e4c3c65`](https://github.com/jtn0123/InkyPi/commit/e4c3c65266e5704858be8784b94c6a3e85ebe2cb))
+
+### Chores
+
+- **lint**: Drop dead noqa codes and bare type ignores
+  ([#763](https://github.com/jtn0123/InkyPi/pull/763),
+  [`db81436`](https://github.com/jtn0123/InkyPi/commit/db814364a3d2a201d115f323e6e13f183e51c91d))
+
+- **scripts**: Record/replay for plugin dry runs; drop stale scripts
+  ([#766](https://github.com/jtn0123/InkyPi/pull/766),
+  [`3341e40`](https://github.com/jtn0123/InkyPi/commit/3341e40efb470272c268106c17dbed17ce5dc3a9))
+
+### Documentation
+
+- Fix the README plugin count, the update example and stale paths
+  ([#764](https://github.com/jtn0123/InkyPi/pull/764),
+  [`9f28513`](https://github.com/jtn0123/InkyPi/commit/9f28513316a30dc72628a40ed104f848a9511fd7))
+
+### Refactoring
+
+- **config**: Load the last-refresh record directly in Config
+  ([#761](https://github.com/jtn0123/InkyPi/pull/761),
+  [`f89c54b`](https://github.com/jtn0123/InkyPi/commit/f89c54b9fbd1cc5def14c55b5defb6d715b3d296))
+
+- **utils**: Keep all three rate limiters in one module
+  ([#762](https://github.com/jtn0123/InkyPi/pull/762),
+  [`9b84a2f`](https://github.com/jtn0123/InkyPi/commit/9b84a2fd57b1466d933e9f08ee713e020207a259))
+
+
 ## v1.8.29 (2026-11-15)
 
 ### Bug Fixes
