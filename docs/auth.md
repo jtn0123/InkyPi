@@ -121,9 +121,27 @@ rest of the app.
 curl -I http://inkypi.local/static/images/current_image.png  # 302 to /login
 ```
 
-PIN comparisons use constant-time verification. Repeated failures are limited
-by session and client IP; after five session failures, the session is locked
-for 60 seconds. HTTPS protects PIN transmission; hashing alone does not.
+PIN comparisons use constant-time verification. HTTPS protects PIN
+transmission; hashing alone does not. Two limits slow down guessing:
+
+- **Per address:** each client address gets about three login attempts a
+  minute.
+- **Whole device:** the first four wrong PINs cost nothing. The fifth pauses
+  logins for 60 seconds, and each wrong PIN after that doubles the pause, up to
+  one hour. While logins are paused, every login is refused with HTTP 429 and a
+  `Retry-After` header, even with the correct PIN, so clearing cookies or
+  switching address does not buy more guesses. A correct login resets the
+  count, a day without failures forgets it, and restarting the service clears
+  it.
+
+Because the pause covers every browser, someone guessing can also keep the
+owner from logging in, for up to an hour at a time. Browsers that are already
+logged in keep working. To clear a pause, restart the service with
+`sudo systemctl restart inkypi`.
+
+Use a PIN of at least 6 characters; InkyPi logs a warning at startup when it is
+shorter. At one guess an hour, trying every 4-digit PIN takes more than a year,
+and every extra character multiplies that.
 
 ## Read-only monitoring token
 
