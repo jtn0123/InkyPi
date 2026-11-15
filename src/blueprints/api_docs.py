@@ -5,8 +5,9 @@ from __future__ import annotations
 import json
 import os
 
-from flask import Blueprint, Response
+from flask import Blueprint, Response, g
 
+from app_setup.security_middleware import allow_extra_csp_sources
 from utils.sri import cdn_sri
 
 api_docs_bp = Blueprint("api_docs", __name__)
@@ -16,13 +17,21 @@ _SPEC_PATH = os.path.normpath(
     os.path.join(os.path.dirname(__file__), "..", "static", "openapi.json")
 )
 
-_SWAGGER_CSS_URL = "https://unpkg.com/swagger-ui-dist@5.35.0/swagger-ui.css"
-_SWAGGER_JS_URL = "https://unpkg.com/swagger-ui-dist@5.35.0/swagger-ui-bundle.js"
+_SWAGGER_ORIGIN = "https://unpkg.com"
+_SWAGGER_CSS_URL = f"{_SWAGGER_ORIGIN}/swagger-ui-dist@5.35.0/swagger-ui.css"
+_SWAGGER_JS_URL = f"{_SWAGGER_ORIGIN}/swagger-ui-dist@5.35.0/swagger-ui-bundle.js"
 
 
 @api_docs_bp.route("/api/docs", methods=["GET"])
 def swagger_ui() -> Response:
     """Serve the Swagger UI HTML page pointing at /api/openapi.json."""
+    # The app's CSP only allows this server's own scripts and styles, so
+    # without these the page stayed blank on the Pi. Dev mode only reports
+    # CSP violations, which is how it went unnoticed. The two files are
+    # pinned by their integrity hashes below.
+    allow_extra_csp_sources("script-src", _SWAGGER_ORIGIN)
+    allow_extra_csp_sources("style-src", _SWAGGER_ORIGIN)
+    nonce = getattr(g, "csp_nonce", "")
     css_integrity = cdn_sri("swagger-ui-css")
     js_integrity = cdn_sri("swagger-ui-bundle")
 
@@ -45,7 +54,7 @@ def swagger_ui() -> Response:
 <body>
   <div id="swagger-ui"></div>
   <script src="{_SWAGGER_JS_URL}"{js_integrity_attr}></script>
-  <script>
+  <script nonce="{nonce}">
     SwaggerUIBundle({{
       url: "/api/openapi.json",
       dom_id: "#swagger-ui",
