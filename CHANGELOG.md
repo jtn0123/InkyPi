@@ -2,6 +2,47 @@
 
 <!-- version list -->
 
+## v1.9.5 (2026-11-15)
+
+### Bug Fixes
+
+- **diagnostics**: Report when the screen last changed
+  ([#841](https://github.com/jtn0123/InkyPi/pull/841),
+  [`c5514a9`](https://github.com/jtn0123/InkyPi/commit/c5514a903b8ef7acd4eb0130968e1c001f5b1248))
+
+- **playlist**: Arrow keys move only a focused row, and a row can be dragged to the top
+  ([#848](https://github.com/jtn0123/InkyPi/pull/848),
+  [`5b90184`](https://github.com/jtn0123/InkyPi/commit/5b90184f6ca62592584419a9865ec0f09c9b83e2))
+
+- **playlist**: Ask before the edit dialog's Delete removes a playlist
+  ([#843](https://github.com/jtn0123/InkyPi/pull/843),
+  [`8fdf8bf`](https://github.com/jtn0123/InkyPi/commit/8fdf8bfb496e84c5507f28280ad08a509638ce37))
+
+- **playlist**: Open the thumbnail preview from the keyboard
+  ([#849](https://github.com/jtn0123/InkyPi/pull/849),
+  [`bf58722`](https://github.com/jtn0123/InkyPi/commit/bf58722887f4c8813203d98d1e6afd3bac3bd618))
+
+- **refresh**: Skip the panel write only when the panel shows the render
+  ([#842](https://github.com/jtn0123/InkyPi/pull/842),
+  [`8bb781a`](https://github.com/jtn0123/InkyPi/commit/8bb781af789050f5941b1802372a70ac31ccb615))
+
+- **refresh**: Update display waits as long as the render can take, and a timed-out render isn't
+  paid for twice ([#846](https://github.com/jtn0123/InkyPi/pull/846),
+  [`785f4be`](https://github.com/jtn0123/InkyPi/commit/785f4be5334b6efcae97c3b1e51a24192fafb971))
+
+- **settings**: Confirm Safe reset, and reload so Save can't undo it
+  ([#845](https://github.com/jtn0123/InkyPi/pull/845),
+  [`2e58eed`](https://github.com/jtn0123/InkyPi/commit/2e58eedb93596a8af69942686c266af389804776))
+
+- **settings**: Report the device's answer to Reboot and Shut down
+  ([#844](https://github.com/jtn0123/InkyPi/pull/844),
+  [`da7633a`](https://github.com/jtn0123/InkyPi/commit/da7633a8792257cda56294c18f0647f7b8281bd6))
+
+- **settings**: Save shows its spinner, turns off once saved, and a failed save keeps your typing
+  ([#847](https://github.com/jtn0123/InkyPi/pull/847),
+  [`68ee5a3`](https://github.com/jtn0123/InkyPi/commit/68ee5a34bde94ffcc97efa16d31a8e2f5f0c1c1c))
+
+
 ## v1.9.4 (2026-11-15)
 
 ### Bug Fixes
