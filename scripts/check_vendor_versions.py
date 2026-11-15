@@ -2,9 +2,10 @@
 """Report vendored front-end libraries that have a newer npm release.
 
 Dependabot can't see these: they are downloaded by ``install/update_vendors.sh``
-(Chart.js, FullCalendar) or loaded from a CDN listed in
-``src/static/cdn_manifest.json`` (Swagger UI). This reads the pinned versions
-from those two files and asks the npm registry for each package's releases.
+(Chart.js, FullCalendar), loaded from a CDN listed in
+``src/static/cdn_manifest.json`` (Swagger UI), or committed under
+``src/static/vendor/`` (htmx, Leaflet). This reads the pinned versions from
+those places and asks the npm registry for each package's releases.
 
 A newer release in the pinned major fails the check (exit 1), so the weekly
 workflow goes red. A new major is listed but doesn't fail: adopting one is a
@@ -29,6 +30,14 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 UPDATE_VENDORS = ROOT / "install" / "update_vendors.sh"
 CDN_MANIFEST = ROOT / "src" / "static" / "cdn_manifest.json"
+VENDOR_DIR = ROOT / "src" / "static" / "vendor"
+# Libraries committed straight into src/static/vendor/: (npm package, file,
+# pattern for the version inside the file). Reading the version from the file
+# itself means replacing the file is the whole update, and nothing can drift.
+COMMITTED_FILES = (
+    ("htmx.org", VENDOR_DIR / "htmx.min.js", r'version:"(\d+\.\d+\.\d+)"'),
+    ("leaflet", VENDOR_DIR / "leaflet" / "leaflet.js", r"Leaflet (\d+\.\d+\.\d+)"),
+)
 REGISTRY = "https://registry.npmjs.org"
 
 # ``…/npm/<pkg>@<version>/…`` (jsDelivr) or ``unpkg.com/<pkg>@<version>/…``;
@@ -78,9 +87,24 @@ def pins_from_cdn_manifest(text: str) -> list[Pin]:
     return _pins_from_urls(urls, "src/static/cdn_manifest.json")
 
 
+def pins_from_committed_files(
+    files: tuple[tuple[str, Path, str], ...] = COMMITTED_FILES,
+) -> list[Pin]:
+    """Return the version of each library committed under ``src/static/vendor/``."""
+    pins = []
+    for package, path, pattern in files:
+        source = path.relative_to(ROOT).as_posix()
+        match = re.search(pattern, path.read_text(encoding="utf-8"))
+        if match is None:
+            raise ValueError(f"{source}: no {package} version found")
+        pins.append(Pin(package, match[1], source))
+    return pins
+
+
 def all_pins() -> list[Pin]:
     pins = pins_from_update_vendors(UPDATE_VENDORS.read_text(encoding="utf-8"))
     pins += pins_from_cdn_manifest(CDN_MANIFEST.read_text(encoding="utf-8"))
+    pins += pins_from_committed_files()
     unique: dict[tuple[str, str], Pin] = {}
     for pin in pins:
         unique.setdefault((pin.package, pin.version), pin)
@@ -155,8 +179,9 @@ def main() -> int:
     if code == 1:
         print(
             "\nA newer release exists in the pinned major. Bump the version and sha256 in "
-            "install/update_vendors.sh, or the URL and integrity in "
-            "src/static/cdn_manifest.json (and src/blueprints/api_docs.py).",
+            "install/update_vendors.sh, the URL and integrity in "
+            "src/static/cdn_manifest.json (and src/blueprints/api_docs.py), or replace "
+            "the file under src/static/vendor/ with the npm package's dist file.",
             file=sys.stderr,
         )
     return code

@@ -57,7 +57,7 @@ Developer, CI and device tools. Run them from the repo root. Python scripts add
 | `check_licenses.sh` | Checks dependency licences with the `pip-licenses` pinned in `install/requirements-dev.txt` (installs nothing; run it from the dev venv). |
 | `check_links.py` | Re-checks links that the Lychee link checker reported as throttled. |
 | `check_requirements_drift.sh` | Checks that the exported lockfile matches `uv.lock`. |
-| `check_vendor_versions.py` | Weekly check that the vendored front-end libraries are current within their major (`vendor-versions.yml`). |
+| `check_vendor_versions.py` | Weekly check that the vendored front-end libraries (downloaded, CDN-loaded, and committed under `src/static/vendor/`) are current within their major (`vendor-versions.yml`). |
 | `mypy_src_baseline.txt`, `mypy_tests_baseline.txt` | The mypy error ratchets used by `lint.sh`. |
 
 ## Install and Pi images
