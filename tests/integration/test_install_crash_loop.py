@@ -46,16 +46,14 @@ only installs ``systemd`` + ``dbus`` — no InkyPi deps, no arm64 emulation.
 from __future__ import annotations
 
 import subprocess
-import textwrap
-import uuid
 from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
 from tests.integration.container_support import (
-    cgroup_run_args,
-    infrastructure_failed,
+    build_systemd_image,
     skip_unless_docker,
+    systemd_container,
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -270,50 +268,8 @@ exit 0
 @pytest.fixture(scope="module")
 def systemd_image() -> Iterator[str]:
     """Build a minimal systemd-capable Debian image once per test module."""
-    image_tag = f"inkypi-crash-loop-{uuid.uuid4().hex[:8]}"
-    dockerfile = textwrap.dedent("""
-        FROM debian:trixie-slim
-        ENV DEBIAN_FRONTEND=noninteractive
-        RUN apt-get update \\
-            && apt-get install -y --no-install-recommends \\
-                systemd \\
-                systemd-sysv \\
-                dbus \\
-                procps \\
-            && rm -rf /var/lib/apt/lists/* \\
-            && find /etc/systemd/system \\
-                /lib/systemd/system/multi-user.target.wants \\
-                /lib/systemd/system/local-fs.target.wants \\
-                /lib/systemd/system/sockets.target.wants \\
-                /lib/systemd/system/basic.target.wants \\
-                /lib/systemd/system/anaconda.target.wants \\
-                -type l -delete 2>/dev/null || true
-        STOPSIGNAL SIGRTMIN+3
-        CMD ["/lib/systemd/systemd"]
-        """).strip()
-
-    build = subprocess.run(
-        ["docker", "build", "-t", image_tag, "-f", "-", str(REPO_ROOT)],
-        input=dockerfile,
-        text=True,
-        capture_output=True,
-        timeout=300,
-        check=False,
-    )
-    if build.returncode != 0:
-        infrastructure_failed(
-            "Could not build systemd-capable Docker image "
-            f"(exit {build.returncode}): {build.stderr[-400:]}"
-        )
-
-    yield image_tag
-
-    subprocess.run(
-        ["docker", "rmi", "-f", image_tag],
-        capture_output=True,
-        check=False,
-        timeout=60,
-    )
+    with build_systemd_image("inkypi-crash-loop", build_timeout=300) as tag:
+        yield tag
 
 
 def _ensure_repo_artifacts_present() -> None:
@@ -346,72 +302,20 @@ def test_install_crash_mid_pip_does_not_restart_loop(systemd_image: str) -> None
     """
     _ensure_repo_artifacts_present()
 
-    container_name = f"inkypi-crash-loop-{uuid.uuid4().hex[:8]}"
     # 512 MB cap matches the Pi Zero 2 W the real incident happened on and
     # keeps this test aligned with the JTN-536 memcap smoke-test invariants
     # without sharing its script.
-    run_cmd = [
-        "docker",
-        "run",
-        "--rm",
-        "--detach",
-        "--name",
-        container_name,
-        "--privileged",
-        "--memory=512m",
-        "--memory-swap=512m",
-        "--tmpfs",
-        "/run",
-        "--tmpfs",
-        "/run/lock",
-        *cgroup_run_args(),
-        "-v",
-        f"{REPO_ROOT}:/opt/inkypi-src:ro",
+    with systemd_container(
         systemd_image,
-    ]
-    start = subprocess.run(
-        run_cmd, capture_output=True, text=True, timeout=60, check=False
-    )
-    if start.returncode != 0:
-        infrastructure_failed(
-            "Could not launch systemd-in-docker container "
-            f"(exit {start.returncode}): {start.stderr[-400:]}"
-        )
-
-    try:
-        # Wait for systemd to finish bringing the container up. `is-system-running`
-        # returns 'running' or 'degraded' once PID 1 has reached the final target.
-        boot_ok = False
-        boot_output = ""
-        for _ in range(30):
-            probe = subprocess.run(
-                [
-                    "docker",
-                    "exec",
-                    container_name,
-                    "systemctl",
-                    "is-system-running",
-                    "--wait",
-                ],
-                capture_output=True,
-                text=True,
-                timeout=15,
-                check=False,
-            )
-            boot_output = (probe.stdout or "") + (probe.stderr or "")
-            state = probe.stdout.strip() if probe.stdout else ""
-            if state in {"running", "degraded"}:
-                boot_ok = True
-                break
-            if state == "initializing" or state == "starting":
-                continue
-            # Any other state — retry briefly in case systemd is still booting.
-        if not boot_ok:
-            infrastructure_failed(
-                "systemd did not reach a running state inside the container; "
-                f"last output: {boot_output[-400:]}"
-            )
-
+        "inkypi-crash-loop",
+        [
+            "--memory=512m",
+            "--memory-swap=512m",
+            "-v",
+            f"{REPO_ROOT}:/opt/inkypi-src:ro",
+        ],
+        launch_timeout=60,
+    ) as container_name:
         exec_cmd = [
             "docker",
             "exec",
@@ -451,11 +355,4 @@ def test_install_crash_mid_pip_does_not_restart_loop(systemd_image: str) -> None
         assert "positive control OK" in combined, (
             "Positive control did not confirm ExecStart ran after lockfile "
             f"removal; output tail:\n{combined[-1500:]}"
-        )
-    finally:
-        subprocess.run(
-            ["docker", "rm", "-f", container_name],
-            capture_output=True,
-            check=False,
-            timeout=60,
         )

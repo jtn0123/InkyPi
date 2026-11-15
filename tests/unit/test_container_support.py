@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import subprocess
+import time
 
 import pytest
 from tests.integration import container_support
@@ -53,3 +54,77 @@ def test_cgroup_flags_follow_the_cgroup_version(
 
     monkeypatch.setattr(subprocess, "run", lambda *a, **k: _Probe())
     assert container_support.cgroup_run_args() == expected
+
+
+class _FakeDocker:
+    """Stands in for subprocess.run and records every docker call."""
+
+    def __init__(self, *, run: object = "ok", boot: str = "running\n") -> None:
+        self.calls: list[list[str]] = []
+        self._run = run
+        self._boot = boot
+
+    def __call__(
+        self, argv: list[str], **kwargs: object
+    ) -> subprocess.CompletedProcess[str]:
+        self.calls.append(list(argv))
+        verb = argv[1]
+        if verb == "run" and isinstance(self._run, BaseException):
+            raise self._run
+        stdout = ""
+        if verb == "info":
+            stdout = "2\n"
+        elif argv[-2:] == ["is-system-running", "--wait"]:
+            stdout = self._boot
+        return subprocess.CompletedProcess(argv, 0, stdout, "")
+
+    def removed(self, name: str) -> bool:
+        return ["docker", "rm", "-f", name] in self.calls
+
+    def launched_name(self) -> str:
+        argv = next(c for c in self.calls if c[1] == "run")
+        return argv[argv.index("--name") + 1]
+
+
+def test_a_launch_that_times_out_still_removes_the_container(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The daemon can create the container after the client gives up waiting."""
+    docker = _FakeDocker(run=subprocess.TimeoutExpired(["docker", "run"], 60))
+    monkeypatch.setattr(subprocess, "run", docker)
+    monkeypatch.setattr(container_support, "REQUIRED", False)
+
+    with pytest.raises(pytest.skip.Exception, match="did not return within 60s"):
+        with container_support.systemd_container("img", "t", launch_timeout=60):
+            pytest.fail("the body must not run when the launch failed")
+
+    assert docker.removed(docker.launched_name())
+
+
+def test_a_failing_test_body_still_removes_the_container(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    docker = _FakeDocker()
+    monkeypatch.setattr(subprocess, "run", docker)
+
+    with pytest.raises(AssertionError):
+        with container_support.systemd_container("img", "t") as name:
+            assert not docker.removed(name)
+            raise AssertionError("scenario failed")
+
+    assert docker.removed(name)
+
+
+def test_a_container_that_never_boots_is_reported_and_removed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    docker = _FakeDocker(boot="starting\n")
+    monkeypatch.setattr(subprocess, "run", docker)
+    monkeypatch.setattr(time, "sleep", lambda _s: None)
+    monkeypatch.setattr(container_support, "REQUIRED", True)
+
+    with pytest.raises(pytest.fail.Exception, match="did not finish booting"):
+        with container_support.systemd_container("img", "t", boot_timeout=0.05):
+            pytest.fail("the body must not run before systemd has booted")
+
+    assert docker.removed(docker.launched_name())

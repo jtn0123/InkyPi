@@ -18,17 +18,15 @@ the start limit is reached in seconds rather than the production 60 s cadence.
 from __future__ import annotations
 
 import subprocess
-import textwrap
-import uuid
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
 import pytest
 from tests.integration.container_support import (
-    cgroup_run_args,
-    infrastructure_failed,
+    build_systemd_image,
     skip_unless_docker,
+    systemd_container,
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -47,35 +45,8 @@ pytestmark = [
 
 @pytest.fixture(scope="module")
 def systemd_image() -> Iterator[str]:
-    tag = f"inkypi-boot-health-{uuid.uuid4().hex[:8]}"
-    dockerfile = textwrap.dedent("""
-        FROM debian:trixie-slim
-        ENV DEBIAN_FRONTEND=noninteractive
-        RUN apt-get update \\
-            && apt-get install -y --no-install-recommends \\
-                systemd systemd-sysv dbus procps \\
-            && rm -rf /var/lib/apt/lists/* \\
-            && find /etc/systemd/system \\
-                /lib/systemd/system/multi-user.target.wants \\
-                /lib/systemd/system/local-fs.target.wants \\
-                /lib/systemd/system/sockets.target.wants \\
-                /lib/systemd/system/basic.target.wants \\
-                -type l -delete 2>/dev/null || true
-        STOPSIGNAL SIGRTMIN+3
-        CMD ["/lib/systemd/systemd"]
-        """).strip()
-    build = subprocess.run(
-        ["docker", "build", "-t", tag, "-f", "-", str(REPO_ROOT)],
-        input=dockerfile,
-        capture_output=True,
-        text=True,
-        timeout=600,
-        check=False,
-    )
-    if build.returncode != 0:
-        infrastructure_failed(f"could not build systemd image: {build.stderr[-400:]}")
-    yield tag
-    subprocess.run(["docker", "rmi", "-f", tag], capture_output=True, check=False)
+    with build_systemd_image("inkypi-boot-health", build_timeout=600) as tag:
+        yield tag
 
 
 class Container:
@@ -103,53 +74,12 @@ class Container:
 
 @pytest.fixture
 def container(systemd_image: str) -> Iterator[Container]:
-    name = f"inkypi-bh-{uuid.uuid4().hex[:8]}"
-    start = subprocess.run(
-        [
-            "docker",
-            "run",
-            "--rm",
-            "--detach",
-            "--name",
-            name,
-            "--privileged",
-            "--tmpfs",
-            "/run",
-            "--tmpfs",
-            "/run/lock",
-            *cgroup_run_args(),
-            "-v",
-            f"{INSTALL_DIR}:/opt/inkypi-install:ro",
-            systemd_image,
-        ],
-        capture_output=True,
-        text=True,
-        timeout=120,
-        check=False,
-    )
-    if start.returncode != 0:
-        infrastructure_failed(f"could not launch container: {start.stderr[-400:]}")
-
-    ctr = Container(name)
-    # `is-system-running --wait` answers empty (and non-zero) if it is asked
-    # before dbus is up, so poll rather than trusting a single call.
-    state = ""
-    for _ in range(30):
-        ready = ctr.exec("systemctl is-system-running --wait", timeout=30)
-        state = (ready.stdout or "").strip()
-        if state in {"running", "degraded"}:
-            break
-    if state not in {"running", "degraded"}:
-        diagnostics = ctr.exec("journalctl -n 30 --no-pager 2>&1 || true").stdout
-        subprocess.run(["docker", "rm", "-f", name], capture_output=True, check=False)
-        infrastructure_failed(
-            f"systemd did not boot inside the container: {state!r}\n{diagnostics[-600:]}"
-        )
-
-    try:
-        yield ctr
-    finally:
-        subprocess.run(["docker", "rm", "-f", name], capture_output=True, check=False)
+    with systemd_container(
+        systemd_image,
+        "inkypi-bh",
+        ["-v", f"{INSTALL_DIR}:/opt/inkypi-install:ro"],
+    ) as name:
+        yield Container(name)
 
 
 def _install_inkypi(ctr: Container, *, version: str, confirmed: str | None) -> None:
