@@ -2,6 +2,43 @@
 
 <!-- version list -->
 
+## v1.9.4 (2026-11-15)
+
+### Bug Fixes
+
+- **api-keys**: Ask before deleting a key in the app's dialog, not window.confirm()
+  ([#832](https://github.com/jtn0123/InkyPi/pull/832),
+  [`43bb1ee`](https://github.com/jtn0123/InkyPi/commit/43bb1ee79926c3264a909886ecd3c66c9d64575a))
+
+- **config**: Stop settings saves from writing a config the device can't start with
+  ([#835](https://github.com/jtn0123/InkyPi/pull/835),
+  [`842fab8`](https://github.com/jtn0123/InkyPi/commit/842fab870e9720710b9bd38a3deae44385d2cd4c))
+
+- **dev**: Don't call the venv out of sync after every release
+  ([#836](https://github.com/jtn0123/InkyPi/pull/836),
+  [`af14b47`](https://github.com/jtn0123/InkyPi/commit/af14b47d5a1a1e36739262e165d3455bea8ddcdd))
+
+- **playlist**: Wake the scheduler when playlists change
+  ([#837](https://github.com/jtn0123/InkyPi/pull/837),
+  [`8afc78e`](https://github.com/jtn0123/InkyPi/commit/8afc78e9f86a135f47b7fc48b4c7d1385117c768))
+
+- **plugin**: Edited instance settings render a new picture next turn
+  ([#840](https://github.com/jtn0123/InkyPi/pull/840),
+  [`f0ea4a5`](https://github.com/jtn0123/InkyPi/commit/f0ea4a5445a05d6c1bc56dc9bcb45f8f2102d463))
+
+- **plugin**: Show Save settings errors, and check required fields first
+  ([#834](https://github.com/jtn0123/InkyPi/pull/834),
+  [`84b8f0f`](https://github.com/jtn0123/InkyPi/commit/84b8f0f584755ec84159b822db1c28f7590f2ca0))
+
+- **refresh**: One rule decides whether a scheduled refresh is due
+  ([#838](https://github.com/jtn0123/InkyPi/pull/838),
+  [`f02d062`](https://github.com/jtn0123/InkyPi/commit/f02d0622185b25fb20e9e88c2820f65dd2a2953b))
+
+- **security**: Keyed backups need a PIN, and .env stays out of the environment
+  ([#839](https://github.com/jtn0123/InkyPi/pull/839),
+  [`1a1cec0`](https://github.com/jtn0123/InkyPi/commit/1a1cec0e3304c7be3fbac9b30045d4d48b86a922))
+
+
 ## v1.9.3 (2026-11-15)
 
 ### Bug Fixes
