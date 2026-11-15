@@ -1,11 +1,11 @@
 """Image serving: plugin static assets, latest-history and instance previews."""
 
-import json
 import os
 from typing import Any
 
 from flask import abort, current_app, send_from_directory
 
+from utils import history_index
 from utils.form_utils import sanitize_log_field
 from utils.http_utils import content_disposition
 from utils.security_utils import validate_file_path
@@ -13,7 +13,6 @@ from utils.security_utils import validate_file_path
 from ._common import (
     _CONFIG_KEY,
     _ERR_NOT_FOUND,
-    _PLUGIN_ID,
     _cacheable_send_file,
     _plugins_dir,
     logger,
@@ -106,111 +105,39 @@ def image(plugin_id: str, filename: str) -> Any:
 def latest_plugin_image(plugin_id: str) -> Any:
     """Serve the most recent history image for a given plugin_id.
 
-    Searches the history directory for the latest PNG matching the plugin_id,
-    regardless of instance name. Used by the plugin page to show "Latest from this plugin".
-
-    JSON files are sorted by filename descending (newest first) so the first
-    match is the most recent, giving O(1) reads in the common case.
+    Any instance of the plugin counts. Used by the plugin page to show
+    "Latest from this plugin".
     """
     device_config = current_app.config[_CONFIG_KEY]
-    try:
-        history_dir = str(device_config.history_image_dir)
-        if not os.path.isdir(history_dir):
-            return (_ERR_NOT_FOUND, 404)
-
-        # Pre-filter to .json files and sort newest-first by filename
-        json_files = sorted(
-            (n for n in os.listdir(history_dir) if n.endswith(".json")),
-            reverse=True,
-        )
-
-        for name in json_files:
-            json_path = os.path.join(history_dir, name)
-            try:
-                with open(json_path, encoding="utf-8") as fh:
-                    meta = json.load(fh)
-                if meta.get(_PLUGIN_ID) == plugin_id:
-                    png_path = os.path.join(history_dir, name.replace(".json", ".png"))
-                    if os.path.exists(png_path):
-                        return _cacheable_send_file(png_path)
-            except Exception:
-                continue
-
-        return (_ERR_NOT_FOUND, 404)
-
-    except Exception:
-        return (_ERR_NOT_FOUND, 404)
+    history_dir = str(device_config.history_image_dir)
+    for entry in history_index.entries(history_dir):
+        if entry.plugin_id == plugin_id:
+            png_path = os.path.join(history_dir, entry.image_name)
+            if os.path.exists(png_path):
+                return _cacheable_send_file(png_path)
+    return (_ERR_NOT_FOUND, 404)
 
 
 def _find_history_image(
     device_config: Any, plugin_id: str, instance_name: str
 ) -> str | None:
-    """Return path to a history PNG that matches plugin and instance, if any.
-
-    Pre-filters directory listing to only .json filenames and sorts newest-first
-    so the first match wins.
-    """
-    try:
-        history_dir: str = str(device_config.history_image_dir)
-        if not os.path.isdir(history_dir):
-            return None
-        json_files = sorted(
-            (n for n in os.listdir(history_dir) if n.endswith(".json")),
-            reverse=True,
-        )
-        for name in json_files:
-            json_path = os.path.join(history_dir, name)
-            try:
-                with open(json_path, encoding="utf-8") as fh:
-                    meta = json.load(fh)
-                if (
-                    meta.get(_PLUGIN_ID) == plugin_id
-                    and meta.get("plugin_instance") == instance_name
-                ):
-                    png_path: str = os.path.join(
-                        history_dir, name.replace(".json", ".png")
-                    )
-                    if os.path.exists(png_path):
-                        return png_path
-            except Exception:
-                continue
-    except Exception:
-        return None
+    """Return path to the newest history PNG of this plugin instance, if any."""
+    history_dir = str(device_config.history_image_dir)
+    for entry in history_index.entries(history_dir):
+        if entry.plugin_id == plugin_id and entry.plugin_instance == instance_name:
+            png_path = os.path.join(history_dir, entry.image_name)
+            if os.path.exists(png_path):
+                return png_path
     return None
 
 
 def _find_latest_plugin_refresh_time(device_config: Any, plugin_id: str) -> str | None:
-    """Return the most recent refresh time for any instance of this plugin.
-
-    Filenames follow the display_YYYYMMDD_HHMMSS pattern, so sorting by
-    filename descending mirrors refresh_time ordering.  We iterate
-    newest-first and return the refresh_time from the first match.
-    """
-    try:
-        history_dir = str(device_config.history_image_dir)
-        if not os.path.isdir(history_dir):
-            return None
-
-        json_files = sorted(
-            (n for n in os.listdir(history_dir) if n.endswith(".json")),
-            reverse=True,
-        )
-
-        for name in json_files:
-            json_path = os.path.join(history_dir, name)
-            try:
-                with open(json_path, encoding="utf-8") as fh:
-                    meta = json.load(fh)
-                if meta.get(_PLUGIN_ID) == plugin_id:
-                    refresh_time = meta.get("refresh_time")
-                    if isinstance(refresh_time, str) and refresh_time:
-                        return refresh_time
-            except Exception:
-                continue
-
-        return None
-    except Exception:
-        return None
+    """Return the most recent refresh time for any instance of this plugin."""
+    history_dir = str(device_config.history_image_dir)
+    for entry in history_index.entries(history_dir):
+        if entry.plugin_id == plugin_id and entry.refresh_time:
+            return entry.refresh_time
+    return None
 
 
 @plugin_bp.route(
