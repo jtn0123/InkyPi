@@ -105,22 +105,6 @@
     return snap;
   }
 
-  function restoreFormFromSnapshot(form, snapshot) {
-    if (!form || !snapshot) return;
-    for (const el of form.querySelectorAll("input, select, textarea")) {
-      const key = el.name || el.id;
-      if (!key || !(key in snapshot)) continue;
-      if (el.type === "checkbox") {
-        el.checked = snapshot[key];
-      } else if (el.type === "radio") {
-        el.checked = snapshot[key] === el.value;
-      } else {
-        el.value = snapshot[key];
-      }
-      el.dispatchEvent(new Event("input", { bubbles: true }));
-    }
-  }
-
   function isErrorLine(line) {
     return /\b(ERROR|CRITICAL|Exception|Traceback)\b/i.test(line);
   }
@@ -219,7 +203,6 @@
     isWarnLine,
     prefKey,
     renderUpdateFailureBanner,
-    restoreFormFromSnapshot,
     showCopyFeedback,
   };
 })();

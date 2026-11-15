@@ -38,16 +38,15 @@
     }
   }
 
+  // A failed save leaves the form as the user typed it, so they can fix it or
+  // try again; the Save button then reflects what is still unsaved.
   async function submitSettingsForm({
     form,
     formData,
     fs,
-    saveBtn,
     saveSettingsUrl,
     snapshotState,
     getFormSnapshot,
-    restoreFormFromSnapshot,
-    checkDirty,
   }) {
     try {
       const response = await fetch(saveSettingsUrl, {
@@ -57,28 +56,22 @@
       const result = await response.json();
       if (response.ok) {
         snapshotState.current = getFormSnapshot(form);
-        if (saveBtn) saveBtn.disabled = true;
         showResponseModal("success", `Success! ${result.message}`);
         return;
       }
-
-      const fieldLevelError = applyFieldLevelError(fs, result);
+      applyFieldLevelError(fs, result);
       showResponseModal("failure", `Error! ${result.error}`);
-      if (!fieldLevelError) {
-        restoreFormFromSnapshot(form, snapshotState.current);
-      }
     } catch (error) {
       console.error("Settings save failed:", error);
       showResponseModal(
         "failure",
         "An error occurred while processing your request. Please try again."
       );
-      checkDirty();
     }
   }
 
   function createFormModule({ config, state, shared }) {
-    const { getFormSnapshot, restoreFormFromSnapshot } = shared;
+    const { getFormSnapshot } = shared;
     const snapshotState = { current: null };
 
     // Server caps the cycle interval at "less than 24 hours" — see
@@ -185,30 +178,20 @@
           form,
           formData,
           fs,
-          saveBtn,
           saveSettingsUrl: config.saveSettingsUrl,
           snapshotState,
           getFormSnapshot,
-          restoreFormFromSnapshot,
-          checkDirty,
         });
 
       if (fs) {
         await fs.run(doSubmit);
-        return;
-      }
-
-      if (saveBtn) {
-        saveBtn.disabled = true;
-        saveBtn.textContent = "Saving…";
-      }
-      try {
+      } else {
+        if (saveBtn) saveBtn.disabled = true;
         await doSubmit();
-      } finally {
-        if (saveBtn?.textContent === "Saving…") {
-          saveBtn.textContent = "Save";
-        }
       }
+      // Saved: nothing left to save, so Save is off. Failed: the changes are
+      // still there, so Save is on for another try.
+      checkDirty();
     }
 
     function toggleUseDeviceLocation(cb) {
