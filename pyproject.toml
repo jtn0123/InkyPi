@@ -17,7 +17,7 @@ dependencies = [
   "pi-heif==1.4.0",
   "tzdata>=2026.1",
   "openai>=3.22,<4",
-  "google-genai>=2.25,<3",
+  "google-genai>=3.3,<4",
   "numpy>=2.5,<3",
   "icalendar>=7.3,<8",
   "recurring-ical-events>=3.8,<4",
@@ -169,4 +169,3 @@ ignore_merge_commits = false
 [build-system]
 requires = ["setuptools>=61"]
 build-backend = "setuptools.build_meta"
-

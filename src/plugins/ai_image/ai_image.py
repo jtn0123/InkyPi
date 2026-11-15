@@ -378,9 +378,9 @@ class AIImage(BasePlugin):
             logger.error("Google AI API Key not configured")
             raise RuntimeError("Google AI API Key not configured.")
 
-        from google import genai
+        from utils.google_ai import google_ai_client
 
-        google_client = genai.Client(api_key=api_key)
+        google_client = google_ai_client(api_key)
         prompt = self._maybe_randomize_google_prompt(
             google_client, text_prompt, randomize
         )

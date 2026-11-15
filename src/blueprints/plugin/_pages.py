@@ -180,14 +180,13 @@ def ai_image_random_prompt() -> Any:
             api_key = device_config.load_env_key("GOOGLE_AI_SECRET")
             if not api_key:
                 raise ClientInputError("Google AI API Key not configured.", status=400)
-            from google import genai
-
             from plugins.ai_image.ai_image import AIImage
+            from utils.google_ai import google_ai_client
 
             # Named per provider: the two branches bind unrelated SDK client
             # types, and sharing one name made the second look like a
             # reassignment to an incompatible type.
-            google_client = genai.Client(api_key=api_key)
+            google_client = google_ai_client(api_key)
             prompt = AIImage.fetch_image_prompt_google(google_client, seed_prompt)
         else:
             api_key = device_config.load_env_key("OPEN_AI_SECRET")
