@@ -238,7 +238,7 @@ function getErrorMessage(status, endpoint) {
     const errorMessages = {
         400: `Invalid request${ctx}. Please check your input.`,
         401: `Authentication required${ctx}. Please log in.`,
-        403: `Access denied${ctx}. You don\'t have permission.`,
+        403: `Access denied${ctx}. You don't have permission.`,
         404: `Resource not found${ctx}.`,
         408: `Request timed out${ctx}. Please try again.`,
         429: `Too many requests${ctx}. Please wait a moment and retry.`,
@@ -264,3 +264,11 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 });
+
+// Other scripts call these by bare name (biome.json lists them under
+// javascript.globals). A classic script's top-level functions are globals
+// already; assigning them here states that contract where it is defined.
+globalThis.showToast = showToast;
+globalThis.showResponseModal = showResponseModal;
+globalThis.showError = showError;
+globalThis.handleJsonResponse = handleJsonResponse;

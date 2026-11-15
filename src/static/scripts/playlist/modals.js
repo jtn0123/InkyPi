@@ -1,5 +1,6 @@
 (function (global) {
-  const ns = (global.InkyPiPlaylist = global.InkyPiPlaylist || {});
+  global.InkyPiPlaylist = global.InkyPiPlaylist || {};
+  const ns = global.InkyPiPlaylist;
 
   function syncModalOpenState() {
     const ui = global.InkyPiUI;

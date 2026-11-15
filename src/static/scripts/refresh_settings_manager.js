@@ -283,7 +283,8 @@ class RefreshSettingsManager {
     }
 }
 
-// Global utility function to create and initialize a manager
+// Create and initialize a manager. playlist/modals.js calls it as
+// window.createRefreshSettingsManager.
 function createRefreshSettingsManager(modalId, prefix) {
     const manager = new RefreshSettingsManager(modalId, prefix);
     // Auto-initialize when DOM is ready
@@ -294,3 +295,5 @@ function createRefreshSettingsManager(modalId, prefix) {
     }
     return manager;
 }
+
+globalThis.createRefreshSettingsManager = createRefreshSettingsManager;

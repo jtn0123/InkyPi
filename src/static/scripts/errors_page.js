@@ -42,11 +42,11 @@
     if (cancelBtn) cancelBtn.disabled = true;
 
     try {
-      var resp = await fetch(clearUrl, {
+      const resp = await fetch(clearUrl, {
         method: "POST",
         headers: { "X-CSRFToken": globalThis.InkyPiCsrf?.getToken() || "" },
       });
-      var result = await resp.json();
+      const result = await resp.json();
       if (!resp.ok) {
         closeClearModal();
         if (globalThis.showResponseModal) {
@@ -56,15 +56,15 @@
       }
       closeClearModal();
       // Remove all rendered error rows
-      var tbody = document.getElementById("errorsTableBody");
+      const tbody = document.getElementById("errorsTableBody");
       if (tbody) {
         tbody.innerHTML = "";
       }
-      var emptyState = document.getElementById("errorsEmptyState");
+      const emptyState = document.getElementById("errorsEmptyState");
       if (emptyState) {
         emptyState.hidden = false;
       }
-      var clearBtn = document.getElementById("errorsClearBtn");
+      const clearBtn = document.getElementById("errorsClearBtn");
       if (clearBtn) {
         clearBtn.disabled = true;
       }

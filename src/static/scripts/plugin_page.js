@@ -32,7 +32,8 @@
   function createPluginPage(config) {
     const ui = globalThis.InkyPiUI || {};
     const mobileQuery = globalThis.matchMedia ? globalThis.matchMedia("(max-width: 768px)") : { matches: false, addEventListener() {} };
-    const uploadedFiles = (globalThis.uploadedFiles = globalThis.uploadedFiles || {});
+    globalThis.uploadedFiles = globalThis.uploadedFiles || {};
+    const uploadedFiles = globalThis.uploadedFiles;
     let actionInFlight = false;
     let workflowMode = "configure";
     const {

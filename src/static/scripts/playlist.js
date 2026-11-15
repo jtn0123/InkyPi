@@ -1,5 +1,6 @@
 (function (global) {
-  const ns = (global.InkyPiPlaylist = global.InkyPiPlaylist || {});
+  global.InkyPiPlaylist = global.InkyPiPlaylist || {};
+  const ns = global.InkyPiPlaylist;
   const PUBLIC_METHODS = {
     "applyFieldErrorFromResponse": "applyFieldErrorFromResponse",
     "closeDeviceCycleModal": "closeDeviceCycleModal",

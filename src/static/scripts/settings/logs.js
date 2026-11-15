@@ -1,7 +1,6 @@
 (function () {
-  const settingsModules =
-    globalThis.InkyPiSettingsModules ||
-    (globalThis.InkyPiSettingsModules = {});
+  globalThis.InkyPiSettingsModules = globalThis.InkyPiSettingsModules || {};
+  const settingsModules = globalThis.InkyPiSettingsModules;
 
   function updateLastUpdated() {
     const el = document.getElementById("logsUpdated");

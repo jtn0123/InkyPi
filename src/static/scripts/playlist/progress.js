@@ -1,5 +1,6 @@
 (function (global) {
-  const ns = (global.InkyPiPlaylist = global.InkyPiPlaylist || {});
+  global.InkyPiPlaylist = global.InkyPiPlaylist || {};
+  const ns = global.InkyPiPlaylist;
 
   function parseJsonValue(rawValue, label) {
     if (!rawValue) return null;

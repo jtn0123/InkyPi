@@ -1,7 +1,6 @@
 (function () {
-  const settingsModules =
-    globalThis.InkyPiSettingsModules ||
-    (globalThis.InkyPiSettingsModules = {});
+  globalThis.InkyPiSettingsModules = globalThis.InkyPiSettingsModules || {};
+  const settingsModules = globalThis.InkyPiSettingsModules;
 
   const STAGE_LABELS = {
     request_ms: "Request",
