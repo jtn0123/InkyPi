@@ -690,6 +690,7 @@ def display_next() -> Any:
         return json_error("No eligible plugin to display", status=400)
 
     generate_ms = None
+    update_metrics: dict[str, Any] | None = None
     benchmark_id = str(uuid4())
     via_refresh_task = bool(getattr(refresh_task, "running", False))
     try:
@@ -697,7 +698,7 @@ def display_next() -> Any:
             from refresh_task import PlaylistRefresh
 
             try:
-                refresh_task.manual_update(
+                update_metrics = refresh_task.manual_update(
                     PlaylistRefresh(playlist, plugin_instance, force=True)
                 )
             except RuntimeError:
@@ -723,13 +724,22 @@ def display_next() -> Any:
 
     _display_next_limiter.record()
 
-    metrics = _gather_display_metrics(device_config, generate_ms)
-    if not via_refresh_task:
-        # The refresh loop records its own benchmark row (``_save_benchmark``);
-        # only the direct path has nobody else to do it.
-        _persist_dev_refresh_event(
-            device_config, benchmark_id, plugin_instance, playlist, metrics
+    if via_refresh_task:
+        # This refresh's own timings; refresh_info may still describe the
+        # previous one (see manual_update_timings). The loop records its own
+        # benchmark row.
+        from refresh_task import manual_update_timings
+
+        return json_success(
+            message="Display updated", metrics=manual_update_timings(update_metrics)
         )
+
+    # The direct path wrote refresh_info itself, so it is current here, and
+    # nobody else records the benchmark row.
+    metrics = _gather_display_metrics(device_config, generate_ms)
+    _persist_dev_refresh_event(
+        device_config, benchmark_id, plugin_instance, playlist, metrics
+    )
     request_ms, display_ms, generate_ms, preprocess_ms = metrics
 
     return json_success(

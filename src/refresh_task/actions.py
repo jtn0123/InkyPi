@@ -84,6 +84,25 @@ class PluginInstanceLike(Protocol):
     def should_refresh(self, current_dt: datetime) -> bool: ...
 
 
+_TIMING_KEYS = ("request_ms", "generate_ms", "preprocess_ms", "display_ms")
+
+
+def manual_update_timings(metrics: Mapping[str, object] | None) -> Metrics:
+    """The timings a route should report for the refresh it just triggered.
+
+    ``RefreshTask.manual_update`` returns this refresh's own metrics. Reading
+    ``refresh_info`` instead reports the *previous* refresh: ``manual_update``
+    can return at ``image_saved``, before the panel write and before
+    refresh_info is updated. Stages that have not finished yet are ``None``.
+    """
+    metrics = metrics or {}
+    timings: Metrics = {key: metrics.get(key) for key in _TIMING_KEYS}
+    steps = metrics.get("steps")
+    if steps:
+        timings["steps"] = steps
+    return timings
+
+
 @dataclass
 class ManualUpdateRequest:
     request_id: str

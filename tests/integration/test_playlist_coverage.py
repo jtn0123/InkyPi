@@ -265,7 +265,7 @@ def test_display_next_in_playlist_success(
     flask_app.config["DEVICE_CONFIG"].write_config()
 
     # Mock manual_update to verify it's called
-    mock_update = MagicMock()
+    mock_update = MagicMock(return_value={})
     flask_app.config["REFRESH_TASK"].manual_update = mock_update
 
     resp = client.post("/display_next_in_playlist", json={"playlist_name": "Test"})

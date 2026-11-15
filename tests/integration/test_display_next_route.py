@@ -1,4 +1,5 @@
 from datetime import UTC, datetime
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -195,3 +196,65 @@ def test_display_next_does_not_repeat_the_write_on_a_type_error(
     assert resp.status_code == 500
     assert len(calls) == 1
     assert calls[0]["history_meta"]["plugin_instance"] == "Clock A"
+
+
+_STALE_REFRESH_INFO = SimpleNamespace(
+    request_ms=9999, generate_ms=9999, preprocess_ms=9999, display_ms=9999
+)
+_TIMING_CASES = [
+    pytest.param(
+        # manual_update returned at image_saved: the panel write is still going.
+        {"generate_ms": None, "preprocess_ms": 42, "display_ms": None},
+        {
+            "request_ms": None,
+            "generate_ms": None,
+            "preprocess_ms": 42,
+            "display_ms": None,
+        },
+        id="image-saved",
+    ),
+    pytest.param(
+        {
+            "request_ms": 120,
+            "generate_ms": 80,
+            "preprocess_ms": 30,
+            "display_ms": 10,
+            "steps": [["Generate", 80]],
+        },
+        {
+            "request_ms": 120,
+            "generate_ms": 80,
+            "preprocess_ms": 30,
+            "display_ms": 10,
+            "steps": [["Generate", 80]],
+        },
+        id="completed",
+    ),
+]
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize(("returned", "expected"), _TIMING_CASES)
+def test_display_next_reports_this_refreshs_timings(
+    client: FlaskClient,
+    device_config_dev: Any,
+    monkeypatch: pytest.MonkeyPatch,
+    flask_app: Flask,
+    returned: dict[str, Any],
+    expected: dict[str, Any],
+) -> None:
+    """The response used to read refresh_info, which still describes the
+    previous refresh when manual_update returns at image_saved."""
+    _add_playlist_with_plugin(device_config_dev)
+    monkeypatch.setattr("utils.time_utils.now_device_tz", _fixed_now, raising=True)
+    refresh_task = flask_app.config["REFRESH_TASK"]
+    monkeypatch.setattr(refresh_task, "running", True)
+    monkeypatch.setattr(refresh_task, "manual_update", lambda action: returned)
+    monkeypatch.setattr(
+        device_config_dev, "get_refresh_info", lambda: _STALE_REFRESH_INFO
+    )
+
+    resp = client.post("/display-next")
+
+    assert resp.status_code == 200
+    assert resp.get_json()["metrics"] == expected
