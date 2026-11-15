@@ -3,17 +3,38 @@
 
 from __future__ import annotations
 
+import time
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
 import pytest
 from flask import Flask
-from playwright.sync_api import Page
+from playwright.sync_api import Page, Request, Response
 
 from app_setup.auth import mark_session_authenticated
 
 CRITICAL_RESPONSE_TYPES = {"document", "script", "stylesheet", "xhr", "fetch"}
+
+# Requests page scripts make. EventSource streams stay open for the life of
+# the page, so they never count as "in flight".
+_TRACKED_REQUEST_TYPES = frozenset({"xhr", "fetch"})
+# The network counts as idle once nothing has been in flight for this long.
+# A response handler that starts a follow-up request does so within a few
+# milliseconds (the dashboard refetches as soon as its event stream opens),
+# so a short quiet period keeps that second batch from being missed.
+_NETWORK_QUIET_S = 0.05
+
+# True once the page shell's entrance animation (``pageIn``: a 250 ms fade
+# and 4 px slide) has finished. Finished CSS animations drop out of
+# getAnimations(), so an empty list also counts as done.
+_SHELL_ANIMATION_DONE_JS = """
+() => {
+  const shell = document.querySelector('[data-page-shell]');
+  return !shell || shell.getAnimations().every((a) => a.playState !== 'running');
+}
+"""
 
 
 def leaflet_stub_js() -> str:
@@ -68,12 +89,92 @@ def stub_leaflet(page: Page) -> None:
     )
 
 
+def is_response_to(
+    method: str, path: str, *, prefix: bool = False
+) -> Callable[[Response], bool]:
+    """Match a response to a ``method`` request for ``path``.
+
+    For ``page.expect_response``. ``path`` is compared with the URL's path
+    (query string ignored); ``prefix=True`` matches any path starting with it,
+    for routes that carry a name, such as ``/delete_playlist/<name>``.
+    """
+
+    def _matches(response: Response) -> bool:
+        if response.request.method != method:
+            return False
+        url_path = urlparse(response.url).path
+        return url_path.startswith(path) if prefix else url_path == path
+
+    return _matches
+
+
+class RequestTracker:
+    """Track the page's fetch/XHR requests that have started but not ended.
+
+    Create it before ``page.goto`` so the page's start-up requests are seen.
+    """
+
+    def __init__(self, page: Page) -> None:
+        self.page = page
+        self._in_flight: set[Request] = set()
+        page.on("request", self._started)
+        page.on("requestfinished", self._ended)
+        page.on("requestfailed", self._ended)
+
+    def _started(self, request: Request) -> None:
+        if request.resource_type in _TRACKED_REQUEST_TYPES:
+            self._in_flight.add(request)
+
+    def _ended(self, request: Request) -> None:
+        self._in_flight.discard(request)
+
+    def wait_until_idle(self, timeout_ms: float = 15_000) -> bool:
+        """Wait until no fetch/XHR request has been in flight for a moment.
+
+        Returns ``False`` if requests were still running after ``timeout_ms``
+        and lets the test carry on, as the fixed sleep this replaces did. The
+        page's own requests finish in well under a second; the slow one is
+        ``/api/version``, which asks GitHub from the server.
+        """
+        deadline = time.monotonic() + timeout_ms / 1000
+        idle_since: float | None = None
+        while time.monotonic() < deadline:
+            now = time.monotonic()
+            if self._in_flight:
+                idle_since = None
+            elif idle_since is None:
+                idle_since = now
+            elif now - idle_since >= _NETWORK_QUIET_S:
+                return True
+            self.page.wait_for_timeout(25)  # poll interval
+        return False
+
+
+def wait_for_page_settled(
+    page: Page, requests: RequestTracker | None = None, timeout_ms: int = 15_000
+) -> None:
+    """Wait until the page has stopped changing on its own.
+
+    That is: the start-up requests ``requests`` saw have finished (so their
+    handlers' DOM updates have landed), the page shell's entrance animation
+    is over, and web fonts have loaded. Use it before measuring pixels,
+    colours or boxes: axe contrast checks, overlap checks, screenshots.
+    """
+    if requests is not None:
+        requests.wait_until_idle(timeout_ms)
+    page.wait_for_function(_SHELL_ANIMATION_DONE_JS, timeout=timeout_ms)
+    page.evaluate("() => document.fonts.ready.then(() => true)")
+
+
 class RuntimeCollector:
     """Attach console error / JS exception listeners to a Playwright page."""
 
     def __init__(self, page: Page, base_url: str = "") -> None:
         self.page = page
         self.base_url = base_url
+        # Lets callers wait for the page's requests before they navigate away:
+        # a request the next navigation aborts is reported as a failure below.
+        self.requests = RequestTracker(page)
         self.console_errors: list[str] = []
         self.page_errors: list[str] = []
         self.request_failures: list[dict[str, object]] = []
@@ -150,10 +251,18 @@ class RuntimeCollector:
             pytest.fail("\n".join(failures))
 
 
-def wait_for_app_ready(page: Page, timeout: int = 10000) -> None:
-    """Wait for DOM content loaded and page shell element."""
+def wait_for_app_ready(
+    page: Page, timeout: int = 10000, requests: RequestTracker | None = None
+) -> None:
+    """Wait for the page shell and, when tracked, the page's start-up requests.
+
+    Page scripts are plain or ``defer`` scripts, so their DOMContentLoaded
+    set-up has already run when ``goto(wait_until="domcontentloaded")``
+    returns. What is still pending is the data they fetch.
+    """
     page.wait_for_selector("[data-page-shell]", timeout=timeout)
-    page.wait_for_timeout(300)
+    if requests is not None:
+        requests.wait_until_idle()
 
 
 def navigate_and_wait(
@@ -163,7 +272,7 @@ def navigate_and_wait(
     stub_leaflet(page)
     collector = RuntimeCollector(page, base_url)
     page.goto(f"{base_url}{path}", wait_until="domcontentloaded", timeout=timeout)
-    wait_for_app_ready(page)
+    wait_for_app_ready(page, requests=collector.requests)
     return collector
 
 

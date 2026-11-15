@@ -47,6 +47,7 @@ from typing import Any
 import pytest
 import yaml
 from playwright.sync_api import Page
+from tests.integration.browser_helpers import RequestTracker, wait_for_page_settled
 from tests.integration.test_click_sweep import (
     PAGES_TO_SWEEP,
     _discover_plugin_ids,
@@ -68,7 +69,6 @@ _AXE_TAGS: tuple[str, ...] = ("wcag2a", "wcag2aa", "wcag21a", "wcag21aa")
 # marker wait is optional.
 _GOTO_TIMEOUT_MS = 30_000
 _MARKER_TIMEOUT_MS = 8_000
-_SETTLE_MS = 300
 
 
 def _load_allowlist() -> dict[str, Any]:
@@ -137,13 +137,16 @@ def _allowlist_for(
 
 
 def _run_axe_on_page(page: Page, url: str, marker: str | None) -> dict[str, Any]:
+    requests = RequestTracker(page)
     page.goto(url, wait_until="domcontentloaded", timeout=_GOTO_TIMEOUT_MS)
     if marker:
         try:
             page.wait_for_selector(marker, timeout=_MARKER_TIMEOUT_MS)
         except Exception:  # marker absence is not fatal
             pass
-    page.wait_for_timeout(_SETTLE_MS)
+    # Contrast checks read rendered colours, so wait out the page's fade-in
+    # and the data its scripts fetch.
+    wait_for_page_settled(page, requests)
     page.add_script_tag(content=_AXE_JS_PATH.read_text(encoding="utf-8"))
     options = {"runOnly": {"type": "tag", "values": list(_AXE_TAGS)}}
     return page.evaluate("(opts) => axe.run(document, opts)", options)

@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from playwright.sync_api import Page
+from playwright.sync_api import Page, expect
 
 pytestmark = pytest.mark.skipif(
     os.getenv("SKIP_UI", "").lower() in ("1", "true"),
@@ -110,13 +110,12 @@ def test_last_progress_card_persistent_in_aside(
     # Clicking the header button re-renders the empty-state content; the card
     # remains visible either way.
     page.locator("#showLastProgressBtn").click()
-    page.wait_for_timeout(150)
 
     assert progress.evaluate(
         "(el) => !el.hidden"
     ), "#requestProgress should remain visible after clicking Last Progress"
     empty = page.locator(".progress-empty-state")
-    assert empty.count() == 1, "no-data empty state should render when unseeded"
+    expect(empty, "no-data empty state should render when unseeded").to_have_count(1)
 
     # Close button is gone — the card is always visible in the aside.
     assert (

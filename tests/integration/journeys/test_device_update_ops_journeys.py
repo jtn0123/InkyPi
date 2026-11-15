@@ -204,7 +204,14 @@ def test_jtn_727_logs_journey(
 
     # Client-side filter
     page.fill("#logsFilter", "disk usage")
-    page.wait_for_timeout(350)  # debounced input path
+    # The filter input is debounced; wait for the viewer to show its result.
+    page.wait_for_function(
+        """() => (document.getElementById('logsViewer')?.textContent || '')
+            .split('\\n')
+            .filter((line) => line.trim())
+            .every((line) => line.toLowerCase().includes('disk usage'))""",
+        timeout=10000,
+    )
     filtered = _viewer_lines(page)
     assert (
         len(filtered) == 1
@@ -213,8 +220,10 @@ def test_jtn_727_logs_journey(
 
     # Level filter (warnings + errors) with filter cleared.
     page.fill("#logsFilter", "")
+    # The level select's change handler re-renders the viewer before
+    # select_option returns. The debounced re-render from clearing the filter
+    # follows and draws the same lines.
     page.select_option("#logsLevel", "warn_errors")
-    page.wait_for_timeout(200)
     leveled = _viewer_lines(page)
     assert (
         len(leveled) == 2

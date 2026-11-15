@@ -13,13 +13,21 @@ pytestmark = pytest.mark.skipif(
 )
 
 
+def _click_theme_toggle(page: Page, current: str | None) -> None:
+    """Click the theme toggle and wait until the page's theme is not ``current``."""
+    page.locator("#themeToggle").click()
+    page.wait_for_function(
+        "(current) => document.documentElement.getAttribute('data-theme') !== current",
+        arg=current,
+    )
+
+
 def test_theme_toggle_changes_attribute(live_server: str, browser_page: Page) -> None:
     page = browser_page
     rc = navigate_and_wait(page, live_server, "/")
 
     initial_theme = page.evaluate("document.documentElement.getAttribute('data-theme')")
-    page.locator("#themeToggle").click()
-    page.wait_for_timeout(500)
+    _click_theme_toggle(page, initial_theme)
 
     new_theme = page.evaluate("document.documentElement.getAttribute('data-theme')")
     assert new_theme != initial_theme
@@ -33,8 +41,7 @@ def test_theme_persists_in_localstorage(live_server: str, browser_page: Page) ->
     navigate_and_wait(page, live_server, "/")
 
     initial_theme = page.evaluate("document.documentElement.getAttribute('data-theme')")
-    page.locator("#themeToggle").click()
-    page.wait_for_timeout(500)
+    _click_theme_toggle(page, initial_theme)
 
     expected = "dark" if initial_theme == "light" else "light"
 
@@ -55,8 +62,7 @@ def test_theme_persists_across_navigation(live_server: str, browser_page: Page) 
 
     current = page.evaluate("document.documentElement.getAttribute('data-theme')")
     if current != "dark":
-        page.locator("#themeToggle").click()
-        page.wait_for_timeout(500)
+        _click_theme_toggle(page, current)
 
     assert (
         page.evaluate("document.documentElement.getAttribute('data-theme')") == "dark"
@@ -76,8 +82,7 @@ def test_theme_persists_after_reload(live_server: str, browser_page: Page) -> No
 
     current = page.evaluate("document.documentElement.getAttribute('data-theme')")
     if current != "dark":
-        page.locator("#themeToggle").click()
-        page.wait_for_timeout(500)
+        _click_theme_toggle(page, current)
 
     assert (
         page.evaluate("document.documentElement.getAttribute('data-theme')") == "dark"

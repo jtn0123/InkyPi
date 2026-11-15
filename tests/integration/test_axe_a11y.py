@@ -97,6 +97,10 @@ def _load_axe_js() -> str:
 def test_axe_scan(live_server: str, route_name: Any, route_path: Any) -> None:
     """Run axe-core against *route_path* and fail on unknown violations."""
     from playwright.sync_api import sync_playwright
+    from tests.integration.browser_helpers import (
+        RequestTracker,
+        wait_for_page_settled,
+    )
 
     axe_js = _load_axe_js()
 
@@ -104,13 +108,16 @@ def test_axe_scan(live_server: str, route_name: Any, route_path: Any) -> None:
         browser = pw.chromium.launch()
         try:
             page = browser.new_page(viewport={"width": 1280, "height": 900})
+            requests = RequestTracker(page)
             page.goto(
                 f"{live_server}{route_path}",
                 wait_until="domcontentloaded",
                 timeout=30_000,
             )
             page.wait_for_selector("[data-page-shell]", timeout=10_000)
-            page.wait_for_timeout(300)
+            # Contrast checks read rendered colours, so wait out the page's
+            # fade-in and the data its scripts fetch.
+            wait_for_page_settled(page, requests)
 
             # Inject axe-core and run the scan
             page.add_script_tag(content=axe_js)

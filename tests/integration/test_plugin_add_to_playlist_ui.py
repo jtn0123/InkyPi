@@ -17,7 +17,7 @@ def test_plugin_add_to_playlist_flow(client: FlaskClient) -> None:
     assert resp.status_code == 200
     html = resp.get_data(as_text=True)
 
-    from playwright.sync_api import sync_playwright
+    from playwright.sync_api import expect, sync_playwright
 
     with sync_playwright() as p:
         browser = p.chromium.launch()
@@ -70,14 +70,16 @@ def test_plugin_add_to_playlist_flow(client: FlaskClient) -> None:
         """)
 
         page.click('button[data-plugin-subtab-target="schedule"]')
-        page.wait_for_timeout(200)
+        expect(page.locator("#scheduleForm")).to_be_visible()
         page.fill("#instance", "My Instance")
         page.fill("#scheduleInterval", "15")
         page.select_option("#scheduleUnit", "minute")
         page.click('button[data-plugin-action="add_to_playlist"]')
 
-        # Small wait for async fetch stub to fire
-        page.wait_for_timeout(500)
+        # The handler validates the form, then calls the fetch stub.
+        page.wait_for_function("""() => window.__requests__.some(
+                (r) => r.method === 'POST' && String(r.url).includes('/add_plugin')
+            )""")
 
         # Verify our stubbed fetch captured a request to add_plugin (Add to Playlist)
         posts = [

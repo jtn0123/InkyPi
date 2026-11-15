@@ -232,7 +232,11 @@ def test_interactive_overlap(
 ) -> None:
     """Flag pairs of clickables whose bounding boxes visually collide."""
     from playwright.sync_api import sync_playwright
-    from tests.integration.browser_helpers import stub_leaflet
+    from tests.integration.browser_helpers import (
+        RequestTracker,
+        stub_leaflet,
+        wait_for_page_settled,
+    )
 
     combo_key = (page_spec.label, viewport.label)
     if combo_key in _XFAIL_COMBOS:
@@ -245,15 +249,17 @@ def test_interactive_overlap(
         )
         try:
             stub_leaflet(page)
+            requests = RequestTracker(page)
             page.goto(
                 f"{live_server}{page_spec.path}",
                 wait_until="domcontentloaded",
                 timeout=30000,
             )
             page.wait_for_selector(page_spec.ready_marker, timeout=10000)
-            # Allow late layout shifts (e.g. web-font swap, async widgets) to
-            # settle before we freeze the bounding rects.
-            page.wait_for_timeout(400)
+            # Let late layout shifts (web-font swap, widgets filled from
+            # fetched data, the page's slide-in) finish before we freeze the
+            # bounding rects.
+            wait_for_page_settled(page, requests)
 
             descriptors = page.evaluate(_ENUMERATE_JS)
         finally:

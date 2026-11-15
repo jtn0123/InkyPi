@@ -44,6 +44,7 @@ from __future__ import annotations
 import time
 from collections.abc import Iterator
 from typing import Any
+from urllib.parse import urlparse
 
 import pytest
 from flask import Flask
@@ -246,6 +247,19 @@ def test_update_flow_happy_path(
     ), f"Precondition: update must not be running at journey start; got {baseline!r}"
 
     # -- Step 5: click "Update Now" -> POST /settings/update ---------------
+    # While an update runs, the page polls /settings/update_status every 2s
+    # and renders the failure banner from each reply. Once a reply says the
+    # run is over, it re-checks /api/version. Record those re-checks (the
+    # page made its own /api/version calls before this click) for step 7.
+    version_rechecks: list[str] = []
+    page.on(
+        "request",
+        lambda request: (
+            version_rechecks.append(request.url)
+            if urlparse(request.url).path == "/api/version"
+            else None
+        ),
+    )
     page.click("#startUpdateBtn")
 
     # The fake runner sets ``started`` the moment the thread picks up the
@@ -306,7 +320,15 @@ def test_update_flow_happy_path(
     # After a successful update the banner should remain hidden. The JS
     # pollUpdateStatus branch calls renderUpdateFailureBanner(null) which
     # hides the element, matching the initial state.
-    page.wait_for_timeout(500)  # let the JS poller (2s interval) catch up
+    # Wait until the page's poller has seen the finished run, so the banner
+    # below reflects that reply rather than the state before the update.
+    deadline = time.monotonic() + _RUNNING_TIMEOUT_S
+    while not version_rechecks and time.monotonic() < deadline:
+        page.wait_for_timeout(50)
+    assert version_rechecks, (
+        "The settings page never polled the finished update (no /api/version "
+        f"re-check within {_RUNNING_TIMEOUT_S}s)"
+    )
     assert failure_banner.is_hidden(), (
         "#updateFailureBanner must remain hidden after a successful update "
         "(JTN-710 contract)"

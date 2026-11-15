@@ -23,7 +23,7 @@ import os
 from dataclasses import dataclass
 
 import pytest
-from playwright.sync_api import Page
+from playwright.sync_api import Page, TimeoutError as PlaywrightTimeoutError
 from tests.integration.browser_helpers import RuntimeCollector, stub_leaflet
 
 pytestmark = pytest.mark.skipif(
@@ -50,8 +50,9 @@ PAGES_TO_SWEEP: tuple[SweepPage, ...] = (
     SweepPage("api_keys", "/api-keys", "#saveApiKeysBtn"),
 )
 
-# Wait after each click to let any reflection handler commit to the DOM.
-_CLICK_SETTLE_MS = 200
+# How long a toggle's handler gets to reflect the click in the DOM. Handlers
+# here update the DOM straight away; the limit only matters when one doesn't.
+_REFLECT_TIMEOUT_MS = 2000
 
 # Cap per page — we expect small toggle counts but a few pages (settings)
 # expand to several collapsibles. 30 is comfortably above observed counts.
@@ -150,6 +151,17 @@ _STATE_JS = """
 """
 
 
+# True once the element's reflected state differs from ``before`` (or the
+# element is gone, which the state lookup after the wait reports).
+_STATE_CHANGED_JS = f"""
+([sel, before]) => {{
+  const after = ({_STATE_JS.strip()})(sel);
+  if (after === null) return true;
+  return Object.keys(after).some((key) => after[key] !== before[key]);
+}}
+"""
+
+
 def _enumerate(page: Page) -> list[dict]:
     return page.evaluate(_ENUMERATE_JS)
 
@@ -192,7 +204,15 @@ def _click_toggle(page: Page, descriptor: dict) -> tuple[dict | None, dict | Non
             )
         except Exception:
             return before, None
-    page.wait_for_timeout(_CLICK_SETTLE_MS)
+    if before is not None:
+        try:
+            page.wait_for_function(
+                _STATE_CHANGED_JS,
+                arg=[selector, before],
+                timeout=_REFLECT_TIMEOUT_MS,
+            )
+        except PlaywrightTimeoutError:
+            pass  # unchanged: the snapshot below records the silent failure
     after = _state(page, marker)
     return before, after
 
@@ -220,7 +240,8 @@ def test_toggle_reflection(
         timeout=30000,
     )
     page.wait_for_selector(sweep.ready_marker, timeout=10000)
-    page.wait_for_timeout(300)
+    # Let the page's start-up fetches land: some toggles render from them.
+    collector.requests.wait_until_idle()
 
     descriptors = _enumerate(page)
 
@@ -250,6 +271,9 @@ def test_toggle_reflection(
                 f" '{descriptor['text']}': state unchanged "
                 f"(before={before}, after={after})"
             )
+
+    # Requests the toggles started can still fail and log an error.
+    collector.requests.wait_until_idle()
 
     # Surface runtime signals the same way click_sweep does so JS errors
     # triggered by toggle handlers fail the test loudly. Resource-load

@@ -19,8 +19,19 @@ pytestmark = pytest.mark.skipif(
 
 from tests.integration.browser_helpers import (  # noqa: E402
     install_direct_manual_update,
+    is_response_to,
     navigate_and_wait,
 )
+
+
+def _save_api_keys(page: Page) -> None:
+    """Click Save on /api-keys and wait for the save to succeed.
+
+    The page reloads itself a second later; callers navigate first.
+    """
+    with page.expect_response(is_response_to("POST", "/api-keys/save")) as info:
+        page.locator("#saveApiKeysBtn").click()
+    assert info.value.ok, f"POST /api-keys/save returned {info.value.status}"
 
 
 def _playlist_names(page: Page) -> list[str]:
@@ -52,9 +63,11 @@ def _create_playlist_via_ui(
     page.locator("#playlist_name").fill(name)
     page.locator("#start_time").fill(start_time)
     page.locator("#end_time").fill(end_time)
-    page.locator("#saveButton").click()
-    page.wait_for_url(f"{live_server}/playlist", timeout=10000)
-    page.wait_for_timeout(600)
+    # The page reloads itself once the playlist is created.
+    with page.expect_event("domcontentloaded"):
+        with page.expect_response(is_response_to("POST", "/create_playlist")) as info:
+            page.locator("#saveButton").click()
+        assert info.value.ok, f"POST /create_playlist returned {info.value.status}"
 
 
 def _add_plugin_via_client(
@@ -115,8 +128,9 @@ def test_jtn_720_first_run_setup_add_schedule_refresh_history(
     page.locator("#playlist").select_option("Default")
     page.locator("#instance").fill("First Clock")
     page.locator("#scheduleInterval").fill("5")
-    page.locator('button[data-plugin-action="add_to_playlist"]').click()
-    page.wait_for_timeout(1000)
+    with page.expect_response(is_response_to("POST", "/add_plugin")) as info:
+        page.locator('button[data-plugin-action="add_to_playlist"]').click()
+    assert info.value.ok, f"POST /add_plugin returned {info.value.status}"
 
     navigate_and_wait(page, live_server, "/playlist")
     assert "First Clock" in page.locator("body").inner_text()
@@ -137,6 +151,7 @@ def test_jtn_720_first_run_setup_add_schedule_refresh_history(
         body_text = page.locator("body").inner_text()
         if "No history yet." not in body_text or time.monotonic() > deadline:
             break
+        # Pause between full page loads of /history while the render runs.
         page.wait_for_timeout(500)
     assert "No history yet." not in body_text
     assert "Source:" in body_text
@@ -204,7 +219,6 @@ def test_jtn_721_playlist_roundtrip_create_add_reorder_delete_persist(
     )
     if journey_toggle.is_visible():
         journey_toggle.click()
-    page.wait_for_timeout(300)
     assert _plugin_instance_names(page, "Journey List") == [
         "Clock Alpha",
         "Year Beta",
@@ -229,7 +243,6 @@ def test_jtn_721_playlist_roundtrip_create_add_reorder_delete_persist(
     )
     if journey_toggle_reload.is_visible():
         journey_toggle_reload.click()
-    page.wait_for_timeout(300)
     assert _plugin_instance_names(page, "Journey List") == [
         "Year Beta",
         "Clock Alpha",
@@ -253,7 +266,6 @@ def test_jtn_721_playlist_roundtrip_create_add_reorder_delete_persist(
     )
     if journey_toggle_final.is_visible():
         journey_toggle_final.click()
-    page.wait_for_timeout(300)
     assert "Journey List" in _playlist_names(page)
     assert _plugin_instance_names(page, "Journey List") == [
         "Clock Alpha",
@@ -282,24 +294,21 @@ def test_jtn_722_api_key_roundtrip_add_edit_delete(
     new_row = page.locator(".apikey-row").last
     new_row.locator(".apikey-key").fill("JOURNEY_KEY")
     new_row.locator(".apikey-value").fill("first-secret")
-    page.locator("#saveApiKeysBtn").click()
-    page.wait_for_timeout(1600)
+    _save_api_keys(page)
 
     navigate_and_wait(page, live_server, "/api-keys")
     assert page.locator(".apikey-row .apikey-key").first.input_value() == "JOURNEY_KEY"
     assert "JOURNEY_KEY=first-secret" in env_path.read_text(encoding="utf-8")
 
     page.locator(".apikey-row .apikey-value").first.fill("second-secret")
-    page.locator("#saveApiKeysBtn").click()
-    page.wait_for_timeout(1600)
+    _save_api_keys(page)
 
     navigate_and_wait(page, live_server, "/api-keys")
     assert "JOURNEY_KEY=second-secret" in env_path.read_text(encoding="utf-8")
 
     page.once("dialog", lambda dialog: dialog.accept())
     page.locator('.apikey-row .btn-delete[data-api-action="delete-row"]').click()
-    page.locator("#saveApiKeysBtn").click()
-    page.wait_for_timeout(1600)
+    _save_api_keys(page)
 
     navigate_and_wait(page, live_server, "/api-keys")
     assert page.locator(".apikey-row .apikey-key").count() == 0
