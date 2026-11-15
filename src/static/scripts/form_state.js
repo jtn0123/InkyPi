@@ -59,6 +59,31 @@
         return sp;
     }
 
+    // The button's words, in their own span, so a busy label can replace
+    // them without deleting the spinner next to them. (.btn-label is a
+    // styled class some buttons already use; a new span gets a plain one.)
+    function ensureLabel(btn) {
+        if (!btn) return null;
+        const existing = btn.querySelector('.form-state-label, .btn-label');
+        if (existing) return existing;
+        const words = Array.from(btn.childNodes).filter(
+            (node) => node.nodeType === Node.TEXT_NODE && node.textContent.trim()
+        );
+        if (!words.length) return null;
+        const label = document.createElement('span');
+        label.className = 'form-state-label';
+        words[0].before(label);
+        words.forEach((node) => label.appendChild(node));
+        return label;
+    }
+
+    const BUSY_VERBS = {
+        save: 'Saving',
+        submit: 'Submitting',
+        update: 'Updating',
+        create: 'Creating',
+    };
+
     function getErrorElement(form, fieldName) {
         if (!form || !fieldName) return null;
         // Prefer an input[name=fieldName] or id=fieldName lookup.
@@ -88,39 +113,52 @@
             this.options = options;
             this.submitBtn = options.submitButton || findSubmitButton(form);
             this.spinner = ensureSpinner(this.submitBtn);
-            this._originalLabel = this.submitBtn ? this.submitBtn.textContent : null;
+            this.label = ensureLabel(this.submitBtn);
+            this._originalLabel = null;
+            this._disabledBefore = false;
             this._busy = false;
         }
 
         isBusy() { return this._busy; }
 
+        /**
+         * Show or clear the busy state. Clearing it puts the button back the
+         * way it was, enabled or not; a caller whose save changes that (a
+         * Save with nothing left to save) sets it again afterwards.
+         */
         setBusy(busy) {
-            this._busy = !!busy;
+            busy = !!busy;
+            if (busy === this._busy) return;
+            this._busy = busy;
             if (this.form) {
                 if (busy) this.form.setAttribute('aria-busy', 'true');
                 else this.form.removeAttribute('aria-busy');
             }
-            if (this.submitBtn) {
-                this.submitBtn.disabled = !!busy;
-                if (this.spinner) this.spinner.style.display = busy ? '' : 'none';
-                if (busy) {
-                    if (this.submitBtn.textContent && !/\u2026$/.test(this.submitBtn.textContent)) {
-                        this._originalLabel = this.submitBtn.textContent;
-                        this.submitBtn.textContent = this._busyLabel() + '\u2026';
-                    }
-                } else if (this._originalLabel) {
-                    this.submitBtn.textContent = this._originalLabel;
-                }
+            const btn = this.submitBtn;
+            if (!btn) return;
+            if (busy) {
+                this._disabledBefore = btn.disabled;
+                btn.disabled = true;
+            } else {
+                btn.disabled = this._disabledBefore;
+            }
+            // The stylesheet hides .btn-spinner, so showing it needs a value.
+            if (this.spinner) this.spinner.style.display = busy ? 'inline-block' : 'none';
+            if (!this.label) return;
+            if (busy) {
+                this._originalLabel = this.label.textContent;
+                this.label.textContent = this._busyLabel(this._originalLabel) + '\u2026';
+            } else if (this._originalLabel !== null) {
+                this.label.textContent = this._originalLabel;
             }
         }
 
-        _busyLabel() {
-            const lbl = (this._originalLabel || 'Saving').trim().replace(/\u2026$/, '');
-            if (/^save$/i.test(lbl)) return 'Saving';
-            if (/^submit$/i.test(lbl)) return 'Submitting';
-            if (/^update$/i.test(lbl)) return 'Updating';
-            if (/^create$/i.test(lbl)) return 'Creating';
-            return lbl;
+        // "Save settings" becomes "Saving settings"; other labels stay.
+        _busyLabel(label) {
+            const words = (label || 'Save').trim().replace(/\u2026$/, '');
+            const match = /^(\w+)(.*)$/s.exec(words);
+            const verb = match && BUSY_VERBS[match[1].toLowerCase()];
+            return verb ? verb + match[2] : words;
         }
 
         clearErrors() {

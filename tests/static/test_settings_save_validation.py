@@ -176,22 +176,14 @@ def test_handle_action_surfaces_field_level_validation_errors_inline() -> None:
     )
 
 
-def test_handle_action_preserves_bad_input_on_field_level_error() -> None:
-    """JTN-780: when a field-level error is surfaced, don't erase the bad value.
+def test_failed_save_never_resets_the_form() -> None:
+    """A failed save leaves every field as typed (JTN-780, then grade C5).
 
-    Pre-fix, every non-OK response restored the form from the last-known-good
-    snapshot. That wiped the user's invalid input alongside the inline error,
-    making the error message reference text the user could no longer see. The
-    snapshot restore must be gated so field-level errors preserve user input.
+    JTN-780 stopped field-level errors from erasing the bad value. Any other
+    failure still put every field back to its saved value, erasing what the
+    user typed. Now no failure resets the form, and Save stays on so they can
+    try again. tests/integration/test_settings_save_button_state.py checks
+    this in a browser.
     """
     js = _read_js()
-    # There must be a guard that skips the snapshot restore when we've
-    # already surfaced a field-level error.
-    assert "fieldLevelError" in js, (
-        "handleAction must track whether a field-level error was surfaced "
-        "so the snapshot restore can be skipped (JTN-780)"
-    )
-    assert "if (!fieldLevelError)" in js, (
-        "restoreFormFromSnapshot must be gated on !fieldLevelError so the "
-        "user's bad input is preserved alongside the inline error message"
-    )
+    assert "restoreFormFromSnapshot" not in js
