@@ -194,7 +194,10 @@ def _read_last_update_failure() -> Any | None:
 
 
 def _latest_refresh_ts() -> str | None:
-    """Return device_config.refresh_info.latest_refresh_time, or None on any miss."""
+    """Return when the screen last changed (``RefreshInfo.refresh_time``).
+
+    None when there is no refresh yet or the record can't be read.
+    """
     dc = current_app.config.get("DEVICE_CONFIG")
     if dc is None:
         return None
@@ -202,7 +205,7 @@ def _latest_refresh_ts() -> str | None:
         refresh_info = dc.get_refresh_info()
     except Exception:
         return None
-    latest = getattr(refresh_info, "latest_refresh_time", None)
+    latest = getattr(refresh_info, "refresh_time", None)
     if isinstance(latest, str) and latest:
         return latest
     return None

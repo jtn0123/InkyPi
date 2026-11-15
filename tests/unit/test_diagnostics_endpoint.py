@@ -473,6 +473,24 @@ def test_refresh_task_snapshot_no_refresh_task(flask_app: Flask) -> None:
     assert snap == {"running": False, "last_run_ts": None, "last_error": None}
 
 
+def test_refresh_task_snapshot_reports_the_last_refresh_time(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
+    """The diagnostics "last run" is when the screen last changed."""
+    from model import RefreshInfo
+
+    device_config_dev.refresh_info = RefreshInfo(
+        refresh_type="Playlist",
+        plugin_id="clock",
+        refresh_time="2026-11-15T09:30:00+00:00",
+        image_hash=None,
+    )
+
+    data = client.get("/api/diagnostics").get_json()
+
+    assert data["refresh_task"]["last_run_ts"] == "2026-11-15T09:30:00+00:00"
+
+
 def test_refresh_task_snapshot_picks_most_recent_failure(
     client: FlaskClient, flask_app: Flask
 ) -> None:
