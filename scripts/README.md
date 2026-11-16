@@ -54,6 +54,7 @@ Developer, CI and device tools. Run them from the repo root. Python scripts add
 | `benchmark_compare.py` | Compares pytest-benchmark runs of a change against runs of its base commit (CI) or the committed baseline. |
 | `memory_diff.py`, `format_memory_diff.py` | Startup memory profile for the per-PR memory diff comment. |
 | `mutation_check.py`, `mutation_summary.py` | A small hand-written mutant check, and the summary for mutmut shards. |
+| `audit_dependencies.sh` | Checks every locked requirement file for known vulnerabilities with pip-audit. `--strict` fails on a finding; CI uses it only when a pull request changes a dependency file, and on the nightly run. |
 | `check_licenses.sh` | Checks dependency licences with the `pip-licenses` pinned in `install/requirements-dev.txt` (installs nothing; run it from the dev venv). |
 | `check_links.py` | Re-checks links that the Lychee link checker reported as throttled. |
 | `check_requirements_drift.sh` | Checks that the exported lockfiles match `uv.lock`, and the installer requirement files match their `.in` files and the lock. |

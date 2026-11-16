@@ -431,21 +431,35 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # HEAD^1 is the pull request's base, to see whether it changes a
+          # dependency file.
+          fetch-depth: 2
       - uses: ./.github/actions/setup-python-deps
+      # pip-audit checks the locked files against a live advisory feed, so
+      # its result can change with no code change. A finding fails a pull
+      # request only when that PR changes a dependency file, and it fails the
+      # nightly and manual runs. Other pull requests and pushes to main get a
+      # warning instead, so an advisory published elsewhere doesn't block
+      # unrelated merges or the release. Dependabot alerts report it too.
       - name: Run pip-audit against hashed lockfiles
+        env:
+          EVENT_NAME: ${{ github.event_name }}
         run: |
-          mkdir -p artifacts/security
-          python -m pip_audit -r install/requirements.txt --format=json \
-            --output artifacts/security/pip-audit-runtime.json
-          python -m pip_audit -r install/requirements-dev.txt --format=json \
-            --output artifacts/security/pip-audit-dev.json
-          # What install.sh and update.sh install as root before the app's
-          # own requirements. Fully pinned and hashed, so pip-audit checks
-          # the pins without installing anything.
-          for name in bootstrap uv ws; do
-            python -m pip_audit --disable-pip -r "install/${name}-requirements.txt" \
-              --format=json --output "artifacts/security/pip-audit-${name}.json"
-          done
+          strict=1
+          if [ "$EVENT_NAME" = "push" ]; then
+            strict=0
+          elif [ "$EVENT_NAME" = "pull_request" ]; then
+            changed=$(git diff --name-only HEAD^1 HEAD)
+            if ! grep -Eq '^(uv\.lock|install/[^/]*requirements[^/]*\.txt)$' <<< "$changed"; then
+              strict=0
+            fi
+          fi
+          if [ "$strict" = 1 ]; then
+            scripts/audit_dependencies.sh --strict
+          else
+            scripts/audit_dependencies.sh
+          fi
       - name: Generate SBOM
         run: |
           python_path="$(python -c 'import sys; print(sys.executable)')"
