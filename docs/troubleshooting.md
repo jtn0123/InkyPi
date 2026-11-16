@@ -391,53 +391,6 @@ If you encounter this error, please feel free to open an Issue, including the na
 
 Also consider supporting the important work of Freedom Forum, an organization dedicated to promoting and protecting free press and the First Amendment: https://www.freedomforum.org/take-action/
 
-## Known Issues during Pi Zero W Installation
-
-Due to limitations with the Pi Zero W, there are some known issues during the InkyPi installation process. For more details and community discussion, refer to this [GitHub Issue](https://github.com/fatihak/InkyPi/issues/5).
-
-### Pip Installation Error
-
-#### Error message
-```bash
-WARNING: Retrying (Retry(total=4, connect=None, read=None, redirect=None, status=None)) after connection broken by 'ProtocolError('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))':
-```
-
-#### Recommended solution
-Manually install the required pip packages in the inkypi virtual environment:
-```bash
-source "/usr/local/inkypi/venv_inkypi/bin/activate"
-pip install -r install/requirements.txt
-deactivate
-```
-Restart the inkypi service to apply the changes:
-```bash
-sudo systemctl restart inkypi.service
-```
-
-### Numpy ImportError
-
-#### Error message
-```bash
-ImportError: Error importing numpy: you should not try to import numpy from
-its source directory; please exit the numpy source tree, and relaunch
-your python interpreter from there.
-```
-
-#### Recommended solution
-To resolve this issue, manually reinstall the Pillow library in the inkypi virtual environment:
-```bash
-sudo su
-source "/usr/local/inkypi/venv_inkypi/bin/activate"
-pip uninstall Pillow
-pip install Pillow
-deactivate
-```
-
-Restart the inkypi service to apply the changes:
-```bash
-sudo systemctl restart inkypi.service
-```
-
 ## Plugin Development Troubleshooting
 
 > See also: [Building InkyPi Plugins](building_plugins.md) for the full plugin authoring guide.
@@ -494,9 +447,9 @@ journalctl -u inkypi -n 100 | grep dimension_mismatch
 
 ---
 
-### Memory Pressure on Pi Zero
+### Memory Pressure on the Pi Zero 2 W
 
-**Symptom:** The service is killed silently (`Main process exited`) or the journal shows `MemoryError` / Python `Killed`. Chromium-based plugins (Weather, Calendar, AI Text) are most affected. The Pi Zero W has only 512 MB of RAM shared with the OS.
+**Symptom:** The service is killed silently (`Main process exited`) or the journal shows `MemoryError` / Python `Killed`. Chromium-based plugins (Weather, Calendar, AI Text) are most affected. The Pi Zero 2 W has 512 MB of RAM, and the kernel reports about 426 MiB of it (`MemTotal`), shared by the OS, InkyPi and Chromium.
 
 **Likely cause:** Launching a headless Chromium instance for `render_image` consumes ~150–200 MB. When available memory runs low, earlyoom kills a process. `install.sh` and `update.sh` set it to prefer Chromium's processes (`chromium-headle` in its log) and to avoid sshd, systemd and journald. If earlyoom can't act in time, the kernel's OOM killer does, and `OOMScoreAdjust=500` makes InkyPi its first choice.
 
@@ -509,11 +462,13 @@ journalctl -u earlyoom -n 50 | grep 'sending SIG'
 free -m
 ```
 
+A `chromium-headle` kill in the earlyoom log costs one render, which InkyPi retries. If earlyoom killed `python` instead, or the service died with no earlyoom line at all, InkyPi itself ran out of memory; work through the steps below.
+
 **Fix:**
-1. Check that zram swap is active: `cat /proc/swaps` should list `/dev/zram0`. Pi OS Trixie sets it up with `rpi-swap`. Only on an OS without that does `install.sh` add `zram-tools` and its `zramswap` service.
-2. Increase the plugin refresh interval to reduce how often Chromium is launched.
-3. Limit simultaneous playlist plugins to avoid back-to-back Chromium launches.
-4. Consider a Pi Zero 2 W (512 MB with a faster CPU) for Chromium-heavy plugin sets.
+1. Check that earlyoom is running (`systemctl is-active earlyoom`) and still has InkyPi's settings: `grep EARLYOOM_ARGS /etc/default/earlyoom` should show `--prefer` with the Chromium names. An update rewrites that line, so re-running the update ([step 3 above](#3-re-run-the-update-or-install-a-specific-version)) restores it.
+2. Check that zram swap is active: `cat /proc/swaps` should list `/dev/zram0`. Pi OS Trixie sets it up with `rpi-swap`. Only on an OS without that does `install.sh` add `zram-tools` and its `zramswap` service.
+3. Increase the plugin refresh interval to reduce how often Chromium is launched.
+4. Limit simultaneous playlist plugins to avoid back-to-back Chromium launches.
 
 ---
 
@@ -529,9 +484,9 @@ which chromium chromium-headless-shell google-chrome 2>/dev/null
 journalctl -u inkypi -n 50 | grep -i 'screenshot\|chromium\|browser'
 ```
 
-**Fix:**
+**Fix:** InkyPi uses `chromium-headless-shell`, which `install.sh` installs from `install/debian-requirements.txt`. Reinstall it:
 ```bash
-sudo apt-get install -y chromium-browser
+sudo apt-get install -y chromium-headless-shell
 sudo systemctl restart inkypi.service
 ```
 If Chromium is present but crashes, check that `/dev/shm` is writable: `ls -la /dev/shm`. On constrained systems the `--disable-dev-shm-usage` flag (already set by InkyPi) moves temp files to `/tmp`; ensure `/tmp` has at least 64 MB free.

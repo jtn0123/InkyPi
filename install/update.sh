@@ -531,7 +531,7 @@ fi
 
 # Setup zramswap on supported Pi OS releases that ship zram-tools (Trixie).
 # This is critical on low-RAM boards like the Pi Zero 2 W (512 MB) — without
-# zramswap, pip install of numpy/Pillow/playwright will OOM during the update step.
+# zramswap, a source build of numpy/Pillow/cffi (no wheelhouse) can OOM during the update step.
 os_version=$(get_os_version)
 if [[ "$os_version" =~ ^(13)$ ]] ; then
   echo "OS version is $os_version (Trixie) - setting up zramswap"

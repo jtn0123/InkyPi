@@ -203,7 +203,7 @@ This fork is **1,100+ commits** ahead of upstream, transforming InkyPi from a fu
 |---------|---------|
 | Watch-Mode CSS Rebuild | Live asset rebuild during development |
 | Dev-Mode Response Validator | Middleware schema enforcement (no-op in prod) |
-| Docker Install Simulation | Multi-base Dockerfile testing |
+| Docker Install Simulation | `install.sh` end to end in an arm64 Trixie container |
 | Benchmark Compare Script | Performance regression analysis |
 | 20 Built-in Plugins | Clocks, weather, news, calendars, AI art and more |
 
@@ -279,8 +279,6 @@ When installing, use `-W` with your model name (without `.py`): `sudo bash insta
 ## Issues
 
 Check the [troubleshooting guide](./docs/troubleshooting.md) first. If you're still stuck, open an issue on [GitHub Issues](https://github.com/jtn0123/InkyPi/issues).
-
-> Pi Zero W users: see [Known Issues during Pi Zero W Installation](./docs/troubleshooting.md#known-issues-during-pi-zero-w-installation).
 
 ## License
 

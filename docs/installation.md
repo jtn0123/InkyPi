@@ -6,8 +6,8 @@ tolerance for waiting.
 ## Option 1 — Pre-built image (easiest, Pi Zero 2 W only)
 
 > Added in [JTN-533](https://linear.app/jtn0123/issue/JTN-533). Available from
-> v0.43.0 onwards. Flash and go — skips the ~15 minute on-device `install.sh`
-> run entirely.
+> v0.43.0 onwards. Flash and go — skips the on-device `install.sh` run
+> entirely.
 
 Every tagged GitHub release ships a pre-installed `.img.xz` built by
 `.github/workflows/build-pi-image.yml`. The image is Debian-based Pi OS Lite
@@ -29,8 +29,8 @@ verify the display lights up before retiring your existing Pi.
 **Scope:** currently **Pi Zero 2 W only** (arm64, though install.sh itself
 runs on 32-bit armv7l on this board). If you're on a Pi 4, Pi 5, or a
 Compute Module, use [Option 2](#option-2--install-from-source-contributors-custom-boards)
-below — those paths build an arch-matched wheelhouse (JTN-604) and run the
-same install.sh flow on-device in about 2–3 minutes.
+below — `install.sh` fetches an arch-matched wheelhouse (JTN-604) from the
+release, so its Python dependency step takes about 2–3 minutes.
 
 ### Install steps
 
@@ -65,11 +65,12 @@ detailed install log.
 
 ### Why the image exists
 
-On a Pi Zero 2 W, `install.sh` takes ~15 minutes end-to-end (numpy + Pillow
-+ playwright wheels compile on a single Cortex-A53 core; zramswap is
-critical to avoid OOM). Even with the JTN-604 wheelhouse it's ~2–3 minutes
-plus apt package fetch. Shipping a pre-installed image collapses all of
-that into the time it takes cloud-init to run its first-boot steps.
+On a Pi Zero 2 W, `install.sh` still has to fetch and install the apt
+packages (Chromium among them) and the Python dependencies. With the
+release's pre-built wheelhouse the Python step takes about 2–3 minutes;
+without it, numpy, Pillow, cffi and other packages compile on the Pi and the
+install takes about 15 minutes. Shipping a pre-installed image collapses
+all of that into the time it takes cloud-init to run its first-boot steps.
 
 The image is also easier to support: if a new user's install fails, we can
 ask them to reflash with the known-good `.img.xz` instead of triaging
@@ -131,7 +132,9 @@ Trixie images set `arm_64bit=1` explicitly in `/boot/firmware/config.txt`. If yo
 
 ### First-boot install time
 
-A fresh `install.sh` run on a Pi Zero 2 W takes **roughly 15 minutes** end-to-end. The bottleneck is `pip install` building wheels for `numpy`, `Pillow`, and `playwright` on a single Cortex-A53 core. Don't kill the install or assume it's hung — `htop` will show `pip` consuming one core. zram swap is critical here; without it the build OOMs. Pi OS Trixie sets it up with `rpi-swap`, and `install.sh` adds `zram-tools` only on an OS that doesn't.
+Every tagged release ships a pre-built wheelhouse (see below), so on a Pi Zero 2 W the Python dependency install takes **about 2–3 minutes**. The apt packages, Chromium included, add time on top, depending on your mirror and Wi-Fi.
+
+If the wheelhouse can't be used (a dev branch, a failed download, or `INKYPI_SKIP_WHEELHOUSE=1`), `install.sh` falls back to a source install and takes **about 15 minutes**. The slow part is compiling the packages that have no 32-bit ARM wheel on PyPI, such as `numpy`, `Pillow` and `cffi`, on one Cortex-A53 core. Don't kill the install or assume it's hung: `htop` shows the build using one core. zram swap matters here, because without it the build can run out of memory. Pi OS Trixie sets it up with `rpi-swap`, and `install.sh` adds `zram-tools` only on an OS that doesn't.
 
 ### Pre-built wheelhouse (faster first boot — JTN-604)
 
@@ -179,7 +182,7 @@ As of the version that resolves [JTN-592](https://linear.app/jtn0123/issue/JTN-5
 
 ### Pi Zero W vs Pi Zero 2 W
 
-The "[Known Issues during Pi Zero W Installation](./troubleshooting.md#known-issues-during-pi-zero-w-installation)" section in the troubleshooting guide refers to the **original** 32-bit Pi Zero W, not the Pi Zero 2 W. The Zero 2 W is much more capable (4× Cortex-A53, ARMv8) and doesn't hit the same pip install issues — provided zram swap is active (`rpi-swap` on Pi OS Trixie; `install.sh` adds `zram-tools` otherwise).
+This fork targets the Pi Zero 2 W (four Cortex-A53 cores, ARMv8). The original Pi Zero W (one ARMv6 core) isn't a supported board: releases ship no ARMv6 wheelhouse, so `install.sh` would compile numpy, Pillow and the other native packages on that one core.
 
 ## Re-editing user-data after first boot (cloud-init runcmd one-shot trap)
 
