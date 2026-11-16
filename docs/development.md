@@ -77,7 +77,8 @@ devbox run dev # alternatively run `devbox shell` and then run `python src/inkyp
 
 ### Install pre-commit hooks (recommended)
 
-After cloning, install the git hooks so linting runs automatically before each commit:
+After cloning, install the git hooks. One command installs all three hook types
+(`pre-commit`, `commit-msg` and `pre-push`):
 
 ```bash
 pre-commit install
@@ -85,10 +86,11 @@ pre-commit install
 
 On every `git commit` this runs: whitespace/YAML/merge-conflict checks, **ruff** (lint),
 **black** (format), **mypy** on `src/`, **Biome** (lint of the web scripts, see below),
-**gitleaks** (secret scanning of the staged changes), and **conventional-commit** message
-validation. Ruff, Black and mypy run from `.venv`, so they are the same pinned versions
-`scripts/lint.sh` and CI use. See [`.pre-commit-config.yaml`](../.pre-commit-config.yaml) for
-the full hook list.
+**gitleaks** (secret scanning of the staged changes), and, when a stylesheet partial changed,
+`scripts/build_css.py` to rebuild `main.css`. The commit-msg hook then checks the message is a
+Conventional Commit. Ruff, Black and mypy run from `.venv`, so they are the same pinned
+versions `scripts/lint.sh` and CI use. See [`.pre-commit-config.yaml`](../.pre-commit-config.yaml)
+for the full hook list.
 
 Before a `git push` whose commits change `src/static/` or `src/templates/`, the pre-push hook
 runs the browser smoke gate (`scripts/test.sh browser-smoke`, about 45 seconds). It's skipped
@@ -241,9 +243,16 @@ For contributors who don't have a Pi, you can run InkyPi in a container:
 docker compose up --build
 ```
 
-The web UI will be available at http://localhost:8080. Source changes
-in `src/` are reflected immediately via volume mount. The display is
-automatically mocked — no hardware required.
+The web UI will be available at http://localhost:8080. The display is
+mocked, so no hardware is needed.
+
+`docker-compose.yml` mounts `src/` into the container read-only and runs the
+app in dev mode, so the same rules apply as in
+[Development Tips](#development-tips): templates are re-read on the next
+request, and a plugin's Python module is reloaded the next time the plugin
+runs. Any other Python change needs `docker compose restart`. The container
+also sets `INKYPI_NO_REFRESH=1`, so the refresh loop doesn't run; use a
+plugin's **Update Now** button to render.
 
 To stop the container, press `Ctrl+C` or run `docker compose down`.
 
@@ -376,40 +385,28 @@ InkyPi will search for a Chrome-like browser in the project's `PATH` (when using
 
 ## CodeQL suppression policy
 
-CodeQL runs on every push and pull request. Most alerts represent real issues
-and should be fixed in code. A small number are taint-tracker false positives
-where CodeQL cannot model a validation/sanitization helper. When that happens,
-suppress the alert at the flagged line with an `lgtm` comment, **always with a
-specific justification**.
+CodeQL runs on every pull request to `main`, on every push to `main`, and
+weekly. Most alerts represent real issues and should be fixed in code. A
+small number are taint-tracker false positives where CodeQL cannot model a
+validation or sanitization helper.
 
-**Format**
+GitHub code scanning ignores `# lgtm[...]` comments (they were an LGTM.com
+feature), so don't add them. To close a false positive, dismiss the alert in
+**Security → Code scanning**:
 
-- Python: `# lgtm[<rule-id>] — <why this is a false positive>`
-- JavaScript: `// lgtm[<rule-id>] — <why this is a false positive>`
+1. Pick the reason that fits: **False positive**, **Used in tests**, or
+   **Won't fix**.
+2. In the comment, say *why* the alert does not apply to this call site:
+   the data flow, sanitization, or runtime invariant that makes it wrong.
+   "False positive" on its own gives the next maintainer nothing to check.
 
-**Required**
-
-1. Use the exact rule ID from the CodeQL alert (e.g. `py/clear-text-logging-sensitive-data`,
-   `js/xss-through-dom`).
-2. Include a justification after the em dash that explains *why* the alert
-   does not apply to this specific call site. Reference the data flow,
-   sanitization, or runtime invariant that makes the alert wrong.
-3. Place the comment on the flagged line itself (not the line above or below)
-   so CodeQL's suppression matcher picks it up.
-
-**Forbidden**
-
-- Generic comments like `# lgtm — false positive` or `# noqa`. They give
-  the next maintainer no signal about whether the suppression is still valid.
-- Suppressing a rule across an entire file or module unless every site has
-  been audited and the rationale is documented in the policy section.
-- Suppressing alerts in `src/blueprints/**` or `src/utils/api_responses.py`
-  without coordinating with the JTN-318 cleanup; those files are still being
-  hardened against raw exception strings in API responses.
+A dismissal applies to that one alert. If the code moves and CodeQL raises
+it again, dismiss the new alert with the same reasoning, or fix the code so
+CodeQL can follow the check.
 
 **When in doubt**
 
 If you are not sure whether an alert is a false positive, open a Linear issue
-under the CodeQL epic (JTN-326) and tag it `security` rather than suppressing.
-A real alert that is silenced by mistake is much worse than an unsuppressed
-false positive that the dashboard learns to ignore.
+under the CodeQL epic (JTN-326) and tag it `security` rather than dismissing it.
+A real alert that is dismissed by mistake is much worse than an open false
+positive.

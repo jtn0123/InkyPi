@@ -35,7 +35,18 @@ Rows older than 30 days (`BENCHMARK_RETENTION_DAYS` in `src/benchmarks/benchmark
 
 ### Exporting reports
 
-Use the export script (to be added) or query the DB directly. A generated summary is tracked at `docs/benchmarks_report.md`.
+There is no export script. Read the numbers from the same JSON endpoints the Diagnostics panel uses (all `GET`, all read-only; they answer 404 while `enable_benchmarks` is off):
+
+- `/api/benchmarks/summary?window=24h`: the refresh count and p50/p95 of `request_ms`, `generate_ms`, `preprocess_ms` and `display_ms`. `window` takes minutes, hours or days (`30m`, `6h`, `7d`) and defaults to `24h`.
+- `/api/benchmarks/refreshes?window=24h&limit=50`: recent `refresh_events` rows, newest first. `limit` is 1–200; pass the response's `next_cursor` as `cursor=` for the next page.
+- `/api/benchmarks/plugins?window=24h`: average timings per plugin.
+- `/api/benchmarks/stages?refresh_id=<id>`: the `stage_events` rows for one refresh.
+
+```bash
+curl -s "http://<pi-hostname>.local/api/benchmarks/summary?window=7d" | jq .
+```
+
+Or copy the database file (`benchmarks_db_path`) off the device and query it with `sqlite3`.
 
 ### Overhead and safety
 

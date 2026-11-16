@@ -400,7 +400,7 @@ Drop any 256x256 PNG into `src/plugins/hello/icon.png`. The web UI shows it in t
 ### 6. Run the dev server
 
 ```bash
-INKYPI_ENV=dev .venv/bin/python src/inkypi.py --dev --web-only
+.venv/bin/python src/inkypi.py --dev --web-only
 ```
 
 Or use the [Docker setup](development.md#docker-development) added in JTN-297:
@@ -409,12 +409,15 @@ Or use the [Docker setup](development.md#docker-development) added in JTN-297:
 docker compose up --build
 ```
 
-### 7. Verify in the web UI
+Start the server after you create the plugin, or restart it: the plugin list is read at startup. `--web-only` (and the Docker setup) serves the web UI without the background refresh loop, so playlists don't rotate. The next step doesn't need them.
 
-1. Open http://localhost:8080
-2. Click **Add Plugin** on the dashboard or playlist page
-3. Find **Hello World** in the list
-4. Save it to a playlist with any message
-5. The next refresh tick will show the message on the (mock) display
+### 7. Show it on the mock display
+
+1. Open http://localhost:8080.
+2. The dashboard's **Plugins** section lists **Hello World** with your icon. Click it. (**Open library**, next to that heading, opens the full plugin list.)
+3. Type a message in the **Message** field and click **Update display**. This renders the plugin straight away, without waiting for the refresh loop, so it works in web-only mode.
+4. Reload the dashboard to see the message, or open `runtime/mock_display_output/latest.png`. (In Docker that folder is the `inkypi-runtime` volume, so use the dashboard.)
+
+To put the plugin in rotation, click **Add to playlist** on the plugin page, fill in the **Schedule** tab, and click **Add to Playlist**. The playlist page then lists it; its **Add plugin instance** link takes you back to the plugin library. Playlists only rotate while the refresh loop runs, so start the server without `--web-only` to watch it take its turn.
 
 That's it — you've built and shipped a plugin. From here, look at the [`year_progress`](../src/plugins/year_progress/) plugin for a slightly richer example using `render_image()` with HTML/CSS templates, or [`weather`](../src/plugins/weather/) for a plugin that calls an external API.

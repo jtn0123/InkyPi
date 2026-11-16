@@ -3,10 +3,17 @@
 ## Default (human-readable)
 
 InkyPi uses Python's standard `logging` module configured via
-`src/config/logging.conf`.  Log lines look like:
+`src/config/logging.conf`. Log lines look like:
 
 ```
-2026-04-08 12:00:00,123 INFO inkypi Starting display refresh
+04:54:37 - INFO - blueprints.plugin - Refresh task not running, updating display directly
+```
+
+The time is `HH:MM:SS` only; under systemd, the journal adds the date. The
+file set by `INKYPI_LOG_FILE` uses `logging.conf`'s `fileFormatter` instead:
+
+```
+04:54:37  blueprints.plugin: INFO       - Refresh task not running, updating display directly
 ```
 
 ## Structured JSON logging
