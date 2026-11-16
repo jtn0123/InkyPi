@@ -2,6 +2,19 @@
 
 <!-- version list -->
 
+## v1.9.9 (2026-11-16)
+
+### Bug Fixes
+
+- Keep saved intervals and plugin edits, and report plugin failures the same way
+  ([#884](https://github.com/jtn0123/InkyPi/pull/884),
+  [`0cf5820`](https://github.com/jtn0123/InkyPi/commit/0cf5820dac35d944db2a392026647636cb496ad9))
+
+- **install**: Guard the plugin command, keep plugin installs on the lock, and tune earlyoom
+  ([#883](https://github.com/jtn0123/InkyPi/pull/883),
+  [`c047fea`](https://github.com/jtn0123/InkyPi/commit/c047fea61dd34faea581d6e1c557ddd675231e7e))
+
+
 ## v1.9.8 (2026-11-16)
 
 ### Bug Fixes
