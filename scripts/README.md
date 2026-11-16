@@ -56,7 +56,8 @@ Developer, CI and device tools. Run them from the repo root. Python scripts add
 | `mutation_check.py`, `mutation_summary.py` | A small hand-written mutant check, and the summary for mutmut shards. |
 | `check_licenses.sh` | Checks dependency licences with the `pip-licenses` pinned in `install/requirements-dev.txt` (installs nothing; run it from the dev venv). |
 | `check_links.py` | Re-checks links that the Lychee link checker reported as throttled. |
-| `check_requirements_drift.sh` | Checks that the exported lockfile matches `uv.lock`. |
+| `check_requirements_drift.sh` | Checks that the exported lockfiles match `uv.lock`, and the installer requirement files match their `.in` files and the lock. |
+| `check_install_pins.py` | Run by the drift check: installer requirement files must agree with `uv.lock` and with each other. |
 | `check_vendor_versions.py` | Weekly check that the vendored front-end libraries (downloaded, CDN-loaded, and committed under `src/static/vendor/`) are current within their major (`vendor-versions.yml`). |
 | `mypy_src_baseline.txt`, `mypy_tests_baseline.txt` | The mypy error ratchets used by `lint.sh`. |
 

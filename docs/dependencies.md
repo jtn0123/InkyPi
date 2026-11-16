@@ -50,6 +50,28 @@ the dev group and the CI/release steps for consistent resolution.
 matches `uv.lock`. Commit `pyproject.toml`, `uv.lock` and both exports together,
 then run `pip check` and the test and strict mypy gates.
 
+## Installer requirement files
+
+`install.sh` and `update.sh` install three small hashed files as root before
+the app's own requirements: `install/bootstrap-requirements.txt` (pip,
+setuptools, wheel, packaging), `install/uv-requirements.txt` (uv) and
+`install/ws-requirements.txt` (the Waveshare GPIO libraries). Each is compiled
+from the `.in` file next to it, which holds the pins. They aren't exported from
+`uv.lock`, so Dependabot never updates them. To change one, edit its `.in`
+file, then regenerate the `.txt` (shown for `bootstrap`):
+
+```bash
+uv --no-config pip compile --universal --python-version 3.13 \
+    --prerelease disallow --generate-hashes --no-header --no-annotate \
+    install/bootstrap-requirements.in --output-file install/bootstrap-requirements.txt
+```
+
+`scripts/check_requirements_drift.sh` fails when a `.txt` doesn't match its
+`.in`, when a package also in `uv.lock` (pip, packaging, uv) has a different
+version or a hash the lock doesn't list, or when two of the files pin one
+package differently (`scripts/check_install_pins.py`). CI's security job runs
+pip-audit on all three.
+
 ## Compatibility constraints
 
 - `pydantic-core` follows Pydantic's exact pin. Google GenAI currently caps
