@@ -95,13 +95,13 @@
                     <div class="form-group">
                         <label for="deviceName" class="form-label">Device name</label>
                         {# JTN-780: mirror server-side constraints from JTN-746 so users see inline feedback
-                           before hitting Save. maxlength caps input at 64; pattern forbids control characters
-                           (Cc category) except tab, matching blueprints/settings/_config.py::_validate_device_name.
+                           before hitting Save. maxlength is the config schema's maxLength for "name"; pattern
+                           forbids control characters (Cc category) except tab, matching the schema's pattern.
                            ISSUE-008 / CodeRabbit follow-up: the central character class requires at least one
                            character that is neither whitespace nor a Cc control character, so a value of "   " or
                            a lone control char fails client-side instead of round-tripping to the server's
                            whitespace + Cc-category checks in _validate_device_name. #}
-                        <input type="text" id="deviceName" name="deviceName" placeholder="Enter device name" value="{{ device_settings.name }}" required maxlength="64" pattern="[^\u0000-\u0008\u000A-\u001F\u007F-\u009F]*[^\s\u0000-\u0008\u000A-\u001F\u007F-\u009F][^\u0000-\u0008\u000A-\u001F\u007F-\u009F]*" title="Up to 64 characters with at least one non-space character. Tabs are allowed; other control characters are not." class="form-input" aria-required="true" aria-invalid="false" aria-describedby="deviceName-error">
+                        <input type="text" id="deviceName" name="deviceName" placeholder="Enter device name" value="{{ device_settings.name }}" required maxlength="{{ device_name_max_length }}" pattern="[^\u0000-\u0008\u000A-\u001F\u007F-\u009F]*[^\s\u0000-\u0008\u000A-\u001F\u007F-\u009F][^\u0000-\u0008\u000A-\u001F\u007F-\u009F]*" title="Up to {{ device_name_max_length }} characters with at least one non-space character. Tabs are allowed; other control characters are not." class="form-input" aria-required="true" aria-invalid="false" aria-describedby="deviceName-error">
                         <span id="deviceName-error" class="validation-message" role="alert"></span>
                     </div>
                     {# Handoff parity: Orientation | Preview size sit in a
@@ -715,6 +715,7 @@
             importSettingsUrl: {{ url_for('settings.import_settings') | tojson }},
             logsUrl: {{ url_for('settings.api_logs') | tojson }},
             pluginCycleIntervalSeconds: {{ device_settings.plugin_cycle_interval_seconds | default(3600) | tojson }},
+            pluginCycleIntervalMaxSeconds: {{ cycle_interval_max_seconds | tojson }},
             saveSettingsUrl: {{ url_for('settings.save_settings') | tojson }},
             shutdownUrl: {{ url_for('settings.shutdown') | tojson }},
             startUpdateUrl: {{ url_for('settings.start_update') | tojson }},

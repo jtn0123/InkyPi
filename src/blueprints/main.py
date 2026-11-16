@@ -1,6 +1,7 @@
 import logging
 import math
 import os
+from collections.abc import Mapping
 from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
 from typing import Any
@@ -16,10 +17,12 @@ from flask import (
     send_from_directory,
 )
 from flask.typing import ResponseReturnValue
+from PIL import Image
 
 from benchmarks.benchmark_storage import save_refresh_event, save_stage_event
 from refresh_task import schedule
 from refresh_task.health import PluginHealthTracker
+from services.direct_render import execute_direct_render
 from utils import blackout
 from utils.api_responses import APIError, JsonResponse, json_error, json_success
 from utils.backend_errors import mapped_render_errors
@@ -28,6 +31,7 @@ from utils.display_names import (
     instance_suffix_label,
     is_auto_instance_name,
 )
+from utils.form_utils import sanitize_log_field
 from utils.image_serving import maybe_serve_webp
 from utils.output_validator import fit_image_to_device
 from utils.rate_limit import CooldownLimiter
@@ -494,6 +498,10 @@ def _configure_app_static(state: Any) -> None:
 
 _display_next_limiter = CooldownLimiter(10)
 
+# The 400 message when a plugin fails on the direct path; the exception text
+# goes to the log only.
+_MSG_PLUGIN_GENERATION_FAILED = "Plugin image generation failed"
+
 
 def _reset_display_next_cooldown() -> None:
     """Reset the display-next rate limiter. Exposed for testing."""
@@ -506,57 +514,105 @@ def _display_next_direct(
     plugin_instance: Any,
     playlist: Any,
     current_dt: datetime,
-    benchmark_id: str,
-) -> tuple[int | None, JsonResponse | None]:
-    """Execute a direct display update (dev path, no background task).
+) -> JsonResponse:
+    """Show *plugin_instance* in the request thread (the refresh loop is off).
 
-    Returns ``(generate_ms, error_response)``.  When *error_response* is not
-    ``None`` it should be returned to the client immediately.
+    The outcome rules (no image, plugin failure, known failures, metrics) are
+    :func:`services.direct_render.execute_direct_render`'s, shared with
+    ``/update_now``. This adds what a playlist turn records once the panel
+    shows the image: refresh_info and the benchmark rows.
     """
-    from time import perf_counter
-
     from plugins.plugin_registry import get_plugin_instance
 
-    plugin_config = device_config.get_plugin(plugin_instance.plugin_id)
+    plugin_id = plugin_instance.plugin_id
+    plugin_config = device_config.get_plugin(plugin_id)
     if not plugin_config:
-        return None, json_error("Plugin config not found", status=404)
+        return json_error("Plugin config not found", status=404)
 
-    plugin = get_plugin_instance(plugin_config)
-    _t_gen_start = perf_counter()
-    try:
-        image = plugin.generate_image(plugin_instance.settings, device_config)
-    except RuntimeError:
-        logger.exception("generate_image failed in display_next")
-        return None, json_error("Plugin image generation failed", status=400)
-    if image is None:
-        # A control-only plugin legitimately produces no image (see BasePlugin.generate_image). That is a completed refresh with nothing to show, not a failure — leave the panel alone.
+    display_timings: dict[str, Any] = {}
+
+    def generate() -> Image.Image | None:
+        plugin = get_plugin_instance(plugin_config)
+        image: Image.Image | None = plugin.generate_image(
+            plugin_instance.settings, device_config
+        )
+        return image
+
+    def display(image: Image.Image) -> None:
+        # Fitted to the panel exactly as the refresh task would. One write: a
+        # driver fault fails the request (500) rather than repeating the
+        # panel write and the history entry.
+        timings = display_manager.display_image(
+            fit_image_to_device(image, device_config, plugin_id),
+            image_settings=plugin_config.get("image_settings", []),
+            history_meta={
+                "refresh_type": "Playlist",
+                "plugin_id": plugin_id,
+                "playlist": playlist.name,
+                "plugin_instance": plugin_instance.name,
+            },
+        )
+        if isinstance(timings, Mapping):
+            display_timings.update(timings)
+
+    def read_timings() -> tuple[int | None, int | None]:
+        return display_timings.get("display_ms"), display_timings.get("preprocess_ms")
+
+    def log_failure(error: BaseException, _counts_as_render: bool) -> None:
+        # This path leaves the panel as it is on a failure; the error goes to
+        # the log, never into the response.
+        logger.error(
+            "display_next: %s failed during direct render",
+            sanitize_log_field(plugin_id),
+            exc_info=error,
+        )
+
+    outcome = execute_direct_render(
+        generate,
+        display,
+        read_timings,
+        log_failure,
+        plugin_error_message=_MSG_PLUGIN_GENERATION_FAILED,
+    )
+    if not outcome.ok:
+        return json_error(
+            outcome.message,
+            status=outcome.status,
+            code=outcome.code,
+            details=outcome.details or None,
+        )
+    if outcome.metrics.get("no_image"):
+        # A control-only plugin: a completed refresh with nothing to show.
+        # The panel, refresh_info and the benchmark are left alone, as the
+        # refresh loop does (RefreshCycle._finish_without_image).
         logger.info(
             "display_next: %s produced no image; leaving the display unchanged",
-            plugin_instance.plugin_id,
+            sanitize_log_field(plugin_id),
         )
-        return None, json_error("Plugin produced no image to display", status=409)
-    generate_ms = int((perf_counter() - _t_gen_start) * 1000)
+        return json_success(message=outcome.message, metrics=outcome.metrics)
 
-    save_stage_event(device_config, benchmark_id, "generate_image", generate_ms)
-
-    # Display — fitted to the panel exactly as the refresh task would.
-    image = fit_image_to_device(image, device_config, plugin_instance.plugin_id)
-    image_settings = plugin_config.get("image_settings", [])
-    # One write. A TypeError here is a real driver/Pillow fault, so it must
-    # propagate (500) rather than repeat the panel write and history entry.
-    display_manager.display_image(
-        image,
-        image_settings=image_settings,
-        history_meta={
-            "refresh_type": "Playlist",
-            "plugin_id": plugin_instance.plugin_id,
-            "playlist": playlist.name,
-            "plugin_instance": plugin_instance.name,
-        },
+    _record_direct_refresh(
+        device_config, plugin_instance, playlist, current_dt, outcome.metrics
     )
+    return json_success(message=outcome.message, metrics=outcome.metrics)
 
+
+def _record_direct_refresh(
+    device_config: Any,
+    plugin_instance: Any,
+    playlist: Any,
+    current_dt: datetime,
+    metrics: Mapping[str, Any],
+) -> None:
+    """Record a direct refresh the way the refresh loop records its own.
+
+    Persists the advanced playlist index and the new refresh_info in one
+    locked transaction, so a concurrent update_atomic rollback in another
+    thread cannot discard either, then writes the benchmark rows.
+    """
     from model import RefreshInfo
 
+    benchmark_id = str(uuid4())
     latest = RefreshInfo(
         refresh_type="Playlist",
         plugin_id=plugin_instance.plugin_id,
@@ -564,10 +620,10 @@ def _display_next_direct(
         plugin_instance=plugin_instance.name,
         refresh_time=current_dt.isoformat(),
         image_hash=None,
-        request_ms=None,
-        display_ms=None,
-        generate_ms=generate_ms,
-        preprocess_ms=None,
+        request_ms=metrics.get("request_ms"),
+        display_ms=metrics.get("display_ms"),
+        generate_ms=metrics.get("generate_ms"),
+        preprocess_ms=metrics.get("preprocess_ms"),
         used_cached=False,
         benchmark_id=benchmark_id,
     )
@@ -575,31 +631,14 @@ def _display_next_direct(
     def _record_display(_config: dict[str, Any]) -> None:
         device_config.refresh_info = latest
 
-    # Persist the advanced playlist index and the new refresh_info in one
-    # locked transaction, so a concurrent update_atomic rollback in another
-    # thread cannot discard either.
     device_config.update_atomic(_record_display)
 
-    return generate_ms, None
-
-
-def _gather_display_metrics(
-    device_config: Any, generate_ms: int | None
-) -> tuple[Any | None, Any | None, int | None, Any | None]:
-    """Read timing metrics from refresh_info, filling in any gaps.
-
-    Returns ``(request_ms, display_ms, generate_ms, preprocess_ms)``.
-    """
-    request_ms = display_ms = preprocess_ms = None
-    try:
-        ri = device_config.get_refresh_info()
-        request_ms = getattr(ri, "request_ms", None)
-        display_ms = getattr(ri, "display_ms", None)
-        generate_ms = generate_ms or getattr(ri, "generate_ms", None)
-        preprocess_ms = getattr(ri, "preprocess_ms", None)
-    except Exception:
-        logger.warning("Could not read this refresh's timings", exc_info=True)
-    return request_ms, display_ms, generate_ms, preprocess_ms
+    save_stage_event(
+        device_config, benchmark_id, "generate_image", metrics.get("generate_ms")
+    )
+    _persist_dev_refresh_event(
+        device_config, benchmark_id, plugin_instance, playlist, metrics
+    )
 
 
 def _persist_dev_refresh_event(
@@ -607,12 +646,10 @@ def _persist_dev_refresh_event(
     benchmark_id: str,
     plugin_instance: Any,
     playlist: Any,
-    metrics: tuple[Any | None, Any | None, int | None, Any | None],
+    metrics: Mapping[str, Any],
 ) -> None:
     """Persist a refresh event for the dev (direct) path."""
-    request_ms, display_ms, generate_ms, preprocess_ms = metrics
     try:
-        ri = device_config.get_refresh_info()
         cpu_percent = memory_percent = None
         try:
             import psutil
@@ -624,16 +661,16 @@ def _persist_dev_refresh_event(
         save_refresh_event(
             device_config,
             {
-                "refresh_id": getattr(ri, "benchmark_id", benchmark_id),
+                "refresh_id": benchmark_id,
                 "ts": None,
                 "plugin_id": plugin_instance.plugin_id,
                 "instance": plugin_instance.name,
                 "playlist": playlist.name,
                 "used_cached": False,
-                "request_ms": request_ms,
-                "generate_ms": generate_ms,
-                "preprocess_ms": getattr(ri, "preprocess_ms", None),
-                "display_ms": getattr(ri, "display_ms", None),
+                "request_ms": metrics.get("request_ms"),
+                "generate_ms": metrics.get("generate_ms"),
+                "preprocess_ms": metrics.get("preprocess_ms"),
+                "display_ms": metrics.get("display_ms"),
                 "cpu_percent": cpu_percent,
                 "memory_percent": memory_percent,
                 "notes": "display_next_dev",
@@ -686,33 +723,27 @@ def _show_next_plugin() -> JsonResponse:
     if not plugin_instance:
         return json_error("No eligible plugin to display", status=400)
 
-    generate_ms = None
-    update_metrics: dict[str, Any] | None = None
-    benchmark_id = str(uuid4())
-    via_refresh_task = bool(getattr(refresh_task, "running", False))
-    try:
-        if via_refresh_task:
-            from refresh_task import PlaylistRefresh
-
-            try:
-                with mapped_render_errors("display_next", logger=logger):
-                    update_metrics = refresh_task.manual_update(
-                        PlaylistRefresh(playlist, plugin_instance, force=True)
-                    )
-            except RuntimeError:
-                logger.exception("manual_update failed")
-                return json_error("Plugin update failed", status=400)
-        else:
-            generate_ms, err = _display_next_direct(
-                device_config,
-                display_manager,
-                plugin_instance,
-                playlist,
-                current_dt,
-                benchmark_id,
+    if not getattr(refresh_task, "running", False):
+        try:
+            return _display_next_direct(
+                device_config, display_manager, plugin_instance, playlist, current_dt
             )
-            if err:
-                return err
+        except Exception:
+            # Recording the refresh failed after the panel was written.
+            logger.exception("display_next failed")
+            return json_error("An internal error occurred", status=500)
+
+    from refresh_task import PlaylistRefresh, manual_update_timings
+
+    try:
+        try:
+            with mapped_render_errors("display_next", logger=logger):
+                update_metrics = refresh_task.manual_update(
+                    PlaylistRefresh(playlist, plugin_instance, force=True)
+                )
+        except RuntimeError:
+            logger.exception("manual_update failed")
+            return json_error("Plugin update failed", status=400)
     except APIError as exc:
         # A known failure (blackout, the loop stopping between the
         # ``running`` check and the enqueue, a timeout ...), mapped above.
@@ -723,32 +754,11 @@ def _show_next_plugin() -> JsonResponse:
         logger.exception("display_next failed")
         return json_error("An internal error occurred", status=500)
 
-    if via_refresh_task:
-        # This refresh's own timings; refresh_info may still describe the
-        # previous one (see manual_update_timings). The loop records its own
-        # benchmark row.
-        from refresh_task import manual_update_timings
-
-        return json_success(
-            message="Display updated", metrics=manual_update_timings(update_metrics)
-        )
-
-    # The direct path wrote refresh_info itself, so it is current here, and
-    # nobody else records the benchmark row.
-    metrics = _gather_display_metrics(device_config, generate_ms)
-    _persist_dev_refresh_event(
-        device_config, benchmark_id, plugin_instance, playlist, metrics
-    )
-    request_ms, display_ms, generate_ms, preprocess_ms = metrics
-
+    # This refresh's own timings; refresh_info may still describe the
+    # previous one (see manual_update_timings). The loop records its own
+    # benchmark row.
     return json_success(
-        message="Display updated",
-        metrics={
-            "request_ms": request_ms,
-            "generate_ms": generate_ms,
-            "preprocess_ms": preprocess_ms,
-            "display_ms": display_ms,
-        },
+        message="Display updated", metrics=manual_update_timings(update_metrics)
     )
 
 

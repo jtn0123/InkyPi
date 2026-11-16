@@ -1,6 +1,5 @@
 """Settings pages, save, import/export, API keys, isolation, and safe-reset route handlers."""
 
-import unicodedata
 from typing import Any
 from zoneinfo import available_timezones
 
@@ -10,13 +9,37 @@ from flask.typing import ResponseReturnValue
 from app_setup.logging_setup import configure_log_timezone
 from blueprints._refresh_loop import wake_refresh_loop
 from blueprints.settings import logger, settings_bp
-from display.rendering_settings import SCREEN_RENDERING_KEY, SCREEN_RENDERING_MODES
+from display.rendering_settings import SCREEN_RENDERING_KEY
+from utils import config_schema
 from utils.api_responses import JsonResponse, json_error, json_success
 from utils.backend_errors import ClientInputError, route_error_boundary
 from utils.config_schema import ConfigValidationError
 from utils.time_utils import calculate_seconds
 
-_DEVICE_NAME_MAX_LEN = 64
+# The runtime controls a safe reset puts back to the schema's defaults.
+_SAFE_RESET_KEYS = (
+    "plugin_cycle_interval_seconds",
+    "log_system_stats",
+    "isolated_plugins",
+)
+
+# Form fields whose allowed values are an enum in the config schema, with the
+# schema path each one is saved under.
+_OPTIONAL_ENUM_FIELDS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("orientation", ("orientation",)),
+    ("previewSizeMode", ("preview_size_mode",)),
+    (SCREEN_RENDERING_KEY, ("image_settings", SCREEN_RENDERING_KEY)),
+)
+
+# Numeric image-adjustment form fields; each is saved under the same name in
+# ``image_settings``, where the schema gives its range.
+_IMAGE_SETTING_FIELDS = (
+    "saturation",
+    "brightness",
+    "sharpness",
+    "contrast",
+    "inky_saturation",
+)
 
 # Import allowlists for settings import. ``refresh_info`` is left out on
 # purpose: it records what this screen is showing right now, so restoring a
@@ -145,33 +168,38 @@ def safe_reset() -> ResponseReturnValue:
         hint="Check config readability and write permissions.",
     ):
         device_config = current_app.config["DEVICE_CONFIG"]
-        # Reset only these runtime controls. update_config merges, so every
-        # other key (plugins, playlists, name, display) is left as it was;
-        # copying them in here wrote null for any that had never been set,
-        # which the config schema rejects at the next start.
+        # Reset only these runtime controls, to the defaults the config schema
+        # declares. update_config merges, so every other key (plugins,
+        # playlists, name, display) is left as it was; copying them in here
+        # wrote null for any that had never been set, which the config schema
+        # rejects at the next start.
         device_config.update_config(
-            {
-                "plugin_cycle_interval_seconds": 3600,
-                "log_system_stats": False,
-                "isolated_plugins": [],
-            }
+            {key: config_schema.default_value(key) for key in _SAFE_RESET_KEYS}
         )
         # The loop may be sleeping on the old interval.
         wake_refresh_loop("a safe reset")
         return json_success(message="Safe reset applied.")
 
 
-@settings_bp.route("/settings", methods=["GET"])
-def settings_page() -> ResponseReturnValue:
+def _render_settings_page() -> str:
     device_config = current_app.config["DEVICE_CONFIG"]
-    timezones = sorted(available_timezones())
     return render_template(
         "settings.html",
         device_settings=device_config.get_config(),
-        timezones=timezones,
+        timezones=sorted(available_timezones()),
         active_nav="settings",
         pin_enabled=bool(current_app.config.get("AUTH_ENABLED")),
+        # The page's own input limits, from the schema the save is checked by.
+        device_name_max_length=config_schema.field_rules("name")["maxLength"],
+        cycle_interval_max_seconds=config_schema.numeric_range(
+            "plugin_cycle_interval_seconds"
+        )[1],
     )
+
+
+@settings_bp.route("/settings", methods=["GET"])
+def settings_page() -> ResponseReturnValue:
+    return _render_settings_page()
 
 
 @settings_bp.route("/settings/diagnostics", methods=["GET"])
@@ -188,15 +216,8 @@ def diagnostics_redirect() -> ResponseReturnValue:
 
 @settings_bp.route("/settings/backup", methods=["GET"])
 def backup_restore_page() -> ResponseReturnValue:
-    device_config = current_app.config["DEVICE_CONFIG"]
     # For now, reuse the main settings page and anchor to a section; separate template can be added later
-    return render_template(
-        "settings.html",
-        device_settings=device_config.get_config(),
-        timezones=sorted(available_timezones()),
-        active_nav="settings",
-        pin_enabled=bool(current_app.config.get("AUTH_ENABLED")),
-    )
+    return _render_settings_page()
 
 
 def _include_export_keys() -> bool:
@@ -511,9 +532,11 @@ def _validate_interval(form_data: dict[str, str]) -> JsonResponse | None:
         return _field_error("Refresh interval must be at least 1", "interval")
 
     plugin_cycle_interval_seconds = calculate_seconds(interval_int, unit)
-    if plugin_cycle_interval_seconds > 86400 or plugin_cycle_interval_seconds <= 0:
+    low, high = config_schema.numeric_range("plugin_cycle_interval_seconds")
+    if not low <= plugin_cycle_interval_seconds <= high:
         return _field_error(
-            "Plugin cycle interval must be less than 24 hours", "interval"
+            f"Plugin cycle interval must be {high / 3600:g} hours or less",
+            "interval",
         )
     return None
 
@@ -526,12 +549,14 @@ def _validate_device_name(
     device_name = raw_device_name.strip()
     if not device_name:
         return None, _field_error("Device Name is required", "deviceName")
-    if len(raw_device_name) > _DEVICE_NAME_MAX_LEN:
+    max_length = config_schema.field_rules("name")["maxLength"]
+    if len(raw_device_name) > max_length:
         return None, _field_error(
-            f"Device Name must be {_DEVICE_NAME_MAX_LEN} characters or fewer",
+            f"Device Name must be {max_length} characters or fewer",
             "deviceName",
         )
-    if any(unicodedata.category(ch) == "Cc" and ch != "\t" for ch in raw_device_name):
+    # The schema's pattern bars control characters other than tab.
+    if not config_schema.matches_pattern(raw_device_name, "name"):
         return None, _field_error(
             "Device Name may not contain control characters",
             "deviceName",
@@ -542,7 +567,7 @@ def _validate_device_name(
 def _validate_enum_field(
     form_data: dict[str, str],
     field: str,
-    allowed: tuple[str, ...],
+    allowed: tuple[Any, ...],
     *,
     required: bool = True,
 ) -> JsonResponse | None:
@@ -571,15 +596,7 @@ def _validate_image_settings(form_data: dict[str, str]) -> JsonResponse | None:
     """Validate numeric image-adjustment fields in *form_data*."""
     import math
 
-    _IMAGE_SETTING_MIN = 0.0
-    _IMAGE_SETTING_MAX = 10.0
-    for field in (
-        "saturation",
-        "brightness",
-        "sharpness",
-        "contrast",
-        "inky_saturation",
-    ):
+    for field in _IMAGE_SETTING_FIELDS:
         raw = form_data.get(field)
         if raw is None:
             continue
@@ -589,9 +606,10 @@ def _validate_image_settings(form_data: dict[str, str]) -> JsonResponse | None:
             return _field_error(f"Invalid numeric value for {field}", field)
         if not math.isfinite(value):
             return _field_error(f"Invalid numeric value for {field}", field)
-        if value < _IMAGE_SETTING_MIN or value > _IMAGE_SETTING_MAX:
+        low, high = config_schema.numeric_range("image_settings", field)
+        if not low <= value <= high:
             return _field_error(
-                f"{field} must be between {_IMAGE_SETTING_MIN} and {_IMAGE_SETTING_MAX}",
+                f"{field} must be between {float(low)} and {float(high)}",
                 field,
             )
     return None
@@ -623,24 +641,20 @@ def _validate_settings_form(
         )
 
     time_format = form_data.get("timeFormat")
-    if not time_format or time_format not in ("12h", "24h"):
+    if not time_format or time_format not in config_schema.allowed_values(
+        "time_format"
+    ):
         return _field_error("Time format is required", "timeFormat"), None
 
-    err = _validate_enum_field(
-        form_data, "orientation", ("horizontal", "vertical"), required=False
-    )
-    if err:
-        return err, None
-    err = _validate_enum_field(
-        form_data, "previewSizeMode", ("native", "scaled", "fit"), required=False
-    )
-    if err:
-        return err, None
-    err = _validate_enum_field(
-        form_data, SCREEN_RENDERING_KEY, SCREEN_RENDERING_MODES, required=False
-    )
-    if err:
-        return err, None
+    for field, schema_path in _OPTIONAL_ENUM_FIELDS:
+        err = _validate_enum_field(
+            form_data,
+            field,
+            config_schema.allowed_values(*schema_path),
+            required=False,
+        )
+        if err:
+            return err, None
 
     return _validate_image_settings(form_data), normalized_device_name
 

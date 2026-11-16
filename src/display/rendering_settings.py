@@ -9,6 +9,6 @@ loaded when a frame is actually converted.
 # "image_settings"; that list already travels with every display push.
 CRISP_IMAGE_SETTING = "crisp"
 # Device setting (in config "image_settings"): "auto" converts frames from
-# opted-in plugins crisply, "dithered" leaves every frame to the driver.
+# opted-in plugins crisply, "dithered" leaves every frame to the driver. The
+# allowed values are the enum in the device config schema.
 SCREEN_RENDERING_KEY = "screen_rendering"
-SCREEN_RENDERING_MODES = ("auto", "dithered")

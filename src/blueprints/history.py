@@ -1,10 +1,6 @@
-import csv
-import io
-import json
+"""``/history`` routes: HTTP glue around :mod:`services.history`."""
+
 import logging
-import os
-import shutil
-from collections.abc import Iterator
 from datetime import UTC, datetime
 from typing import Any, cast
 
@@ -21,15 +17,14 @@ from flask import (
 from flask.typing import ResponseReturnValue
 from werkzeug.exceptions import BadRequest
 
+from services import history as history_files
 from utils.api_responses import (
     JsonResponse,
     json_error,
     json_internal_error,
     json_success,
 )
-from utils.form_utils import sanitize_log_field
 from utils.image_serving import THUMBNAIL_WIDTHS, maybe_serve_webp
-from utils.security_utils import validate_file_path
 from utils.time_utils import now_device_tz
 
 logger = logging.getLogger(__name__)
@@ -47,8 +42,6 @@ _ERR_FILE_NOT_FOUND = "File not found"
 _ERR_INVALID_JSON = "Invalid JSON payload"
 _ERR_BODY_NOT_OBJECT = "Request body must be a JSON object"
 _ERR_FILENAME_REQUIRED = "filename is required"
-_EXT_PNG = ".png"
-_EXT_JSON = ".json"
 
 # Helper return codes used in place of pre-built error responses so that
 # taint-tracking (CodeQL py/reflective-xss) sees only module-level constant
@@ -57,8 +50,8 @@ _EXT_JSON = ".json"
 _ERRCODE_INVALID_JSON = "invalid_json"
 _ERRCODE_BODY_NOT_OBJECT = "body_not_object"
 _ERRCODE_FILENAME_REQUIRED = "filename_required"
-_ERRCODE_INVALID_FILENAME = "invalid_filename"
-_ERRCODE_FILE_NOT_FOUND = "file_not_found"
+_ERRCODE_INVALID_FILENAME = history_files.ERR_INVALID_FILENAME
+_ERRCODE_FILE_NOT_FOUND = history_files.ERR_FILE_NOT_FOUND
 
 
 def _filename_error_response(code: str) -> JsonResponse:
@@ -77,261 +70,17 @@ def _filename_error_response(code: str) -> JsonResponse:
     return json_error(_ERR_INVALID_FILENAME, status=400)
 
 
-def _timestamp_from_history_filename(filename: str) -> float:
-    """Extract an epoch timestamp from display_YYYYMMDD_HHMMSS-style filenames."""
-    stem, _ext = os.path.splitext(filename)
-    parts = stem.split("_")
-    if len(parts) < 3:
-        return 0.0
-    try:
-        dt = datetime.strptime(f"{parts[-2]}_{parts[-1]}", "%Y%m%d_%H%M%S").replace(
-            tzinfo=UTC
-        )
-    except ValueError:
-        return 0.0
-    return dt.timestamp()
-
-
-def _format_size(num_bytes: int) -> str:
-    size: float = float(num_bytes)
-    try:
-        for unit in ["B", "KB", "MB", "GB", "TB"]:
-            if size < 1024.0:
-                return f"{size:.1f} {unit}" if unit != "B" else f"{int(size)} {unit}"
-            size /= 1024.0
-        return f"{size:.1f} PB"
-    except Exception:
-        return "-"
+_DEFAULT_PER_PAGE = 24
 
 
 def _now_in_device_tz() -> datetime:
     """Return "now" in the device timezone, falling back to UTC.
 
     Safe to call without an app context (falls back to UTC), which keeps
-    ``_list_history_images`` usable from unit tests that call it directly.
+    it usable from unit tests that call it directly.
     """
     device_config = current_app.config.get(_CONFIG_KEY) if has_app_context() else None
     return now_device_tz(device_config)
-
-
-def _day_label(dt: datetime, now: datetime) -> str:
-    """Human day-group label: Today, Yesterday, or a formatted date."""
-    delta_days = (now.date() - dt.date()).days
-    if delta_days == 0:
-        return "Today"
-    if delta_days == 1:
-        return "Yesterday"
-    return dt.strftime("%b %d, %Y").replace(" 0", " ")
-
-
-def _list_history_images(
-    history_dir: str, offset: int = 0, limit: int | None = None
-) -> tuple[list[dict[str, Any]], int]:
-    # Phase 1: cheap directory listing + sort
-    try:
-        files = [
-            f
-            for f in os.listdir(history_dir)
-            if os.path.isfile(os.path.join(history_dir, f))
-            and f.lower().endswith(_EXT_PNG)
-        ]
-    except Exception:
-        logger.exception("Failed to list history directory")
-        files = []
-
-    # Sort by modification time descending; skip files that disappear or are inaccessible
-    def _safe_mtime(path: str) -> float:
-        try:
-            return os.path.getmtime(path)
-        except Exception:
-            return 0.0
-
-    files.sort(
-        key=lambda f: (
-            _safe_mtime(os.path.join(history_dir, f)),
-            _timestamp_from_history_filename(f),
-            f,
-        ),
-        reverse=True,
-    )
-
-    total = len(files)
-
-    # Slice to requested page before doing expensive per-file work
-    page_files = files[offset : offset + limit] if limit is not None else files
-
-    # Phase 2: expensive stat + sidecar load only for the page slice
-    now = _now_in_device_tz()
-    result: list[dict[str, Any]] = []
-    for f in page_files:
-        full_path = os.path.join(history_dir, f)
-        try:
-            mtime = os.path.getmtime(full_path)
-            size = os.path.getsize(full_path)
-        except Exception:
-            # Skip files that were deleted or cannot be accessed
-            continue
-        # Try to load sidecar metadata (JSON) if present
-        meta: dict[str, Any] = {}
-        try:
-            base, _ = os.path.splitext(f)
-            sidecar_path = os.path.join(history_dir, f"{base}{_EXT_JSON}")
-            if os.path.exists(sidecar_path):
-                with open(sidecar_path, encoding="utf-8") as fh:
-                    meta = json.load(fh) or {}
-        except Exception:
-            # Non-fatal; ignore malformed sidecar
-            meta = {}
-        try:
-            # Use device timezone for display
-            dt = datetime.fromtimestamp(mtime, tz=now.tzinfo)
-        except Exception:
-            dt = datetime.fromtimestamp(mtime, tz=UTC)
-        result.append(
-            {
-                "filename": f,
-                "mtime": mtime,
-                "mtime_str": dt.strftime("%b %d, %Y %I:%M %p")
-                .lstrip("0")
-                .replace(" 0", " "),
-                "size": size,
-                "size_str": _format_size(size),
-                "meta": meta,
-                # Day-grouping + source-filter fields (History v2)
-                "date_key": dt.strftime("%Y-%m-%d"),
-                "day_label": _day_label(dt, now),
-                "category": (
-                    "playlist" if meta.get("refresh_type") == "Playlist" else "manual"
-                ),
-            }
-        )
-    return result, total
-
-
-def _group_images_by_day(images: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Group a newest-first image list into consecutive same-day buckets.
-
-    Images arrive sorted by mtime descending, so consecutive grouping keeps
-    that order while producing one section per calendar day.
-    """
-    groups: list[dict[str, Any]] = []
-    for img in images:
-        if not groups or groups[-1]["date_key"] != img["date_key"]:
-            groups.append(
-                {
-                    "date_key": img["date_key"],
-                    "label": img["day_label"],
-                    "entries": [],
-                }
-            )
-        groups[-1]["entries"].append(img)
-    return groups
-
-
-def _resolve_history_entry_path(history_dir: str, expected_name: str) -> str | None:
-    """Return the real path for *expected_name* if it exists in *history_dir*.
-
-    The lookup only considers entries that come from ``os.listdir`` and then
-    performs a containment check against the resolved history directory.  That
-    keeps downstream filesystem operations from reconstructing paths directly
-    from request data.
-    """
-    try:
-        entries = os.listdir(history_dir)
-    except OSError:
-        return None
-
-    real_history_dir = os.path.realpath(history_dir)
-    for entry in entries:
-        if entry != expected_name:
-            continue
-        full = os.path.join(history_dir, entry)
-        try:
-            real_full = os.path.realpath(full)
-        except OSError:
-            return None
-        try:
-            common = os.path.commonpath([real_history_dir, real_full])
-        except ValueError:
-            return None
-        if common != real_history_dir:
-            return None
-        if os.path.isfile(real_full):
-            return real_full
-        return None
-    return None
-
-
-def _remove_history_entry_by_name(history_dir: str, expected_name: str) -> None:
-    """Delete a history entry by basename after resolving it safely."""
-    real_full = _resolve_history_entry_path(history_dir, expected_name)
-    if real_full is None:
-        return
-    os.remove(real_full)
-
-
-def _remove_sidecar_by_name(history_dir: str, expected_name: str) -> None:
-    """Delete an entry in *history_dir* whose basename equals *expected_name*."""
-    _remove_history_entry_by_name(history_dir, expected_name)
-
-
-def _resolve_history_path(history_dir: str, filename: str) -> str:
-    """Resolve a requested filename under history_dir and enforce containment.
-
-    Uses :func:`utils.security_utils.validate_file_path`, which resolves both
-    the candidate and the allowed directory via ``os.path.realpath`` and
-    rejects any path that escapes the allowed directory (including traversal
-    attempts using ``..`` or absolute paths, and symlink-based escapes).
-
-    A :class:`ValueError` is raised on rejection.  Callers that also need to
-    reject embedded NUL bytes should do so before calling this helper; we
-    defensively raise here too since ``os.path`` behaviour on NUL varies.
-    """
-    if "\x00" in filename:
-        raise ValueError(_ERR_INVALID_FILENAME)
-    # Reject absolute paths up-front — joining them with ``history_dir``
-    # silently drops the base on POSIX, which would mask traversal intent.
-    if os.path.isabs(filename):
-        raise ValueError(_ERR_INVALID_FILENAME)
-    # Accept only plain filenames (no directory components).
-    if os.path.basename(filename) != filename:
-        raise ValueError(_ERR_INVALID_FILENAME)
-    if filename in {".", ".."}:
-        raise ValueError(_ERR_INVALID_FILENAME)
-    candidate = os.path.join(history_dir, filename)
-    try:
-        return validate_file_path(candidate, history_dir)
-    except ValueError as exc:
-        raise ValueError(_ERR_INVALID_FILENAME) from exc
-
-
-def _validate_and_resolve_history_file(
-    history_dir: str, filename: str
-) -> tuple[str | None, str | None]:
-    """Validate and resolve a history filename to a safe absolute path.
-
-    Returns ``(safe_path, None)`` on success, or ``(None, err_code)`` where
-    ``err_code`` is one of the ``_ERRCODE_*`` sentinels. Callers convert the
-    code to a response via :func:`_filename_error_response` so that only
-    module-level constant strings flow into ``json_error`` (CodeQL
-    py/reflective-xss).
-    """
-    try:
-        _resolve_history_path(history_dir, filename)
-    except ValueError:
-        logger.warning(
-            "history: invalid filename rejected filename=%s",
-            sanitize_log_field(filename),
-        )
-        return None, _ERRCODE_INVALID_FILENAME
-    safe_path = _resolve_history_entry_path(history_dir, filename)
-    if safe_path is None:
-        logger.warning(
-            "history: file not found filename=%s",
-            sanitize_log_field(filename),
-        )
-        return None, _ERRCODE_FILE_NOT_FOUND
-    return safe_path, None
 
 
 def _parse_filename_from_request() -> tuple[str | None, str | None]:
@@ -352,9 +101,6 @@ def _parse_filename_from_request() -> tuple[str | None, str | None]:
     return filename, None
 
 
-_DEFAULT_PER_PAGE = 24
-
-
 def _latest_metrics(device_config: Any) -> dict[str, Any]:
     """Per-stage latencies from the most recent refresh (None when absent)."""
     try:
@@ -372,37 +118,6 @@ def _latest_metrics(device_config: Any) -> dict[str, Any]:
             "preprocess_ms": None,
             "display_ms": None,
         }
-
-
-def _storage_context(history_dir: str) -> dict[str, Any]:
-    """Storage usage for the filesystem containing *history_dir*."""
-    free_bytes = None
-    total_bytes = None
-    used_bytes = None
-    pct_free = None
-    try:
-        usage = shutil.disk_usage(history_dir)
-        total_bytes = int(usage.total)
-        free_bytes = int(usage.free)
-        used_bytes = int(usage.used)
-        pct_free = (
-            (free_bytes / total_bytes * 100.0)
-            if (total_bytes and total_bytes > 0)
-            else None
-        )
-    except Exception:
-        logger.exception("Failed to stat filesystem for history directory")
-
-    gb = 1024**3
-    return {
-        "free_bytes": free_bytes,
-        "total_bytes": total_bytes,
-        "used_bytes": used_bytes,
-        "pct_free": pct_free,
-        "free_gb": round(free_bytes / gb, 2) if free_bytes is not None else None,
-        "total_gb": round(total_bytes / gb, 2) if total_bytes is not None else None,
-        "used_gb": round(used_bytes / gb, 2) if used_bytes is not None else None,
-    }
 
 
 def _panel_thumb_ratio(device_config: Any) -> str | None:
@@ -442,7 +157,10 @@ def history_page() -> Response | str:
         per_page = _DEFAULT_PER_PAGE
 
     start = (page - 1) * per_page
-    images, total = _list_history_images(history_dir, offset=start, limit=per_page)
+    now = _now_in_device_tz()
+    images, total = history_files.list_images(
+        history_dir, offset=start, limit=per_page, now=now
+    )
     total_pages = max(1, (total + per_page - 1) // per_page)
 
     # Clamp upper bound: ?page=99999 should render the last valid page rather
@@ -452,16 +170,16 @@ def history_page() -> Response | str:
         page = total_pages
         start = (page - 1) * per_page
         if total > 0:
-            images, total = _list_history_images(
-                history_dir, offset=start, limit=per_page
+            images, total = history_files.list_images(
+                history_dir, offset=start, limit=per_page, now=now
             )
 
     template_ctx = {
         "images": images,
-        "groups": _group_images_by_day(images),
+        "groups": history_files.group_by_day(images),
         "thumb_ratio": _panel_thumb_ratio(device_config),
         "thumb_width": _GRID_THUMB_WIDTH,
-        "storage": _storage_context(history_dir),
+        "storage": history_files.storage_context(history_dir),
         "metrics": _latest_metrics(device_config),
         "page": page,
         "total_pages": total_pages,
@@ -482,7 +200,7 @@ def history_image(filename: str) -> Response | JsonResponse:
     device_config = current_app.config[_CONFIG_KEY]
     history_dir = device_config.history_image_dir
     try:
-        _resolve_history_path(history_dir, filename)
+        history_files.resolve_requested_path(history_dir, filename)
     except ValueError:
         return json_error(_ERR_INVALID_FILENAME, status=400)
     width: int | None = None
@@ -512,7 +230,7 @@ def history_redisplay() -> ResponseReturnValue:
 
         if filename is None:
             return _filename_error_response(_ERRCODE_FILENAME_REQUIRED)
-        _safe_path, err_code = _validate_and_resolve_history_file(history_dir, filename)
+        _safe_path, err_code = history_files.find_entry(history_dir, filename)
         if err_code is not None:
             return _filename_error_response(err_code)
 
@@ -546,31 +264,18 @@ def history_delete() -> ResponseReturnValue:
 
         if filename is None:
             return _filename_error_response(_ERRCODE_FILENAME_REQUIRED)
-        safe_path, err_code = _validate_and_resolve_history_file(history_dir, filename)
+        safe_path, err_code = history_files.find_entry(history_dir, filename)
         if err_code is not None:
             return _filename_error_response(err_code)
 
         safe_path = cast(str, safe_path)
-        _base, ext = os.path.splitext(safe_path)
-        if not ext.lower().endswith((_EXT_PNG, _EXT_JSON)):
+        if not history_files.is_deletable(safe_path):
             return json_error(
                 "unsupported file type",
                 status=400,
                 details={"hint": "Only .png and .json history files may be deleted."},
             )
-
-        os.remove(safe_path)
-        # Remove the matching sidecar, if present.  Rather than constructing a
-        # new path from user-derived data, enumerate the history directory and
-        # pick the entry whose basename matches the expected sidecar name.
-        # This way the value passed to ``os.remove`` originates from
-        # ``os.listdir`` (which is not user-controlled) and CodeQL cannot
-        # taint-track it back to the request body.
-        expected_stem = os.path.splitext(os.path.basename(safe_path))[0]
-        sidecar_ext = _EXT_JSON if ext.lower() == _EXT_PNG else _EXT_PNG
-        expected_sidecar_name = expected_stem + sidecar_ext
-        _remove_history_entry_by_name(history_dir, os.path.basename(safe_path))
-        _remove_sidecar_by_name(history_dir, expected_sidecar_name)
+        history_files.delete_entry(history_dir, safe_path)
         return json_success("Deleted")
     except Exception:
         logger.exception("Error deleting history image")
@@ -587,12 +292,7 @@ def history_clear() -> ResponseReturnValue:
     device_config = current_app.config[_CONFIG_KEY]
     history_dir = device_config.history_image_dir
     try:
-        count = 0
-        for f in os.listdir(history_dir):
-            p = os.path.join(history_dir, f)
-            if os.path.isfile(p) and f.lower().endswith((_EXT_PNG, _EXT_JSON)):
-                os.remove(p)
-                count += 1
+        count = history_files.clear(history_dir)
         return json_success(f"Cleared {count} images")
     except Exception:
         logger.exception("Error clearing history images")
@@ -600,94 +300,6 @@ def history_clear() -> ResponseReturnValue:
             "clear history",
             details={"hint": "Check history directory permissions."},
         )
-
-
-_CSV_HEADERS = [
-    "timestamp",
-    "plugin_id",
-    "instance_name",
-    "status",
-    "duration_ms",
-    "error_message",
-]
-
-
-def _iter_history_csv(history_dir: str) -> Iterator[bytes]:
-    """Yield CSV rows (as bytes) for every history entry, newest first.
-
-    Each PNG in *history_dir* produces one row.  The sidecar JSON is read for
-    metadata; missing fields default to an empty string.
-    """
-    buf = io.StringIO()
-    writer = csv.writer(buf)
-    writer.writerow(_CSV_HEADERS)
-    buf.seek(0)
-    yield buf.getvalue().encode("utf-8")
-
-    try:
-        files = [
-            f
-            for f in os.listdir(history_dir)
-            if os.path.isfile(os.path.join(history_dir, f))
-            and f.lower().endswith(_EXT_PNG)
-        ]
-    except Exception:
-        logger.exception("CSV export: failed to list history directory")
-        return
-
-    # Sort newest first (mirrors _list_history_images ordering)
-    def _safe_mtime(path: str) -> float:
-        try:
-            return os.path.getmtime(path)
-        except Exception:
-            return 0.0
-
-    files.sort(
-        key=lambda f: (
-            _safe_mtime(os.path.join(history_dir, f)),
-            _timestamp_from_history_filename(f),
-            f,
-        ),
-        reverse=True,
-    )
-
-    for f in files:
-        full_path = os.path.join(history_dir, f)
-        try:
-            mtime = os.path.getmtime(full_path)
-        except Exception:
-            continue
-
-        meta: dict[str, Any] = {}
-        try:
-            base, _ = os.path.splitext(f)
-            sidecar_path = os.path.join(history_dir, f"{base}{_EXT_JSON}")
-            if os.path.exists(sidecar_path):
-                with open(sidecar_path, encoding="utf-8") as fh:
-                    meta = json.load(fh) or {}
-        except Exception:
-            meta = {}
-
-        # Prefer the ISO timestamp stored in the sidecar; fall back to mtime.
-        timestamp = (
-            meta.get("refresh_time")
-            or datetime.fromtimestamp(mtime, tz=UTC).isoformat()
-        )
-
-        row = [
-            timestamp,
-            meta.get("plugin_id", ""),
-            meta.get("plugin_instance", ""),
-            meta.get("status", ""),
-            meta.get("duration_ms", ""),
-            meta.get("error_message", ""),
-        ]
-
-        buf = io.StringIO()
-        writer = csv.writer(buf)
-        writer.writerow(row)
-        buf.seek(0)
-        yield buf.getvalue().encode("utf-8")
 
 
 @history_bp.route("/history/export.csv", methods=["GET"])
@@ -704,7 +316,7 @@ def history_export_csv() -> Response:
     filename = f"inkypi-history-{date_str}.csv"
 
     return Response(
-        _iter_history_csv(history_dir),
+        history_files.iter_csv(history_dir),
         status=200,
         mimetype="text/csv",
         headers={
@@ -723,28 +335,7 @@ def history_storage() -> ResponseReturnValue:
     device_config = current_app.config[_CONFIG_KEY]
     history_dir = device_config.history_image_dir
     try:
-        usage = shutil.disk_usage(history_dir)
-        total_bytes = int(usage.total)
-        free_bytes = int(usage.free)
-        used_bytes = int(usage.used)
-        pct_free = (
-            (free_bytes / total_bytes * 100.0)
-            if (total_bytes and total_bytes > 0)
-            else None
-        )
-
-        gb = 1024**3
-        return (
-            jsonify(
-                {
-                    "free_gb": round(free_bytes / gb, 2),
-                    "total_gb": round(total_bytes / gb, 2),
-                    "used_gb": round(used_bytes / gb, 2),
-                    "pct_free": round(pct_free, 2) if pct_free is not None else None,
-                }
-            ),
-            200,
-        )
+        return jsonify(history_files.storage_summary(history_dir)), 200
     except Exception:
         logger.exception("Failed to stat filesystem for history directory")
         return cast(

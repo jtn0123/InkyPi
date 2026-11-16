@@ -2,9 +2,11 @@
 (ISSUE-009).
 
 Without `max`, users could type 999999 hours, click Save, and only then learn
-the server's "less than 24 hours" cap when the request returned 422. The fix
-sets `max` dynamically on the `#interval` input based on which `#unit` is
-selected (23 for hours, 1439 for minutes).
+the server's cap when the request returned 422. The fix sets `max`
+dynamically on the `#interval` input based on which `#unit` is selected. The
+cap itself is the config schema's maximum for plugin_cycle_interval_seconds,
+which the page passes in as ``pluginCycleIntervalMaxSeconds`` (checked in
+tests/unit/test_settings_schema_rules.py).
 """
 
 import re
@@ -35,17 +37,14 @@ def test_form_js_caps_interval_max_per_unit() -> None:
     assert fn_match, "helper body not found"
     body = fn_match.group("body")
     assert '"hour"' in body, "must distinguish hours specifically"
-    # Hours: 23 (server allows < 24 hours). Minutes: 1439 (= 23h59).
-    # Match the actual return statements rather than a bare `" 23"` /
-    # `"1439"` substring, because comments inside the helper happen to
-    # mention "23h59" / "1439" — a regression that dropped the literal
-    # `return 23;` would otherwise still pass on comment text alone.
-    assert re.search(
-        r"return\s+23\b", body
-    ), "hour branch must `return 23` (server cap is < 24 hours)"
-    assert re.search(
-        r"return\s+1439\b", body
-    ), "minute branch must `return 1439` (server cap is < 24h = 1440 min)"
+    # The cap comes from the page's boot config (the schema's maximum), not a
+    # literal in the script, so the form cannot drift from the saver again.
+    assert (
+        "config.pluginCycleIntervalMaxSeconds" in body
+    ), "the cap must come from the schema maximum the page passes in"
+    assert not re.search(
+        r"return\s+\d+\s*;", body
+    ), "no hard-coded cap: derive it from pluginCycleIntervalMaxSeconds"
 
 
 def test_unit_change_listener_refreshes_max() -> None:

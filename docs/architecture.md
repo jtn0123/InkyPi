@@ -64,7 +64,7 @@ flowchart TD
    - `/update_now`, `/display-next`, `/display_next_in_playlist` and `/display_plugin_instance` call `RefreshTask.manual_update()`. It queues a request for the refresh thread and blocks until the rendered image is saved to disk (not until the slower panel write finishes). It waits twice, each time for the plugin's whole render budget (every attempt the retry policy allows, plus 30 s): once for the loop to take the request, then for the image. A request the loop never took is withdrawn and reported as busy (503 `refresh_loop_busy`). Giving up on a render that is still running reports a timeout (504) but records no plugin failure, because the render records its own outcome when it ends.
    - Blackout and history redisplay call `RefreshTask.run_display_command()`, which runs a callable against `DisplayManager` on the refresh thread.
    - `/update_now` with `X-Async: true` (or `?async=1`) enqueues the same work on a small thread pool (`refresh_task/job_queue.py`) and returns 202 with a job id to poll at `/api/job/<job_id>`, and `wait_s`, the longest that job can take, so the page waits that long before it reports a timeout.
-5. When the refresh thread is not running (web-only mode), `/update_now` and `/display-next` call `generate_image()` in the request thread and push the result to `DisplayManager` themselves (`services/direct_render.py` holds the outcome handling for `/update_now`).
+5. When the refresh thread is not running (web-only mode), `/update_now` and `/display-next` call `generate_image()` in the request thread and push the result to `DisplayManager` themselves. Both use `services/direct_render.py` for the outcome, so they answer a failure with the same status and code, and a plugin that returns no image is a 200 that leaves the panel alone, as in the refresh loop.
 6. HTML responses are rendered with Jinja2 from `src/templates/` (and plugin templates under `src/plugins/`). JSON responses use the envelope helpers in `utils/api_responses.py`.
 
 ## Refresh flow (background)
@@ -120,7 +120,7 @@ Single modules cover the rest: `main` (dashboard, previews, `/display-next`, `/r
 
 Logic the blueprints call directly, kept out of the route modules:
 
-- Flask-free workflows: `plugin_workflows` (saving plugin settings and the saved-settings instance), `playlist_workflows` (adding an instance to a playlist and validating its settings), and `direct_render` (the outcome policy for a `/update_now` render that runs outside the refresh loop).
+- Flask-free workflows: `plugin_workflows` (saving plugin settings and the saved-settings instance), `playlist_workflows` (adding an instance to a playlist and validating its settings), `direct_render` (the outcome policy for a `/update_now` or `/display-next` render that runs outside the refresh loop), and `history` (listing, deleting and exporting the display history files, and the disk-use figures; the `history` blueprint only parses requests and shapes responses).
 - Behind the settings routes: `updates` (finding and validating the update and rollback scripts, launching them with `systemd-run` or a simulated thread off-device, and the in-memory update state and lock), `logs` (journal reads, and the in-memory buffer that stands in for the journal in dev mode; it reads the device timezone from the Flask app context) and `version_check` (the cached GitHub latest-release check behind `/api/version`). Tests patch names on these modules, for example `services.updates._systemd_available`.
 
 ### `src/refresh_task/`
@@ -147,7 +147,7 @@ One directory per plugin (`<id>/<id>.py`, `plugin-info.json`, templates and asse
 
 ### `src/config.py`, `src/model.py`, `src/config/`
 
-`Config` and the playlist models (see "Config and storage"). `src/config/` holds the JSON Schemas for `device.json` (enforced on load by `utils/config_schema.py`) and `plugin-info.json`, `logging.conf`, and `device_dev.json`.
+`Config` and the playlist models (see "Config and storage"). `src/config/` holds the JSON Schemas for `device.json` and `plugin-info.json`, `logging.conf`, and `device_dev.json`. `utils/config_schema.py` enforces the device schema when the config loads, on every write and in the updater's preflight, and the settings form reads its allowed values, ranges, name limits and safe-reset defaults from the same schema, so a rule changes in one place.
 
 ### `src/benchmarks/`
 

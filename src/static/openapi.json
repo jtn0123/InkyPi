@@ -252,7 +252,7 @@
           "Display"
         ],
         "summary": "Advance to next plugin in playlist",
-        "description": "Triggers an immediate display refresh, advancing to the next eligible plugin in the active playlist. Rate-limited to prevent rapid successive calls.",
+        "description": "Triggers an immediate display refresh, advancing to the next eligible plugin in the active playlist. Rate-limited to prevent rapid successive calls. A plugin that returns no image (a control-only plugin) completes with 200 and metrics {\"no_image\": true}, leaving the display unchanged. Known render failures answer like /update_now: 409 blackout, 422 rejected URL, 503 renderer unavailable, 504 timeout, each with a code.",
         "operationId": "displayNext",
         "responses": {
           "200": {
@@ -278,8 +278,14 @@
           "400": {
             "$ref": "#/components/responses/BadRequest"
           },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
           "429": {
             "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
           }
         }
       }
@@ -1675,6 +1681,10 @@
           "display_ms": {
             "type": "integer",
             "nullable": true
+          },
+          "no_image": {
+            "type": "boolean",
+            "description": "Present and true when the plugin returned no image and the display was left unchanged"
           }
         }
       },

@@ -13,7 +13,7 @@ from typing import Any, cast
 from dotenv import dotenv_values, set_key, unset_key
 
 from model import PlaylistManager, RefreshInfo
-from utils.config_schema import validate_device_config
+from utils.config_schema import truncate_device_name, validate_device_config
 from utils.paths import (
     BASE_DIR as _PATHS_BASE_DIR,
     CURRENT_IMAGE_FILE as _DEFAULT_CURRENT_IMAGE,
@@ -33,20 +33,6 @@ _ConfigSnapshot = tuple[
 ]
 
 _DEVICE_JSON = "device.json"
-
-# JTN-777: mirror the 64-character cap enforced by /save_settings
-# (see blueprints/settings/_config.py::_DEVICE_NAME_MAX_LEN — JTN-746).
-# Legacy device.local.json files edited before the cap existed can still
-# contain names longer than 64 chars. Those values would otherwise leak
-# unbounded into <title>, title=, and alt= render sites (where CSS cannot
-# truncate). Coerce at config-load time so every consumer — templates,
-# screen readers, tab titles — sees a sane value.
-# Cap enforced by the server on /save_settings (JTN-746) and re-applied at
-# config-load time (JTN-777) to coerce stale on-disk values from before the cap
-# existed. The limit is measured in Unicode code points, matching the
-# server-side cap — grapheme-aware segmentation is intentionally not used so
-# client and server agree on the boundary.
-_DEVICE_NAME_MAX_LEN = 64
 
 _SENSITIVE_TERMS = ("secret", "token", "api", "key", "password")
 
@@ -81,38 +67,6 @@ def _mask_config_value(value: Any) -> Any:
             else "***"
         )
     return "<omitted>"
-
-
-def _coerce_device_name(config: dict[str, Any]) -> bool:
-    """Truncate ``config['name']`` to ``_DEVICE_NAME_MAX_LEN`` characters in place.
-
-    Returns True if the name was truncated. Non-string values are left
-    unchanged (schema validation has already run and should reject them);
-    this branch is defensive and returns False.
-
-    Logs a warning on truncation so operators know the stored value exceeded
-    the render-safe cap.
-
-    The on-disk config is not rewritten here; callers that subsequently invoke
-    :meth:`Config.write_config` will flush the coerced value naturally. The
-    original value is preserved on disk until that happens.
-    """
-    name = config.get("name")
-    if not isinstance(name, str):
-        # JSON schema allows any string, and the validator has already run.
-        # Non-strings shouldn't reach here, but be defensive.
-        return False
-    if len(name) <= _DEVICE_NAME_MAX_LEN:
-        return False
-    truncated = name[:_DEVICE_NAME_MAX_LEN]
-    logger.warning(
-        "device_name_truncated: stored name is %d chars; truncating to %d "
-        "(JTN-777). Re-save settings to persist the coerced value.",
-        len(name),
-        _DEVICE_NAME_MAX_LEN,
-    )
-    config["name"] = truncated
-    return True
 
 
 def _summarize_playlist(pl: dict[str, Any]) -> dict[str, Any]:
@@ -364,13 +318,13 @@ class Config:
             with open(self.config_file) as f:
                 config = cast(dict[str, Any], json.load(f))
 
+            # JTN-777: a name saved before the length cap existed would fail
+            # the schema's maxLength, so cut it first and keep the device
+            # starting. The next config write persists the shorter name.
+            truncate_device_name(config)
+
             # Validate against JSON Schema — raises ConfigValidationError on failure
             validate_device_config(config)
-
-            # JTN-777: coerce oversize legacy device names to the same 64-char
-            # cap enforced by /save_settings. Done after schema validation so
-            # the cap applies even if a user edited device.local.json directly.
-            _coerce_device_name(config)
 
             # Log a sanitized summary instead of full config to avoid leaking secrets
             try:

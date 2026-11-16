@@ -49,8 +49,8 @@ _BASE_CFG: dict[str, Any] = {
     },
 }
 
-# Mirror the cap imposed by Config._coerce_device_name (and by
-# /save_settings in blueprints/settings/_config.py). Kept as a literal here so
+# Mirror the schema maxLength that utils.config_schema.truncate_device_name (and
+# /save_settings) apply. Kept as a literal here so
 # the test module does not need a module-scope ``import config``.
 _CAP = 64
 
@@ -164,7 +164,7 @@ def test_name_at_or_under_cap_untouched(
     """Names with <=64 characters round-trip unchanged through read_config.
 
     The empty-string case is deliberately excluded: whether "" is legal is a
-    question for :func:`validate_device_config`, not :func:`_coerce_device_name`.
+    question for :func:`validate_device_config`, not :func:`truncate_device_name`.
     Conflating the two would produce a false pass/fail depending on schema
     strictness. Validation behaviour is covered in other test modules.
     """

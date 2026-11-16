@@ -93,7 +93,7 @@ def test_history_delete_empty_filename(client: FlaskClient) -> None:
 
 
 def test_history_image_invalid_filename_not_reflected(client: FlaskClient) -> None:
-    # ``history_image`` uses ``_resolve_history_path`` directly and returns
+    # ``history_image`` uses ``resolve_requested_path`` directly and returns
     # ``_ERR_INVALID_FILENAME``; confirm traversal attempts don't reflect.
     resp = client.get("/history/image/%3Cscript%3Ealert(1)%3C%2Fscript%3E")
     # Depending on routing, Flask may 400/404; either way, no reflection.

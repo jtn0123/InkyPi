@@ -204,6 +204,27 @@ class TestConfigGate:
         assert "failed schema validation" in err
         assert "orientation" in err
 
+    def test_long_legacy_name_passes_like_the_app_loads_it(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        # The schema caps the name, but the app cuts a longer legacy name on
+        # load (JTN-777), so the gate must not refuse the update over it.
+        repo = _make_repo(
+            tmp_path / "repo", config={"display_type": "mock", "name": "N" * 300}
+        )
+        rc, _, err = _run(repo, capsys=capsys)
+        assert rc == pf.EXIT_OK, err
+
+    def test_name_with_a_control_character_fails(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        repo = _make_repo(
+            tmp_path / "repo", config={"display_type": "mock", "name": "two\nlines"}
+        )
+        rc, _, err = _run(repo, capsys=capsys)
+        assert rc == pf.EXIT_FAILED
+        assert "name" in err
+
     def test_invalid_json_fails(
         self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
     ) -> None:
