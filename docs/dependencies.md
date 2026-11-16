@@ -36,6 +36,11 @@ uv export --format requirements.txt --group dev --no-emit-project \
     --output-file install/requirements-dev.txt
 ```
 
+The release tools (Python Semantic Release, GitPython's patched floor and
+cyclonedx-bom) are a separate `release` group, which `dev` includes. The
+release workflow installs only that group, exported from `uv.lock` with hashes,
+because that job can push tags and publish releases.
+
 The lock must satisfy `required-environments`, which includes the 32-bit ARM
 Pis. A dev tool with no build for them (Playwright) carries a
 `platform_machine` marker so those environments skip it. uv 0.13.4 is pinned in
@@ -45,12 +50,35 @@ the dev group and the CI/release steps for consistent resolution.
 matches `uv.lock`. Commit `pyproject.toml`, `uv.lock` and both exports together,
 then run `pip check` and the test and strict mypy gates.
 
+## Installer requirement files
+
+`install.sh` and `update.sh` install three small hashed files as root before
+the app's own requirements: `install/bootstrap-requirements.txt` (pip,
+setuptools, wheel, packaging), `install/uv-requirements.txt` (uv) and
+`install/ws-requirements.txt` (the Waveshare GPIO libraries). Each is compiled
+from the `.in` file next to it, which holds the pins. They aren't exported from
+`uv.lock`, so Dependabot never updates them. To change one, edit its `.in`
+file, then regenerate the `.txt` (shown for `bootstrap`):
+
+```bash
+uv --no-config pip compile --universal --python-version 3.13 \
+    --prerelease disallow --generate-hashes --no-header --no-annotate \
+    install/bootstrap-requirements.in --output-file install/bootstrap-requirements.txt
+```
+
+`scripts/check_requirements_drift.sh` fails when a `.txt` doesn't match its
+`.in`, when a package also in `uv.lock` (pip, packaging, uv) has a different
+version or a hash the lock doesn't list, or when two of the files pin one
+package differently (`scripts/check_install_pins.py`). CI's security job runs
+pip-audit on all three.
+
 ## Compatibility constraints
 
 - `pydantic-core` follows Pydantic's exact pin. Google GenAI currently caps
   `websockets` below 17. Upgrade through their parent libraries.
 - Requests type stubs are explicitly pinned to a version validated by mypy.
-- Python Semantic Release is pinned in both the dev group and release workflow.
+- Python Semantic Release is pinned in the `release` group; the release
+  workflow installs it from the lock.
   Its v10 changelog uses update mode and the `<!-- version list -->` marker;
   keep that marker above the existing releases. The parser options preserve
   the previous squash-commit behavior.

@@ -2925,7 +2925,8 @@ class TestMemoryDiffWorkflow:
     def test_memray_listed_in_the_dev_dependency_group(self) -> None:
         pyproject = tomllib.loads((INSTALL_DIR.parent / "pyproject.toml").read_text())
         assert any(
-            req.startswith("memray") for req in pyproject["dependency-groups"]["dev"]
+            isinstance(req, str) and req.startswith("memray")
+            for req in pyproject["dependency-groups"]["dev"]
         ), (
             "memray must be in pyproject.toml's dev dependency group so the "
             "memory-diff workflow can install it from the lockfile."

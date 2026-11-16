@@ -1,5 +1,6 @@
 # pyright: reportMissingImports=false
 import importlib
+import ipaddress
 import json
 import os
 import sys
@@ -76,6 +77,8 @@ UI_BROWSER_TESTS = {
     "test_client_error_reporting_e2e.py",
     # Scripted scrolls jump instead of animating under "reduce motion".
     "test_reduced_motion_scroll.py",
+    # "Increase contrast" switches every theme to the high-contrast colours.
+    "test_high_contrast_mode.py",
     # JTN-703 two-minute click loop. Still opt-in with SKIP_LOAD=0, which the
     # browser-full CI job sets only on the nightly schedule.
     "test_sustained_load.py",
@@ -336,6 +339,111 @@ def public_dns(monkeypatch: pytest.MonkeyPatch) -> None:
         ]
 
     monkeypatch.setattr(socket, "getaddrinfo", _resolve)
+
+
+@pytest.fixture()
+def lan_address(monkeypatch: pytest.MonkeyPatch) -> str:
+    """Give the startup screen a fixed LAN address instead of asking the OS.
+
+    ``get_ip_address`` finds the address by pointing a UDP socket at a
+    public IP, which ``no_outside_network`` refuses.
+    """
+    from utils import app_utils
+
+    monkeypatch.setattr(app_utils, "get_ip_address", lambda: "192.168.1.50")
+    return "192.168.1.50"
+
+
+class NetworkBlocked(OSError):
+    """A test tried to reach a host other than this machine."""
+
+
+# What no_outside_network refused during the current test, so a test of the
+# guard itself can read and clear it.
+NETWORK_ATTEMPTS = pytest.StashKey[list[str]]()
+
+
+def _names_this_machine(host: Any) -> bool:
+    """True for loopback, the unspecified address, or no host at all."""
+    if host is None:
+        return True
+    name = (host.decode() if isinstance(host, bytes) else str(host)).split("%")[0]
+    if name in ("", "localhost"):
+        return True
+    try:
+        address = ipaddress.ip_address(name)
+    except ValueError:
+        return False
+    return address.is_loopback or address.is_unspecified
+
+
+def _is_ip_literal(host: Any) -> bool:
+    name = (host.decode() if isinstance(host, bytes) else str(host)).split("%")[0]
+    try:
+        ipaddress.ip_address(name)
+    except ValueError:
+        return False
+    return True
+
+
+@pytest.fixture(autouse=True)
+def no_outside_network(
+    request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
+) -> Iterator[None]:
+    """Fail a test that tries to reach any host but this machine.
+
+    A test that forgets a stub would otherwise call the real internet: slow,
+    flaky offline and rate-limited. Connections to loopback and Unix sockets
+    still work, and so do DNS lookups of local names and IP literals. Any
+    other connect or lookup raises ``NetworkBlocked`` (an ``OSError``, so the
+    code under test sees what it would see offline) and the test fails at
+    teardown even if that code swallowed the error. Chromium runs in its own
+    process and is not affected. Mark a test ``allow_network`` to opt out;
+    ``public_dns`` still replaces the lookup for tests that use it.
+    """
+    if request.node.get_closest_marker("allow_network"):
+        yield
+        return
+
+    import socket
+
+    attempts: list[str] = []
+    request.node.stash[NETWORK_ATTEMPTS] = attempts
+    real_connect = socket.socket.connect
+    real_connect_ex = socket.socket.connect_ex
+    real_getaddrinfo = socket.getaddrinfo
+
+    def _refuse(what: str) -> NetworkBlocked:
+        attempts.append(what)
+        return NetworkBlocked(
+            f"{what}: tests may only reach this machine "
+            "(stub the call, or mark the test allow_network)"
+        )
+
+    def connect(self: socket.socket, address: Any) -> None:
+        if isinstance(address, tuple) and not _names_this_machine(address[0]):
+            raise _refuse(f"connect to {address[0]}:{address[1]}")
+        real_connect(self, address)
+
+    def connect_ex(self: socket.socket, address: Any) -> int:
+        if isinstance(address, tuple) and not _names_this_machine(address[0]):
+            raise _refuse(f"connect to {address[0]}:{address[1]}")
+        return real_connect_ex(self, address)
+
+    def getaddrinfo(host: Any, *args: Any, **kwargs: Any) -> Any:
+        if not (_names_this_machine(host) or _is_ip_literal(host)):
+            raise _refuse(f"DNS lookup of {host}")
+        return real_getaddrinfo(host, *args, **kwargs)
+
+    monkeypatch.setattr(socket.socket, "connect", connect)
+    monkeypatch.setattr(socket.socket, "connect_ex", connect_ex)
+    monkeypatch.setattr(socket, "getaddrinfo", getaddrinfo)
+    yield
+    if attempts:
+        pytest.fail(
+            "test tried to reach the network: " + "; ".join(sorted(set(attempts))),
+            pytrace=False,
+        )
 
 
 @pytest.fixture(scope="session")

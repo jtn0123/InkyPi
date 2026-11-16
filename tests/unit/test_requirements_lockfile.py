@@ -37,9 +37,19 @@ def _pinned_versions(path: Path) -> set[str]:
 
 
 def _dev_group() -> list[str]:
-    """The `dev` list under [dependency-groups] in pyproject.toml."""
+    """The `dev` list under [dependency-groups], with included groups expanded."""
     groups = tomllib.loads(PYPROJECT.read_text())["dependency-groups"]
-    return [str(req) for req in groups["dev"]]
+
+    def expand(name: str) -> list[str]:
+        out: list[str] = []
+        for entry in groups[name]:
+            if isinstance(entry, dict):
+                out += expand(entry["include-group"])
+            else:
+                out.append(str(entry))
+        return out
+
+    return expand("dev")
 
 
 # Lines that begin a pinned package block (package==version \\)

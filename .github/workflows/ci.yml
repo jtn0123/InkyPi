@@ -470,6 +470,13 @@ jobs:
             --output artifacts/security/pip-audit-runtime.json
           python -m pip_audit -r install/requirements-dev.txt --format=json \
             --output artifacts/security/pip-audit-dev.json
+          # What install.sh and update.sh install as root before the app's
+          # own requirements. Fully pinned and hashed, so pip-audit checks
+          # the pins without installing anything.
+          for name in bootstrap uv ws; do
+            python -m pip_audit --disable-pip -r "install/${name}-requirements.txt" \
+              --format=json --output "artifacts/security/pip-audit-${name}.json"
+          done
       - name: Generate SBOM
         run: |
           python_path="$(python -c 'import sys; print(sys.executable)')"

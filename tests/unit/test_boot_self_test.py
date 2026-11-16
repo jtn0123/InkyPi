@@ -167,6 +167,7 @@ def test_maybe_run_runs_once_per_version(
     assert len(driver.images) == 2
 
 
+@pytest.mark.usefixtures("lan_address")
 def test_run_boot_display_tasks_runs_self_test_then_startup_image(
     flask_app: Any, monkeypatch: pytest.MonkeyPatch
 ) -> None:
