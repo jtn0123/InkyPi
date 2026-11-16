@@ -341,14 +341,26 @@ class TestRunSurvivesServiceRestart:
         assert data["running"] is True
         assert data["kind"] == "rollback"
 
+    # The timed-out unit's start time is filled in when the test runs, not in
+    # the parameter: a value read from the clock at collection can differ
+    # between xdist workers, which then refuse to run ("Different tests were
+    # collected").
     @pytest.mark.parametrize(
         "stdout",
         [
-            "",
-            "inkypi.service loaded active running InkyPi\n",
-            "inkypi-update-abc.service loaded active running\n",
-            "inkypi-update-123.service.evil loaded active running\n",
-            f"inkypi-update-{int(time.time()) - 4000}.service loaded active running\n",
+            pytest.param("", id="empty"),
+            pytest.param("inkypi.service loaded active running InkyPi\n", id="main"),
+            pytest.param(
+                "inkypi-update-abc.service loaded active running\n", id="not-a-time"
+            ),
+            pytest.param(
+                "inkypi-update-123.service.evil loaded active running\n",
+                id="suffixed",
+            ),
+            pytest.param(
+                "inkypi-update-{timed_out}.service loaded active running\n",
+                id="timed-out",
+            ),
         ],
     )
     def test_ignores_other_and_timed_out_units(
@@ -358,6 +370,7 @@ class TestRunSurvivesServiceRestart:
         monkeypatch: pytest.MonkeyPatch,
         stdout: str,
     ) -> None:
+        stdout = stdout.replace("{timed_out}", str(int(time.time()) - 4000))
         self._list_units(monkeypatch, stdout)
 
         data = client.get("/settings/update_status").get_json()
