@@ -193,6 +193,74 @@ setup_earlyoom_service() {
   echo "Enabling and starting earlyoom service."
   sudo apt-get install -y earlyoom > /dev/null
   sudo systemctl enable --now earlyoom
+  configure_earlyoom
+}
+
+# ---------------------------------------------------------------------------
+# earlyoom tuning (G7)
+#
+# On Raspberry Pi OS earlyoom is the memory guard that actually works: the
+# firmware boots the kernel with cgroup_disable=memory, so the MemoryHigh /
+# MemoryMax caps in memory.conf (below) are ignored. On its Debian defaults
+# earlyoom picks by oom_score alone, and on a Pi with a desktop session that
+# has meant killing 1-5 MiB user services (wireplumber, gvfsd) while the real
+# consumer kept running. So:
+#   --prefer  the Chromium processes that render plugins. Killing one costs a
+#             render (image_utils retries it), not the service.
+#   --avoid   PID 1 and the user managers (systemd), journald, and SSH, so the
+#             Pi stays reachable and keeps its logs.
+# earlyoom matches these against /proc/PID/comm, which is cut to 15 bytes:
+# chromium-headless-shell (the renderer image_utils prefers, and every one of
+# its zygote, GPU and renderer processes) shows up as "chromium-headle", and
+# systemd-journald as "systemd-journal". headless_shell and chrome are
+# Playwright's Chromium builds.
+#
+# -r 3600 is the Debian default memory-report interval. The regexes hold no
+# spaces, quotes or backslashes: systemd splits $EARLYOOM_ARGS at whitespace
+# in earlyoom.service's ExecStart=, and the init script expands it unquoted.
+# earlyoom 1.8 (Trixie) has --prefer and --avoid.
+# ---------------------------------------------------------------------------
+INKYPI_EARLYOOM_ARGS='-r 3600 --prefer ^(chromium|chromium-headle|headless_shell|chrome)$ --avoid ^(systemd|systemd-journal|sshd|sshd-session|sshd-auth)$'
+
+# configure_earlyoom — set EARLYOOM_ARGS in /etc/default/earlyoom and restart
+# earlyoom, only when the line changed. Other lines (Debian's comments and
+# examples) are kept. Rerunning install or update rewrites the line, so a
+# hand edit to it doesn't survive; put local changes in a systemd drop-in.
+#
+# Env overrides (tests):
+#   INKYPI_EARLYOOM_DEFAULTS — the defaults file. Defaults to /etc/default/earlyoom.
+configure_earlyoom() {
+  local defaults_file="${INKYPI_EARLYOOM_DEFAULTS:-/etc/default/earlyoom}"
+  local marker="# Set by InkyPi (install/_common.sh: configure_earlyoom)."
+  local wanted="EARLYOOM_ARGS=\"$INKYPI_EARLYOOM_ARGS\""
+  local current="" new_content
+
+  if [ -f "$defaults_file" ]; then
+    current=$(grep -E '^EARLYOOM_ARGS=' "$defaults_file" || true)
+  fi
+  if [ "$current" = "$wanted" ]; then
+    echo "earlyoom already prefers Chromium and avoids sshd, systemd and journald."
+    return 0
+  fi
+
+  # Replace the first EARLYOOM_ARGS line in place, or append one, and drop any
+  # later ones (the last assignment would win). ENVIRON, not awk -v, so
+  # nothing in the values is unescaped.
+  new_content=$(
+    if [ -f "$defaults_file" ]; then cat "$defaults_file"; fi |
+      MARKER="$marker" WANTED="$wanted" awk '
+        $0 == ENVIRON["MARKER"] { next }
+        /^EARLYOOM_ARGS=/ {
+          if (!done) { print ENVIRON["MARKER"]; print ENVIRON["WANTED"]; done = 1 }
+          next
+        }
+        { print }
+        END { if (!done) { print ENVIRON["MARKER"]; print ENVIRON["WANTED"] } }
+      '
+  )
+  printf '%s\n' "$new_content" | sudo tee "$defaults_file" > /dev/null
+  echo "Configured earlyoom to prefer Chromium and avoid sshd, systemd and journald."
+  sudo systemctl restart earlyoom
 }
 
 configure_persistent_journal() {
@@ -295,29 +363,35 @@ build_css_bundle() {
 # ---------------------------------------------------------------------------
 # Memory-cap tiering (JTN-785)
 #
-# Pi Zero 2 W (512 MB RAM) was being SIGKILLed by the cgroup OOM killer when
-# chromium-heavy plugins refreshed — the historical 250M/350M caps in the
-# base systemd unit were tighter than chromium + PIL + numpy resident set.
-# After 5 kills the JTN-671 StartLimitBurst=5 halted auto-restart and the
-# device went dark until manual `systemctl reset-failed`.
+# Best-effort only: Raspberry Pi OS turns the cgroup memory controller off.
+# The Pi firmware adds cgroup_disable=memory to the kernel command line, so
+# /sys/fs/cgroup/cgroup.controllers lists "cpuset cpu io pids" and systemd
+# ignores MemoryHigh= and MemoryMax=. The caps below take effect only where
+# the controller is on (another OS, or cgroup_enable=memory added to
+# cmdline.txt by hand). On a Pi the guards that work are earlyoom (tuned in
+# configure_earlyoom above) and OOMScoreAdjust=500 on the unit.
+# /api/diagnostics reports memory_controller.active, so you can check.
 #
-# Fix: detect total RAM at install/update time and scale the caps via a
-# systemd drop-in at /etc/systemd/system/inkypi.service.d/memory.conf. The
-# drop-in is a separate file so it (a) composes with any user-added drop-ins
-# (e.g. plugin-isolation.conf per JTN-783) and (b) leaves the base unit in
-# git free of device-specific tuning.
+# History: where the controller was on, the earlier 250M/350M caps in the
+# base unit were tighter than Chromium + PIL + numpy, the cgroup OOM killer
+# fired on Chromium-heavy refreshes, and after five kills StartLimitBurst=5
+# (JTN-671) left the service stopped until `systemctl reset-failed`. So the
+# caps were scaled to total RAM and moved to a drop-in at
+# /etc/systemd/system/inkypi.service.d/memory.conf, which (a) composes with
+# other drop-ins (e.g. plugin-isolation.conf per JTN-783) and (b) keeps the
+# base unit in git free of device-specific tuning.
 #
 # Thresholds:
 #   ≤ 700 MB MemTotal  → low-mem tier   (Pi Zero 2 W 512 MB): 350M / 500M
 #   > 700 MB MemTotal  → standard tier  (Pi 3/4/5 ≥1 GB):     250M / 350M
 #
-# 700 MB is the split because `/proc/meminfo` MemTotal on a 512 MB Pi Zero 2 W
-# typically reports ~475–490 MB (kernel + GPU carveout take some) and a 1 GB
-# Pi 3 reports ~920–960 MB. 700 MB cleanly separates the two without a false
-# positive on any shipping Pi we target.
+# A Pi Zero 2 W reports MemTotal 436204 kB (about 426 MiB; the GPU and the
+# kernel keep the rest of the 512 MB), and a 1 GB Pi 3 about 920–960 MB, so
+# 700 MB separates them. On the Zero, MemoryMax=500M is above all of its RAM
+# and could never fire; MemoryHigh=350M would be the cap that throttles.
 #
-# zramswap is already enabled by setup_zramswap_service above, so the kernel
-# has compressed-swap headroom under the raised caps on low-mem devices.
+# zram swap (rpi-swap on Trixie, or setup_zramswap_service above) gives the
+# kernel compressed-swap headroom on low-mem devices.
 # ---------------------------------------------------------------------------
 
 # pick_memory_caps — print "<high_mb> <max_mb> <tier>" for a given MemTotal.
@@ -337,7 +411,7 @@ pick_memory_caps() {
   local meminfo_path="${1:-${INKYPI_MEMINFO_PATH:-/proc/meminfo}}"
   local mem_total_kb=0
   if [ -r "$meminfo_path" ]; then
-    # MemTotal line format: "MemTotal:       498064 kB"
+    # MemTotal line format: "MemTotal:         436204 kB" (a Pi Zero 2 W)
     mem_total_kb=$(awk '/^MemTotal:/ {print $2; exit}' "$meminfo_path" 2>/dev/null || echo 0)
   fi
   # Guard against non-numeric / empty readings.
@@ -348,9 +422,8 @@ pick_memory_caps() {
   # for why this is the cleanest split between 512 MB and ≥1 GB Pis.
   local low_mem_threshold_kb=700000
   if [ "$mem_total_kb" -gt 0 ] && [ "$mem_total_kb" -le "$low_mem_threshold_kb" ]; then
-    # Pi Zero 2 W tier. zramswap gives the kernel ~300 MB of compressed swap
-    # headroom, so a 500M hard cap is safely above chromium + PIL peak without
-    # starving the rest of the system.
+    # Pi Zero 2 W tier. 500M is above the Zero's ~426 MiB, so only
+    # MemoryHigh=350M could bite, and only where the memory controller is on.
     echo "350 500 low-mem"
   else
     # Standard tier (≥1 GB Pis, or unknown where MemTotal couldn't be parsed).
@@ -388,6 +461,12 @@ install_memory_dropin() {
 # Memory caps are scaled to the detected total RAM tier:
 #   low-mem  (≤700 MB MemTotal, e.g. Pi Zero 2 W 512 MB): 350M / 500M
 #   standard (>700 MB MemTotal, e.g. Pi 3/4/5 ≥1 GB):     250M / 350M
+#
+# Best-effort: systemd applies these only when the kernel's cgroup memory
+# controller is on, and Raspberry Pi OS boots with cgroup_disable=memory, so
+# on a Pi they do nothing. There, earlyoom (/etc/default/earlyoom) and
+# OOMScoreAdjust=500 are the memory guards. /api/diagnostics reports
+# memory_controller.active.
 #
 # The base unit (install/inkypi.service) intentionally omits Memory*= so this
 # drop-in is the single source of truth and coexists with any other drop-ins

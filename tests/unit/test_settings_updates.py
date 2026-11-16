@@ -593,6 +593,46 @@ class TestStartUpdateViaSystemdValidation:
         assert "v0.28.1" not in cmd
         assert target_file.read_text(encoding="utf-8") == "v0.28.1\n"
 
+    def test_passes_a_github_repo_override_to_do_update(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        """E10: do_update.sh compares origin with INKYPI_GITHUB_REPO, so the
+        override the version check uses must reach the transient unit."""
+        from services import updates
+
+        self._redirect_target_version_file(monkeypatch, tmp_path)
+        calls = self._patch_popen_tracker(
+            monkeypatch, "/usr/local/inkypi/install/do_update.sh"
+        )
+        monkeypatch.setenv("INKYPI_GITHUB_REPO", "someone/InkyPi")
+        updates._start_update_via_systemd(target_tag="v0.28.1")
+        monkeypatch.delenv("INKYPI_GITHUB_REPO")
+        updates._start_update_via_systemd(target_tag="v0.28.1")
+
+        with_override, without = calls
+        assert "--setenv=INKYPI_GITHUB_REPO=someone/InkyPi" in with_override
+        assert with_override.index(
+            "--setenv=INKYPI_GITHUB_REPO=someone/InkyPi"
+        ) < with_override.index("/bin/bash")
+        assert not [a for a in without if "INKYPI_GITHUB_REPO" in a]
+
+    @pytest.mark.parametrize(
+        "value", ["", "InkyPi", "a/b/c", "a b/c", "x/y --property=User=root"]
+    )
+    def test_drops_a_malformed_github_repo_override(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path, value: str
+    ) -> None:
+        from services import updates
+
+        self._redirect_target_version_file(monkeypatch, tmp_path)
+        calls = self._patch_popen_tracker(
+            monkeypatch, "/usr/local/inkypi/install/do_update.sh"
+        )
+        monkeypatch.setenv("INKYPI_GITHUB_REPO", value)
+        updates._start_update_via_systemd(target_tag="v0.28.1")
+
+        assert not [a for a in calls[0] if "INKYPI_GITHUB_REPO" in a]
+
     def test_accepts_valid_invocation_without_target_tag(
         self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
     ) -> None:

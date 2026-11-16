@@ -18,7 +18,7 @@
 #             again after exercising the render-adjacent routes. Fails CI when
 #             the running service exceeds the Pi Zero 2 W memory envelope even
 #             though install.sh and the boot probes pass (the regression mode
-#             where baseline RSS balloons past MemoryMax=350M).
+#             where baseline RSS balloons past what a Pi Zero 2 W can hold).
 #
 # Usage:
 #   ./scripts/test_install_memcap.sh [trixie]
@@ -294,9 +294,12 @@ fi
 
 # ── Phase 4: RSS budget checks (JTN-608) ─────────────────────────────────────
 # Asserts the running web service stays within the Pi Zero 2 W memory envelope.
-# A Pi Zero 2 W has 512 MB RAM and the systemd unit caps InkyPi at MemoryMax=350M,
-# so a service that idles around 250 MB in CI would OOM on the real hardware even
-# though install.sh and the initial boot probes pass.
+# A Pi Zero 2 W has 512 MB RAM, of which the kernel reports about 426 MiB, shared
+# with the OS and Chromium renders. Nothing caps the service there (Raspberry Pi
+# OS boots with cgroup_disable=memory, so memory.conf's MemoryHigh/MemoryMax do
+# nothing) and earlyoom kills when memory runs out. A service that idles around
+# 250 MB in CI would run the real hardware out of memory even though install.sh
+# and the initial boot probes pass.
 #
 # Budgets (see docs/testing.md "CI memory budgets"):
 #   Post-install idle RSS          : target <150 MB / hard fail 200 MB
@@ -343,7 +346,7 @@ echo "BUDGET CHECK: post-install idle RSS = ${IDLE_RSS_MB} MB (hard fail > ${IDL
 if [[ "${IDLE_RSS_MB}" -gt "${IDLE_RSS_HARD_MB}" ]]; then
     echo "" >&2
     echo "ERROR: idle RSS ${IDLE_RSS_MB} MB exceeds the ${IDLE_RSS_HARD_MB} MB hard budget." >&2
-    echo "       This would OOM on a Pi Zero 2 W (MemoryMax=350M) after the refresh task starts." >&2
+    echo "       This would run a Pi Zero 2 W (about 426 MiB) out of memory after the refresh task starts." >&2
     docker logs "${CONTAINER_NAME}" 2>&1 | tee "${LOG_DIR}/container.log" >&2 || true
     exit 1
 fi

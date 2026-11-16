@@ -2474,6 +2474,28 @@
           }
         }
       },
+      "DiagnosticsMemoryController": {
+        "type": "object",
+        "required": [
+          "active",
+          "controllers"
+        ],
+        "properties": {
+          "active": {
+            "type": "boolean",
+            "nullable": true,
+            "description": "Whether the kernel's cgroup memory controller is on, so the service's MemoryHigh/MemoryMax caps can apply. False on Raspberry Pi OS, which boots with cgroup_disable=memory; earlyoom is the memory guard there. Null when cgroup v2 isn't mounted."
+          },
+          "controllers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true,
+            "description": "Contents of /sys/fs/cgroup/cgroup.controllers."
+          }
+        }
+      },
       "DiagnosticsDisk": {
         "type": "object",
         "required": [
@@ -2578,6 +2600,9 @@
           },
           "memory": {
             "$ref": "#/components/schemas/DiagnosticsMemory"
+          },
+          "memory_controller": {
+            "$ref": "#/components/schemas/DiagnosticsMemoryController"
           },
           "disk": {
             "$ref": "#/components/schemas/DiagnosticsDisk"

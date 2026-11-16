@@ -343,6 +343,18 @@ def _start_update_via_systemd(target_tag: str | None = None) -> str:
     # 4. Build the unit name from a hardcoded literal prefix + a fresh int.
     unit_name = f"{_UPDATE_UNIT_PREFIX}-{int(time.time())}"
 
+    # 5. E10: do_update.sh refuses an origin other than the repo the version
+    #    check reads releases from (services.version_check). Pass an
+    #    INKYPI_GITHUB_REPO override through, so a device that follows another
+    #    fork on purpose can still update. Only an owner/name value is passed.
+    repo_env: list[str] = []
+    repo_match = re.fullmatch(
+        r"[A-Za-z0-9_.-]{1,100}/[A-Za-z0-9_.-]{1,100}",
+        os.getenv("INKYPI_GITHUB_REPO", ""),
+    )
+    if repo_match is not None:
+        repo_env.append(f"--setenv=INKYPI_GITHUB_REPO={repo_match.group(0)}")
+
     cmd: list[str] = [
         "systemd-run",
         "--collect",
@@ -350,6 +362,7 @@ def _start_update_via_systemd(target_tag: str | None = None) -> str:
         "--property=StandardOutput=journal",
         "--property=StandardError=journal",
         f"--setenv=PROJECT_DIR={project_dir}",
+        *repo_env,
         "/bin/bash",
         script_path,
     ]
