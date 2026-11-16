@@ -138,10 +138,10 @@
 
 /* At medium widths the plugin detail header has 3 action buttons competing
    with the icon + title + description column, forcing the title to wrap in a
-   narrow ribbon on the left. The workflow layout itself collapses to a single
-   column at 1200px, so stack the pageheader a touch earlier (~960px) to give
-   the title its full width and push the action row cleanly below. */
-@media (max-width: 960px) {
+   narrow ribbon on the left. Stack it wherever the workflow layout below is a
+   single column (--bp-wide and narrower), so the title gets its full width
+   and the action row sits cleanly below. */
+@media (max-width: 1200px) {
   .pageheader-plugin {
     flex-direction: column;
     align-items: stretch;
@@ -213,4 +213,3 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
-

@@ -59,8 +59,10 @@ The remaining code-quality items come from a local grade report
 (`.claude/grade-report.md`, which is not committed); the IDs refer to the
 2026-11-15 regrade.
 
-- [ ] **C12** — 14 different responsive breakpoints. Settling on 3–4 width
-      tokens changes layouts, so each page needs a visual check.
+- [x] **C12** — 14 different responsive breakpoints are now four tokens
+      (640, 768, 900 and 1200px), listed in `partials/_tokens.css`. The build
+      warns about any other width, and `tests/unit/test_css_breakpoints.py`
+      fails on it. Every page was checked at 34 widths.
 - [x] **D1** — "CI gate (all checks pass)" is a required status check for
       `main`, set by the repository ruleset "main: require the CI gate". Its
       only bypass is the release deploy key, which pushes the version-bump

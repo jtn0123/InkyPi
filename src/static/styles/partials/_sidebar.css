@@ -522,14 +522,13 @@
 }
 
 /* Phones: the hostname is already in the address bar, and with the device
-   name it stacked the brand into three lines that doubled the top strip. */
+   name it stacked the brand into three lines that doubled the top strip.
+   The strip itself gets tighter so the menu has room. */
 @media (max-width: 640px) {
   .brand-host {
     display: none;
   }
-}
 
-@media (max-width: 360px) {
   .shell-sidebar {
     grid-template-columns: auto minmax(72px, 1fr) auto;
     gap: 6px;

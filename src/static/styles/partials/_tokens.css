@@ -170,17 +170,19 @@
     /* Animation */
     --transition-speed: 0.18s;
 
-    /* Breakpoint reference (CSS custom properties cannot be used in
-       @media queries, so these serve as a single-source-of-truth
-       reference for the values used throughout _responsive.css and
-       per-component @media blocks):
-       --bp-xs:  430px   Narrowest phones
-       --bp-sm:  520px   Small phones
-       --bp-md:  640px   Progress-step threshold
-       --bp-tab: 768px   Tablet / mobile boundary
-       --bp-lg:  900px   Enhanced responsive
-       --bp-xl:  1024px  Tablet landscape
-       --bp-2xl: 1440px  Large screens */
+    /* Breakpoints. CSS custom properties cannot be used inside @media, so
+       this list is the single source: every width query in the partials
+       uses one of these values, written (max-width: N) for "N and
+       narrower" or (min-width: N+1) for "wider than N". build_css.py
+       warns about any other width and tests/unit/test_css_breakpoints.py
+       fails on it. The scripts' matchMedia calls use the same 640 and 768.
+       --bp-phone:   640px   Phones, portrait or landscape: one column,
+                             stacked page headers, full-width buttons.
+       --bp-tablet:  768px   Tablets in portrait: the mobile layout in
+                             _responsive-mobile.css.
+       --bp-sidebar: 900px   The sidebar becomes the top strip.
+       --bp-wide:    1200px  Wider: the plugin page puts its preview
+                             column beside the form, and pages are capped. */
 }
 [data-theme="dark"] {
     /* Console aesthetic — dark-first refined UI */

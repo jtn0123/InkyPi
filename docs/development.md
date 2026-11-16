@@ -46,7 +46,10 @@ worktree's lock differs, the worktree builds its own `.venv`.
 The compiled stylesheet (`src/static/styles/main.css`) and the vendored
 htmx/Leaflet files are committed, so nothing else needs building. After editing
 CSS, run `python scripts/build_css.py` (or `./scripts/dev_watch.sh`, below) and
-commit the rebuilt `main.css`.
+commit the rebuilt `main.css`. A width `@media` query must use one of the four
+breakpoint tokens listed in `partials/_tokens.css` (640, 768, 900 and 1200px,
+as `max-width: N` or `min-width: N+1`); the build warns about any other width
+and `tests/unit/test_css_breakpoints.py` fails on it.
 
 </td>
 <td>

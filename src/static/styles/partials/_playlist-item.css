@@ -430,7 +430,7 @@ a.pl-add-row:hover {
    the text. Selectors are doubled up so they beat the generic
    `.plugin-item` / `.plugin-actions` / `.plugin-info` rules in
    _responsive-mobile.css, which load later. */
-@media (max-width: 720px) {
+@media (max-width: 768px) {
   .pl-item.plugin-item {
     grid-template-columns: auto auto minmax(0, 1fr);
     grid-template-areas:
