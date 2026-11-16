@@ -199,11 +199,6 @@
     height: 16px;
 }
 
-.thumbnail-preview-close .close-icon {
-    width: 20px;
-    height: 20px;
-}
-
 /* Help icon (info) */
 .help-icon {
     display: inline-flex;

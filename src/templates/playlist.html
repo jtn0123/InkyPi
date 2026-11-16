@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block title %}InkyPi - Playlists{% endblock %}
 {% block head %}
+    <script src="{{ url_for('static', filename='scripts/lightbox.js') }}" defer></script>
     <script src="{{ url_for('static', filename='scripts/refresh_settings_manager.js') }}"></script>
     <script nonce="{{ csp_nonce }}">
         window.PLAYLIST_CTX = {
@@ -129,11 +130,7 @@
                             <div class="pl-item-thumb">
                                 <button type="button" class="plugin-thumbnail-container lightboxable"
                                         aria-label="Preview {{ pi_label }}"
-                                        title="View full size"
-                                        data-thumbnail-plugin="{{ plugin_instance.plugin_id }}"
-                                        data-thumbnail-display-name="{{ (plugins.get(plugin_instance.plugin_id, {}).display_name or plugin_instance.plugin_id) }}"
-                                        data-thumbnail-instance="{{ plugin_instance.name }}"
-                                        data-thumbnail-instance-label="{{ pi_label }}">
+                                        title="View full size">
                                     <span class="img-skeleton" aria-hidden="true"></span>
                                     <img
                                         src="{{ url_for('plugin.plugin_instance_image', plugin_id=plugin_instance.plugin_id, instance_name=plugin_instance.name) }}"
@@ -278,15 +275,6 @@
 
     <!-- Success/Error Modal -->
 
-    <!-- Thumbnail Preview Modal -->
-    <dialog id="thumbnailPreviewModal" class="thumbnail-preview-modal playlist-thumbnail-modal" aria-labelledby="thumbnailPreviewTitle" hidden>
-        <div class="thumbnail-preview-content playlist-thumbnail-content">
-            <h2 id="thumbnailPreviewTitle" class="sr-only">Image Preview</h2>
-            <button class="thumbnail-preview-close" type="button" id="closeThumbnailPreviewBtn" aria-label="Close">{{ icon('x', 'close-icon') | safe }}</button>
-            <img id="thumbnailPreviewImage" src="" alt="Plugin Instance Preview">
-            <div class="thumbnail-preview-info playlist-thumbnail-info" id="thumbnailPreviewInfo"></div>
-        </div>
-    </dialog>
     </div>
     </main>
 {% endblock %}

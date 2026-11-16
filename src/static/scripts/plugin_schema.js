@@ -223,7 +223,7 @@
       button.disabled = true;
       button.textContent = "Thinking...";
       try {
-        const response = await fetch(
+        const result = await fetchJson(
           window.__INKYPI_PLUGIN_BOOT__?.urls?.random_prompt ||
             "/plugin/ai_image/random_prompt",
           {
@@ -235,9 +235,8 @@
             }),
           }
         );
-        const result = await response.json();
-        if (!response.ok || !result?.success || !result.prompt) {
-          throw new Error(result?.error || "Failed to generate a prompt");
+        if (!result?.success || !result.prompt) {
+          throw new Error("The reply had no prompt in it");
         }
         promptInput.value = result.prompt;
         promptInput.dispatchEvent(new Event("input", { bubbles: true }));
@@ -248,7 +247,7 @@
         if (window.showResponseModal) {
           window.showResponseModal(
             "failure",
-            error.message || "Failed to generate a prompt"
+            globalThis.InkyPiHttp.errorMessage(error, "Failed to generate a prompt")
           );
         }
       } finally {

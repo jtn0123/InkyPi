@@ -80,12 +80,6 @@
     button.textContent = pending ? "Switching\u2026" : defaultLabel;
   }
 
-  async function fetchDashboardJson(url) {
-    const response = await fetch(url);
-    if (!response.ok) throw new Error(`Dashboard request failed: ${response.status}`);
-    return response.json();
-  }
-
   function createDashboardPage(config) {
     const pollIntervalMs = config.pollIntervalMs || DEFAULTS.pollIntervalMs;
     const refreshDelayMs = config.refreshDelayMs || DEFAULTS.refreshDelayMs;
@@ -195,11 +189,11 @@
       let up = null;
       try {
         [info, up] = await Promise.all([
-          fetchDashboardJson(config.refreshInfoUrl).catch((err) => {
+          fetchJson(config.refreshInfoUrl).catch((err) => {
             console.warn("Failed to fetch refresh info:", err);
             return null;
           }),
-          fetchDashboardJson(config.nextUpUrl).catch((err) => {
+          fetchJson(config.nextUpUrl).catch((err) => {
             console.warn("Failed to fetch next-up info:", err);
             return null;
           }),
@@ -385,31 +379,22 @@
       if (!playlistName || !config.quickSwitchUrl) return;
       setQuickSwitchButtonPending(button, true);
       try {
-        const response = await fetch(config.quickSwitchUrl, {
+        const result = await fetchJson(config.quickSwitchUrl, {
           method: "POST",
-          headers: {
-            Accept: "application/json",
-            "Content-Type": "application/json",
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ playlist_name: playlistName }),
         });
-        const result = await response.json();
-        if (!response.ok || !result.success) {
-          showResponseModal(
-            "failure",
-            `Failed to switch playlist: ${result.error || "Unknown error"}`
-          );
-          return;
-        }
         setQuickSwitchActiveRow(result.playlist || playlistName);
         setTimeout(() => {
           refreshPreviewSafely();
           void refreshKpis();
         }, refreshDelayMs);
-      } catch {
-        // Network failure — surface a generic modal rather than rethrowing.
-        // The detailed error is of no use to the user here.
-        showResponseModal("failure", "Failed to switch playlist");
+      } catch (error) {
+        console.debug("Quick switch failed:", error);
+        showResponseModal(
+          "failure",
+          `Failed to switch playlist: ${globalThis.InkyPiHttp.errorMessage(error)}`
+        );
       } finally {
         setQuickSwitchButtonPending(button, false);
       }
@@ -428,15 +413,14 @@
           button.classList.add("loading");
       }
       try {
-        const response = await fetch(config.displayNextUrl, { method: "POST" });
-        const result = await response.json();
-        if (!response.ok || !result.success) {
-          showResponseModal("failure", `Failed to display next: ${result.error || "Unknown error"}`);
-        } else {
-          setTimeout(refreshPreviewSafely, refreshDelayMs);
-        }
-      } catch {
-        showResponseModal("failure", "Failed to display next");
+        await fetchJson(config.displayNextUrl, { method: "POST" });
+        setTimeout(refreshPreviewSafely, refreshDelayMs);
+      } catch (error) {
+        console.debug("Display next failed:", error);
+        showResponseModal(
+          "failure",
+          `Failed to display next: ${globalThis.InkyPiHttp.errorMessage(error)}`
+        );
       } finally {
         if (button) {
             button.disabled = false;
@@ -456,16 +440,14 @@
       if (!button) return;
       button.disabled = true;
       try {
-        const response = await fetch(button.dataset.blackoutUrl, { method: "DELETE" });
-        const result = await response.json();
-        if (!response.ok || !result.success) {
-          showResponseModal("failure", `Failed to resume: ${result.error || "Unknown error"}`);
-          button.disabled = false;
-          return;
-        }
+        await fetchJson(button.dataset.blackoutUrl, { method: "DELETE" });
         globalThis.location.reload();
-      } catch {
-        showResponseModal("failure", "Failed to resume");
+      } catch (error) {
+        console.debug("Resume from blackout failed:", error);
+        showResponseModal(
+          "failure",
+          `Failed to resume: ${globalThis.InkyPiHttp.errorMessage(error)}`
+        );
         button.disabled = false;
       }
     }
@@ -725,9 +707,7 @@
 
     async function fetchStatsSnapshot(statsUrl, sequence) {
       try {
-        const resp = await fetch(statsUrl, { headers: { Accept: "application/json" } });
-        if (!resp.ok) return { reachable: false, hasTelemetry: false };
-        const body = await resp.json();
+        const body = await fetchJson(statsUrl);
         if (sequence !== kpiRefreshSequence) return { reachable: false, hasTelemetry: false };
         const w = body.last_24h || {};
         const total = Number(w.total);
@@ -749,16 +729,15 @@
           || Number.isFinite(errs);
         return { reachable: true, hasTelemetry };
       } catch (error) {
-        console.warn("Failed to fetch refresh stats:", error);
+        // The KPI tiles show the gap; an error status is not worth a warning.
+        if (error?.kind !== "http") console.warn("Failed to fetch refresh stats:", error);
         return { reachable: false, hasTelemetry: false };
       }
     }
 
     async function fetchHealthSnapshot(healthUrl, sequence) {
       try {
-        const resp = await fetch(healthUrl, { headers: { Accept: "application/json" } });
-        if (!resp.ok) return { reachable: false, hasTelemetry: false };
-        const body = await resp.json();
+        const body = await fetchJson(healthUrl);
         if (sequence !== kpiRefreshSequence) return { reachable: false, hasTelemetry: false };
         const free = Number(body.disk_free_gb);
         setKpiText(
@@ -767,7 +746,7 @@
         );
         return { reachable: true, hasTelemetry: Number.isFinite(free) };
       } catch (error) {
-        console.warn("Failed to fetch system health:", error);
+        if (error?.kind !== "http") console.warn("Failed to fetch system health:", error);
         return { reachable: false, hasTelemetry: false };
       }
     }

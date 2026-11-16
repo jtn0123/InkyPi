@@ -33,7 +33,7 @@
     const modalModule = requireSettingsFactory(
       settingsModules,
       "createModalModule"
-    )({ ui });
+    )();
     const logsModule = requireSettingsFactory(
       settingsModules,
       "createLogsModule"

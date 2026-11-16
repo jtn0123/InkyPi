@@ -42,18 +42,10 @@
     if (cancelBtn) cancelBtn.disabled = true;
 
     try {
-      const resp = await fetch(clearUrl, {
+      await fetchJson(clearUrl, {
         method: "POST",
         headers: { "X-CSRFToken": globalThis.InkyPiCsrf?.getToken() || "" },
       });
-      const result = await resp.json();
-      if (!resp.ok) {
-        closeClearModal();
-        if (globalThis.showResponseModal) {
-          showResponseModal("failure", "Error! " + (result.error || "Clear failed"));
-        }
-        return;
-      }
       closeClearModal();
       // Remove all rendered error rows, and the table with them.
       const tbody = document.getElementById("errorsTableBody");
@@ -83,10 +75,13 @@
         showResponseModal("success", "Error logs cleared.");
       }
     } catch (e) {
-      console.error("Failed to clear error logs", e);
+      console.debug("Failed to clear error logs", e);
       closeClearModal();
       if (globalThis.showResponseModal) {
-        showResponseModal("failure", "Failed to clear error logs. Please try again.");
+        showResponseModal(
+          "failure",
+          globalThis.InkyPiHttp.errorMessage(e, "Failed to clear error logs. Please try again.")
+        );
       }
     } finally {
       if (confirmBtn) {

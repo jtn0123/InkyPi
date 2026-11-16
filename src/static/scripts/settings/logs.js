@@ -20,21 +20,6 @@
       : "Refresh failed";
   }
 
-  async function readLogsResponse(resp) {
-    let data = null;
-    try {
-      data = await resp.json();
-    } catch {
-      data = null;
-    }
-    if (resp.ok && Array.isArray(data?.lines)) {
-      return { lines: data.lines, error: null };
-    }
-    const reason =
-      data?.error || `The device answered with status ${resp.status}`;
-    return { lines: null, error: reason };
-  }
-
   function isViewerAtBottom(viewer) {
     return viewer.scrollHeight - viewer.scrollTop - viewer.clientHeight < 8;
   }
@@ -208,22 +193,21 @@
           filterInput,
           maxLinesInput
         );
-        const resp = await fetch(`${config.logsUrl}?${params.toString()}`, {
+        const data = await fetchJson(`${config.logsUrl}?${params.toString()}`, {
           cache: "no-store",
         });
-        const { lines, error } = await readLogsResponse(resp);
-        if (lines) {
-          state.lastLogsRaw = lines.join("\n");
+        if (Array.isArray(data?.lines)) {
+          state.lastLogsRaw = data.lines.join("\n");
           updateLastUpdated(state);
           applyLogFiltersAndRender();
           flashLogsViewer();
           return true;
         }
-        failure = error;
+        failure = "The device sent no log lines";
       } catch (e) {
         // Shown on the page below, so it isn't logged as an error.
         console.debug("Failed to fetch logs", e);
-        failure = "Couldn't reach the device";
+        failure = globalThis.InkyPiHttp.errorMessage(e, "Couldn't reach the device");
       }
       showRefreshFailed(state);
       if (announce) {

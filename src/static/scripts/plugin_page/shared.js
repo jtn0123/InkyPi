@@ -31,12 +31,6 @@
     return true;
   }
 
-  function syncModalOpenState(ui) {
-    if (ui?.syncModalOpenState) return ui.syncModalOpenState();
-    const open = document.querySelector(".modal.is-open");
-    document.body.classList.toggle("modal-open", !!open);
-  }
-
   function setHidden(node, hidden) {
     if (!node) return;
     node.hidden = hidden;
@@ -202,7 +196,6 @@
     setHidden,
     setPluginSubtab,
     showInstanceFallback,
-    syncModalOpenState,
     updateCombinedColorPreview,
     validateAddToPlaylistAction,
   };

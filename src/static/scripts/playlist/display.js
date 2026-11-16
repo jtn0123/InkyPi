@@ -3,15 +3,6 @@
   global.InkyPiPlaylist = global.InkyPiPlaylist || {};
   const ns = global.InkyPiPlaylist;
 
-  async function readResponseJson(response) {
-    try {
-      return await response.json();
-    } catch (error) {
-      console.debug("Playlist display response was not JSON:", error);
-      return null;
-    }
-  }
-
   function restoreStoredMessage() {
     const storedMessage = sessionStorage.getItem("storedMessage");
     if (!storedMessage) return;
@@ -59,7 +50,7 @@
   ) {
     setRowBusy(btnEl, true);
     try {
-      const response = await fetch(ns.config.display_plugin_instance_url, {
+      const result = await fetchJson(ns.config.display_plugin_instance_url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -68,24 +59,21 @@
           plugin_instance: pluginInstance,
         }),
       });
-      const result = await readResponseJson(response);
-      if (response.ok && result?.success) {
-        sessionStorage.setItem(
-          "storedMessage",
-          JSON.stringify({ type: "success", text: `Success! ${result.message}` })
-        );
-        location.reload();
-        return;
-      }
-      showResponseModal(
-        "failure",
-        result?.error || result?.message || "Display request failed"
+      sessionStorage.setItem(
+        "storedMessage",
+        JSON.stringify({ type: "success", text: `Success! ${result.message}` })
       );
+      location.reload();
+      return;
     } catch (error) {
-      console.error("Error:", error);
+      // Shown in the toast below, so it isn't logged as an error.
+      console.debug("Playlist display request failed:", error);
       showResponseModal(
         "failure",
-        "An error occurred while processing your request."
+        globalThis.InkyPiHttp.errorMessage(
+          error,
+          "An error occurred while processing your request."
+        )
       );
     }
     setRowBusy(btnEl, false);

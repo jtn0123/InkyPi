@@ -5,16 +5,13 @@
   function initThumbnailPreviewHandlers() {
     document.querySelectorAll(".plugin-thumbnail-container").forEach((box) => {
       if (box.dataset.playlistPreviewBound === "1") return;
-      // The thumbnail is a <button>, so Enter and Space open it too.
+      // The thumbnail is a <button>, so Enter and Space open it too. The
+      // shared lightbox shows the image the thumbnail already loaded, and
+      // hands focus back to the thumbnail when it closes.
       box.addEventListener("click", (event) => {
-        const target = event.currentTarget;
-        ns.showThumbnailPreview(
-          target.dataset.thumbnailPlugin,
-          target.dataset.thumbnailDisplayName,
-          target.dataset.thumbnailInstance,
-          target.dataset.thumbnailInstanceLabel,
-          target
-        );
+        const img = event.currentTarget.querySelector("img.plugin-thumbnail");
+        const url = img?.getAttribute("src");
+        if (url) global.Lightbox?.open(url, img.alt);
       });
       box.dataset.playlistPreviewBound = "1";
     });

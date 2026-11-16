@@ -63,7 +63,7 @@ def test_playlist_escape_routes_every_dialog_to_its_close_function() -> None:
     # a removed one doesn't keep its close code alive.
     template = (_TEMPLATES_DIR / "playlist.html").read_text(encoding="utf-8")
     modal_ids = set(re.findall(r'id="(\w+Modal)"', template))
-    assert {"playlistModal", "thumbnailPreviewModal"} <= modal_ids
+    assert {"playlistModal", "refreshSettingsModal"} <= modal_ids
 
     routed = set(re.findall(r'case "(\w+Modal)":', content))
     assert routed == modal_ids

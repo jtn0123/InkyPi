@@ -7,14 +7,6 @@
     return `plg-${ns.runtime.playlistDragCounter}`;
   }
 
-  async function readResponseJson(response) {
-    try {
-      return await response.json();
-    } catch (_error) {
-      return null;
-    }
-  }
-
   function capturePlaylistOrder(item) {
     const parent = item?.parentNode;
     const nextSibling = item?.nextSibling;
@@ -38,28 +30,21 @@
     );
     if (!playlistName || !ordered.length) return;
 
-    fetch(ns.config.reorder_url, {
+    fetchJson(ns.config.reorder_url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ playlist_name: playlistName, ordered }),
     })
-      .then((response) =>
-        readResponseJson(response).then((result) => ({ response, result }))
-      )
-      .then(({ response, result }) => {
-        if (response.ok && result?.success) {
-          showResponseModal("success", `Success! ${result.message || "Order saved"}`);
-          return;
-        }
+      .then((result) => {
+        showResponseModal("success", `Success! ${result.message || "Order saved"}`);
+      })
+      .catch((error) => {
+        console.debug("Playlist order was not saved:", error);
         restoreOrder?.();
         showResponseModal(
           "failure",
-          result?.error || result?.message || "Error saving new order"
+          globalThis.InkyPiHttp.errorMessage(error, "Error saving new order")
         );
-      })
-      .catch(() => {
-        restoreOrder?.();
-        showResponseModal("failure", "Error saving new order");
       });
   }
 

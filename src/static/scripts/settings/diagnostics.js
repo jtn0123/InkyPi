@@ -274,37 +274,23 @@
     return table;
   }
 
+  // The panel says what failed, so a failed request isn't logged as a
+  // warning. Anything else (a bug while drawing the panel) still is.
   function setPanelFailure(panelId, message, error) {
-    console.warn(message, error);
+    const { FetchJsonError } = globalThis.InkyPiHttp;
+    (error instanceof FetchJsonError ? console.debug : console.warn)(message, error);
     const panel = document.getElementById(panelId);
     if (panel) {
-      const detail = error?.message ? `: ${error.message}` : "";
-      panel.textContent = `${message}${detail}`;
+      panel.textContent = `${message}: ${globalThis.InkyPiHttp.errorMessage(error)}`;
     }
   }
 
-  function getResponseError(data, fallback) {
-    if (typeof data?.error === "string" && data.error.trim()) {
-      return data.error;
-    }
-    if (data?.error != null) {
-      return String(data.error);
-    }
-    if (typeof data?.message === "string" && data.message.trim()) {
-      return data.message;
-    }
-    return fallback;
-  }
-
-  function getIsolationFailureMessage(data, verb, pluginId) {
-    const fallbackMsg = `Failed to ${verb} plugin`;
-    let errorText = fallbackMsg;
-    if (typeof data?.error === "string") {
-      errorText = data.error;
-    } else if (data?.error != null) {
-      errorText = String(data.error);
-    }
-    if (errorText.includes("registered")) {
+  function getIsolationFailureMessage(error, verb, pluginId) {
+    const errorText = globalThis.InkyPiHttp.errorMessage(
+      error,
+      `Failed to ${verb} plugin. Check your connection and try again.`
+    );
+    if (error?.kind === "http" && errorText.includes("registered")) {
       return `Plugin "${pluginId}" is not a registered plugin. Check the ID and try again.`;
     }
     return errorText;
@@ -350,16 +336,10 @@
       panel.textContent = `Loading stages for ${refreshLabel}...`;
       try {
         const params = new URLSearchParams({ refresh_id: refreshItem.refresh_id });
-        const resp = await fetch(`/api/benchmarks/stages?${params.toString()}`, {
+        const data = await fetchJson(`/api/benchmarks/stages?${params.toString()}`, {
           cache: "no-store",
         });
-        const data = await resp.json();
         if (requestSeq !== stageRequestSeq) return;
-        if (!resp.ok || data?.success === false) {
-          throw new Error(
-            getResponseError(data, resp.statusText || `HTTP ${resp.status}`)
-          );
-        }
         panel.textContent = "";
         const header = document.createElement("div");
         header.className = "benchmark-stage-heading";
@@ -384,43 +364,32 @@
       setBenchmarkPanelsLoading(true);
       resetStagesPanel();
       try {
-        const [summaryResp, pluginsResp, refreshesResp] = await Promise.all([
-          fetch(
-            `/api/benchmarks/summary?window=${encodeURIComponent(windowValue)}`,
-            { cache: "no-store" }
-          ),
-          fetch(
-            `/api/benchmarks/plugins?window=${encodeURIComponent(windowValue)}`,
-            { cache: "no-store" }
-          ),
-          fetch(
-            `/api/benchmarks/refreshes?window=${encodeURIComponent(windowValue)}&limit=12`,
-            { cache: "no-store" }
-          ),
-        ]);
-        const summary = await summaryResp.json();
-        const plugins = await pluginsResp.json();
-        const refreshes = await refreshesResp.json();
+        const query = `window=${encodeURIComponent(windowValue)}`;
+        const panels = [
+          [`/api/benchmarks/summary?${query}`, "benchSummary", "benchmark summary"],
+          [`/api/benchmarks/plugins?${query}`, "benchPlugins", "plugin timing"],
+          [`/api/benchmarks/refreshes?${query}&limit=12`, "benchRefreshes", "recent refreshes"],
+        ];
+        // Each panel reports its own failure, so one bad reply doesn't blank
+        // the other two.
+        const settled = await Promise.allSettled(
+          panels.map(([url]) => fetchJson(url, { cache: "no-store" }))
+        );
         if (requestSeq !== benchmarkRequestSeq || windowValue !== getBenchmarkWindow()) {
           return;
         }
 
-        const failures = [
-          [summaryResp, summary, "benchSummary", "benchmark summary"],
-          [pluginsResp, plugins, "benchPlugins", "plugin timing"],
-          [refreshesResp, refreshes, "benchRefreshes", "recent refreshes"],
-        ].filter(([resp, body]) => !resp.ok || body?.success === false);
-
-        if (failures.length > 0) {
-          for (const [, body, panelId, label] of failures) {
-            const message = getResponseError(body, `Failed to load ${label}`);
-            renderPanel(panelId, document.createTextNode(message));
-          }
-          resetStagesPanel("Refresh stages are unavailable until recent refreshes load.");
-          return;
-        }
-
-        const summaryData = summary.summary || {};
+        const failed = new Set();
+        settled.forEach((outcome, index) => {
+          if (outcome.status !== "rejected") return;
+          const [, panelId, label] = panels[index];
+          setPanelFailure(panelId, `Failed to load ${label}`, outcome.reason);
+          failed.add(panelId);
+        });
+        const [summary, plugins, refreshes] = settled.map((outcome) =>
+          outcome.status === "fulfilled" ? outcome.value : null
+        );
+        const summaryData = summary?.summary || {};
         const hasData = Object.values(summaryData).some(
           (stage) => stage?.p50 !== null && stage?.p50 !== undefined
         );
@@ -429,7 +398,8 @@
           ? refreshes.items
           : [];
 
-        if (!hasData && pluginItems.length === 0 && refreshItems.length === 0) {
+        const empty = !hasData && pluginItems.length === 0 && refreshItems.length === 0;
+        if (failed.size === 0 && empty) {
           const emptyMsg = document.createElement("div");
           emptyMsg.className = "bench-empty";
           emptyMsg.textContent =
@@ -441,15 +411,22 @@
           return;
         }
 
-        const summaryPanel = renderPanel("benchSummary", null);
-        const heading1 = document.createElement("strong");
-        heading1.textContent = `Timing Summary (${windowValue})`;
-        summaryPanel?.appendChild(heading1);
-        summaryPanel?.appendChild(buildSummaryTable(summaryData));
-
-        renderPanel("benchPlugins", buildPluginsTable(pluginItems));
-        renderPanel("benchRefreshes", buildRefreshesTable(refreshItems, refreshStages));
-        resetStagesPanel();
+        if (!failed.has("benchSummary")) {
+          const summaryPanel = renderPanel("benchSummary", null);
+          const heading1 = document.createElement("strong");
+          heading1.textContent = `Timing Summary (${windowValue})`;
+          summaryPanel?.appendChild(heading1);
+          summaryPanel?.appendChild(buildSummaryTable(summaryData));
+        }
+        if (!failed.has("benchPlugins")) {
+          renderPanel("benchPlugins", buildPluginsTable(pluginItems));
+        }
+        if (failed.has("benchRefreshes")) {
+          resetStagesPanel("Refresh stages are unavailable until recent refreshes load.");
+        } else {
+          renderPanel("benchRefreshes", buildRefreshesTable(refreshItems, refreshStages));
+          resetStagesPanel();
+        }
       } catch (e) {
         if (requestSeq !== benchmarkRequestSeq) return;
         setPanelFailure("benchSummary", "Failed to load benchmark summary", e);
@@ -466,12 +443,10 @@
     async function refreshHealth() {
       ui.setPanelLoading?.("healthSummary", true);
       try {
-        const [pluginsResp, systemResp] = await Promise.all([
-          fetch("/api/health/plugins", { cache: "no-store" }),
-          fetch("/api/health/system", { cache: "no-store" }),
+        const [plugins, system] = await Promise.all([
+          fetchJson("/api/health/plugins", { cache: "no-store" }),
+          fetchJson("/api/health/system", { cache: "no-store" }),
         ]);
-        const plugins = await pluginsResp.json();
-        const system = await systemResp.json();
 
         const panel = document.getElementById("healthSummary");
         if (!panel) return;
@@ -485,7 +460,7 @@
         const heading2 = document.createElement("strong");
         heading2.textContent = "Plugin Health";
         panel.appendChild(heading2);
-        panel.appendChild(buildPluginHealthTable(plugins.items || {}));
+        panel.appendChild(buildPluginHealthTable(plugins?.items || {}));
       } catch (e) {
         setPanelFailure("healthSummary", "Failed to load health data", e);
       } finally {
@@ -496,8 +471,7 @@
     async function refreshIsolation() {
       ui.setPanelLoading?.("isolationSummary", true);
       try {
-        const resp = await fetch("/settings/isolation", { cache: "no-store" });
-        const data = await resp.json();
+        const data = await fetchJson("/settings/isolation", { cache: "no-store" });
         const panel = document.getElementById("isolationSummary");
         if (!panel) return;
         panel.textContent = "";
@@ -518,30 +492,20 @@
         return;
       }
       try {
-        const resp = await fetch("/settings/isolation", {
+        await fetchJson("/settings/isolation", {
           method,
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ plugin_id: pluginId }),
         });
-        const data = await resp.json();
-        if (!resp.ok || !data.success) {
-          showResponseModal(
-            "failure",
-            getIsolationFailureMessage(data, verb, pluginId)
-          );
-          return;
-        }
-        const past = verb === "isolate" ? "isolated" : "un-isolated";
-        showResponseModal("success", `Plugin "${pluginId}" has been ${past}.`);
-        await refreshIsolation();
-        await refreshHealth();
       } catch (e) {
-        console.warn("Failed to toggle plugin isolation:", verb, e);
-        showResponseModal(
-          "failure",
-          `Failed to ${verb} plugin. Check your connection and try again.`
-        );
+        console.debug("Failed to toggle plugin isolation:", verb, e);
+        showResponseModal("failure", getIsolationFailureMessage(e, verb, pluginId));
+        return;
       }
+      const past = verb === "isolate" ? "isolated" : "un-isolated";
+      showResponseModal("success", `Plugin "${pluginId}" has been ${past}.`);
+      await refreshIsolation();
+      await refreshHealth();
     }
 
     async function isolatePlugin() {
@@ -561,16 +525,13 @@
       if (confirmBtn) confirmBtn.disabled = true;
       let error = "Safe reset failed";
       try {
-        const resp = await fetch("/settings/safe_reset", { method: "POST" });
-        const data = await resp.json().catch(() => ({}));
-        if (resp.ok && data.success) {
-          storeMessageForReload("success", data.message || "Safe reset complete");
-          globalThis.location.reload();
-          return;
-        }
-        error = data.error || error;
+        const data = await fetchJson("/settings/safe_reset", { method: "POST" });
+        storeMessageForReload("success", data.message || "Safe reset complete");
+        globalThis.location.reload();
+        return;
       } catch (e) {
-        console.warn("Safe reset failed:", e);
+        console.debug("Safe reset failed:", e);
+        error = globalThis.InkyPiHttp.errorMessage(e, error);
       }
       if (confirmBtn) confirmBtn.disabled = false;
       modals.closeSafeResetConfirm();

@@ -91,23 +91,19 @@
       data.append("plugin_id", ns.state.currentEditPluginId);
       data.append("refresh_settings", JSON.stringify(formData));
       const encodedInstance = encodeURIComponent(ns.state.currentEditInstance);
-      const response = await fetch(
+      // A failure rejects, and the manager shows it.
+      const result = await fetchJson(
         ns.config.update_instance_base_url + encodedInstance,
         {
           method: "PUT",
           body: data,
         }
       );
-      const result = await response.json();
-      if (response.ok) {
-        sessionStorage.setItem(
-          "storedMessage",
-          JSON.stringify({ type: "success", text: `Success! ${result.message}` })
-        );
-        location.reload();
-        return;
-      }
-      throw new Error(result.error || "Failed to update refresh settings");
+      sessionStorage.setItem(
+        "storedMessage",
+        JSON.stringify({ type: "success", text: `Success! ${result.message}` })
+      );
+      location.reload();
     });
   }
 

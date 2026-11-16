@@ -146,11 +146,6 @@
     return modal;
   }
 
-  function syncModalOpen() {
-    var ui = window.InkyPiUI;
-    if (ui && ui.syncModalOpenState) ui.syncModalOpenState();
-  }
-
   function openLightbox(url, alt){
     const modal = ensureModal();
     const img = document.getElementById(IMG_ID);
@@ -175,7 +170,7 @@
     modal.removeAttribute('hidden');
     modal.style.display = 'block';
     modal.classList.add('is-open');
-    syncModalOpen();
+    globalThis.InkyPiModalFocus?.syncModalOpenState();
 
     // If already cached, trigger load immediately
     if (img.complete && img.naturalWidth > 0) {
@@ -196,7 +191,7 @@
       modal.classList.remove('is-open');
       globalThis.InkyPiModalFocus?.deactivate(modal);
     }
-    syncModalOpen();
+    globalThis.InkyPiModalFocus?.syncModalOpenState();
   }
 
   function toggleNativeSizing(e){

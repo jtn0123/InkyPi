@@ -54,11 +54,6 @@ class TestBenchmarkTableBuilder:
         assert "benchmarkRequestSeq" in js
         assert "windowValue !== getBenchmarkWindow()" in js
 
-    def test_benchmark_errors_check_response_status(self) -> None:
-        js = _read_js()
-        assert "!resp.ok || body?.success === false" in js
-        assert "!resp.ok || data?.success === false" in js
-
     def test_stage_panel_reset_helper_defined(self) -> None:
         js = _read_js()
         assert "function resetStagesPanel" in js

@@ -173,6 +173,8 @@ Shared helpers, grouped roughly as:
 
 Jinja2 page templates and the front-end assets (JS, CSS, images). `scripts/build_assets.py` writes the minified bundles to `static/dist/`, which `app_setup/asset_helpers.py` resolves.
 
+Page scripts ask the server for JSON with `fetchJson(url, init)` from `static/scripts/fetch_json.js` (in the common bundle). It checks the status before it reads the body, and rejects with a readable message, the server's own `error` when it sent one, so a proxy's error page or a sign-in page never surfaces as a JSON parse error. `InkyPiHttp.errorMessage(error, fallback)` gives the text to show. Toasts come from `showResponseModal` / `showToast` in `response_modal.js`.
+
 ## Where to look next
 
 - New to the codebase? Start with `create_app()` and `_init_core_services()` in `src/inkypi.py` to see the wiring, then `src/app_setup/`.

@@ -382,8 +382,7 @@
         align-self: flex-start;
     }
 
-    .modal-content,
-    .thumbnail-preview-content {
+    .modal-content {
         width: min(100vw - 12px, 100%);
         max-width: none;
         margin: auto auto 0;

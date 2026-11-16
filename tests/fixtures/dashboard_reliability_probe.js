@@ -1,6 +1,7 @@
 // Execute the shipped controller with native EventTarget delivery and controlled HTTP.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
+const path = require('node:path');
 const vm = require('node:vm');
 const scenario = process.argv[2];
 const source = process.argv[3];
@@ -54,7 +55,7 @@ let generation = 1;
 const failures = new Set();
 let failureKind = 'http';
 const sandbox = {
-  console: {warn() {}}, Date, Intl, Promise, EventSource: Source,
+  console: {debug() {}, warn() {}}, Date, Intl, Promise, EventSource: Source, Headers, URL,
   document: {
     getElementById: id => nodes[id] || null,
     querySelectorAll: selector => selector === '[data-quick-switch-row]' ? quickSwitchRows : [],
@@ -73,25 +74,31 @@ const sandbox = {
       await new Promise(resolve => delayedResponses.push(resolve));
     }
     if (failed && failureKind === 'network') throw new Error('offline');
+    const body = () => {
+      if (failed) return {success: false, error: 'unavailable'};
+      if (url === '/refresh') return {
+        plugin_id: version === 3 ? null : 'weather',
+        plugin_display_name: `Weather ${version}`, playlist: `Morning ${version}`,
+        refresh_time: '2026-10-01T12:00:00Z', cycle_minutes: 15,
+        next_refresh_meta: `Generation ${version} cadence`, image_hash: `hash-${version}`,
+      };
+      if (url === '/next') return {plugin_id: version === 3 ? null : 'countdown', plugin_display_name: `Countdown ${version}`, playlist: `Next ${version}`};
+      if (url === '/stats') return {last_24h: {total: version, failure: 0, p50_duration_ms: 1000}};
+      return {disk_free_gb: version};
+    };
     return {
-      ok: !failed, status: failed ? 503 : 200,
-      json: async () => {
-        if (failed) return {success: false, error: 'unavailable'};
-        if (url === '/refresh') return {
-          plugin_id: version === 3 ? null : 'weather',
-          plugin_display_name: `Weather ${version}`, playlist: `Morning ${version}`,
-          refresh_time: '2026-10-01T12:00:00Z', cycle_minutes: 15,
-          next_refresh_meta: `Generation ${version} cadence`, image_hash: `hash-${version}`,
-        };
-        if (url === '/next') return {plugin_id: version === 3 ? null : 'countdown', plugin_display_name: `Countdown ${version}`, playlist: `Next ${version}`};
-        if (url === '/stats') return {last_24h: {total: version, failure: 0, p50_duration_ms: 1000}};
-        return {disk_free_gb: version};
-      },
+      ok: !failed, status: failed ? 503 : 200, redirected: false, url,
+      text: async () => JSON.stringify(body()),
     };
   },
 };
 sandbox.globalThis = sandbox;
-vm.runInNewContext(fs.readFileSync(source, 'utf8'), sandbox, {filename: source});
+// The page reads its JSON through the shared fetchJson helper, which the
+// common bundle loads first.
+const context = vm.createContext(sandbox);
+const helper = path.join(path.dirname(source), 'fetch_json.js');
+vm.runInContext(fs.readFileSync(helper, 'utf8'), context, {filename: helper});
+vm.runInContext(fs.readFileSync(source, 'utf8'), context, {filename: source});
 const count = url => calls.filter(call => call === url).length;
 const refresh = async () => { nodes.dashboardRefreshBtn.handlers.click(); await flush(); };
 const dispatch = async name => {

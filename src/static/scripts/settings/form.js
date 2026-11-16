@@ -48,26 +48,24 @@
     snapshotState,
     getFormSnapshot,
   }) {
+    let result;
     try {
-      const response = await fetch(saveSettingsUrl, {
+      result = await fetchJson(saveSettingsUrl, {
         method: "POST",
         body: formData,
       });
-      const result = await response.json();
-      if (response.ok) {
-        snapshotState.current = getFormSnapshot(form);
-        showResponseModal("success", `Success! ${result.message}`);
-        return;
-      }
-      applyFieldLevelError(fs, result);
-      showResponseModal("failure", `Error! ${result.error}`);
     } catch (error) {
-      console.error("Settings save failed:", error);
-      showResponseModal(
-        "failure",
-        "An error occurred while processing your request. Please try again."
+      console.debug("Settings save failed:", error);
+      if (error?.kind === "http") applyFieldLevelError(fs, error.data);
+      const message = globalThis.InkyPiHttp.errorMessage(
+        error,
+        "Couldn't save the settings. Check your connection and try again."
       );
+      showResponseModal("failure", `Error! ${message}`);
+      return;
     }
+    snapshotState.current = getFormSnapshot(form);
+    showResponseModal("success", `Success! ${result.message}`);
   }
 
   function createFormModule({ config, state, shared }) {

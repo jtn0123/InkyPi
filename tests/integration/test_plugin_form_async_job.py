@@ -23,7 +23,10 @@ pytestmark = [
     ),
 ]
 
-SCRIPT = Path(__file__).resolve().parents[2] / "src/static/scripts/plugin_form.js"
+SCRIPTS_DIR = Path(__file__).resolve().parents[2] / "src/static/scripts"
+SCRIPT = SCRIPTS_DIR / "plugin_form.js"
+# Every page loads the shared fetch helper (common bundle) before page scripts.
+FETCH_JSON = SCRIPTS_DIR / "fetch_json.js"
 
 PAGE = """
 <form id="settingsForm"><input name="plugin_id" value="clock"></form>
@@ -83,6 +86,7 @@ def _open(
         page.evaluate("(body) => { window.__accepted = body; }", accepted)
     if not live_stream:
         page.evaluate("() => { window.EventSource = undefined; }")
+    page.add_script_tag(content=FETCH_JSON.read_text(encoding="utf-8"))
     page.add_script_tag(content=SCRIPT.read_text(encoding="utf-8"))
     page.evaluate("() => window.__send()")
 

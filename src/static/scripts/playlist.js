@@ -5,7 +5,6 @@
     "applyFieldErrorFromResponse": "applyFieldErrorFromResponse",
     "closeModal": "closeModal",
     "closeRefreshModal": "closeRefreshModal",
-    "closeThumbnailPreview": "closeThumbnailPreview",
     "createPlaylist": "createPlaylist",
     "deletePlaylist": "deletePlaylist",
     "displayNextInPlaylist": "displayNextInPlaylist",
@@ -17,7 +16,6 @@
     "openEditModal": "openEditModal",
     "openRefreshModal": "openRefreshModal",
     "saveRefreshSettings": "saveRefreshSettings",
-    "showThumbnailPreview": "showThumbnailPreview",
     "updatePlaylist": "updatePlaylist",
   };
 
