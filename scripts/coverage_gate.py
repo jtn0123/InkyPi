@@ -118,6 +118,8 @@ def _parse_condition_coverage(value: str) -> tuple[int, int]:
 
 def _find_file_counts(coverage_xml: Path) -> dict[str, Counts]:
     root = ET.parse(coverage_xml).getroot()
+    if root is None:
+        raise ValueError(f"{coverage_xml} has no root element")
     counts: dict[str, Counts] = {}
     for class_node in root.findall(".//class"):
         filename = class_node.attrib.get("filename")

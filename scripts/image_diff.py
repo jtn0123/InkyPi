@@ -24,6 +24,7 @@ import argparse
 import json
 import sys
 from pathlib import Path
+from typing import Any
 
 from PIL import Image
 
@@ -35,10 +36,18 @@ def load_images(path_a: str, path_b: str) -> tuple[Image.Image, Image.Image]:
     return img_a, img_b
 
 
+def _rgba_at(img: Image.Image, x: int, y: int) -> tuple[int, ...]:
+    """Return the pixel at (x, y) of an RGBA image as a tuple of channels."""
+    value = img.getpixel((x, y))
+    if not isinstance(value, tuple):
+        raise TypeError(f"expected an RGBA tuple at ({x}, {y}), got {value!r}")
+    return value
+
+
 def resize_to_match(img_a: Image.Image, img_b: Image.Image) -> Image.Image:
     """Resize img_b to match img_a dimensions if they differ."""
     if img_b.size != img_a.size:
-        img_b = img_b.resize(img_a.size, Image.LANCZOS)
+        img_b = img_b.resize(img_a.size, Image.Resampling.LANCZOS)
     return img_b
 
 
@@ -51,8 +60,6 @@ def compute_diff(
     Returns:
         (total_pixels, changed_pixels, max_channel_delta)
     """
-    pixels_a = img_a.load()
-    pixels_b = img_b.load()
     width, height = img_a.size
     total_pixels = width * height
 
@@ -61,8 +68,8 @@ def compute_diff(
 
     for y in range(height):
         for x in range(width):
-            pa = pixels_a[x, y]  # type: ignore[index]
-            pb = pixels_b[x, y]  # type: ignore[index]
+            pa = _rgba_at(img_a, x, y)
+            pb = _rgba_at(img_b, x, y)
             # Compare only RGB channels (ignore alpha for "changed" determination)
             channel_delta = max(abs(int(pa[c]) - int(pb[c])) for c in range(3))
             if channel_delta > max_channel_delta:
@@ -81,19 +88,16 @@ def build_diff_image(
 
     Changed pixels are those where any RGB channel differs by more than threshold.
     """
-    pixels_a = img_a.load()
-    pixels_b = img_b.load()
     width, height = img_a.size
 
     # Start with a copy of img_a
     diff_img = img_a.copy()
-    diff_pixels = diff_img.load()
 
     # Red overlay pixel (R=255, G=0, B=0, A=128 for 50% alpha blended into RGBA)
     for y in range(height):
         for x in range(width):
-            pa = pixels_a[x, y]  # type: ignore[index]
-            pb = pixels_b[x, y]  # type: ignore[index]
+            pa = _rgba_at(img_a, x, y)
+            pb = _rgba_at(img_b, x, y)
             channel_delta = max(abs(int(pa[c]) - int(pb[c])) for c in range(3))
             if channel_delta > threshold:
                 # Blend 50% red over the original pixel
@@ -101,7 +105,7 @@ def build_diff_image(
                 g = int(pa[1] * 0.5 + 0 * 0.5)
                 b = int(pa[2] * 0.5 + 0 * 0.5)
                 a = pa[3]
-                diff_pixels[x, y] = (r, g, b, a)  # type: ignore[index]
+                diff_img.putpixel((x, y), (r, g, b, a))
 
     return diff_img
 
@@ -140,7 +144,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def run(argv: list[str] | None = None) -> dict:
+def run(argv: list[str] | None = None) -> dict[str, Any]:
     """
     Main entry point. Returns a dict with diff statistics.
 

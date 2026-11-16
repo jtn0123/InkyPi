@@ -168,6 +168,11 @@ def _safe_int(value: Any) -> int | None:
         return None
 
 
+def _as_dict(value: object) -> dict[str, Any]:
+    """Return ``value`` if it is a dict, else an empty dict (missing or malformed)."""
+    return value if isinstance(value, dict) else {}
+
+
 def parse_diagnostics_payload(
     payload: dict[str, Any] | None,
     *,
@@ -190,18 +195,10 @@ def parse_diagnostics_payload(
             http_status=http_status,
         )
 
-    memory = payload.get("memory") if isinstance(payload.get("memory"), dict) else {}
-    disk = payload.get("disk") if isinstance(payload.get("disk"), dict) else {}
-    refresh = (
-        payload.get("refresh_task")
-        if isinstance(payload.get("refresh_task"), dict)
-        else {}
-    )
-    client_log = (
-        payload.get("recent_client_log_errors")
-        if isinstance(payload.get("recent_client_log_errors"), dict)
-        else {}
-    )
+    memory = _as_dict(payload.get("memory"))
+    disk = _as_dict(payload.get("disk"))
+    refresh = _as_dict(payload.get("refresh_task"))
+    client_log = _as_dict(payload.get("recent_client_log_errors"))
     plugin_health_raw = payload.get("plugin_health")
     plugin_health: dict[str, str] = {}
     if isinstance(plugin_health_raw, dict):

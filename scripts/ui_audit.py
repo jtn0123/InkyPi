@@ -5,10 +5,17 @@ import argparse
 import json
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any, Literal, TypedDict
 from urllib.parse import urlencode
 
 import requests
-from playwright.sync_api import TimeoutError as PlaywrightTimeoutError, sync_playwright
+from playwright.sync_api import (
+    Browser,
+    ConsoleMessage,
+    Page,
+    TimeoutError as PlaywrightTimeoutError,
+    sync_playwright,
+)
 
 TOP_LEVEL_ROUTES = [
     ("home", "/"),
@@ -18,7 +25,15 @@ TOP_LEVEL_ROUTES = [
     ("api_keys", "/settings/api-keys"),
 ]
 
-VIEWPORTS = {
+
+class Viewport(TypedDict):
+    width: int
+    height: int
+    scheme: Literal["light", "dark"]
+    mobile: bool
+
+
+VIEWPORTS: dict[str, Viewport] = {
     "desktop_light": {
         "width": 1440,
         "height": 1200,
@@ -37,6 +52,27 @@ class Scenario:
     path: str
 
 
+# One finding: {"severity": "P1" | "P2" | "P3", "text": "..."}.
+Issue = dict[str, str]
+
+
+class Capture(TypedDict):
+    """One route at one viewport, as written to audit_matrix.json."""
+
+    route: str
+    route_name: str
+    viewport: str
+    screenshot: str
+    issues: list[Issue]
+
+
+class RuntimeTracker(TypedDict):
+    console_errors: list[str]
+    page_errors: list[str]
+    request_failures: list[dict[str, object]]
+    response_failures: list[dict[str, object]]
+
+
 def discover_plugin_ids(repo_root: Path) -> list[str]:
     plugin_root = repo_root / "src" / "plugins"
     return sorted(
@@ -49,8 +85,10 @@ def discover_plugin_ids(repo_root: Path) -> list[str]:
     )
 
 
-def fill_form_and_extract(page):
-    return page.evaluate("""
+def fill_form_and_extract(page: Page) -> dict[str, Any] | None:
+    # page.evaluate returns whatever the JS produced (JSON-shaped), so the
+    # annotation on this local is the contract.
+    payload: dict[str, Any] | None = page.evaluate("""
         () => {
           const form = document.querySelector('#settingsForm, #pluginForm');
           if (!form) return null;
@@ -85,9 +123,10 @@ def fill_form_and_extract(page):
           return data;
         }
         """)
+    return payload
 
 
-def stub_external_assets(page):
+def stub_external_assets(page: Page) -> None:
     page.route(
         "**/static/vendor/leaflet/leaflet.css",
         lambda route: route.fulfill(status=200, content_type="text/css", body=""),
@@ -185,8 +224,8 @@ def create_plugin_scenarios(base_url: str, plugin_id: str) -> list[Scenario]:
     return scenarios
 
 
-def collect_dom_issues(page, route_name: str):
-    return page.evaluate(
+def collect_dom_issues(page: Page, route_name: str) -> list[Issue]:
+    issues: list[Issue] = page.evaluate(
         """
         (routeName) => {
           const issues = [];
@@ -269,10 +308,11 @@ def collect_dom_issues(page, route_name: str):
         """,
         route_name,
     )
+    return issues
 
 
-def create_runtime_tracker(page, base_url: str):
-    tracker = {
+def create_runtime_tracker(page: Page, base_url: str) -> RuntimeTracker:
+    tracker: RuntimeTracker = {
         "console_errors": [],
         "page_errors": [],
         "request_failures": [],
@@ -280,7 +320,7 @@ def create_runtime_tracker(page, base_url: str):
     }
     page.on("pageerror", lambda exc: tracker["page_errors"].append(str(exc)))
 
-    def handle_console(msg):
+    def handle_console(msg: ConsoleMessage) -> None:
         if msg.type != "error":
             return
         text = msg.text
@@ -325,8 +365,8 @@ def create_runtime_tracker(page, base_url: str):
     return tracker
 
 
-def collect_runtime_issues(tracker):
-    issues = []
+def collect_runtime_issues(tracker: RuntimeTracker) -> list[Issue]:
+    issues: list[Issue] = []
     if tracker["page_errors"]:
         issues.append(
             {
@@ -359,9 +399,13 @@ def collect_runtime_issues(tracker):
 
 
 def capture_route(
-    browser, base_url: str, route_name: str, route_path: str, output_dir: Path
-):
-    matrix = []
+    browser: Browser,
+    base_url: str,
+    route_name: str,
+    route_path: str,
+    output_dir: Path,
+) -> list[Capture]:
+    matrix: list[Capture] = []
     for viewport_name, cfg in VIEWPORTS.items():
         print(f"[capture] {route_name} {viewport_name}", flush=True)
         context = browser.new_context(
@@ -411,8 +455,8 @@ def capture_route(
     return matrix
 
 
-def build_backlog(matrix: list[dict]) -> list[dict]:
-    backlog = []
+def build_backlog(matrix: list[Capture]) -> list[dict[str, str | int]]:
+    backlog: list[dict[str, str | int]] = []
     index = 1
     for capture in matrix:
         for issue in capture["issues"]:
@@ -430,7 +474,7 @@ def build_backlog(matrix: list[dict]) -> list[dict]:
     return backlog
 
 
-def write_artifacts(output_dir: Path, matrix: list[dict]):
+def write_artifacts(output_dir: Path, matrix: list[Capture]) -> None:
     backlog = build_backlog(matrix)
     (output_dir / "audit_matrix.json").write_text(json.dumps(matrix, indent=2))
     (output_dir / "audit_backlog.json").write_text(json.dumps(backlog, indent=2))
@@ -443,7 +487,7 @@ def write_artifacts(output_dir: Path, matrix: list[dict]):
     (output_dir / "audit_backlog.md").write_text("\n".join(lines) + "\n")
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(description="Capture a batched UI audit backlog.")
     parser.add_argument("--base-url", default="http://127.0.0.1:8080")
     parser.add_argument("--output-dir", default="runtime/mock_display_output/ui_audit")

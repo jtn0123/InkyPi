@@ -15,7 +15,9 @@ import json
 import os
 import sys
 import tarfile
+from collections.abc import Callable
 from datetime import UTC, datetime
+from typing import Any
 
 
 def _detect_instances_dir() -> str:
@@ -40,7 +42,7 @@ def _sha256_file(path: str) -> str:
     return h.hexdigest()
 
 
-def _read_manifest(tar: tarfile.TarFile) -> dict:
+def _read_manifest(tar: tarfile.TarFile) -> dict[str, Any]:
     """Extract and parse manifest.json from an open tarfile."""
     try:
         member = tar.getmember("manifest.json")
@@ -49,7 +51,8 @@ def _read_manifest(tar: tarfile.TarFile) -> dict:
     fobj = tar.extractfile(member)
     if fobj is None:
         raise ValueError("manifest.json is not a regular file")
-    return json.loads(fobj.read().decode("utf-8"))
+    manifest: dict[str, Any] = json.loads(fobj.read().decode("utf-8"))
+    return manifest
 
 
 def _pre_restore_backup(
@@ -128,7 +131,7 @@ def run_restore(
     config_dir: str,
     instances_dir: str,
     yes: bool = False,
-    _input_fn=input,
+    _input_fn: Callable[[str], str] = input,
 ) -> int:
     """Perform restore and return exit code."""
     backup_path = os.path.abspath(backup_path)

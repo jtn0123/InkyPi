@@ -45,6 +45,7 @@ import sys
 import tempfile
 import textwrap
 from pathlib import Path
+from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SRC_DIR = REPO_ROOT / "src"
@@ -117,7 +118,7 @@ def _run_plain_import_stats() -> dict[str, int]:
     }
 
 
-def _run_tracemalloc() -> dict:
+def _run_tracemalloc() -> dict[str, Any]:
     """Profile ``import inkypi`` using stdlib tracemalloc.
 
     Runs in a subprocess so ``sys.modules`` starts empty and tracemalloc
@@ -156,12 +157,12 @@ def _run_tracemalloc() -> dict:
     # The subprocess may emit warnings / log lines before the JSON; take the
     # last non-empty line.
     last = [line for line in proc.stdout.splitlines() if line.strip()][-1]
-    result = json.loads(last)
+    result: dict[str, Any] = json.loads(last)
     result.update(_run_plain_import_stats())
     return result
 
 
-def _run_memray() -> dict:
+def _run_memray() -> dict[str, Any]:
     """Profile ``import inkypi`` using memray.
 
     Runs ``memray run`` in a subprocess to produce a capture file, then
@@ -234,7 +235,7 @@ def _run_memray() -> dict:
                     break
             by_location[loc] = by_location.get(loc, 0) + size
 
-        allocators: list[dict] = [
+        allocators: list[dict[str, Any]] = [
             {"location": loc, "bytes": total}
             for loc, total in sorted(
                 by_location.items(), key=lambda kv: kv[1], reverse=True

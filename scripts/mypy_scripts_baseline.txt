@@ -1,0 +1,24 @@
+# Checked-in mypy scripts/ advisory baseline for scripts/lint.sh.
+#
+# The file holds exactly one value: the number on the last line. Everything
+# else is a comment. scripts/lint.sh fails if it finds more than one value, so
+# lowering the baseline means editing that last line, not adding another.
+#
+# Take the number from a CI lint job ("Found N errors in" under "ratchet —
+# scripts/ only"), never from a macOS run. CI runs on Linux, which installs the
+# `sys_platform == "linux"` dependencies (memray among them) that a macOS
+# checkout skips, so the two counts can differ. A lower local count passes as
+# "ratchet improved".
+#
+# History
+#
+# 92 -> 2 (2026-11-15): scripts/ was never type-checked before this pass. Its
+# 92 errors were annotations (dict and list type arguments, untyped defs and
+# callers), Optional and Any-returning json.loads results narrowed or annotated,
+# Pillow's Optional PixelAccess replaced by a typed getpixel helper, and
+# monkeypatches moved from bare assignment to unittest.mock.patch.object.
+#
+# 2 -> 0 (2026-11-15): the last two were defusedxml imports in coverage_gate.py.
+# types-defusedxml is now in the dev group; with real types, mypy also caught
+# that getroot() can return None, which coverage_gate.py now checks.
+0

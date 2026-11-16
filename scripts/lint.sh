@@ -5,6 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="${SCRIPT_DIR}/.."
 MYPY_SRC_BASELINE_FILE="${MYPY_SRC_BASELINE_FILE:-${REPO_ROOT}/scripts/mypy_src_baseline.txt}"
 MYPY_TESTS_BASELINE_FILE="${MYPY_TESTS_BASELINE_FILE:-${REPO_ROOT}/scripts/mypy_tests_baseline.txt}"
+MYPY_SCRIPTS_BASELINE_FILE="${MYPY_SCRIPTS_BASELINE_FILE:-${REPO_ROOT}/scripts/mypy_scripts_baseline.txt}"
 cd "${REPO_ROOT}" || exit
 
 # Use existing environment in CI or when a virtualenv is active
@@ -22,6 +23,9 @@ MYPY_SRC_RATCHET_EXIT=0
 MYPY_TESTS_EXIT=0
 MYPY_TESTS_BASELINE="?"
 MYPY_TESTS_RATCHET_EXIT=0
+MYPY_SCRIPTS_EXIT=0
+MYPY_SCRIPTS_BASELINE="?"
+MYPY_SCRIPTS_RATCHET_EXIT=0
 SHELLCHECK_EXIT=0
 BIOME_EXIT=0
 
@@ -43,11 +47,11 @@ else
     echo "✅ Black formatting check passed"
 fi
 
-# mypy runs in strict mode (mypy.ini) as two passes, src/ and tests/, so that
-# production-code type drift stays visible even when test-only typing noise
-# dominates. src/ must stay clean, while tests/ is ratcheted against a
-# checked-in baseline so new test typing debt cannot slip in silently.
-# See docs/typing.md.
+# mypy runs in strict mode (mypy.ini) as three passes, src/, tests/ and
+# scripts/, so that production-code type drift stays visible even when
+# test-only typing noise dominates. src/ must stay clean, while tests/ and
+# scripts/ are ratcheted against checked-in baselines so new typing debt
+# cannot slip in silently. See docs/typing.md.
 count_mypy_errors() {
     # Parse "Found N errors" / "Success: ..." lines from captured output.
     # Returns "?" when mypy exited non-zero without a recognizable summary
@@ -112,6 +116,13 @@ load_mypy_tests_baseline() {
 
     baseline_value="$(load_mypy_baseline "$MYPY_TESTS_BASELINE_FILE" "tests/")" || return 1
     MYPY_TESTS_BASELINE="$baseline_value"
+}
+
+load_mypy_scripts_baseline() {
+    local baseline_value
+
+    baseline_value="$(load_mypy_baseline "$MYPY_SCRIPTS_BASELINE_FILE" "scripts/")" || return 1
+    MYPY_SCRIPTS_BASELINE="$baseline_value"
 }
 
 # Run mypy on a directory and capture its error count for either advisory
@@ -224,10 +235,47 @@ enforce_mypy_tests_ratchet() {
     echo "✅ mypy tests/ ratchet held at baseline ${MYPY_TESTS_BASELINE}"
 }
 
+enforce_mypy_scripts_ratchet() {
+    local display_baseline_file="${MYPY_SCRIPTS_BASELINE_FILE#"${REPO_ROOT}"/}"
+
+    if ! load_mypy_scripts_baseline; then
+        MYPY_SCRIPTS_RATCHET_EXIT=1
+        return
+    fi
+
+    if [ "$MYPY_SCRIPTS_COUNT" = "?" ]; then
+        echo "❌ mypy scripts/ ratchet failed: unable to determine the advisory count for comparison"
+        MYPY_SCRIPTS_RATCHET_EXIT=1
+        return
+    fi
+
+    if [ "$MYPY_SCRIPTS_COUNT" -gt "$MYPY_SCRIPTS_BASELINE" ]; then
+        echo "❌ mypy scripts/ ratchet failed: ${MYPY_SCRIPTS_COUNT} issue(s) exceeds baseline ${MYPY_SCRIPTS_BASELINE}"
+        MYPY_SCRIPTS_RATCHET_EXIT=1
+        return
+    fi
+
+    if [ "$MYPY_SCRIPTS_BASELINE" -eq 0 ] && [ "$MYPY_SCRIPTS_EXIT" -ne 0 ]; then
+        echo "❌ mypy scripts/ must remain clean now that the baseline is zero"
+        MYPY_SCRIPTS_RATCHET_EXIT=1
+        return
+    fi
+
+    if [ "$MYPY_SCRIPTS_COUNT" -lt "$MYPY_SCRIPTS_BASELINE" ]; then
+        echo "✅ mypy scripts/ ratchet improved: ${MYPY_SCRIPTS_COUNT} issue(s) vs baseline ${MYPY_SCRIPTS_BASELINE}"
+        echo "ℹ️  Lower ${display_baseline_file} when that reduced count is ready to become the new floor."
+        return
+    fi
+
+    echo "✅ mypy scripts/ ratchet held at baseline ${MYPY_SCRIPTS_BASELINE}"
+}
+
 run_counted_mypy src "src/" SRC ratchet
 enforce_mypy_src_ratchet
 run_counted_mypy tests "tests/" TESTS ratchet
 enforce_mypy_tests_ratchet
+run_counted_mypy scripts "scripts/" SCRIPTS ratchet
+enforce_mypy_scripts_ratchet
 
 # Every tracked shell script: bash -n, then shellcheck at its default
 # severity. This is the only shellcheck run; CI's lint job gets it from here.
@@ -256,15 +304,16 @@ if [ $BIOME_EXIT -ne 0 ]; then
     echo "❌ Biome found issues (exit code: $BIOME_EXIT)"
 fi
 
-# Report summary — src/ must stay clean and tests/ is ratcheted. Ruff,
-# Black, shellcheck and Biome are blocking too.
-if [ $RUFF_EXIT -ne 0 ] || [ $BLACK_EXIT -ne 0 ] || [ $MYPY_SRC_RATCHET_EXIT -ne 0 ] || [ $MYPY_TESTS_RATCHET_EXIT -ne 0 ] || [ $SHELLCHECK_EXIT -ne 0 ] || [ $BIOME_EXIT -ne 0 ]; then
+# Report summary — src/ must stay clean and tests/ and scripts/ are ratcheted.
+# Ruff, Black, shellcheck and Biome are blocking too.
+if [ $RUFF_EXIT -ne 0 ] || [ $BLACK_EXIT -ne 0 ] || [ $MYPY_SRC_RATCHET_EXIT -ne 0 ] || [ $MYPY_TESTS_RATCHET_EXIT -ne 0 ] || [ $MYPY_SCRIPTS_RATCHET_EXIT -ne 0 ] || [ $SHELLCHECK_EXIT -ne 0 ] || [ $BIOME_EXIT -ne 0 ]; then
     echo ""
     echo "❌ Some checks failed:"
     [ $RUFF_EXIT -ne 0 ] && echo "  - Ruff: $RUFF_EXIT"
     [ $BLACK_EXIT -ne 0 ] && echo "  - Black: $BLACK_EXIT"
     [ $MYPY_SRC_RATCHET_EXIT -ne 0 ] && echo "  - mypy src/ ratchet: $MYPY_SRC_RATCHET_EXIT"
     [ $MYPY_TESTS_RATCHET_EXIT -ne 0 ] && echo "  - mypy tests/ ratchet: $MYPY_TESTS_RATCHET_EXIT"
+    [ $MYPY_SCRIPTS_RATCHET_EXIT -ne 0 ] && echo "  - mypy scripts/ ratchet: $MYPY_SCRIPTS_RATCHET_EXIT"
     [ $SHELLCHECK_EXIT -ne 0 ] && echo "  - shellcheck: $SHELLCHECK_EXIT"
     [ $BIOME_EXIT -ne 0 ] && echo "  - Biome: $BIOME_EXIT"
     echo ""
@@ -300,7 +349,21 @@ else
     echo "✅ mypy tests/: ${MYPY_TESTS_COUNT} issue(s) matches baseline ${MYPY_TESTS_BASELINE}"
 fi
 
-if [ $RUFF_EXIT -ne 0 ] || [ $BLACK_EXIT -ne 0 ] || [ $MYPY_SRC_RATCHET_EXIT -ne 0 ] || [ $MYPY_TESTS_RATCHET_EXIT -ne 0 ] || [ $SHELLCHECK_EXIT -ne 0 ] || [ $BIOME_EXIT -ne 0 ]; then
+if [ "$MYPY_SCRIPTS_BASELINE" = "?" ]; then
+    echo "❌ mypy scripts/: ratchet baseline could not be loaded"
+elif [ "$MYPY_SCRIPTS_COUNT" = "?" ]; then
+    echo "❌ mypy scripts/: ratchet could not compare against baseline ${MYPY_SCRIPTS_BASELINE}"
+elif [ "$MYPY_SCRIPTS_COUNT" -gt "$MYPY_SCRIPTS_BASELINE" ]; then
+    echo "❌ mypy scripts/: ${MYPY_SCRIPTS_COUNT} issue(s) exceeds baseline ${MYPY_SCRIPTS_BASELINE}"
+elif [ "$MYPY_SCRIPTS_COUNT" -lt "$MYPY_SCRIPTS_BASELINE" ]; then
+    echo "✅ mypy scripts/: ${MYPY_SCRIPTS_COUNT} issue(s) (below baseline ${MYPY_SCRIPTS_BASELINE})"
+elif [ $MYPY_SCRIPTS_EXIT -eq 0 ]; then
+    echo "✅ mypy scripts/: clean"
+else
+    echo "✅ mypy scripts/: ${MYPY_SCRIPTS_COUNT} issue(s) matches baseline ${MYPY_SCRIPTS_BASELINE}"
+fi
+
+if [ $RUFF_EXIT -ne 0 ] || [ $BLACK_EXIT -ne 0 ] || [ $MYPY_SRC_RATCHET_EXIT -ne 0 ] || [ $MYPY_TESTS_RATCHET_EXIT -ne 0 ] || [ $MYPY_SCRIPTS_RATCHET_EXIT -ne 0 ] || [ $SHELLCHECK_EXIT -ne 0 ] || [ $BIOME_EXIT -ne 0 ]; then
     exit 1
 fi
 

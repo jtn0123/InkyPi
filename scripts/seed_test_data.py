@@ -20,6 +20,10 @@ import shutil
 import sys
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from PIL.Image import Image
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -48,7 +52,7 @@ _COLOURS = [
 ]
 
 # Sample plugin instances to seed
-_SAMPLE_PLUGINS = [
+_SAMPLE_PLUGINS: list[dict[str, Any]] = [
     {
         "plugin_id": "year_progress",
         "name": "Year Progress",
@@ -155,7 +159,7 @@ def _safety_check(target: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
-def _make_image(colour: tuple[int, int, int]):
+def _make_image(colour: tuple[int, int, int]) -> Image:
     """Create a solid-colour 800x480 PIL Image."""
     try:
         from PIL import Image
