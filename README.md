@@ -216,7 +216,7 @@ cd InkyPi
 sudo bash install/do_update.sh
 ```
 
-Pin a specific version: `sudo bash install/do_update.sh vX.Y.Z` (a tag from [Releases](https://github.com/jtn0123/InkyPi/releases); with no tag it installs the latest)
+Pin a specific version: `sudo bash install/do_update.sh vX.Y.Z` (a tag from [Releases](https://github.com/jtn0123/InkyPi/releases); with no tag it installs the latest published release)
 
 The web UI's "Update" button uses the same path. For branch tracking, use `git pull` then `sudo bash install/update.sh`.
 

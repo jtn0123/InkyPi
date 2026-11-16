@@ -322,6 +322,108 @@ class TestDoUpdateOrigin:
         assert _git(device["repo"], "describe", "--tags") == "v0.0.1"
 
 
+def _add_draft_tag(repo: Path) -> None:
+    """Tag v0.0.3 on top of v0.0.2 without moving HEAD: a release that has
+    been tagged but not published yet."""
+    _git(repo, "checkout", "-q", "refs/tags/v0.0.2", "--")
+    (repo / "VERSION").write_text("0.0.3\n")
+    _git(repo, "commit", "-q", "-am", "v0.0.3")
+    _git(repo, "tag", "v0.0.3")
+    _git(repo, "checkout", "-q", "refs/tags/v0.0.1", "--")
+
+
+def _fake_curl(tmp_path: Path, body: str | None) -> dict[str, str]:
+    """A curl that prints *body* (None: fails like an unreachable host) and
+    logs its arguments. Returns the env that puts it first on PATH."""
+    bin_dir = tmp_path / "fake-bin"
+    bin_dir.mkdir()
+    log = tmp_path / "curl.log"
+    script = f'#!/bin/bash\necho "$*" >> "{log}"\n'
+    if body is None:
+        script += "exit 22\n"
+    else:
+        (tmp_path / "curl-body.json").write_text(body)
+        script += f'cat "{tmp_path / "curl-body.json"}"\n'
+    (bin_dir / "curl").write_text(script)
+    (bin_dir / "curl").chmod(0o755)
+    return {"PATH": f"{bin_dir}{os.pathsep}{os.environ['PATH']}"}
+
+
+class TestDoUpdateDefaultTarget:
+    """E5: with no tag given, install the latest *published* release. The
+    release workflow tags first and publishes only once every file is
+    attached, so the newest tag can belong to a draft."""
+
+    def test_installs_the_published_release_not_a_newer_draft_tag(
+        self, device: dict[str, Path], tmp_path: Path
+    ) -> None:
+        _make_repo(device["repo"])
+        _add_draft_tag(device["repo"])
+        env = _fake_curl(tmp_path, '{"tag_name": "v0.0.2", "draft": false}')
+        proc = _do_update(device, "", env)
+        assert proc.returncode == 0, proc.stdout + proc.stderr
+        assert "Latest release: v0.0.2" in proc.stdout
+        assert _git(device["repo"], "describe", "--tags") == "v0.0.2"
+        log = (tmp_path / "curl.log").read_text()
+        assert "https://api.github.com/repos/jtn0123/InkyPi/releases/latest" in log
+
+    def test_asks_the_fork_the_device_follows(
+        self, device: dict[str, Path], tmp_path: Path
+    ) -> None:
+        _make_repo(device["repo"], origin="https://github.com/someone/InkyPi.git")
+        env = _fake_curl(tmp_path, '{"tag_name": "v0.0.2"}')
+        proc = _do_update(device, "", {**env, "INKYPI_GITHUB_REPO": "someone/InkyPi"})
+        assert proc.returncode == 0, proc.stdout + proc.stderr
+        log = (tmp_path / "curl.log").read_text()
+        assert "repos/someone/InkyPi/releases/latest" in log
+
+    @pytest.mark.parametrize(
+        ("body", "message"),
+        [
+            (None, "Couldn't ask GitHub for the latest release"),
+            ("not json", "Couldn't ask GitHub for the latest release"),
+            (
+                '{"tag_name": "v0.0.2-rc1"}',
+                "Couldn't ask GitHub for the latest release",
+            ),
+            ('{"tag_name": "v9.9.9"}', "The latest release, v9.9.9, has no tag here"),
+        ],
+    )
+    def test_falls_back_to_the_newest_tag(
+        self,
+        device: dict[str, Path],
+        tmp_path: Path,
+        body: str | None,
+        message: str,
+    ) -> None:
+        _make_repo(device["repo"])
+        _add_draft_tag(device["repo"])
+        proc = _do_update(device, "", _fake_curl(tmp_path, body))
+        assert proc.returncode == 0, proc.stdout + proc.stderr
+        assert message in proc.stdout
+        assert "Target version: v0.0.3" in proc.stdout
+        assert _git(device["repo"], "describe", "--tags") == "v0.0.3"
+
+    def test_does_not_step_back_from_a_newer_pinned_tag(
+        self, device: dict[str, Path], tmp_path: Path
+    ) -> None:
+        _make_repo(device["repo"])
+        _add_draft_tag(device["repo"])
+        _git(device["repo"], "checkout", "-q", "refs/tags/v0.0.3", "--")
+        proc = _do_update(device, "", _fake_curl(tmp_path, '{"tag_name": "v0.0.2"}'))
+        assert proc.returncode == 0, proc.stdout + proc.stderr
+        assert "Already newer than the latest release, v0.0.2" in proc.stdout
+        assert _git(device["repo"], "describe", "--tags") == "v0.0.3"
+
+    def test_a_named_tag_skips_the_lookup(
+        self, device: dict[str, Path], tmp_path: Path
+    ) -> None:
+        _make_repo(device["repo"])
+        proc = _do_update(device, "v0.0.2", _fake_curl(tmp_path, None))
+        assert proc.returncode == 0, proc.stdout + proc.stderr
+        assert not (tmp_path / "curl.log").exists()
+
+
 @pytest.fixture
 def install_tree(tmp_path: Path) -> dict[str, Path]:
     if not shutil.which("bash"):
