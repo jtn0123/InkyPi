@@ -402,7 +402,7 @@ def refresh_info() -> ResponseReturnValue:
         info = device_config.get_refresh_info().to_dict()
     except Exception:
         # Return an empty payload on failure — callers (dashboard JS and
-        # unit tests in test_blueprint_coverage / test_startup_recovery) expect
+        # tests in test_main_routes / test_startup_recovery_validation) expect
         # `{}` rather than partial schedule metadata when refresh_info is
         # broken or missing.
         return jsonify({})
