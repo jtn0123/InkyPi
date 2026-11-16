@@ -46,6 +46,9 @@ class RefreshContext:
         history_image_dir: Directory for historical image snapshots.
         resolution: ``(width, height)`` tuple for the display.
         timezone: IANA timezone string (e.g. ``"America/New_York"``).
+        validated_config_digest: The parent ``Config``'s
+            :meth:`~config.Config.validated_config_digest` at the time of the
+            attempt, so the child can skip validating identical content.
     """
 
     config_file: str
@@ -55,6 +58,7 @@ class RefreshContext:
     history_image_dir: str
     resolution: tuple[int, int]
     timezone: str
+    validated_config_digest: str | None = None
 
     @classmethod
     def from_config(cls, device_config: SupportsRefreshConfig) -> RefreshContext:
@@ -113,4 +117,4 @@ class RefreshContext:
         Config.processed_image_file = self.processed_image_file
         Config.plugin_image_dir = self.plugin_image_dir
         Config.history_image_dir = self.history_image_dir
-        return Config()
+        return Config(trusted_config_digest=self.validated_config_digest)

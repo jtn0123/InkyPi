@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import logging
 import os
 import queue
@@ -170,6 +171,11 @@ class RefreshExecutor:
             # A worker tempfile is ours to delete; a plugin's cache file
             # (``image_path_owned`` False) must stay for the next turn.
             owned = payload.get("image_path_owned", True) is not False
+            if refresh_action is not None:
+                # The worker set this on its own copy of the action; record it
+                # here so the display can copy the cache file instead of
+                # encoding the image again. A tempfile is gone after this read.
+                refresh_action.cached_image_path = None if owned else image_path
             try:
                 with Image.open(image_path) as image:
                     result_image = image.copy()
@@ -190,6 +196,24 @@ class RefreshExecutor:
             str(payload.get("error_message") or "unknown error"),
         )
 
+    def attempt_context(self) -> RefreshContext:
+        """The refresh context for one worker, with the config hash it may trust.
+
+        The worker rebuilds ``Config`` from the file; given the hash of the
+        content this process already validated, it skips validating the same
+        bytes again (and never imports jsonschema for it).
+        """
+        get_digest = getattr(self.device_config, "validated_config_digest", None)
+        # Test doubles stand in for either side; hand those over untouched.
+        context: object = self.refresh_context
+        if not isinstance(context, RefreshContext) or not callable(get_digest):
+            return self.refresh_context
+        digest = get_digest()
+        return dataclasses.replace(
+            self.refresh_context,
+            validated_config_digest=digest if isinstance(digest, str) else None,
+        )
+
     def run_subprocess_attempt(
         self,
         refresh_action: RefreshAction,
@@ -208,7 +232,7 @@ class RefreshExecutor:
                 result_queue,
                 plugin_config,
                 refresh_action,
-                self.refresh_context,
+                self.attempt_context(),
                 current_dt,
             ),
             daemon=True,

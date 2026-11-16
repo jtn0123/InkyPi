@@ -3,6 +3,7 @@ import logging
 import os
 import random
 import sqlite3
+import threading
 import time
 from typing import Any, Protocol
 
@@ -34,6 +35,22 @@ class _SaveFailureLog:
 
 
 _save_failures = _SaveFailureLog()
+
+#: Benchmark rows older than this are deleted by :func:`prune_benchmarks`.
+#: The diagnostics page shows at most the last 7 days; 30 keeps a month for
+#: ad-hoc ``?window=30d`` queries. A Pi writes ~330 rows a day (one refresh
+#: row and ~3 stage rows per picture), so this caps the database at ~10k rows
+#: instead of growing it for as long as the device runs.
+BENCHMARK_RETENTION_DAYS = 30
+
+# Databases whose schema this process has already checked: path and file
+# identity -> the ``PRAGMA schema_version`` seen right after the check. A
+# matching version means nobody changed or recreated the schema since (a
+# recreated file starts at 0), so the check is skipped. Without this every
+# saved event ran two PRAGMA table_info scans and the CREATE statements
+# before its INSERT.
+_schema_checked: dict[tuple[str, int, int], int] = {}
+_schema_lock = threading.Lock()
 
 
 def _get_db_path(device_config: DeviceConfigLike) -> str:
@@ -159,7 +176,54 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
             "extra_json": "TEXT",
         },
     )
+    # The benchmark routes filter refresh_events by ts and stage_events by
+    # refresh_id; the prune deletes from both by ts.
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_refresh_events_ts ON refresh_events (ts)"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_stage_events_refresh_id "
+        "ON stage_events (refresh_id)"
+    )
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_stage_events_ts ON stage_events (ts)")
     conn.commit()
+
+
+def _schema_key(db_path: str) -> tuple[str, int, int] | None:
+    try:
+        st = os.stat(db_path)
+    except OSError:
+        return None
+    return (os.path.abspath(db_path), st.st_dev, st.st_ino)
+
+
+def _schema_version(conn: sqlite3.Connection) -> int:
+    row = conn.execute("PRAGMA schema_version").fetchone()
+    return int(row[0]) if row else 0
+
+
+def _connect(db_path: str) -> sqlite3.Connection:
+    """Open *db_path*, creating or upgrading its schema once per process.
+
+    A fresh connection per call: events are saved from the refresh thread
+    and from request threads, and render workers are forked, so a shared
+    connection would need cross-thread locking and must never cross a fork.
+    Opening the file is cheap; the schema check is what this skips.
+    """
+    os.makedirs(os.path.dirname(db_path) or ".", exist_ok=True)
+    conn = sqlite3.connect(db_path)
+    try:
+        key = _schema_key(db_path)
+        with _schema_lock:
+            version = _schema_version(conn)
+            if key is None or _schema_checked.get(key) != version:
+                _ensure_schema(conn)
+                if key is not None:
+                    _schema_checked[key] = _schema_version(conn)
+    except BaseException:
+        conn.close()
+        raise
+    return conn
 
 
 _ALLOWED_TABLES = frozenset({"refresh_events", "stage_events"})
@@ -268,11 +332,8 @@ def save_refresh_event(
     try:
         if not _should_record_event(device_config, refresh_event):
             return
-        db_path = _get_db_path(device_config)
-        os.makedirs(os.path.dirname(db_path), exist_ok=True)
-        conn = sqlite3.connect(db_path)
+        conn = _connect(_get_db_path(device_config))
         try:
-            _ensure_schema(conn)
             cur = conn.cursor()
             # Resolve timestamp safely
             ts_raw = refresh_event.get("ts")
@@ -325,11 +386,8 @@ def save_stage_event(
     try:
         if not _is_enabled(device_config):
             return
-        db_path = _get_db_path(device_config)
-        os.makedirs(os.path.dirname(db_path), exist_ok=True)
-        conn = sqlite3.connect(db_path)
+        conn = _connect(_get_db_path(device_config))
         try:
-            _ensure_schema(conn)
             cur = conn.cursor()
             cur.execute(
                 """
@@ -354,3 +412,37 @@ def save_stage_event(
         _save_failures.succeeded()
     except Exception as exc:
         _save_failures.failed(f"the {stage} stage", exc)
+
+
+def prune_benchmarks(
+    device_config: DeviceConfigLike,
+    max_age_days: float = BENCHMARK_RETENTION_DAYS,
+    *,
+    now: float | None = None,
+) -> int:
+    """Delete benchmark rows older than *max_age_days*; return how many.
+
+    Runs whether or not benchmarks are enabled, since turning them off does
+    not delete what was recorded. Does nothing if the database does not
+    exist. Raises whatever sqlite raises; the caller decides how to report.
+    """
+    db_path = _get_db_path(device_config)
+    if not os.path.isfile(db_path):
+        return 0
+    cutoff = (time.time() if now is None else now) - max_age_days * 86400
+    conn = _connect(db_path)
+    try:
+        deleted = conn.execute(
+            "DELETE FROM refresh_events WHERE ts < ?", (cutoff,)
+        ).rowcount
+        deleted += conn.execute(
+            "DELETE FROM stage_events WHERE ts < ?", (cutoff,)
+        ).rowcount
+        conn.commit()
+    finally:
+        conn.close()
+    if deleted:
+        logger.info(
+            "Pruned %d benchmark rows older than %s days", deleted, max_age_days
+        )
+    return deleted

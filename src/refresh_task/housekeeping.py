@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 import os
 from collections.abc import Mapping
-from typing import Protocol
+from typing import Protocol, cast
 
 from PIL import Image
 
@@ -88,6 +88,22 @@ class RefreshHousekeeper:
             prune_unreferenced_uploads(get_upload_dir(), snapshots)
         except Exception:
             logger.exception("upload_cleanup: unexpected error during cleanup")
+
+    def maybe_prune_benchmarks(
+        self, *, tick_count: int, cleanup_interval_ticks: int
+    ) -> None:
+        """Delete old benchmark rows every N ticks, without raising."""
+        if tick_count % cleanup_interval_ticks != 0:
+            return
+        try:
+            from benchmarks.benchmark_storage import (
+                DeviceConfigLike,
+                prune_benchmarks,
+            )
+
+            prune_benchmarks(cast(DeviceConfigLike, self.device_config))
+        except Exception:
+            logger.exception("benchmark_cleanup: unexpected error during prune")
 
     @staticmethod
     def build_history_meta(

@@ -29,6 +29,7 @@ class _DisplayManager:
         history_meta: dict[str, str | None] | None = None,
         on_image_saved: Any = None,
         image_hash: str | None = None,
+        source_png: str | None = None,
     ) -> object:
         self.calls.append(
             {
@@ -37,6 +38,7 @@ class _DisplayManager:
                 "history_meta": history_meta,
                 "on_image_saved": on_image_saved,
                 "image_hash": image_hash,
+                "source_png": source_png,
             }
         )
         if on_image_saved is not None:

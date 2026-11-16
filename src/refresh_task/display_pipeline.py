@@ -26,6 +26,7 @@ class SupportsDisplayPipeline(Protocol):
         history_meta: dict[str, str | None] | None = ...,
         on_image_saved: Callable[[Mapping[str, Any]], None] | None = ...,
         image_hash: str | None = ...,
+        source_png: str | None = ...,
     ) -> object: ...
 
     def panel_shows(
@@ -78,6 +79,7 @@ class DisplayPipeline:
         instance_name: str | None,
         request_id: str | None,
         manual_request: ManualUpdateRequest | None,
+        source_png: str | None = None,
     ) -> tuple[int | None, int | None]:
         """Push the image to the display, or skip when the cache is warm."""
         if not used_cached:
@@ -91,6 +93,7 @@ class DisplayPipeline:
                 instance_name=instance_name,
                 request_id=request_id,
                 manual_request=manual_request,
+                source_png=source_png,
             )
         logger.info(
             f"Image already displayed, skipping refresh. | refresh_info: {refresh_info}"
@@ -119,8 +122,13 @@ class DisplayPipeline:
         instance_name: str | None,
         request_id: str | None,
         manual_request: ManualUpdateRequest | None = None,
+        source_png: str | None = None,
     ) -> tuple[int | None, int | None]:
-        """Push image to the display hardware and record display benchmark stages."""
+        """Push image to the display hardware and record display benchmark stages.
+
+        *source_png* is a PNG file that already holds exactly *image*; the
+        display manager copies it instead of encoding *image* again.
+        """
         logger.info(f"Updating display. | refresh_info: {refresh_info}")
         history_meta = self.housekeeper.build_history_meta(refresh_action)
         logger.info(
@@ -158,6 +166,7 @@ class DisplayPipeline:
                 # RefreshTask already hashed this exact image for its cache
                 # check; reuse it instead of hashing the frame again.
                 image_hash=refresh_info.get("image_hash"),
+                source_png=source_png,
             )
             if isinstance(display_metrics, dict):
                 preprocess_ms = display_metrics.get("preprocess_ms")

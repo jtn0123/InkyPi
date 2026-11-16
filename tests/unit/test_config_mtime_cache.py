@@ -88,11 +88,11 @@ def _make_config(
 def test_repeated_reads_use_cache(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> Any:
-    """1 000 read_config() calls on an unchanged file produce only 1 json.load."""
+    """1 000 read_config() calls on an unchanged file produce only 1 json.loads."""
     cfg = _make_config(tmp_path, monkeypatch)
 
     parse_count = {"n": 0}
-    original_json_load = json.load
+    original_json_load = json.loads
 
     def counting_load(fp: Any) -> Any:
         parse_count["n"] += 1
@@ -100,11 +100,11 @@ def test_repeated_reads_use_cache(
 
     import config as config_mod
 
-    with patch.object(config_mod.json, "load", side_effect=counting_load):
+    with patch.object(config_mod.json, "loads", side_effect=counting_load):
         results = [cfg.read_config() for _ in range(1000)]
 
     assert parse_count["n"] == 0, (
-        f"Expected 0 json.load calls (all cache hits) but got {parse_count['n']}. "
+        f"Expected 0 json.loads calls (all cache hits) but got {parse_count['n']}. "
         "The mtime cache is not working."
     )
     assert results[-1]["name"] == "CacheTest"
@@ -120,18 +120,18 @@ def test_first_read_after_construction_hits_cache(
     assert cfg._config_cache_mtime is not None
     assert cfg._config_cache_data is not None
 
-    # A second call should hit the cache (no json.load)
+    # A second call should hit the cache (no json.loads)
     parse_count = {"n": 0}
 
     import config as config_mod
 
-    original_load = json.load
+    original_load = json.loads
 
     def counting_load(fp: Any) -> Any:
         parse_count["n"] += 1
         return original_load(fp)
 
-    with patch.object(config_mod.json, "load", side_effect=counting_load):
+    with patch.object(config_mod.json, "loads", side_effect=counting_load):
         result = cfg.read_config()
 
     assert parse_count["n"] == 0
@@ -197,20 +197,20 @@ def test_mtime_bump_invalidates_cache(
     parse_count = {"n": 0}
     import config as config_mod
 
-    original_load = json.load
+    original_load = json.loads
 
     def counting_load(fp: Any) -> Any:
         parse_count["n"] += 1
         return original_load(fp)
 
-    with patch.object(config_mod.json, "load", side_effect=counting_load):
+    with patch.object(config_mod.json, "loads", side_effect=counting_load):
         cfg.read_config()
 
     new_mtime = cfg._config_cache_mtime
     assert new_mtime != original_mtime, "mtime_ns should have changed after utime()"
     assert (
         parse_count["n"] == 1
-    ), f"Expected exactly 1 json.load after mtime bump, got {parse_count['n']}"
+    ), f"Expected exactly 1 json.loads after mtime bump, got {parse_count['n']}"
 
 
 # ---------------------------------------------------------------------------
@@ -229,22 +229,22 @@ def test_invalidate_config_cache_clears_cache(
     assert cfg._config_cache_mtime is None
     assert cfg._config_cache_data is None
 
-    # Next read must re-parse (json.load is called)
+    # Next read must re-parse (json.loads is called)
     parse_count = {"n": 0}
     import config as config_mod
 
-    original_load = json.load
+    original_load = json.loads
 
     def counting_load(fp: Any) -> Any:
         parse_count["n"] += 1
         return original_load(fp)
 
-    with patch.object(config_mod.json, "load", side_effect=counting_load):
+    with patch.object(config_mod.json, "loads", side_effect=counting_load):
         result = cfg.read_config()
 
     assert (
         parse_count["n"] == 1
-    ), f"Expected 1 json.load after invalidation, got {parse_count['n']}"
+    ), f"Expected 1 json.loads after invalidation, got {parse_count['n']}"
     assert result["name"] == "CacheTest"
 
 
@@ -271,13 +271,13 @@ def test_write_config_refreshes_cache(
     parse_count = {"n": 0}
     import config as config_mod
 
-    original_load = json.load
+    original_load = json.loads
 
     def counting_load(fp: Any) -> Any:
         parse_count["n"] += 1
         return original_load(fp)
 
-    with patch.object(config_mod.json, "load", side_effect=counting_load):
+    with patch.object(config_mod.json, "loads", side_effect=counting_load):
         result = cfg.read_config()
 
     assert (
@@ -417,7 +417,7 @@ def test_stat_failure_clears_cache_and_falls_back_to_full_read(
     import config as config_mod
 
     parse_count = {"n": 0}
-    original_load = json.load
+    original_load = json.loads
 
     def counting_load(fp: Any) -> Any:
         parse_count["n"] += 1
@@ -425,7 +425,7 @@ def test_stat_failure_clears_cache_and_falls_back_to_full_read(
 
     with (
         patch.object(config_mod.os, "stat", side_effect=OSError("simulated")),
-        patch.object(config_mod.json, "load", side_effect=counting_load),
+        patch.object(config_mod.json, "loads", side_effect=counting_load),
     ):
         result = cfg.read_config()
 
