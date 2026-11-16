@@ -131,7 +131,6 @@ _PUBLIC_FUNCTIONS = (
     "showToast",
     "showResponseModal",
     "showError",
-    "handleJsonResponse",
     "fetchJson",
     "createRefreshSettingsManager",
 )

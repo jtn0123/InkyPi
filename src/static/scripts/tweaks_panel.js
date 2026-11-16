@@ -49,17 +49,15 @@
         }
     }
 
+    // Only the hue is set here. The tokens build --accent from --accent-h
+    // with each theme's own lightness, so switching theme keeps button text
+    // readable, and the high-contrast rules (which set --accent itself)
+    // still win over the user's hue.
     function applyAccent(hue) {
         let h = Number.parseInt(hue, 10);
         if (Number.isNaN(h)) return;
         h = Math.max(MIN_ACCENT, Math.min(MAX_ACCENT, h));
-        const root = document.documentElement;
-        // Override the default --accent hue while preserving lightness/chroma from tokens
-        const isDark = root.dataset.theme !== 'light';
-        const l = isDark ? '68%' : '56%';
-        const c = '0.08';
-        root.style.setProperty('--accent', 'oklch(' + l + ' ' + c + ' ' + h + ')');
-        root.style.setProperty('--accent-hover', 'oklch(' + (isDark ? '74%' : '48%') + ' 0.09 ' + h + ')');
+        document.documentElement.style.setProperty('--accent-h', String(h));
     }
 
     // Trim trailing slash characters without using a regex. Sonar S5852
@@ -192,8 +190,7 @@
                 save({});
                 applyAesthetic(DEFAULT_AESTHETIC);
                 applyDensity(DEFAULT_DENSITY);
-                document.documentElement.style.removeProperty('--accent');
-                document.documentElement.style.removeProperty('--accent-hover');
+                document.documentElement.style.removeProperty('--accent-h');
                 syncAestheticActive(DEFAULT_AESTHETIC);
                 syncDensityActive(DEFAULT_DENSITY);
                 syncAccent(DEFAULT_ACCENT);

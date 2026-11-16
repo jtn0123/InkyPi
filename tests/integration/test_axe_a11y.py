@@ -2,8 +2,9 @@
 Axe-core accessibility scans for every main route.
 
 These tests load each page in a real Playwright browser, inject axe-core, and
-assert zero *new* violations.  Known pre-existing violations are whitelisted
-with TODO references so they can be burned down incrementally.
+assert zero violations. A rule that can't be fixed yet may be allowed for a
+route in _KNOWN_VIOLATIONS with a TODO reference, and the test fails once an
+allowed rule stops firing, so a fixed rule can't come back unnoticed.
 
 Gate: SKIP_BROWSER=1 or SKIP_A11Y=1 causes pytest to skip collection entirely
 (handled by conftest.pytest_ignore_collect).
@@ -31,57 +32,11 @@ _ROUTES: list[tuple[str, str]] = [
     ("plugin_clock", "/plugin/clock"),
 ]
 
-# ── Known violations whitelisted per-route ──────────────────────────────────
-# Each entry maps an axe rule-id to a TODO ticket so regressions are tracked.
-_KNOWN_VIOLATIONS: dict[str, set[str]] = {
-    # landmark-one-main / region fire because axe sees content outside <main>
-    # due to skip-link and modal markup.  TODO(JTN-508): restructure base.html.
-    #
-    # landmark-banner-is-top-level fires on pages with <header role="banner">
-    # nested inside <main>.  TODO(JTN-508): move banner outside <main>.
-    #
-    # aria-dialog-name fires on the response modal and schedule modal when
-    # aria-labelledby points to an empty <p>.  TODO(JTN-509): set modal title.
-    #
-    "home": {
-        "landmark-one-main",
-        "region",
-    },
-    "settings": {
-        "landmark-one-main",
-        "region",
-        "landmark-banner-is-top-level",  # TODO(JTN-508)
-        "aria-dialog-name",  # TODO(JTN-509)
-    },
-    "playlist": {
-        "landmark-one-main",
-        "region",
-        "landmark-banner-is-top-level",  # TODO(JTN-508)
-        "heading-order",  # TODO(JTN-508): h3 inside empty-state skips h2
-        "aria-dialog-name",  # TODO(JTN-509)
-    },
-    "history": {
-        "landmark-one-main",
-        "region",
-        "landmark-banner-is-top-level",  # TODO(JTN-508)
-        "heading-order",  # TODO(JTN-508)
-        "aria-dialog-name",  # TODO(JTN-509)
-    },
-    "api_keys": {
-        "landmark-one-main",
-        "region",
-        "landmark-banner-is-top-level",  # TODO(JTN-508)
-        "heading-order",  # TODO(JTN-508)
-        "aria-dialog-name",  # TODO(JTN-509)
-    },
-    "plugin_clock": {
-        "landmark-one-main",
-        "region",
-        "aria-dialog-name",  # TODO(JTN-509)
-        "nested-interactive",  # TODO(JTN-511): collapsible button wraps interactive
-        "aria-hidden-focus",  # TODO(JTN-511): hidden modal contains focusable elements
-    },
-}
+# ── Known violations allowed per route ──────────────────────────────────────
+# Maps a route name to the axe rule ids it may still violate, each with a
+# TODO ticket. Empty: every rule passes on every route. The test fails when an
+# allowed rule no longer fires, so remove an entry as soon as its fix lands.
+_KNOWN_VIOLATIONS: dict[str, set[str]] = {}
 
 
 def _load_axe_js() -> str:
@@ -99,6 +54,7 @@ def test_axe_scan(live_server: str, route_name: Any, route_path: Any) -> None:
     from playwright.sync_api import sync_playwright
     from tests.integration.browser_helpers import (
         RequestTracker,
+        assert_axe_allowlist,
         wait_for_page_settled,
     )
 
@@ -125,13 +81,4 @@ def test_axe_scan(live_server: str, route_name: Any, route_path: Any) -> None:
         finally:
             browser.close()
 
-    known = _KNOWN_VIOLATIONS.get(route_name, set())
-    new_violations = [
-        v for v in (result.get("violations") or []) if v["id"] not in known
-    ]
-
-    if new_violations:
-        summary = "\n".join(
-            f"  - {v['id']} ({v['impact']}): {v['description']}" for v in new_violations
-        )
-        pytest.fail(f"New a11y violations on {route_name}:\n{summary}")
+    assert_axe_allowlist(result, _KNOWN_VIOLATIONS.get(route_name, set()), route_name)

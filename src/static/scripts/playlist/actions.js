@@ -99,14 +99,14 @@
           body: data,
         }
       );
-      sessionStorage.setItem(
-        "storedMessage",
-        JSON.stringify({ type: "success", text: `Success! ${result.message}` })
-      );
-      location.reload();
+      ns.reloadWithMessage("success", `Success! ${result.message}`);
     });
   }
 
+  // Draws the playlist's next item. The request returns once the panel has
+  // been drawn, which can take a while on a Pi Zero; the confirm dialog's
+  // button shows that it is working (see openDisplayNextConfirmModal).
+  // Resolves true when the page is reloading, false when it stays.
   async function displayNextInPlaylist(name) {
     const card = document.querySelector(
       `[data-playlist-name="${CSS.escape(name)}"]`
@@ -116,24 +116,24 @@
         "failure",
         "Cannot display next — playlist has no items."
       );
-      return;
+      return false;
     }
     try {
-      const resp = await fetch(ns.config.display_next_url, {
+      const result = await fetchJson(ns.config.display_next_url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ playlist_name: name }),
       });
-      const result = await handleJsonResponse(resp);
-      if (resp.ok && result?.success) {
-        showResponseModal("success", "Display updated — refreshing…");
-        setTimeout(() => {
-          location.reload();
-        }, 500);
-      }
+      ns.reloadWithMessage("success", result?.message || "Display updated.");
+      return true;
     } catch (error) {
+      // Shown in the toast below, so it isn't logged as an error.
       console.debug("Failed to trigger display next:", error);
-      showResponseModal("failure", "Failed to trigger display");
+      showResponseModal(
+        "failure",
+        `Failed to display next: ${globalThis.InkyPiHttp.errorMessage(error)}`
+      );
+      return false;
     }
   }
 

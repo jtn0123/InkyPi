@@ -5,7 +5,7 @@ Tests for ARIA landmark roles and skip-to-content link (JTN-296 partial).
 Verifies that:
 - Base template contains a skip-to-content link pointing to #main-content
 - All main pages contain role="main" (or <main>) with id="main-content"
-- All main pages contain role="banner" (or <header>) for the page header
+- No page puts a banner landmark inside <main>, and none has two banners
 - The dashboard page exposes a role="navigation" for the site-nav links
 - Skip link CSS positions it off-screen by default
 """
@@ -102,21 +102,32 @@ def test_main_element_has_tabindex_minus_one(client: FlaskClient, path: Any) -> 
 
 
 # ---------------------------------------------------------------------------
-# role="banner" / <header>
-# Plugin pages are out of scope for this PR (JTN-296 partial).
+# role="banner"
+# A banner is site-level and must be top-level. The shared pageheader sits
+# inside <main>, so it is a plain <header> there; the dashboard's hand-rolled
+# header sits before <main> and is the one page that keeps role="banner".
 # ---------------------------------------------------------------------------
 
-BANNER_PAGES = [p for p in MAIN_PAGES if not p.startswith("/plugin")]
+_BANNER = re.compile(r'role=["\']banner["\']')
 
 
-@pytest.mark.parametrize("path", BANNER_PAGES)
-def test_shared_layout_pages_have_banner_landmark(
-    client: FlaskClient, path: Any
-) -> None:
-    """Shared-layout pages (non-plugin) must have <header role='banner'>."""
+@pytest.mark.parametrize("path", MAIN_PAGES)
+def test_no_banner_landmark_inside_main(client: FlaskClient, path: Any) -> None:
     html = _html(client, path)
-    has_banner = bool(re.search(r'role=["\']banner["\']', html))
-    assert has_banner, f"No role='banner' found on {path}"
+    main = re.search(r"<main\b.*?</main>", html, re.DOTALL)
+    assert main, f"No <main> on {path}"
+    assert not _BANNER.search(main.group(0)), (
+        f"role='banner' inside <main> on {path}: a banner must be top-level "
+        "(axe landmark-banner-is-top-level)"
+    )
+    assert len(_BANNER.findall(html)) <= 1, f"More than one banner on {path}"
+
+
+def test_shared_pageheader_is_not_a_banner(client: FlaskClient) -> None:
+    html = _html(client, "/playlist")
+    header = re.search(r'<header class="pageheader"[^>]*>', html)
+    assert header, "shared pageheader not rendered on /playlist"
+    assert "role=" not in header.group(0)
 
 
 # ---------------------------------------------------------------------------

@@ -18,7 +18,6 @@
   "javascript": {
     "globals": [
       "fetchJson",
-      "handleJsonResponse",
       "showError",
       "showResponseModal",
       "showToast"

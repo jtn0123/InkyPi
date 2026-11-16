@@ -54,6 +54,7 @@ def test_playlist_accessibility_with_axe(
     html = resp.data.decode("utf-8")
 
     from playwright.sync_api import sync_playwright
+    from tests.integration.browser_helpers import assert_axe_allowlist
 
     # Load axe-core from local fixture
     axe_path = Path(__file__).parent.parent / "fixtures" / "axe.min.js"
@@ -67,15 +68,4 @@ def test_playlist_accessibility_with_axe(
         result = page.evaluate("() => axe.run(document)")
         browser.close()
 
-    # Filter out known violations that are pre-existing upstream issues
-    # "label" and "select-name" have been fixed by JTN-315
-    # landmark-banner-is-top-level: pageheader sits inside <main> on the
-    # playlist page; tracked with other nested-banner routes in JTN-508.
-    known_violations = {
-        "landmark-one-main",
-        "region",
-        "landmark-banner-is-top-level",  # TODO(JTN-508)
-    }
-    all_violations = result.get("violations") or []
-    violations = [v for v in all_violations if v.get("id") not in known_violations]
-    assert not violations, f"New A11y violations: {[v.get('id') for v in violations]}"
+    assert_axe_allowlist(result, set(), "/playlist")

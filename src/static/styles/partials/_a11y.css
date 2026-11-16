@@ -24,12 +24,15 @@
 }
 
 /* High contrast mode support ("Increase contrast" in the OS settings).
-   "more" is the standard value; browsers ignore a block written for "high". */
+   "more" is the standard value; browsers ignore a block written for "high".
+   These replace --accent outright, so the Tweaks hue (--accent-h) has no
+   effect here: the slider only sets --accent-h, never --accent itself. */
 @media (prefers-contrast: more) {
     :root {
         --surface-border: #000;
         --text: #000;
         --accent: #0066cc;
+        --accent-hover: #004c99;
     }
 
     /* The paper and minimal looks set their own dark colours with a
@@ -38,6 +41,7 @@
         --surface-border: #fff;
         --text: #fff;
         --accent: #4d9fff;
+        --accent-hover: #80bbff;
     }
 
     .icon-button,
