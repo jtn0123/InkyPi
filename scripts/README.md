@@ -51,7 +51,7 @@ Developer, CI and device tools. Run them from the repo root. Python scripts add
 | `preflash_validate.sh` | The hardware-free pre-flash gate (wraps `preflash_smoke.py`). |
 | `coverage_gate.py` | Per-file and per-package coverage floors for critical modules. |
 | `perf_budget_gate.py` | Fails CI when the median plugin render or cold start goes over its ceiling. |
-| `benchmark_compare.py` | Compares pytest-benchmark output against a stored baseline. |
+| `benchmark_compare.py` | Compares pytest-benchmark runs of a change against runs of its base commit (CI) or the committed baseline. |
 | `memory_diff.py`, `format_memory_diff.py` | Startup memory profile for the per-PR memory diff comment. |
 | `mutation_check.py`, `mutation_summary.py` | A small hand-written mutant check, and the summary for mutmut shards. |
 | `check_licenses.sh` | Checks dependency licences with the `pip-licenses` pinned in `install/requirements-dev.txt` (installs nothing; run it from the dev venv). |

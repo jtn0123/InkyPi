@@ -1,4 +1,5 @@
-"""The relative benchmark gate only enforces timings measured on the same CPU."""
+"""The relative benchmark gate: same-CPU enforcement, retired benchmarks, and
+the lowest median across several runs of each side."""
 
 from __future__ import annotations
 
@@ -24,15 +25,19 @@ def _write(
 
 
 def _run(
-    baseline: Path, current: Path, expected: Path | None = None
+    baseline: Path | list[Path],
+    current: Path | list[Path],
+    expected: Path | None = None,
 ) -> subprocess.CompletedProcess[str]:
+    bases = baseline if isinstance(baseline, list) else [baseline]
+    currents = current if isinstance(current, list) else [current]
     args = [
         sys.executable,
         str(SCRIPT),
         "--baseline",
-        str(baseline),
+        *map(str, bases),
         "--current",
-        str(current),
+        *map(str, currents),
         "--threshold",
         "15",
     ]
@@ -82,8 +87,8 @@ def test_unknown_cpu_is_still_enforced(tmp_path: Path) -> None:
 def test_benchmark_removed_from_committed_baseline_is_retired(
     tmp_path: Path,
 ) -> None:
-    # The cached baseline still lists "gone"; the PR deleted the benchmark
-    # and its entry in the committed baseline.
+    # The base commit still has "gone"; the PR deleted the benchmark and its
+    # entry in the committed baseline.
     base = _write(tmp_path / "b.json", {"a": 1.0, "gone": 1.0})
     cur = _write(tmp_path / "c.json", {"a": 1.0})
     committed = _write(tmp_path / "committed.json", {"a": 1.0})
@@ -99,3 +104,36 @@ def test_benchmark_still_in_committed_baseline_must_run(tmp_path: Path) -> None:
     result = _run(base, cur, expected=committed)
     assert result.returncode == 1
     assert "missing from the current run" in result.stdout
+
+
+def test_one_slow_run_on_either_side_does_not_fail(tmp_path: Path) -> None:
+    # Each side's lowest median counts: the slow second run of the change and
+    # the fast first run of the base are both outliers.
+    bases = [
+        _write(tmp_path / "b1.json", {"a": 0.8}),
+        _write(tmp_path / "b2.json", {"a": 1.0}),
+    ]
+    currents = [
+        _write(tmp_path / "c1.json", {"a": 0.9}),
+        _write(tmp_path / "c2.json", {"a": 1.6}),
+    ]
+    result = _run(bases, currents)
+    assert result.returncode == 0, result.stdout
+    assert "PASS  a: 800000.0us -> 900000.0us (+12.5%)" in result.stdout
+
+
+def test_regression_in_every_run_still_fails(tmp_path: Path) -> None:
+    bases = [_write(tmp_path / f"b{i}.json", {"a": 1.0}) for i in (1, 2)]
+    currents = [_write(tmp_path / f"c{i}.json", {"a": 1.3}) for i in (1, 2)]
+    result = _run(bases, currents)
+    assert result.returncode == 1
+    assert "FAIL  a" in result.stdout
+
+
+def test_benchmark_in_any_current_run_is_not_missing(tmp_path: Path) -> None:
+    base = _write(tmp_path / "b.json", {"a": 1.0, "b": 1.0})
+    currents = [
+        _write(tmp_path / "c1.json", {"a": 1.0}),
+        _write(tmp_path / "c2.json", {"a": 1.0, "b": 1.0}),
+    ]
+    assert _run(base, currents).returncode == 0

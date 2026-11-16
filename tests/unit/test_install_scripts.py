@@ -2922,15 +2922,27 @@ class TestMemoryDiffWorkflow:
         assert "memray" in capture
         assert "tracemalloc" in capture
 
-    def test_memray_listed_in_the_dev_dependency_group(self) -> None:
-        pyproject = tomllib.loads((INSTALL_DIR.parent / "pyproject.toml").read_text())
+    def test_memray_comes_from_its_own_locked_group(self) -> None:
+        groups = tomllib.loads((INSTALL_DIR.parent / "pyproject.toml").read_text())[
+            "dependency-groups"
+        ]
         assert any(
             isinstance(req, str) and req.startswith("memray")
-            for req in pyproject["dependency-groups"]["dev"]
+            for req in groups["memory-diff"]
         ), (
-            "memray must be in pyproject.toml's dev dependency group so the "
+            "memray must be in pyproject.toml's memory-diff group so the "
             "memory-diff workflow can install it from the lockfile."
         )
+        assert {"include-group": "memory-diff"} in groups["dev"]
+
+    def test_workflow_installs_only_what_the_pi_installs(self) -> None:
+        # A dev-only package the app imports when present would count towards
+        # the measured memory, so the job installs the runtime requirements
+        # and the memory-diff group, both hash-checked, and nothing else.
+        assert "--require-hashes -r install/requirements.txt" in self.content
+        assert "--only-group memory-diff" in self.content
+        assert "--require-hashes --no-deps" in self.content
+        assert "requirements-dev.txt" not in self.content
 
 
 # ---- JTN-701: pinned Waveshare driver + safe device.json mutation ----

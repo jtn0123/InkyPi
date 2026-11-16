@@ -877,6 +877,9 @@ dev = [
     { name = "uv" },
     { name = "watchdog" },
 ]
+memory-diff = [
+    { name = "memray", marker = "sys_platform == 'linux'" },
+]
 release = [
     { name = "cyclonedx-bom" },
     { name = "gitpython" },
@@ -942,6 +945,7 @@ dev = [
     { name = "uv", specifier = "==0.13.4" },
     { name = "watchdog", specifier = ">=7.1,<8" },
 ]
+memory-diff = [{ name = "memray", marker = "sys_platform == 'linux'", specifier = ">=1.20,<2" }]
 release = [
     { name = "cyclonedx-bom", specifier = ">=8.0,<9" },
     { name = "gitpython", specifier = ">=3.1.59,<4" },

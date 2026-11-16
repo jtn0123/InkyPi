@@ -61,33 +61,42 @@ SKIP_BROWSER=1 PYTHONPATH=src pytest tests/benchmarks/ --benchmark-only \
 
 #### CI regression gate
 
-Every PR runs benchmarks and compares against a cached CI baseline. If any
-benchmark's median time exceeds the baseline by more than the configured
-threshold, CI fails.
+The `lint` job in `.github/workflows/ci.yml` times the change and its base
+commit (`HEAD^1`: the PR's base branch, or the previous commit on `main`) on
+the same runner. Each side runs twice, in turn, and each benchmark's lowest
+median counts. If a benchmark is more than the threshold slower than on the
+base commit, CI fails.
 
-- **CI baseline**: cached per-OS via GitHub Actions cache. Each push to `main`
-  saves its run as a new cache entry, and PRs restore the newest one. PRs never
-  write it.
-- **Repo baseline** (`tests/benchmarks/baseline.json`): committed for local
-  development use and as a blocking fallback when no CI cache exists.
+The gate used to compare against a baseline cached from an earlier `main` run.
+Two hosted runners with the same CPU model can differ by 25–33%, and more
+across models, so unrelated PRs failed.
+
 - **Threshold**: defaults to +15%. Override via the `BENCHMARK_THRESHOLD_PCT`
   GitHub Actions variable or environment variable.
-- **Comparison script**: `scripts/benchmark_compare.py`
-- **Artifacts**: every PR uploads `benchmark-results` with the current
-  pytest-benchmark JSON and comparison log for audit/debugging.
+- **Comparison script**: `scripts/benchmark_compare.py`. `--baseline` and
+  `--current` each take one or more pytest-benchmark JSON files.
+- **Absolute budgets**: `scripts/perf_budget_gate.py` also fails CI when a
+  plugin render or cold start is over its budget.
+- **Artifacts**: every run uploads `benchmark-results` with all four JSON
+  files and the comparison log.
 
-The gate runs as part of the `lint` job in `.github/workflows/ci.yml`.
+#### The committed baseline
 
-#### Updating the baseline
+`tests/benchmarks/baseline.json` lists the benchmarks that should exist, and
+gives local runs something to compare against:
 
-When a legitimate performance change lands (new feature, algorithm change), update
-the baseline:
+```bash
+SKIP_BROWSER=1 PYTHONPATH=src pytest tests/benchmarks/ --benchmark-only \
+  --benchmark-json=/tmp/bench-current.json -q
+python scripts/benchmark_compare.py --current /tmp/bench-current.json
+```
+
+Its timings come from one machine, so compare against it only on similar
+hardware. To refresh it:
 
 ```bash
 SKIP_BROWSER=1 PYTHONPATH=src pytest tests/benchmarks/ --benchmark-only \
   --benchmark-json=tests/benchmarks/baseline.json -q
-git add tests/benchmarks/baseline.json
-git commit -m "chore: update benchmark baseline"
 ```
 
 #### Adding a new benchmark
@@ -103,8 +112,9 @@ After adding a new benchmark, regenerate the baseline as described above.
 #### Removing a benchmark
 
 Delete the test and its entry in `tests/benchmarks/baseline.json`. The gate
-fails when a benchmark in the CI baseline is missing from the run, unless the
-committed baseline no longer lists it either; then it is reported as `RETIRED`.
+fails when a benchmark the base commit ran is missing from the change's run,
+unless the committed baseline no longer lists it either; then it is reported
+as `RETIRED`.
 
 ### Dashboard
 

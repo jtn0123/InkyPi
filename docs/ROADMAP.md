@@ -56,31 +56,54 @@ tracked in Linear:
 ## Grade follow-ups
 
 The remaining code-quality items come from a local grade report
-(`.claude/grade-report.md`, which is not committed); the IDs refer to it.
+(`.claude/grade-report.md`, which is not committed); the IDs refer to the
+2026-11-15 regrade.
 
-- [ ] **A1** — Give scheduling policy one owner; next-due and next-up maths is
-      still repeated across the scheduler and the routes.
-- [ ] **A4 / B5** — Partly done in #784: the refresh loop raises HTTP-free
-      domain errors and the four display routes map them the same way. Left:
-      the `WorkflowError` duplicate, direct-render (no refresh loop) statuses,
-      and the async `/update_now` job path.
-- [ ] **A5** — `blueprints/settings/__init__.py` is a service locator for
-      updates, logs, the version check and benchmarks.
-- [ ] **A6** — The main process loads plugin code (and its imports) on each
-      refresh to pick a progress label and ask `skip_display_condition`.
-- [ ] **C6** — Modal dialogs handle keyboard focus inconsistently.
-- [ ] **C8–C12** — Other front-end cleanups: `plugin_form.js`, large page
-      closures and copied helpers, badge colours, leaked bundle globals,
-      one-off breakpoints.
-- [ ] **C5 / D4** — JS tests assert on source text instead of behaviour.
-- [ ] **E3** — The service still runs as root. A systemd sandbox now limits
-      what it can write (`hardening.conf`); an unprivileged user is still open.
-- [ ] **E5** — Updates trust release files; tags are not signed or verified.
-- [ ] **G3** — The forkserver preloads the whole web app, not what workers need.
-- [ ] **I4** — CI duplicates installs and checks.
+- [ ] **C12** — 14 different responsive breakpoints. Settling on 3–4 width
+      tokens changes layouts, so each page needs a visual check.
+- [ ] **D1** — Make "CI gate (all checks pass)" a required status check for
+      `main`. A repository setting; see `docs/development.md`.
+- [ ] **E4** — The service runs as root and keeps CAP_SYS_ADMIN, so code inside
+      it can remount the sandbox's read-only paths or leave through
+      `systemd-run`. Add `SystemCallFilter=~@mount` and
+      `RestrictNamespaces=yes` and test on the Pi; closing `systemd-run` fully
+      needs a non-root service user.
+- [ ] **E5** — An update trusts a wheel whose hash is in the release's own
+      manifest, and both come from the same editable release. Turn on GitHub's
+      immutable releases, or commit the manifest into the tagged tree;
+      optionally sign tags and verify them in `do_update.sh`.
+- [ ] **A4 / B5** (previous grade) — Direct-render statuses now match the
+      refresh loop's (#877) and there is one `WorkflowError`. Left: check that
+      the async `/update_now` job path maps errors the same way.
+- [ ] **G6** — A playlist turn that isn't due still starts a render worker.
+      Left for now: the Pi logged none in 24 hours.
+- [ ] A render worker spends about 1.8 s on the Pi importing
+      `refresh_task.worker`, because the package `__init__` also loads the
+      task, SSE and event-bus modules. A lean worker entry module would cut
+      that (found in #874).
+- [ ] `/update_device_cycle` keeps its own 1440-minute limit, and the
+      3600-second default cycle is still copied in a few places instead of
+      read from the config schema (found in #877).
+- [ ] The plugin page's API-key badges (`.api-key-indicator` in
+      `plugin.html`) are rendered hidden and nothing shows them. Show them or
+      delete them and their CSS.
+- [ ] The Debian image digest in `build-wheelhouse.yml` is pinned by hand and
+      Dependabot does not update it. Refresh it on each Trixie point release.
 
 ## Closed since the last reconcile
 
+- [x] The 2026-11-15 regrade: 49 of its 54 items landed (#834–#878 and this
+      reconcile), from the "Fit to container" crash (#835) and the PIN-off
+      API-key leak (#839) to one schema for every config rule (#877), one
+      `fetchJson` for every page script (#878), a suite-wide network block
+      (#875) and random-order test runs (#872). Its open items are listed
+      above.
+- [x] The previous grade's open items: A1, A5, A6, C6 and I4 landed in #789,
+      #796, #802, #804 and #805, and G3 was closed. For C5 / D4, a ceiling
+      stops new source-text tests (#872). Of C8–C12, `plugin_form.js` and the
+      badge colours were done before the regrade, the page closures and
+      leaked globals in #878, and the breakpoints carry over as C12. E3 and
+      E5 carry over as E4 and E5. A4 / B5 is listed above.
 - [x] Split the largest modules: `refresh_task/task.py` (#705),
       `blueprints/plugin.py` (#706), `utils/http_utils.py` (#707) and
       `blueprints/playlist.py` (#708).
