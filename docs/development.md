@@ -239,24 +239,30 @@ To stop the container, press `Ctrl+C` or run `docker compose down`.
 
 ## CI Gate and Required Status Checks
 
-The CI workflow includes a `ci-gate` job that depends on all required jobs, including the
-install gates. This job is the single handle the repo owner should mark as a required
-status check in GitHub branch protection.
+The CI workflow includes a `ci-gate` job, named **`CI gate (all checks pass)`**, that
+depends on all required jobs, including the install gates. It is the single check `main`
+requires.
 
 Frontend changes under `src/static/**` or `src/templates/**` also trigger the local
-pre-commit browser gate, which runs `scripts/test.sh browser-smoke` before the commit is
-allowed through.
+pre-push browser gate, which runs `scripts/test.sh browser-smoke` before the push goes
+through (see [Install pre-commit hooks](#install-pre-commit-hooks-recommended)).
 
 ### Making `ci-gate` a required status check (repo owner steps)
 
-1. Go to **GitHub.com → jtn0123/InkyPi → Settings → Branches**.
-2. Under "Branch protection rules", click **Edit** next to the `main` rule (or **Add rule**
-   if none exists).
-3. Enable **"Require status checks to pass before merging"**.
-4. In the search box, type `CI gate` and select the check named
+`main` is protected by a repository ruleset, not a classic branch-protection rule. The
+release workflow pushes its version-bump commit and tag straight to `main` (see
+[Releases](#releases)). That commit never has CI results of its own, so a required check
+would reject it, and the ruleset lets the release deploy key bypass the check.
+
+1. Go to **GitHub.com → jtn0123/InkyPi → Settings → Rules → Rulesets**, and create a
+   branch ruleset (or edit the existing one) that targets the default branch, `main`.
+2. Set **Enforcement status** to **Active**.
+3. Enable **Require status checks to pass**, and add the check
    **`CI gate (all checks pass)`**.
-5. Also enable **"Require branches to be up to date before merging"** for extra safety.
-6. Click **Save changes**.
+4. Leave **Require branches to be up to date before merging** off. With it on, every pull
+   request would have to be rebased after each release commit.
+5. Under **Bypass list**, add the release deploy key (**Deploy keys**) and nothing else.
+6. Click **Create** (or **Save changes**).
 
 Once saved, every PR must have a green `ci-gate` result before it can be merged. Because
 `ci-gate` mirrors the required-job list in `.github/workflows/ci.yml`, any required-job
@@ -266,6 +272,67 @@ failure will also fail the gate.
 > GitHub's required-checks list is static — adding a new CI job requires a manual settings
 > update. The gate pattern means you only ever need to protect one check name, and the
 > `ci.yml` file controls which sub-jobs are required.
+
+## Releases
+
+`.github/workflows/release.yml` runs when CI passes for a push to `main`, and only for the
+commit CI tested. A release stays a draft until every file is attached to it:
+
+1. **Tag the release** runs `semantic-release version --no-vcs-release`. It picks the next
+   version from the commit subjects, updates `pyproject.toml`, `VERSION`, `uv.lock` and
+   `CHANGELOG.md`, then commits, tags and pushes. The push goes over the release deploy key
+   (the `RELEASE_DEPLOY_KEY` Actions secret, which `actions/checkout` configures), because
+   `[tool.semantic_release.remote] ignore_token_for_push` keeps a token out of the push
+   URL. The commit message carries `[skip ci]`, so the version-only commit doesn't run CI or
+   start another release.
+2. **Create the draft release** creates the GitHub release as a draft, with the notes
+   semantic-release generates from `templates/.release_notes.md.j2`.
+3. **Attach the SBOM**, **Build wheelhouse release assets** (`build-wheelhouse.yml`) and
+   **Build pre-installed Pi image** (`build-pi-image.yml`) attach their files to the
+   draft. Each one uploads only to a draft.
+4. **Publish the release** runs only after all three succeed. It checks that every file is
+   on the draft, then publishes it and marks it latest. If a higher version is already
+   published, because an older release run finished last, it stays latest instead.
+
+A Pi's update check reads `/releases/latest`, which never returns a draft, and a draft's
+download URLs return 404. One gap remains: the Update button starts `do_update.sh` with no
+target, and it installs the newest version tag, which a draft already has. Such an
+update finds no wheelhouse and builds from source. After a release is published, GitHub's
+immutable releases (once turned on) stop its files and tag from changing.
+
+### When a release job fails
+
+If an asset job fails, the release stays a draft, and the tag stays on `main`. Re-run the
+failed jobs from the Release run's page (**Re-run failed jobs**). Uploads replace files of
+the same name, so a re-run doesn't add duplicates, and **Publish the release** runs again
+once they pass. Don't re-run all jobs: the gate then finds `main` has moved past the tested
+commit and skips everything.
+
+A re-run uses the workflow files of the original run. If the failure needs a change to a
+workflow, merge the fix with a type that doesn't cut a release, such as `ci:`. Then attach
+the missing files by hand and publish:
+
+- Run **Build release wheelhouse** or **Build pre-installed Pi image** from the Actions
+  tab for the release's tag. Both attach to a release only while it is a draft.
+- The SBOM has no manual workflow. Build it the way the **Attach the SBOM** job does (at the
+  tag, from a venv holding only `install/requirements.txt`), and upload it with
+  `gh release upload vX.Y.Z inkypi-vX.Y.Z-bom.json --clobber`.
+- Check that the draft has the SBOM, both wheelhouse architectures (the tarball, its
+  `.sha256` and its `.manifest.sha256`) and the image (the `.img.xz`, its `.sha256` and the
+  `-os-list.json` manifest). Then publish it with
+  `gh release edit vX.Y.Z --draft=false --latest`.
+
+If **Tag the release** fails after its push, a re-run stops at "Confirm main is still the
+tested commit". Create the draft yourself with
+`gh release create vX.Y.Z --draft --verify-tag --title vX.Y.Z`, using that version's
+`CHANGELOG.md` section as the notes, and attach the files as above.
+
+### Manual rechecks
+
+Both asset workflows can be run by hand for any tag. For a published release they only
+build: the wheelhouse and the image stay as artifacts of that run, because a published,
+immutable release can't take new files. A Pi image run with `reuse_run_id` only
+boot-verifies an image from an earlier run, and never attaches it.
 
 ## Other Requirements
 

@@ -1388,11 +1388,11 @@ class TestWheelhouseBuildWorkflow:
         ), f"Expected workflow file at {self.WORKFLOW_PATH}"
         self.content = self.WORKFLOW_PATH.read_text()
 
-    def test_workflow_triggers_on_release_published(self) -> None:
-        # The workflow must run on release publish so every tagged release
-        # automatically gets a wheelhouse attached.
-        assert "release:" in self.content
-        assert "published" in self.content
+    def test_workflow_runs_from_the_release_not_on_publish(self) -> None:
+        # release.yml attaches the wheelhouse to the draft before publishing
+        # it. A `release: published` run would upload to an immutable release.
+        triggers = yaml.safe_load(self.content)[True]
+        assert set(triggers) == {"workflow_call", "workflow_dispatch"}
 
     def test_workflow_supports_manual_rebuild(self) -> None:
         # workflow_dispatch lets maintainers rebuild a wheelhouse for an
@@ -1436,7 +1436,8 @@ class TestWheelhouseBuildWorkflow:
         assert ".tar.gz" in self.content
 
     def test_workflow_uploads_release_asset(self) -> None:
-        assert "softprops/action-gh-release" in self.content
+        # Only to a draft; tests/unit/test_release_workflow.py runs the step.
+        assert "gh release upload" in self.content
 
     def test_workflow_attaches_sha256_alongside_tarball(self) -> None:
         # sha256 checksum must travel with the tarball so install.sh can
@@ -1475,10 +1476,11 @@ class TestPiImageBuildWorkflow:
         assert "on" in doc or True in doc
         assert "jobs" in doc
 
-    def test_workflow_triggers_on_release_published(self) -> None:
-        # Must run on every tagged release so each release ships an image.
-        assert "release:" in self.content
-        assert "published" in self.content
+    def test_workflow_runs_from_the_release_not_on_publish(self) -> None:
+        # release.yml attaches the image to the draft before publishing it.
+        # A `release: published` run would upload to an immutable release.
+        triggers = yaml.safe_load(self.content)[True]
+        assert set(triggers) == {"workflow_call", "workflow_dispatch"}
 
     def test_workflow_supports_manual_rebuild(self) -> None:
         # workflow_dispatch lets maintainers rebuild an image for an existing
@@ -1603,25 +1605,25 @@ class TestPiImageBuildWorkflow:
         # Verify immutable pins without freezing the test to an obsolete major.
         for action in (
             "actions/checkout",
-            "softprops/action-gh-release",
             "actions/upload-artifact",
             "actions/download-artifact",
         ):
             assert re.search(rf"{re.escape(action)}@[0-9a-f]{{40}}\b", self.content)
 
     def test_workflow_uploads_release_asset(self) -> None:
-        assert "softprops/action-gh-release" in self.content
+        # Only to a draft; tests/unit/test_release_workflow.py runs the step.
+        assert "gh release upload" in self.content
 
-    def test_workflow_attach_supports_reusable_release_and_manual_dry_run(self) -> None:
-        # Reusable release.yml calls inherit the push event. Manual image
-        # verification remains a dry run; every attachment requires a boot pass.
+    def test_workflow_attach_requires_a_boot_pass_and_this_runs_image(self) -> None:
+        # Every attachment requires a boot pass of an image built in this run.
+        # The step attaches to a draft only; a manual recheck of a published
+        # release keeps the image in the run's artifacts.
         workflow = yaml.safe_load(self.content)
         condition = workflow["jobs"]["attach-release"]["if"]
-        assert "github.event_name != 'workflow_dispatch'" in condition
         assert "needs.verify-boot.outputs.verified == 'true'" in condition
         assert "github.event_name == 'release'" not in condition
         attach = workflow["jobs"]["attach-release"]["steps"][-1]
-        assert attach["with"]["tag_name"] == "${{ needs.build-image.outputs.tag }}"
+        assert attach["env"]["TAG"] == "${{ needs.build-image.outputs.tag }}"
 
 
 class TestReleaseWorkflow:
@@ -1643,7 +1645,9 @@ class TestReleaseWorkflow:
 
     def test_release_invokes_reusable_wheelhouse_workflow(self) -> None:
         assert "uses: ./.github/workflows/build-wheelhouse.yml" in self.content
-        assert "needs: release" in self.content
+        workflow = yaml.safe_load(self.content)
+        # It attaches to the draft, so it runs once the draft exists.
+        assert workflow["jobs"]["wheelhouse"]["needs"] == ["release", "draft"]
         assert "needs.release.outputs.released == 'true'" in self.content
         assert "tag: ${{ needs.release.outputs.tag }}" in self.content
 

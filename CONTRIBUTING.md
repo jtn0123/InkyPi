@@ -131,7 +131,10 @@ the release bump. The PR Title Lint check enforces this pre-merge.
 The Release workflow runs when CI passes on `main`, and only for the commit CI
 tested. When several PRs merge in a row, CI finishes only for the last one, and
 that release includes them all. If CI on `main` fails, nothing is released until
-it passes; re-running a flaky job is enough to retry.
+it passes; re-running a flaky job is enough to retry. Each release stays a draft
+until its SBOM, wheelhouse and Pi image are attached; see
+[Releases](docs/development.md#releases) for the steps and for recovering a
+release whose build failed.
 
 Recognized types:
 
