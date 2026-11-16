@@ -159,11 +159,7 @@ coverage_suite() {
 }
 
 security_suite() {
-    mkdir -p artifacts/security
-    python -m pip_audit -r install/requirements.txt --format=json \
-        --output artifacts/security/pip-audit-runtime.json
-    python -m pip_audit -r install/requirements-dev.txt --format=json \
-        --output artifacts/security/pip-audit-dev.json
+    scripts/audit_dependencies.sh --strict
     python -m cyclonedx_py environment .venv/bin/python --of JSON \
         -o artifacts/security/sbom.json
 }

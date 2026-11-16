@@ -199,17 +199,30 @@ cyclonedx-cli convert \
 ### Checking for known vulnerabilities
 
 From the repository root, use the committed development environment and audit
-the locked requirement files:
+the locked requirement files: the runtime and dev exports, and the installer's
+own files (pip, uv and the GPIO libraries). Every file is fully hashed, so
+pip-audit checks the pins as written, for every platform, without installing
+anything:
 
 ```bash
 source scripts/venv.sh
-python -m pip_audit -r install/requirements.txt --format=json --output runtime-audit.json
-python -m pip_audit -r install/requirements-dev.txt --format=json --output dev-audit.json
-# The installer's own files (pip, uv, GPIO libraries); fully hashed, so no install
-for name in bootstrap uv ws; do
-  python -m pip_audit --disable-pip -r "install/${name}-requirements.txt"
-done
+scripts/audit_dependencies.sh --strict
 ```
+
+It writes one JSON report per file to `artifacts/security/` and lists each
+finding with the version that fixes it.
+
+pip-audit checks the files against a live advisory feed, so a new advisory can
+turn CI red with no code change. CI's **Security and SBOM** job therefore runs
+it strictly only where a finding is something to act on:
+
+- a pull request that changes `uv.lock` or an `install/*requirements*.txt` file;
+- the nightly run, and a manual run.
+
+Other pull requests and pushes to `main` report a finding as a warning, so an
+advisory doesn't block unrelated merges or the release. Fix it in a pull
+request that updates the package. GitHub's Dependabot alerts report the same
+advisories.
 
 Generate a CycloneDX inventory separately:
 
