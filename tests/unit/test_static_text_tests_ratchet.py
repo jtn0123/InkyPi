@@ -9,7 +9,7 @@ up, and when it goes down, so CEILING always matches the real count.
 from pathlib import Path
 
 # Lower this when a test under tests/static/ is removed or ported to Playwright.
-CEILING = 55
+CEILING = 54
 
 STATIC_DIR = Path(__file__).resolve().parents[1] / "static"
 

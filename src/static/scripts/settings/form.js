@@ -94,13 +94,15 @@
       const unitSelect = document.getElementById("unit");
       const seconds = config.pluginCycleIntervalSeconds;
       if (!intervalInput || !unitSelect || seconds == null) return;
-      const intervalInMinutes = Math.floor(seconds / 60);
-      const intervalInHours = Math.floor(seconds / 3600);
-      if (intervalInHours > 0) {
-        intervalInput.value = String(intervalInHours);
+      // Hours only for a whole number of hours. 5400 s showed as "1 hour",
+      // and the form took that as its saved state, so the next Save wrote
+      // 3600 s. Anything else is shown in minutes, and the unit list has no
+      // seconds, so less than a minute shows as 1 minute.
+      if (seconds >= 3600 && seconds % 3600 === 0) {
+        intervalInput.value = String(seconds / 3600);
         unitSelect.value = "hour";
       } else {
-        intervalInput.value = String(Math.max(1, intervalInMinutes));
+        intervalInput.value = String(Math.max(1, Math.floor(seconds / 60)));
         unitSelect.value = "minute";
       }
       refreshIntervalMax();
