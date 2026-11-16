@@ -25,6 +25,8 @@ from utils.http_transport import (
 if TYPE_CHECKING:  # pragma: no cover — type hints only
     import requests
 
+    from utils.plugin_errors import URLValidationError
+
 # Keeps the pre-split logger name so log filters and output are unchanged.
 logger = logging.getLogger(__name__)
 
@@ -42,11 +44,12 @@ MAX_GUARDED_REDIRECTS = 5
 
 _REDIRECT_STATUSES = frozenset({301, 302, 303, 307, 308})
 
-#: Request headers dropped when a redirect leaves the original origin, matching
-#: what ``requests`` itself strips: credentials must not follow a redirect to a
-#: different host.
-_CROSS_ORIGIN_STRIP_HEADERS = frozenset(
-    {"authorization", "cookie", "proxy-authorization"}
+#: The only caller-supplied request headers kept when a redirect leaves the
+#: original origin.  Anything else may be a credential (``Authorization``,
+#: ``Cookie``, or a service key such as Immich's ``x-api-key``), so it is
+#: dropped rather than forwarded to a host the caller never chose.
+_CROSS_ORIGIN_KEEP_HEADERS = frozenset(
+    {"accept", "accept-encoding", "accept-language", "user-agent"}
 )
 
 
@@ -84,12 +87,11 @@ def _origin(url: str) -> tuple[str, str, int | None]:
 def _hop_headers(
     headers: dict[str, str], original_url: str, hop_url: str
 ) -> dict[str, str]:
-    """Return *headers* for *hop_url*, minus credentials on a cross-origin hop."""
+    """Return *headers* for *hop_url*: all of them on the original origin,
+    only :data:`_CROSS_ORIGIN_KEEP_HEADERS` once a redirect leaves it."""
     if _origin(hop_url) == _origin(original_url):
         return headers
-    return {
-        k: v for k, v in headers.items() if k.lower() not in _CROSS_ORIGIN_STRIP_HEADERS
-    }
+    return {k: v for k, v in headers.items() if k.lower() in _CROSS_ORIGIN_KEEP_HEADERS}
 
 
 def _close_quietly(resp: Any) -> None:
@@ -264,8 +266,9 @@ def open_guarded_stream(
 ) -> Any:
     """Open an SSRF-guarded streaming GET of *url* and return the response.
 
-    Every hop is validated and DNS-pinned (see :func:`guarded_fetch`) and
-    credentials are dropped on a cross-origin redirect. The caller owns the
+    Every hop is validated and DNS-pinned (see :func:`guarded_fetch`) and,
+    on a cross-origin redirect, every header but ``User-Agent`` and the
+    ``Accept`` family is dropped. The caller owns the
     returned response: check its status, read it with :func:`read_capped` or
     :func:`copy_capped`, and close it. Responses are never cached.
 
@@ -337,15 +340,30 @@ def safe_fetch_bytes(
 
 
 def private_feeds_allowed() -> bool:
-    """Return True when the deployment opted feeds into LAN targets.
+    """Return True when the deployment opted user URLs into LAN targets.
 
-    Controlled by ``INKYPI_ALLOW_PRIVATE_FEEDS`` (see docs/security.md).  Read
-    on every call so a restart with an updated environment takes effect
-    without code changes.
+    Controlled by ``INKYPI_ALLOW_PRIVATE_FEEDS`` (see docs/security.md), which
+    RSS, Calendar, Image URL and Image Album honour.  Read on every call so a
+    restart with an updated environment takes effect without code changes.
     """
     from utils.plugin_errors import ALLOW_PRIVATE_FEEDS_ENV
 
     return env_bool(ALLOW_PRIVATE_FEEDS_ENV)
+
+
+def url_validation_error(exc: ValueError) -> URLValidationError:
+    """Wrap a URL-guard rejection as a response-safe ``URLValidationError``.
+
+    A pure LAN-range rejection (:class:`utils.security_utils.LanAddressError`)
+    is the one the ``INKYPI_ALLOW_PRIVATE_FEEDS`` opt-in can fix, so it gets
+    the message that names the setting; loopback, link-local and similar
+    targets keep the generic one.
+    """
+    from utils.plugin_errors import URL_ERR_PRIVATE_FEED, URLValidationError
+    from utils.security_utils import LanAddressError
+
+    reason = URL_ERR_PRIVATE_FEED if isinstance(exc, LanAddressError) else str(exc)
+    return URLValidationError(f"Invalid URL: {reason}", reason=reason)
 
 
 def fetch_feed_bytes(
@@ -364,8 +382,7 @@ def fetch_feed_bytes(
     shows a specific, response-safe reason (including how to opt in when a
     LAN address was the cause) and the refresh loop does not retry.
     """
-    from utils.plugin_errors import URL_ERR_PRIVATE_FEED, URLValidationError
-    from utils.security_utils import LanAddressError
+    from utils.plugin_errors import URLValidationError
 
     allow_lan = private_feeds_allowed()
     try:
@@ -386,7 +403,4 @@ def fetch_feed_bytes(
             # ``requests.InvalidURL`` & co. subclass ValueError but are
             # transport errors, not SSRF validation results.
             raise
-        # Only a pure LAN-range rejection is fixable by the opt-in; loopback,
-        # link-local and similar targets keep the generic message.
-        reason = URL_ERR_PRIVATE_FEED if isinstance(exc, LanAddressError) else str(exc)
-        raise URLValidationError(f"Invalid URL: {reason}", reason=reason) from exc
+        raise url_validation_error(exc) from exc
