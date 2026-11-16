@@ -105,16 +105,32 @@ Chromium documents [proxy behavior and loopback bypass rules](https://chromium.g
 
 ## Server-side fetches of user URLs
 
-Plugins that download a user-supplied URL on the Pi (Image URL, remote images,
-RSS and Calendar) validate the URL before connecting: the scheme must be
-HTTP/HTTPS and every address the hostname resolves to must be public. The
-connection is pinned to the addresses that were checked, so a DNS answer that
-changes between the check and the request cannot redirect it. Redirects are
-not followed automatically. Each `Location` target, including relative ones,
-is checked and pinned in the same way, with a limit of 5 hops. A public site
-that redirects to `192.168.x.x`, `127.0.0.1` or a cloud metadata address is
-refused. Credential headers are dropped when a redirect leaves the original
-host.
+Plugins that download a user-supplied URL on the Pi (Image URL, Image Album,
+remote images, RSS and Calendar) validate the URL before connecting: the
+scheme must be HTTP/HTTPS and every address the hostname resolves to must be
+public, by the same rule the Screenshot proxy above applies. Private,
+shared (`100.64.0.0/10`, which carrier NAT and Tailscale use), loopback,
+link-local, documentation, benchmarking, reserved and multicast addresses are
+refused, as are the deprecated 6to4 relay prefix `192.88.99.0/24` and IPv6
+outside `2000::/3` or inside the 6to4 and Teredo tunnel prefixes.
+
+The connection is pinned to the addresses that were checked, so a DNS answer
+that changes between the check and the request cannot redirect it. A host
+name with non-ASCII letters, such as `exämple.com`, is checked and pinned in
+the ASCII form the request looks up (`xn--exmple-cua.com`). While a request
+is pinned, any other name it tries to look up is refused rather than
+resolved. Redirects are not followed automatically. Each `Location` target,
+including relative ones, is checked and pinned in the same way, with a limit
+of 5 hops. A public site that redirects to `192.168.x.x`, `127.0.0.1` or a
+cloud metadata address is refused. When a redirect leaves the original scheme,
+host and port, only the `User-Agent` and `Accept` headers go with it;
+credentials such as `Authorization`, cookies and Immich's `x-api-key` are
+dropped.
+
+Image Album's Immich API calls don't follow redirects at all. If Immich
+answers one, the refresh fails, the service log names the redirect, and the
+API key is never sent to its target. Set the Base URL to the address Immich
+is actually served from, for example `https://` rather than `http://`.
 
 RSS and Calendar downloads are streamed with a size cap: 5 MB for a feed and
 10 MB for an `.ics` file. Larger responses fail the refresh and nothing is
@@ -131,12 +147,13 @@ template renderer's Content-Security-Policy allows only `file:`, `data:` and
 Third-party plugin templates that referenced remote `<img>` URLs must fetch
 them in Python the same way.
 
-### Feeds on your local network (opt-in)
+### Servers on your local network or Tailscale (opt-in)
 
-RSS and Calendar refuse private-network addresses by default. When one is
-configured, the plugin shows an error that names the setting below. To fetch
-feeds from a server on your LAN, such as Nextcloud or Radicale on
-`192.168.x.x`, opt in for the deployment. Add the setting to the service
+RSS, Calendar, Image URL and Image Album refuse private-network addresses by
+default. When one is configured, the plugin shows an error that names the
+setting below. To fetch from a server on your LAN, such as Nextcloud,
+Radicale or Immich on `192.168.x.x`, or one you reach over Tailscale on
+`100.x.y.z`, opt in for the deployment. Add the setting to the service
 environment file described in [auth.md](auth.md) and restart:
 
 ```ini
@@ -144,13 +161,28 @@ INKYPI_ALLOW_PRIVATE_FEEDS=1
 ```
 
 The opt-in admits only site-local ranges: `10.0.0.0/8`, `172.16.0.0/12`,
-`192.168.0.0/16` and IPv6 unique-local `fc00::/7`. Loopback (`localhost`,
-`127.0.0.1`, `::1`), link-local and cloud-metadata (`169.254.0.0/16`),
-unspecified, reserved and multicast addresses stay blocked. To use a calendar
-server running on the Pi itself, give its LAN address instead of `localhost`.
-The setting affects only RSS and Calendar. Image URL, Screenshot and Image
-Album (Immich) are unchanged. Enable it only if everyone who can edit plugin
-settings may make the Pi send GET requests to hosts on your network.
+`192.168.0.0/16`, shared address space `100.64.0.0/10` (Tailscale) and IPv6
+unique-local `fc00::/7` (which holds Tailscale's IPv6 range). Loopback
+(`localhost`, `127.0.0.1`, `::1`), link-local and cloud-metadata
+(`169.254.0.0/16`), unspecified, reserved and multicast addresses stay
+blocked. To use a calendar server running on the Pi itself, give its LAN
+address instead of `localhost`. The setting affects RSS, Calendar, Image URL
+and Image Album (Immich). Screenshot and the plugins that fetch from fixed
+public services are unchanged. Enable it only if everyone who can edit plugin
+settings may make the Pi send requests to hosts on your network.
+
+## Backups
+
+**Settings → Backup** leaves secrets out unless **Include API keys** is on,
+which needs a PIN (see [auth.md](auth.md)). A backup without keys has no API
+keys, no `auth` section (where `device.json` can hold the PIN) and no
+`webhook_urls`, whose links carry each service's token.
+
+Restoring a backup changes only what the backup holds. A backup without keys
+leaves this device's API keys, PIN and webhooks as they are. A backup with
+keys puts back its PIN and webhook list when it has them; InkyPi reads the
+PIN when it starts, so restart it to use the restored one. A PIN set with
+`INKYPI_AUTH_PIN` in the service environment still takes precedence.
 
 ## Software Bill of Materials (SBOM)
 

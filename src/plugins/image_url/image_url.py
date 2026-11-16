@@ -6,17 +6,22 @@ from PIL import Image
 from plugins.base_plugin.base_plugin import BasePlugin, DeviceConfigLike
 from plugins.base_plugin.settings_schema import callout, field, schema, section
 from utils.image_utils import fetch_and_resize_remote_image
-from utils.security_utils import URLValidationError, validate_url
+from utils.safe_fetch import private_feeds_allowed, url_validation_error
+from utils.security_utils import validate_url
 
 logger = logging.getLogger(__name__)
 
 
 def grab_image(
-    image_url: str, dimensions: tuple[int, int], timeout_ms: int = 40000
+    image_url: str,
+    dimensions: tuple[int, int],
+    timeout_ms: int = 40000,
+    *,
+    allow_lan: bool = False,
 ) -> Image.Image | None:
     """Grab an image from a URL and resize it to the specified dimensions."""
     return fetch_and_resize_remote_image(
-        image_url, dimensions, timeout_seconds=timeout_ms / 1000
+        image_url, dimensions, timeout_seconds=timeout_ms / 1000, allow_lan=allow_lan
     )
 
 
@@ -28,9 +33,10 @@ class ImageURL(BasePlugin):
         if not url:
             return "Image URL is required."
         try:
-            validate_url(url)
+            # LAN and Tailscale hosts need the INKYPI_ALLOW_PRIVATE_FEEDS opt-in.
+            validate_url(url, allow_lan=private_feeds_allowed())
         except ValueError as err:
-            return str(err)
+            return url_validation_error(err).reason
         return None
 
     def build_settings_schema(self) -> dict[str, object]:
@@ -61,19 +67,20 @@ class ImageURL(BasePlugin):
             raise RuntimeError("URL is required.")
         url = raw_url
 
+        allow_lan = private_feeds_allowed()
         try:
-            validate_url(url)
+            validate_url(url, allow_lan=allow_lan)
         except ValueError as e:
             # URLValidationError is a PermanentPluginError subclass, so the
             # refresh-task retry loop skips extra attempts (JTN-778) and the
             # plugin blueprint maps it to HTTP 422 validation_error (JTN-776).
-            raise URLValidationError(f"Invalid URL: {e}") from e
+            raise url_validation_error(e) from e
 
         dimensions = self.get_oriented_dimensions(device_config)
 
         logger.info(f"Grabbing image from: {url}")
 
-        image = grab_image(url, dimensions, timeout_ms=40000)
+        image = grab_image(url, dimensions, timeout_ms=40000, allow_lan=allow_lan)
 
         if not image:
             raise RuntimeError("Failed to load image, please check logs.")

@@ -128,12 +128,28 @@ def test_mixed_public_private_dns_answers_are_blocked(
 
 
 @pytest.mark.parametrize(
-    "ip", ["100.64.0.1", "64:ff9b::7f00:1", "2002:7f00:1::", "224.0.0.1"]
+    "ip",
+    [
+        "100.64.0.1",
+        "100.100.100.100",
+        "192.88.99.1",
+        "64:ff9b::7f00:1",
+        "::ffff:8.8.8.8",
+        "2002:7f00:1::",
+        "224.0.0.1",
+    ],
 )
-def test_special_address_ranges_are_blocked(ip: str) -> None:
-    from utils.remote_rendering import _is_public_address
+def test_special_address_ranges_are_blocked(
+    ip: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import utils.remote_rendering as remote
+    from utils.security_utils import is_public_address
 
-    assert not _is_public_address(ip)
+    assert not is_public_address(ip)
+    # The proxy refuses them too, even if the URL guard were to let one by.
+    monkeypatch.setattr(remote, "validate_url_with_ips", lambda url: (url, (ip,)))
+    with pytest.raises(ValueError):
+        remote.connect_public("https://special.test/")
 
 
 @pytest.mark.parametrize(

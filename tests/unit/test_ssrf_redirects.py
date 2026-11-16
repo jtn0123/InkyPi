@@ -30,6 +30,9 @@ HOSTS = {
     "cdn.example.net": PUBLIC_B,
     "lan.example.com": "192.168.1.20",
     "loop.example.com": "127.0.0.1",
+    # Tailscale hands out 100.64.0.0/10 (RFC 6598 shared) addresses.
+    "tailnet.example.com": "100.101.102.103",
+    "relay.example.com": "192.88.99.1",
 }
 
 
@@ -220,7 +223,14 @@ def test_allow_redirects_false_returns_redirect_response(http_get_router: Any) -
     assert resp is redirect
 
 
-def test_cross_origin_redirect_drops_credentials(http_get_router: Any) -> None:
+def test_cross_origin_redirect_keeps_only_allow_listed_headers(
+    http_get_router: Any,
+) -> None:
+    """Only User-Agent and Accept* follow a redirect to another origin.
+
+    A deny-list of ``Authorization``/``Cookie`` let service keys such as
+    Immich's ``x-api-key`` through to whatever host the redirect named.
+    """
     from utils.safe_fetch import safe_http_get
 
     router = http_get_router(
@@ -229,14 +239,31 @@ def test_cross_origin_redirect_drops_credentials(http_get_router: Any) -> None:
             "https://cdn.example.net/b": FakeResp(200),
         }
     )
-    safe_http_get(
-        "https://public.example.com/a",
-        headers={"Authorization": "Bearer s3cret", "X-Keep": "1"},
-    )
+    sent = {
+        "Authorization": "Bearer s3cret",
+        "x-api-key": "immich-secret",
+        "X-Custom": "1",
+        "User-Agent": "InkyPi-test",
+        "Accept": "image/*",
+    }
+    safe_http_get("https://public.example.com/a", headers=sent)
     first, second = router.calls
-    assert first["headers"]["Authorization"] == "Bearer s3cret"
-    assert "Authorization" not in second["headers"]
-    assert second["headers"]["X-Keep"] == "1"
+    assert first["headers"] == sent
+    assert second["headers"] == {"User-Agent": "InkyPi-test", "Accept": "image/*"}
+
+
+def test_same_origin_redirect_keeps_every_header(http_get_router: Any) -> None:
+    from utils.safe_fetch import safe_http_get
+
+    router = http_get_router(
+        {
+            "https://public.example.com/a": _redirect("/b"),
+            "https://public.example.com/b": FakeResp(200),
+        }
+    )
+    sent = {"x-api-key": "immich-secret", "User-Agent": "InkyPi-test"}
+    safe_http_get("https://public.example.com/a", headers=sent)
+    assert [call["headers"] for call in router.calls] == [sent, sent]
 
 
 # ---------------------------------------------------------------------------
@@ -364,6 +391,80 @@ def test_allow_lan_still_blocks_loopback_and_link_local(url: str) -> None:
     with pytest.raises(ValueError) as excinfo:
         validate_url_with_ips(url, allow_lan=True)
     assert not isinstance(excinfo.value, LanAddressError)
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "http://100.64.0.1/",
+        "http://100.100.100.100/",  # Tailscale's MagicDNS resolver
+        "http://100.127.255.254/",
+        "http://tailnet.example.com/feed",
+        "http://[fd7a:115c:a1e0::1]/",  # Tailscale IPv6
+    ],
+)
+def test_shared_and_tailscale_addresses_need_the_lan_opt_in(url: str) -> None:
+    """100.64.0.0/10 used to pass as public; it is a LAN range now."""
+    from utils.security_utils import LanAddressError, validate_url_with_ips
+
+    with pytest.raises(LanAddressError):
+        validate_url_with_ips(url)
+    _, ips = validate_url_with_ips(url, allow_lan=True)
+    assert ips
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "http://192.88.99.1/",
+        "http://relay.example.com/",
+        "http://198.18.0.1/",
+        "http://192.0.2.10/",
+        "http://240.0.0.1/",
+        "http://[64:ff9b::a00:1]/",  # NAT64 of 10.0.0.1
+        "http://[::ffff:10.0.0.1]/",
+        "http://[2002:a00:1::]/",  # 6to4 of 10.0.0.1
+    ],
+)
+def test_non_public_ranges_are_blocked_even_with_the_lan_opt_in(url: str) -> None:
+    from utils.security_utils import LanAddressError, validate_url_with_ips
+
+    for allow_lan in (False, True):
+        with pytest.raises(ValueError) as excinfo:
+            validate_url_with_ips(url, allow_lan=allow_lan)
+        assert not isinstance(excinfo.value, LanAddressError)
+
+
+@pytest.mark.parametrize(
+    "ip,public",
+    [
+        ("93.184.216.34", True),
+        ("2606:2800:220:1:248:1893:25c8:1946", True),
+        ("100.64.0.1", False),
+        ("100.100.100.100", False),
+        ("192.88.99.1", False),
+        ("192.168.1.1", False),
+        ("fd7a:115c:a1e0::1", False),
+        ("169.254.169.254", False),
+        ("224.0.0.1", False),
+    ],
+)
+def test_is_public_address(ip: str, public: bool) -> None:
+    from utils.security_utils import is_public_address
+
+    assert is_public_address(ip) is public
+    assert is_public_address(ipaddress.ip_address(ip)) is public
+
+
+def test_redirect_to_tailscale_address_is_blocked(http_get_router: Any) -> None:
+    from utils.safe_fetch import safe_http_get
+
+    router = http_get_router(
+        {"https://public.example.com/a": _redirect("http://100.100.100.100/")}
+    )
+    with pytest.raises(ValueError, match="private"):
+        safe_http_get("https://public.example.com/a")
+    assert [c["url"] for c in router.calls] == ["https://public.example.com/a"]
 
 
 # ---------------------------------------------------------------------------
@@ -631,3 +732,28 @@ def test_calendar_oversized_ics_rejected(monkeypatch: pytest.MonkeyPatch) -> Non
     )
     with pytest.raises(RuntimeError, match="Response too large"):
         cal.fetch_calendar("https://public.example.com/c.ics")
+
+
+def test_rss_tailscale_url_blocked_with_opt_in_hint(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from utils.plugin_errors import URL_ERR_PRIVATE_FEED, URLValidationError
+
+    rss, session = _rss(monkeypatch, {})
+    with pytest.raises(URLValidationError) as excinfo:
+        rss.parse_rss_feed("http://tailnet.example.com/feed")
+    assert excinfo.value.reason == URL_ERR_PRIVATE_FEED
+    assert "Tailscale" in excinfo.value.safe_message()
+    assert session.router.calls == []
+
+
+def test_calendar_tailscale_url_allowed_with_opt_in(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("INKYPI_ALLOW_PRIVATE_FEEDS", "1")
+    cal, session = _calendar(
+        monkeypatch, {"http://tailnet.example.com/cal.ics": FakeResp(200, ICS)}
+    )
+    parsed = cal.fetch_calendar("http://tailnet.example.com/cal.ics")
+    assert parsed is not None
+    assert session.router.calls[0]["ip"] == "100.101.102.103"

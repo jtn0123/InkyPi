@@ -34,6 +34,13 @@ from typing import Any
 # lock and use a re-entrant pin store so only threads that have actually
 # called ``pinned_dns`` see rewritten results.  Other threads' lookups pass
 # through unchanged.
+#
+# Pins are keyed by the ASCII (IDNA) form of the host name, because that is
+# the form ``requests``/``urllib3`` hand to ``getaddrinfo``: a pin stored
+# under ``exämple.com`` would never match the ``xn--exmple-cua.com`` lookup.
+# While a thread holds any pin, a lookup from that thread for any other host
+# is refused rather than passed to the real resolver, so a key mismatch
+# fails closed instead of silently skipping the pin.
 
 _dns_pin_global_lock = threading.Lock()
 _dns_pin_depth: int = 0
@@ -49,16 +56,37 @@ def _pin_store() -> dict[str, tuple[str, ...]]:
     return store
 
 
+def idna_hostname(hostname: str) -> str:
+    """Return *hostname* in the lowercase ASCII form an HTTP client resolves.
+
+    ``requests`` converts a non-ASCII host with the ``idna`` package (UTS 46
+    mapping, IDNA 2008) before ``urllib3`` calls ``getaddrinfo``, so this does
+    the same; Python's built-in ``idna`` codec follows IDNA 2003 and maps some
+    names (``straße``) to a different domain.  A trailing root dot is dropped.
+    Raises :class:`UnicodeError` (``idna.IDNAError``) for a name that has no
+    valid ASCII form, which ``requests`` would refuse as well.
+    """
+    host = hostname.rstrip(".")
+    if host.isascii():
+        return host.lower()
+    import idna
+
+    return idna.encode(host, uts46=True).decode("ascii").lower()
+
+
 def _normalize_host(host: Any) -> str | None:
-    """Return *host* as a lowercase string, or None if not a decodable host."""
+    """Return *host* as its pin key, or None if it is not a usable host name."""
     if isinstance(host, (bytes, bytearray)):
         try:
-            host_str: Any = host.decode("idna")
-        except Exception:
-            host_str = host.decode("ascii", errors="replace")
-    else:
-        host_str = host
-    return host_str.lower() if isinstance(host_str, str) else None
+            host = bytes(host).decode("ascii")
+        except UnicodeDecodeError:
+            return None
+    if not isinstance(host, str) or not host:
+        return None
+    try:
+        return idna_hostname(host)
+    except UnicodeError:
+        return None
 
 
 def _coerce_port(port: Any) -> int:
@@ -89,25 +117,29 @@ def _addrinfo_for_pinned_ip(ip: str, port_int: int) -> tuple[Any, ...] | None:
 def _make_patched_getaddrinfo(original: Any) -> Any:
     """Return a getaddrinfo wrapper that consults the thread-local pin store.
 
-    *original* is the resolver to delegate to for unpinned hostnames (or
-    when the calling thread has no active pins).
+    *original* is the resolver used when the calling thread has no active
+    pins.  A thread that holds a pin gets the pinned addresses for that host
+    and a resolution error for every other lookup, so a host name that
+    doesn't match its pin can never reach the real resolver.
     """
 
     def _patched_getaddrinfo(host: Any, port: Any, *args: Any, **kwargs: Any) -> Any:
         pins = _pin_store()
-        key = _normalize_host(host) if pins else None
-        ips = pins.get(key) if key else None
-        if not ips:
+        if not pins:
             return original(host, port, *args, **kwargs)
+        key = _normalize_host(host)
+        ips = pins.get(key) if key is not None else None
         port_int = _coerce_port(port)
         results: list[Any] = [
             info
-            for info in (_addrinfo_for_pinned_ip(ip, port_int) for ip in ips)
+            for info in (_addrinfo_for_pinned_ip(ip, port_int) for ip in ips or ())
             if info is not None
         ]
         if not results:
-            # Shouldn't happen (we vet IPs before pinning) — fall back.
-            return original(host, port, *args, **kwargs)
+            raise socket.gaierror(
+                socket.EAI_NONAME,
+                f"DNS lookup of {host!r} refused: only pinned hosts resolve here",
+            )
         return results
 
     return _patched_getaddrinfo
@@ -118,8 +150,10 @@ def pinned_dns(hostname: str, ips: tuple[str, ...] | list[str]) -> Iterator[None
     """Context manager that pins ``socket.getaddrinfo(hostname, ...)`` to *ips*.
 
     Only threads that entered ``pinned_dns`` see rewritten results; other
-    threads fall through to the underlying resolver.  Intended to bracket
-    an HTTP request whose hostname was already validated via
+    threads fall through to the underlying resolver.  Inside the block the
+    calling thread can resolve only pinned hosts (see
+    :func:`_make_patched_getaddrinfo`).  Intended to bracket an HTTP request
+    whose hostname was already validated via
     :func:`utils.security_utils.validate_url_with_ips`.
     """
     global _dns_pin_depth, _dns_pin_saved
@@ -128,7 +162,9 @@ def pinned_dns(hostname: str, ips: tuple[str, ...] | list[str]) -> Iterator[None
         yield
         return
 
-    key = hostname.lower()
+    # A name with no ASCII form can't be requested either; keying it on the
+    # raw text still installs the pin, so every lookup in the block fails.
+    key = _normalize_host(hostname) or hostname.lower()
     store = _pin_store()
     previous_pin = store.get(key)
     store[key] = tuple(ips)
