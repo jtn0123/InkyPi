@@ -257,8 +257,8 @@ textarea:focus-visible {
     outline-offset: 2px;
 }
 
-/* ── Button responsive: small screens ── */
-@media (max-width: 520px) {
+/* ── Button responsive: phones ── */
+@media (max-width: 640px) {
     .buttons-container {
         flex-direction: column;
     }

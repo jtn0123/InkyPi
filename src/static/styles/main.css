@@ -237,17 +237,19 @@ samp {
     /* Animation */
     --transition-speed: 0.18s;
 
-    /* Breakpoint reference (CSS custom properties cannot be used in
-       @media queries, so these serve as a single-source-of-truth
-       reference for the values used throughout _responsive.css and
-       per-component @media blocks):
-       --bp-xs:  430px   Narrowest phones
-       --bp-sm:  520px   Small phones
-       --bp-md:  640px   Progress-step threshold
-       --bp-tab: 768px   Tablet / mobile boundary
-       --bp-lg:  900px   Enhanced responsive
-       --bp-xl:  1024px  Tablet landscape
-       --bp-2xl: 1440px  Large screens */
+    /* Breakpoints. CSS custom properties cannot be used inside @media, so
+       this list is the single source: every width query in the partials
+       uses one of these values, written (max-width: N) for "N and
+       narrower" or (min-width: N+1) for "wider than N". build_css.py
+       warns about any other width and tests/unit/test_css_breakpoints.py
+       fails on it. The scripts' matchMedia calls use the same 640 and 768.
+       --bp-phone:   640px   Phones, portrait or landscape: one column,
+                             stacked page headers, full-width buttons.
+       --bp-tablet:  768px   Tablets in portrait: the mobile layout in
+                             _responsive-mobile.css.
+       --bp-sidebar: 900px   The sidebar becomes the top strip.
+       --bp-wide:    1200px  Wider: the plugin page puts its preview
+                             column beside the form, and pages are capped. */
 }
 [data-theme="dark"] {
     /* Console aesthetic — dark-first refined UI */
@@ -1659,14 +1661,13 @@ main[data-page-shell="workflow"] .frame {
 }
 
 /* Phones: the hostname is already in the address bar, and with the device
-   name it stacked the brand into three lines that doubled the top strip. */
+   name it stacked the brand into three lines that doubled the top strip.
+   The strip itself gets tighter so the menu has room. */
 @media (max-width: 640px) {
   .brand-host {
     display: none;
   }
-}
 
-@media (max-width: 360px) {
   .shell-sidebar {
     grid-template-columns: auto minmax(72px, 1fr) auto;
     gap: 6px;
@@ -1898,7 +1899,7 @@ body[data-page="plugin"] .tweaks-panel {
   color: var(--text);
 }
 
-@media (max-width: 520px) {
+@media (max-width: 640px) {
   .tweaks-panel {
     right: 10px;
     left: 10px;
@@ -2055,10 +2056,10 @@ body[data-page="plugin"] .tweaks-panel {
 
 /* At medium widths the plugin detail header has 3 action buttons competing
    with the icon + title + description column, forcing the title to wrap in a
-   narrow ribbon on the left. The workflow layout itself collapses to a single
-   column at 1200px, so stack the pageheader a touch earlier (~960px) to give
-   the title its full width and push the action row cleanly below. */
-@media (max-width: 960px) {
+   narrow ribbon on the left. Stack it wherever the workflow layout below is a
+   single column (--bp-wide and narrower), so the title gets its full width
+   and the action row sits cleanly below. */
+@media (max-width: 1200px) {
   .pageheader-plugin {
     flex-direction: column;
     align-items: stretch;
@@ -2130,7 +2131,6 @@ body[data-page="plugin"] .tweaks-panel {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
-
 
 /* Refined card primitive — unified surface wrapper for dashboards, settings, aside KPIs.
    Designed to coexist with existing *-card classes; apply .card additively when adopting. */
@@ -2826,8 +2826,8 @@ textarea:focus-visible {
     outline-offset: 2px;
 }
 
-/* ── Button responsive: small screens ── */
-@media (max-width: 520px) {
+/* ── Button responsive: phones ── */
+@media (max-width: 640px) {
     .buttons-container {
         flex-direction: column;
     }
@@ -5632,7 +5632,7 @@ a.pl-add-row:hover {
    the text. Selectors are doubled up so they beat the generic
    `.plugin-item` / `.plugin-actions` / `.plugin-info` rules in
    _responsive-mobile.css, which load later. */
-@media (max-width: 720px) {
+@media (max-width: 768px) {
   .pl-item.plugin-item {
     grid-template-columns: auto auto minmax(0, 1fr);
     grid-template-areas:
@@ -8578,8 +8578,8 @@ body[data-page="api-keys"] .status-popover {
     }
 }
 
-/* ── Progress block small screens ── */
-@media (max-width: 520px) {
+/* ── Progress block on phones ── */
+@media (max-width: 640px) {
     .progress-meta { flex-wrap: wrap; gap: 6px 10px; }
 
     .playlist-toolbar {
@@ -8589,7 +8589,7 @@ body[data-page="api-keys"] .status-popover {
 }
 
 /* ── API key row mobile ── */
-@media (max-width: 700px) {
+@media (max-width: 768px) {
     .apikey-row {
         grid-template-columns: 1fr;
     }
@@ -9205,8 +9205,8 @@ select.form-input,
     }
 }
 
-/* ── Narrowest screens ── */
-@media (max-width: 430px) {
+/* ── Phones (--bp-phone) ── */
+@media (max-width: 640px) {
     .frame,
     .playlist-frame,
     .api-keys-frame {
@@ -9253,8 +9253,9 @@ select.form-input,
     }
 }
 
-/* ── Tablet landscape (iPad landscape, small laptops) ── */
-@media (min-width: 1024px) {
+/* ── Wide screens (wider than --bp-wide). These caps only bite on even
+   wider viewports, so they can share the one breakpoint. ── */
+@media (min-width: 1201px) {
     .frame {
         max-width: 1200px;
         margin-inline: auto;
@@ -9264,10 +9265,7 @@ select.form-input,
         max-width: 1400px;
         margin-inline: auto;
     }
-}
 
-/* ── Large screens (>1440px) ── */
-@media (min-width: 1440px) {
     .page-shell {
         max-width: 1600px;
         margin-inline: auto;

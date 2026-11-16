@@ -209,7 +209,7 @@ body[data-page="plugin"] .tweaks-panel {
   color: var(--text);
 }
 
-@media (max-width: 520px) {
+@media (max-width: 640px) {
   .tweaks-panel {
     right: 10px;
     left: 10px;

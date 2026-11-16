@@ -76,8 +76,8 @@
     }
 }
 
-/* ── Progress block small screens ── */
-@media (max-width: 520px) {
+/* ── Progress block on phones ── */
+@media (max-width: 640px) {
     .progress-meta { flex-wrap: wrap; gap: 6px 10px; }
 
     .playlist-toolbar {
@@ -87,7 +87,7 @@
 }
 
 /* ── API key row mobile ── */
-@media (max-width: 700px) {
+@media (max-width: 768px) {
     .apikey-row {
         grid-template-columns: 1fr;
     }

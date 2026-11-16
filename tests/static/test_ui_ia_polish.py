@@ -163,7 +163,7 @@ def test_second_validation_mobile_and_feedback_polish_contracts() -> None:
     )
 
     assert "grid-template-columns: auto minmax(84px, 1fr) auto" in css
-    assert "@media (max-width: 360px)" in css
+    assert "grid-template-columns: auto minmax(72px, 1fr) auto" in css
     assert ".brand-host" in css and "display: none" in css
     assert "bottom: 20px" in css and ".toast-container" in css
     assert "--modal-overlay-destructive" in css
