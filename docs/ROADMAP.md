@@ -64,11 +64,13 @@ The remaining code-quality items come from a local grade report
 - [ ] **D1** — Make "CI gate (all checks pass)" a required status check for
       `main`: a repository ruleset whose only bypass is the release deploy key,
       which pushes the version-bump commit. See `docs/development.md`.
-- [ ] **E4** — The service runs as root and keeps CAP_SYS_ADMIN, so code inside
-      it can remount the sandbox's read-only paths or leave through
-      `systemd-run`. Add `SystemCallFilter=~@mount` and
-      `RestrictNamespaces=yes` and test on the Pi; closing `systemd-run` fully
-      needs a non-root service user.
+- **E4** (won't do) — The service runs as root and keeps CAP_SYS_ADMIN.
+      The suggested `SystemCallFilter=~@mount` and `RestrictNamespaces=yes`
+      would break the Screenshot plugin: Chromium's sandbox runs as `nobody`
+      and needs user namespaces and chroot. `systemd-run` stays open on
+      purpose, because updates run through it. The only full fix is a
+      non-root service user, which isn't worth it for a device on a private
+      network that only its owner reaches.
 - [ ] **E5** — An update trusts a wheel whose hash is in the release's own
       manifest, and both come from the same editable release. The release
       workflow now keeps each release a draft until the SBOM, wheelhouse and
