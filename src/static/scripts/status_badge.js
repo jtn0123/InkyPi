@@ -1,9 +1,11 @@
 // In-app status badge (JTN-709).
 //
-// Polls /api/diagnostics (JTN-707) every 30s and surfaces a small floating
-// badge in the page corner when something is wrong. Click opens a popover
-// with the active issues and quick links (logs, pretty diagnostics, settings
-// updates page).
+// Polls /api/diagnostics?summary=1 (JTN-707) every 30s and surfaces a small
+// floating badge in the page corner when something is wrong. Click opens a
+// popover with the active issues and quick links (logs, pretty diagnostics,
+// settings updates page). The summary skips the log tail, disk and asset
+// checks, which the badge doesn't use. Polling stops while the tab is hidden
+// and resumes, with an immediate poll, when it is shown again.
 //
 // Badge state derivation:
 //   ok      : refresh_task.last_error == null
@@ -33,6 +35,7 @@
   }
 
   const ENDPOINT = "/api/diagnostics";
+  const POLL_URL = `${ENDPOINT}?summary=1`;
   const POLL_MS = 30_000;
 
   let badgeEl = null;
@@ -261,7 +264,7 @@
   async function poll() {
     if (disabled) return;
     try {
-      const resp = await fetch(ENDPOINT, {
+      const resp = await fetch(POLL_URL, {
         credentials: "same-origin",
         headers: { Accept: "application/json" },
       });
@@ -296,17 +299,27 @@
     }
   }
 
+  function resumePolling() {
+    if (disabled) return;
+    void poll(); // never rejects: it catches its own errors
+    startPolling();
+  }
+
   function handleVisibility() {
-    if (document.visibilityState === "visible" && !disabled) {
-      void poll(); // never rejects: it catches its own errors
+    // A hidden tab has no one to show the badge to: stop asking the Pi.
+    if (document.visibilityState === "visible") {
+      resumePolling();
+    } else {
+      stopPolling();
     }
   }
 
   function init() {
     ensureBadge();
-    void poll(); // never rejects: it catches its own errors
-    startPolling();
     document.addEventListener("visibilitychange", handleVisibility);
+    if (document.visibilityState === "visible") {
+      resumePolling();
+    }
   }
 
   if (document.readyState === "loading") {

@@ -521,6 +521,40 @@ def write_bytes_atomic(data: bytes, path: str) -> None:
     _replace_atomically(path, lambda fh: fh.write(data))
 
 
+def link_atomic(source: str, path: str, *, touch: bool = False) -> None:
+    """Make *path* a hard link to *source*, replacing *path* atomically.
+
+    For a file that would otherwise get the same bytes as one already on
+    disk: nothing is written to the card but the directory entry. The two
+    names share one file, which is only safe while every writer of either
+    name replaces it with a new file (as :func:`write_bytes_atomic` and
+    :func:`save_image_atomic` do) and never rewrites it in place.
+
+    *touch* sets the file's modification time to now. Without it, linking
+    to an older file (a plugin's cached render) would move *path*'s mtime
+    back, and a client polling with If-Modified-Since would be told the new
+    picture had not changed.
+
+    Raises :class:`OSError` when the link cannot be made: *source* is
+    missing, or on another file system or one without hard links. Callers
+    then write the bytes instead.
+    """
+    directory = os.path.dirname(os.path.abspath(path))
+    tmp_path = os.path.join(
+        directory, f".{os.path.basename(path)}.{os.urandom(8).hex()}.tmp"
+    )
+    os.link(source, tmp_path)
+    try:
+        if touch:
+            os.utime(tmp_path)
+        os.replace(tmp_path, path)
+    finally:
+        # Gone after a successful replace. Still there if the replace failed,
+        # or if *path* already was this file, when rename() does nothing.
+        with contextlib.suppress(OSError):
+            os.unlink(tmp_path)
+
+
 def _playwright_env() -> dict[str, str | float | bool]:
     """``browser_environment()`` in the value type Playwright's ``launch`` declares."""
     return dict(browser_environment())

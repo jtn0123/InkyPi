@@ -267,7 +267,18 @@ class RefreshExecutor:
         current_dt: datetime,
         request_id: str | None = None,
     ) -> tuple[Any, Any]:
-        """Run a plugin with the configured retry and isolation policy."""
+        """Run a plugin with the configured retry and isolation policy.
+
+        A turn that only reloads the plugin's last render is answered here,
+        with no worker: see :meth:`RefreshAction.reuse_cached_image`. Like a
+        worker's cached turn it has no plugin metadata.
+        """
+        # getattr: stand-ins that only implement execute() still work.
+        reuse = getattr(refresh_action, "reuse_cached_image", None)
+        cached = reuse(self.device_config, current_dt) if callable(reuse) else None
+        if isinstance(cached, Image.Image):
+            return cached, None
+
         plugin_id = refresh_action.get_plugin_id()
         _retries, backoff_ms, attempts = self.retry_policy()
         timeout_s = self.plugin_timeout_seconds(plugin_id)
