@@ -12,6 +12,7 @@ can cost a paid API call (AI image, AI text).
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -130,9 +131,11 @@ class _Renderer:
     """Stands in for the clock plugin; draws blue so it differs from the cache."""
 
     def __init__(self) -> None:
-        self.settings_seen: list[dict[str, Any]] = []
+        self.settings_seen: list[dict[str, object]] = []
 
-    def generate_image(self, settings: dict[str, Any], config: Any) -> Image.Image:
+    def generate_image(
+        self, settings: Mapping[str, object], device_config: object
+    ) -> Image.Image | None:
         self.settings_seen.append(dict(settings))
         return Image.new("RGB", (8, 8), "blue")
 
