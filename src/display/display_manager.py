@@ -20,6 +20,7 @@ from utils.image_utils import (
     HISTORY_PNG_COMPRESS_LEVEL,
     apply_image_enhancement,
     change_orientation,
+    link_atomic,
     resize_image,
     save_image_atomic,
     write_bytes_atomic,
@@ -150,9 +151,12 @@ class DisplayManager:
     # Approximate count of history entries to avoid scanning the directory on
     # every save.  Reset to None to force a recount on the next prune cycle.
     _history_count_estimate: int | None = None
-    # Force a full recount every N increments to correct estimate drift
+    # Force a full recount after N saves without a scan, to correct drift
     _RECOUNT_INTERVAL = 50
     _history_increment_count = 0
+    # A scan that finds history over the cap prunes this many more entries
+    # (at most a tenth of the cap), so the next saves can skip the scan.
+    _PRUNE_HEADROOM = 25
     _history_lock = threading.RLock()
 
     def _history_max_entries(self) -> int:
@@ -167,11 +171,18 @@ class DisplayManager:
         return RetentionPolicy.from_config(raw).max_count
 
     def _prune_history(self, history_dir: str) -> None:
-        """Remove the oldest history entries beyond the configured count cap.
+        """Keep the history at or under the configured count cap.
 
-        Uses an in-memory count estimate to skip the directory scan when the
-        count is clearly below the limit.  The estimate is refreshed whenever
-        an actual scan is performed or every _RECOUNT_INTERVAL increments.
+        A scan lists the folder and stats every entry, about 130 ms on a Pi
+        Zero 2 W with 500 entries, so it is skipped while an in-memory count
+        says the cap has not been reached. Every scan resets that count, and
+        a scan also runs after ``_RECOUNT_INTERVAL`` saves without one, to
+        notice entries deleted elsewhere.
+
+        A scan that finds history over the cap removes the oldest entries
+        down to ``_PRUNE_HEADROOM`` below it (at most a tenth of the cap), so
+        the next saves skip the scan again. With the default cap of 500 that
+        is one scan per 26 saves, and history holds 475 to 500 entries.
         """
         max_entries = self._history_max_entries()
         if max_entries <= 0:
@@ -186,11 +197,16 @@ class DisplayManager:
                 # Force periodic recount to correct drift from external deletions
                 if self._history_increment_count < self._RECOUNT_INTERVAL:
                     return
-                self._history_increment_count = 0
+            self._history_increment_count = 0
             # Age and free-space limits are left to the refresh loop's
             # periodic cleanup; a save only needs the count cap.
+            headroom = min(self._PRUNE_HEADROOM, max_entries // 10)
             result = cleanup_history(
-                history_dir, max_age_days=0, max_count=max_entries, min_free_bytes=0
+                history_dir,
+                max_age_days=0,
+                max_count=max_entries,
+                min_free_bytes=0,
+                trim_to=max_entries - headroom,
             )
             self._history_count_estimate = result.remaining_count
 
@@ -198,7 +214,7 @@ class DisplayManager:
         self,
         processed_image: Image.Image | bytes,
         history_meta: Mapping[str, object] | None = None,
-    ) -> None:
+    ) -> str | None:
         """Persist a processed image snapshot and optional JSON sidecar metadata.
 
         *processed_image* is the frame, or its PNG from :func:`encode_frame_png`
@@ -210,10 +226,14 @@ class DisplayManager:
         non-render does NOT count toward Dashboard "Refreshes / Errors"
         KPIs (ISSUE-006). ``utils.refresh_stats.compute_stats`` derives
         those numbers by counting sidecar files; no sidecar = no count.
+
+        Returns the PNG's path, or ``None`` when no snapshot was written. The
+        PNG is flushed to disk and never rewritten, so the processed preview
+        can be a hard link to it (see :meth:`_save_processed`).
         """
         history_dir_raw = getattr(self.device_config, "history_image_dir", None)
         if not isinstance(history_dir_raw, str) or not history_dir_raw:
-            return
+            return None
 
         history_dir = history_dir_raw
         try:
@@ -237,10 +257,14 @@ class DisplayManager:
                         continue
                     # Publish atomically: the history page lists and decodes
                     # display_*.png, so it must never see a half-written file.
+                    # Flushed to disk because the processed preview, which
+                    # restore_last_frame reads after a reboot, links to it.
                     tmp_path = os.path.join(history_dir, f".{candidate}.png.tmp")
                     try:
                         with open(tmp_path, "wb") as fh:
                             fh.write(frame_png)
+                            fh.flush()
+                            os.fsync(fh.fileno())
                         os.replace(tmp_path, candidate_path)
                     except BaseException:
                         with contextlib.suppress(OSError):
@@ -254,12 +278,12 @@ class DisplayManager:
                     raise OSError("Unable to allocate a unique history snapshot path")
         except (OSError, ValueError, RuntimeError):
             logger.exception("Failed to save history snapshot image")
-            return
+            return None
         # Skip the sidecar entirely when there's no metadata to record
         # (callers explicitly opting out). The PNG above is still on disk.
         if not history_meta:
             self._prune_history(history_dir)
-            return
+            return png_path
         try:
             meta_payload = dict(history_meta)
             meta_payload.setdefault("refresh_time", timestamp.isoformat())
@@ -272,6 +296,7 @@ class DisplayManager:
         except (OSError, TypeError, ValueError):
             logger.exception("Failed to persist history metadata for %s", base_name)
         self._prune_history(history_dir)
+        return png_path
 
     @staticmethod
     def _save_preview(image: Image.Image, path: str) -> None:
@@ -287,20 +312,29 @@ class DisplayManager:
         )
 
     def _save_current(self, image: Image.Image, source_png: str | None) -> None:
-        """Write the unprocessed preview, copying *source_png* when given.
+        """Write the unprocessed preview, linking to *source_png* when given.
 
         *source_png* is a PNG file that already holds exactly *image* (the
-        plugin's cache file), so copying its bytes gives the same picture
-        without a second PNG encode. If the copy fails the image is encoded
-        as before.
+        plugin's cache file). The preview becomes a hard link to it, so the
+        picture is neither encoded nor written a second time. Where a link
+        can't be made, its bytes are copied; if that fails too, the image is
+        encoded as before.
         """
         path = self.device_config.current_image_file
         if source_png is not None:
             try:
                 with open(source_png, "rb") as fh:
+                    if fh.read(len(_PNG_SIGNATURE)) != _PNG_SIGNATURE:
+                        raise ValueError("not a PNG file")
+                try:
+                    # Touched: the preview's mtime is what /api/current_image
+                    # compares with If-Modified-Since.
+                    link_atomic(source_png, path, touch=True)
+                    return
+                except OSError as exc:
+                    logger.debug("Could not link %s (%s); copying it", path, exc)
+                with open(source_png, "rb") as fh:
                     data = fh.read()
-                if not data.startswith(_PNG_SIGNATURE):
-                    raise ValueError("not a PNG file")
                 write_bytes_atomic(data, path)
                 return
             except (OSError, ValueError) as exc:
@@ -310,6 +344,22 @@ class DisplayManager:
                     exc,
                 )
         self._save_preview(image, path)
+
+    def _save_processed(self, frame_png: bytes, history_png: str | None) -> None:
+        """Write the processed preview, linking to its history copy when there is one.
+
+        *history_png* holds exactly *frame_png*. History files are flushed to
+        disk and never rewritten, so a link is as safe as a second copy, and
+        is just a directory entry where a copy writes the frame again.
+        """
+        path = self.device_config.processed_image_file
+        if history_png is not None:
+            try:
+                link_atomic(history_png, path)
+                return
+            except OSError as exc:
+                logger.debug("Could not link %s (%s); writing it", path, exc)
+        write_bytes_atomic(frame_png, path)
 
     def _maybe_crisp(
         self, image: Image.Image, image_settings: list[object]
@@ -479,13 +529,13 @@ class DisplayManager:
                 logger.exception("Failed to encode the processed frame")
                 frame_png = None
             if frame_png is not None:
+                history_png = self._save_history_entry(
+                    frame_png, history_meta=history_meta
+                )
                 try:
-                    write_bytes_atomic(
-                        frame_png, self.device_config.processed_image_file
-                    )
+                    self._save_processed(frame_png, history_png)
                 except (OSError, ValueError, RuntimeError):
                     logger.exception("Failed to save processed image preview")
-                self._save_history_entry(frame_png, history_meta=history_meta)
             preprocess_ms = int((perf_counter() - preprocess_t0) * 1000)
 
             # JTN-786: signal the caller that the image is safely on disk

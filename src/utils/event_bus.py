@@ -15,8 +15,6 @@ import time
 from collections.abc import Callable, Generator
 from typing import Any
 
-from utils.sse import bounded_stream
-
 logger = logging.getLogger(__name__)
 
 _SENTINEL = object()  # placed in a subscriber's queue to signal close
@@ -130,6 +128,10 @@ class EventBus:
             event_type = item.get("event", "message")
             data = json.dumps(item, separators=(",", ":"))
             return [f"event: {event_type}\ndata: {data}\n\n"]
+
+        # Imported here, not at the top: utils.sse imports Flask, and the
+        # refresh loop publishes on this bus without ever serving a stream.
+        from utils.sse import bounded_stream
 
         try:
             yield from bounded_stream(

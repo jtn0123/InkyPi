@@ -165,6 +165,17 @@ class RefreshAction:
         """
         raise NotImplementedError("Subclasses must implement the execute method.")
 
+    def reuse_cached_image(
+        self, device_config: DeviceConfigLike, current_dt: datetime
+    ) -> Image.Image | None:
+        """Return the image this turn would show without running the plugin.
+
+        ``None`` means the plugin must run (in a worker). An action whose
+        turn only reloads an earlier render overrides this, so the parent can
+        load it without starting a worker process for a file read.
+        """
+        return None
+
     def get_refresh_info(self) -> RefreshInfo:
         """Return refresh metadata as a dictionary."""
         raise NotImplementedError(
@@ -314,14 +325,50 @@ class PlaylistRefresh(RefreshAction):
             delta["settings"] = changed_settings
         self._state_delta = delta
 
+    def _cache_path(self, device_config: DeviceConfigLike) -> str:
+        """The plugin instance's cache file: its last render."""
+        return os.path.join(
+            device_config.plugin_image_dir, self.plugin_instance.get_image_path()
+        )
+
+    def _log_not_due(self) -> None:
+        logger.info(
+            f"Not time to refresh plugin instance, using latest image. | plugin_instance: {self.plugin_instance.name}."
+        )
+
+    def reuse_cached_image(
+        self, device_config: DeviceConfigLike, current_dt: datetime
+    ) -> Image.Image | None:
+        """Load the last render when this turn is not due, as :meth:`execute` would.
+
+        That turn only reads the cache file, which is no reason to start a
+        worker process and import the plugin. The result is what a worker
+        would hand back: the image, no state change, and the cache file as
+        :attr:`cached_image_path`.
+
+        Returns ``None`` when the plugin is due or forced, or when the file
+        can't be read. A worker then runs the turn as before, so a missing or
+        corrupt cache file still fails the turn the same way.
+        """
+        if self.plugin_instance.should_refresh(current_dt) or self.force:
+            return None
+        plugin_image_path = self._cache_path(device_config)
+        try:
+            with Image.open(plugin_image_path) as cached:
+                image = cached.copy()
+        except (OSError, ValueError):
+            return None
+        self._log_not_due()
+        self._state_delta = {}
+        self.cached_image_path = plugin_image_path
+        return image
+
     def execute(
         self, plugin: PluginLike, device_config: DeviceConfigLike, current_dt: datetime
     ) -> Image.Image | None:
         """Performs a refresh for the specified plugin instance within its playlist context."""
         # Determine the file path for the plugin's image
-        plugin_image_path = os.path.join(
-            device_config.plugin_image_dir, self.plugin_instance.get_image_path()
-        )
+        plugin_image_path = self._cache_path(device_config)
 
         self._state_delta = {}
         self.cached_image_path = None
@@ -353,9 +400,7 @@ class PlaylistRefresh(RefreshAction):
             )
             self._record_refresh(current_dt, settings_before)
         else:
-            logger.info(
-                f"Not time to refresh plugin instance, using latest image. | plugin_instance: {self.plugin_instance.name}."
-            )
+            self._log_not_due()
             # Load the existing image from disk using standardized helper
             image = load_image_from_path(plugin_image_path)
             if image is None:

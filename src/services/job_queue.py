@@ -9,6 +9,7 @@ No external dependencies (no Celery, no Redis) — uses a stdlib
 
 from __future__ import annotations
 
+import functools
 import logging
 import threading
 import uuid
@@ -60,8 +61,8 @@ class JobQueue:
     # Public API
     # ------------------------------------------------------------------
 
-    def enqueue(
-        self, fn: Callable[..., object], *args: object, **kwargs: object
+    def enqueue[**P](
+        self, fn: Callable[P, object], *args: P.args, **kwargs: P.kwargs
     ) -> str:
         """Submit *fn(*args, **kwargs)* for background execution.
 
@@ -75,7 +76,9 @@ class JobQueue:
             self._prune_finished_locked()
             self._jobs[job_id] = entry
 
-        future = self._executor.submit(self._run, entry, fn, *args, **kwargs)
+        future = self._executor.submit(
+            self._run, entry, functools.partial(fn, *args, **kwargs)
+        )
         entry.future = future
         return job_id
 
@@ -142,16 +145,10 @@ class JobQueue:
     # Internal helpers
     # ------------------------------------------------------------------
 
-    def _run(
-        self,
-        entry: _JobEntry,
-        fn: Callable[..., object],
-        *args: object,
-        **kwargs: object,
-    ) -> object:
+    def _run(self, entry: _JobEntry, call: Callable[[], object]) -> object:
         entry.status = STATUS_RUNNING
         try:
-            result = fn(*args, **kwargs)
+            result = call()
             entry.result = result
             entry.status = STATUS_DONE
             entry.finished_at = self._clock()

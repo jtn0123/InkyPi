@@ -1,12 +1,15 @@
 """Plugin instance CRUD and instance actions (delete, update, display, retry)."""
 
+from __future__ import annotations
+
 import os
 from html import escape
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from flask import current_app, request
+from flask import request
 from flask.typing import ResponseReturnValue
 
+from blueprints._deps import get_device_config, get_refresh_task
 from plugins.plugin_registry import get_plugin_instance
 from refresh_task import PlaylistRefresh
 from services.playlist_workflows import validate_plugin_refresh_settings
@@ -31,7 +34,6 @@ from utils.request_models import (
 )
 
 from ._common import (
-    _CONFIG_KEY,
     _ERR_PLAYLIST_NOT_FOUND,
     _ERR_PLUGIN_INSTANCE_NOT_FOUND,
     _MSG_CIRCUIT_BREAKER_RESET,
@@ -43,11 +45,14 @@ from ._common import (
     plugin_bp,
 )
 
+if TYPE_CHECKING:
+    from config import Config
+
 
 def _cleanup_plugin_resources(
-    device_config: Any,
-    plugin_id: str | None,
-    plugin_instance_name: str | None,
+    device_config: Config,
+    plugin_id: str,
+    plugin_instance_name: str,
     plugin_settings: dict[str, Any] | None = None,
 ) -> None:
     """Clean up cached image and run plugin-specific teardown after instance deletion.
@@ -71,7 +76,7 @@ def _cleanup_plugin_resources(
         logger.warning(
             "Could not clean up image for %s/%s",
             sanitize_log_field(plugin_id),
-            sanitize_log_field(str(plugin_instance_name)),
+            sanitize_log_field(plugin_instance_name),
             exc_info=True,
         )
 
@@ -90,7 +95,7 @@ def _cleanup_plugin_resources(
 
 @plugin_bp.route("/delete_plugin_instance", methods=["POST", "DELETE"])
 def delete_plugin_instance() -> ResponseReturnValue:
-    device_config = current_app.config[_CONFIG_KEY]
+    device_config = get_device_config()
     playlist_manager = device_config.get_playlist_manager()
 
     if not request.is_json:
@@ -113,24 +118,27 @@ def delete_plugin_instance() -> ResponseReturnValue:
         playlist = playlist_manager.get_playlist(parsed.playlist_name)
         if not playlist:
             raise ResourceLookupError("Playlist not found", status=400)
+        plugin_id, instance_name = parsed.plugin_id, parsed.plugin_instance
+        if plugin_id is None or instance_name is None:
+            # No instance has a missing id or name, so this is the answer the
+            # lookup below would give, without writing the config first.
+            raise ResourceLookupError("Plugin instance not found", status=400)
 
-        existing = playlist.find_plugin(parsed.plugin_id, parsed.plugin_instance)
+        existing = playlist.find_plugin(plugin_id, instance_name)
         plugin_settings = dict(existing.settings) if existing else {}
 
         del_result: list[bool] = []
 
         def _do_delete(cfg: Any) -> None:
-            del_result.append(
-                playlist.delete_plugin(parsed.plugin_id, parsed.plugin_instance)
-            )
+            del_result.append(playlist.delete_plugin(plugin_id, instance_name))
 
         device_config.update_atomic(_do_delete)
         if not del_result or not del_result[0]:
             raise ResourceLookupError("Plugin instance not found", status=400)
         _cleanup_plugin_resources(
             device_config,
-            parsed.plugin_id,
-            parsed.plugin_instance,
+            plugin_id,
+            instance_name,
             plugin_settings,
         )
 
@@ -139,7 +147,7 @@ def delete_plugin_instance() -> ResponseReturnValue:
 
 @plugin_bp.route("/update_plugin_instance/<string:instance_name>", methods=["PUT"])
 def update_plugin_instance(instance_name: str) -> ResponseReturnValue:
-    device_config = current_app.config[_CONFIG_KEY]
+    device_config = get_device_config()
     playlist_manager = device_config.get_playlist_manager()
 
     with route_error_boundary(
@@ -255,8 +263,8 @@ def update_plugin_instance(instance_name: str) -> ResponseReturnValue:
 
 @plugin_bp.route("/display_plugin_instance", methods=["POST"])
 def display_plugin_instance() -> ResponseReturnValue:
-    device_config = current_app.config[_CONFIG_KEY]
-    refresh_task = current_app.config["REFRESH_TASK"]
+    device_config = get_device_config()
+    refresh_task = get_refresh_task()
     playlist_manager = device_config.get_playlist_manager()
 
     if not request.is_json:
@@ -284,7 +292,11 @@ def display_plugin_instance() -> ResponseReturnValue:
             )
             raise ResourceLookupError(_ERR_PLAYLIST_NOT_FOUND, status=400)
 
-        plugin_instance = playlist.find_plugin(parsed.plugin_id, parsed.plugin_instance)
+        plugin_instance = (
+            playlist.find_plugin(parsed.plugin_id, parsed.plugin_instance)
+            if parsed.plugin_id is not None and parsed.plugin_instance is not None
+            else None
+        )
         if not plugin_instance:
             logger.warning(
                 "display_plugin_instance: plugin instance not found "
@@ -318,12 +330,7 @@ def force_retry_plugin_instance(
     Allows a paused plugin to be retried on the next scheduler cycle without
     waiting for a successful refresh to reset it automatically.
     """
-    refresh_task = current_app.config.get("REFRESH_TASK")
-    if refresh_task is None:
-        return json_error("Refresh task not available", status=503)
-    if not hasattr(refresh_task, "reset_circuit_breaker"):
-        return json_error("Circuit-breaker reset not supported", status=501)
-    found = refresh_task.reset_circuit_breaker(plugin_id, instance_name)
+    found = get_refresh_task().reset_circuit_breaker(plugin_id, instance_name)
     if not found:
         logger.warning(
             "force_retry: plugin instance not found plugin_id=%s instance=%s",

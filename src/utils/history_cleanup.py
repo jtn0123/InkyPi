@@ -158,6 +158,8 @@ def cleanup_history(
     max_age_days: int = DEFAULT_MAX_AGE_DAYS,
     max_count: int = DEFAULT_MAX_COUNT,
     min_free_bytes: int = DEFAULT_MIN_FREE_BYTES,
+    *,
+    trim_to: int | None = None,
 ) -> CleanupResult:
     """Delete old history images according to a retention policy.
 
@@ -171,6 +173,11 @@ def cleanup_history(
     max_count:
         Keep at most this many PNG files (newest first).  ``0`` disables the
         count cap.
+    trim_to:
+        When there are more than *max_count* files, keep only this many
+        (clamped to ``0..max_count``) instead of exactly *max_count*. A caller
+        that adds one file at a time can then skip the scan for a while.
+        ``None`` keeps *max_count*.
     min_free_bytes:
         If free disk space on the *history_dir* filesystem falls below this
         threshold, delete oldest files until the threshold is met.  ``0``
@@ -209,9 +216,10 @@ def cleanup_history(
                 survivors.append((mtime, path))
         entries = survivors
 
-    # --- Pass 2: count-based deletion (keep newest max_count) ---
+    # --- Pass 2: count-based deletion (keep newest max_count, or trim_to) ---
     if max_count > 0 and len(entries) > max_count:
-        overflow = len(entries) - max_count
+        keep = max_count if trim_to is None else max(0, min(trim_to, max_count))
+        overflow = len(entries) - keep
         to_delete, to_keep = entries[:overflow], entries[overflow:]
         for _mtime, path in to_delete:
             logger.debug("history_cleanup: count evict %s", path)

@@ -91,6 +91,8 @@ UI_BROWSER_TESTS = {
     "test_fetch_json_errors_e2e.py",
     # Settings shows a 90-minute cycle as 90 minutes, and Save keeps it.
     "test_settings_interval_units_e2e.py",
+    # The status badge polls the diagnostics summary, and not from a hidden tab.
+    "test_status_badge_polling.py",
 }
 A11Y_BROWSER_TESTS = {
     "test_a11y_sweep.py",
