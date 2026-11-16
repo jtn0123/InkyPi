@@ -15,7 +15,6 @@
     setHidden,
     setPluginSubtab,
     showInstanceFallback,
-    syncModalOpenState,
     updateCombinedColorPreview,
     validateAddToPlaylistAction,
   } = globalThis.InkyPiPluginPageShared;
@@ -230,8 +229,7 @@
       }
 
       try {
-        const res = await fetch(config.refreshInfoUrl);
-        const info = await res.json();
+        const info = await fetchJson(config.refreshInfoUrl);
         const currTime = document.getElementById("currentDisplayTime");
         if (currTime) currTime.textContent = formatPreviewTimestamp(info?.refresh_time);
         const pluginRefreshTime =
@@ -268,7 +266,7 @@
       modal.hidden = false;
       modal.style.display = "flex";
       modal.classList.add("is-open");
-      syncModalOpenState(ui);
+      globalThis.InkyPiModalFocus?.syncModalOpenState();
       globalThis.InkyPiModalFocus?.activate(modal, triggerEl, () =>
         closeModal(modalId)
       );
@@ -280,7 +278,7 @@
       modal.hidden = true;
       modal.style.display = "none";
       modal.classList.remove("is-open");
-      syncModalOpenState(ui);
+      globalThis.InkyPiModalFocus?.syncModalOpenState();
       globalThis.InkyPiModalFocus?.deactivate(modal);
     }
 
@@ -417,22 +415,19 @@
 
     async function displayInstanceNow() {
       try {
-        const resp = await fetch(config.displayInstanceUrl, {
+        const result = await fetchJson(config.displayInstanceUrl, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(config.displayInstancePayload),
         });
-        const result = await resp.json();
-        if (!resp.ok) {
-          showResponseModal("failure", `Error! ${result.error}`);
-        } else {
-          showResponseModal("success", `Success! ${result.message}`);
-          setTimeout(() => {
-            refreshPreviewsAfterSuccess().catch(reportPreviewRefreshFailure);
-          }, 400);
-        }
-      } catch {
-        showResponseModal("failure", "Failed to display instance");
+        showResponseModal("success", `Success! ${result.message}`);
+        setTimeout(() => {
+          refreshPreviewsAfterSuccess().catch(reportPreviewRefreshFailure);
+        }, 400);
+      } catch (error) {
+        console.debug("Display instance failed:", error);
+        const message = globalThis.InkyPiHttp.errorMessage(error, "Failed to display instance");
+        showResponseModal("failure", `Error! ${message}`);
       }
     }
 

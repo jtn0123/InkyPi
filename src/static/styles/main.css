@@ -5164,20 +5164,6 @@ body[data-page="plugin"] .workflow-help p {
   margin: 0 auto;
 }
 
-.playlist-thumbnail-modal {
-    background-color: var(--modal-overlay);
-}
-
-.playlist-thumbnail-content {
-    background-color: var(--modal-bg);
-    box-shadow: 0 4px 20px var(--shadow-medium);
-}
-
-.playlist-thumbnail-info {
-    background-color: var(--bg-primary);
-    color: var(--text-secondary);
-}
-
 /* Drag handle */
 .drag-handle {
     display: flex;
@@ -7385,40 +7371,6 @@ body[data-page="settings"] .settings-device-name {
   }
 }
 
-.thumbnail-preview-modal {
-  position: fixed;
-  inset: 0;
-  z-index: 1000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.thumbnail-preview-content {
-  position: relative;
-  max-width: 90vw;
-  max-height: 90vh;
-  border-radius: 12px;
-  overflow: hidden;
-  padding: 16px;
-}
-
-.thumbnail-preview-close {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  background: none;
-  border: none;
-  font-size: 1.5rem;
-  cursor: pointer;
-  color: var(--text);
-}
-
-.thumbnail-preview-info {
-  padding: 12px 0 0;
-  font-size: 0.9rem;
-}
-
 .pagination {
   display: flex;
   align-items: center;
@@ -8258,11 +8210,6 @@ details[open] > .update-release-notes-toggle::before {
 .close-button .close-icon {
     width: 16px;
     height: 16px;
-}
-
-.thumbnail-preview-close .close-icon {
-    width: 20px;
-    height: 20px;
 }
 
 /* Help icon (info) */
@@ -9199,8 +9146,7 @@ body[data-page="api-keys"] .status-popover {
         align-self: flex-start;
     }
 
-    .modal-content,
-    .thumbnail-preview-content {
+    .modal-content {
         width: min(100vw - 12px, 100%);
         max-width: none;
         margin: auto auto 0;

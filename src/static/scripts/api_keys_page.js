@@ -310,19 +310,18 @@
       const data = new FormData(form);
       let savedOk = false;
       try {
-        const resp = await fetch(config.saveManagedUrl, {
+        const result = await fetchJson(config.saveManagedUrl, {
           method: "POST",
           body: data,
         });
-        const result = await resp.json();
-        if (resp.ok) {
-          savedOk = true;
-          handleManagedSaveSuccess(result);
-        } else {
-          showResponseModal("failure", `Error! ${result.error}`);
-        }
-      } catch {
-        showResponseModal("failure", "Failed to save keys. Please try again.");
+        savedOk = true;
+        handleManagedSaveSuccess(result);
+      } catch (error) {
+        console.debug("api_keys_page: save failed:", error);
+        showResponseModal(
+          "failure",
+          `Error! ${globalThis.InkyPiHttp.errorMessage(error, "Failed to save keys. Please try again.")}`
+        );
       } finally {
         finalizeSaveButton(saveBtn, savedOk);
       }
@@ -376,21 +375,22 @@
       if (!confirmed) return;
       const data = new FormData();
       data.append("key", keyName);
+      let result;
       try {
-        const resp = await fetch(config.deleteManagedUrl, {
+        result = await fetchJson(config.deleteManagedUrl, {
           method: "POST",
           body: data,
         });
-        const result = await resp.json();
-        if (resp.ok) {
-          showResponseModal("success", `Success! ${result.message}`);
-          updateDeletedStatus(keyName);
-        } else {
-          showResponseModal("failure", `Error! ${result.error}`);
-        }
-      } catch {
-        showResponseModal("failure", "Failed to delete key. Please try again.");
+      } catch (error) {
+        console.debug("api_keys_page: delete failed:", error);
+        showResponseModal(
+          "failure",
+          `Error! ${globalThis.InkyPiHttp.errorMessage(error, "Failed to delete key. Please try again.")}`
+        );
+        return;
       }
+      showResponseModal("success", `Success! ${result.message}`);
+      updateDeletedStatus(keyName);
     }
 
     // Keep delete-button + value-input aria-labels in sync with the current
@@ -633,21 +633,20 @@
       if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = "Saving\u2026"; }
       let savedOk = false;
       try {
-        const response = await fetch(config.saveGenericUrl, {
+        const result = await fetchJson(config.saveGenericUrl, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ entries }),
         });
-        const result = await response.json();
-        if (response.ok) {
-          savedOk = true;
-          showResponseModal("success", result.message);
-          setTimeout(() => globalThis.location.reload(), 1000);
-        } else {
-          showResponseModal("failure", result.error);
-        }
-      } catch {
-        showResponseModal("failure", "Failed to save API keys");
+        savedOk = true;
+        showResponseModal("success", result.message);
+        setTimeout(() => globalThis.location.reload(), 1000);
+      } catch (error) {
+        console.debug("api_keys_page: save failed:", error);
+        showResponseModal(
+          "failure",
+          globalThis.InkyPiHttp.errorMessage(error, "Failed to save API keys")
+        );
       } finally {
         finalizeSaveButton(saveBtn, savedOk);
       }

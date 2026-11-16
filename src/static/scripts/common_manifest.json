@@ -32,6 +32,10 @@
     "defer": true
   },
   {
+    "path": "fetch_json.js",
+    "defer": true
+  },
+  {
     "path": "response_modal.js",
     "defer": true
   },

@@ -183,7 +183,7 @@ def test_reboot_shutdown_modals_toggle_is_open_class(client: FlaskClient) -> Non
     """
     js = _read_settings_modals_js(client)
     assert 'classList.toggle("is-open"' in js
-    # syncModalOpenState is how InkyPiUI keeps body.modal-open up to date.
+    # InkyPiModalFocus.syncModalOpenState keeps body.modal-open up to date.
     assert "syncModalOpenState" in js
 
 

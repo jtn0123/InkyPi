@@ -222,8 +222,7 @@
       polls++;
       let jobInfo;
       try {
-        const resp = await fetch('/api/job/' + jobId, { signal });
-        jobInfo = await resp.json();
+        jobInfo = await fetchJson('/api/job/' + jobId, { signal });
       } catch (pollErr) {
         if (pollErr.name === 'AbortError') break;
         console.warn('Poll error:', pollErr);
@@ -368,7 +367,7 @@
 
       if (response.status === 202) {
         // Background render: follow it until the job finishes.
-        const accepted = await response.json();
+        const accepted = await globalThis.InkyPiHttp.readJson(response);
         const jobWaitS = Number(accepted.wait_s);
         if (Number.isFinite(jobWaitS) && jobWaitS > 0) {
           clearTimeout(timeoutId);
@@ -398,12 +397,19 @@
         }
       } else {
         progress.setStep('Waiting (device)…', 60);
-        result = await response.json();
-        if (response.ok) {
+        // An error reply (JSON or not) becomes a result whose `error` is
+        // readable; field details the server sent are kept.
+        let failure = null;
+        result = await globalThis.InkyPiHttp.readJson(response).catch((error) => {
+          if (error?.name !== 'FetchJsonError' || error.kind === 'network') throw error;
+          failure = { ...error.data, error: error.message };
+          return failure;
+        });
+        if (failure) {
+          reportFailure(failure);
+        } else {
           await reportSuccess(progress, result, onAfterSuccess);
           success = true;
-        } else {
-          reportFailure(result);
         }
       }
     } catch (e){
@@ -415,7 +421,7 @@
           ? 'You appear to be offline. Check your connection.'
           : 'Unable to reach the device. Check that InkyPi is running.');
       } else {
-        notify('failure', 'An error occurred. Please try again.');
+        notify('failure', globalThis.InkyPiHttp.errorMessage(e, 'An error occurred. Please try again.'));
       }
     } finally {
       clearTimeout(timeoutId);

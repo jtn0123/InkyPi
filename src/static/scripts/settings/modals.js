@@ -2,21 +2,12 @@
   globalThis.InkyPiSettingsModules = globalThis.InkyPiSettingsModules || {};
   const settingsModules = globalThis.InkyPiSettingsModules;
 
-  function syncModalOpenState(ui) {
-    if (ui?.syncModalOpenState) {
-      ui.syncModalOpenState();
-      return;
-    }
-    const anyOpen = document.querySelector(".modal.is-open");
-    document.body.classList.toggle("modal-open", !!anyOpen);
-  }
-
   function isDeviceActionModalOpen(modalId) {
     const modal = document.getElementById(modalId);
     return !!(modal && !modal.hidden);
   }
 
-  function createModalModule({ ui }) {
+  function createModalModule() {
     let lastWhatsNewTrigger = null;
 
     function setDeviceActionModalOpen(modalId, open, triggerEl) {
@@ -25,7 +16,7 @@
       modal.hidden = !open;
       modal.style.display = open ? "flex" : "none";
       modal.classList.toggle("is-open", !!open);
-      syncModalOpenState(ui);
+      globalThis.InkyPiModalFocus.syncModalOpenState();
       if (open) {
         globalThis.InkyPiModalFocus.activate(modal, triggerEl, () => setDeviceActionModalOpen(modalId, false));
         return;
@@ -89,7 +80,7 @@
       modal.hidden = false;
       modal.style.display = "flex";
       modal.classList.add("is-open");
-      syncModalOpenState(ui);
+      globalThis.InkyPiModalFocus.syncModalOpenState();
       globalThis.InkyPiModalFocus.activate(modal, lastWhatsNewTrigger, closeWhatsNew);
     }
 
@@ -100,7 +91,7 @@
       modal.style.display = "none";
       modal.classList.remove("is-open");
       globalThis.InkyPiModalFocus.deactivate(modal);
-      syncModalOpenState(ui);
+      globalThis.InkyPiModalFocus.syncModalOpenState();
 
     }
 

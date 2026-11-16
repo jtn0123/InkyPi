@@ -38,15 +38,8 @@
     } catch {}
   }
 
-  async function fetchVersion(signal) {
-    const response = await fetch("/api/version", {
-      cache: "no-store",
-      signal,
-    });
-    if (!response.ok) {
-      throw new Error("version check failed: " + response.status);
-    }
-    return await response.json();
+  function fetchVersion(signal) {
+    return globalThis.fetchJson("/api/version", { cache: "no-store", signal });
   }
 
   function showIndicator(btn, data) {
@@ -106,13 +99,7 @@
       confirmBtn.textContent = "Starting…";
     }
     try {
-      const response = await fetch("/settings/update", { method: "POST" });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok || !data.success) {
-        const err = (data && data.error) || "Failed to start update";
-        window.showResponseModal("failure", err);
-        return;
-      }
+      const data = await globalThis.fetchJson("/settings/update", { method: "POST" });
       window.showResponseModal(
         "success",
         data.message || "Update started. Streaming progress on Settings → Updates."
@@ -126,8 +113,12 @@
           location.href = "/settings#section-software-update";
         }, 600);
       }
-    } catch {
-      window.showResponseModal("failure", "Failed to start update");
+    } catch (error) {
+      console.debug("Update indicator: start failed:", error);
+      window.showResponseModal(
+        "failure",
+        globalThis.InkyPiHttp.errorMessage(error, "Failed to start update")
+      );
     } finally {
       if (confirmBtn) {
         confirmBtn.disabled = false;

@@ -76,5 +76,12 @@
     const entry = top();
     if (entry && !entry.modal.contains(event.target)) focusFirst(entry);
   });
-  globalThis.InkyPiModalFocus = {activate, deactivate};
+  // body.modal-open stops the page behind an open dialog from scrolling.
+  // Pages call this after they show or hide a dialog.
+  function syncModalOpenState() {
+    const open = !!document.querySelector('.modal.is-open');
+    document.body.classList.toggle('modal-open', open);
+    return open;
+  }
+  globalThis.InkyPiModalFocus = {activate, deactivate, syncModalOpenState};
 })();

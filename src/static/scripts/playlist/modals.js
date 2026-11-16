@@ -2,20 +2,6 @@
   global.InkyPiPlaylist = global.InkyPiPlaylist || {};
   const ns = global.InkyPiPlaylist;
 
-  function syncModalOpenState() {
-    const ui = global.InkyPiUI;
-    const delegatedState =
-      typeof ui?.syncModalOpenState === "function"
-        ? ui.syncModalOpenState()
-        : null;
-    const open =
-      typeof delegatedState === "boolean"
-        ? delegatedState
-        : document.querySelector(".modal.is-open, .thumbnail-preview-modal.is-open");
-    if (typeof ui?.syncModalOpenState !== "function")
-      document.body.classList.toggle("modal-open", !!open);
-  }
-
   // The shared InkyPiModalFocus helper makes the page behind an open dialog
   // inert, moves focus in, keeps Tab inside, closes the dialog on Escape and
   // hands focus back to whatever opened it.
@@ -53,7 +39,7 @@
     modal.hidden = !open;
     modal.style.display = open ? "flex" : "none";
     modal.classList.toggle("is-open", open);
-    syncModalOpenState();
+    global.InkyPiModalFocus?.syncModalOpenState();
     if (open) {
       trapFocus(modal, triggerEl, modalId);
       return;
@@ -72,9 +58,6 @@
       case "displayNextConfirmModal":
         ns.closeDisplayNextConfirmModal();
         return;
-      case "thumbnailPreviewModal":
-        ns.closeThumbnailPreview();
-        return;
       case "refreshSettingsModal":
         ns.closeRefreshModal();
         return;
@@ -84,36 +67,6 @@
       default:
         return;
     }
-  }
-
-  function showThumbnailPreview(
-    pluginId,
-    pluginName,
-    instanceName,
-    instanceLabel,
-    triggerEl
-  ) {
-    const img = document.getElementById("thumbnailPreviewImage");
-    const info = document.getElementById("thumbnailPreviewInfo");
-    if (!img || !info) return;
-    // Same URL the thumbnail itself loads (plugin.plugin_instance_image).
-    // Instances are keyed by plugin and name, not by playlist.
-    img.src = `/instance_image/${encodeURIComponent(
-      pluginId
-    )}/${encodeURIComponent(instanceName)}`;
-    const label = instanceLabel || instanceName;
-    if (label && label !== pluginName) {
-      info.textContent = `Plugin: ${pluginName} | Instance: ${label}`;
-    } else {
-      info.textContent = `Plugin: ${pluginName}`;
-    }
-    // Focus goes back to the thumbnail that opened it, even after a mouse
-    // click (which doesn't focus a button in every browser).
-    setModalOpen("thumbnailPreviewModal", true, triggerEl);
-  }
-
-  function closeThumbnailPreview() {
-    setModalOpen("thumbnailPreviewModal", false);
   }
 
   function openRefreshModal(
@@ -141,7 +94,7 @@
       if (modal) {
         modal.hidden = false;
         modal.classList.add("is-open");
-        syncModalOpenState();
+        global.InkyPiModalFocus?.syncModalOpenState();
         trapFocus(modal, triggerEl, "refreshSettingsModal");
       }
       return;
@@ -156,7 +109,7 @@
       if (modal) {
         modal.hidden = true;
         modal.classList.remove("is-open");
-        syncModalOpenState();
+        global.InkyPiModalFocus?.syncModalOpenState();
         releaseFocus(modal);
       }
       return;
@@ -338,9 +291,6 @@
       .getElementById("closeRefreshModalBtn")
       ?.addEventListener("click", closeRefreshModal);
     document
-      .getElementById("closeThumbnailPreviewBtn")
-      ?.addEventListener("click", closeThumbnailPreview);
-    document
       .getElementById("cancelDeletePlaylistBtn")
       ?.addEventListener("click", closeDeletePlaylistModal);
     document
@@ -353,7 +303,6 @@
     global.addEventListener("click", (event) => {
       if (event.target?.id === "playlistModal") closeModal();
       if (event.target?.id === "refreshSettingsModal") closeRefreshModal();
-      if (event.target?.id === "thumbnailPreviewModal") closeThumbnailPreview();
       if (event.target?.id === "deletePlaylistModal") closeDeletePlaylistModal();
       if (event.target?.id === "deleteInstanceModal") closeDeleteInstanceModal();
       if (event.target?.id === "displayNextConfirmModal") {
@@ -370,7 +319,6 @@
     closeModal,
     closeModalById,
     closeRefreshModal,
-    closeThumbnailPreview,
     initModalLifecycle,
     openCreateModal,
     openDeleteInstanceModal,
@@ -380,7 +328,5 @@
     openModal,
     openRefreshModal,
     setModalOpen,
-    showThumbnailPreview,
-    syncModalOpenState,
   });
 })(globalThis);

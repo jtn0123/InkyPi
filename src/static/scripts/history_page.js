@@ -111,9 +111,7 @@
 
     async function updateStorage() {
       try {
-        const resp = await fetch(config.storageUrl, { cache: "no-store" });
-        const data = await resp.json();
-        if (!resp.ok) return;
+        const data = await fetchJson(config.storageUrl, { cache: "no-store" });
         const block = document.getElementById("storage-block");
         const text = document.getElementById("storage-text");
         const inner = document.getElementById("storage-bar-inner");
@@ -134,21 +132,24 @@
     async function redisplay(filename, button) {
       if (button) button.disabled = true;
       try {
-        const resp = await fetch(config.redisplayUrl, {
+        const result = await fetchJson(config.redisplayUrl, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ filename }),
         });
-        const result = await resp.json();
-        if (!resp.ok) {
-          showResponseModal("failure", `Error! ${result.error}`);
+        if (!result?.success) {
+          showResponseModal("failure", "Error! The image was not redisplayed.");
         } else {
           showResponseModal("success", `Success! ${result.message}`);
           void updateStorage(); // reports its own failures
         }
-      } catch (e) {
-        console.error(e);
-        showResponseModal("failure", "Failed to redisplay image. Please try again.");
+      } catch (error) {
+        console.debug("Redisplay failed:", error);
+        const message = globalThis.InkyPiHttp.errorMessage(
+          error,
+          "Failed to redisplay image. Please try again."
+        );
+        showResponseModal("failure", `Error! ${message}`);
       } finally {
         if (button) button.disabled = false;
       }
@@ -180,26 +181,21 @@
       }
       if (cancelBtn) cancelBtn.disabled = true;
       try {
-        const resp = await fetch(config.deleteUrl, {
+        const result = await fetchJson(config.deleteUrl, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ filename: state.pendingDelete }),
         });
-        const result = await resp.json();
-        if (!resp.ok) {
-          closeDeleteModal();
-          showResponseModal("failure", "Error! " + result.error);
-          return;
-        }
         sessionStorage.setItem(
           "storedMessage",
           JSON.stringify({ type: "success", text: "Success! " + result.message })
         );
         globalThis.location.reload();
-      } catch (e) {
-        console.error(e);
+      } catch (error) {
+        console.debug("Delete failed:", error);
         closeDeleteModal();
-        showResponseModal("failure", "Failed to delete image");
+        const message = globalThis.InkyPiHttp.errorMessage(error, "Failed to delete image");
+        showResponseModal("failure", `Error! ${message}`);
       } finally {
         if (confirmBtn) {
           confirmBtn.disabled = false;
@@ -220,22 +216,17 @@
       }
       if (cancelBtn) cancelBtn.disabled = true;
       try {
-        const resp = await fetch(config.clearUrl, { method: "POST" });
-        const result = await resp.json();
-        if (!resp.ok) {
-          closeClearModal();
-          showResponseModal("failure", "Error! " + result.error);
-          return;
-        }
+        const result = await fetchJson(config.clearUrl, { method: "POST" });
         sessionStorage.setItem(
           "storedMessage",
           JSON.stringify({ type: "success", text: "Success! " + result.message })
         );
         globalThis.location.reload();
-      } catch (e) {
-        console.error(e);
+      } catch (error) {
+        console.debug("Clear history failed:", error);
         closeClearModal();
-        showResponseModal("failure", "Failed to clear history");
+        const message = globalThis.InkyPiHttp.errorMessage(error, "Failed to clear history");
+        showResponseModal("failure", `Error! ${message}`);
       } finally {
         if (confirmBtn) {
           confirmBtn.disabled = false;

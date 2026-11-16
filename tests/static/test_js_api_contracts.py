@@ -102,7 +102,6 @@ def test_response_modal_script_exists(client: FlaskClient) -> None:
         "function closeToast(toastId)",
         "function showResponseModal(status, message)",
         "async function handleJsonResponse(response, options = {})",
-        "function getErrorMessage(status, endpoint)",
         "function showError(message, duration)",
     ]:
         assert token in js
@@ -120,13 +119,19 @@ def test_handle_json_response_presence(client: FlaskClient) -> None:
     assert resp.status_code == 200
     js = resp.get_data(as_text=True)
 
-    # Check that handleJsonResponse includes request_id and maps codes
+    # Check that handleJsonResponse includes request_id
     assert "handleJsonResponse" in js
     assert "request_id" in js
-    assert "getErrorMessage" in js
-    # Common messages present
-    assert "Server error" in js
-    assert "Resource not found" in js or "Not found" in js
+
+    # Status codes are mapped to messages by the shared fetchJson helper,
+    # which handleJsonResponse reads replies through.
+    assert "InkyPiHttp.readJson" in js
+    resp = client.get("/static/scripts/fetch_json.js")
+    assert resp.status_code == 200
+    helper = resp.get_data(as_text=True)
+    assert "function statusMessage(status, endpoint)" in helper
+    assert "Server error" in helper
+    assert "Resource not found" in helper
 
 
 # --- Theme ---

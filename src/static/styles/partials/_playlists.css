@@ -170,20 +170,6 @@
   margin: 0 auto;
 }
 
-.playlist-thumbnail-modal {
-    background-color: var(--modal-overlay);
-}
-
-.playlist-thumbnail-content {
-    background-color: var(--modal-bg);
-    box-shadow: 0 4px 20px var(--shadow-medium);
-}
-
-.playlist-thumbnail-info {
-    background-color: var(--bg-primary);
-    color: var(--text-secondary);
-}
-
 /* Drag handle */
 .drag-handle {
     display: flex;

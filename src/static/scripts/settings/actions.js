@@ -199,17 +199,11 @@
       // bypasses its 1h cache and actually hits GitHub. Silent/background
       // checks leave the cache alone.
       const url = force ? appendForceParam(versionUrl) : versionUrl;
-      const response = await fetch(url, {
+      const data = await fetchJson(url, {
         cache: "no-store",
         signal: controller.signal,
       });
-      const data = await response.json();
-      if (
-        response.ok &&
-        data &&
-        typeof data === "object" &&
-        "latest" in data
-      ) {
+      if (data && typeof data === "object" && "latest" in data) {
         setCachedVersionData(data);
       }
       return data;
@@ -291,11 +285,21 @@
         if (e?.name === "AbortError") {
           return;
         }
-        console.warn("Version check failed:", e);
+        if (e?.kind === "http") {
+          // The server answered with an error: there is no known latest
+          // version, so don't offer an update.
+          console.debug("Version check refused:", e);
+          renderVersionCheckResult(elements, {});
+        } else {
+          console.warn("Version check failed:", e);
+        }
         if (!silent) {
           showResponseModal(
             "failure",
-            "Unable to check for updates. Try again later."
+            globalThis.InkyPiHttp.errorMessage(
+              e,
+              "Unable to check for updates. Try again later."
+            )
           );
         }
       } finally {
@@ -305,15 +309,14 @@
 
     async function refreshUpdateStatus() {
       try {
-        const resp = await fetch(config.updateStatusUrl, { cache: "no-store" });
-        if (!resp.ok) return;
-        const data = await resp.json();
+        const data = await fetchJson(config.updateStatusUrl, { cache: "no-store" });
         renderUpdateFailureBanner(
           data?.last_failure ?? null,
           data?.prev_version ?? null
         );
       } catch (e) {
-        console.warn("Update status refresh failed:", e);
+        // An error reply leaves the banner as it was, as it always has.
+        if (e?.kind !== "http") console.warn("Update status refresh failed:", e);
       }
     }
 
@@ -322,8 +325,7 @@
       state.updateTimer = setInterval(async () => {
         try {
           await logs.fetchAndRenderLogs();
-          const sresp = await fetch(config.updateStatusUrl);
-          const sdata = await sresp.json();
+          const sdata = await fetchJson(config.updateStatusUrl);
           renderUpdateFailureBanner(
             sdata?.last_failure ?? null,
             sdata?.prev_version ?? null
@@ -356,17 +358,15 @@
       }
       try {
         setHeaderButtonsDisabled(true);
-        const resp = await fetch(url, { method: "POST" });
-        const data = await resp.json();
-        if (!resp.ok || !data.success) {
-          showResponseModal("failure", data.error || failureMessage);
-          return;
-        }
+        const data = await fetchJson(url, { method: "POST" });
         showResponseModal("success", data.message || startingLabel);
         pollUpdateStatusUntilDone(kind);
       } catch (e) {
-        console.warn("Failed to start settings action:", kind, e);
-        showResponseModal("failure", failureMessage);
+        console.debug("Failed to start settings action:", kind, e);
+        showResponseModal(
+          "failure",
+          globalThis.InkyPiHttp.errorMessage(e, failureMessage)
+        );
       } finally {
         setHeaderButtonsDisabled(false);
       }
@@ -399,15 +399,10 @@
       }
       const include = document.getElementById("includeKeys")?.checked;
       try {
-        const resp = await fetch(
+        const data = await fetchJson(
           config.exportSettingsUrl,
           getExportRequestInit(include)
         );
-        const data = await resp.json();
-        if (!resp.ok || !data.success) {
-          showResponseModal("failure", data.error || "Export failed");
-          return;
-        }
         const blob = new Blob([JSON.stringify(data.data, null, 2)], {
           type: "application/json",
         });
@@ -418,8 +413,11 @@
         URL.revokeObjectURL(anchor.href);
         showResponseModal("success", "Backup downloaded");
       } catch (e) {
-        console.error("Export failed", e);
-        showResponseModal("failure", "Export failed");
+        console.debug("Export failed", e);
+        showResponseModal(
+          "failure",
+          globalThis.InkyPiHttp.errorMessage(e, "Export failed")
+        );
       } finally {
         if (btn) {
           btn.disabled = false;
@@ -443,19 +441,17 @@
       const form = new FormData();
       form.append("file", file);
       try {
-        const resp = await fetch(config.importSettingsUrl, {
+        const data = await fetchJson(config.importSettingsUrl, {
           method: "POST",
           body: form,
         });
-        const data = await resp.json();
-        if (!resp.ok || !data.success) {
-          showResponseModal("failure", data.error || "Import failed");
-          return;
-        }
         showResponseModal("success", data.message || "Import complete");
       } catch (e) {
-        console.error("Import failed", e);
-        showResponseModal("failure", "Import failed");
+        console.debug("Import failed", e);
+        showResponseModal(
+          "failure",
+          globalThis.InkyPiHttp.errorMessage(e, "Import failed")
+        );
       } finally {
         if (btn) {
           btn.textContent = "Restore from file";
