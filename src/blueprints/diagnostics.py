@@ -30,6 +30,7 @@ from typing import Any
 from flask import Blueprint, current_app, jsonify, request
 from flask.typing import ResponseReturnValue
 
+from blueprints._deps import get_device_config, get_refresh_task
 from utils import blackout, boot_self_test, crash_breadcrumb
 from utils.api_responses import json_error
 from utils.app_version import read_app_version
@@ -215,9 +216,7 @@ def _latest_refresh_ts() -> str | None:
 
     None when there is no refresh yet or the record can't be read.
     """
-    dc = current_app.config.get("DEVICE_CONFIG")
-    if dc is None:
-        return None
+    dc = get_device_config()
     try:
         refresh_info = dc.get_refresh_info()
     except Exception:
@@ -268,10 +267,8 @@ def _refresh_task_snapshot() -> dict[str, Any]:
         "last_error": None,
     }
     try:
-        rt = current_app.config.get("REFRESH_TASK")
-        if rt is None:
-            return payload
-        payload["running"] = bool(getattr(rt, "running", False))
+        rt = get_refresh_task()
+        payload["running"] = rt.running
         payload["last_run_ts"] = _latest_refresh_ts()
         payload["last_error"] = _most_recent_plugin_error(_safe_health_snapshot(rt))
     except Exception:
@@ -307,7 +304,7 @@ def _plugin_health_summary() -> dict[str, str]:
         logger.exception("diagnostics: failed to list registered plugins")
 
     # Overlay with the refresh-task health snapshot so we report ok/fail where known.
-    snap = _safe_health_snapshot(current_app.config.get("REFRESH_TASK"))
+    snap = _safe_health_snapshot(get_refresh_task())
     for pid, entry in snap.items():
         if not isinstance(entry, dict):
             continue
@@ -392,10 +389,7 @@ def _boot_self_test() -> dict[str, Any] | None:
 
 
 def _blackout_state() -> dict[str, Any]:
-    device_config = current_app.config.get("DEVICE_CONFIG")
-    if device_config is None:
-        return {"active": False, "since": None}
-    return blackout.get_state(device_config)
+    return blackout.get_state(get_device_config())
 
 
 # ---------------------------------------------------------------------------

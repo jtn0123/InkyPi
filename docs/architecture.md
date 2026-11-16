@@ -63,7 +63,7 @@ flowchart TD
 4. Routes that put something on the panel do not write to it directly while the refresh thread is running:
    - `/update_now`, `/display-next`, `/display_next_in_playlist` and `/display_plugin_instance` call `RefreshTask.manual_update()`. It queues a request for the refresh thread and blocks until the rendered image is saved to disk (not until the slower panel write finishes). It waits twice, each time for the plugin's whole render budget (every attempt the retry policy allows, plus 30 s): once for the loop to take the request, then for the image. A request the loop never took is withdrawn and reported as busy (503 `refresh_loop_busy`). Giving up on a render that is still running reports a timeout (504) but records no plugin failure, because the render records its own outcome when it ends. A full request queue is also reported as busy. A plugin's `RuntimeError` reaches the route as `PluginRenderFailed` (400 `plugin_error`, or its cause's own answer for a rejected URL, a provider refusal or chromium being down), and a manual request for a plugin that is not installed as `PluginNotFound` (404 `plugin_not_found`). Both are mapped once in `utils/backend_errors.route_error_for`, so every one of these routes answers a failure the same way.
    - Blackout and history redisplay call `RefreshTask.run_display_command()`, which runs a callable against `DisplayManager` on the refresh thread.
-   - `/update_now` with `X-Async: true` (or `?async=1`) enqueues the same work on a small thread pool (`refresh_task/job_queue.py`) and returns 202 with a job id to poll at `/api/job/<job_id>`, and `wait_s`, the longest that job can take, so the page waits that long before it reports a timeout.
+   - `/update_now` with `X-Async: true` (or `?async=1`) enqueues the same work on a small thread pool (`services/job_queue.py`) and returns 202 with a job id to poll at `/api/job/<job_id>`, and `wait_s`, the longest that job can take, so the page waits that long before it reports a timeout.
 5. When the refresh thread is not running (web-only mode), `/update_now` and `/display-next` call `generate_image()` in the request thread and push the result to `DisplayManager` themselves. Both use `services/direct_render.py` for the outcome, which applies the refresh loop's rule (`utils/domain_errors.as_render_failure`), so they answer a failure with the same status and code as the loop, and a plugin that returns no image is a 200 that leaves the panel alone, as in the refresh loop.
 6. HTML responses are rendered with Jinja2 from `src/templates/` (and plugin templates under `src/plugins/`). JSON responses use the envelope helpers in `utils/api_responses.py`.
 
@@ -116,11 +116,14 @@ The Flask routes. The larger areas are packages whose `__init__` documents which
 
 Single modules cover the rest: `main` (dashboard, previews, `/display-next`, `/refresh-info`, `/next-up`), `history`, `apikeys`, `auth`, `blackout`, `events` (SSE stream of refresh events), `diagnostics`, `stats`, `metrics`, `version_info`, `plugin_history_bp`, `plugin_io` (instance export/import), `api_docs`, and the browser-report endpoints `client_error`, `client_log`, `csp_report` and `errors`.
 
+Routes get the `Config`, `DisplayManager` and `RefreshTask` that `create_app` stores on `app.config` from `_deps.py` (`get_device_config()`, `get_display_manager()`, `get_refresh_task()`), which return the real types, so strict mypy checks every call a route makes on them.
+
 ### `src/services/`
 
 Logic the blueprints call directly, kept out of the route modules:
 
 - Flask-free workflows: `plugin_workflows` (saving plugin settings and the saved-settings instance), `playlist_workflows` (adding an instance to a playlist and validating its settings), `direct_render` (the outcome policy for a `/update_now` or `/display-next` render that runs outside the refresh loop), and `history` (listing, deleting and exporting the display history files, and the disk-use figures; the `history` blueprint only parses requests and shapes responses).
+- `job_queue`: the thread pool behind async `/update_now`. It reports a failed job with `direct_render`'s outcome, which comes from the web error layer (`utils/backend_errors`), so it lives here and not in `refresh_task/`, which must not import that layer.
 - Behind the settings routes: `updates` (finding and validating the update and rollback scripts, launching them with `systemd-run` or a simulated thread off-device, and the in-memory update state and lock), `logs` (journal reads, and the in-memory buffer that stands in for the journal in dev mode; it reads the device timezone from the Flask app context) and `version_check` (the cached GitHub latest-release check behind `/api/version`). Tests patch names on these modules, for example `services.updates._systemd_available`.
 
 ### `src/refresh_task/`
@@ -135,7 +138,7 @@ The background refresh loop. `RefreshTask` (`task.py`) owns the thread, the loop
 - `actions.py` — `RefreshAction` and its subclasses (`PlaylistRefresh`, `ManualRefresh`, `DisplayCommand`) and the `ManualUpdateRequest` queue entry.
 - `scheduler.py` (`RefreshScheduler`) — the condition wait and watchdog cadence; `schedule.py` — pure next-due maths used by the scheduler and next-plugin selection.
 - `display_pipeline.py` (`DisplayPipeline`) — the display push, cache skip and image-saved signal; `housekeeping.py` (`RefreshHousekeeper`) — history cleanup, deleting unused uploads (`utils/upload_cleanup.py`), history metadata and the fallback image push; `recorder.py` (`RefreshRecorder`) — progress events, SSE events and benchmark writes.
-- `plugin_lookup.py` — the single place the loop resolves `get_plugin_instance`; `job_queue.py` — the thread pool behind async `/update_now`.
+- `plugin_lookup.py` — the single place the loop resolves `get_plugin_instance`.
 
 ### `src/plugins/`
 

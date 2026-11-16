@@ -24,7 +24,6 @@ logger = logging.getLogger("blueprints.plugin")
 plugin_bp = Blueprint("plugin", "blueprints.plugin")
 
 # Sonar S1192 — duplicate string constants
-_CONFIG_KEY = "DEVICE_CONFIG"
 _PLUGIN_ID = "plugin_id"
 _ERR_INTERNAL = "An internal error occurred"
 _ERR_NOT_FOUND = "Not Found"

@@ -1,24 +1,29 @@
 """Image serving: plugin static assets, latest-history and instance previews."""
 
-import os
-from typing import Any
+from __future__ import annotations
 
-from flask import abort, current_app, send_from_directory
+import os
+from typing import TYPE_CHECKING
+
+from flask import abort, send_from_directory
 from flask.typing import ResponseReturnValue
 
+from blueprints._deps import get_device_config
 from utils import history_index
 from utils.api_responses import content_disposition
 from utils.form_utils import sanitize_log_field
 from utils.security_utils import validate_file_path
 
 from ._common import (
-    _CONFIG_KEY,
     _ERR_NOT_FOUND,
     _cacheable_send_file,
     _plugins_dir,
     logger,
     plugin_bp,
 )
+
+if TYPE_CHECKING:
+    from config import Config
 
 
 @plugin_bp.route("/images/<plugin_id>/<path:filename>", methods=["GET"])
@@ -109,7 +114,7 @@ def latest_plugin_image(plugin_id: str) -> ResponseReturnValue:
     Any instance of the plugin counts. Used by the plugin page to show
     "Latest from this plugin".
     """
-    device_config = current_app.config[_CONFIG_KEY]
+    device_config = get_device_config()
     history_dir = str(device_config.history_image_dir)
     for entry in history_index.entries(history_dir):
         if entry.plugin_id == plugin_id:
@@ -120,7 +125,7 @@ def latest_plugin_image(plugin_id: str) -> ResponseReturnValue:
 
 
 def _find_history_image(
-    device_config: Any, plugin_id: str, instance_name: str
+    device_config: Config, plugin_id: str, instance_name: str
 ) -> str | None:
     """Return path to the newest history PNG of this plugin instance, if any."""
     history_dir = str(device_config.history_image_dir)
@@ -132,7 +137,9 @@ def _find_history_image(
     return None
 
 
-def _find_latest_plugin_refresh_time(device_config: Any, plugin_id: str) -> str | None:
+def _find_latest_plugin_refresh_time(
+    device_config: Config, plugin_id: str
+) -> str | None:
     """Return the most recent refresh time for any instance of this plugin."""
     history_dir = str(device_config.history_image_dir)
     for entry in history_index.entries(history_dir):
@@ -158,7 +165,7 @@ def instance_image(plugin_id: str, instance_name: str) -> ResponseReturnValue:
     playlist hides the tile; the plugin page falls back to the plugin's
     latest image).
     """
-    device_config = current_app.config[_CONFIG_KEY]
+    device_config = get_device_config()
 
     try:
         path = device_config.get_plugin_image_path(plugin_id, instance_name)

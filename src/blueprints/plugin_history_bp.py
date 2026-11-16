@@ -13,19 +13,22 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import Any
+from typing import TYPE_CHECKING
 
-from flask import Blueprint, current_app, jsonify, request
+from flask import Blueprint, jsonify, request
 from flask.typing import ResponseReturnValue
 
+from blueprints._deps import get_device_config
 from utils.api_responses import json_error
 from utils.plugin_history import compute_diff, get_history
+
+if TYPE_CHECKING:
+    from config import Config
 
 logger = logging.getLogger(__name__)
 
 plugin_history_bp = Blueprint("plugin_history", __name__)
 
-_CONFIG_KEY = "DEVICE_CONFIG"
 # Only allow instance names that are safe filesystem identifiers.
 # Strict allowlist regex makes this an explicit barrier for taint analyzers.
 # Aligned with _INSTANCE_NAME_RE in services/playlist_workflows.py to accept user-entered names
@@ -50,16 +53,13 @@ def _safe_instance_name(name: str) -> str | None:
 _MAX_LIMIT = 100
 
 
-def _config_dir(device_config: Any) -> str:
+def _config_dir(device_config: Config) -> str:
     import os
 
-    config_file = getattr(device_config, "config_file", "")
-    if not isinstance(config_file, str):
-        return ""
-    return os.path.dirname(config_file)
+    return os.path.dirname(device_config.config_file)
 
 
-def _instance_exists(device_config: Any, instance_name: str) -> bool:
+def _instance_exists(device_config: Config, instance_name: str) -> bool:
     """Return True if the named plugin instance exists in any playlist."""
     playlist_manager = device_config.get_playlist_manager()
     for pname in playlist_manager.get_playlist_names():
@@ -81,7 +81,7 @@ def plugin_instance_history(instance_name: str) -> ResponseReturnValue:
     if safe_name is None:
         return json_error("Invalid instance name", status=400)
 
-    device_config = current_app.config[_CONFIG_KEY]
+    device_config = get_device_config()
 
     if not _instance_exists(device_config, safe_name):
         return json_error("Plugin instance not found", status=404)
@@ -106,7 +106,7 @@ def plugin_instance_diff(instance_name: str) -> ResponseReturnValue:
     if safe_name is None:
         return json_error("Invalid instance name", status=400)
 
-    device_config = current_app.config[_CONFIG_KEY]
+    device_config = get_device_config()
 
     if not _instance_exists(device_config, safe_name):
         return json_error("Plugin instance not found", status=404)

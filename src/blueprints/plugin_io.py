@@ -12,11 +12,12 @@ import logging
 from copy import deepcopy
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
-from flask import Blueprint, Response, current_app, jsonify, request
+from flask import Blueprint, Response, jsonify, request
 from flask.typing import ResponseReturnValue
 
+from blueprints._deps import get_device_config
 from blueprints._refresh_loop import wake_refresh_loop
 from services.playlist_workflows import (
     clean_instance_name,
@@ -25,11 +26,13 @@ from services.playlist_workflows import (
 from utils.api_responses import JsonResponse, content_disposition, json_error
 from utils.form_utils import sanitize_log_field
 
+if TYPE_CHECKING:
+    from config import Config
+
 logger = logging.getLogger(__name__)
 
 plugin_io_bp = Blueprint("plugin_io", __name__)
 
-_CONFIG_KEY = "DEVICE_CONFIG"
 _EXPORT_VERSION = 1
 _ERR_PLUGIN_INSTANCE_NOT_FOUND = "Plugin instance not found"
 
@@ -94,7 +97,7 @@ def export_plugins() -> Response | JsonResponse:
         instance (str, optional): name of a specific instance to export.
             If omitted, all instances are exported.
     """
-    device_config = current_app.config[_CONFIG_KEY]
+    device_config = get_device_config()
     playlist_manager = device_config.get_playlist_manager()
 
     instance_name = request.args.get("instance", "").strip()
@@ -200,13 +203,11 @@ class _ImportInstance:
 
 
 def _prepare_import_instances(
-    device_config: Any, instances: list[dict[str, Any]]
+    device_config: Config, instances: list[dict[str, Any]]
 ) -> tuple[list[_ImportInstance], list[str], JsonResponse | None]:
     """Validate the entire installed batch before touching playlist state."""
     installed_ids = {
-        plugin["id"]
-        for plugin in device_config.get_plugins()
-        if isinstance(plugin, dict) and "id" in plugin
+        plugin["id"] for plugin in device_config.get_plugins() if "id" in plugin
     }
     prepared: list[_ImportInstance] = []
     skipped: list[str] = []
@@ -264,7 +265,7 @@ def _unique_import_name(name: str, existing_names: set[str]) -> str:
 
 
 def _add_import_instances(
-    device_config: Any, prepared: list[_ImportInstance]
+    device_config: Config, prepared: list[_ImportInstance]
 ) -> list[str]:
     """Commit creation, collision resolution and additions under one lock."""
     renamed: list[str] = []
@@ -313,7 +314,7 @@ def import_plugins() -> ResponseReturnValue:
             skipped  (list[str]): plugin_ids not installed on this device
             renamed  (list[str]): instances renamed to avoid name collisions
     """
-    device_config = current_app.config[_CONFIG_KEY]
+    device_config = get_device_config()
     payload = _parse_import_body()
     if payload is None:
         return json_error("Could not parse JSON from request", status=400)

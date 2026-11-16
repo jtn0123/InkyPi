@@ -36,9 +36,10 @@ import logging
 from typing import Any
 from urllib.parse import urlsplit
 
-from flask import Blueprint, current_app, redirect, request, url_for
+from flask import Blueprint, redirect, request, url_for
 from flask.typing import ResponseReturnValue
 
+from blueprints._deps import get_device_config, get_refresh_task
 from utils import blackout
 from utils.api_responses import JsonResponse, json_error, json_success
 from utils.env_flags import TRUTHY
@@ -93,19 +94,17 @@ def _wants_html() -> bool:
 
 def _push(name: str, command: Any) -> str:
     """Queue a display command; return ``"queued"``, ``"done"`` or ``"failed"``."""
-    refresh_task = current_app.config.get("REFRESH_TASK")
-    if refresh_task is None:
-        return "failed"
+    refresh_task = get_refresh_task()
     try:
         refresh_task.run_display_command(name, command, wait=False)
     except Exception:  # the pause itself already took effect
         logger.warning("blackout: display command %s failed", name, exc_info=True)
         return "failed"
-    return "queued" if getattr(refresh_task, "running", False) else "done"
+    return "queued" if refresh_task.running else "done"
 
 
 def _apply(turn_on: bool) -> ResponseReturnValue:
-    device_config = current_app.config["DEVICE_CONFIG"]
+    device_config = get_device_config()
     current = blackout.get_state(device_config)
     changed = current["active"] != turn_on
     display = "unchanged"
@@ -158,7 +157,6 @@ def api_blackout() -> ResponseReturnValue:
 def _refuse_panel_writes_during_blackout() -> JsonResponse | None:
     if request.method != "POST" or request.endpoint not in _PANEL_ENDPOINTS:
         return None
-    device_config = current_app.config.get("DEVICE_CONFIG")
-    if device_config is None or not blackout.is_active(device_config):
+    if not blackout.is_active(get_device_config()):
         return None
     return json_error(blackout.BLOCKED_MESSAGE, status=409, code="blackout_active")

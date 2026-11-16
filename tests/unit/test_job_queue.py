@@ -1,5 +1,5 @@
 # pyright: reportMissingImports=false
-"""Unit tests for refresh_task.job_queue."""
+"""Unit tests for services.job_queue."""
 
 from __future__ import annotations
 
@@ -10,7 +10,8 @@ from typing import Any
 
 import pytest
 
-from refresh_task.job_queue import (
+from services.direct_render import INTERNAL_ERROR_MSG
+from services.job_queue import (
     STATUS_DONE,
     STATUS_ERROR,
     STATUS_RUNNING,
@@ -18,7 +19,6 @@ from refresh_task.job_queue import (
     get_job_queue,
     reset_job_queue,
 )
-from services.direct_render import INTERNAL_ERROR_MSG
 
 
 class _FakeClock:

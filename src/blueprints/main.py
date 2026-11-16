@@ -1,15 +1,16 @@
+from __future__ import annotations
+
 import logging
 import math
 import os
 from collections.abc import Mapping
 from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from uuid import uuid4
 
 from flask import (
     Blueprint,
-    current_app,
     jsonify,
     render_template,
     request,
@@ -20,6 +21,8 @@ from flask.typing import ResponseReturnValue
 from PIL import Image
 
 from benchmarks.benchmark_storage import save_refresh_event, save_stage_event
+from blueprints._deps import get_device_config, get_display_manager, get_refresh_task
+from display.mock_display import MockDisplay
 from refresh_task import schedule
 from refresh_task.health import PluginHealthTracker
 from services.direct_render import execute_direct_render
@@ -38,12 +41,17 @@ from utils.rate_limit import CooldownLimiter
 from utils.request_models import parse_plugin_order_request
 from utils.time_utils import now_device_tz
 
+if TYPE_CHECKING:
+    from config import Config
+    from display.display_manager import DisplayManager
+    from model import Playlist, PluginInstance
+
 logger = logging.getLogger(__name__)
 
 main_bp = Blueprint("main", __name__)
 
 
-def _playlist_cycle_seconds(device_config: Any, playlist_name: Any) -> float:
+def _playlist_cycle_seconds(device_config: Config, playlist_name: Any) -> float:
     """The cycle the refresh loop uses for *playlist_name*, in seconds."""
     device_interval = schedule.device_interval_seconds(device_config)
     if not playlist_name:
@@ -63,7 +71,7 @@ def _playlist_cycle_seconds(device_config: Any, playlist_name: Any) -> float:
 
 
 def _loop_last_attempt() -> datetime | None:
-    return schedule.last_attempt_of(current_app.config.get("REFRESH_TASK"))
+    return schedule.last_attempt_of(get_refresh_task())
 
 
 def _parse_refresh_datetime(iso_value: Any) -> datetime | None:
@@ -113,7 +121,7 @@ def _build_next_refresh_meta(
 
 
 def _annotate_refresh_schedule(
-    payload: Any, device_config: Any, last_attempt: datetime | None = None
+    payload: Any, device_config: Config, last_attempt: datetime | None = None
 ) -> Any:
     """Attach next-refresh timing metadata for dashboard rendering.
 
@@ -153,7 +161,7 @@ def _annotate_refresh_schedule(
     return payload
 
 
-def _peek_next_up(device_config: Any, current_dt: datetime) -> dict[str, Any]:
+def _peek_next_up(device_config: Config, current_dt: datetime) -> dict[str, Any]:
     """What the refresh loop would show next, without touching the playlist.
 
     The next show-eligible instance, chosen with the same skip rule as the
@@ -187,7 +195,7 @@ def _is_dev_mode() -> bool:
 
 @main_bp.route("/", methods=["GET"])
 def main_page() -> ResponseReturnValue:
-    device_config = current_app.config["DEVICE_CONFIG"]
+    device_config = get_device_config()
     playlist_manager = device_config.get_playlist_manager()
     # Compute a non-mutating next-up preview for SSR convenience
     current_dt = now_device_tz(device_config)
@@ -235,7 +243,7 @@ def main_page() -> ResponseReturnValue:
 
 @main_bp.route("/preview", methods=["GET"])
 def preview_image() -> ResponseReturnValue:
-    device_config = current_app.config["DEVICE_CONFIG"]
+    device_config = get_device_config()
     # Prefer processed image; fall back to current raw image if missing
     path = device_config.processed_image_file
     if not os.path.exists(path):
@@ -255,9 +263,8 @@ def dev_mock_frame() -> ResponseReturnValue:
     if not _is_dev_mode():
         return ("Not found", 404)
 
-    display_manager = current_app.config.get("DISPLAY_MANAGER")
-    display = getattr(display_manager, "display", None)
-    frame_path = getattr(display, "mock_frame_path", None)
+    display = get_display_manager().display
+    frame_path = display.mock_frame_path if isinstance(display, MockDisplay) else None
     if not frame_path:
         return ("Mock frame not available", 404)
 
@@ -281,7 +288,7 @@ def screenshot() -> ResponseReturnValue:
     GET via If-Modified-Since / 304, and sets Cache-Control: no-cache so
     monitoring dashboards always poll for fresh content.
     """
-    device_config = current_app.config["DEVICE_CONFIG"]
+    device_config = get_device_config()
     path = device_config.processed_image_file
     if not os.path.exists(path):
         path = device_config.current_image_file
@@ -315,7 +322,7 @@ def screenshot() -> ResponseReturnValue:
 @main_bp.route("/api/current_image", methods=["GET"])
 def get_current_image() -> ResponseReturnValue:
     """Serve current_image.png with conditional request support (If-Modified-Since) for polling."""
-    device_config = current_app.config["DEVICE_CONFIG"]
+    device_config = get_device_config()
     image_path = device_config.current_image_file
 
     if not os.path.exists(image_path):
@@ -355,7 +362,7 @@ def get_current_image() -> ResponseReturnValue:
 def _plugin_display_name_map() -> dict[str, str]:
     """Return a {plugin_id: display_name} mapping for the current device config."""
     try:
-        device_config = current_app.config["DEVICE_CONFIG"]
+        device_config = get_device_config()
         return {
             p["id"]: p.get("display_name") or p["id"]
             for p in device_config.get_plugins()
@@ -390,7 +397,7 @@ def _annotate_instance_labels(payload: Any) -> Any:
 
 @main_bp.route("/refresh-info", methods=["GET"])
 def refresh_info() -> ResponseReturnValue:
-    device_config = current_app.config["DEVICE_CONFIG"]
+    device_config = get_device_config()
     try:
         info = device_config.get_refresh_info().to_dict()
     except Exception:
@@ -406,7 +413,7 @@ def refresh_info() -> ResponseReturnValue:
 
 @main_bp.route("/next-up", methods=["GET"])
 def next_up() -> ResponseReturnValue:
-    device_config = current_app.config["DEVICE_CONFIG"]
+    device_config = get_device_config()
     current_dt = now_device_tz(device_config)
 
     try:
@@ -422,7 +429,7 @@ def next_up() -> ResponseReturnValue:
 @main_bp.route("/api/plugin_order", methods=["POST"])
 def save_plugin_order() -> ResponseReturnValue:
     """Save custom plugin order from dashboard drag-and-drop."""
-    device_config = current_app.config["DEVICE_CONFIG"]
+    device_config = get_device_config()
     parsed, parse_error = parse_plugin_order_request(request.get_json(silent=True))
     if parse_error is not None:
         return json_error(parse_error.message, status=parse_error.status)
@@ -502,10 +509,10 @@ def _reset_display_next_cooldown() -> None:
 
 
 def _display_next_direct(
-    device_config: Any,
-    display_manager: Any,
-    plugin_instance: Any,
-    playlist: Any,
+    device_config: Config,
+    display_manager: DisplayManager,
+    plugin_instance: PluginInstance,
+    playlist: Playlist,
     current_dt: datetime,
 ) -> JsonResponse:
     """Show *plugin_instance* in the request thread (the refresh loop is off).
@@ -590,9 +597,9 @@ def _display_next_direct(
 
 
 def _record_direct_refresh(
-    device_config: Any,
-    plugin_instance: Any,
-    playlist: Any,
+    device_config: Config,
+    plugin_instance: PluginInstance,
+    playlist: Playlist,
     current_dt: datetime,
     metrics: Mapping[str, Any],
 ) -> None:
@@ -634,10 +641,10 @@ def _record_direct_refresh(
 
 
 def _persist_dev_refresh_event(
-    device_config: Any,
+    device_config: Config,
     benchmark_id: str,
-    plugin_instance: Any,
-    playlist: Any,
+    plugin_instance: PluginInstance,
+    playlist: Playlist,
     metrics: Mapping[str, Any],
 ) -> None:
     """Persist a refresh event for the dev (direct) path."""
@@ -693,9 +700,9 @@ def display_next() -> ResponseReturnValue:
 
 def _show_next_plugin() -> JsonResponse:
     """Advance the active playlist and show its next plugin."""
-    device_config = current_app.config["DEVICE_CONFIG"]
-    refresh_task = current_app.config["REFRESH_TASK"]
-    display_manager = current_app.config["DISPLAY_MANAGER"]
+    device_config = get_device_config()
+    refresh_task = get_refresh_task()
+    display_manager = get_display_manager()
     playlist_manager = device_config.get_playlist_manager()
 
     # Determine current time
@@ -721,7 +728,7 @@ def _show_next_plugin() -> JsonResponse:
     if not plugin_instance:
         return json_error("No eligible plugin to display", status=400)
 
-    if not getattr(refresh_task, "running", False):
+    if not refresh_task.running:
         try:
             return _display_next_direct(
                 device_config, display_manager, plugin_instance, playlist, current_dt

@@ -517,14 +517,6 @@ class TestForceRetryEndpoint:
             resp = client.post("/plugin_instance/weather/nonexistent/force_retry")
             assert resp.status_code == 404
 
-    def test_force_retry_returns_503_when_no_refresh_task(
-        self, device_config_dev: Any
-    ) -> None:
-        app = self._make_app(device_config_dev, None)
-        with app.test_client() as client:
-            resp = client.post("/plugin_instance/weather/my_weather/force_retry")
-            assert resp.status_code == 503
-
 
 # ---------------------------------------------------------------------------
 # Automatic retry of paused plugins (cooldown + probe)

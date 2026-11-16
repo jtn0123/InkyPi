@@ -64,6 +64,8 @@ FULL_THRESHOLDS: dict[str, tuple[float, float]] = {
     "services/updates.py": (0.83, 0.76),  # projected 84.6 / 78.4
     "services/logs.py": (0.94, 0.90),  # projected ~96 / ~100
     "services/version_check.py": (0.98, 0.90),  # projected 100 / 100
+    # Moved out of refresh_task/, so the refresh_task/ floor no longer covers it.
+    "services/job_queue.py": (0.98, 0.88),  # 100 / 92.3 (its own tests)
 }
 
 # The preflash subset (coverage-gate artifact, same run).

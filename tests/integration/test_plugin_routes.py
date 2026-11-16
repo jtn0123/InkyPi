@@ -330,7 +330,7 @@ def test_update_now_async_poll_completes(
     from PIL import Image
 
     import plugins.clock.clock as clock_mod
-    from refresh_task.job_queue import get_job_queue
+    from services.job_queue import get_job_queue
 
     def fake_generate(self: Any, settings: Any, device_config: Any) -> Any:
         return Image.new("RGB", device_config.get_resolution(), "white")
@@ -377,7 +377,7 @@ def test_update_now_async_poll_error(
     import time
 
     import blueprints.plugin._update_now as plugin_mod
-    from refresh_task.job_queue import get_job_queue
+    from services.job_queue import get_job_queue
 
     refresh_task = flask_app.config["REFRESH_TASK"]
     refresh_task.running = False
@@ -514,6 +514,28 @@ def test_delete_plugin_instance_missing(client: FlaskClient) -> None:
     )
     assert resp.status_code == 400
     assert resp.get_json()["error"] == "Plugin instance not found"
+
+
+@pytest.mark.parametrize("missing", ["plugin_id", "plugin_instance"])
+def test_delete_plugin_instance_without_an_id_or_name(
+    client: FlaskClient,
+    flask_app: Flask,
+    monkeypatch: pytest.MonkeyPatch,
+    missing: str,
+) -> None:
+    """No instance lacks an id or a name, so nothing is deleted or saved."""
+    writes: list[object] = []
+    monkeypatch.setattr(
+        flask_app.config["DEVICE_CONFIG"], "update_atomic", writes.append
+    )
+    payload = {"playlist_name": "Default", "plugin_id": "x", "plugin_instance": "y"}
+    del payload[missing]
+
+    resp = client.post("/delete_plugin_instance", json=payload)
+
+    assert resp.status_code == 400
+    assert resp.get_json()["error"] == "Plugin instance not found"
+    assert writes == []
 
 
 def test_update_plugin_instance_missing(client: FlaskClient) -> None:

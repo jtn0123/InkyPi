@@ -1,11 +1,14 @@
 """Plugin settings save routes, including HTMX partial responses (JTN-506)."""
 
-import json
-from typing import Any
+from __future__ import annotations
 
-from flask import Response, current_app, make_response, render_template, request
+import json
+from typing import TYPE_CHECKING, Any
+
+from flask import Response, make_response, render_template, request
 from flask.typing import ResponseReturnValue
 
+from blueprints._deps import get_device_config
 from blueprints._refresh_loop import wake_refresh_loop
 from plugins.plugin_registry import get_plugin_instance
 from services.plugin_workflows import save_plugin_settings_workflow
@@ -16,7 +19,6 @@ from utils.plugin_history import record_change as _record_plugin_change
 from utils.request_models import parse_plugin_settings_form_request
 
 from ._common import (
-    _CONFIG_KEY,
     _ERR_INTERNAL,
     _PLUGIN_ID,
     _plugin_form_data,
@@ -25,10 +27,13 @@ from ._common import (
     plugin_bp,
 )
 
+if TYPE_CHECKING:
+    from config import Config
+
 
 @plugin_bp.route("/save_plugin_settings", methods=["POST"])
 def save_plugin_settings() -> ResponseReturnValue:
-    device_config = current_app.config[_CONFIG_KEY]
+    device_config = get_device_config()
     playlist_manager = device_config.get_playlist_manager()
     htmx = _is_htmx_request()
 
@@ -65,7 +70,7 @@ def save_plugin_settings() -> ResponseReturnValue:
 @plugin_bp.route("/plugin/<string:plugin_id>/save", methods=["POST"])
 def save_plugin_settings_alias(plugin_id: str) -> ResponseReturnValue:
     """Backward-compatible route alias for plugin settings save."""
-    device_config = current_app.config[_CONFIG_KEY]
+    device_config = get_device_config()
     playlist_manager = device_config.get_playlist_manager()
 
     try:
@@ -137,7 +142,7 @@ def _render_plugin_form_success(
 def _save_plugin_settings_common(
     plugin_id: str,
     plugin_settings: dict[str, Any],
-    device_config: Any,
+    device_config: Config,
     playlist_manager: Any,
 ) -> ResponseReturnValue:
     htmx = _is_htmx_request()

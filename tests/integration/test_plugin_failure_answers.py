@@ -24,7 +24,7 @@ from flask import Flask
 from flask.testing import FlaskClient
 
 from refresh_task import ManualRefresh
-from refresh_task.job_queue import get_job_queue, reset_job_queue
+from services.job_queue import get_job_queue, reset_job_queue
 from utils.backend_errors import PLUGIN_RENDER_FAILED_MSG
 from utils.domain_errors import PluginNotFound
 
