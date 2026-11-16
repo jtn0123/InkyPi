@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 5
 requires-python = "==3.13.*"
 required-markers = [
     "platform_machine == 'aarch64' and sys_platform == 'linux'",
@@ -817,7 +817,7 @@ wheels = [
 
 [[package]]
 name = "inkypi"
-version = "1.9.5"
+version = "1.9.6"
 source = { editable = "." }
 dependencies = [
     { name = "astral" },
