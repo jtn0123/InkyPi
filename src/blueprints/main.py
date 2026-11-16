@@ -156,11 +156,11 @@ def _annotate_refresh_schedule(
 def _peek_next_up(device_config: Any, current_dt: datetime) -> dict[str, Any]:
     """What the refresh loop would show next, without touching the playlist.
 
-    Mirrors ``_determine_next_plugin_locked`` in ``refresh_task.loop_scheduling``:
-    the next show-eligible instance, skipping circuit-breaker-paused instances
-    unless their retry probe is due. The peek never writes
-    ``current_plugin_index``, so it needs no config lock and cannot undo an
-    advance the refresh thread makes meanwhile (B4).
+    The next show-eligible instance, chosen with the same skip rule as the
+    loop and "Display next" (``PluginHealthTracker.skip_resting``): paused
+    instances are passed over unless their retry probe is due. The peek never
+    writes ``current_plugin_index``, so it needs no config lock and cannot
+    undo an advance the refresh thread makes meanwhile (B4).
     """
     playlist = device_config.get_playlist_manager().determine_active_playlist(
         current_dt
@@ -168,12 +168,9 @@ def _peek_next_up(device_config: Any, current_dt: datetime) -> dict[str, Any]:
     if not playlist:
         return {}
 
-    def _paused_and_resting(inst: Any) -> bool:
-        return bool(getattr(inst, "paused", False)) and not (
-            PluginHealthTracker.probe_due(inst, current_dt)
-        )
-
-    inst = playlist.peek_next_eligible_plugin(current_dt, skip=_paused_and_resting)
+    inst = playlist.peek_next_eligible_plugin(
+        current_dt, skip=PluginHealthTracker.skip_resting(current_dt)
+    )
     if not inst:
         return {}
     return {
@@ -712,11 +709,17 @@ def _show_next_plugin() -> JsonResponse:
     # Pick next eligible and commit index change. The index advance is held
     # under the config lock so it cannot interleave with the refresh thread
     # or another request's update_atomic snapshot/rollback; it is persisted
-    # by the refresh-info write that follows the display update.
+    # by the refresh-info write that follows the display update. Paused
+    # plugins are skipped by the same rule as the loop and "Next up", so this
+    # shows what "Next up" named.
     with device_config.locked():
         playlist = playlist_manager.determine_active_playlist(current_dt)
         plugin_instance = (
-            playlist.get_next_eligible_plugin(current_dt) if playlist else None
+            playlist.get_next_eligible_plugin(
+                current_dt, skip=PluginHealthTracker.skip_resting(current_dt)
+            )
+            if playlist
+            else None
         )
     if not playlist:
         return json_error("No active playlist", status=400)

@@ -565,6 +565,7 @@ def run_once(created_app: Flask) -> int:
         than logging and exiting successfully.
     """
     from refresh_task import PlaylistRefresh
+    from refresh_task.health import PluginHealthTracker
     from utils.time_utils import now_device_tz
 
     device_config = created_app.config.get("DEVICE_CONFIG")
@@ -580,7 +581,10 @@ def run_once(created_app: Flask) -> int:
         logger.error("run-once: no active playlist for %s", current_dt)
         return 1
 
-    plugin_instance = playlist.get_next_eligible_plugin(current_dt)
+    # Paused plugins are skipped by the refresh loop's own rule.
+    plugin_instance = playlist.get_next_eligible_plugin(
+        current_dt, skip=PluginHealthTracker.skip_resting(current_dt)
+    )
     if plugin_instance is None:
         logger.error("run-once: no eligible plugin in playlist '%s'", playlist.name)
         return 1

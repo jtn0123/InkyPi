@@ -23,7 +23,7 @@ class _FakePlaylist:
         self.name = "default"
         self._plugin_instance = plugin_instance
 
-    def get_next_eligible_plugin(self, _current_dt: Any) -> Any:
+    def get_next_eligible_plugin(self, _current_dt: Any, skip: Any = None) -> Any:
         return self._plugin_instance
 
 
