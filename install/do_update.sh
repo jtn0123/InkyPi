@@ -5,7 +5,8 @@
 # Usage:
 #   sudo bash do_update.sh [target_tag]
 #
-# If target_tag is omitted, checks out the latest semver tag.
+# If target_tag is omitted, checks out the latest published GitHub release,
+# or the newest semver tag when GitHub can't be asked.
 
 set -euo pipefail
 
@@ -228,6 +229,40 @@ git_repo fetch origin --tags --prune
 TARGET_TAG="${1:-}"
 if [ -z "$TARGET_TAG" ] && [ -r "$TARGET_VERSION_FILE" ]; then
   TARGET_TAG=$(head -n 1 "$TARGET_VERSION_FILE" | tr -d '\r\n')
+fi
+
+# The tag of the newest *published* release of $1 (owner/name), or nothing.
+# The newest tag alone is not enough: the release workflow tags first and
+# publishes only once every file is attached, so for a while (or for good, if
+# a build fails) the newest tag belongs to a draft.
+latest_published_release() {
+  local json tag
+  command -v curl >/dev/null 2>&1 || return 0
+  command -v python3 >/dev/null 2>&1 || return 0
+  json=$(curl -fsSL --max-time 15 -H 'Accept: application/vnd.github+json' \
+    "https://api.github.com/repos/$1/releases/latest" 2>/dev/null) || return 0
+  tag=$(python3 -I -c 'import json,sys; print(json.load(sys.stdin).get("tag_name") or "")' \
+    <<<"$json" 2>/dev/null) || return 0
+  if [[ "$tag" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    printf '%s\n' "$tag"
+  fi
+}
+
+if [ -z "$TARGET_TAG" ]; then
+  PUBLISHED_TAG=$(latest_published_release "$EXPECTED_REPO")
+  if [ -z "$PUBLISHED_TAG" ]; then
+    echo "Couldn't ask GitHub for the latest release; using the newest tag instead."
+  elif ! git_repo rev-parse -q --verify "refs/tags/$PUBLISHED_TAG^{commit}" >/dev/null; then
+    echo "The latest release, $PUBLISHED_TAG, has no tag here; using the newest tag instead."
+  elif [ "$(git_repo tag --list --sort=-v:refname "$PUBLISHED_TAG" "$CURRENT_VERSION" \
+      | awk 'NR == 1')" != "$PUBLISHED_TAG" ]; then
+    # Already past the latest release (someone pinned a newer tag by hand):
+    # don't step back to it.
+    echo "Already newer than the latest release, $PUBLISHED_TAG; using the newest tag instead."
+  else
+    TARGET_TAG="$PUBLISHED_TAG"
+    echo "Latest release: $TARGET_TAG"
+  fi
 fi
 if [ -z "$TARGET_TAG" ]; then
   # Find the latest semver tag (v1.2.3 format).  Use awk instead of

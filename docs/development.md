@@ -249,10 +249,11 @@ through (see [Install pre-commit hooks](#install-pre-commit-hooks-recommended)).
 
 ### Making `ci-gate` a required status check (repo owner steps)
 
-`main` is protected by a repository ruleset, not a classic branch-protection rule. The
-release workflow pushes its version-bump commit and tag straight to `main` (see
-[Releases](#releases)). That commit never has CI results of its own, so a required check
-would reject it, and the ruleset lets the release deploy key bypass the check.
+`main` is protected by a repository ruleset, **main: require the CI gate**, not a classic
+branch-protection rule. The release workflow pushes its version-bump commit and tag
+straight to `main` (see [Releases](#releases)). That commit never has CI results of its
+own, so a required check would reject it, and the ruleset lets the release deploy key
+bypass the check.
 
 1. Go to **GitHub.com → jtn0123/InkyPi → Settings → Rules → Rulesets**, and create a
    branch ruleset (or edit the existing one) that targets the default branch, `main`.
@@ -295,10 +296,10 @@ commit CI tested. A release stays a draft until every file is attached to it:
    published, because an older release run finished last, it stays latest instead.
 
 A Pi's update check reads `/releases/latest`, which never returns a draft, and a draft's
-download URLs return 404. One gap remains: the Update button starts `do_update.sh` with no
-target, and it installs the newest version tag, which a draft already has. Such an
-update finds no wheelhouse and builds from source. After a release is published, GitHub's
-immutable releases (once turned on) stop its files and tag from changing.
+download URLs return 404. With no tag given, `do_update.sh` (which the Update button runs)
+installs the release `/releases/latest` names, not the newest tag, which a draft already
+has. Only when it can't ask GitHub does it fall back to the newest tag. After a release is
+published, GitHub's immutable releases stop its files and tag from changing.
 
 ### When a release job fails
 
