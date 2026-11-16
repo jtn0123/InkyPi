@@ -2,6 +2,26 @@
 
 <!-- version list -->
 
+## v1.9.11 (2026-11-16)
+
+### Performance Improvements
+
+- Skip work the frame doesn't need ([#887](https://github.com/jtn0123/InkyPi/pull/887),
+  [`7d40478`](https://github.com/jtn0123/InkyPi/commit/7d4047805946eb555293474e2306f81921130696))
+
+### Refactoring
+
+- Type route dependencies and move the job queue out of refresh_task
+  ([#886](https://github.com/jtn0123/InkyPi/pull/886),
+  [`4018481`](https://github.com/jtn0123/InkyPi/commit/4018481b6bcdb56475732479ed32ba9c2cba8b84))
+
+### Testing
+
+- Resume the mutation nightly, gate its scores, and tighten weak tests
+  ([#889](https://github.com/jtn0123/InkyPi/pull/889),
+  [`71e0f4e`](https://github.com/jtn0123/InkyPi/commit/71e0f4efbf6a782a784e1e205cdb0a6c21a96b1b))
+
+
 ## v1.9.10 (2026-11-16)
 
 ### Bug Fixes
