@@ -27,7 +27,7 @@ SCRIPT_DIR=$( cd -P "$( dirname "$SOURCE" )" >/dev/null 2>&1 && pwd )
 # the UI has zero signal about why the update failed.
 #
 # The JSON shape MUST match update.sh's trap exactly so downstream readers
-# (src/blueprints/settings/_update_status.py::read_last_update_failure)
+# (src/services/updates.py::read_last_update_failure)
 # don't need to branch on origin. Required keys: timestamp, exit_code,
 # last_command, recent_journal_lines.
 #

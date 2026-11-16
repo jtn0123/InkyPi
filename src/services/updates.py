@@ -1,14 +1,22 @@
 """Update and rollback runner for the settings page.
 
 Finds and validates the install scripts, launches them in a transient systemd
-unit (or a simulated fallback thread off-device), and keeps the in-memory
-update state the status, logs and version routes read.
+unit (or a simulated fallback thread off-device), and owns the update state:
+whether a run is going, which unit it is, when it ends, and whether a
+rollback may start. The routes in ``blueprints/settings/_updates.py`` only
+parse requests and map the results here to responses:
 
-The route handlers live in ``blueprints/settings/_updates.py``. Tests patch
-names here (``services.updates.<name>``) because the routes look them up on
-this module at call time.
+* ``start_update`` / ``start_rollback`` check, claim and launch a run, and
+  return a ``LaunchResult`` (started, or refused with a reason);
+* ``status`` reports the run, the last failure and rollback eligibility;
+* ``is_running`` and ``current_unit`` serve the version and logs routes.
+
+Tests patch names here (``services.updates.<name>``), so every function looks
+its collaborators up on this module at call time.
 """
 
+import datetime as _dt
+import json
 import logging
 import os
 import re
@@ -16,10 +24,17 @@ import shutil
 import subprocess
 import threading
 import time
+from collections.abc import Mapping
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Literal
 
+from utils.json_types import JsonObject
 from utils.progress_events import get_progress_bus
 
 logger = logging.getLogger(__name__)
+
+UpdateKind = Literal["update", "rollback"]
 
 UPDATE_SCRIPT_NAMES = ("do_update.sh", "update.sh")
 # JTN-708: rollback.sh reverts to the tag recorded in /var/lib/inkypi/prev_version.
@@ -82,16 +97,30 @@ _UPDATE_TARGET_VERSION_FILENAME = "update-target-version"
 _TAG_RE = re.compile(r"^v?\d+\.\d+\.\d+(-[A-Za-z0-9.]+)?$", re.ASCII)
 
 
-# In-memory update state for coordinating UI status and logs
+# In-memory update state for coordinating UI status and logs. Only the
+# functions in this module write it, always under ``_update_lock``.
 _UPDATE_STATE: dict[str, object] = {
     "running": False,
     "unit": None,
     "started_at": None,  # epoch seconds
     "last_unit": None,  # preserved after update completes for log retrieval
+    "kind": None,  # "update" or "rollback" while a run is going
 }
 
 _UPDATE_TIMEOUT_SECONDS = 1800  # 30 minutes
 _update_lock = threading.Lock()
+
+# A run's transient unit, as _start_update_via_systemd and
+# _start_rollback_via_systemd name it: prefix, launch time, ".service".
+_RUN_UNIT_RE = re.compile(r"inkypi-(update|rollback)-(\d{1,12})\.service", re.ASCII)
+
+# Breadcrumbs the install scripts leave in the state directory.
+_DEFAULT_STATE_DIR = "/var/lib/inkypi"
+_FAILURE_FILENAME = ".last-update-failure"
+_PREV_VERSION_FILENAME = "prev_version"
+# Cap how much of the failure record is ever returned to a browser so a
+# runaway journal capture can't blow up the response body.
+_MAX_FAILURE_BYTES = 64 * 1024
 
 
 def _get_update_script_path() -> str | None:
@@ -177,13 +206,100 @@ def _systemd_available() -> bool:
         return False
 
 
+def _kind_for_unit(unit: str | None) -> UpdateKind:
+    if unit and unit.startswith(f"{_ROLLBACK_UNIT_PREFIX}-"):
+        return "rollback"
+    return "update"
+
+
+def _clear_run_locked() -> None:
+    """End the current run. The caller holds ``_update_lock``."""
+    unit = _UPDATE_STATE.get("unit")
+    if unit:
+        _UPDATE_STATE["last_unit"] = unit
+    _UPDATE_STATE["running"] = False
+    _UPDATE_STATE["unit"] = None
+    _UPDATE_STATE["started_at"] = None
+    _UPDATE_STATE["kind"] = None
+
+
 def _set_update_state(running: bool, unit: str | None) -> None:
+    """Set the run state outright (the fallback runner's end, and tests)."""
     with _update_lock:
-        if not running and _UPDATE_STATE.get("unit"):
-            _UPDATE_STATE["last_unit"] = _UPDATE_STATE["unit"]
-        _UPDATE_STATE["running"] = bool(running)
+        if not running:
+            _clear_run_locked()
+            return
+        _UPDATE_STATE["running"] = True
         _UPDATE_STATE["unit"] = unit
-        _UPDATE_STATE["started_at"] = float(time.time()) if running else None
+        _UPDATE_STATE["started_at"] = float(time.time())
+        _UPDATE_STATE["kind"] = _kind_for_unit(unit)
+
+
+# ---------------------------------------------------------------------------
+# Run ownership: one run at a time, and only its owner ends it.
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class RunTicket:
+    """Proof that one caller began the current run.
+
+    ``finish`` and ``_record_unit`` act only while the state still holds this
+    run, so a request that fails after claiming the run can undo its own
+    claim without ever touching a run someone else started.
+    """
+
+    kind: UpdateKind
+    started_at: float
+
+
+def try_begin(kind: UpdateKind) -> RunTicket | None:
+    """Claim the run for ``kind``, or return None when one is already going.
+
+    The check and the claim happen under one lock acquisition, so two
+    concurrent requests can't both pass.
+    """
+    with _update_lock:
+        if _UPDATE_STATE.get("running"):
+            return None
+        started_at = float(time.time())
+        _UPDATE_STATE["running"] = True
+        _UPDATE_STATE["unit"] = None
+        _UPDATE_STATE["started_at"] = started_at
+        _UPDATE_STATE["kind"] = kind
+        return RunTicket(kind=kind, started_at=started_at)
+
+
+def _owns_run_locked(ticket: RunTicket) -> bool:
+    return bool(_UPDATE_STATE.get("running")) and (
+        _UPDATE_STATE.get("started_at") == ticket.started_at
+    )
+
+
+def _record_unit(ticket: RunTicket, unit: str) -> None:
+    with _update_lock:
+        if _owns_run_locked(ticket):
+            _UPDATE_STATE["unit"] = unit
+
+
+def finish(ticket: RunTicket) -> bool:
+    """End the run ``ticket`` began. Returns False, changing nothing, when the
+    state now belongs to another run (or to none)."""
+    with _update_lock:
+        if not _owns_run_locked(ticket):
+            return False
+        _clear_run_locked()
+        return True
+
+
+def is_running() -> bool:
+    return bool(_UPDATE_STATE.get("running"))
+
+
+def current_unit() -> str | None:
+    """The transient unit of the run going now, if it has one."""
+    unit = _UPDATE_STATE.get("unit")
+    return unit if isinstance(unit, str) and unit else None
 
 
 # ---------------------------------------------------------------------------
@@ -547,3 +663,442 @@ def _start_update_fallback_thread(
         daemon=True,
     )
     t.start()
+
+
+# ---------------------------------------------------------------------------
+# Breadcrumbs the install scripts leave in the state directory
+# ---------------------------------------------------------------------------
+
+
+def _state_dir() -> Path:
+    """The scripts' state directory; ``INKYPI_LOCKFILE_DIR`` redirects it in
+    tests, as it does for the scripts themselves."""
+    return Path(os.environ.get("INKYPI_LOCKFILE_DIR") or _DEFAULT_STATE_DIR)
+
+
+def read_last_update_failure() -> JsonObject | None:
+    """Return the ``.last-update-failure`` record the scripts' EXIT traps write.
+
+    * ``None``: no record (no failure yet, or a later successful update
+      removed it).
+    * the parsed JSON object: keys are whatever the trap wrote
+      (``timestamp``, ``exit_code``, ``last_command``,
+      ``recent_journal_lines``); partial records are returned as they are.
+    * ``{"parse_error": True}``: the file exists but can't be read or parsed,
+      so callers still see that the last update failed.
+    """
+    path = _state_dir() / _FAILURE_FILENAME
+    try:
+        if not path.is_file():
+            return None
+    except OSError:
+        # e.g. permission denied on the parent dir: treat as "no record"
+        # rather than show an error banner for an unreadable state dir.
+        logger.debug("Could not stat %s", path, exc_info=True)
+        return None
+
+    try:
+        raw = path.read_bytes()
+    except OSError:
+        logger.warning("Failed to read %s", path, exc_info=True)
+        return {"parse_error": True}
+
+    if len(raw) > _MAX_FAILURE_BYTES:
+        raw = raw[:_MAX_FAILURE_BYTES]
+
+    try:
+        data = json.loads(raw.decode("utf-8", errors="replace"))
+    except ValueError:
+        logger.warning("Malformed JSON in %s", path)
+        return {"parse_error": True}
+
+    if not isinstance(data, dict):
+        logger.warning("Unexpected JSON shape in %s: %r", path, type(data).__name__)
+        return {"parse_error": True}
+
+    return data
+
+
+def read_prev_version() -> str | None:
+    """Return the tag do_update.sh recorded in ``prev_version``, or None.
+
+    A record that fails the strict semver check counts as missing, so a
+    corrupt breadcrumb hides the Roll back button instead of offering an
+    unusable target.
+    """
+    try:
+        raw = (_state_dir() / _PREV_VERSION_FILENAME).read_text(encoding="utf-8")
+    except OSError:
+        return None
+    tag = raw.strip()
+    if not tag or not _TAG_RE.fullmatch(tag):
+        return None
+    return tag
+
+
+# ---------------------------------------------------------------------------
+# Rollback eligibility: one rule for the Roll back button and the route
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class Refusal:
+    """Why a run can't start. ``code`` is the stable reason clients read."""
+
+    code: str
+    message: str
+
+
+ALREADY_RUNNING = "already_running"
+
+
+def rollback_eligibility(
+    last_failure: Mapping[str, object] | None, prev_version: str | None
+) -> Refusal | None:
+    """Return why a rollback can't start, or None when it can.
+
+    * A ``.last-update-failure`` record must exist. A rollback is a recovery
+      path, not a time machine; to move a healthy install, update to a
+      chosen version instead. A failure synthesized from the journal has no
+      record, so it doesn't count.
+    * The failure must not be a pre-flight abort: those stop before anything
+      is checked out, so the device is still on the version it was on.
+    * ``prev_version`` must hold a valid tag to go back to.
+    """
+    if not last_failure:
+        return Refusal("no_failure", "No failed update recorded; nothing to roll back.")
+    step = last_failure.get("last_command")
+    if isinstance(step, str) and step.startswith("preflight:"):
+        return Refusal(
+            "preflight_abort",
+            "The last update stopped in its pre-flight checks before changing "
+            "anything, so there is nothing to roll back.",
+        )
+    if not prev_version:
+        return Refusal(
+            "no_prev_version", "No previous version recorded; cannot roll back."
+        )
+    return None
+
+
+# ---------------------------------------------------------------------------
+# Keeping the in-memory state in line with systemd
+# ---------------------------------------------------------------------------
+
+
+def _probe_finished_unit(unit: str) -> tuple[bool, bool]:
+    """Return ``(finished, failed)`` for a run's transient unit.
+
+    ``finished`` is True once the unit is in any state other than
+    ``active``/``activating``; ``failed`` only when systemd says ``failed``
+    (JTN-787 then synthesizes a failure record from the journal). Errors
+    count as "still running": probing must never fail the status endpoint.
+    """
+    try:
+        result = subprocess.run(
+            ["systemctl", "is-active", unit],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        state = result.stdout.strip()
+        if state in ("active", "activating"):
+            return (False, False)
+        return (True, state == "failed")
+    except Exception:
+        return (False, False)
+
+
+def _synthesize_failure_from_journal(unit: str) -> dict[str, object] | None:
+    """JTN-787: build a failure record from ``journalctl -u <unit>``.
+
+    Covers a unit that failed without writing ``.last-update-failure`` (for
+    example an old do_update.sh that aborts before delegating to update.sh).
+    The shape mirrors the trap's record plus ``synthesized: True``. Returns
+    None when the journal has nothing or can't be read.
+    """
+    try:
+        journal_result = subprocess.run(
+            ["journalctl", "-u", unit, "-n", "20", "--no-pager"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+    except Exception:
+        logger.debug("Failed to synthesize last_failure from journalctl", exc_info=True)
+        return None
+    journal_tail = (journal_result.stdout or "").strip()
+    if not journal_tail:
+        return None
+    return {
+        "timestamp": _dt.datetime.now(_dt.UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "exit_code": None,
+        "last_command": "systemd_unit_failed",
+        "recent_journal_lines": journal_tail,
+        "unit": unit,
+        "synthesized": True,
+    }
+
+
+def _compare_and_clear_update_state(unit: object, started_at: object) -> bool:
+    """Clear the run iff ``(unit, started_at)`` still matches.
+
+    Returns False when a concurrent start replaced the run since the caller
+    took its snapshot, so the reaper leaves the new run alone (JTN-K3).
+    """
+    with _update_lock:
+        if (
+            _UPDATE_STATE.get("running")
+            and _UPDATE_STATE.get("unit") == unit
+            and _UPDATE_STATE.get("started_at") == started_at
+        ):
+            _clear_run_locked()
+            return True
+        return False
+
+
+def _reap_finished_run() -> str | None:
+    """End the recorded run when its unit has finished or it has timed out.
+
+    Returns the unit's name only when the unit ended ``failed`` (for the
+    journal fallback). The slow ``systemctl`` probe runs outside the lock,
+    and the clear is compare-and-clear, so a run started meanwhile survives.
+    """
+    unit = _UPDATE_STATE.get("unit")
+    started_at = _UPDATE_STATE.get("started_at")
+
+    if isinstance(unit, str) and unit and _systemd_available():
+        finished, failed = _probe_finished_unit(unit)
+        if finished and _compare_and_clear_update_state(unit, started_at):
+            return unit if failed else None
+
+    # Timeout fallback: a run started more than 30 minutes ago is over.
+    if (
+        isinstance(started_at, (int, float, str))
+        and (time.time() - float(started_at)) > _UPDATE_TIMEOUT_SECONDS
+    ):
+        _compare_and_clear_update_state(unit, started_at)
+    return None
+
+
+def _find_active_run_unit() -> tuple[str, float] | None:
+    """Return the newest active update or rollback unit and its launch time.
+
+    systemd keeps a run's transient unit going while this service restarts,
+    which every real update does. Errors and unexpected output mean "none".
+    """
+    try:
+        result = subprocess.run(
+            [
+                "systemctl",
+                "list-units",
+                "--type=service",
+                "--state=active,activating",
+                "--no-legend",
+                "--plain",
+                "--no-pager",
+                f"{_UPDATE_UNIT_PREFIX}-*",
+                f"{_ROLLBACK_UNIT_PREFIX}-*",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        lines = str(result.stdout).splitlines()
+    except Exception:
+        logger.debug("Could not list update units", exc_info=True)
+        return None
+    newest: tuple[str, float] | None = None
+    for line in lines:
+        fields = line.split()
+        match = _RUN_UNIT_RE.fullmatch(fields[0]) if fields else None
+        if match is None:
+            continue
+        launched_at = float(match.group(2))
+        if newest is None or launched_at > newest[1]:
+            newest = (match.group(0), launched_at)
+    return newest
+
+
+def _adopt_running_unit() -> None:
+    """Track a run this process didn't start, so status reports it running.
+
+    An update stops this service and starts it again, then keeps checking
+    the new build is serving; the restarted process has no memory of the
+    run. Without this, status would say "not running" while update.sh is
+    still working, and the page would report a result too early.
+    """
+    if not _systemd_available():
+        return
+    found = _find_active_run_unit()
+    if found is None:
+        return
+    unit, launched_at = found
+    if time.time() - launched_at > _UPDATE_TIMEOUT_SECONDS:
+        # Past the reaper's timeout: adopting it would only be cleared again.
+        return
+    with _update_lock:
+        if _UPDATE_STATE.get("running"):
+            return
+        _UPDATE_STATE["running"] = True
+        _UPDATE_STATE["unit"] = unit
+        _UPDATE_STATE["started_at"] = launched_at
+        _UPDATE_STATE["kind"] = _kind_for_unit(unit)
+    logger.info("update | %s is still running; tracking it", unit)
+
+
+def _reconcile() -> str | None:
+    """Bring the in-memory run state in line with systemd.
+
+    A recorded run whose unit has finished (or timed out) is ended; with no
+    recorded run, a still-active unit is adopted. Returns the unit's name
+    when a run just ended ``failed``.
+    """
+    if _UPDATE_STATE.get("running"):
+        return _reap_finished_run()
+    _adopt_running_unit()
+    return None
+
+
+# ---------------------------------------------------------------------------
+# What the routes call
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class LaunchResult:
+    """The outcome of ``start_update`` / ``start_rollback``.
+
+    ``refusal`` is None when the run started. On a refusal nothing changed;
+    ``unit`` is then the unit of the run already going, if any.
+    """
+
+    refusal: Refusal | None = None
+    unit: str | None = None
+    target_version: str | None = None
+
+
+def _already_running() -> LaunchResult:
+    return LaunchResult(
+        refusal=Refusal(
+            ALREADY_RUNNING, "An update or rollback is already in progress."
+        ),
+        unit=current_unit(),
+    )
+
+
+def start_update(target_tag: str | None = None) -> LaunchResult:
+    """Start an update to ``target_tag`` (None: the newest release tag).
+
+    ``target_tag`` must already have passed ``_TAG_RE``. Off systemd, or if
+    systemd-run fails, the simulated fallback runner takes over. If the
+    launch itself raises, this run's claim is undone before the error
+    propagates; a run someone else started is never touched.
+    """
+    _reconcile()
+    script_path = _get_update_script_path()
+    use_systemd = _systemd_available()
+    ticket = try_begin("update")
+    if ticket is None:
+        return _already_running()
+    try:
+        if use_systemd:
+            try:
+                unit = _start_update_via_systemd(target_tag=target_tag)
+            except Exception:
+                logger.exception("systemd-run failed; falling back to thread runner")
+                _start_update_fallback_thread(script_path, target_tag=target_tag)
+            else:
+                # Tests stub the launcher; record only a real unit name so
+                # the reaper probes a unit that exists.
+                if isinstance(unit, str):
+                    _record_unit(ticket, unit)
+        else:
+            _start_update_fallback_thread(script_path, target_tag=target_tag)
+    except BaseException:
+        finish(ticket)
+        raise
+    return LaunchResult(unit=current_unit(), target_version=target_tag)
+
+
+def start_rollback() -> LaunchResult:
+    """Roll back to the version in ``prev_version`` (JTN-708).
+
+    Refused, with nothing changed, unless ``rollback_eligibility`` allows it
+    and no other run is going. rollback.sh checks out the tag and hands over
+    to update.sh, whose EXIT trap records a failed rollback like any update.
+    """
+    _reconcile()
+    prev_version = read_prev_version()
+    refusal = rollback_eligibility(read_last_update_failure(), prev_version)
+    if refusal is not None:
+        return LaunchResult(refusal=refusal, unit=current_unit())
+    use_systemd = _systemd_available()
+    ticket = try_begin("rollback")
+    if ticket is None:
+        return _already_running()
+    try:
+        if use_systemd:
+            unit = _start_rollback_via_systemd()
+            if isinstance(unit, str):
+                _record_unit(ticket, unit)
+        else:
+            # Dev / macOS: the simulated runner still shows log output.
+            _start_update_fallback_thread(None, target_tag=prev_version)
+    except BaseException:
+        finish(ticket)
+        raise
+    return LaunchResult(unit=current_unit(), target_version=prev_version)
+
+
+@dataclass(frozen=True)
+class UpdateStatus:
+    """What ``GET /settings/update_status`` reports."""
+
+    running: bool
+    kind: UpdateKind | None
+    unit: str | None
+    started_at: float | None
+    last_failure: JsonObject | None
+    prev_version: str | None
+    rollback_eligible: bool
+
+
+def _kind_or_none(value: object) -> UpdateKind | None:
+    if value == "update":
+        return "update"
+    if value == "rollback":
+        return "rollback"
+    return None
+
+
+def status() -> UpdateStatus:
+    """Report the current run, the last failure, and whether a rollback may
+    start now (it may not while a run is going)."""
+    failed_unit = _reconcile()
+    with _update_lock:
+        running = bool(_UPDATE_STATE.get("running"))
+        unit = _UPDATE_STATE.get("unit")
+        started_at = _UPDATE_STATE.get("started_at")
+        kind = _kind_or_none(_UPDATE_STATE.get("kind"))
+    unit_name = unit if isinstance(unit, str) and unit else None
+    if running and kind is None:
+        kind = _kind_for_unit(unit_name)
+
+    recorded_failure = read_last_update_failure()
+    last_failure = recorded_failure
+    if last_failure is None and failed_unit:
+        last_failure = _synthesize_failure_from_journal(failed_unit)
+    prev_version = read_prev_version()
+    eligible = (
+        not running and rollback_eligibility(recorded_failure, prev_version) is None
+    )
+    return UpdateStatus(
+        running=running,
+        kind=kind,
+        unit=unit_name,
+        started_at=float(started_at) if isinstance(started_at, (int, float)) else None,
+        last_failure=last_failure,
+        prev_version=prev_version,
+        rollback_eligible=eligible,
+    )

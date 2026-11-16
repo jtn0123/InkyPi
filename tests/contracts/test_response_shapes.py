@@ -428,7 +428,6 @@ def test_update_device_cycle_shape(client: FlaskClient) -> None:
 def test_update_control_shapes(
     client: FlaskClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    from blueprints.settings import _updates as updates_mod
     from services import updates
 
     monkeypatch.setattr(updates, "_systemd_available", lambda: False)
@@ -439,11 +438,11 @@ def test_update_control_shapes(
         lambda script_path, target_tag=None: None,
     )
     monkeypatch.setattr(
-        updates_mod,
+        updates,
         "read_last_update_failure",
         lambda: {"message": "boom"},
     )
-    monkeypatch.setattr(updates_mod, "_read_prev_version", lambda: "v1.2.3")
+    monkeypatch.setattr(updates, "read_prev_version", lambda: "v1.2.3")
     monkeypatch.setenv("INKYPI_LOCKFILE_DIR", str(tmp_path))
     updates._set_update_state(False, None)
 

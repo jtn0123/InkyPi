@@ -41,10 +41,9 @@ class TestStartUpdate:
         self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """POST /settings/update returns 409 when update is already running."""
-        from blueprints.settings import _updates as _updates_mod
         from services import updates
 
-        # JTN-K3: POST now runs ``_auto_clear_stale_update_state`` before
+        # JTN-K3: POST now runs the reaper (``updates._reconcile``) before
         # the conflict guard, which probes systemd for the recorded unit.
         # On CI runners systemd is available but the fake unit name we set
         # below does not exist, so the probe would treat it as "finished"
@@ -53,7 +52,7 @@ class TestStartUpdate:
         # conflict path without relying on implementation detail of the
         # reaper.
         monkeypatch.setattr(
-            _updates_mod, "_probe_finished_unit", lambda _unit: (False, False)
+            updates, "_probe_finished_unit", lambda _unit: (False, False)
         )
 
         updates._set_update_state(True, "inkypi-update-test.service")

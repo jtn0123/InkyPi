@@ -300,9 +300,9 @@ def test_update_flow_happy_path(
     ), f"Happy-path must leave last_failure empty; got {final!r}"
 
     # -- Step 7: failure banner must still be hidden -----------------------
-    # After a successful update the banner should remain hidden. The JS
-    # pollUpdateStatus branch calls renderUpdateFailureBanner(null) which
-    # hides the element, matching the initial state.
+    # After a successful update the banner should remain hidden. The page's
+    # update tracker renders each status reply, so last_failure=null keeps
+    # the banner hidden, matching the initial state.
     # Wait until the page's poller has seen the finished run, so the banner
     # below reflects that reply rather than the state before the update.
     deadline = time.monotonic() + _RUNNING_TIMEOUT_S

@@ -324,7 +324,7 @@ class TestReadLastUpdateFailureHelper:
     def test_returns_none_when_file_missing(
         self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
     ) -> None:
-        from blueprints.settings._update_status import read_last_update_failure
+        from services.updates import read_last_update_failure
 
         monkeypatch.setenv("INKYPI_LOCKFILE_DIR", str(tmp_path))
         assert read_last_update_failure() is None
@@ -332,7 +332,7 @@ class TestReadLastUpdateFailureHelper:
     def test_returns_parsed_record_when_present(
         self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
     ) -> None:
-        from blueprints.settings._update_status import read_last_update_failure
+        from services.updates import read_last_update_failure
 
         record = {
             "timestamp": "2026-04-14T00:00:00Z",
@@ -350,7 +350,7 @@ class TestReadLastUpdateFailureHelper:
         self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
     ) -> None:
         """A 1 MiB failure file must not blow up the response."""
-        from blueprints.settings._update_status import read_last_update_failure
+        from services.updates import read_last_update_failure
 
         (tmp_path / ".last-update-failure").write_text(
             "x" * (1024 * 1024), encoding="utf-8"
@@ -385,7 +385,7 @@ class TestStartUpdateReapsStaleRunningState:
     ) -> None:
         """Pre-populate a >30 min old running state; POST must succeed.
 
-        Uses the timeout-fallback branch of ``_auto_clear_stale_update_state``
+        Uses the timeout-fallback branch of ``updates._reap_finished_run``
         so the test does not need to mock systemd probes.
         """
         import time as _time

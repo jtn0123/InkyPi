@@ -19,7 +19,6 @@
       logsWrap: true,
       lastLogsRaw: "",
       logsUpdatedAt: "",
-      updateTimer: null,
       attachGeo: false,
       activeTab: "device",
     };
@@ -46,10 +45,21 @@
       settingsModules,
       "createNavigationModule"
     )({ state, ui, mobileQuery });
+    // Follows an update or rollback to the end; when it ends, the version
+    // check runs again so the panel shows what is installed now.
+    const trackerModule = requireSettingsFactory(
+      settingsModules,
+      "createUpdateTrackerModule"
+    )({
+      config,
+      shared,
+      logs: logsModule,
+      onFinished: () => actionsModule.checkForUpdates({ silent: true }),
+    });
     const actionsModule = requireSettingsFactory(
       settingsModules,
       "createActionsModule"
-    )({ config, state, shared, logs: logsModule, modals: modalModule });
+    )({ config, modals: modalModule, tracker: trackerModule });
 
     function syncProgressStreamForTab(tab) {
       if (tab === "maintenance") {
@@ -83,6 +93,7 @@
       formModule.populateIntervalFields();
       formModule.bind();
       actionsModule.bind();
+      trackerModule.bind();
       diagnosticsModule.bind();
       document.addEventListener("settingsTabChanged", (event) =>
         syncProgressStreamForTab(event.detail?.tab)
@@ -98,14 +109,14 @@
       syncProgressStreamForTab(state.activeTab);
       actionsModule.hydrateVersionCheckFromCache();
       setTimeout(() => actionsModule.checkForUpdates({ silent: true }), 5000);
-      actionsModule.refreshUpdateStatus();
+      trackerModule.resume();
       if (mobileQuery && typeof mobileQuery.addEventListener === "function") {
         mobileQuery.addEventListener("change", () =>
           navigationModule.setActiveTab(state.activeTab)
         );
       }
       const teardown = () => {
-        actionsModule.stop();
+        trackerModule.pause();
         diagnosticsModule.teardown();
       };
       globalThis.addEventListener("beforeunload", teardown);
@@ -113,6 +124,7 @@
       globalThis.addEventListener("pageshow", (event) => {
         if (event.persisted) {
           syncProgressStreamForTab(state.activeTab);
+          void trackerModule.resume();
         }
       });
     }
