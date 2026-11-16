@@ -70,6 +70,30 @@ inkypi_find_python() {
     return 1
 }
 
+# Prints the main checkout's venv when this is a git worktree and that venv
+# was synced, hash-checked, from exactly this worktree's lock on the
+# supported Python. Building a worktree its own .venv takes minutes.
+inkypi_shared_venv() {
+    local common main
+    common="$(git -C "$REPO_ROOT" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)" || return 1
+    main="$(dirname "$common")"
+    # In the main checkout itself the common dir is its own .git.
+    [ "$(cd "$main" 2>/dev/null && pwd -P)" != "$(cd "$REPO_ROOT" && pwd -P)" ] || return 1
+    [ -x "$main/.venv/bin/python3" ] || return 1
+    "$main/.venv/bin/python3" "${REPO_ROOT}/scripts/dev_environment.py" --require-stamp >/dev/null 2>&1 || return 1
+    printf '%s\n' "$main/.venv"
+}
+
+# A worktree without a .venv of its own shares the main checkout's when it
+# matches (INKYPI_OWN_VENV=1 builds one anyway). It is only ever read from
+# here: once this worktree's lock differs, the worktree gets its own .venv.
+INKYPI_SHARED_VENV=""
+if [ ! -d "$VENV_DIR" ] && [ "${INKYPI_OWN_VENV:-}" != "1" ] \
+    && INKYPI_SHARED_VENV="$(inkypi_shared_venv)"; then
+    echo "Using the main checkout's virtual environment ($INKYPI_SHARED_VENV): it matches this worktree's lock."
+    VENV_DIR="$INKYPI_SHARED_VENV"
+fi
+
 if [ ! -d "$VENV_DIR" ]; then
     if ! INKYPI_PYTHON="$(inkypi_find_python)"; then
         echo "InkyPi needs Python ${INKYPI_PYTHON_VERSION}, and neither python${INKYPI_PYTHON_VERSION} nor python3 on PATH is that version." >&2
@@ -105,6 +129,12 @@ else
 fi
 
 if ! "$PY_BIN" "${REPO_ROOT}/scripts/dev_environment.py"; then
+    if [ -n "$INKYPI_SHARED_VENV" ]; then
+        # Never sync another checkout's venv to this worktree's lock.
+        echo "The main checkout's venv ($VENV_DIR) no longer matches this worktree's lock; it was left alone." >&2
+        echo "Run again with INKYPI_OWN_VENV=1 to build this worktree its own .venv." >&2
+        if (return 0 2>/dev/null); then return 1; else exit 1; fi
+    fi
     "$PY_BIN" "${REPO_ROOT}/scripts/dev_environment.py" --sync || return 1 2>/dev/null || exit 1
 fi
 

@@ -217,6 +217,8 @@ coverage.xml
 /src/static/scripts/calendar.min.js
 /src/static/scripts/jquery.min.js
 /src/static/scripts/select2.min.js
+/src/static/vendor/swagger-ui/swagger-ui.css
+/src/static/vendor/swagger-ui/swagger-ui-bundle.js
 # Snapshot failure artifacts (actual PNGs saved on mismatch)
 tests/snapshots/actual/
 tests/snapshots/layout/actual/

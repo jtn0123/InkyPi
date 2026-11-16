@@ -33,6 +33,16 @@ packages have drifted, and sets `PYTHONPATH`. An unchanged environment takes a
 check-only fast path. To inspect the environment without installing anything,
 run `python scripts/dev_environment.py`.
 
+A new environment gets uv first (pip installs it from
+`install/uv-requirements.txt`, hash-checked), and uv then installs the dev
+requirements, which takes seconds rather than pip's minutes. In a git worktree
+that has no `.venv`, `scripts/venv.sh` uses the main checkout's `.venv`
+instead, when that venv was synced from exactly the worktree's
+`install/requirements-dev.txt` on Python 3.13 (`dev_environment.py
+--require-stamp`). It never syncs that venv from the worktree: once the
+worktree's lock differs, the worktree builds its own `.venv`.
+`INKYPI_OWN_VENV=1` always builds one.
+
 The compiled stylesheet (`src/static/styles/main.css`) and the vendored
 htmx/Leaflet files are committed, so nothing else needs building. After editing
 CSS, run `python scripts/build_css.py` (or `./scripts/dev_watch.sh`, below) and

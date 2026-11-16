@@ -8,8 +8,8 @@ Covers:
 - DisplayManager display() raises mid-refresh: next tick recovers gracefully.
 - Config reload mid-refresh: no crash, new config applied on next tick.
 
-Note: pytest-timeout is NOT installed in this environment; tests use
-``signal``/threading timeouts internally to cap wall-clock time.
+pytest-timeout (``timeout`` in pytest.ini) fails a test that hangs; these
+tests also cap their own waits with ``signal``/threading timeouts.
 All ``time.sleep`` paths in production code are mocked.
 """
 

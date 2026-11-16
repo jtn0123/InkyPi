@@ -27,7 +27,7 @@ Notes:
 - It runs a single explicit test file serially, and hands any other targets to `scripts/test-fast.sh`.
 - Browser suites are skipped (`SKIP_BROWSER=1`) unless you target a single browser test file; they run in CI's `browser-smoke` and `browser-full` jobs.
 - Use `PYTHONPATH=$(pwd)/src pytest -q` for serial debugging or when investigating xdist-only issues.
-- Coverage runs remain serial for now while the parallel local path soaks.
+- `INKYPI_TEST_COVERAGE=1 scripts/test-fast.sh` also measures coverage across both passes and writes `coverage.xml`, which is how CI's `tests` job runs.
 - `scripts/test_profile.sh` profiles the slowest tests with `--durations=25` and defaults to `tests/plugins`.
 - Tests auto-mock Chromium image capture with a fixture; no browser required.
 - Managed API-key env vars are cleared per test and the temp test `PROJECT_DIR` gets an empty `.env`, which keeps missing-key flows local and deterministic.
@@ -163,7 +163,7 @@ The gate runs automatically in CI via the `install-crash-loop-gate` job (see `.g
 
 ### CI
 
-GitHub Actions runs the pytest matrix, pre-flash validation matrix, coverage gate, security/SBOM checks, flake detection, and the browser-smoke job. Nightly scheduled jobs run the soak and mutation lanes on Linux. The main pytest job remains serial for now while the local xdist path soaks. Workflow file: `.github/workflows/ci.yml`.
+GitHub Actions runs the pytest matrix, pre-flash validation matrix, coverage gate, security/SBOM checks, flake detection, and the browser-smoke job. Nightly scheduled jobs run the soak and mutation lanes on Linux. The main pytest job runs `scripts/test-fast.sh`, the same two passes as a local `scripts/test.sh` (4 xdist workers, then the `memory` tests serially), with coverage combined across both. Workflow file: `.github/workflows/ci.yml`.
 
 ---
 

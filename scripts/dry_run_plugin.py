@@ -78,8 +78,9 @@ def _missing_vendor_files() -> list[str]:
     """Vendored scripts listed in install/update_vendors.sh that are absent.
 
     They are gitignored (a fresh clone or worktree has none). Plugin
-    templates load them, so without them a chart or calendar renders blank
-    instead of failing.
+    templates load the ones under src/static/scripts/, so without them a chart
+    or calendar renders blank instead of failing. The script's other files
+    (Swagger UI, for the API docs page) don't affect a plugin render.
     """
     try:
         text = (Path(REPO_ROOT) / "install" / "update_vendors.sh").read_text(
@@ -87,7 +88,9 @@ def _missing_vendor_files() -> list[str]:
         )
     except OSError:
         return []
-    paths = re.findall(r'^\s*"[^|"]+\|[^|"]+\|([^|"]+)\|', text, flags=re.M)
+    paths = re.findall(
+        r'^\s*"[^|"]+\|[^|"]+\|(src/static/scripts/[^|"]+)\|', text, flags=re.M
+    )
     return [path for path in paths if not (Path(REPO_ROOT) / path).is_file()]
 
 

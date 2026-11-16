@@ -1,0 +1,99 @@
+name: Dependabot lock exports
+
+# Dependabot's uv updates change pyproject.toml and uv.lock, but not the two
+# files exported from the lock (install/requirements.txt and
+# install/requirements-dev.txt), so every bump failed CI's lockfile drift
+# check until someone exported them by hand. This regenerates them with
+# scripts/export_requirements.sh and pushes them to the bump's branch.
+#
+# Owner step on each bump PR: GitHub doesn't start workflows for a push made
+# with GITHUB_TOKEN on its own. The pushed commit's runs (CI and its required
+# "CI gate (all checks pass)" among them) wait for approval instead: click
+# "Approve workflows to run" on the PR. Nothing here needs a secret, a token
+# or a repository setting.
+#
+# The job that runs uv can only read the repository; the job that can push
+# runs nothing from the branch: it copies the two exported files in, commits
+# them and pushes.
+
+on:
+  pull_request:
+    paths:
+      - uv.lock
+
+permissions: {}
+
+# A newer Dependabot push supersedes an export still running. The actor is in
+# the key so the run for this workflow's own push (whose jobs are skipped)
+# can never cancel the run that pushed.
+concurrency:
+  group: dependabot-exports-${{ github.event.pull_request.number }}-${{ github.actor }}
+  cancel-in-progress: true
+
+jobs:
+  export:
+    name: Export uv.lock
+    # Only Dependabot's own PRs, from branches in this repository.
+    if: >-
+      github.actor == 'dependabot[bot]' &&
+      github.event.pull_request.user.login == 'dependabot[bot]' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.13'
+      - name: Install uv
+        run: python -m pip install --require-hashes -r install/uv-requirements.txt
+      - name: Export the lockfile
+        run: bash scripts/export_requirements.sh
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: lock-exports
+          path: |
+            install/requirements.txt
+            install/requirements-dev.txt
+          if-no-files-found: error
+          retention-days: 1
+
+  push:
+    name: Push the exports
+    needs: export
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: lock-exports
+          path: ${{ runner.temp }}/lock-exports
+      - name: Commit and push
+        env:
+          EXPORTS: ${{ runner.temp }}/lock-exports
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        run: |
+          cp "$EXPORTS/requirements.txt" "$EXPORTS/requirements-dev.txt" install/
+          if git diff --quiet -- install/requirements.txt install/requirements-dev.txt; then
+            echo "The exports already match uv.lock."
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          # "[dependabot skip]" lets Dependabot keep rebasing the PR over this
+          # commit; it re-exports after each rebase.
+          git commit -m "build(deps): export uv.lock to the install requirements [dependabot skip]" \
+            -- install/requirements.txt install/requirements-dev.txt
+          # Not forced: if Dependabot pushed again meanwhile, this is rejected
+          # and the run for that push exports instead.
+          git push origin "HEAD:refs/heads/$HEAD_REF"

@@ -1,14 +1,19 @@
-# Checked-in mypy scripts/ advisory baseline for scripts/lint.sh.
+# Checked-in mypy scripts/ baseline for scripts/lint.sh, which compares it with
+# a strict mypy run through scripts/mypy_ratchet.py.
 #
-# The file holds exactly one value: the number on the last line. Everything
-# else is a comment. scripts/lint.sh fails if it finds more than one value, so
-# lowering the baseline means editing that last line, not adding another.
+# Below these comments is one line per `path:error-code` fingerprint, with the
+# number of errors mypy reports for it. lint.sh fails when a fingerprint is
+# new, has more or fewer errors than listed, or has gone, and prints only
+# those differences. After fixing errors, rewrite the list (this header is
+# kept; --update replaces everything below it):
 #
-# Take the number from a CI lint job ("Found N errors in" under "ratchet —
-# scripts/ only"), never from a macOS run. CI runs on Linux, which installs the
-# `sys_platform == "linux"` dependencies (memray among them) that a macOS
-# checkout skips, so the two counts can differ. A lower local count passes as
-# "ratchet improved".
+#   python scripts/mypy_ratchet.py scripts scripts/mypy_scripts_baseline.txt --update
+#
+# The list is empty: scripts/ is clean, and any error fails lint.
+#
+# CI runs on Linux, which installs the `sys_platform == "linux"` dependencies
+# (memray among them) that a macOS checkout skips, so the two runs can differ.
+# When they disagree, the CI lint job is the one to satisfy.
 #
 # History
 #
@@ -21,4 +26,3 @@
 # 2 -> 0 (2026-11-15): the last two were defusedxml imports in coverage_gate.py.
 # types-defusedxml is now in the dev group; with real types, mypy also caught
 # that getroot() can return None, which coverage_gate.py now checks.
-0

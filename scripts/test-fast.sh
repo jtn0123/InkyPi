@@ -14,14 +14,16 @@
 # worker per core, and that, or several suites at once, ran a Mac out
 # of memory.
 #
-# CI stays serial on purpose (see .github/workflows/ci.yml — "Keep CI serial
-# while the local pytest-xdist path soaks"), which is why this lives in a
-# script rather than in pytest.ini addopts, where it would leak into CI.
+# CI's tests job runs this script too, with INKYPI_TEST_COVERAGE=1, so a local
+# whole-suite run and CI select and schedule the tests the same way. Other
+# pytest runs (a single file, preflash_validate.sh's suites) stay serial,
+# which is why the worker flags live here and not in pytest.ini's addopts.
 #
 # Usage:
 #   scripts/test-fast.sh                 # whole suite, parallel
 #   scripts/test-fast.sh tests/unit      # just one directory
 #   scripts/test-fast.sh -k weather      # pass any pytest args through
+#   INKYPI_TEST_COVERAGE=1 scripts/test-fast.sh   # also write coverage.xml
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -50,9 +52,25 @@ run_pass() {
     return $rc
 }
 
+# Coverage across both passes: the parallel pass measures into .coverage
+# (pytest-cov combines its workers) and skips the fail_under check, since it
+# is only part of the run. The serial pass appends to that data, writes
+# coverage.xml, and checks the combined total against .coveragerc's
+# fail_under.
+PARALLEL_COV=()
+SERIAL_COV=()
+if [[ "${INKYPI_TEST_COVERAGE:-0}" == "1" ]]; then
+    PARALLEL_COV=(--cov --cov-report= --cov-fail-under=0)
+    SERIAL_COV=(--cov --cov-append --cov-report=xml)
+fi
+
+# ${X[@]+"${X[@]}"} expands an empty array without tripping `set -u` on
+# macOS's bash 3.2.
 echo "==> parallel pass (excluding memory-sensitive tests)"
 run_pass "${TARGET[@]}" -q -m "not container and not memory" \
-    -n "${INKYPI_TEST_WORKERS:-4}" --dist=loadfile
+    -n "${INKYPI_TEST_WORKERS:-4}" --dist=loadfile \
+    ${PARALLEL_COV[@]+"${PARALLEL_COV[@]}"}
 
 echo "==> serial pass (memory-sensitive tests)"
-run_pass "${TARGET[@]}" -q -m "not container and memory"
+run_pass "${TARGET[@]}" -q -m "not container and memory" \
+    ${SERIAL_COV[@]+"${SERIAL_COV[@]}"}

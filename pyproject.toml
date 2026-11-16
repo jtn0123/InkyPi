@@ -32,9 +32,8 @@ dependencies = [
 [dependency-groups]
 # Dev, test and CI tools. They are locked in uv.lock with the runtime
 # dependencies, so Dependabot's uv updates cover them too, and
-# install/requirements-dev.txt is exported from the lock (runtime + dev):
-#   uv export --format requirements.txt --group dev --no-emit-project \
-#     --output-file install/requirements-dev.txt
+# install/requirements-dev.txt is exported from the lock (runtime + dev) by
+# scripts/export_requirements.sh, with install/requirements.txt.
 # scripts/check_requirements_drift.sh fails CI when the export is stale.
 dev = [
   "uv==0.13.4",

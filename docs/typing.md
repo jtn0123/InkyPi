@@ -7,9 +7,9 @@ module**: `strict = True` sits once in the `[mypy]` section of `mypy.ini`, plus
 When one fires on a guard, first ask whether the annotation is honest: a value
 read from JSON or the network should be typed `object` and keep its
 `isinstance` check, not be `cast` to the shape it is hoped to have and then
-re-checked. `src/` must stay at zero errors;
-`tests/` is ratcheted against a checked-in baseline so new test typing debt
-cannot slip in while the backlog is paid down.
+re-checked. `src/` and `scripts/` must stay at zero errors; `tests/` is
+ratcheted against a checked-in list of error fingerprints so new test typing
+debt cannot slip in while the backlog is paid down.
 
 ## Why there is no per-module strict list
 
@@ -61,19 +61,25 @@ never raised. When a package gets to zero, add it to that section;
 
 ## Current CI behavior: clean `src/` and `scripts/`, ratcheted `tests/`
 
-`scripts/lint.sh` runs mypy as **three separate invocations**:
+`scripts/lint.sh` runs mypy as **three separate invocations**, `src/`,
+`tests/` and `scripts/`, each through `scripts/mypy_ratchet.py`, which
+compares the run with a checked-in baseline:
 
-1. `mypy src/` — production code, compared against the checked-in baseline in
-   `scripts/mypy_src_baseline.txt`; this baseline should remain `0`
-2. `mypy tests/` — test suite, compared against the checked-in baseline in
-   `scripts/mypy_tests_baseline.txt`
-3. `mypy scripts/` — the developer, CI and device tools, compared against the
-   checked-in baseline in `scripts/mypy_scripts_baseline.txt`; this baseline
-   is `0` too
+- `scripts/mypy_src_baseline.txt` — empty: `src/` must stay clean
+- `scripts/mypy_tests_baseline.txt` — the test suite's known errors
+- `scripts/mypy_scripts_baseline.txt` — empty: the developer, CI and device
+  tools must stay clean too
 
-CI fails if `mypy src/` reports any issue or cannot produce a summary, and if
-the test or script error count rises above its committed baseline or mypy
-cannot produce a summary to compare against.
+A baseline lists **fingerprints**, `path:error-code`, each with the number of
+errors mypy reports for it, for example `tests/unit/test_x.py:arg-type 2`. The
+check fails when a fingerprint is new, has more or fewer errors than listed,
+or has gone, and prints only those differences (with the errors behind a new
+or grown one). A crashed or misconfigured mypy run fails too, since it has
+nothing to compare.
+
+The baselines used to hold one total each. That let a fixed error in one test
+file pay for a new error in another, so new debt could arrive unseen; per-file,
+per-code counts close that gap.
 
 `scripts/` is checked with the same strict settings as `src/` and `tests/`.
 Its modules are not a package, so `mypy.ini` puts `scripts/` on `mypy_path`:
@@ -85,51 +91,41 @@ imports are unchanged; the scripts still add their own directory to `sys.path`.
 The test suite carries far more typing noise than `src/` (fixtures,
 monkeypatching, duck-typed stubs). When both were combined into a single
 `mypy src tests` run, a small regression in production code was invisible,
-drowned out by thousands of test-only errors. Splitting the counts keeps
+drowned out by thousands of test-only errors. Splitting the runs keeps
 **`src/` clean and makes `tests/` type drift legible** so we can ratchet it
 down over time.
 
-### What to do if the `src/` count changes
+### When `src/` or `scripts/` fails
 
-If `src/` goes above zero:
+The baseline is empty, so every error printed is new:
 
-1. Run `mypy src/` locally and look at the diff in errors vs `main`.
-2. If your PR introduced the new errors, fix them before merging.
-3. If the increase is unrelated to your change, call it out in the PR and fix
-   the underlying dependency/config issue rather than raising the baseline.
+1. Fix errors your change introduced before merging.
+2. If one is unrelated to your change, call it out in the PR and fix the
+   underlying dependency or config issue rather than adding it to the
+   baseline.
+3. For an untyped library, add a stub package to the dev group.
 
-If `src/` stays at zero:
+### When `tests/` fails
 
-1. Leave `scripts/mypy_src_baseline.txt` at `0`.
+If it prints **errors beyond the baseline**, fix them: they are new in that
+file. Adding a fingerprint to the baseline is exceptional and coordinated,
+not routine.
 
-If `mypy src/` exits without a `Found N errors` or `Success:` summary, treat it
-as a broken type-check invocation. The ratchet will fail until the underlying
-config/import problem is fixed.
+If it prints **fixed errors still listed**, you removed some: lock in the
+improvement by rewriting the list, and commit it with your change:
 
-### What to do if the `tests/` count changes
+```bash
+python scripts/mypy_ratchet.py tests scripts/mypy_tests_baseline.txt --update
+```
 
-If `tests/` goes up:
+`--update` keeps the comment header and rewrites the fingerprints under it;
+add a line to the header's history when the drop is worth recording. CI runs
+on Linux, which installs a few Linux-only dependencies a macOS checkout
+skips, so the two runs could disagree (they have matched so far). When they
+do, commit the list the CI lint job wants.
 
-1. Run `mypy tests/` locally and inspect the new errors.
-2. Fix errors introduced by the PR before merging.
-3. Treat baseline increases as exceptional and coordinated, not as routine.
-
-If `tests/` goes down:
-
-1. Confirm the lower count is real by rerunning `mypy tests/` or
-   `bash scripts/lint.sh`.
-2. Update `scripts/mypy_tests_baseline.txt` to the new lower integer, taken
-   from a CI lint job rather than a macOS run (the file's header explains
-   why). Edit the single value on its last line and add a history comment
-   above it; `scripts/lint.sh` rejects a file with more than one value.
-3. Prefer paying down errors in clusters: shared fixtures, contract/security
-   tests, then browser/integration tests.
-
-### What to do if the `scripts/` count changes
-
-The same rules as `src/` apply: the baseline is `0`, so a new or changed
-script must pass `mypy scripts/` cleanly. Add a stub package to the dev group
-for an untyped library rather than raising the baseline.
+Prefer paying down errors in clusters: shared fixtures, contract and security
+tests, then browser and integration tests.
 
 ## Coding guidelines for typed modules
 

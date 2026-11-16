@@ -13,12 +13,13 @@ package within its range:
 
 ```bash
 uv lock --upgrade-package openai
-uv export --format requirements.txt --no-dev --no-emit-project \
-    --output-file install/requirements.txt
-uv export --format requirements.txt --group dev --no-emit-project \
-    --output-file install/requirements-dev.txt
+bash scripts/export_requirements.sh
 bash scripts/check_requirements_drift.sh
 ```
+
+`scripts/export_requirements.sh` writes both exports from `uv.lock` as it
+stands (`uv export --frozen`): `install/requirements.txt` without the dev
+group and `install/requirements-dev.txt` with it.
 
 Use `uv lock --upgrade` for a full refresh. Commit the source changes, lock,
 and export together. The universal lock covers Linux and macOS, including Pi
@@ -32,8 +33,7 @@ and export:
 
 ```bash
 uv lock --upgrade-package ruff
-uv export --format requirements.txt --group dev --no-emit-project \
-    --output-file install/requirements-dev.txt
+bash scripts/export_requirements.sh
 ```
 
 The release tools (Python Semantic Release, GitPython's patched floor and
@@ -52,6 +52,21 @@ the dev group and the CI/release steps for consistent resolution.
 `scripts/check_requirements_drift.sh` fails when either export no longer
 matches `uv.lock`. Commit `pyproject.toml`, `uv.lock` and both exports together,
 then run `pip check` and the test and strict mypy gates.
+
+## Dependabot updates
+
+Dependabot's `uv` updates change `pyproject.toml` and `uv.lock` only. The
+`Dependabot lock exports` workflow (`.github/workflows/dependabot-exports.yml`)
+runs `scripts/export_requirements.sh` on each such PR and pushes the two
+exports to its branch. The commit message carries `[dependabot skip]`, so
+Dependabot still rebases the PR, and the workflow exports again after each
+rebase.
+
+GitHub doesn't start workflows for a push made with the workflow's own token
+on its own: the pushed commit's runs wait for approval. Open the PR and click
+**Approve workflows to run** so CI, and its required `CI gate (all checks
+pass)`, runs on the regenerated files. That click is the only manual step; the
+workflow needs no secrets or extra repository settings.
 
 ## Installer requirement files
 

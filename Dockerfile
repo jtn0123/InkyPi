@@ -15,10 +15,21 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-ins
 
 WORKDIR /app
 
-# Copy and install Python dependencies first (layer caching)
-COPY install/requirements.txt install/requirements.txt
-RUN pip install --no-cache-dir --upgrade pip wheel \
- && pip install --no-cache-dir -r install/requirements.txt
+# Copy and install Python dependencies first (layer caching). Both files pin
+# every package by hash, as the Pi installer does: the installer tools first
+# (pip, setuptools, wheel), then the runtime lockfile. Some Pi-only packages
+# (spidev, cysystemd) ship only as source, so a compiler and the systemd
+# headers are installed for this step and removed after it.
+COPY install/bootstrap-requirements.txt install/requirements.txt install/
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+    gcc \
+    libc6-dev \
+    libsystemd-dev \
+    pkg-config \
+ && pip install --no-cache-dir --require-hashes -r install/bootstrap-requirements.txt \
+ && pip install --no-cache-dir --require-hashes -r install/requirements.txt \
+ && apt-get purge -y --auto-remove gcc libc6-dev libsystemd-dev pkg-config \
+ && rm -rf /var/lib/apt/lists/*
 
 # Copy source code
 COPY src/ src/
@@ -37,7 +48,9 @@ RUN useradd -m -u 1000 appuser \
 
 USER appuser
 
+# The slim image has no wget or curl, so probe /healthz (the always-OK
+# liveness route) with the image's own Python. Dev mode serves on 8080.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
-    CMD wget -qO- http://localhost:8080/ || exit 1
+    CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/healthz', timeout=4)"]
 
 CMD ["python", "src/inkypi.py", "--dev", "--web-only"]

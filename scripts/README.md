@@ -8,8 +8,8 @@ Developer, CI and device tools. Run them from the repo root. Python scripts add
 | Script | What it does |
 |---|---|
 | `dev.sh` | Creates the venv if needed and installs dev dependencies. |
-| `venv.sh` | Sourced by the other scripts to activate the venv (adds a `python` shim when only `python3` exists). |
-| `dev_environment.py` | Checks the active environment, or hash-verifies and syncs it (`--sync`). |
+| `venv.sh` | Sourced by the other scripts to activate the venv (adds a `python` shim when only `python3` exists). In a worktree without a `.venv`, it uses the main checkout's when that matches the worktree's lock. |
+| `dev_environment.py` | Checks the active environment, or hash-verifies and syncs it (`--sync`, which installs the pinned uv first). `--require-stamp` also requires a verified sync of this exact lock. |
 | `web_only.sh` | Starts the web UI without the refresh loop, using an ignored local device config. |
 | `dev_watch.sh` | Watches `src/static/` and `src/templates/` and rebuilds assets on change (dispatches through `_dev_watch_dispatch.py`). |
 | `seed_test_data.py` | Fills a dev install with sample plugin instances, playlists and history images. |
@@ -58,10 +58,12 @@ Developer, CI and device tools. Run them from the repo root. Python scripts add
 | `audit_dependencies.sh` | Checks every locked requirement file for known vulnerabilities with pip-audit. `--strict` fails on a finding; CI uses it only when a pull request changes a dependency file, and on the nightly run. |
 | `check_licenses.sh` | Checks dependency licences with the `pip-licenses` pinned in `install/requirements-dev.txt` (installs nothing; run it from the dev venv). |
 | `check_links.py` | Re-checks links that the Lychee link checker reported as throttled. |
+| `export_requirements.sh` | Writes `install/requirements.txt` and `install/requirements-dev.txt` from `uv.lock` (`uv export --frozen`). The drift check and the Dependabot exports workflow both run it. |
 | `check_requirements_drift.sh` | Checks that the exported lockfiles match `uv.lock`, and the installer requirement files match their `.in` files and the lock. |
 | `check_install_pins.py` | Run by the drift check: installer requirement files must agree with `uv.lock` and with each other. |
 | `check_vendor_versions.py` | Weekly check that the vendored front-end libraries (downloaded, CDN-loaded, and committed under `src/static/vendor/`) are current within their major (`vendor-versions.yml`). |
-| `mypy_src_baseline.txt`, `mypy_tests_baseline.txt`, `mypy_scripts_baseline.txt` | The mypy error ratchets used by `lint.sh`: `src/` and `scripts/` must stay clean, and `tests/` may not exceed its count. |
+| `mypy_ratchet.py` | Runs mypy on one directory and compares its `path:error-code` fingerprints with a baseline; `--update` rewrites the baseline. `lint.sh` runs it for `src/`, `tests/` and `scripts/`. |
+| `mypy_src_baseline.txt`, `mypy_tests_baseline.txt`, `mypy_scripts_baseline.txt` | The baselines it compares with: `src/` and `scripts/` are empty (must stay clean), and `tests/` lists its known errors by fingerprint. |
 
 ## Install and Pi images
 

@@ -387,12 +387,14 @@ def test_missing_vendor_files_lists_only_absent_ones(
         "declare -a VENDORS=(\n"
         '  "Chart JS|https://cdn.example/chart.js|src/static/scripts/chart.js|abc"\n'
         '  "Cal JS|https://cdn.example/cal.js|src/static/scripts/calendar.min.js|def"\n'
+        '  "Docs JS|https://cdn.example/d.js|src/static/vendor/docs/d.js|123"\n'
         ")\n"
     )
     (tmp_path / "src" / "static" / "scripts").mkdir(parents=True)
     (tmp_path / "src" / "static" / "scripts" / "chart.js").write_text("x")
     monkeypatch.setattr(dry_run_mod, "REPO_ROOT", str(tmp_path))
 
+    # Only plugin-loaded scripts count; the API docs' files don't.
     assert dry_run_mod._missing_vendor_files() == ["src/static/scripts/calendar.min.js"]
 
 

@@ -1,5 +1,17 @@
-# Checked-in mypy src/ advisory baseline for scripts/lint.sh.
-# Lower this number when src/ typing debt is intentionally reduced.
+# Checked-in mypy src/ baseline for scripts/lint.sh, which compares it with
+# a strict mypy run through scripts/mypy_ratchet.py.
+#
+# Below these comments is one line per `path:error-code` fingerprint, with the
+# number of errors mypy reports for it. lint.sh fails when a fingerprint is
+# new, has more or fewer errors than listed, or has gone, and prints only
+# those differences. After fixing errors, rewrite the list (this header is
+# kept; --update replaces everything below it):
+#
+#   python scripts/mypy_ratchet.py src scripts/mypy_src_baseline.txt --update
+#
+# The list is empty: src/ is clean, and any error fails lint.
+#
+# History
 #
 # 0 -> 90 (2026-08-21). This is NOT a regression, and no new error was
 # introduced. The previous zero was an artefact of `follow_imports = skip` in
@@ -23,7 +35,6 @@
 # return-value, arg-type and attr-defined are the ones most likely to be real
 # defects rather than annotation noise; they are the intended next piece of
 # work (item I2 in .claude/grade-report.md). This number must only go down.
-0
 
 # 90 -> 50 (2026-08-21). Worked the highest-signal rules. Three were real:
 #   * calendar.get_contrast_color unpacked ImageColor.getrgb() into three

@@ -2,10 +2,11 @@
 
 ``scripts/test.sh`` hands whole-suite runs to ``scripts/test-fast.sh``, which
 runs everything except ``memory`` tests in parallel and then the ``memory``
-tests serially. Those two marker expressions must add up to CI's ``tests``
-job selection (``-m "not container"``), or a clean local run stops meaning
-CI will pass. Checked statically: collecting the suite three times would
-make this test slower than the bug it guards against.
+tests serially. CI's ``tests`` job runs the same script, and the two marker
+expressions must add up to ``-m "not container"`` (the ``container`` tests
+have their own job), or a clean run stops covering the suite. Checked
+statically: collecting the suite three times would make this test slower than
+the bug it guards against.
 """
 
 from __future__ import annotations
@@ -38,11 +39,35 @@ def test_fast_runner_passes_add_up_to_the_ci_selection() -> None:
         "not container and memory",
         "not container and not memory",
     ]
-    ci = CI_YML.read_text()
-    assert re.search(r'pytest --cov --cov-report=xml -q -m "not container"', ci), (
-        "CI's tests job selection changed; update scripts/test-fast.sh's two "
-        "passes to match it"
+
+
+def _ci_tests_job() -> str:
+    """The ``tests:`` job's block in ci.yml, up to the next top-level job."""
+    match = re.search(
+        r"^  tests:\n(.*?)(?=^  [\w-]+:\n)", CI_YML.read_text(), re.M | re.S
     )
+    assert match, "ci.yml has no `tests` job"
+    return match.group(1)
+
+
+def test_ci_tests_job_runs_the_fast_runner_with_coverage() -> None:
+    job = "\n".join(
+        line
+        for line in _ci_tests_job().splitlines()
+        if not line.lstrip().startswith("#")
+    )
+    assert "scripts/test-fast.sh" in job
+    assert "INKYPI_TEST_COVERAGE: '1'" in job
+    # A second pytest command in the job would run tests outside the two passes.
+    assert not re.search(r"(^|\s)(python -m )?pytest\s", job), job
+
+
+def test_fast_runner_coverage_spans_both_passes() -> None:
+    fast = _code(TEST_FAST_SH)
+    assert "PARALLEL_COV=(--cov --cov-report= --cov-fail-under=0)" in fast
+    # The serial pass appends to the parallel pass's data before reporting,
+    # so coverage.xml and the fail_under check see the whole run.
+    assert "SERIAL_COV=(--cov --cov-append --cov-report=xml)" in fast
 
 
 def test_fast_runner_defaults_to_the_whole_tests_tree() -> None:

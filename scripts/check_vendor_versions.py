@@ -2,8 +2,8 @@
 """Report vendored front-end libraries that have a newer npm release.
 
 Dependabot can't see these: they are downloaded by ``install/update_vendors.sh``
-(Chart.js, FullCalendar), loaded from a CDN listed in
-``src/static/cdn_manifest.json`` (Swagger UI), or committed under
+(Chart.js, FullCalendar, Swagger UI), loaded from a CDN listed in
+``src/static/cdn_manifest.json`` (none at present), or committed under
 ``src/static/vendor/`` (htmx, Leaflet). This reads the pinned versions from
 those places and asks the npm registry for each package's releases.
 
@@ -179,9 +179,9 @@ def main() -> int:
     if code == 1:
         print(
             "\nA newer release exists in the pinned major. Bump the version and sha256 in "
-            "install/update_vendors.sh, the URL and integrity in "
-            "src/static/cdn_manifest.json (and src/blueprints/api_docs.py), or replace "
-            "the file under src/static/vendor/ with the npm package's dist file.",
+            "install/update_vendors.sh (or the URL and integrity in "
+            "src/static/cdn_manifest.json), or replace the file under "
+            "src/static/vendor/ with the npm package's dist file.",
             file=sys.stderr,
         )
     return code

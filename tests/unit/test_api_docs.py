@@ -4,7 +4,10 @@
 from __future__ import annotations
 
 import json
+import os
+import re
 from html.parser import HTMLParser
+from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
 
@@ -12,35 +15,37 @@ import pytest
 from flask import Flask
 from flask.testing import FlaskClient
 
+import blueprints.api_docs as api_docs
+from utils.sri import compute_sri
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+
 # ---------------------------------------------------------------------------
 # GET /api/docs — Swagger UI HTML page
 # ---------------------------------------------------------------------------
 
 
-def test_api_docs_returns_200(client: FlaskClient) -> None:
-    """GET /api/docs should return 200 OK."""
-    resp = client.get("/api/docs")
-    assert resp.status_code == 200
+@pytest.fixture
+def static_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """Point the docs page at an empty static folder."""
+    monkeypatch.setattr(api_docs, "_STATIC_ROOT", tmp_path)
+    monkeypatch.delenv("INKYPI_CSP", raising=False)
+    return tmp_path
 
 
-def test_api_docs_content_type_is_html(client: FlaskClient) -> None:
-    """GET /api/docs should serve an HTML response."""
-    resp = client.get("/api/docs")
-    assert "text/html" in resp.content_type
-
-
-def test_api_docs_contains_swagger_ui(client: FlaskClient) -> None:
-    """GET /api/docs HTML must reference swagger-ui so the browser loads the explorer."""
-    resp = client.get("/api/docs")
-    body = resp.data.decode("utf-8")
-    assert "swagger-ui" in body.lower()
-
-
-def test_api_docs_points_to_openapi_spec(client: FlaskClient) -> None:
-    """Swagger UI page must reference /api/openapi.json as its spec URL."""
-    resp = client.get("/api/docs")
-    body = resp.data.decode("utf-8")
-    assert "/api/openapi.json" in body
+@pytest.fixture
+def swagger_files(static_root: Path) -> dict[str, Path]:
+    """Install stand-in Swagger UI files, as update_vendors.sh would."""
+    files: dict[str, Path] = {}
+    for name, body in (
+        (api_docs.SWAGGER_CSS, "#swagger-ui { margin: 0; }\n"),
+        (api_docs.SWAGGER_JS, "window.SwaggerUIBundle = function () {};\n"),
+    ):
+        path = static_root / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(body, encoding="utf-8")
+        files[name] = path
+    return files
 
 
 def _csp(resp: Any) -> dict[str, list[str]]:
@@ -55,56 +60,121 @@ def _csp(resp: Any) -> dict[str, list[str]]:
 
 
 class _Tags(HTMLParser):
-    """Collect <script> attributes and stylesheet links from a page."""
+    """Collect <script>, stylesheet <link> and <a> attributes from a page."""
 
     def __init__(self) -> None:
         super().__init__()
         self.scripts: list[dict[str, str]] = []
-        self.stylesheets: list[str] = []
+        self.stylesheets: list[dict[str, str]] = []
+        self.links: list[str] = []
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         values = {name: value or "" for name, value in attrs}
         if tag == "script":
             self.scripts.append(values)
         elif tag == "link" and values.get("rel") == "stylesheet":
-            self.stylesheets.append(values["href"])
+            self.stylesheets.append(values)
+        elif tag == "a":
+            self.links.append(values.get("href", ""))
 
 
-def test_api_docs_page_is_allowed_by_its_own_csp(
-    client: FlaskClient, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    # The default CSP blocked Swagger UI from unpkg and the inline start-up
-    # script, so the page was blank on the Pi (dev mode only reports).
-    monkeypatch.delenv("INKYPI_CSP", raising=False)
-    resp = client.get("/api/docs")
-    body = resp.data.decode("utf-8")
-    csp = _csp(resp)
-
-    def origin(url: str) -> str:
-        parts = urlsplit(url)
-        return f"{parts.scheme}://{parts.netloc}"
-
+def _page(resp: Any) -> _Tags:
     page = _Tags()
-    page.feed(body)
-    scripts = [a["src"] for a in page.scripts if a.get("src")]
-    inline = [a for a in page.scripts if not a.get("src")]
-    assert scripts and inline and page.stylesheets
-    for url in scripts:
-        assert origin(url) in csp["script-src"]
-    for url in page.stylesheets:
-        assert origin(url) in csp["style-src"]
-    for attrs in inline:
-        assert attrs.get("nonce") and f"'nonce-{attrs['nonce']}'" in csp["script-src"]
+    page.feed(resp.data.decode("utf-8"))
+    return page
 
 
-def test_api_docs_sources_do_not_leak_to_other_pages(
-    client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+def test_api_docs_serves_swagger_ui_from_this_device(
+    client: FlaskClient, swagger_files: dict[str, Path]
 ) -> None:
-    monkeypatch.delenv("INKYPI_CSP", raising=False)
-    client.get("/api/docs")
+    resp = client.get("/api/docs")
+    assert resp.status_code == 200
+    assert "text/html" in resp.content_type
+    body = resp.data.decode("utf-8")
+    assert 'id="swagger-ui"' in body
+    assert "/api/openapi.json" in body
+
+    page = _page(resp)
+    loaded = [a for a in page.scripts if a.get("src")] + page.stylesheets
+    assert len(loaded) == 2
+    for attrs, name in zip(
+        loaded, (api_docs.SWAGGER_JS, api_docs.SWAGGER_CSS), strict=True
+    ):
+        url = urlsplit(attrs.get("src") or attrs["href"])
+        # Same origin, from the vendored copy, pinned by its own hash.
+        assert not url.scheme and not url.netloc
+        assert url.path == f"/static/{name}"
+        assert attrs["integrity"] == compute_sri(swagger_files[name])
+
+
+def test_api_docs_fits_the_default_csp(
+    client: FlaskClient, swagger_files: dict[str, Path]
+) -> None:
+    # The page used to widen script-src and style-src to unpkg.com; now it
+    # gets exactly the policy every other page gets.
+    resp = client.get("/api/docs")
+    csp = _csp(resp)
     other = _csp(client.get("/api/openapi.json"))
-    assert other["script-src"][0] == "'self'"
-    assert not any("unpkg" in s for s in other["script-src"] + other["style-src"])
+
+    def without_nonce(directives: dict[str, list[str]]) -> dict[str, list[str]]:
+        return {
+            name: [s for s in sources if not s.startswith("'nonce-")]
+            for name, sources in directives.items()
+        }
+
+    assert without_nonce(csp) == without_nonce(other)
+    assert csp["script-src"][0] == "'self'"
+    assert not any(
+        re.match(r"https?:", s) for s in csp["script-src"] + csp["style-src"]
+    )
+    inline = [a for a in _page(resp).scripts if not a.get("src")]
+    assert len(inline) == 1
+    assert f"'nonce-{inline[0]['nonce']}'" in csp["script-src"]
+
+
+def test_api_docs_rehashes_an_updated_file(
+    client: FlaskClient, swagger_files: dict[str, Path]
+) -> None:
+    js = swagger_files[api_docs.SWAGGER_JS]
+    before = _page(client.get("/api/docs")).scripts[0]["integrity"]
+    mtime_ns = js.stat().st_mtime_ns
+    js.write_text("window.SwaggerUIBundle = function () { return 2; };\n")
+    os.utime(js, ns=(mtime_ns + 10**9, mtime_ns + 10**9))
+
+    after = _page(client.get("/api/docs")).scripts[0]["integrity"]
+    assert after == compute_sri(js)
+    assert after != before
+
+
+@pytest.mark.parametrize("missing", [None, api_docs.SWAGGER_CSS, api_docs.SWAGGER_JS])
+def test_api_docs_without_swagger_ui_says_how_to_install_it(
+    client: FlaskClient, static_root: Path, missing: str | None
+) -> None:
+    if missing is not None:
+        # One file present is still not enough to load the explorer.
+        present = (
+            api_docs.SWAGGER_JS
+            if missing == api_docs.SWAGGER_CSS
+            else api_docs.SWAGGER_CSS
+        )
+        (static_root / present).parent.mkdir(parents=True)
+        (static_root / present).write_text("x", encoding="utf-8")
+
+    resp = client.get("/api/docs")
+    assert resp.status_code == 200
+    body = resp.data.decode("utf-8")
+    assert "install/update_vendors.sh" in body
+    page = _page(resp)
+    assert page.scripts == [] and page.stylesheets == []
+    assert "/api/openapi.json" in page.links
+
+
+def test_swagger_files_are_the_ones_update_vendors_installs() -> None:
+    vendors = (REPO_ROOT / "install" / "update_vendors.sh").read_text()
+    ignored = (REPO_ROOT / ".gitignore").read_text().splitlines()
+    for name in (api_docs.SWAGGER_CSS, api_docs.SWAGGER_JS):
+        assert f"|src/static/{name}|" in vendors
+        assert f"/src/static/{name}" in ignored
 
 
 # ---------------------------------------------------------------------------

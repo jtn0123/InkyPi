@@ -5,7 +5,7 @@ Covers:
 - sri_for: Jinja-friendly, cached, handles missing files gracefully
 - cdn_sri: reads cdn_manifest.json, returns empty string for unknown keys
 - init_sri: registers helpers as Jinja globals
-- cdn_manifest.json: valid JSON with expected keys
+- cdn_manifest.json: valid JSON, and every entry used by a template
 - update_cdn_sri.py: computes correct hashes (uses responses/requests_mock)
 """
 
@@ -14,6 +14,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+import re
 import sys
 from collections.abc import Iterator
 from pathlib import Path
@@ -320,11 +321,19 @@ class TestCdnManifest:
         manifest = json.loads(CDN_MANIFEST_PATH.read_text(encoding="utf-8"))
         assert isinstance(manifest, dict)
 
-    def test_manifest_has_expected_keys(self) -> None:
+    def test_every_manifest_entry_is_used(self) -> None:
+        # Swagger UI's entries went when the API docs began serving it from
+        # the device; an entry no template asks for is a stale pin.
         manifest = json.loads(CDN_MANIFEST_PATH.read_text(encoding="utf-8"))
-        expected_keys = {"swagger-ui-css", "swagger-ui-bundle"}
-        for key in expected_keys:
-            assert key in manifest, f"cdn_manifest.json missing key: {key}"
+        sources = "\n".join(
+            path.read_text(encoding="utf-8")
+            for pattern in ("*.html", "*.py")
+            for path in SRC_ROOT.rglob(pattern)
+        )
+        for key in manifest:
+            assert re.search(
+                rf"cdn_sri\(\s*['\"]{re.escape(key)}['\"]", sources
+            ), f"cdn_manifest.json entry {key!r} is not used by any template"
 
     def test_manifest_entries_have_required_fields(self) -> None:
         manifest = json.loads(CDN_MANIFEST_PATH.read_text(encoding="utf-8"))

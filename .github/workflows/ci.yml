@@ -159,8 +159,18 @@ jobs:
           # Process-wide (not only while a test runs), so the SIGABRT below
           # dumps every thread even if the hang is at session teardown.
           PYTHONFAULTHANDLER: '1'
+          # scripts/test-fast.sh measures both of its passes and writes
+          # coverage.xml from the combined data.
+          INKYPI_TEST_COVERAGE: '1'
         run: |
-          # Keep CI serial while the local pytest-xdist path soaks.
+          # The same runner as a local `scripts/test.sh`: everything except
+          # the `memory` tests on 4 xdist workers, then the `memory` tests
+          # serially (they assert on this process's RSS, which is only
+          # meaningful without sibling workers). The two passes select
+          # `-m "not container"`; tests/unit/test_local_test_runner.py keeps
+          # it that way. Hosted runners have 4 CPUs, and a public repo's
+          # runner minutes are free, so the extra minutes the workers spend
+          # starting up cost nothing.
           # Note: tests/snapshots/ are collected here but skip automatically
           # because REQUIRE_BROWSER_SMOKE is not set (they need Playwright
           # Chromium which isn't installed in this job). The browser-smoke
@@ -172,14 +182,15 @@ jobs:
           #
           # Hang diagnostics: a hung run used to reach timeout-minutes, ignore
           # the cancel, get force-killed and lose its whole log (runs
-          # 43345263063 and 43668709714). Stop it ourselves first: SIGABRT
-          # makes faulthandler print every thread's stack and the step fails
-          # normally, so the log survives. A normal run takes 7-10 minutes.
-          # faulthandler_timeout also dumps stacks for a single test stuck
-          # where pytest-timeout's signal can't reach it (blocked in C code).
+          # 43345263063 and 43668709714). Stop it ourselves first: timeout
+          # signals its whole process group, xdist workers included, and
+          # SIGABRT makes faulthandler print every thread's stack in each, so
+          # the step fails normally and the log survives. A serial run took
+          # 7-10 minutes. faulthandler_timeout also dumps stacks for a single
+          # test stuck where pytest-timeout's signal can't reach it (blocked
+          # in C code).
           timeout --signal=ABRT --kill-after=30s 16m \
-            pytest --cov --cov-report=xml -q -m "not container" \
-              -o faulthandler_timeout=110
+            scripts/test-fast.sh -o faulthandler_timeout=110
       - name: Upload coverage
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -663,33 +674,7 @@ jobs:
       - uses: ./.github/actions/setup-python-deps
         with:
           os-packages: 'true'
-      - name: Install Playwright Chromium
-        run: |
-          python -m playwright install --with-deps chromium
-      - name: Allow the test browser to create its sandbox namespaces
-        run: |
-          # Ubuntu restricts user namespaces for downloaded Chromium binaries.
-          # Permit only this exact test binary; keep Chromium sandboxing enabled.
-          if [[ -f /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]] &&
-             [[ "$(cat /proc/sys/kernel/apparmor_restrict_unprivileged_userns)" == "1" ]]; then
-            python - <<'PYPROFILE' > /tmp/inkypi-headless-shell.apparmor
-          from pathlib import Path
-          from playwright.sync_api import sync_playwright
-          with sync_playwright() as p:
-              executable = Path(p.chromium.executable_path)
-          cache = executable.parents[2]
-          revision = executable.parents[1].name.removeprefix("chromium-")
-          binaries = list(cache.glob(f"chromium_headless_shell-{revision}/**/headless_shell"))
-          binaries += list(cache.glob(f"chromium_headless_shell-{revision}/**/chrome-headless-shell"))
-          assert len(binaries) == 1, binaries
-          print('abi <abi/4.0>,')
-          print('include <tunables/global>')
-          print(f'profile inkypi-headless-shell "{binaries[0]}" flags=(unconfined) {{')
-          print('  userns,')
-          print('}')
-          PYPROFILE
-            sudo apparmor_parser -r /tmp/inkypi-headless-shell.apparmor
-          fi
+      - uses: ./.github/actions/setup-playwright
       - name: Run browser smoke suite
         env:
           BROWSER_SMOKE_ARTIFACT_DIR: runtime/mock_display_output/browser_smoke_failures
@@ -755,33 +740,7 @@ jobs:
       - uses: ./.github/actions/setup-python-deps
         with:
           os-packages: 'true'
-      - name: Install Playwright Chromium
-        run: |
-          python -m playwright install --with-deps chromium
-      - name: Allow the test browser to create its sandbox namespaces
-        run: |
-          # Same AppArmor allowance as browser-smoke: permit only this exact
-          # test binary to create user namespaces; Chromium sandbox stays on.
-          if [[ -f /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]] &&
-             [[ "$(cat /proc/sys/kernel/apparmor_restrict_unprivileged_userns)" == "1" ]]; then
-            python - <<'PYPROFILE' > /tmp/inkypi-headless-shell.apparmor
-          from pathlib import Path
-          from playwright.sync_api import sync_playwright
-          with sync_playwright() as p:
-              executable = Path(p.chromium.executable_path)
-          cache = executable.parents[2]
-          revision = executable.parents[1].name.removeprefix("chromium-")
-          binaries = list(cache.glob(f"chromium_headless_shell-{revision}/**/headless_shell"))
-          binaries += list(cache.glob(f"chromium_headless_shell-{revision}/**/chrome-headless-shell"))
-          assert len(binaries) == 1, binaries
-          print('abi <abi/4.0>,')
-          print('include <tunables/global>')
-          print(f'profile inkypi-headless-shell "{binaries[0]}" flags=(unconfined) {{')
-          print('  userns,')
-          print('}')
-          PYPROFILE
-            sudo apparmor_parser -r /tmp/inkypi-headless-shell.apparmor
-          fi
+      - uses: ./.github/actions/setup-playwright
       - name: Run browser suites (shard ${{ matrix.shard }}/2)
         env:
           INKYPI_ENV: dev

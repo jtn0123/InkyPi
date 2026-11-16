@@ -1,15 +1,18 @@
-# Checked-in mypy tests/ advisory baseline for scripts/lint.sh.
+# Checked-in mypy tests/ baseline for scripts/lint.sh, which compares it with
+# a strict mypy run through scripts/mypy_ratchet.py.
 #
-# The file holds exactly one value: the number on the last line. Everything
-# else is a comment. scripts/lint.sh fails if it finds more than one value, so
-# lowering the baseline means editing that last line, not adding another.
+# Below these comments is one line per `path:error-code` fingerprint, with the
+# number of errors mypy reports for it. lint.sh fails when a fingerprint is
+# new, has more or fewer errors than listed, or has gone, and prints only
+# those differences. After fixing errors, rewrite the list (this header is
+# kept; --update replaces everything below it):
 #
-# Take the number from a CI lint job ("Found N errors in" under "ratchet —
-# tests/ only"), never from a macOS run. CI runs on Linux, which installs the
-# `sys_platform == "linux"` dependencies (cysystemd, inky, gpiod, spidev) that
-# a macOS checkout skips. Those change what mypy can resolve through
-# follow_imports, so a macOS count runs a little lower and would fail the next
-# Linux CI run if committed. A lower local count passes as "ratchet improved".
+#   python scripts/mypy_ratchet.py tests scripts/mypy_tests_baseline.txt --update
+#
+# CI runs on Linux, which installs the `sys_platform == "linux"` dependencies
+# (cysystemd, inky, gpiod, spidev) that a macOS checkout skips. Those change
+# what mypy can resolve through follow_imports. When a macOS run and the CI
+# lint job disagree, commit the list the CI job wants.
 #
 # History
 #
@@ -61,4 +64,247 @@
 # 485 -> 450 (2026-11-15): Linux Python 3.13 CI run 43782522367, lint job
 # 133022706240 (#879, on main at 317f5fe7; local mypy also counts 450).
 # The regrade's fixes in #869-#878 typed more of the suite.
-450
+# 450 errors -> 238 fingerprints (2026-11-16): until now this file held one
+# total, so a fixed error anywhere in tests/ could pay for a new one anywhere
+# else. The 450 errors became a list of fingerprints. Linux CI (run
+# 43807486268, lint job 133101466386, main at 9c76ad4a) and a macOS run gave
+# the same list.
+
+tests/benchmarks/test_perf_baseline.py:attr-defined 1
+tests/benchmarks/test_plugin_render.py:type-arg 1
+tests/conftest.py:attr-defined 1
+tests/conftest.py:no-any-return 1
+tests/contracts/test_external_apis.py:no-any-return 1
+tests/contracts/test_external_apis.py:type-arg 4
+tests/contracts/test_frontend_api_contract_coverage.py:no-any-return 1
+tests/contracts/test_frontend_api_contract_coverage.py:operator 1
+tests/contracts/test_json_envelope.py:type-arg 2
+tests/helpers/config_runtime_helpers.py:type-arg 3
+tests/install/test_upgrade_chain.py:no-any-return 2
+tests/install/test_upgrade_chain.py:type-arg 2
+tests/integration/journeys/test_api_key_roundtrip.py:arg-type 1
+tests/integration/journeys/test_device_update_ops_journeys.py:attr-defined 1
+tests/integration/journeys/test_first_run_setup.py:no-any-return 1
+tests/integration/journeys/test_first_run_setup.py:type-arg 1
+tests/integration/journeys/test_plugin_preview_save_roundtrip.py:call-overload 1
+tests/integration/journeys/test_plugin_preview_save_roundtrip.py:no-any-return 1
+tests/integration/journeys/test_update_flow_happy_path.py:type-arg 2
+tests/integration/test_a11y_sweep.py:no-any-return 1
+tests/integration/test_api_json_errors.py:no-untyped-def 1
+tests/integration/test_browser_smoke.py:operator 1
+tests/integration/test_browser_smoke.py:type-arg 2
+tests/integration/test_browser_smoke.py:var-annotated 1
+tests/integration/test_click_sweep.py:assignment 1
+tests/integration/test_click_sweep.py:call-overload 1
+tests/integration/test_click_sweep.py:no-any-return 2
+tests/integration/test_click_sweep.py:type-arg 4
+tests/integration/test_dashboard_display_next_e2e.py:operator 2
+tests/integration/test_display_flows.py:union-attr 4
+tests/integration/test_error_injection.py:no-untyped-def 4
+tests/integration/test_form_roundtrip.py:no-any-return 1
+tests/integration/test_jtn_341_clock_preview.py:union-attr 1
+tests/integration/test_jtn_720_721_722_journeys.py:no-any-return 2
+tests/integration/test_jtn_720_721_722_journeys.py:type-arg 1
+tests/integration/test_layout_overlap.py:no-any-return 1
+tests/integration/test_layout_overlap.py:type-arg 6
+tests/integration/test_playlist_interactions.py:func-returns-value 3
+tests/integration/test_plugin_preview_smoke.py:call-overload 1
+tests/integration/test_plugin_preview_smoke.py:no-any-return 1
+tests/integration/test_privileged_flow_security.py:attr-defined 1
+tests/integration/test_privileged_flow_security.py:type-arg 1
+tests/integration/test_refresh_cycle.py:type-arg 1
+tests/integration/test_refresh_task.py:arg-type 8
+tests/integration/test_refresh_task.py:no-untyped-def 1
+tests/integration/test_refresh_task_interval.py:arg-type 2
+tests/integration/test_refresh_task_interval.py:no-untyped-def 1
+tests/integration/test_settings_more.py:attr-defined 1
+tests/integration/test_settings_more.py:union-attr 2
+tests/integration/test_settings_more.py:unreachable 1
+tests/integration/test_settings_updates_dom.py:type-arg 1
+tests/integration/test_sidebar_update_indicator.py:type-arg 3
+tests/integration/test_sustained_load.py:no-any-return 1
+tests/integration/test_sustained_load.py:type-arg 1
+tests/integration/test_toggle_reflection.py:no-any-return 2
+tests/integration/test_toggle_reflection.py:type-arg 4
+tests/integration/test_update_now_happy.py:attr-defined 1
+tests/integration/test_update_now_happy.py:no-untyped-def 1
+tests/integration/test_update_now_happy.py:union-attr 1
+tests/integration/test_update_now_screenshot_backend.py:unused-ignore 1
+tests/integration/test_update_now_timeout.py:unused-ignore 1
+tests/integration/test_update_now_url_validation.py:unused-ignore 1
+tests/integration/test_weather_image_render.py:arg-type 1
+tests/integration/test_weather_image_render.py:assignment 1
+tests/integration/test_weather_image_render.py:attr-defined 2
+tests/plugins/test_ai_image.py:attr-defined 4
+tests/plugins/test_ai_image.py:index 2
+tests/plugins/test_ai_image.py:operator 2
+tests/plugins/test_ai_image.py:return-value 1
+tests/plugins/test_ai_text.py:index 2
+tests/plugins/test_ai_text.py:operator 2
+tests/plugins/test_apod.py:index 3
+tests/plugins/test_calendar.py:arg-type 3
+tests/plugins/test_calendar.py:attr-defined 1
+tests/plugins/test_calendar.py:union-attr 1
+tests/plugins/test_calendar_errors.py:attr-defined 1
+tests/plugins/test_clock.py:attr-defined 1
+tests/plugins/test_comic.py:attr-defined 1
+tests/plugins/test_comic.py:call-overload 1
+tests/plugins/test_image_folder.py:arg-type 6
+tests/plugins/test_image_upload.py:misc 1
+tests/plugins/test_image_upload.py:no-untyped-def 1
+tests/plugins/test_image_url.py:arg-type 1
+tests/plugins/test_newspaper.py:type-arg 1
+tests/plugins/test_rss_item_images.py:attr-defined 1
+tests/plugins/test_rss_plugin.py:operator 6
+tests/plugins/test_unsplash.py:index 3
+tests/plugins/test_weather.py:type-arg 2
+tests/plugins/test_weather.py:var-annotated 1
+tests/plugins/test_weather_providers.py:type-arg 2
+tests/plugins/test_weather_redaction.py:type-arg 1
+tests/simulation/test_watchdog_under_systemd.py:assignment 1
+tests/test_asset_bundling.py:type-arg 2
+tests/test_auth.py:arg-type 1
+tests/test_client_error_forwarding.py:type-arg 1
+tests/test_http_metrics.py:no-any-return 2
+tests/test_i18n_scaffold.py:no-any-return 1
+tests/test_i18n_scaffold.py:unused-ignore 2
+tests/test_image_diff.py:index 2
+tests/test_image_diff.py:type-arg 1
+tests/test_log_redaction.py:type-arg 1
+tests/test_log_redaction.py:union-attr 2
+tests/test_mutmut_config.py:no-any-return 1
+tests/test_mutmut_config.py:type-arg 1
+tests/test_readonly_token.py:arg-type 1
+tests/test_readonly_token.py:type-arg 1
+tests/test_sri.py:var-annotated 1
+tests/test_sse.py:arg-type 2
+tests/test_sse.py:index 3
+tests/test_sse.py:type-arg 3
+tests/test_sse.py:union-attr 2
+tests/test_sse.py:var-annotated 2
+tests/test_sse_limits.py:attr-defined 1
+tests/test_validate_api_keys.py:var-annotated 1
+tests/ui_audit/test_handler_audit.py:type-arg 9
+tests/unit/test_apikeys_blueprint.py:arg-type 1
+tests/unit/test_app_utils.py:type-arg 1
+tests/unit/test_background_color_modes.py:arg-type 1
+tests/unit/test_background_color_modes.py:method-assign 1
+tests/unit/test_base_plugin.py:arg-type 1
+tests/unit/test_base_plugin.py:assignment 1
+tests/unit/test_base_plugin.py:list-item 1
+tests/unit/test_base_plugin.py:return-value 1
+tests/unit/test_client_log_capture.py:assignment 1
+tests/unit/test_client_log_capture.py:type-arg 1
+tests/unit/test_config_fallbacks_extra.py:attr-defined 3
+tests/unit/test_config_migration.py:no-any-return 1
+tests/unit/test_config_migration.py:type-arg 2
+tests/unit/test_config_mtime_cache.py:attr-defined 7
+tests/unit/test_config_mtime_cache.py:name-defined 1
+tests/unit/test_config_mtime_cache.py:type-arg 1
+tests/unit/test_config_update_atomic.py:arg-type 1
+tests/unit/test_config_update_atomic.py:no-untyped-call 1
+tests/unit/test_config_update_atomic.py:type-arg 1
+tests/unit/test_crash_breadcrumb.py:index 1
+tests/unit/test_crash_breadcrumb.py:unreachable 1
+tests/unit/test_crisp_display.py:index 1
+tests/unit/test_crisp_display.py:no-untyped-def 1
+tests/unit/test_crisp_display.py:union-attr 3
+tests/unit/test_crisp_display.py:unused-ignore 1
+tests/unit/test_debug_stabilization.py:arg-type 2
+tests/unit/test_debug_stabilization.py:var-annotated 3
+tests/unit/test_diagnostics_endpoint.py:attr-defined 2
+tests/unit/test_display_interfaces.py:arg-type 2
+tests/unit/test_display_manager.py:no-any-return 1
+tests/unit/test_display_manager_edges.py:operator 1
+tests/unit/test_display_save_failure_isolation.py:no-untyped-def 1
+tests/unit/test_execute_inprocess.py:var-annotated 11
+tests/unit/test_fallback_image_sanitization.py:no-untyped-def 2
+tests/unit/test_fallback_image_sanitization.py:unused-ignore 1
+tests/unit/test_filesystem_permission_validation.py:no-untyped-def 1
+tests/unit/test_form_labels.py:type-arg 3
+tests/unit/test_history_csv_export.py:type-arg 1
+tests/unit/test_host_validation.py:attr-defined 1
+tests/unit/test_http_client.py:attr-defined 3
+tests/unit/test_http_client.py:unreachable 2
+tests/unit/test_http_utils_more.py:no-untyped-def 1
+tests/unit/test_icon_utils.py:attr-defined 2
+tests/unit/test_image_and_display.py:arg-type 1
+tests/unit/test_image_fit_modes.py:arg-type 1
+tests/unit/test_image_upload_unit.py:arg-type 5
+tests/unit/test_image_upload_unit.py:index 1
+tests/unit/test_image_upload_unit.py:type-arg 1
+tests/unit/test_image_utils.py:arg-type 1
+tests/unit/test_image_utils.py:comparison-overlap 1
+tests/unit/test_image_utils_edge_cases.py:arg-type 1
+tests/unit/test_image_utils_edge_cases.py:call-arg 1
+tests/unit/test_image_utils_property_based.py:arg-type 1
+tests/unit/test_inkypi.py:type-var 3
+tests/unit/test_inkypi_extra.py:arg-type 1
+tests/unit/test_inkypi_extra.py:unreachable 1
+tests/unit/test_inkypi_sidebar_helpers.py:arg-type 5
+tests/unit/test_lazy_imports.py:call-overload 4
+tests/unit/test_lazy_imports.py:no-any-return 1
+tests/unit/test_lazy_imports.py:unused-ignore 4
+tests/unit/test_memory_leaks.py:var-annotated 2
+tests/unit/test_perf_budget_gate.py:attr-defined 4
+tests/unit/test_permanent_plugin_error.py:var-annotated 2
+tests/unit/test_plugin_defaults.py:no-untyped-def 5
+tests/unit/test_plugin_isolation.py:union-attr 1
+tests/unit/test_plugin_isolation.py:unreachable 1
+tests/unit/test_plugin_isolation.py:var-annotated 6
+tests/unit/test_plugin_registry.py:arg-type 1
+tests/unit/test_plugin_registry.py:attr-defined 1
+tests/unit/test_polish_audit_fixes.py:attr-defined 1
+tests/unit/test_polish_audit_fixes.py:var-annotated 2
+tests/unit/test_privileged_flow_auth_boundaries.py:no-any-return 1
+tests/unit/test_refresh_context.py:misc 1
+tests/unit/test_refresh_policy.py:var-annotated 3
+tests/unit/test_refresh_task_chaos.py:no-untyped-def 2
+tests/unit/test_refresh_task_critical.py:arg-type 6
+tests/unit/test_refresh_task_critical.py:attr-defined 2
+tests/unit/test_refresh_task_critical.py:no-untyped-def 1
+tests/unit/test_refresh_task_critical.py:type-arg 1
+tests/unit/test_refresh_task_critical.py:var-annotated 5
+tests/unit/test_refresh_task_display_pipeline.py:method-assign 3
+tests/unit/test_refresh_task_execute.py:arg-type 1
+tests/unit/test_refresh_task_execute.py:var-annotated 2
+tests/unit/test_refresh_task_helpers.py:attr-defined 4
+tests/unit/test_refresh_task_stress.py:union-attr 4
+tests/unit/test_refresh_task_stress.py:var-annotated 1
+tests/unit/test_refresh_task_unit.py:arg-type 1
+tests/unit/test_refresh_task_unit.py:no-untyped-def 4
+tests/unit/test_refresh_task_unit.py:var-annotated 4
+tests/unit/test_refresh_task_watchdog.py:unused-ignore 2
+tests/unit/test_screenshot_backend_retry.py:attr-defined 5
+tests/unit/test_screenshot_backend_retry.py:type-arg 1
+tests/unit/test_screenshot_render_wait_and_blank.py:attr-defined 1
+tests/unit/test_security_csrf_rate_limit.py:var-annotated 1
+tests/unit/test_settings_update.py:attr-defined 1
+tests/unit/test_settings_updates.py:arg-type 1
+tests/unit/test_settings_updates.py:attr-defined 3
+tests/unit/test_settings_updates.py:type-arg 1
+tests/unit/test_skip_display_and_no_image.py:arg-type 6
+tests/unit/test_smoke_render.py:type-arg 1
+tests/unit/test_soak_runner.py:name-defined 1
+tests/unit/test_soak_runner.py:type-arg 1
+tests/unit/test_specific_exceptions.py:attr-defined 1
+tests/unit/test_ssrf_dns_rebind.py:arg-type 3
+tests/unit/test_ssrf_dns_rebind.py:no-untyped-def 1
+tests/unit/test_ssrf_dns_rebind.py:type-arg 3
+tests/unit/test_systemd_notify.py:arg-type 2
+tests/unit/test_systemd_notify.py:attr-defined 3
+tests/unit/test_take_screenshot.py:type-arg 1
+tests/unit/test_time_utils.py:arg-type 1
+tests/unit/test_updates_rollback_route.py:attr-defined 4
+tests/unit/test_updates_rollback_route.py:type-arg 1
+tests/unit/test_utils_coverage.py:func-returns-value 1
+tests/unit/test_utils_coverage.py:union-attr 3
+tests/unit/test_waveshare_display.py:arg-type 1
+tests/unit/test_waveshare_display.py:attr-defined 1
+tests/unit/test_waveshare_display.py:misc 1
+tests/unit/test_waveshare_display.py:no-untyped-def 1
+tests/unit/test_waveshare_display.py:override 1
+tests/unit/test_waveshare_display.py:var-annotated 7
+tests/unit/test_weather_plugin.py:type-arg 1
+tests/unit/test_weather_plugin.py:var-annotated 1
+tests/unit/test_wpotd_unit.py:no-untyped-def 1

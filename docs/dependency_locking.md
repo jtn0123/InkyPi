@@ -21,12 +21,14 @@ After changing a dependency in `pyproject.toml`:
 # 1. Update uv.lock from pyproject.toml
 uv lock
 
-# 2. Re-export the hash-pinned requirements file used by install.sh
-uv export --format requirements.txt --no-dev --no-emit-project \
-    --output-file install/requirements.txt
+# 2. Re-export install/requirements.txt (used by install.sh) and
+#    install/requirements-dev.txt from the lock
+bash scripts/export_requirements.sh
 ```
 
-Commit both `uv.lock` and `install/requirements.txt`.
+Commit `uv.lock` and both exports. On a Dependabot PR the
+`Dependabot lock exports` workflow does step 2 for you (see
+[Dependency Management](dependencies.md#dependabot-updates)).
 
 To verify everything is in sync locally (the same check that runs in CI):
 
@@ -58,6 +60,5 @@ regenerates the file is different.
 
 Dev and CI tools are the `dev` group under `[dependency-groups]` in
 `pyproject.toml`, locked in the same `uv.lock`, and exported with
-`uv export --group dev` to `install/requirements-dev.txt`. See
-[Dependency Management](dependencies.md) for the full command. The drift check
-validates both exports.
+`uv export --group dev` to `install/requirements-dev.txt` by
+`scripts/export_requirements.sh`. The drift check validates both exports.
