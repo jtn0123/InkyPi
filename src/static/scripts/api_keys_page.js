@@ -95,21 +95,17 @@
     if (actions) actions.setAttribute("hidden", "");
   }
 
-  // Mapping for managed-key providers. Hoisted above the functions that
-  // consume it so updateConfiguredStatus / updateDeletedStatus can live at
-  // module scope (SonarCloud javascript:S7721 — no closure use required).
-  const MANAGED_KEY_MAPPING = {
-    OPEN_AI_SECRET: ["openai-status", "openai-input", "openai"],
-    OPEN_WEATHER_MAP_SECRET: [
-      "openweather-status",
-      "openweather-input",
-      "openweather",
-    ],
-    NASA_SECRET: ["nasa-status", "nasa-input", "nasa"],
-    UNSPLASH_ACCESS_KEY: ["unsplash-status", "unsplash-input", "unsplash"],
-    GITHUB_SECRET: ["github-status", "github-input", "github"],
-    GOOGLE_AI_SECRET: ["googleai-status", "googleai-input", "googleai"],
-  };
+  // The [statusId, inputId, sectionId] of a managed-key card, found from the
+  // card's input (name = the key) so the server's provider list stays the
+  // only list: each card's ids are "<section>-input" and "<section>-status".
+  function _managedKeyIds(keyName) {
+    const input = document.querySelector(
+      `#apiKeysForm input[name="${CSS.escape(keyName)}"]`
+    );
+    if (!input?.id.endsWith("-input")) return null;
+    const sectionId = input.id.slice(0, -"-input".length);
+    return [`${sectionId}-status`, input.id, sectionId];
+  }
 
   // Mirror the server's `mask()` helper in src/blueprints/settings/_config.py
   // so the transient post-save state matches what the server will render on
@@ -139,7 +135,7 @@
 
   function updateConfiguredStatus(updatedKeys) {
     updatedKeys.forEach((key) => {
-      const entry = MANAGED_KEY_MAPPING[key];
+      const entry = _managedKeyIds(key);
       if (!entry) return;
       const [statusId, inputId, sectionId] = entry;
       const statusElement = document.getElementById(statusId);
@@ -161,7 +157,7 @@
   }
 
   function updateDeletedStatus(keyName) {
-    const entry = MANAGED_KEY_MAPPING[keyName];
+    const entry = _managedKeyIds(keyName);
     if (!entry) return;
     const [statusId, inputId, sectionId] = entry;
     const statusElement = document.getElementById(statusId);

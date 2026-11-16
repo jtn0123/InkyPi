@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from utils.messages import PLAYLIST_NAME_REQUIRED_ERROR
+from utils.time_utils import format_hhmm, parse_hhmm
 
 CODE_VALIDATION = "validation_error"
 PLAYLIST_NAME_MAX_LEN = 64
@@ -166,29 +167,15 @@ def validate_playlist_name(
     return normalized, None
 
 
-def _to_minutes(time_str: str) -> int:
-    if time_str == "24:00":
-        return 24 * 60
-    hour, minute = map(int, time_str.split(":"))
-    if hour < 0 or hour > 23 or minute < 0 or minute > 59:
-        raise ValueError("Invalid time")
-    return hour * 60 + minute
-
-
-def _format_minutes(minutes: int) -> str:
-    """Canonical ``HH:MM`` for a minute offset (1440 is ``24:00``).
-
-    The parser accepts loose input such as ``8:00``; the config schema only
-    accepts two-digit fields, so the stored value is rebuilt from the
-    parsed minutes.
-    """
-    return f"{minutes // 60:02d}:{minutes % 60:02d}"
-
-
 def validate_playlist_times(
     start_time: Any, end_time: Any
 ) -> tuple[int | None, int | None, RequestModelError | None]:
-    """Validate start/end playlist times and return minute offsets."""
+    """Validate start/end playlist times and return minute offsets.
+
+    The config schema decides which times exist (``parse_hhmm`` reads by its
+    rule). A one-digit hour such as ``8:00`` is accepted here and stored as
+    ``08:00`` (``format_hhmm``), the only form the schema allows.
+    """
     if not start_time:
         missing_field = "start_time"
     elif not end_time:
@@ -207,7 +194,7 @@ def validate_playlist_times(
         )
 
     try:
-        start_min = _to_minutes(str(start_time))
+        start_min = parse_hhmm(start_time)
     except Exception:
         return (
             None,
@@ -218,7 +205,7 @@ def validate_playlist_times(
             ),
         )
     try:
-        end_min = _to_minutes(str(end_time))
+        end_min = parse_hhmm(end_time)
     except Exception:
         return (
             None,
@@ -390,8 +377,8 @@ def parse_playlist_create_request(
     return (
         PlaylistCreateRequest(
             playlist_name=playlist_name,
-            start_time=_format_minutes(start_min),
-            end_time=_format_minutes(end_min),
+            start_time=format_hhmm(start_min),
+            end_time=format_hhmm(end_min),
             start_min=start_min,
             end_min=end_min,
             cycle_minutes_int=cycle_minutes_int,
@@ -424,8 +411,8 @@ def parse_playlist_update_request(
     return (
         PlaylistUpdateRequest(
             new_name=new_name,
-            start_time=_format_minutes(start_min),
-            end_time=_format_minutes(end_min),
+            start_time=format_hhmm(start_min),
+            end_time=format_hhmm(end_min),
             start_min=start_min,
             end_min=end_min,
             cycle_minutes_int=cycle_minutes_int,

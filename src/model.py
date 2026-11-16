@@ -5,6 +5,8 @@ from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
+from utils.time_utils import parse_hhmm
+
 logger = logging.getLogger(__name__)
 
 
@@ -274,25 +276,11 @@ class Playlist:
         self.current_plugin_index = current_plugin_index
         self.cycle_interval_seconds = cycle_interval_seconds
 
-    @staticmethod
-    def _to_minutes(time_str: str) -> int:
-        """Convert an ``HH:MM`` string to minutes since midnight.
-
-        ``24:00`` is treated as midnight of the following day (1440 minutes).
-        Raises ``ValueError`` for out-of-range hours or minutes.
-        """
-        if time_str == "24:00":
-            return 24 * 60
-        hour, minute = map(int, time_str.split(":"))
-        if hour < 0 or hour > 23 or minute < 0 or minute > 59:
-            raise ValueError("Invalid time")
-        return hour * 60 + minute
-
     def is_active(self, current_time: str) -> bool:
         """Check if the playlist is active at the given time."""
-        start = self._to_minutes(self.start_time)
-        end = self._to_minutes(self.end_time)
-        current = self._to_minutes(current_time)
+        start = parse_hhmm(self.start_time)
+        end = parse_hhmm(self.end_time)
+        current = parse_hhmm(current_time)
 
         if start <= end:
             return start <= current < end
@@ -501,8 +489,8 @@ class Playlist:
         When ``start_time`` is later than ``end_time`` the range is assumed to
         wrap past midnight.
         """
-        start = self._to_minutes(self.start_time)
-        end = self._to_minutes(self.end_time)
+        start = parse_hhmm(self.start_time)
+        end = parse_hhmm(self.end_time)
         if end >= start:
             return end - start
         return (24 * 60 - start) + end
