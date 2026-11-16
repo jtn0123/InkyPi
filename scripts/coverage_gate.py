@@ -45,6 +45,10 @@ FULL_THRESHOLDS: dict[str, tuple[float, float]] = {
     "app_setup/": (0.91, 0.84),  # 92.9 / 85.4
     "plugins/": (0.92, 0.81),  # 94.0 / 82.9
     "utils/": (0.92, 0.88),  # 93.5 / 89.7
+    # #877 moved history, playlist, plugin and direct-render logic here from
+    # blueprints/, which kept the floor. Measured on main @ 9c76ad4a (CI run
+    # 43807486268, coverage-3.13).
+    "services/": (0.92, 0.88),  # 93.2 / 89.2
     # Files
     "refresh_task/task.py": (0.95, 0.90),  # 96.9 / 93.3
     "refresh_task/refresh_cycle.py": (0.91, 0.84),  # 92.9 / 87.5
@@ -64,6 +68,8 @@ FULL_THRESHOLDS: dict[str, tuple[float, float]] = {
     "services/updates.py": (0.83, 0.76),  # projected 84.6 / 78.4
     "services/logs.py": (0.94, 0.90),  # projected ~96 / ~100
     "services/version_check.py": (0.98, 0.90),  # projected 100 / 100
+    # Moved out of blueprints/history.py by #877 (same run as services/).
+    "services/history.py": (0.92, 0.94),  # 93.2 / 95.8
     # Moved out of refresh_task/, so the refresh_task/ floor no longer covers it.
     "services/job_queue.py": (0.98, 0.88),  # 100 / 92.3 (its own tests)
 }

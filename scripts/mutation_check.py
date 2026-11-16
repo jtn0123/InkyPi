@@ -1,12 +1,31 @@
 #!/usr/bin/env python3
+"""Narrow PR mutation gate: a few hand-picked mutants that tests must catch.
+
+For each mutant, in a fresh copy of the repository:
+
+1. Run the mutant's commands on the unmutated code. Every one must pass. If
+   one fails, its exit status would say nothing about the mutant (an import
+   error or a missing tool fails the same way a caught bug does), so the
+   gate reports the mutant as broken and fails.
+2. Apply the mutation and run the commands again. The mutant is killed when
+   at least one command fails, and survives when they all pass.
+
+The gate fails when any mutant survives or is broken. A mutant marked
+``linux_only`` is reported as skipped on other systems, never as killed.
+``scripts/preflash_validate.sh`` runs it when ``INKYPI_VALIDATE_MUTATION=1``,
+which CI's ``preflash-validate`` job sets.
+"""
 
 from __future__ import annotations
 
+import importlib.util
 import os
 import shutil
 import subprocess
 import sys
 import tempfile
+import time
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -18,6 +37,14 @@ class Mutant:
     old: str
     new: str
     commands: tuple[tuple[str, ...], ...]
+    linux_only: bool = False
+
+
+@dataclass(frozen=True)
+class MutantResult:
+    name: str
+    status: str  # "killed", "survived", "broken" or "skipped"
+    detail: str = ""
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -79,13 +106,15 @@ MUTANTS: tuple[Mutant, ...] = (
         old="            if lines.count(overlay) != 1:\n",
         new="            if lines.count(overlay) != 2:\n",
         commands=((str(PYTHON), "scripts/preflash_smoke.py", "install-idempotency"),),
+        # The smoke drives GNU sed, so it refuses to run anywhere but Linux.
+        linux_only=True,
     ),
 )
 
 
-def _copy_repo(destination: Path) -> None:
+def _copy_repo(source: Path, destination: Path) -> None:
     shutil.copytree(
-        REPO_ROOT,
+        source,
         destination,
         dirs_exist_ok=True,
         ignore=shutil.ignore_patterns(
@@ -93,6 +122,10 @@ def _copy_repo(destination: Path) -> None:
             ".venv",
             "__pycache__",
             ".pytest_cache",
+            ".mypy_cache",
+            ".ruff_cache",
+            "node_modules",
+            "mutants",
             "htmlcov",
             "coverage.xml",
             "runtime",
@@ -107,49 +140,85 @@ def _apply_mutation(repo_root: Path, mutant: Mutant) -> None:
         raise RuntimeError(f"{mutant.name}: target snippet not found in {mutant.file}")
     mutated = original.replace(mutant.old, mutant.new, 1)
     target.write_text(mutated, encoding="utf-8")
+    # The baseline run compiled the unmutated file. Drop its bytecode so a
+    # same-length mutation (== to !=) cannot be masked by a stale .pyc.
+    cached = Path(importlib.util.cache_from_source(str(target)))
+    cached.unlink(missing_ok=True)
 
 
-def _run_commands(repo_root: Path, mutant: Mutant) -> bool:
+def _run(repo_root: Path, command: Sequence[str]) -> subprocess.CompletedProcess[str]:
     env = os.environ.copy()
     env["PYTHONPATH"] = str(repo_root / "src")
     env["INKYPI_ENV"] = "dev"
     env["INKYPI_NO_REFRESH"] = "1"
-    for command in mutant.commands:
-        proc = subprocess.run(
-            list(command),
-            cwd=repo_root,
-            env=env,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
+    return subprocess.run(
+        list(command),
+        cwd=repo_root,
+        env=env,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        check=False,
+    )
+
+
+def _tail(output: str, lines: int = 15) -> str:
+    return "\n".join(output.strip().splitlines()[-lines:])
+
+
+def check_mutant(mutant: Mutant, repo_root: Path = REPO_ROOT) -> MutantResult:
+    """Run one mutant's baseline and mutated runs in a fresh repository copy."""
+    if mutant.linux_only and sys.platform != "linux":
+        return MutantResult(mutant.name, "skipped", "needs Linux")
+    with tempfile.TemporaryDirectory(prefix=f"inkypi-mutant-{mutant.name}-") as tmp:
+        repo_copy = Path(tmp) / "repo"
+        _copy_repo(repo_root, repo_copy)
+        for command in mutant.commands:
+            proc = _run(repo_copy, command)
+            if proc.returncode != 0:
+                return MutantResult(
+                    mutant.name,
+                    "broken",
+                    f"`{' '.join(command)}` exited {proc.returncode} on the "
+                    f"unmutated code:\n{_tail(proc.stdout)}",
+                )
+        _apply_mutation(repo_copy, mutant)
+        for command in mutant.commands:
+            proc = _run(repo_copy, command)
+            if proc.returncode != 0:
+                return MutantResult(
+                    mutant.name, "killed", f"exit {proc.returncode}: {command[-1]}"
+                )
+    return MutantResult(mutant.name, "survived")
+
+
+def main(mutants: Sequence[Mutant] = MUTANTS, repo_root: Path = REPO_ROOT) -> int:
+    failures: list[MutantResult] = []
+    for mutant in mutants:
+        started = time.monotonic()
+        result = check_mutant(mutant, repo_root)
+        elapsed = time.monotonic() - started
+        suffix = (
+            f" ({result.detail})" if result.detail and result.status != "broken" else ""
         )
-        if proc.returncode == 0:
-            return False
-    return True
+        print(f"{mutant.name}: {result.status}{suffix} in {elapsed:.1f}s", flush=True)
+        if result.status in ("survived", "broken"):
+            failures.append(result)
 
-
-def main() -> int:
-    survivors: list[str] = []
-    for mutant in MUTANTS:
-        with tempfile.TemporaryDirectory(
-            prefix=f"inkypi-mutant-{mutant.name}-"
-        ) as tmpdir:
-            repo_copy = Path(tmpdir) / "repo"
-            _copy_repo(repo_copy)
-            _apply_mutation(repo_copy, mutant)
-            killed = _run_commands(repo_copy, mutant)
-        status = "killed" if killed else "survived"
-        print(f"{mutant.name}: {status}")
-        if not killed:
-            survivors.append(mutant.name)
-
-    if survivors:
-        print(
-            "Mutation survivors: " + ", ".join(sorted(survivors)),
-            file=sys.stderr,
-        )
-        return 1
-    return 0
+    for result in failures:
+        if result.status == "broken":
+            print(
+                f"{result.name}: the commands fail without the mutation, so the "
+                f"gate cannot tell whether the tests catch it.\n{result.detail}",
+                file=sys.stderr,
+            )
+        else:
+            print(
+                f"{result.name}: no command failed with the mutation applied. "
+                "Add or fix a test so it catches this bug.",
+                file=sys.stderr,
+            )
+    return 1 if failures else 0
 
 
 if __name__ == "__main__":

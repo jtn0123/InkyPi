@@ -1,11 +1,17 @@
+import time
+from collections.abc import Iterator
 from datetime import UTC, datetime
 from types import SimpleNamespace
 from typing import Any
+from unittest.mock import MagicMock, patch
 
 import pytest
 from flask import Flask
 from flask.testing import FlaskClient
 from PIL import Image
+
+from blueprints.main import _reset_display_next_cooldown
+from utils.domain_errors import PluginRenderFailed
 
 
 def _fixed_now(_device_config: Any) -> Any:
@@ -258,3 +264,148 @@ def test_display_next_reports_this_refreshs_timings(
 
     assert resp.status_code == 200
     assert resp.get_json()["metrics"] == expected
+
+
+@pytest.fixture(autouse=True)
+def _fresh_cooldown() -> Iterator[None]:
+    _reset_display_next_cooldown()
+    yield
+    _reset_display_next_cooldown()
+
+
+def _seed_clock_playlist(device_config_dev: Any) -> None:
+    pm = device_config_dev.get_playlist_manager()
+    pm.add_playlist("Default", "00:00", "24:00")
+    pm.get_playlist("Default").add_plugin(
+        {
+            "plugin_id": "clock",
+            "name": "Clock A",
+            "plugin_settings": {},
+            "refresh": {"interval": 300},
+        }
+    )
+    device_config_dev.write_config()
+
+
+def test_refresh_alias_answers_like_display_next(client: FlaskClient) -> None:
+    # The dev config's Default playlist starts with no plugins.
+    resp = client.post("/refresh")
+    assert resp.status_code == 400
+    assert resp.get_json()["error"] == "No eligible plugin to display"
+    # A failed attempt arms no cooldown.
+    assert client.post("/refresh").status_code == 400
+
+
+def test_success_shows_the_next_item_and_arms_the_cooldown(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
+    _seed_clock_playlist(device_config_dev)
+
+    resp = client.post("/display-next")
+    assert resp.status_code == 200
+    assert resp.get_json()["success"] is True
+    shown = client.get("/refresh-info").get_json()
+    assert shown["plugin_id"] == "clock"
+    assert shown["plugin_instance"] == "Clock A"
+    assert shown["playlist"] == "Default"
+
+    blocked = client.post("/display-next")
+    assert blocked.status_code == 429
+    body = blocked.get_json()
+    assert body["success"] is False
+    assert body["error"].startswith("Please wait ")
+
+    _reset_display_next_cooldown()
+    assert client.post("/display-next").status_code == 200
+
+
+def test_refresh_alias_shares_the_cooldown(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
+    _seed_clock_playlist(device_config_dev)
+
+    assert client.post("/refresh").status_code == 200
+    assert client.post("/display-next").status_code == 429
+    assert client.post("/refresh").status_code == 429
+
+
+def test_cooldown_ends_after_ten_seconds(
+    client: FlaskClient, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _seed_clock_playlist(device_config_dev)
+    fake_time = [1000.0]
+    monkeypatch.setattr(time, "monotonic", lambda: fake_time[0])
+
+    assert client.post("/display-next").status_code == 200
+
+    fake_time[0] = 1005.0
+    assert client.post("/display-next").status_code == 429
+
+    fake_time[0] = 1011.0
+    assert client.post("/display-next").status_code == 200
+
+
+def _mock_playlist_manager() -> MagicMock:
+    plugin_instance = MagicMock()
+    plugin_instance.plugin_id = "test_plugin"
+    plugin_instance.name = "Test"
+    plugin_instance.settings = {}
+    playlist = MagicMock()
+    playlist.name = "Test Playlist"
+    playlist.get_next_eligible_plugin.return_value = plugin_instance
+    manager = MagicMock()
+    manager.determine_active_playlist.return_value = playlist
+    return manager
+
+
+def test_render_failure_via_the_refresh_task_does_not_leak_detail(
+    client: FlaskClient, flask_app: Flask, device_config_dev: Any
+) -> None:
+    secret_detail = "SECRET_STACKTRACE_DETAIL_abc123"
+    refresh_task = flask_app.config["REFRESH_TASK"]
+    with patch.object(
+        device_config_dev,
+        "get_playlist_manager",
+        return_value=_mock_playlist_manager(),
+    ):
+        refresh_task.running = True
+        # What the refresh cycle raises for a plugin's RuntimeError.
+        refresh_task.manual_update = MagicMock(
+            side_effect=PluginRenderFailed(secret_detail)
+        )
+        resp = client.post("/display-next")
+
+    assert resp.status_code == 400
+    body = resp.get_json()
+    # Generic message only (CodeQL py/stack-trace-exposure).
+    assert body["code"] == "plugin_error"
+    assert body["error"] == "Plugin image generation failed"
+    assert secret_detail not in resp.get_data(as_text=True)
+
+
+def test_render_failure_in_the_request_does_not_leak_detail(
+    client: FlaskClient, flask_app: Flask, device_config_dev: Any
+) -> None:
+    secret_detail = "LEAKY_RUNTIME_DETAIL_xyz789"
+    plugin = MagicMock()
+    plugin.generate_image.side_effect = RuntimeError(secret_detail)
+    flask_app.config["REFRESH_TASK"].running = False
+
+    with (
+        patch.object(
+            device_config_dev,
+            "get_playlist_manager",
+            return_value=_mock_playlist_manager(),
+        ),
+        patch.object(
+            device_config_dev,
+            "get_plugin",
+            return_value={"id": "test_plugin", "image_settings": []},
+        ),
+        patch("plugins.plugin_registry.get_plugin_instance", return_value=plugin),
+    ):
+        resp = client.post("/display-next")
+
+    assert resp.status_code == 400
+    assert resp.get_json()["error"] == "Plugin image generation failed"
+    assert secret_detail not in resp.get_data(as_text=True)

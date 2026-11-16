@@ -201,9 +201,11 @@ PYTHONPATH=src:. SKIP_BROWSER=1 pytest -p randomly
 
 The header prints `Using --randomly-seed=N`. To replay a failing order, pass the same seed: `pytest -p randomly --randomly-seed=N <file>`. `.github/workflows/random-order-nightly.yml` runs the suite shuffled every night, without browsers.
 
-### tests/static ratchet
+### Source-text test ratchet
 
-`tests/static/` holds tests that grep JS and CSS source text instead of driving the page. They miss real behaviour, so new ones are not allowed. `tests/unit/test_static_text_tests_ratchet.py` counts the `test_*.py` files there and fails if the count goes up. Write a Playwright test in `tests/integration/` instead. The test also fails if the count goes down, so lower `CEILING` in that file to the new count.
+Some tests read a script, stylesheet or the service worker (from `src/static/`, or by fetching `/static/scripts/...` or `/sw.js`) and assert that a substring is or is not in it. They pass as long as the text is there, whether or not the page works, so new ones are not allowed. Write a Playwright test in `tests/integration/` instead.
+
+`tests/unit/test_static_text_tests_ratchet.py` counts these tests, one per test function: every test in `tests/static/`, plus every test elsewhere under `tests/` that its scan flags. It fails if the count goes over `CEILING`. It also fails if the count goes down, so lower `CEILING` in that file to the new count. When the scan flags a test that does not check the page by its text (a test of the build, lint or install tooling, or a Playwright test that loads the scripts into a page), add it to `ALLOWLIST` in that file with the reason.
 
 ---
 

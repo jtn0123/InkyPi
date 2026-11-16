@@ -182,13 +182,17 @@ known-first-party = ["src"]
 
 [tool.mutmut]
 # Copy the full source tree so imports and runtime assets remain available,
-# while preserving the original four-package mutation scope.
+# and mutate only these paths. The nightly runs them in shards
+# (scripts/mutmut_shard.py), and every pattern here must belong to a shard.
 source_paths = ["src/"]
 only_mutate = [
   "src/app_setup/*",
   "src/blueprints/*",
   "src/utils/*",
   "src/refresh_task/*",
+  "src/config.py",
+  "src/model.py",
+  "src/services/*",
 ]
 pytest_add_cli_args = ["-x", "--tb=no", "-q", "-m", "not container"]
 pytest_add_cli_args_test_selection = ["tests/"]

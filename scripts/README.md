@@ -53,7 +53,8 @@ Developer, CI and device tools. Run them from the repo root. Python scripts add
 | `perf_budget_gate.py` | Fails CI when the median plugin render or cold start goes over its ceiling. |
 | `benchmark_compare.py` | Compares pytest-benchmark runs of a change against runs of its base commit (CI) or the committed baseline. |
 | `memory_diff.py`, `format_memory_diff.py` | Startup memory profile for the per-PR memory diff comment. |
-| `mutation_check.py`, `mutation_summary.py` | A small hand-written mutant check, and the summary for mutmut shards. |
+| `mutation_check.py` | The PR mutation gate: a few hand-written mutants the tests must catch (preflash `INKYPI_VALIDATE_MUTATION=1`). |
+| `mutmut_shard.py`, `mutation_summary.py`, `mutation_scores.json` | The nightly mutmut shards: run one shard with resume, summarise its score, and compare it with the committed floor. |
 | `audit_dependencies.sh` | Checks every locked requirement file for known vulnerabilities with pip-audit. `--strict` fails on a finding; CI uses it only when a pull request changes a dependency file, and on the nightly run. |
 | `check_licenses.sh` | Checks dependency licences with the `pip-licenses` pinned in `install/requirements-dev.txt` (installs nothing; run it from the dev venv). |
 | `check_links.py` | Re-checks links that the Lychee link checker reported as throttled. |
