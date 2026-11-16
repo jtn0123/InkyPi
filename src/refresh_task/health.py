@@ -152,6 +152,23 @@ class PluginHealthTracker:
         due_at = cls.next_probe_at(plugin_instance, now)
         return due_at is not None and now >= due_at
 
+    @classmethod
+    def skip_resting(cls, now: datetime) -> Callable[[PluginInstanceLike], bool]:
+        """Return the playlist ``skip`` rule for choosing what to show next.
+
+        It skips a paused instance until its probe is due; once the cooldown
+        has run out, that turn is the instance's one retry. The refresh loop,
+        the dashboard's "Next up" and both "Display next" routes all choose
+        with this rule, so the instance "Next up" names is the one shown.
+        """
+
+        def skip(plugin_instance: PluginInstanceLike) -> bool:
+            return bool(plugin_instance.paused) and not cls.probe_due(
+                plugin_instance, now
+            )
+
+        return skip
+
     def begin_probe(
         self, plugin_instance: PluginInstanceLike, plugin_id: str, instance: str
     ) -> None:

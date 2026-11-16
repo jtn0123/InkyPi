@@ -8,6 +8,7 @@ from flask import current_app, request
 from flask.typing import ResponseReturnValue
 
 from refresh_task import PlaylistRefresh, manual_update_timings, schedule
+from refresh_task.health import PluginHealthTracker
 from utils.api_responses import json_success
 from utils.backend_errors import (
     ClientInputError,
@@ -73,9 +74,12 @@ def display_next_in_playlist() -> ResponseReturnValue:
 
         # The index advance mutates shared config state; hold the config lock
         # (as /display-next does) so it cannot interleave with the refresh
-        # thread or another request's update_atomic snapshot/rollback.
+        # thread or another request's update_atomic snapshot/rollback. Paused
+        # plugins are skipped by the loop's own rule.
         with device_config.locked():
-            plugin_instance = playlist.get_next_eligible_plugin(current_dt)
+            plugin_instance = playlist.get_next_eligible_plugin(
+                current_dt, skip=PluginHealthTracker.skip_resting(current_dt)
+            )
         if not plugin_instance:
             raise ClientInputError(
                 "No eligible instance in playlist",

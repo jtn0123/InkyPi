@@ -208,7 +208,8 @@ def test_weather_save_settings(
     assert resp.status_code == 200
     result = resp.get_json()
     assert result["success"] is True
-    assert "Add to Playlist" in result.get("message", "")
+    # Saved settings already rotate in the Default playlist; nothing to add.
+    assert "Default playlist" in result.get("message", "")
 
 
 def test_weather_settings_persistence(

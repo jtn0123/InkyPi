@@ -376,15 +376,23 @@ def test_update_now_async_poll_error(
     """Async update_now job that raises shows status 'error' when polled."""
     import time
 
+    import blueprints.plugin._update_now as plugin_mod
     from refresh_task.job_queue import get_job_queue
 
     refresh_task = flask_app.config["REFRESH_TASK"]
     refresh_task.running = False
 
-    # Use a plugin that doesn't exist — guaranteed to raise without monkeypatch timing issues
+    def broken(_config: Any) -> Any:
+        raise RuntimeError("sensitive load failure")
+
+    # An unknown plugin is now refused before anything is queued, so the job
+    # fails in the render instead. The job reaches "error" only after the
+    # render and its fallback ran, so the patches are still in place.
+    monkeypatch.setattr(plugin_mod, "get_plugin_instance", broken)
+    monkeypatch.setattr(plugin_mod, "_push_update_now_fallback", lambda *a, **k: None)
     resp = client.post(
         "/update_now",
-        data={"plugin_id": "nonexistent_plugin_xyz"},
+        data={"plugin_id": "clock"},
         headers={"X-Async": "true"},
     )
     assert resp.status_code == 202
@@ -393,7 +401,8 @@ def test_update_now_async_poll_error(
     data = _wait_for_job(client, job_id)
 
     assert data["status"] == "error"
-    assert "not found" in data["error"]
+    assert data["code"] == "plugin_error"
+    assert "sensitive" not in str(data)
 
     # Ensure background thread finishes before test cleanup
     queue = get_job_queue()
@@ -406,7 +415,7 @@ def test_update_now_async_poll_error(
 def test_update_now_async_plugin_not_found(
     client: FlaskClient, flask_app: Flask
 ) -> None:
-    """Plugin not found is reported via the job error status."""
+    """An unknown plugin is 404 before anything is queued, as without X-Async."""
 
     refresh_task = flask_app.config["REFRESH_TASK"]
     refresh_task.running = False
@@ -416,13 +425,10 @@ def test_update_now_async_plugin_not_found(
         data={"plugin_id": "nonexistent"},
         headers={"X-Async": "true"},
     )
-    assert resp.status_code == 202
-    job_id = resp.get_json()["job_id"]
-
-    data = _wait_for_job(client, job_id)
-
-    assert data["status"] == "error"
-    assert "not found" in data["error"]
+    assert resp.status_code == 404
+    body = resp.get_json()
+    assert body["code"] == "plugin_not_found"
+    assert "job_id" not in body
 
 
 def test_update_now_exception_handling(
@@ -532,7 +538,11 @@ def test_save_plugin_settings_persist_and_load_on_plugin_page(
     assert resp.status_code == 200
     j = resp.get_json()
     assert j.get("success") is True
-    assert "Add to Playlist" in j.get("message", "")
+    # The saved settings are an instance in the Default playlist already, so
+    # the message no longer tells the user to add them to a playlist.
+    assert j.get("message") == (
+        "Settings saved. The Default playlist shows them on this plugin's next turn."
+    )
 
     # Then open plugin page and confirm settings prepopulate (not tied to any instance)
     page = client.get("/plugin/ai_text")

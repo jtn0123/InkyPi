@@ -100,7 +100,7 @@ def test_ai_text_generate_image_missing_text_model(
     assert body["code"] == "plugin_error"
     # JTN-326: plugin RuntimeError text is no longer surfaced by /update_now
     # (py/stack-trace-exposure).  Response is a generic message.
-    assert body["error"] == "An internal error occurred"
+    assert body["error"] == "Plugin image generation failed"
 
 
 def test_ai_text_generate_image_missing_text_prompt(
@@ -122,7 +122,7 @@ def test_ai_text_generate_image_missing_text_prompt(
     assert body["success"] is False
     assert body["code"] == "plugin_error"
     # JTN-326: generic message only — the RuntimeError detail is logged.
-    assert body["error"] == "An internal error occurred"
+    assert body["error"] == "Plugin image generation failed"
 
 
 @patch("plugins.ai_text.ai_text.OpenAI")
@@ -150,7 +150,7 @@ def test_ai_text_generate_image_openai_error(
     assert body["success"] is False
     assert body["code"] == "plugin_error"
     # JTN-326: generic message only — upstream failure text is logged.
-    assert body["error"] == "An internal error occurred"
+    assert body["error"] == "Plugin image generation failed"
 
 
 @pytest.mark.parametrize(
@@ -234,7 +234,7 @@ def test_ai_text_generate_image_missing_key(
     assert body["success"] is False
     assert body["code"] == "plugin_error"
     # JTN-326: RuntimeError text is no longer echoed (py/stack-trace-exposure).
-    assert body["error"] == "An internal error occurred"
+    assert body["error"] == "Plugin image generation failed"
 
 
 @patch("plugins.ai_text.ai_text.OpenAI")

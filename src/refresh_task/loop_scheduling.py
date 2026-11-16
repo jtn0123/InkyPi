@@ -9,18 +9,19 @@ from __future__ import annotations
 import logging
 import os
 import threading
+from collections.abc import Callable
 from datetime import datetime
 from time import monotonic
 from typing import TYPE_CHECKING, Any
 
 from refresh_task.actions import PlaylistRefresh, RefreshAction
 from refresh_task.context import RefreshContext
+from refresh_task.health import PluginHealthTracker
 from refresh_task.scheduler import RefreshScheduler, Trigger
 from utils.time_utils import now_device_tz
 
 if TYPE_CHECKING:
     from refresh_task.executor import RefreshExecutor
-    from refresh_task.health import PluginHealthTracker
     from refresh_task.housekeeping import RefreshHousekeeper
 
 logger = logging.getLogger(__name__)
@@ -236,41 +237,45 @@ class SchedulingMixin:
             logger.info("Not time to update display. | playlist: %s", playlist.name)
             return None, None
 
-        # Use eligibility-aware selection; skip circuit-breaker paused plugins
-        # unless their cooldown has elapsed, in which case this turn is the
-        # single probe that decides whether they resume.
-        attempts_left = len(playlist.plugins)
-        while attempts_left > 0:
-            plugin = playlist.get_next_eligible_plugin(current_dt)
-            if plugin is None:
-                break
-            if getattr(plugin, "paused", False):
-                if self.health_tracker.probe_due(plugin, current_dt):
-                    self.health_tracker.begin_probe(
-                        plugin, plugin.plugin_id, plugin.name
-                    )
-                    return playlist, plugin
-                next_probe = self.health_tracker.next_probe_at(plugin, current_dt)
-                logger.info(
-                    "plugin circuit_breaker: skipping paused plugin | "
-                    "plugin_id=%s instance=%s failures=%s reason=%s next_retry=%s",
-                    plugin.plugin_id,
-                    plugin.name,
-                    getattr(plugin, "consecutive_failure_count", "?"),
-                    getattr(plugin, "disabled_reason", None) or "not recorded",
-                    next_probe.isoformat() if next_probe else "manual only",
-                )
-                attempts_left -= 1
-                continue
-            logger.info(
-                f"Determined next plugin. | active_playlist: {playlist.name} | plugin_instance: {plugin.name}"
-            )
-            return playlist, plugin
-
-        logger.info(
-            f"No eligible plugin to display in active playlist '{playlist.name}'."
+        # Skip circuit-breaker paused plugins unless their cooldown has
+        # elapsed, in which case this turn is the single probe that decides
+        # whether they resume. "Next up" and "Display next" use the same rule.
+        plugin = playlist.get_next_eligible_plugin(
+            current_dt, skip=self._skip_resting_logged(current_dt)
         )
-        return None, None
+        if plugin is None:
+            logger.info(
+                f"No eligible plugin to display in active playlist '{playlist.name}'."
+            )
+            return None, None
+        if getattr(plugin, "paused", False):
+            self.health_tracker.begin_probe(plugin, plugin.plugin_id, plugin.name)
+            return playlist, plugin
+        logger.info(
+            f"Determined next plugin. | active_playlist: {playlist.name} | plugin_instance: {plugin.name}"
+        )
+        return playlist, plugin
+
+    def _skip_resting_logged(self, current_dt: datetime) -> Callable[[Any], bool]:
+        """The shared skip rule, logging each paused plugin it passes over."""
+        resting = PluginHealthTracker.skip_resting(current_dt)
+
+        def skip(plugin: Any) -> bool:
+            if not resting(plugin):
+                return False
+            next_probe = PluginHealthTracker.next_probe_at(plugin, current_dt)
+            logger.info(
+                "plugin circuit_breaker: skipping paused plugin | "
+                "plugin_id=%s instance=%s failures=%s reason=%s next_retry=%s",
+                plugin.plugin_id,
+                plugin.name,
+                getattr(plugin, "consecutive_failure_count", "?"),
+                getattr(plugin, "disabled_reason", None) or "not recorded",
+                next_probe.isoformat() if next_probe else "manual only",
+            )
+            return True
+
+        return skip
 
     def log_system_stats(self) -> None:
         """Log a snapshot of CPU, memory, disk, swap, and network I/O metrics.

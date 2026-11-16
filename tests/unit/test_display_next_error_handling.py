@@ -12,6 +12,8 @@ from flask import Flask
 from flask.testing import FlaskClient
 from PIL import Image
 
+from utils.domain_errors import PluginRenderFailed
+
 
 def _fixed_now(_device_config: Any) -> Any:
     return datetime(2025, 1, 1, 8, 0, 0, tzinfo=UTC)
@@ -151,7 +153,7 @@ class TestPluginConfigNotFound:
 
 
 class TestManualUpdateFailure:
-    """When manual_update raises, endpoint returns 400 with message."""
+    """When the loop reports a failed render, the endpoint returns 400."""
 
     @pytest.mark.integration
     def test_manual_update_exception_returns_400(
@@ -166,7 +168,8 @@ class TestManualUpdateFailure:
         monkeypatch.setattr("blueprints.main.now_device_tz", _fixed_now, raising=True)
 
         def _failing_manual_update(playlist_refresh: Any) -> None:
-            raise RuntimeError("background task crashed")
+            # What the refresh cycle raises for a plugin's RuntimeError.
+            raise PluginRenderFailed("background task crashed")
 
         flask_app.config["REFRESH_TASK"].manual_update = _failing_manual_update
 
@@ -176,5 +179,6 @@ class TestManualUpdateFailure:
         assert body["success"] is False
         # Generic message only — raw exception detail must not leak
         # (CodeQL py/stack-trace-exposure).
-        assert body["error"] == "Plugin update failed"
+        assert body["code"] == "plugin_error"
+        assert body["error"] == "Plugin image generation failed"
         assert "background task crashed" not in resp.get_data(as_text=True)

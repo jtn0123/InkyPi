@@ -28,7 +28,13 @@ from utils.backend_errors import (
     route_error_for,
 )
 from utils.blackout import BLOCKED_MESSAGE, BlackoutActiveError
-from utils.domain_errors import DomainError, RefreshLoopBusy, RefreshTaskUnavailable
+from utils.domain_errors import (
+    DomainError,
+    PluginNotFound,
+    PluginRenderFailed,
+    RefreshLoopBusy,
+    RefreshTaskUnavailable,
+)
 from utils.plugin_errors import (
     ProviderReportedPluginError,
     ScreenshotBackendError,
@@ -38,6 +44,14 @@ from utils.plugin_errors import (
 _INSTANCE = "Clock Mapping"
 # Exception text that must never reach a response body.
 _SECRET = "/var/lib/inkypi/secret-path: upstream said no"
+
+
+def _render_failed(cause: BaseException | None = None) -> PluginRenderFailed:
+    """A failed render as the refresh cycle raises it."""
+    failed = PluginRenderFailed(_SECRET)
+    failed.__cause__ = cause
+    return failed
+
 
 # (id, make the failure, expected status, expected code)
 _FAILURES: list[tuple[str, Callable[[], BaseException], int, str]] = [
@@ -62,6 +76,20 @@ _FAILURES: list[tuple[str, Callable[[], BaseException], int, str]] = [
         lambda: ScreenshotBackendError(_SECRET),
         503,
         "backend_unavailable",
+    ),
+    ("plugin-missing", PluginNotFound, 404, "plugin_not_found"),
+    (
+        "render-failed",
+        lambda: _render_failed(RuntimeError(_SECRET)),
+        400,
+        "plugin_error",
+    ),
+    # A failed render whose cause has its own answer is reported as that.
+    (
+        "render-bad-url",
+        lambda: _render_failed(URLValidationError(f"Invalid URL: {_SECRET}")),
+        422,
+        "validation_error",
     ),
 ]
 

@@ -145,7 +145,7 @@ def test_clock_update_preview_runtime_error_returns_400_and_logs(
     # the client (py/stack-trace-exposure).  The response carries a generic
     # message and the real cause is logged server-side.
     assert plugin_authored_message not in body.get("error", "")
-    assert body.get("error") == "An internal error occurred"
+    assert body.get("error") == "Plugin image generation failed"
     assert body.get("code") == "plugin_error"
 
     # logger.exception (JTN-318): stacktrace must be captured, and any record

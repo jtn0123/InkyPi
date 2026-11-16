@@ -53,8 +53,9 @@ def test_rate_limit_ok_adds_timestamp() -> None:
 
 
 def test_manual_update_raises_when_queue_full() -> None:
-    """manual_update raises RuntimeError when the deque is at capacity."""
+    """manual_update reports the loop busy when the deque is at capacity."""
     from refresh_task import ManualRefresh, RefreshTask
+    from utils.domain_errors import RefreshLoopBusy
 
     device_config = MagicMock()
     device_config.get_plugins.return_value = []
@@ -71,7 +72,9 @@ def test_manual_update_raises_when_queue_full() -> None:
     for _ in range(maxlen):
         task.manual_update_requests.append(MagicMock())
 
-    with pytest.raises(RuntimeError, match="[Mm]anual update queue is full"):
+    # Reported as busy (503 refresh_loop_busy on every route), as when the
+    # loop does not take a request in time.
+    with pytest.raises(RefreshLoopBusy):
         task.manual_update(ManualRefresh("test_plugin", {}))
 
 

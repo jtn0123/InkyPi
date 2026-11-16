@@ -399,14 +399,18 @@ class Playlist:
             return index
         return None
 
-    def get_next_eligible_plugin(self, current_time: datetime) -> PluginInstance | None:
+    def get_next_eligible_plugin(
+        self,
+        current_time: datetime,
+        skip: Callable[[PluginInstance], bool] | None = None,
+    ) -> PluginInstance | None:
         """Advance to and return the next eligible plugin based on current_time.
 
-        Tries each plugin at most once to find one that is_show_eligible, and
-        moves current_plugin_index to it. Returns None, leaving the index
-        unchanged, if no plugin is eligible.
+        Tries each plugin at most once to find one that is_show_eligible and
+        that ``skip`` (if given) does not drop, and moves current_plugin_index
+        to it. Returns None, leaving the index unchanged, if there is none.
         """
-        index = self._next_eligible_index(current_time)
+        index = self._next_eligible_index(current_time, skip)
         if index is None:
             return None
         self.current_plugin_index = index

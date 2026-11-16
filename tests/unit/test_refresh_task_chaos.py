@@ -25,6 +25,7 @@ from PIL import Image
 from model import PluginInstance
 from refresh_task import RefreshTask
 from refresh_task.actions import PlaylistRefresh
+from utils.domain_errors import RefreshLoopBusy
 
 # ---------------------------------------------------------------------------
 # Shared helpers
@@ -206,10 +207,10 @@ class TestSubprocessHangTimeout:
 class TestOutputQueueOverflow:
     """Verify backpressure when the manual update queue is at capacity."""
 
-    def test_queue_at_capacity_raises_runtime_error(
+    def test_queue_at_capacity_reports_the_loop_busy(
         self, device_config_dev: Any
     ) -> None:
-        """Filling the deque to maxlen → manual_update raises RuntimeError."""
+        """Filling the deque to maxlen → manual_update raises RefreshLoopBusy."""
         task, _dm = _make_task(device_config_dev)
         task.running = True
 
@@ -224,7 +225,7 @@ class TestOutputQueueOverflow:
         action.get_plugin_id.return_value = "dummy"
         action.get_refresh_info.return_value = {}
 
-        with pytest.raises(RuntimeError, match="queue is full"):
+        with pytest.raises(RefreshLoopBusy):
             task.manual_update(action)
 
     def test_queue_capacity_is_fifty(self, device_config_dev: Any) -> None:

@@ -11,6 +11,8 @@ from flask import Flask
 from flask.testing import FlaskClient
 from PIL import Image
 
+from utils.domain_errors import PluginRenderFailed
+
 
 def _save_png(path: Any, size: Any = (800, 480), color: Any = "white") -> None:
     Image.new("RGB", size, color).save(path)
@@ -273,14 +275,18 @@ def test_display_next_exception(
     with patch.object(device_config_dev, "get_playlist_manager", return_value=mock_pm):
         refresh_task = flask_app.config["REFRESH_TASK"]
         refresh_task.running = True
-        refresh_task.manual_update = MagicMock(side_effect=RuntimeError(secret_detail))
+        # What the refresh cycle raises for a plugin's RuntimeError.
+        refresh_task.manual_update = MagicMock(
+            side_effect=PluginRenderFailed(secret_detail)
+        )
 
         resp = client.post("/display-next")
     assert resp.status_code == 400
     body = resp.get_json()
     # Generic message only; raw exception detail must not leak to the client
     # (CodeQL py/stack-trace-exposure regression).
-    assert body["error"] == "Plugin update failed"
+    assert body["code"] == "plugin_error"
+    assert body["error"] == "Plugin image generation failed"
     assert secret_detail not in resp.get_data(as_text=True)
 
 

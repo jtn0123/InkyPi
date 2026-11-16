@@ -204,7 +204,7 @@ def test_display_next_in_playlist_advances_index_under_config_lock(
     held: list[bool] = []
     original = model.Playlist.get_next_eligible_plugin
 
-    def _probe(self: Any, current_time: Any) -> Any:
+    def _probe(self: Any, current_time: Any, skip: Any = None) -> Any:
         # Another thread can take the lock only if this one does not hold it.
         result: dict[str, bool] = {}
 
@@ -218,7 +218,7 @@ def test_display_next_in_playlist_advances_index_under_config_lock(
         t.start()
         t.join()
         held.append(not result["free"])
-        return original(self, current_time)
+        return original(self, current_time, skip)
 
     monkeypatch.setattr(model.Playlist, "get_next_eligible_plugin", _probe)
     rt = flask_app.config["REFRESH_TASK"]

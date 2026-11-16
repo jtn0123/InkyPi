@@ -89,6 +89,8 @@ UI_BROWSER_TESTS = {
     # A non-JSON or HTML reply reads as a sentence, not a SyntaxError; shared
     # scripts keep their private names out of the global scope.
     "test_fetch_json_errors_e2e.py",
+    # Settings shows a 90-minute cycle as 90 minutes, and Save keeps it.
+    "test_settings_interval_units_e2e.py",
 }
 A11Y_BROWSER_TESTS = {
     "test_a11y_sweep.py",

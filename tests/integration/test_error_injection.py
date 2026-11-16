@@ -8,6 +8,8 @@ import pytest
 from flask.testing import FlaskClient
 from PIL import Image
 
+from utils.domain_errors import PluginRenderFailed
+
 
 def _valid_ai_text_settings() -> Any:
     return {"title": "T", "textModel": "gpt-4o", "textPrompt": "Hi"}
@@ -65,8 +67,10 @@ def test_manual_update_propagates_plugin_exception(
     try:
         task.start()
         os.environ["OPEN_AI_SECRET"] = "test"
-        with pytest.raises(RuntimeError):
+        # The plugin's own error is the cause of the failed render.
+        with pytest.raises(PluginRenderFailed, match="boom") as excinfo:
             task.manual_update(ManualRefresh("ai_text", _valid_ai_text_settings()))
+        assert isinstance(excinfo.value.__cause__, RuntimeError)
     finally:
         task.stop()
 
@@ -131,7 +135,7 @@ def test_update_now_returns_500_when_display_raises(
 
 
 @patch("plugins.ai_text.ai_text.OpenAI")
-def test_display_plugin_instance_returns_500_on_plugin_error(
+def test_display_plugin_instance_returns_400_on_plugin_error(
     mock_openai: Any,
     client: FlaskClient,
     device_config_dev: Any,
@@ -202,7 +206,9 @@ def test_display_plugin_instance_returns_500_on_plugin_error(
                 "plugin_instance": "inst",
             },
         )
-        assert resp.status_code == 500
+        # A failed render: 400 plugin_error, as on every display route.
+        assert resp.status_code == 400
+        assert resp.get_json()["code"] == "plugin_error"
     finally:
         task.stop()
 
