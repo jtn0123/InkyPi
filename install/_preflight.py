@@ -136,18 +136,24 @@ def _load_validator(repo_dir: Path) -> Callable[[dict[str, Any]], None]:
     if src_dir not in sys.path:
         sys.path.insert(0, src_dir)
     try:
-        from utils.config_schema import truncate_device_name, validate_device_config
+        from utils.config_schema import (
+            set_aside_invalid_playlists,
+            truncate_device_name,
+            validate_device_config,
+        )
     except Exception as exc:  # pragma: no cover - broken checkout
         raise PreflightError(
             f"cannot load the config validator from {src_dir}: {exc}"
         ) from exc
 
     def validate(config: dict[str, Any]) -> None:
-        # The app cuts a name saved before the length cap before it validates
-        # (Config.read_config), so a device with one still starts. Do the
-        # same here, or the gate would refuse an update the app would load.
+        # The app cuts a name saved before the length cap, and sets aside a
+        # playlist that breaks the playlist rules, before it validates
+        # (Config.read_config), so such a device still starts. Do the same
+        # here, or the gate would refuse an update the app would load.
         candidate = dict(config)
         truncate_device_name(candidate)
+        set_aside_invalid_playlists(candidate)
         validate_device_config(candidate)
 
     return validate

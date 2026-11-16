@@ -13,6 +13,7 @@ from blueprints._deps import get_device_config
 from blueprints._refresh_loop import wake_refresh_loop
 from blueprints.settings import logger, settings_bp
 from display.rendering_settings import SCREEN_RENDERING_KEY
+from services.api_keys import API_KEY_NAMES, API_KEY_PROVIDERS, plugin_names_by_key
 from utils import config_schema
 from utils.api_responses import JsonResponse, json_error, json_success
 from utils.backend_errors import ClientInputError, route_error_boundary
@@ -70,19 +71,16 @@ _ALLOWED_IMPORT_CONFIG_KEYS = frozenset(
     }
 )
 
+# Config entries that are secrets: ``auth`` can hold the PIN and every
+# ``webhook_urls`` entry carries its service's token. Only a keyed backup
+# (which needs a PIN) exports them, and an import restores them only when the
+# backup has them, so restoring a backup without keys keeps this device's PIN
+# and webhooks.
+_KEYED_CONFIG_KEYS = ("auth", "webhook_urls")
+
 # The provider keys plugins read; a keyed backup exports and imports exactly
 # these, so a restore brings back every key a plugin needs.
-_BACKUP_ENV_KEYS = frozenset(
-    {
-        "GITHUB_SECRET",
-        "GOOGLE_AI_SECRET",
-        "IMMICH_KEY",
-        "NASA_SECRET",
-        "OPEN_AI_SECRET",
-        "OPEN_WEATHER_MAP_SECRET",
-        "UNSPLASH_ACCESS_KEY",
-    }
-)
+_BACKUP_ENV_KEYS = API_KEY_NAMES
 
 
 def _isolation_state() -> tuple[Any, list[Any], set[Any]]:
@@ -264,9 +262,14 @@ def export_settings() -> ResponseReturnValue:
             )
         device_config = get_device_config()
 
-        # Build export object with config plus env keys when requested
+        # Build export object with config plus env keys when requested. The
+        # PIN and webhook links travel only with the keys.
+        config = device_config.get_config()
+        if not include_keys:
+            for key in _KEYED_CONFIG_KEYS:
+                config.pop(key, None)
         data = {
-            "config": device_config.get_config(),
+            "config": config,
         }
         if include_keys:
             keys = {}
@@ -301,6 +304,54 @@ def _extract_import_payload() -> dict[str, Any] | None:
     return dict(payload)
 
 
+def _refuse_invalid_playlists(playlist_config: dict[str, Any]) -> None:
+    """Refuse a backup with a playlist that breaks the playlist rules.
+
+    Checked before anything is written, with the config schema's rules, the
+    ones device.json is loaded by. A playlist time such as ``25:00`` used to
+    be restored and then stop that playlist, and every other one, from ever
+    being chosen.
+    """
+    playlists = playlist_config.get("playlists", [])
+    if not isinstance(playlists, list):
+        raise ClientInputError("Backup has an invalid playlist section", status=400)
+    for index, playlist in enumerate(playlists):
+        problems = config_schema.playlist_problems(playlist)
+        if problems:
+            raise ClientInputError(
+                "Backup has an invalid playlist "
+                f"{config_schema.playlist_label(playlist, index)}: "
+                f"{'; '.join(problems)}. Nothing was restored.",
+                status=400,
+            )
+
+
+def _keyed_config_from_backup(cfg: dict[str, Any]) -> dict[str, Any]:
+    """Return the backup's PIN and webhook entries that should be restored.
+
+    An entry the backup leaves out is left out here too, so the device keeps
+    its own value. One that is present but malformed fails the import before
+    anything is written.
+    """
+    keyed: dict[str, Any] = {}
+    if "auth" in cfg:
+        auth = cfg["auth"]
+        if not isinstance(auth, dict) or not isinstance(auth.get("pin", ""), str):
+            raise ClientInputError("Backup has an invalid auth section", status=400)
+        keyed["auth"] = auth
+    if "webhook_urls" in cfg:
+        urls = cfg["webhook_urls"]
+        if not isinstance(urls, list) or not all(
+            isinstance(url, str) and url.lower().startswith(("http://", "https://"))
+            for url in urls
+        ):
+            raise ClientInputError(
+                "Backup has an invalid webhook_urls list", status=400
+            )
+        keyed["webhook_urls"] = urls
+    return keyed
+
+
 def _apply_imported_config(device_config: Config, filtered_cfg: dict[str, Any]) -> None:
     """Write imported settings and rebuild the models they feed.
 
@@ -311,6 +362,8 @@ def _apply_imported_config(device_config: Config, filtered_cfg: dict[str, Any]) 
     playlist_config = filtered_cfg.get("playlist_config")
     if "playlist_config" in filtered_cfg and not isinstance(playlist_config, dict):
         raise ClientInputError("Backup has an invalid playlist section", status=400)
+    if playlist_config is not None:
+        _refuse_invalid_playlists(playlist_config)
 
     def apply(config: dict[str, Any]) -> None:
         config.update(filtered_cfg)
@@ -351,12 +404,17 @@ def import_settings() -> ResponseReturnValue:
             raise ClientInputError("Invalid import payload", status=400)
 
         cfg_keys_applied = 0
+        pin_changed = False
         cfg = payload.get("config")
         if isinstance(cfg, dict):
             # Filter to allowed keys only
             filtered_cfg = {
                 k: v for k, v in cfg.items() if k in _ALLOWED_IMPORT_CONFIG_KEYS
             }
+            keyed_cfg = _keyed_config_from_backup(cfg)
+            current_auth = device_config.get_config("auth")
+            pin_changed = "auth" in keyed_cfg and keyed_cfg["auth"] != current_auth
+            filtered_cfg.update(keyed_cfg)
             if filtered_cfg:
                 _apply_imported_config(device_config, filtered_cfg)
                 cfg_keys_applied = len(filtered_cfg)
@@ -388,7 +446,11 @@ def import_settings() -> ResponseReturnValue:
             parts.append(
                 f"{env_keys_applied} API key{'s' if env_keys_applied != 1 else ''}"
             )
-        return json_success(message=f"Restored {' and '.join(parts)}")
+        message = f"Restored {' and '.join(parts)}"
+        if pin_changed:
+            # The PIN is read once, when InkyPi starts.
+            message += ". Restart InkyPi to use the PIN from the backup"
+        return json_success(message=message)
 
 
 @settings_bp.route("/settings/api-keys", methods=["GET"])
@@ -405,31 +467,17 @@ def api_keys_page() -> ResponseReturnValue:
         except Exception:
             return "set"
 
-    keys = {
-        "OPEN_AI_SECRET": device_config.load_env_key("OPEN_AI_SECRET"),
-        "OPEN_WEATHER_MAP_SECRET": device_config.load_env_key(
-            "OPEN_WEATHER_MAP_SECRET"
-        ),
-        "NASA_SECRET": device_config.load_env_key("NASA_SECRET"),
-        "UNSPLASH_ACCESS_KEY": device_config.load_env_key("UNSPLASH_ACCESS_KEY"),
-        "GITHUB_SECRET": device_config.load_env_key("GITHUB_SECRET"),
-        "GOOGLE_AI_SECRET": device_config.load_env_key("GOOGLE_AI_SECRET"),
-    }
-    masked = {k: mask(v) for k, v in keys.items()}
-    api_key_plugins = {
-        "OPEN_AI_SECRET": ["AI Image", "AI Text"],
-        "OPEN_WEATHER_MAP_SECRET": ["Weather"],
-        "NASA_SECRET": ["NASA APOD"],
-        "UNSPLASH_ACCESS_KEY": ["Unsplash Background"],
-        "GITHUB_SECRET": ["GitHub"],
-        "GOOGLE_AI_SECRET": ["AI Image", "AI Text"],
+    masked = {
+        provider.key: mask(device_config.load_env_key(provider.key))
+        for provider in API_KEY_PROVIDERS
     }
     return render_template(
         "api_keys.html",
         api_keys_mode="managed",
         entries=[],
         masked=masked,
-        api_key_plugins=api_key_plugins,
+        api_key_providers=API_KEY_PROVIDERS,
+        api_key_plugins=plugin_names_by_key(device_config.get_plugins()),
         active_nav="api-keys",
     )
 
@@ -445,14 +493,7 @@ def save_api_keys() -> ResponseReturnValue:
         form_data = request.form.to_dict()
         updated = []
         skipped_placeholder = []
-        for key in (
-            "OPEN_AI_SECRET",
-            "OPEN_WEATHER_MAP_SECRET",
-            "NASA_SECRET",
-            "UNSPLASH_ACCESS_KEY",
-            "GITHUB_SECRET",
-            "GOOGLE_AI_SECRET",
-        ):
+        for key in (provider.key for provider in API_KEY_PROVIDERS):
             value = form_data.get(key)
             if not value:
                 # Empty field means "leave current key unchanged" (JTN-598).
@@ -491,16 +532,12 @@ def save_api_keys() -> ResponseReturnValue:
 @settings_bp.route("/settings/delete_api_key", methods=["POST"])
 def delete_api_key() -> ResponseReturnValue:
     device_config = get_device_config()
-    key = request.form.get("key")
-    valid_keys = {
-        "OPEN_AI_SECRET",
-        "OPEN_WEATHER_MAP_SECRET",
-        "NASA_SECRET",
-        "UNSPLASH_ACCESS_KEY",
-        "GITHUB_SECRET",
-        "GOOGLE_AI_SECRET",
-    }
-    if key not in valid_keys:
+    requested = request.form.get("key")
+    # Use the registry's own copy of the name from here on, never the
+    # submitted text, so nothing the client sent reaches the .env file or the
+    # log.
+    key = next((name for name in API_KEY_NAMES if name == requested), None)
+    if key is None:
         raise ClientInputError("Invalid key name", status=400)
     with route_error_boundary(
         "deleting API key",

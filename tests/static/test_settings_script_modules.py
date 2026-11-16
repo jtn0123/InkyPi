@@ -14,6 +14,7 @@ def test_settings_template_loads_feature_modules_before_bootstrap() -> None:
         "scripts/settings/logs.js",
         "scripts/settings/diagnostics.js",
         "scripts/settings/navigation.js",
+        "scripts/settings/update_tracker.js",
         "scripts/settings/actions.js",
         "scripts/settings_page.js",
     ]

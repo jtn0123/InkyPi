@@ -162,6 +162,11 @@ class TestRollbackHappyPath:
         monkeypatch.setenv("INKYPI_LOCKFILE_DIR", str(tmp_path))
         _write_failure(tmp_path)
         _write_prev_version(tmp_path, "v0.52.0")
+        # Start paths reap a finished unit first; on a host with systemd the
+        # fake unit would read as finished, so pin it as still running.
+        monkeypatch.setattr(
+            updates, "_probe_finished_unit", lambda _unit: (False, False)
+        )
         updates._set_update_state(True, "inkypi-update-busy.service")
 
         try:
@@ -204,7 +209,7 @@ class TestRollbackSanitization:
 
         try:
             resp = client.post("/settings/update/rollback")
-            # _read_prev_version applied _TAG_RE and returned None →
+            # read_prev_version applied _TAG_RE and returned None →
             # route refuses with 409 / no_prev_version; Popen is never reached.
             assert resp.status_code == 409
             assert resp.get_json()["code"] == "no_prev_version"

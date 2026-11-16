@@ -79,6 +79,9 @@ ALLOWLIST: dict[str, str] = {
     "tests/test_service_worker.py::test_sw_js_content_type_javascript": (
         "checks the Content-Type header, not the body"
     ),
+    "tests/unit/test_accent_hue_contrast.py": (
+        "computes WCAG contrast from the token values at every hue"
+    ),
     # Behaviour tests that load the scripts into a browser.
     "tests/integration/test_plugin_add_to_playlist_ui.py": _PLAYWRIGHT,
     "tests/integration/test_plugin_draft_add_to_playlist.py": _PLAYWRIGHT,

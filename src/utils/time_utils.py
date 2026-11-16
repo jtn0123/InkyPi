@@ -1,9 +1,41 @@
 import logging
+import re
 from datetime import UTC, datetime, timedelta, tzinfo
 from typing import Protocol
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
+from utils import config_schema
+
 logger = logging.getLogger(__name__)
+
+# H:MM or HH:MM; which of these are real times is the schema's rule.
+_HHMM_SHAPE = re.compile(r"([0-9]{1,2}):([0-9]{2})")
+_PLAYLIST_TIME_RULE = ("playlist_config", "playlists", "start_time")
+
+
+def format_hhmm(minutes: int) -> str:
+    """The stored ``HH:MM`` for minutes past midnight (1440 is ``24:00``)."""
+    return f"{minutes // 60:02d}:{minutes % 60:02d}"
+
+
+def parse_hhmm(value: object) -> int:
+    """Minutes past midnight for a playlist time; ``24:00`` is 1440.
+
+    The one reader of playlist times. It accepts exactly the times the device
+    config schema allows for a playlist's ``start_time`` (00:00 to 23:59, and
+    24:00), and also a one-digit hour such as ``8:00`` as a person types it;
+    :func:`format_hhmm` gives the two-digit form to store. Raises
+    ``ValueError`` for anything else.
+    """
+    match = _HHMM_SHAPE.fullmatch(value) if isinstance(value, str) else None
+    if match is None:
+        raise ValueError(f"not an HH:MM time: {value!r}")
+    minutes = int(match[1]) * 60 + int(match[2])
+    if not config_schema.matches_pattern(
+        f"{match[1]:0>2}:{match[2]}", *_PLAYLIST_TIME_RULE
+    ):
+        raise ValueError(f"not a time from 00:00 to 24:00: {value!r}")
+    return minutes
 
 
 def calculate_seconds(interval: int, unit: str) -> int:

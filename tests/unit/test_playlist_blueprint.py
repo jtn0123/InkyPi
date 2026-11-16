@@ -1282,7 +1282,7 @@ class TestDefaultOverlapWarning:
         from model import Playlist
 
         playlists = [Playlist("Default", "00:00", "24:00")]
-        from blueprints.playlist._schedule import _to_minutes
+        from utils.time_utils import parse_hhmm as _to_minutes
 
         result = _default_overlap_warning(
             _to_minutes("09:00"), _to_minutes("17:00"), playlists
@@ -1292,8 +1292,9 @@ class TestDefaultOverlapWarning:
         assert "priority" in result
 
     def test_returns_none_when_no_default(self) -> None:
-        from blueprints.playlist._schedule import _default_overlap_warning, _to_minutes
+        from blueprints.playlist._schedule import _default_overlap_warning
         from model import Playlist
+        from utils.time_utils import parse_hhmm as _to_minutes
 
         playlists = [Playlist("Work", "09:00", "17:00")]
         result = _default_overlap_warning(
@@ -1302,8 +1303,9 @@ class TestDefaultOverlapWarning:
         assert result is None
 
     def test_returns_none_when_no_overlap(self) -> None:
-        from blueprints.playlist._schedule import _default_overlap_warning, _to_minutes
+        from blueprints.playlist._schedule import _default_overlap_warning
         from model import Playlist
+        from utils.time_utils import parse_hhmm as _to_minutes
 
         playlists = [Playlist("Default", "09:00", "17:00")]
         result = _default_overlap_warning(

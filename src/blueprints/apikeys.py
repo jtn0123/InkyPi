@@ -7,6 +7,9 @@ from dotenv import dotenv_values
 from flask import Blueprint, Response, render_template, request
 from flask.typing import ResponseReturnValue
 
+from blueprints._deps import get_device_config
+from config import env_file_path
+from services.api_keys import API_KEY_PROVIDERS, plugin_names_by_key
 from utils.api_responses import (
     JsonResponse,
     json_error,
@@ -52,14 +55,9 @@ def _is_internal_key(key: str) -> bool:
     )
 
 
-# Path to .env file
 def get_env_path() -> str:
-    """Get path to .env file in the project root."""
-    project_dir = os.environ.get("PROJECT_DIR")
-    if project_dir:
-        return os.path.join(project_dir, ".env")
-    base_dir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-    return os.path.join(base_dir, ".env")
+    """The ``.env`` file the keys live in, the one ``Config`` reads them from."""
+    return env_file_path()
 
 
 def parse_env_file(filepath: str) -> list[tuple[str, str]]:
@@ -207,21 +205,14 @@ def apikeys_page() -> Response | str:
         if not _is_internal_key(key)
     ]
 
-    api_key_plugins = {
-        "OPEN_AI_SECRET": ["AI Image", "AI Text"],
-        "GOOGLE_AI_SECRET": ["AI Image", "AI Text"],
-        "OPEN_WEATHER_MAP_SECRET": ["Weather"],
-        "NASA_SECRET": ["NASA APOD"],
-        "UNSPLASH_ACCESS_KEY": ["Unsplash Background"],
-        "GITHUB_SECRET": ["GitHub"],
-    }
     return render_template(
         "api_keys.html",
         entries=template_entries,
         env_exists=os.path.exists(env_path),
         api_keys_mode="generic",
         masked={},
-        api_key_plugins=api_key_plugins,
+        api_key_providers=API_KEY_PROVIDERS,
+        api_key_plugins=plugin_names_by_key(get_device_config().get_plugins()),
         active_nav="api-keys",
     )
 

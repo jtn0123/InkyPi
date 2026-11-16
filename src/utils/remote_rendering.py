@@ -8,7 +8,6 @@ rebinding. This is separate from the trusted file-template browser.
 
 from __future__ import annotations
 
-import ipaddress
 import os
 import select
 import socket
@@ -21,7 +20,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import SplitResult, urlsplit
 
-from utils.security_utils import validate_url_with_ips
+from utils.security_utils import is_public_address, validate_url_with_ips
 
 _MAX_BODY = 1024 * 1024
 _HOP_HEADERS = {
@@ -36,24 +35,13 @@ _HOP_HEADERS = {
 }
 
 
-def _is_public_address(ip: str) -> bool:
-    address = ipaddress.ip_address(ip)
-    if not address.is_global or address.is_multicast:
-        return False
-    if isinstance(address, ipaddress.IPv6Address):
-        # Translation/tunnelling ranges can encode private IPv4 destinations.
-        return address in ipaddress.ip_network("2000::/3") and not (
-            address.sixtofour or address.teredo
-        )
-    return True
-
-
 def connect_public(url: str) -> socket.socket:
     _, ips = validate_url_with_ips(url)
     parsed = urlsplit(url)
     port = parsed.port or (443 if parsed.scheme == "https" else 80)
-    # is_global also rejects shared-address space and special translation ranges.
-    if parsed.username is not None or any(not _is_public_address(ip) for ip in ips):
+    # validate_url_with_ips already applied is_public_address; checking again
+    # here keeps the proxy's boundary explicit if that guard ever changes.
+    if parsed.username is not None or any(not is_public_address(ip) for ip in ips):
         raise ValueError("Remote rendering requires public addresses")
     last_error: OSError | None = None
     for ip in ips:

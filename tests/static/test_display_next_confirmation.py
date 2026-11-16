@@ -90,11 +90,13 @@ def test_display_next_helper_exists_and_is_async(client: FlaskClient) -> None:
 
 def test_display_next_success_surfaces_toast(client: FlaskClient) -> None:
     """On success, the user must see positive feedback (toast) — previously
-    there was only a silent reload, per JTN-630."""
+    there was only a silent reload, per JTN-630. Success reloads the page, so
+    the message is carried across the reload rather than toasted on the page
+    that is about to go away (test_playlist_feedback_e2e.py checks the toast)."""
     js = _read_script(client, "/static/scripts/playlist/actions.js")
-    assert "showResponseModal('success'" in js or 'showResponseModal("success"' in js, (
-        "Display Next success path must call showResponseModal('success', ...) "
-        "so the user has positive feedback — this is the JTN-630 fix"
+    assert 'ns.reloadWithMessage("success"' in js, (
+        "Display Next success path must keep its success message for the "
+        "reloaded page — this is the JTN-630 fix"
     )
 
 

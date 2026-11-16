@@ -1,7 +1,8 @@
 // Enhanced toast notification system.
-// Everything here is private to this file except the namespace and the four
+// Everything here is private to this file except the namespace and the three
 // names other scripts call bare (biome.json lists them under
-// javascript.globals).
+// javascript.globals). Requests go through fetchJson (fetch_json.js); pages
+// toast its result or InkyPiHttp.errorMessage(error) themselves.
 (function () {
     "use strict";
 
@@ -127,38 +128,8 @@
         return showToast('error', message, duration);
     }
 
-    /**
-     * Read a fetch Response and show a success or error toast for it.
-     * Returns the parsed JSON body (an error reply's body too, so callers can
-     * show its field errors), or null when there is no readable body.
-     */
-    async function handleJsonResponse(response, options = {}) {
-        const { includeRequestId = false } = options;
-        const rid = (id) => (includeRequestId && id ? ` (id: ${id})` : '');
-
-        let data;
-        try {
-            data = await globalThis.InkyPiHttp.readJson(response);
-        } catch (error) {
-            if (error?.name !== 'FetchJsonError') throw error;
-            console.debug('Request failed:', response.url, error);
-            showToast('error', `${error.message}${rid(error.requestId)}`);
-            return error.data;
-        }
-
-        if (data?.success === false || data?.error) {
-            const msg = data.error || data.message || 'The request failed.';
-            showToast('error', `${msg}${rid(data.request_id)}`);
-        } else {
-            const msg = data?.message || 'Operation completed successfully';
-            showToast('success', `${msg}${rid(data?.request_id)}`);
-        }
-        return data;
-    }
-
     globalThis.InkyPiToast = Object.freeze({
         close: closeToast,
-        handleJsonResponse,
         show: showToast,
         showError,
         showResponseModal,
@@ -166,5 +137,4 @@
     globalThis.showToast = showToast;
     globalThis.showResponseModal = showResponseModal;
     globalThis.showError = showError;
-    globalThis.handleJsonResponse = handleJsonResponse;
 })();

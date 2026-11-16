@@ -1,6 +1,6 @@
 # pyright: reportMissingImports=false
 import json
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime, timedelta, tzinfo
 from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock
@@ -268,10 +268,15 @@ def test_delete_lowercase_default_playlist_is_allowed(
     assert pm.get_playlist("default") is None
 
 
-def test_add_plugin_to_playlist_validation(client: FlaskClient) -> None:
-    # Missing fields
+def test_add_plugin_without_refresh_settings_is_refused(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     resp = client.post("/add_plugin", data={})
-    assert resp.status_code == 500 or resp.status_code == 400
+    assert resp.status_code == 400
+    body = resp.get_json()
+    assert body["error"] == "refresh_settings is required"
+    assert body["details"] == {"field": "refresh_settings"}
+    assert _saved_playlists(device_config_dev) == {}
 
 
 def test_reorder_plugins_endpoint(client: FlaskClient, device_config_dev: Any) -> None:
@@ -811,6 +816,23 @@ def test_playlist_page_preserves_user_instance_names(
     assert b"Kitchen Weather" in resp.data
 
 
+def test_playlist_edit_plugin_link_encodes_instance_name(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
+    """The row's "Edit plugin" link interpolated the raw instance name into the
+    query string, so "Groceries & errands" opened ?instance=Groceries%20 and
+    404'd. It must go through url_for so the name is query-encoded."""
+    _add_instance(device_config_dev, "Groceries & errands")
+    device_config_dev.write_config()
+
+    body = client.get("/playlist").get_data(as_text=True)
+    assert "/plugin/clock?instance=Groceries+%26+errands" in body
+    assert "?instance=Groceries &amp; errands" not in body
+
+    resp = client.get("/plugin/clock?instance=Groceries+%26+errands")
+    assert resp.status_code == 200
+
+
 def test_playlist_form_uses_native_time_input(client: FlaskClient) -> None:
     """JTN-647: start/end time fields must be <input type="time"> (not a 15-min <select>).
 
@@ -830,7 +852,9 @@ def test_playlist_form_uses_native_time_input(client: FlaskClient) -> None:
     assert '<select id="end_time"' not in body
 
 
-def test_create_playlist_accepts_non_quarter_hour_times(client: FlaskClient) -> None:
+def test_create_playlist_accepts_non_quarter_hour_times(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     """JTN-647: backend accepts arbitrary HH:MM values like 09:05 or 07:10."""
     payload = {
         "playlist_name": "OddHours",
@@ -839,6 +863,8 @@ def test_create_playlist_accepts_non_quarter_hour_times(client: FlaskClient) -> 
     }
     resp = client.post("/create_playlist", json=payload)
     assert resp.status_code == 200
+    saved = _saved_playlists(device_config_dev)["OddHours"]
+    assert (saved["start_time"], saved["end_time"]) == ("09:05", "07:10")
 
     # Update to another non-quarter-hour value.
     upd = {
@@ -848,6 +874,8 @@ def test_create_playlist_accepts_non_quarter_hour_times(client: FlaskClient) -> 
     }
     resp = client.put("/update_playlist/OddHours", json=upd)
     assert resp.status_code == 200
+    saved = _saved_playlists(device_config_dev)["OddHours"]
+    assert (saved["start_time"], saved["end_time"]) == ("06:37", "22:13")
 
 
 # ---- /update_device_cycle: the loop's default interval ----
@@ -1150,6 +1178,39 @@ def test_playlist_eta_of_an_empty_playlist_is_empty(
     assert resp.get_json()["eta"] == {}
 
 
+def test_playlist_eta_lists_each_instance_with_a_request_id(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
+    pm = device_config_dev.get_playlist_manager()
+    pm.add_playlist("Default", "00:00", "24:00")
+    for plugin_id, name in (("weather", "A"), ("clock", "B")):
+        pm.get_playlist("Default").add_plugin(
+            {
+                "plugin_id": plugin_id,
+                "name": name,
+                "plugin_settings": {},
+                "refresh": {"interval": 60},
+            }
+        )
+    device_config_dev.write_config()
+
+    resp = client.get("/playlist/eta/Default")
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["success"] is True
+    assert isinstance(body["request_id"], str) and body["request_id"]
+    eta = body["eta"]
+    assert list(eta) == ["A", "B"]
+    for entry in eta.values():
+        assert isinstance(entry["minutes"], int) and entry["minutes"] >= 0
+        datetime.strptime(entry["at"], "%H:%M")
+
+    missing = client.get("/playlist/eta/NoSuch")
+    assert missing.status_code == 404
+    assert missing.get_json()["error"]
+    assert missing.get_json()["request_id"]
+
+
 def test_playlist_eta_is_stable_within_a_minute(
     client: FlaskClient, device_config_dev: Any
 ) -> None:
@@ -1174,6 +1235,59 @@ def test_playlist_eta_is_stable_within_a_minute(
 # ---- relative times on the playlist page ----
 
 
+class _FrozenDatetime(datetime):
+    """``datetime`` whose ``now()`` is pinned, so calendar-day buckets are
+    deterministic no matter what hour the suite runs at."""
+
+    frozen: datetime
+
+    @classmethod
+    def now(cls, tz: tzinfo | None = None) -> datetime:  # type: ignore[override]
+        return cls.frozen if tz is None else cls.frozen.astimezone(tz)
+
+
+def _freeze_playlist_now(monkeypatch: pytest.MonkeyPatch, frozen: datetime) -> None:
+    import blueprints.playlist._pages as playlist_mod
+
+    _FrozenDatetime.frozen = frozen
+    monkeypatch.setattr(playlist_mod, "datetime", _FrozenDatetime)
+
+
+def test_format_relative_time_labels(monkeypatch: pytest.MonkeyPatch) -> None:
+    from blueprints.playlist._pages import format_relative_time
+
+    now = datetime(2026, 3, 10, 15, 0, tzinfo=UTC)
+    _freeze_playlist_now(monkeypatch, now)
+
+    assert format_relative_time(now.isoformat()) == "just now"
+    ten_min_ago = (now - timedelta(minutes=10)).isoformat()
+    assert format_relative_time(ten_min_ago) == "10 minutes ago"
+    earlier_today = (now - timedelta(hours=2)).isoformat()
+    assert format_relative_time(earlier_today) == "today at 1:00 PM"
+    yesterday = (now - timedelta(days=1, hours=1)).isoformat()
+    assert format_relative_time(yesterday) == "yesterday at 2:00 PM"
+    older = (now - timedelta(days=10)).isoformat()
+    assert format_relative_time(older) == "Feb 28 at 3:00 PM"
+
+
+def test_format_relative_time_buckets_by_calendar_day(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """At 2 AM, a refresh at 8:55 PM the previous evening is "yesterday",
+    not "today" (regression: rolling 24h window mislabelled it)."""
+    from blueprints.playlist._pages import format_relative_time
+
+    now = datetime(2026, 3, 10, 2, 0, tzinfo=UTC)
+    _freeze_playlist_now(monkeypatch, now)
+
+    last_evening = datetime(2026, 3, 9, 20, 55, tzinfo=UTC).isoformat()
+    assert format_relative_time(last_evening) == "yesterday at 8:55 PM"
+
+    # 26h ago crosses two midnights -> dated label, not "yesterday".
+    two_days = datetime(2026, 3, 8, 23, 59, tzinfo=UTC).isoformat()
+    assert format_relative_time(two_days) == "Mar 8 at 11:59 PM"
+
+
 def test_format_relative_time_reads_a_naive_timestamp_as_utc() -> None:
     """Bug 13: a timestamp without a zone is UTC, not an error."""
     from blueprints.playlist._pages import format_relative_time
@@ -1192,3 +1306,274 @@ def test_format_relative_time_says_just_now_under_two_minutes() -> None:
     assert format_relative_time((now - timedelta(seconds=120)).isoformat()) == (
         "2 minutes ago"
     )
+
+
+# ---- /add_plugin: saving a plugin instance to a playlist ----
+
+
+def _add_clock(client: FlaskClient, **overrides: Any) -> Any:
+    """POST /add_plugin for a clock; a value of None drops that key."""
+    settings: dict[str, Any] = {
+        "playlist": "Default",
+        "instance_name": "My Clock",
+        "refreshType": "interval",
+        "unit": "minute",
+        "interval": 10,
+    }
+    settings.update(overrides)
+    settings = {k: v for k, v in settings.items() if v is not None}
+    return client.post(
+        "/add_plugin",
+        data={"plugin_id": "clock", "refresh_settings": json.dumps(settings)},
+    )
+
+
+def _saved_instances(device_config_dev: Any, playlist: str = "Default") -> Any:
+    saved = _saved_playlists(device_config_dev).get(playlist, {})
+    return {p["name"]: p for p in saved.get("plugins", [])}
+
+
+def test_add_plugin_saves_the_instance_and_refuses_a_duplicate(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
+    resp = _add_clock(client)
+    assert resp.status_code == 200
+    assert resp.get_json()["message"] == "Scheduled refresh configured."
+    saved = _saved_instances(device_config_dev)
+    assert list(saved) == ["My Clock"]
+    assert saved["My Clock"]["plugin_id"] == "clock"
+    assert saved["My Clock"]["refresh"] == {"interval": 600}
+
+    again = _add_clock(client, interval=30)
+    assert again.status_code == 400
+    assert "already exists" in again.get_json()["error"]
+    saved = _saved_instances(device_config_dev)
+    assert list(saved) == ["My Clock"]
+    assert saved["My Clock"]["refresh"] == {"interval": 600}
+
+
+@pytest.mark.parametrize("name", ["weather_home", "my-plugin", "plain"])
+def test_add_plugin_accepts_underscores_and_hyphens_in_names(
+    client: FlaskClient, device_config_dev: Any, name: str
+) -> None:
+    """JTN-471: underscores and hyphens are allowed in instance names."""
+    resp = _add_clock(client, instance_name=name)
+    assert resp.status_code == 200
+    assert list(_saved_instances(device_config_dev)) == [name]
+
+
+@pytest.mark.parametrize(
+    ("name", "error"),
+    [
+        pytest.param(
+            "foo/bar",
+            "letters, numbers, spaces, underscores, and hyphens",
+            id="slash",
+        ),
+        pytest.param(
+            "../etc",
+            "letters, numbers, spaces, underscores, and hyphens",
+            id="traversal",
+        ),
+        pytest.param("", "Instance name is required", id="empty"),
+    ],
+)
+def test_add_plugin_refuses_an_unsafe_instance_name(
+    client: FlaskClient, device_config_dev: Any, name: str, error: str
+) -> None:
+    """JTN-471: a name that could leave the plugin folder is refused."""
+    resp = _add_clock(client, instance_name=name)
+    assert resp.status_code == 422
+    assert error in resp.get_json()["error"]
+    assert _saved_instances(device_config_dev) == {}
+
+
+@pytest.mark.parametrize(
+    ("overrides", "error"),
+    [
+        pytest.param({"playlist": None}, "Playlist name is required", id="playlist"),
+        pytest.param(
+            {"instance_name": None}, "Instance name is required", id="instance"
+        ),
+        pytest.param(
+            {"refreshType": None, "unit": None, "interval": None},
+            "Refresh type is required",
+            id="refresh-type",
+        ),
+        pytest.param({"unit": None}, "Refresh interval unit is required", id="unit"),
+        pytest.param({"interval": None}, "Refresh interval is required", id="interval"),
+        pytest.param(
+            {"refreshType": "scheduled", "unit": None, "interval": None},
+            "Refresh time is required",
+            id="scheduled-time",
+        ),
+    ],
+)
+def test_add_plugin_refuses_incomplete_refresh_settings(
+    client: FlaskClient, device_config_dev: Any, overrides: Any, error: str
+) -> None:
+    resp = _add_clock(client, **overrides)
+    assert resp.status_code == 422
+    assert error in resp.get_json()["error"]
+    assert _saved_instances(device_config_dev) == {}
+
+
+def test_add_plugin_reports_a_failed_save(
+    client: FlaskClient, flask_app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    pm = flask_app.config["DEVICE_CONFIG"].get_playlist_manager()
+    monkeypatch.setattr(pm, "add_plugin_to_playlist", lambda *args, **kwargs: False)
+
+    resp = _add_clock(client)
+    assert resp.status_code == 500
+    assert "Failed to add to playlist" in resp.get_json()["error"]
+    assert pm.find_plugin("clock", "My Clock") is None
+
+
+# ---- /create_playlist and /update_playlist refusals keep what was saved ----
+
+
+@pytest.mark.parametrize(
+    "request_kwargs",
+    [pytest.param({}, id="no-body"), pytest.param({"data": "not json"}, id="text")],
+)
+def test_create_playlist_needs_json_or_a_form(
+    client: FlaskClient, device_config_dev: Any, request_kwargs: Any
+) -> None:
+    resp = client.post("/create_playlist", **request_kwargs)
+    assert resp.status_code == 415
+    assert resp.get_json()["error"] == "Unsupported media type"
+    assert _saved_playlists(device_config_dev) == {}
+
+
+def test_create_playlist_needs_a_name(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
+    resp = client.post(
+        "/create_playlist", json={"start_time": "06:00", "end_time": "09:00"}
+    )
+    assert resp.status_code == 400
+    data = resp.get_json()
+    # JTN-658: validator-owned messages are preserved end-to-end (they are
+    # static strings so safe) and carry ``details.field`` for frontend
+    # highlighting.
+    assert "required" in data["error"].lower()
+    assert data["details"]["field"] == "playlist_name"
+    assert _saved_playlists(device_config_dev) == {}
+
+
+def test_create_playlist_needs_both_times(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
+    resp = client.post("/create_playlist", json={"playlist_name": "Test"})
+    assert resp.status_code == 400
+    assert "Start time and End time are required" in resp.get_json()["error"]
+    assert _saved_playlists(device_config_dev) == {}
+
+
+def test_create_playlist_reports_a_failed_save(
+    client: FlaskClient, flask_app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    pm = flask_app.config["DEVICE_CONFIG"].get_playlist_manager()
+    monkeypatch.setattr(pm, "add_playlist", lambda *args, **kwargs: False)
+
+    resp = _create(client, "Test", "06:00", "09:00")
+    assert resp.status_code == 500
+    assert "Failed to create playlist" in resp.get_json()["error"]
+    assert pm.get_playlist("Test") is None
+
+
+def test_create_playlist_hides_an_unexpected_error(
+    client: FlaskClient,
+    flask_app: Flask,
+    device_config_dev: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def boom(*args: Any, **kwargs: Any) -> bool:
+        raise Exception("secret detail")
+
+    pm = flask_app.config["DEVICE_CONFIG"].get_playlist_manager()
+    monkeypatch.setattr(pm, "add_playlist", boom)
+
+    resp = _create(client, "Test", "06:00", "09:00")
+    assert resp.status_code == 500
+    body = resp.get_json()
+    assert body["error"] == "An internal error occurred"
+    assert body["code"] == "internal_error"
+    assert body["details"]["context"] == "create playlist"
+    assert "secret detail" not in resp.get_data(as_text=True)
+    assert _saved_playlists(device_config_dev) == {}
+
+
+@pytest.mark.parametrize(
+    ("payload", "error"),
+    [
+        pytest.param({}, "Playlist name is required", id="empty"),
+        pytest.param(
+            {"new_name": "Updated", "start_time": "10:00", "end_time": "10:00"},
+            "cannot be the same",
+            id="same-times",
+        ),
+    ],
+)
+def test_update_playlist_refusal_keeps_the_saved_playlist(
+    client: FlaskClient, device_config_dev: Any, payload: Any, error: str
+) -> None:
+    assert _create(client, "Test", "06:00", "09:00").status_code == 200
+
+    resp = client.put("/update_playlist/Test", json=payload)
+    assert resp.status_code == 400
+    assert error in resp.get_json()["error"]
+    saved = _saved_playlists(device_config_dev)
+    assert "Updated" not in saved
+    assert (saved["Test"]["start_time"], saved["Test"]["end_time"]) == (
+        "06:00",
+        "09:00",
+    )
+
+
+def test_update_playlist_reports_a_failed_save(
+    client: FlaskClient,
+    flask_app: Flask,
+    device_config_dev: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    assert _create(client, "X", "01:00", "02:00").status_code == 200
+    pm = flask_app.config["DEVICE_CONFIG"].get_playlist_manager()
+    monkeypatch.setattr(pm, "update_playlist", lambda *args, **kwargs: False)
+
+    resp = client.put(
+        "/update_playlist/X",
+        json={"new_name": "Y", "start_time": "03:00", "end_time": "04:00"},
+    )
+    assert resp.status_code == 500
+    assert resp.get_json()["success"] is False
+    saved = _saved_playlists(device_config_dev)
+    assert "Y" not in saved
+    assert (saved["X"]["start_time"], saved["X"]["end_time"]) == ("01:00", "02:00")
+
+
+def test_update_playlist_saves_an_overnight_window(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
+    assert _create(client, "Overnight", "06:00", "09:00").status_code == 200
+
+    resp = client.put(
+        "/update_playlist/Overnight",
+        json={"new_name": "Overnight", "start_time": "22:00", "end_time": "05:00"},
+    )
+    assert resp.status_code == 200
+    saved = _saved_playlists(device_config_dev)["Overnight"]
+    assert (saved["start_time"], saved["end_time"]) == ("22:00", "05:00")
+
+
+def test_delete_playlist_without_a_name_is_not_a_route(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
+    assert _create(client, "Keep", "06:00", "09:00").status_code == 200
+
+    before = _saved_playlists(device_config_dev)
+    assert "Keep" in before
+
+    assert client.delete("/delete_playlist/").status_code == 404
+    assert _saved_playlists(device_config_dev) == before

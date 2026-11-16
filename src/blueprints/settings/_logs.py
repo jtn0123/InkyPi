@@ -129,8 +129,8 @@ def api_logs() -> ResponseReturnValue:
 
         # Read raw lines for the main service; include update unit if running
         units = ["inkypi.service"]
-        update_unit = updates._UPDATE_STATE.get("unit")
-        if isinstance(update_unit, str) and update_unit:
+        update_unit = updates.current_unit()
+        if update_unit:
             units.append(update_unit)
         if len(units) == 1:
             lines = logs._read_log_lines(hours)

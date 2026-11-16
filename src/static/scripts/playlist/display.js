@@ -3,6 +3,19 @@
   global.InkyPiPlaylist = global.InkyPiPlaylist || {};
   const ns = global.InkyPiPlaylist;
 
+  // Every playlist change reloads the page so the cards come from the server.
+  // A toast shown just before the reload would vanish with the old page, so
+  // the message waits in sessionStorage and restoreStoredMessage shows it on
+  // the new one.
+  function reloadWithMessage(type, text) {
+    try {
+      sessionStorage.setItem("storedMessage", JSON.stringify({ type, text }));
+    } catch (error) {
+      console.debug("Could not keep the playlist message for the reload:", error);
+    }
+    location.reload();
+  }
+
   function restoreStoredMessage() {
     const storedMessage = sessionStorage.getItem("storedMessage");
     if (!storedMessage) return;
@@ -59,11 +72,7 @@
           plugin_instance: pluginInstance,
         }),
       });
-      sessionStorage.setItem(
-        "storedMessage",
-        JSON.stringify({ type: "success", text: `Success! ${result.message}` })
-      );
-      location.reload();
+      reloadWithMessage("success", `Success! ${result.message}`);
       return;
     } catch (error) {
       // Shown in the toast below, so it isn't logged as an error.
@@ -83,4 +92,5 @@
 
   ns.bindStoredMessageHandler = bindStoredMessageHandler;
   ns.displayPluginInstance = displayPluginInstance;
+  ns.reloadWithMessage = reloadWithMessage;
 })(globalThis);

@@ -448,6 +448,56 @@ body.modal-open {
     white-space: pre-wrap;
 }
 
+/* Progress of an update or rollback (settings/update_tracker.js): a
+   spinner while it runs, then a green or red edge for how it ended.
+   @keyframes spin lives in _validation.css. */
+.update-progress {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px 12px;
+    margin: 0 0 var(--spacing-md);
+    padding: 10px 14px;
+    border: 1px solid var(--surface-border);
+    border-left: 4px solid var(--accent);
+    border-radius: var(--border-radius-sm);
+    background: var(--surface);
+    color: var(--text);
+    font-size: 0.9rem;
+}
+
+.update-progress[hidden] {
+    display: none;
+}
+
+.update-progress[data-state="success"] {
+    border-left-color: var(--success);
+}
+
+.update-progress[data-state="failure"] {
+    border-left-color: var(--error);
+}
+
+.update-progress-text {
+    flex: 1 1 16rem;
+    min-width: 0;
+}
+
+.update-progress-spinner {
+    display: none;
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+    border: 2px solid var(--surface-border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.9s linear infinite;
+}
+
+.update-progress[data-state="running"] .update-progress-spinner {
+    display: inline-block;
+}
+
 .update-release-notes {
     margin-bottom: var(--spacing-md);
 }

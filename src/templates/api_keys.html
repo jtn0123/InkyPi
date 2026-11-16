@@ -19,13 +19,8 @@
         {{ breadcrumb([{'label': 'Home', 'url': url_for('main.main_page')}, {'label': 'Settings', 'url': url_for('settings.settings_page')}, {'label': 'API Keys'}]) }}
         {% set key_summary = namespace(provider_count=(entries|length if entries is defined else 0), configured_count=0) %}
         {% if api_keys_mode == 'managed' %}
-            {% set key_summary.provider_count = 6 %}
-            {% if masked.OPEN_AI_SECRET %}{% set key_summary.configured_count = key_summary.configured_count + 1 %}{% endif %}
-            {% if masked.OPEN_WEATHER_MAP_SECRET %}{% set key_summary.configured_count = key_summary.configured_count + 1 %}{% endif %}
-            {% if masked.NASA_SECRET %}{% set key_summary.configured_count = key_summary.configured_count + 1 %}{% endif %}
-            {% if masked.UNSPLASH_ACCESS_KEY %}{% set key_summary.configured_count = key_summary.configured_count + 1 %}{% endif %}
-            {% if masked.GITHUB_SECRET %}{% set key_summary.configured_count = key_summary.configured_count + 1 %}{% endif %}
-            {% if masked.GOOGLE_AI_SECRET %}{% set key_summary.configured_count = key_summary.configured_count + 1 %}{% endif %}
+            {% set key_summary.provider_count = api_key_providers | length %}
+            {% set key_summary.configured_count = masked.values() | select | list | length %}
         {% else %}
             {% set key_summary.configured_count = entries|length if entries is defined else 0 %}
         {% endif %}
@@ -44,16 +39,17 @@
 
         {% if api_keys_mode == 'managed' %}
         <form id="apiKeysForm" class="settings-form">
+            {# The providers come from services/api_keys.py, the one list of keys. #}
             <div class="settings-container api-keys-grid">
-                {{ api_key_card('OpenWeather', 'OPEN_WEATHER_MAP_SECRET', 'openweather-input', 'openweather-status', 'Enter OpenWeather API key', masked, api_key_plugins) }}
-                {{ api_key_card('OpenAI', 'OPEN_AI_SECRET', 'openai-input', 'openai-status', 'Enter OpenAI API key', masked, api_key_plugins) }}
-                {{ api_key_card('NASA', 'NASA_SECRET', 'nasa-input', 'nasa-status', 'Enter NASA API key', masked, api_key_plugins, delete_label='NASA APOD') }}
-                {{ api_key_card('Unsplash', 'UNSPLASH_ACCESS_KEY', 'unsplash-input', 'unsplash-status', 'Enter Unsplash access key', masked, api_key_plugins) }}
+                {% for provider in api_key_providers if not provider.more %}
+                {{ api_key_card(provider.label, provider.key, provider.slug ~ '-input', provider.slug ~ '-status', provider.placeholder, masked, api_key_plugins, delete_label=provider.delete_label) }}
+                {% endfor %}
                 <details class="api-keys-more">
                     <summary>More providers</summary>
                     <div class="api-keys-more-grid">
-                        {{ api_key_card('GitHub', 'GITHUB_SECRET', 'github-input', 'github-status', 'Enter GitHub personal access token', masked, api_key_plugins) }}
-                        {{ api_key_card('Google AI', 'GOOGLE_AI_SECRET', 'googleai-input', 'googleai-status', 'Enter Google AI API key', masked, api_key_plugins) }}
+                        {% for provider in api_key_providers if provider.more %}
+                        {{ api_key_card(provider.label, provider.key, provider.slug ~ '-input', provider.slug ~ '-status', provider.placeholder, masked, api_key_plugins, delete_label=provider.delete_label) }}
+                        {% endfor %}
                     </div>
                 </details>
             </div>
@@ -79,12 +75,9 @@
             <div class="add-buttons-grid">
                 <button type="button" id="addApiKeyBtn" class="btn-add" data-api-action="add-row"><span>+</span> Add API Key</button>
                 {# data-test-skip-click: preset chips are repetitive low-signal click-sweep targets; add-row/save/delete coverage already exercises the page handlers. #}
-                <button type="button" class="btn-preset" data-api-action="add-preset" data-key="OPEN_WEATHER_MAP_SECRET" data-test-skip-click="true" title="Used by: {{ api_key_plugins.get('OPEN_WEATHER_MAP_SECRET', []) | join(', ') }}">OPEN_WEATHER_MAP_SECRET</button>
-                <button type="button" class="btn-preset" data-api-action="add-preset" data-key="OPEN_AI_SECRET" data-test-skip-click="true" title="Used by: {{ api_key_plugins.get('OPEN_AI_SECRET', []) | join(', ') }}">OPEN_AI_SECRET</button>
-                <button type="button" class="btn-preset" data-api-action="add-preset" data-key="NASA_SECRET" data-test-skip-click="true" title="Used by: {{ api_key_plugins.get('NASA_SECRET', []) | join(', ') }}">NASA_SECRET</button>
-                <button type="button" class="btn-preset" data-api-action="add-preset" data-key="UNSPLASH_ACCESS_KEY" data-test-skip-click="true" title="Used by: {{ api_key_plugins.get('UNSPLASH_ACCESS_KEY', []) | join(', ') }}">UNSPLASH_ACCESS_KEY</button>
-                <button type="button" class="btn-preset" data-api-action="add-preset" data-key="GITHUB_SECRET" data-test-skip-click="true" title="Used by: {{ api_key_plugins.get('GITHUB_SECRET', []) | join(', ') }}">GITHUB_SECRET</button>
-                <button type="button" class="btn-preset" data-api-action="add-preset" data-key="GOOGLE_AI_SECRET" data-test-skip-click="true" title="Used by: {{ api_key_plugins.get('GOOGLE_AI_SECRET', []) | join(', ') }}">GOOGLE_AI_SECRET</button>
+                {% for provider in api_key_providers %}
+                <button type="button" class="btn-preset" data-api-action="add-preset" data-key="{{ provider.key }}" data-test-skip-click="true" title="Used by: {{ api_key_plugins.get(provider.key, []) | join(', ') }}">{{ provider.key }}</button>
+                {% endfor %}
             </div>
         </div>
         {% endif %}

@@ -7,15 +7,11 @@ rotation ETA used by both the ``/playlist`` page and ``/playlist/eta``.
 from datetime import datetime, timedelta
 from typing import Any, cast
 
-from model import Playlist
 from refresh_task import schedule
 from utils.api_responses import JsonResponse, json_error
+from utils.time_utils import parse_hhmm
 
 from ._common import _CODE_VALIDATION, _MSG_TIME_OVERLAP, logger
-
-
-def _to_minutes(time_str: str) -> int:
-    return int(Playlist._to_minutes(time_str))
 
 
 def _segments(start_min: int, end_min: int) -> list[tuple[int, int]]:
@@ -41,8 +37,8 @@ def _default_overlap_warning(
     try:
         for pl in playlists:
             if getattr(pl, "name", "") == "Default":
-                ps = _to_minutes(pl.start_time)
-                pe = _to_minutes(pl.end_time)
+                ps = parse_hhmm(pl.start_time)
+                pe = parse_hhmm(pl.end_time)
                 if _windows_overlap(start_min, end_min, ps, pe):
                     return (
                         "This playlist overlaps with Default. During its active hours, "
@@ -67,8 +63,8 @@ def _check_playlist_overlap(
         if pl.name == exclude_name or getattr(pl, "name", "") == "Default":
             continue
         try:
-            ps = _to_minutes(pl.start_time)
-            pe = _to_minutes(pl.end_time)
+            ps = parse_hhmm(pl.start_time)
+            pe = parse_hhmm(pl.end_time)
         except (AttributeError, TypeError, ValueError):
             # One unreadable stored window mustn't switch the check off for
             # every other playlist.

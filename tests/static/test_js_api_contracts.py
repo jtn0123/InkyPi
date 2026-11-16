@@ -101,31 +101,30 @@ def test_response_modal_script_exists(client: FlaskClient) -> None:
         "function showToast(status, message, duration = TOAST_DURATION_MS)",
         "function closeToast(toastId)",
         "function showResponseModal(status, message)",
-        "async function handleJsonResponse(response, options = {})",
         "function showError(message, duration)",
     ]:
         assert token in js
 
     # Other scripts call these by bare name; the file publishes them.
-    for name in ["showToast", "showResponseModal", "showError", "handleJsonResponse"]:
+    for name in ["showToast", "showResponseModal", "showError"]:
         assert f"globalThis.{name} = {name};" in js
 
     # Auto-dismiss constants
     assert "TOAST_ERROR_DURATION_MS" in js
 
 
-def test_handle_json_response_presence(client: FlaskClient) -> None:
-    resp = client.get("/static/scripts/response_modal.js")
-    assert resp.status_code == 200
-    js = resp.get_data(as_text=True)
+def test_requests_go_through_fetch_json(client: FlaskClient) -> None:
+    # handleJsonResponse toasted every reply itself, so a success message
+    # flashed and vanished on the reload that followed. Its last callers (the
+    # playlist page) moved to fetchJson, and it was deleted.
+    users = [
+        str(path.relative_to(_SCRIPTS_DIR))
+        for path in sorted(_SCRIPTS_DIR.rglob("*.js"))
+        if "handleJsonResponse" in path.read_text(encoding="utf-8")
+    ]
+    assert users == []
 
-    # Check that handleJsonResponse includes request_id
-    assert "handleJsonResponse" in js
-    assert "request_id" in js
-
-    # Status codes are mapped to messages by the shared fetchJson helper,
-    # which handleJsonResponse reads replies through.
-    assert "InkyPiHttp.readJson" in js
+    # Status codes are mapped to messages by the shared fetchJson helper.
     resp = client.get("/static/scripts/fetch_json.js")
     assert resp.status_code == 200
     helper = resp.get_data(as_text=True)

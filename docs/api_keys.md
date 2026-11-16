@@ -18,12 +18,15 @@ Use the web UI:
 
 1. Open InkyPi in a browser and choose **API Keys** in the sidebar. A plugin
    that needs a key also has a **Manage keys** button on its page.
-2. To add a key, choose **Add API Key**, enter the key name from the table
-   (for example `NASA_SECRET`) and paste the value.
-3. To replace a key, for example after rotating it, type the new value into
-   its row. A row left blank keeps its current value.
-4. To remove a key, choose **×** on its row.
-5. Save.
+2. Find the provider's card. Every key in the table has one; GitHub, Google
+   AI and Immich are under **More providers**.
+3. To add a key, choose **Add key** and paste the value. To replace one, for
+   example after rotating it, choose **Change key** and paste the new value.
+4. Choose **Save API keys**. A card left blank keeps its current key.
+5. To remove a key, choose **Change key**, then **Delete**.
+
+The page lists the keys in `src/services/api_keys.py`. The same list decides
+which keys a backup includes.
 
 Plugins read their key on every refresh, so a change applies from the
 plugin's next refresh. If a plugin still uses the old key, restart the

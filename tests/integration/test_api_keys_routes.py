@@ -14,8 +14,8 @@ def test_api_keys_page_loads(client: FlaskClient) -> None:
     assert 'id="saveApiKeysBtn"' in body
     assert "Save API keys" in body
     assert "Third-party credentials used by plugins." in body
-    # The managed API keys page renders a `6 providers` status chip below
-    # the header (see test_managed_api_keys_renders_all_six_providers).
+    # The managed API keys page renders an `N providers` status chip below
+    # the header (see test_managed_api_keys_renders_all_providers).
 
 
 def test_api_keys_page_shows_configured_count(

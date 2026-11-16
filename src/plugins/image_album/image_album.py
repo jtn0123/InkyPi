@@ -18,9 +18,26 @@ from utils.image_loader import (
     resolve_fit_mode,
 )
 from utils.image_utils import pad_image_blur, resolve_background_color
-from utils.security_utils import URLValidationError, validate_url_with_ips
+from utils.safe_fetch import private_feeds_allowed, url_validation_error
+from utils.security_utils import validate_url_with_ips
 
 logger = logging.getLogger(__name__)
+
+
+def _refuse_redirect(response: object, url: str) -> None:
+    """Raise if *response* is a redirect.
+
+    Immich API calls carry the ``x-api-key`` header, which ``requests`` keeps
+    when it follows a redirect to another host, and a followed redirect
+    would also skip the SSRF check on its target.  The calls therefore never
+    follow redirects; a server that answers with one is reported instead.
+    """
+    status = getattr(response, "status_code", None)
+    if isinstance(status, int) and 300 <= status < 400:
+        raise RuntimeError(
+            f"Immich answered {status} (a redirect) for {url}. Set the Base URL "
+            "to the address Immich is served from."
+        )
 
 
 class ImmichProvider:
@@ -30,6 +47,8 @@ class ImmichProvider:
         key: str,
         image_loader: AdaptiveImageLoader,
         pinned_ips: tuple[str, ...] | None = None,
+        *,
+        allow_lan: bool = False,
     ) -> None:
         self.base_url = base_url
         self.key = key
@@ -37,6 +56,7 @@ class ImmichProvider:
         self.image_loader = image_loader
         self.session = get_http_session()
         self.pinned_ips: tuple[str, ...] = tuple(pinned_ips or ())
+        self.allow_lan = allow_lan
         import urllib.parse as _urlparse
 
         self._pin_hostname = _urlparse.urlparse(base_url).hostname or ""
@@ -50,10 +70,12 @@ class ImmichProvider:
 
     def get_album_id(self, album: str) -> str:
         logger.debug(f"Fetching albums from {self.base_url}")
+        url = f"{self.base_url}/api/albums"
         with self._pin():
             r = self.session.get(
-                f"{self.base_url}/api/albums", headers=self.headers, timeout=10
+                url, headers=self.headers, timeout=10, allow_redirects=False
             )
+        _refuse_redirect(r, url)
         r.raise_for_status()
         albums_raw: object = r.json()
         albums = (
@@ -75,15 +97,18 @@ class ImmichProvider:
         page = 1
 
         logger.debug(f"Fetching assets from album {album_id}")
+        url = f"{self.base_url}/api/search/metadata"
         while page_items:
             body = {"albumIds": [album_id], "size": 1000, "page": page}
             with self._pin():
                 r2 = self.session.post(
-                    f"{self.base_url}/api/search/metadata",
+                    url,
                     json=body,
                     headers=self.headers,
                     timeout=10,
+                    allow_redirects=False,
                 )
+            _refuse_redirect(r2, url)
             r2.raise_for_status()
             assets_data = cast(dict[str, object], r2.json())
             assets_obj = assets_data.get("assets")
@@ -140,15 +165,17 @@ class ImmichProvider:
         logger.debug(f"Downloading from: {asset_url}")
 
         # Use adaptive image loader for memory-efficient processing
-        # Let loader resize when requested (when no padding will be applied)
-        with self._pin():
-            img = self.image_loader.from_url(
-                asset_url,
-                dimensions,
-                timeout_ms=40000,
-                resize=resize,
-                headers=self.headers,
-            )
+        # Let loader resize when requested (when no padding will be applied).
+        # The loader's guarded stream validates and pins every hop itself, and
+        # drops the API key if a redirect leaves the Immich origin.
+        img = self.image_loader.from_url(
+            asset_url,
+            dimensions,
+            timeout_ms=40000,
+            resize=resize,
+            headers=self.headers,
+            allow_lan=self.allow_lan,
+        )
 
         if not img:
             logger.error(f"Failed to load image {asset_id} from Immich")
@@ -265,13 +292,15 @@ class ImageAlbum(BasePlugin):
             raise RuntimeError("Immich URL is required.")
         url = raw_url
 
+        # LAN and Tailscale servers need the INKYPI_ALLOW_PRIVATE_FEEDS opt-in.
+        allow_lan = private_feeds_allowed()
         try:
-            _, pinned_ips = validate_url_with_ips(url)
+            _, pinned_ips = validate_url_with_ips(url, allow_lan=allow_lan)
         except ValueError as e:
             # URLValidationError is a PermanentPluginError subclass, so the
             # refresh-task retry loop skips extra attempts (JTN-778) and the
             # plugin blueprint maps it to HTTP 422 validation_error (JTN-776).
-            raise URLValidationError(f"Invalid URL: {e}") from e
+            raise url_validation_error(e) from e
 
         raw_album = settings.get("album")
         if not isinstance(raw_album, str) or not raw_album:
@@ -282,7 +311,9 @@ class ImageAlbum(BasePlugin):
         logger.info(f"Immich URL: {url}")
         logger.info(f"Album: {album}")
 
-        provider = ImmichProvider(url, key, self.image_loader, pinned_ips=pinned_ips)
+        provider = ImmichProvider(
+            url, key, self.image_loader, pinned_ips=pinned_ips, allow_lan=allow_lan
+        )
         img = provider.get_image(album, dimensions, resize=not use_padding)
 
         if not img:

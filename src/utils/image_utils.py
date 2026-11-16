@@ -152,7 +152,9 @@ def get_image(image_url: str, timeout_seconds: float = 10.0) -> Image.Image | No
     return img
 
 
-def _stream_to_disk(url: str, timeout: float, pinned_ips: tuple[str, ...]) -> str:
+def _stream_to_disk(
+    url: str, timeout: float, pinned_ips: tuple[str, ...], *, allow_lan: bool = False
+) -> str:
     """Download *url* to a temporary file via streaming and return its path.
 
     *pinned_ips* are the addresses already vetted for *url*; any redirect
@@ -171,7 +173,9 @@ def _stream_to_disk(url: str, timeout: float, pinned_ips: tuple[str, ...]) -> st
             allow_redirects=False,
         )
 
-    with closing(guarded_fetch(url, _fetch, first_hop_ips=pinned_ips)) as response:
+    with closing(
+        guarded_fetch(url, _fetch, first_hop_ips=pinned_ips, allow_lan=allow_lan)
+    ) as response:
         response.raise_for_status()
         with tempfile.NamedTemporaryFile(delete=False, suffix=".img") as tmp:
             for chunk in response.iter_content(chunk_size=8192):
@@ -184,15 +188,20 @@ def fetch_and_resize_remote_image(
     image_url: str,
     dimensions: tuple[int, int],
     timeout_seconds: float = 40.0,
+    *,
+    allow_lan: bool = False,
 ) -> Image.Image | None:
     """Fetch a remote image and return a resized detached copy.
 
     The hostname is validated and DNS-pinned for the duration of the fetch
     to mitigate DNS-rebinding SSRF (JTN-656); redirects are followed only
-    after each target is validated and pinned the same way.
+    after each target is validated and pinned the same way.  *allow_lan*
+    admits local-network and Tailscale addresses on every hop.
     """
     try:
-        validated_url, pinned_ips = validate_url_with_ips(image_url)
+        validated_url, pinned_ips = validate_url_with_ips(
+            image_url, allow_lan=allow_lan
+        )
     except ValueError as exc:
         logger.error(f"Rejected remote image URL {image_url}: {exc}")
         return None
@@ -206,7 +215,9 @@ def fetch_and_resize_remote_image(
     if loader.is_low_resource:
         tmp_path = None
         try:
-            tmp_path = _stream_to_disk(validated_url, timeout_seconds, pinned_ips)
+            tmp_path = _stream_to_disk(
+                validated_url, timeout_seconds, pinned_ips, allow_lan=allow_lan
+            )
             return loader.from_file(tmp_path, dimensions, resize=True)
         except Exception as e:
             logger.error(f"Failed to fetch remote image from {image_url}: {e}")
@@ -225,6 +236,7 @@ def fetch_and_resize_remote_image(
                 hop_url, timeout=timeout_seconds, allow_redirects=False
             ),
             first_hop_ips=pinned_ips,
+            allow_lan=allow_lan,
         )
         response.raise_for_status()
     except Exception as e:
