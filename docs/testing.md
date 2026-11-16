@@ -191,6 +191,22 @@ Notes:
 
 ---
 
+### Random test order
+
+`pytest-randomly` is installed, but it is off by default (`pytest.ini` has `-p no:randomly`). A test that only passes in one order hides state leaks, so run the suite shuffled when you change shared state. Turn it on with `-p randomly`:
+
+```bash
+PYTHONPATH=src:. SKIP_BROWSER=1 pytest -p randomly
+```
+
+The header prints `Using --randomly-seed=N`. To replay a failing order, pass the same seed: `pytest -p randomly --randomly-seed=N <file>`. `.github/workflows/random-order-nightly.yml` runs the suite shuffled every night, without browsers.
+
+### tests/static ratchet
+
+`tests/static/` holds tests that grep JS and CSS source text instead of driving the page. They miss real behaviour, so new ones are not allowed. `tests/unit/test_static_text_tests_ratchet.py` counts the `test_*.py` files there and fails if the count goes up. Write a Playwright test in `tests/integration/` instead. The test also fails if the count goes down, so lower `CEILING` in that file to the new count.
+
+---
+
 ### Adding New Tests
 
 1) Place tests under `tests/` (unit, integration, or plugin subfolders).
