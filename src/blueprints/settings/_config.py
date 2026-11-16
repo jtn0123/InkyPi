@@ -70,6 +70,13 @@ _ALLOWED_IMPORT_CONFIG_KEYS = frozenset(
     }
 )
 
+# Config entries that are secrets: ``auth`` can hold the PIN and every
+# ``webhook_urls`` entry carries its service's token. Only a keyed backup
+# (which needs a PIN) exports them, and an import restores them only when the
+# backup has them, so restoring a backup without keys keeps this device's PIN
+# and webhooks.
+_KEYED_CONFIG_KEYS = ("auth", "webhook_urls")
+
 # The provider keys plugins read; a keyed backup exports and imports exactly
 # these, so a restore brings back every key a plugin needs.
 _BACKUP_ENV_KEYS = frozenset(
@@ -264,9 +271,14 @@ def export_settings() -> ResponseReturnValue:
             )
         device_config = get_device_config()
 
-        # Build export object with config plus env keys when requested
+        # Build export object with config plus env keys when requested. The
+        # PIN and webhook links travel only with the keys.
+        config = device_config.get_config()
+        if not include_keys:
+            for key in _KEYED_CONFIG_KEYS:
+                config.pop(key, None)
         data = {
-            "config": device_config.get_config(),
+            "config": config,
         }
         if include_keys:
             keys = {}
@@ -299,6 +311,32 @@ def _extract_import_payload() -> dict[str, Any] | None:
     if not payload or not isinstance(payload, dict):
         return None
     return dict(payload)
+
+
+def _keyed_config_from_backup(cfg: dict[str, Any]) -> dict[str, Any]:
+    """Return the backup's PIN and webhook entries that should be restored.
+
+    An entry the backup leaves out is left out here too, so the device keeps
+    its own value. One that is present but malformed fails the import before
+    anything is written.
+    """
+    keyed: dict[str, Any] = {}
+    if "auth" in cfg:
+        auth = cfg["auth"]
+        if not isinstance(auth, dict) or not isinstance(auth.get("pin", ""), str):
+            raise ClientInputError("Backup has an invalid auth section", status=400)
+        keyed["auth"] = auth
+    if "webhook_urls" in cfg:
+        urls = cfg["webhook_urls"]
+        if not isinstance(urls, list) or not all(
+            isinstance(url, str) and url.lower().startswith(("http://", "https://"))
+            for url in urls
+        ):
+            raise ClientInputError(
+                "Backup has an invalid webhook_urls list", status=400
+            )
+        keyed["webhook_urls"] = urls
+    return keyed
 
 
 def _apply_imported_config(device_config: Config, filtered_cfg: dict[str, Any]) -> None:
@@ -351,12 +389,17 @@ def import_settings() -> ResponseReturnValue:
             raise ClientInputError("Invalid import payload", status=400)
 
         cfg_keys_applied = 0
+        pin_changed = False
         cfg = payload.get("config")
         if isinstance(cfg, dict):
             # Filter to allowed keys only
             filtered_cfg = {
                 k: v for k, v in cfg.items() if k in _ALLOWED_IMPORT_CONFIG_KEYS
             }
+            keyed_cfg = _keyed_config_from_backup(cfg)
+            current_auth = device_config.get_config("auth")
+            pin_changed = "auth" in keyed_cfg and keyed_cfg["auth"] != current_auth
+            filtered_cfg.update(keyed_cfg)
             if filtered_cfg:
                 _apply_imported_config(device_config, filtered_cfg)
                 cfg_keys_applied = len(filtered_cfg)
@@ -388,7 +431,11 @@ def import_settings() -> ResponseReturnValue:
             parts.append(
                 f"{env_keys_applied} API key{'s' if env_keys_applied != 1 else ''}"
             )
-        return json_success(message=f"Restored {' and '.join(parts)}")
+        message = f"Restored {' and '.join(parts)}"
+        if pin_changed:
+            # The PIN is read once, when InkyPi starts.
+            message += ". Restart InkyPi to use the PIN from the backup"
+        return json_success(message=message)
 
 
 @settings_bp.route("/settings/api-keys", methods=["GET"])

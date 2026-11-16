@@ -5,6 +5,8 @@ import os
 import socket
 import urllib.parse
 
+from utils.dns_pinning import idna_hostname
+
 # URLValidationError — and the whitelist of hardcoded validator messages —
 # live in ``utils.plugin_errors`` so the subprocess worker and cross-process
 # tests can reference the exception type without importing ``security_utils``
@@ -24,19 +26,23 @@ from utils.plugin_errors import (
 __all__ = [
     "LanAddressError",
     "URLValidationError",
+    "is_public_address",
     "validate_url",
     "validate_url_with_ips",
     "validate_file_path",
 ]
 
 
-def validate_url(url: str) -> str:
+def validate_url(url: str, *, allow_lan: bool = False) -> str:
     """Validate that a URL uses an allowed scheme and does not resolve to a private IP.
 
     Parameters
     ----------
     url:
         The URL string to validate.
+    allow_lan:
+        Also accept local-network and Tailscale addresses; see
+        :func:`validate_url_with_ips`.
 
     Returns
     -------
@@ -49,20 +55,57 @@ def validate_url(url: str) -> str:
         If the URL is empty, uses a disallowed scheme, targets localhost,
         or resolves to a private/reserved IP address.
     """
-    url_out, _ips = validate_url_with_ips(url)
+    url_out, _ips = validate_url_with_ips(url, allow_lan=allow_lan)
     return url_out
 
 
-#: Site-local ranges that :func:`validate_url_with_ips` admits when the caller
-#: passes ``allow_lan=True`` (RFC 1918 IPv4 and RFC 4193 IPv6 unique-local).
-#: Loopback, link-local (cloud metadata), unspecified, reserved and multicast
+#: Ranges that :func:`validate_url_with_ips` admits when the caller passes
+#: ``allow_lan=True``: RFC 1918 IPv4, RFC 6598 shared address space (carrier
+#: NAT, and the addresses Tailscale hands out) and RFC 4193 IPv6
+#: unique-local (Tailscale's IPv6 range sits inside it).  Loopback,
+#: link-local (cloud metadata), unspecified, reserved and multicast
 #: addresses stay blocked even then.
 _LAN_NETWORKS: tuple[ipaddress.IPv4Network | ipaddress.IPv6Network, ...] = (
     ipaddress.ip_network("10.0.0.0/8"),
     ipaddress.ip_network("172.16.0.0/12"),
     ipaddress.ip_network("192.168.0.0/16"),
+    ipaddress.ip_network("100.64.0.0/10"),
     ipaddress.ip_network("fc00::/7"),
 )
+
+#: Ranges Python's ``is_global`` still counts as public that no fetch should
+#: reach: the 6to4 relay anycast prefix, deprecated by RFC 7526, forwards to
+#: whichever relay is nearest rather than to one known host.
+_NOT_PUBLIC_NETWORKS: tuple[ipaddress.IPv4Network, ...] = (
+    ipaddress.IPv4Network("192.88.99.0/24"),
+)
+
+#: Global unicast IPv6.  Addresses outside it that ``is_global`` accepts
+#: (NAT64 ``64:ff9b::/96``, IPv4-mapped ``::ffff:0:0/96``) can carry a
+#: private IPv4 destination.
+_IPV6_GLOBAL_UNICAST = ipaddress.IPv6Network("2000::/3")
+
+
+def is_public_address(
+    address: str | ipaddress.IPv4Address | ipaddress.IPv6Address,
+) -> bool:
+    """Return True if *address* is a public unicast address a fetch may reach.
+
+    Shared by the user-URL guard (:func:`validate_url_with_ips`) and the
+    remote-rendering proxy (:mod:`utils.remote_rendering`), so both refuse
+    the same ranges.  Anything ``ipaddress`` doesn't call global is refused:
+    private, shared (``100.64.0.0/10``), loopback, link-local, documentation,
+    benchmarking and reserved ranges.  Multicast, the 6to4 relay anycast
+    prefix and IPv6 outside ``2000::/3`` or inside the 6to4 and Teredo
+    tunnelling prefixes are refused too, because those can stand for a
+    private IPv4 destination.
+    """
+    addr = ipaddress.ip_address(address)
+    if not addr.is_global or addr.is_multicast:
+        return False
+    if isinstance(addr, ipaddress.IPv6Address):
+        return addr in _IPV6_GLOBAL_UNICAST and not (addr.sixtofour or addr.teredo)
+    return not any(addr in network for network in _NOT_PUBLIC_NETWORKS)
 
 
 def validate_url_with_ips(
@@ -77,9 +120,15 @@ def validate_url_with_ips(
     the answer to a private IP between validation and the actual request
     (JTN-656).
 
-    When *allow_lan* is true, addresses inside :data:`_LAN_NETWORKS` are
-    accepted (an explicit per-deployment opt-in for feeds served from the
-    local network); every other private/special range is still rejected.
+    Every resolved address must pass :func:`is_public_address`.  When
+    *allow_lan* is true, addresses inside :data:`_LAN_NETWORKS` are accepted
+    as well (an explicit per-deployment opt-in for servers on the local
+    network or a Tailscale tailnet); every other non-public range is still
+    rejected.
+
+    A non-ASCII host name is resolved in the ASCII (IDNA) form that
+    ``requests`` connects to, so the returned IPs belong to the same name
+    that :func:`utils.dns_pinning.pinned_dns` pins.
 
     Raises
     ------
@@ -127,7 +176,7 @@ def validate_url_with_ips(
 
     # Resolve hostname and check all resulting IPs
     try:
-        addr_infos = socket.getaddrinfo(hostname, None)
+        addr_infos = socket.getaddrinfo(idna_hostname(hostname), None)
     except (UnicodeError, OSError) as exc:
         raise ValueError(_URL_ERR_UNRESOLVABLE) from exc
 
@@ -163,24 +212,19 @@ def _reject_private_ip(
     *,
     allow_lan: bool = False,
 ) -> None:
-    """Raise ValueError if *addr* is private, loopback, link-local, reserved, or multicast.
+    """Raise ValueError unless *addr* is public (see :func:`is_public_address`).
 
-    With *allow_lan*, RFC 1918 / unique-local addresses are permitted.  When
+    With *allow_lan*, :data:`_LAN_NETWORKS` addresses are permitted too.  When
     they are not, the rejection is a :class:`LanAddressError` so callers that
     offer an opt-in can tell "LAN host" apart from loopback/metadata targets.
     """
+    if is_public_address(addr):
+        return
     if _is_lan_address(addr):
         if allow_lan:
             return
         raise LanAddressError(_URL_ERR_PRIVATE)
-    if (
-        addr.is_private
-        or addr.is_loopback
-        or addr.is_link_local
-        or addr.is_reserved
-        or addr.is_multicast
-    ):
-        raise ValueError(_URL_ERR_PRIVATE)
+    raise ValueError(_URL_ERR_PRIVATE)
 
 
 def validate_file_path(file_path: str, allowed_directory: str) -> str:
