@@ -166,3 +166,118 @@ def test_import_ignores_unknown_config_and_env_keys(
     assert device_config_dev.load_env_key("EVIL_KEY") is None
     # Allowed env key should be set
     assert device_config_dev.load_env_key("OPEN_AI_SECRET") == "sk-ok"
+
+
+SECRET_PIN = "pin-do-not-leak-4821"
+SECRET_WEBHOOK = "https://hooks.example.com/services/T000/B000/token-do-not-leak"
+
+
+def _set_secrets(device_config: Any, pin: str, webhook: str) -> None:
+    device_config.update_value("auth", {"pin": pin}, write=True)
+    device_config.update_value("webhook_urls", [webhook], write=True)
+
+
+def test_export_without_keys_leaves_out_the_pin_and_webhooks(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
+    _set_secrets(device_config_dev, SECRET_PIN, SECRET_WEBHOOK)
+
+    resp = client.get("/settings/export")
+
+    assert resp.status_code == 200
+    config = resp.get_json()["data"]["config"]
+    assert "auth" not in config
+    assert "webhook_urls" not in config
+    assert config["name"] == device_config_dev.get_config("name")
+    body = resp.get_data(as_text=True)
+    assert SECRET_PIN not in body
+    assert "token-do-not-leak" not in body
+    # Exporting must not drop them from the device itself.
+    assert device_config_dev.get_config("auth") == {"pin": SECRET_PIN}
+    assert device_config_dev.get_config("webhook_urls") == [SECRET_WEBHOOK]
+
+
+def test_export_with_keys_includes_the_pin_and_webhooks(
+    client: FlaskClient, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setitem(client.application.config, "AUTH_ENABLED", True)
+    _set_secrets(device_config_dev, SECRET_PIN, SECRET_WEBHOOK)
+
+    resp = client.post("/settings/export", json={"include_keys": True})
+
+    assert resp.status_code == 200
+    config = resp.get_json()["data"]["config"]
+    assert config["auth"] == {"pin": SECRET_PIN}
+    assert config["webhook_urls"] == [SECRET_WEBHOOK]
+
+
+def test_restoring_a_backup_without_keys_keeps_the_pin_and_webhooks(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
+    _set_secrets(device_config_dev, SECRET_PIN, SECRET_WEBHOOK)
+    backup = client.get("/settings/export").get_json()["data"]
+    backup["config"]["name"] = "Restored"
+
+    resp = client.post("/settings/import", json=backup)
+
+    assert resp.status_code == 200
+    assert "PIN" not in resp.get_json()["message"]
+    assert device_config_dev.get_config("name") == "Restored"
+    assert device_config_dev.get_config("auth") == {"pin": SECRET_PIN}
+    assert device_config_dev.get_config("webhook_urls") == [SECRET_WEBHOOK]
+
+
+def test_restoring_a_keyed_backup_puts_back_the_pin_and_webhooks(
+    client: FlaskClient, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setitem(client.application.config, "AUTH_ENABLED", True)
+    _set_secrets(device_config_dev, SECRET_PIN, SECRET_WEBHOOK)
+    backup = client.post("/settings/export", json={"include_keys": True}).get_json()[
+        "data"
+    ]
+    _set_secrets(device_config_dev, "another-pin", "https://example.com/other")
+
+    resp = client.post("/settings/import", json=backup)
+
+    assert resp.status_code == 200
+    assert "Restart InkyPi to use the PIN" in resp.get_json()["message"]
+    assert device_config_dev.get_config("auth") == {"pin": SECRET_PIN}
+    assert device_config_dev.get_config("webhook_urls") == [SECRET_WEBHOOK]
+
+
+def test_restoring_the_same_pin_does_not_ask_for_a_restart(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
+    _set_secrets(device_config_dev, SECRET_PIN, SECRET_WEBHOOK)
+    resp = client.post(
+        "/settings/import",
+        json={"config": {"auth": {"pin": SECRET_PIN}, "webhook_urls": []}},
+    )
+    assert resp.status_code == 200
+    assert "PIN" not in resp.get_json()["message"]
+    # A keyed backup with an empty list means "no webhooks".
+    assert device_config_dev.get_config("webhook_urls") == []
+
+
+@pytest.mark.parametrize(
+    "bad",
+    [
+        {"auth": "1234"},
+        {"auth": {"pin": 1234}},
+        {"webhook_urls": "https://example.com/hook"},
+        {"webhook_urls": ["ftp://example.com/hook"]},
+        {"webhook_urls": [None]},
+    ],
+)
+def test_a_malformed_pin_or_webhook_entry_fails_the_whole_import(
+    client: FlaskClient, device_config_dev: Any, bad: dict[str, Any]
+) -> None:
+    _set_secrets(device_config_dev, SECRET_PIN, SECRET_WEBHOOK)
+    before = device_config_dev.get_config("name")
+
+    resp = client.post("/settings/import", json={"config": {"name": "New", **bad}})
+
+    assert resp.status_code == 400
+    assert device_config_dev.get_config("name") == before
+    assert device_config_dev.get_config("auth") == {"pin": SECRET_PIN}
+    assert device_config_dev.get_config("webhook_urls") == [SECRET_WEBHOOK]

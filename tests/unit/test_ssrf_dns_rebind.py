@@ -111,24 +111,178 @@ def test_pinned_dns_forces_getaddrinfo_to_return_pinned_ip(
     ), "pinned_dns must short-circuit DNS for the pinned hostname"
 
 
-def test_pinned_dns_does_not_affect_other_hostnames(
+def test_pinned_dns_refuses_other_hostnames_in_the_pinned_thread(
     monkeypatch: pytest.MonkeyPatch,
 ) -> Any:
+    """While a pin is active, an unmatched lookup fails instead of resolving."""
     from utils import dns_pinning
 
-    seen: dict[str, int] = {}
+    seen: list[Any] = []
 
     def real_resolver(host: Any, port: Any = 0, *a: Any, **kw: Any) -> Any:
-        seen[host] = seen.get(host, 0) + 1
+        seen.append(host)
         return _ainfo("8.8.8.8", port or 0)
 
     monkeypatch.setattr(socket, "getaddrinfo", real_resolver)
 
     with dns_pinning.pinned_dns("pinned.example.com", ("93.184.216.34",)):
-        other = socket.getaddrinfo("other.example.net", 80)
+        with pytest.raises(socket.gaierror):
+            socket.getaddrinfo("other.example.net", 80)
+        with pytest.raises(socket.gaierror):
+            socket.getaddrinfo(None, 80)
 
-    assert other[0][4][0] == "8.8.8.8"
-    assert seen.get("other.example.net") == 1
+    assert seen == [], "an unpinned name reached the real resolver"
+    # Once the pin is gone the thread resolves normally again.
+    assert socket.getaddrinfo("other.example.net", 80)[0][4][0] == "8.8.8.8"
+
+
+def test_pinned_dns_does_not_affect_other_threads(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import threading
+
+    from utils import dns_pinning
+
+    monkeypatch.setattr(socket, "getaddrinfo", lambda *a, **kw: _ainfo("8.8.8.8"))
+    results: list[str] = []
+
+    def other_thread() -> None:
+        results.append(str(socket.getaddrinfo("other.example.net", 80)[0][4][0]))
+
+    with dns_pinning.pinned_dns("pinned.example.com", ("93.184.216.34",)):
+        worker = threading.Thread(target=other_thread)
+        worker.start()
+        worker.join(10)
+
+    assert results == ["8.8.8.8"]
+
+
+def test_pinned_dns_with_no_addresses_resolves_nothing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An empty pin must not fall back to the real resolver."""
+    from utils import dns_pinning
+
+    monkeypatch.setattr(socket, "getaddrinfo", lambda *a, **kw: _ainfo("10.0.0.5"))
+
+    with dns_pinning.pinned_dns("example.com", ()):
+        with pytest.raises(socket.gaierror):
+            socket.getaddrinfo("example.com", 443)
+
+
+# ---------------------------------------------------------------------------
+# Host names with non-ASCII letters (IDNA)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "unicode_host,ascii_host",
+    [
+        ("exämple.com", "xn--exmple-cua.com"),
+        ("BÜCHER.example", "xn--bcher-kva.example"),
+        # IDNA 2008, as requests uses; Python's IDNA 2003 codec gives strasse.de.
+        ("straße.de", "xn--strae-oqa.de"),
+    ],
+)
+def test_pinned_dns_matches_the_ascii_form_of_a_unicode_host(
+    monkeypatch: pytest.MonkeyPatch, unicode_host: str, ascii_host: str
+) -> None:
+    from utils import dns_pinning
+
+    monkeypatch.setattr(socket, "getaddrinfo", lambda *a, **kw: _ainfo("10.0.0.5"))
+
+    with dns_pinning.pinned_dns(unicode_host, ("93.184.216.34",)):
+        by_ascii = socket.getaddrinfo(ascii_host, 443)
+        by_unicode = socket.getaddrinfo(unicode_host, 443)
+        by_bytes = socket.getaddrinfo(ascii_host.encode(), 443)
+
+    for result in (by_ascii, by_unicode, by_bytes):
+        assert result[0][4][0] == "93.184.216.34"
+
+
+def test_pinned_dns_ignores_a_trailing_root_dot(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from utils import dns_pinning
+
+    monkeypatch.setattr(socket, "getaddrinfo", lambda *a, **kw: _ainfo("10.0.0.5"))
+
+    with dns_pinning.pinned_dns("example.com.", ("93.184.216.34",)):
+        assert socket.getaddrinfo("example.com", 443)[0][4][0] == "93.184.216.34"
+
+
+def test_validate_url_with_ips_resolves_the_ascii_form(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from utils.security_utils import validate_url_with_ips
+
+    asked: list[Any] = []
+
+    def resolver(host: Any, *a: Any, **kw: Any) -> Any:
+        asked.append(host)
+        return _ainfo("93.184.216.34")
+
+    monkeypatch.setattr(socket, "getaddrinfo", resolver)
+    url, ips = validate_url_with_ips("https://straße.de/feed")
+
+    assert url == "https://straße.de/feed"
+    assert ips == ("93.184.216.34",)
+    assert asked == ["xn--strae-oqa.de"]
+
+
+def test_validate_url_with_ips_rejects_a_host_with_no_ascii_form(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from utils.plugin_errors import URL_ERR_UNRESOLVABLE
+    from utils.security_utils import validate_url_with_ips
+
+    monkeypatch.setattr(socket, "getaddrinfo", lambda *a, **kw: _ainfo("8.8.8.8"))
+    # U+2488 (DIGIT ONE FULL STOP) is disallowed in IDNA 2008.
+    with pytest.raises(ValueError, match=URL_ERR_UNRESOLVABLE):
+        validate_url_with_ips("https://\u2488example.com/")
+
+
+def test_safe_http_get_pins_a_unicode_host_across_dns_rebind(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The fetch resolves the IDNA name requests uses, and it stays pinned.
+
+    Before the fix the pin was stored under ``exämple.com`` while the request
+    looked up ``xn--exmple-cua.com``, so the lookup reached the (rebound)
+    resolver unpinned.
+    """
+    import requests
+
+    from utils import http_transport, safe_fetch
+
+    http_transport._reset_shared_session_for_tests()
+
+    resolver = _RebindingResolver(first="93.184.216.34", rebound="169.254.169.254")
+    monkeypatch.setattr(socket, "getaddrinfo", resolver)
+    seen: list[tuple[str, str]] = []
+
+    def fake_session_get(self: Any, url: Any, **kwargs: Any) -> Any:
+        import urllib.parse as _urlparse
+
+        # Resolve the host exactly as requests would hand it to urllib3.
+        prepared = requests.models.PreparedRequest()
+        prepared.prepare_url(url, None)
+        host = _urlparse.urlsplit(str(prepared.url)).hostname or ""
+        seen.append((host, str(socket.getaddrinfo(host, 443)[0][4][0])))
+
+        class R:
+            status_code = 200
+            content = b""
+            headers: dict[str, str] = {}
+
+        return R()
+
+    monkeypatch.setattr(requests.Session, "get", fake_session_get, raising=True)
+
+    safe_fetch.safe_http_get("https://exämple.com/data")
+
+    assert seen == [("xn--exmple-cua.com", "93.184.216.34")]
+    assert resolver.calls == ["xn--exmple-cua.com"], "the fetch was not pinned"
 
 
 def test_pinned_dns_restores_previous_resolver_on_exit(
