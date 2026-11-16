@@ -2,6 +2,15 @@
 
 <!-- version list -->
 
+## v1.9.10 (2026-11-16)
+
+### Bug Fixes
+
+- **updates**: Install the latest published release when no tag is given
+  ([#885](https://github.com/jtn0123/InkyPi/pull/885),
+  [`9c76ad4`](https://github.com/jtn0123/InkyPi/commit/9c76ad4aa2d62558d438d8b884c3b5698443c2a8))
+
+
 ## v1.9.9 (2026-11-16)
 
 ### Bug Fixes
