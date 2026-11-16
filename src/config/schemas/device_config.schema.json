@@ -73,8 +73,20 @@
             "required": ["name", "plugins"],
             "properties": {
               "name": { "type": "string" },
-              "start_time": { "type": "string", "pattern": "^\\d{2}:\\d{2}$" },
-              "end_time": { "type": "string", "pattern": "^\\d{2}:\\d{2}$" },
+              "start_time": {
+                "type": "string",
+                "description": "HH:MM from 00:00 to 23:59, or 24:00 for midnight at the end of the day. utils.time_utils.parse_hhmm reads times by this rule.",
+                "minLength": 5,
+                "maxLength": 5,
+                "pattern": "^(?:[01][0-9]|2[0-3]):[0-5][0-9]$|^24:00$"
+              },
+              "end_time": {
+                "type": "string",
+                "description": "Same rule as start_time.",
+                "minLength": 5,
+                "maxLength": 5,
+                "pattern": "^(?:[01][0-9]|2[0-3]):[0-5][0-9]$|^24:00$"
+              },
               "plugins": {
                 "type": "array",
                 "items": {
@@ -102,6 +114,10 @@
         "active_playlist": { "type": ["string", "null"] }
       }
     },
-    "refresh_info": { "type": "object" }
+    "refresh_info": { "type": "object" },
+    "skipped_playlists": {
+      "type": "array",
+      "description": "Playlists the loader set aside because they broke the playlist rules above, each as {reason, playlist}. They are not shown or scheduled; fix one by hand and move it back into playlist_config.playlists."
+    }
   }
 }

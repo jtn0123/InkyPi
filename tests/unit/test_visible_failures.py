@@ -7,11 +7,13 @@
 
 from __future__ import annotations
 
+import json
 import logging
 from pathlib import Path
 from typing import Any
 
 import pytest
+from flask import Flask
 from flask.testing import FlaskClient
 
 from benchmarks import benchmark_storage
@@ -20,10 +22,11 @@ from benchmarks import benchmark_storage
 def _add_broken_then_morning(device_config: Any) -> None:
     pm = device_config.get_playlist_manager()
     pm.add_playlist("Broken", "06:00", "07:00")
-    # As if device.json had been hand-edited; it comes before "Morning".
+    # Unreadable, and before "Morning". Only in memory: a config write refuses
+    # such a time and the loader sets one aside, so this tests the overlap
+    # check's own guard.
     pm.get_playlist("Broken").start_time = "25:99"
     pm.add_playlist("Morning", "08:00", "12:00")
-    device_config.write_config()
 
 
 def test_create_still_refuses_an_overlap_past_an_unreadable_playlist(
@@ -58,16 +61,29 @@ def test_update_still_refuses_an_overlap_past_an_unreadable_playlist(
 
 
 def test_an_unreadable_playlist_does_not_block_a_free_window(
-    client: FlaskClient, device_config_dev: Any
+    flask_app: Flask, client: FlaskClient, device_config_dev: Any
 ) -> None:
-    _add_broken_then_morning(device_config_dev)
+    # device.json edited by hand, then the service restarted.
+    path = Path(device_config_dev.config_file)
+    data = json.loads(path.read_text())
+    data["playlist_config"]["playlists"] = [
+        {"name": "Broken", "start_time": "25:99", "end_time": "07:00", "plugins": []},
+        {"name": "Morning", "start_time": "08:00", "end_time": "12:00", "plugins": []},
+    ]
+    path.write_text(json.dumps(data))
+    flask_app.config["DEVICE_CONFIG"] = type(device_config_dev)()
 
-    resp = client.post(
+    free = client.post(
         "/create_playlist",
         json={"playlist_name": "Late", "start_time": "13:00", "end_time": "15:00"},
     )
+    overlapping = client.post(
+        "/create_playlist",
+        json={"playlist_name": "Brunch", "start_time": "10:00", "end_time": "14:00"},
+    )
 
-    assert resp.status_code == 200
+    assert free.status_code == 200
+    assert overlapping.status_code == 400
 
 
 class _Config:

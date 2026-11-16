@@ -11,6 +11,8 @@ from collections.abc import Iterable
 from datetime import datetime, timedelta
 from typing import Any
 
+from utils.time_utils import parse_hhmm
+
 # Floor for a computed wait. A refresh that is already overdue still waits
 # this long, so a state the loop cannot act on can never spin it.
 MIN_WAIT_SECONDS = 5.0
@@ -163,13 +165,8 @@ def _aware(value: datetime, now: datetime) -> datetime:
 
 
 def _minutes(value: object) -> int | None:
-    """Parse "HH:MM" to minutes past midnight; "24:00" is midnight."""
-    if not isinstance(value, str):
-        return None
+    """Minutes past midnight for a playlist time ("24:00" is midnight), or None."""
     try:
-        hour, minute = map(int, value.split(":"))
+        return parse_hhmm(value) % _MINUTES_PER_DAY
     except ValueError:
         return None
-    if not (0 <= hour <= 24 and 0 <= minute <= 59) or (hour == 24 and minute):
-        return None
-    return (hour * 60 + minute) % _MINUTES_PER_DAY

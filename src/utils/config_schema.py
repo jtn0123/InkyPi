@@ -52,12 +52,17 @@ def field_rules(*path: str) -> Mapping[str, Any]:
     """Return the schema for one device-config key.
 
     ``field_rules("image_settings", "saturation")`` is the rule for
-    ``config["image_settings"]["saturation"]``. Raises ``KeyError`` when the
-    schema does not describe that key, so a caller asking for a rule the schema
-    lacks fails loudly instead of falling back to a private copy.
+    ``config["image_settings"]["saturation"]``. A key below a list applies to
+    each of its items, so ``field_rules("playlist_config", "playlists",
+    "start_time")`` is the rule for every playlist's start time. Raises
+    ``KeyError`` when the schema does not describe that key, so a caller
+    asking for a rule the schema lacks fails loudly instead of falling back to
+    a private copy.
     """
     node: Mapping[str, Any] = _load_schema(SCHEMA_PATH)
     for key in path:
+        if "properties" not in node and "items" in node:
+            node = node["items"]
         node = node["properties"][key]
     return node
 
@@ -130,6 +135,108 @@ def _format_error(ve: jsonschema.ValidationError) -> str:
     if len(bad_repr) > 200:
         bad_repr = bad_repr[:197] + "..."
     return f"{msg} (got: {bad_repr})"
+
+
+SKIPPED_PLAYLISTS_KEY = "skipped_playlists"
+
+_PLAYLIST_TIME_LABELS = {"start_time": "start time", "end_time": "end time"}
+
+
+def _describe_playlist_error(error: jsonschema.ValidationError) -> str:
+    path = list(error.path)
+    if len(path) == 1 and path[0] in _PLAYLIST_TIME_LABELS:
+        return (
+            f"{_PLAYLIST_TIME_LABELS[path[0]]} {error.instance!r} is not a time "
+            "from 00:00 to 24:00"
+        )
+    return _format_error(error)
+
+
+def playlist_label(playlist: object, index: int) -> str:
+    """How messages name a playlist: its name, or its position if it has none."""
+    name = playlist.get("name") if isinstance(playlist, dict) else None
+    return repr(name) if isinstance(name, str) else f"#{index + 1}"
+
+
+def playlist_problems(playlist: object) -> list[str]:
+    """Why one stored playlist breaks the schema's playlist rules.
+
+    Empty when it fits. This is the check for playlists that do not come
+    through the playlist forms: a restored backup, and device.json when it
+    loads. A bad time reads "start time '25:00' is not a time from 00:00 to
+    24:00"; anything else names the field the schema rejected.
+    """
+    import jsonschema
+
+    validator = jsonschema.Draft202012Validator(
+        field_rules("playlist_config", "playlists")["items"]
+    )
+    errors = sorted(
+        validator.iter_errors(playlist), key=lambda e: [str(p) for p in e.path]
+    )
+    # A bad time breaks the length and the pattern rule; say so once.
+    return list(dict.fromkeys(_describe_playlist_error(error) for error in errors))
+
+
+def set_aside_invalid_playlists(config: dict[str, Any]) -> list[str]:
+    """Move the playlists that break the playlist rules out of *config*.
+
+    The loader calls this before it validates, so one bad playlist in
+    device.json (a hand edit, or a backup restored before the import checked
+    playlists) is reported and skipped instead of stopping the app from
+    starting. A playlist whose time can't be read would otherwise stop the
+    refresh loop from choosing any playlist. Each one is kept under
+    ``skipped_playlists`` with the reason, so the next config write does not
+    lose its plugin settings.
+
+    Only top-level keys of *config* are replaced, so the caller can pass a
+    shallow copy. Returns one message per playlist set aside.
+    """
+    playlist_config = config.get("playlist_config")
+    playlists = (
+        playlist_config.get("playlists") if isinstance(playlist_config, dict) else None
+    )
+    earlier = config.get(SKIPPED_PLAYLISTS_KEY)
+    if isinstance(earlier, list) and earlier:
+        logger.warning(
+            "device.json keeps %d playlist(s) set aside under %s; they are not "
+            "shown or scheduled until fixed by hand",
+            len(earlier),
+            SKIPPED_PLAYLISTS_KEY,
+        )
+    if (
+        not isinstance(playlist_config, dict)
+        or not isinstance(playlists, list)
+        or not os.path.isfile(SCHEMA_PATH)
+    ):
+        # Not a list of playlists to sort through: validation reports it.
+        return []
+
+    kept: list[Any] = []
+    skipped: list[dict[str, Any]] = []
+    messages: list[str] = []
+    for index, playlist in enumerate(playlists):
+        problems = playlist_problems(playlist)
+        if not problems:
+            kept.append(playlist)
+            continue
+        reason = "; ".join(problems)
+        skipped.append({"reason": reason, "playlist": playlist})
+        messages.append(f"Playlist {playlist_label(playlist, index)}: {reason}")
+        logger.error(
+            "playlist_set_aside: playlist %s in device.json breaks the playlist "
+            "rules (%s). It is not shown or scheduled, and is kept under %s.",
+            playlist_label(playlist, index),
+            reason,
+            SKIPPED_PLAYLISTS_KEY,
+        )
+    if skipped:
+        config["playlist_config"] = {**playlist_config, "playlists": kept}
+        config[SKIPPED_PLAYLISTS_KEY] = [
+            *(earlier if isinstance(earlier, list) else []),
+            *skipped,
+        ]
+    return messages
 
 
 def validate_device_config(config_dict: dict[str, Any]) -> None:

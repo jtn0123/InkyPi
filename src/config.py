@@ -13,7 +13,11 @@ from typing import Any, cast
 from dotenv import dotenv_values, set_key, unset_key
 
 from model import PlaylistManager, RefreshInfo
-from utils.config_schema import truncate_device_name, validate_device_config
+from utils.config_schema import (
+    set_aside_invalid_playlists,
+    truncate_device_name,
+    validate_device_config,
+)
 from utils.paths import (
     BASE_DIR as _PATHS_BASE_DIR,
     CURRENT_IMAGE_FILE as _DEFAULT_CURRENT_IMAGE,
@@ -40,6 +44,19 @@ _SENSITIVE_TERMS = ("secret", "token", "api", "key", "password")
 _REFRESH_INFO_REQUIRED_KEYS = frozenset(
     {"refresh_type", "plugin_id", "refresh_time", "image_hash"}
 )
+
+
+def env_file_path(base_dir: str = _PATHS_BASE_DIR) -> str:
+    """Return the absolute path of the ``.env`` file that holds the API keys.
+
+    ``$PROJECT_DIR/.env`` when ``PROJECT_DIR`` is set (the launcher sets it on
+    the device), otherwise ``.env`` in the parent of *base_dir* (``src/``),
+    the repository root.
+    """
+    project_dir = os.getenv("PROJECT_DIR") or os.path.abspath(
+        os.path.join(base_dir, "..")
+    )
+    return os.path.join(project_dir, ".env")
 
 
 def _looks_sensitive(key_name: str) -> bool:
@@ -337,8 +354,14 @@ class Config:
             truncate_device_name(config)
 
             # Validate against JSON Schema — raises ConfigValidationError on
-            # failure — unless this exact content was validated already.
+            # failure — unless this exact content was validated already. A
+            # playlist that breaks the playlist rules is set aside first and
+            # logged, so it can't stop the device starting or the refresh
+            # loop choosing a playlist. A render worker trusting this digest
+            # skips both: the parent already did this, and a worker never
+            # chooses a playlist.
             if digest != getattr(self, "_trusted_config_digest", None):
+                set_aside_invalid_playlists(config)
                 validate_device_config(config)
             self._validated_config_digest = digest
 
@@ -614,17 +637,8 @@ class Config:
             yield
 
     def get_env_file_path(self) -> str:
-        """Return absolute path to the .env file used for secrets.
-
-        Precedence:
-        - PROJECT_DIR environment variable if provided (set in production by install script)
-        - Repository root inferred as parent of src directory
-        """
-        project_dir = os.getenv("PROJECT_DIR")
-        if not project_dir:
-            # default to repo root: parent of src
-            project_dir = os.path.abspath(os.path.join(self.BASE_DIR, ".."))
-        return os.path.join(project_dir, ".env")
+        """Return absolute path to the .env file used for secrets."""
+        return env_file_path(self.BASE_DIR)
 
     def load_env_key(self, key: str) -> str | None:
         """Return *key* from the managed .env, else from the process environment.
