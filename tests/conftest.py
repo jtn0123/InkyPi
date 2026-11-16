@@ -96,6 +96,9 @@ UI_BROWSER_TESTS = {
     "test_settings_interval_units_e2e.py",
     # The status badge polls the diagnostics summary, and not from a hidden tab.
     "test_status_badge_polling.py",
+    # Playlist buttons show they are working, and their messages outlive the
+    # reload that follows.
+    "test_playlist_feedback_e2e.py",
 }
 A11Y_BROWSER_TESTS = {
     "test_a11y_sweep.py",
