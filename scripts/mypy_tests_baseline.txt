@@ -117,9 +117,6 @@ tests/integration/test_refresh_task.py:arg-type 8
 tests/integration/test_refresh_task.py:no-untyped-def 1
 tests/integration/test_refresh_task_interval.py:arg-type 2
 tests/integration/test_refresh_task_interval.py:no-untyped-def 1
-tests/integration/test_settings_more.py:attr-defined 1
-tests/integration/test_settings_more.py:union-attr 2
-tests/integration/test_settings_more.py:unreachable 1
 tests/integration/test_settings_updates_dom.py:type-arg 1
 tests/integration/test_sidebar_update_indicator.py:type-arg 3
 tests/integration/test_sustained_load.py:no-any-return 1
