@@ -2,6 +2,30 @@
 
 <!-- version list -->
 
+## v1.9.12 (2026-11-16)
+
+### Bug Fixes
+
+- **security**: Tighten dns pins, the private-address guard, immich redirects and keyless backups
+  ([#890](https://github.com/jtn0123/InkyPi/pull/890),
+  [`0b8472e`](https://github.com/jtn0123/InkyPi/commit/0b8472e3145ea52347cce7ea1a5ec55083218ab1))
+
+- **updates**: Keep update state in the service and follow runs to the end
+  ([#893](https://github.com/jtn0123/InkyPi/pull/893),
+  [`1ecbe6f`](https://github.com/jtn0123/InkyPi/commit/1ecbe6f0703728b7988cc2dfa51f36ed2a0f8f92))
+
+### Build System
+
+- Tighten dev tooling and dependency checks ([#888](https://github.com/jtn0123/InkyPi/pull/888),
+  [`ee60f3b`](https://github.com/jtn0123/InkyPi/commit/ee60f3b8cbf1b263fbf91642f14b8cc0f0f45d11))
+
+### Documentation
+
+- Fix install, dev-guide, tutorial and troubleshooting drift, and tighten coverage tests
+  ([#892](https://github.com/jtn0123/InkyPi/pull/892),
+  [`5056379`](https://github.com/jtn0123/InkyPi/commit/5056379007bb00092f6178ca0de2a88dcd1b6e47))
+
+
 ## v1.9.11 (2026-11-16)
 
 ### Performance Improvements
