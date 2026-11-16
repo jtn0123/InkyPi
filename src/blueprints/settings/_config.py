@@ -532,8 +532,12 @@ def save_api_keys() -> ResponseReturnValue:
 @settings_bp.route("/settings/delete_api_key", methods=["POST"])
 def delete_api_key() -> ResponseReturnValue:
     device_config = get_device_config()
-    key = request.form.get("key")
-    if key not in API_KEY_NAMES:
+    requested = request.form.get("key")
+    # Use the registry's own copy of the name from here on, never the
+    # submitted text, so nothing the client sent reaches the .env file or the
+    # log.
+    key = next((name for name in API_KEY_NAMES if name == requested), None)
+    if key is None:
         raise ClientInputError("Invalid key name", status=400)
     with route_error_boundary(
         "deleting API key",
