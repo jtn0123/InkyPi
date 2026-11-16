@@ -22,7 +22,7 @@ import pytest
 
 import config as config_mod
 from refresh_task.context import RefreshContext
-from utils.config_schema import ConfigValidationError
+from utils.config_schema import ConfigValidationError, validate_device_config
 
 SRC_DIR = Path(__file__).resolve().parents[2] / "src"
 
@@ -34,7 +34,7 @@ def _file_digest(path: str) -> str:
 
 def _count_validations(monkeypatch: pytest.MonkeyPatch) -> list[object]:
     calls: list[object] = []
-    real = config_mod.validate_device_config
+    real = validate_device_config
 
     def _counting(config: Any) -> None:
         calls.append(config)
