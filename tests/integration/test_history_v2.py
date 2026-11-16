@@ -71,26 +71,26 @@ def test_history_groups_split_today_and_yesterday(
 
 
 def test_day_label_helper() -> None:
-    from blueprints.history import _day_label
+    from services.history import day_label
 
     now = datetime(2026, 7, 7, 12, 0, tzinfo=UTC)
-    assert _day_label(now, now) == "Today"
-    assert _day_label(now - timedelta(days=1), now) == "Yesterday"
-    assert _day_label(datetime(2026, 7, 1, 8, 0, tzinfo=UTC), now) == "Jul 1, 2026"
+    assert day_label(now, now) == "Today"
+    assert day_label(now - timedelta(days=1), now) == "Yesterday"
+    assert day_label(datetime(2026, 7, 1, 8, 0, tzinfo=UTC), now) == "Jul 1, 2026"
 
 
 def test_group_images_by_day_consecutive_buckets() -> None:
-    from blueprints.history import _group_images_by_day
+    from services.history import group_by_day
 
     images = [
         {"date_key": "2026-07-07", "day_label": "Today"},
         {"date_key": "2026-07-07", "day_label": "Today"},
         {"date_key": "2026-07-06", "day_label": "Yesterday"},
     ]
-    groups = _group_images_by_day(images)
+    groups = group_by_day(images)
     assert [g["label"] for g in groups] == ["Today", "Yesterday"]
     assert [len(g["entries"]) for g in groups] == [2, 1]
-    assert _group_images_by_day([]) == []
+    assert group_by_day([]) == []
 
 
 # ---------------------------------------------------------------------------

@@ -1,4 +1,10 @@
-"""Outcome policy for direct manual renders (needs no request or app context)."""
+"""Outcome policy for direct manual renders (needs no request or app context).
+
+``/update_now`` and ``/display-next`` render in the request thread when the
+refresh loop is not running. Both go through :func:`execute_direct_render`, so
+a plugin that returns no image, a plugin failure and the known failures get
+the same status and code on either route.
+"""
 
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -57,14 +63,16 @@ def internal_failure_outcome() -> DirectRenderOutcome:
     return DirectRenderOutcome(False, INTERNAL_ERROR_MSG, 500, "internal_error")
 
 
-def _render_failure_outcome(error: Exception) -> DirectRenderOutcome:
+def _render_failure_outcome(
+    error: Exception, plugin_error_message: str
+) -> DirectRenderOutcome:
     known = known_failure_outcome(error)
     if known is not None:
         return known
     if isinstance(error, RuntimeError):
-        # A plugin that gave up. Its text goes to the log and the error card
-        # on the panel, not into the response.
-        return DirectRenderOutcome(False, INTERNAL_ERROR_MSG, 400, "plugin_error")
+        # A plugin that gave up. Its text goes to the log (and, on
+        # /update_now, the error card on the panel), not into the response.
+        return DirectRenderOutcome(False, plugin_error_message, 400, "plugin_error")
     return internal_failure_outcome()
 
 
@@ -73,8 +81,19 @@ def execute_direct_render(
     display: Callable[[Image.Image], None],
     read_timings: Callable[[], tuple[int | None, int | None]],
     fallback: Callable[[BaseException, bool], None],
+    *,
+    plugin_error_message: str = INTERNAL_ERROR_MSG,
 ) -> DirectRenderOutcome:
-    """Apply identical no-image, failure, fallback and metric rules to all callers."""
+    """Apply identical no-image, failure, fallback and metric rules to all callers.
+
+    A plugin that returns no image (a control-only plugin) is a completed
+    refresh with nothing to show: 200 with ``metrics={"no_image": True}`` and
+    the display left alone, as the refresh loop treats it. A plugin failure is
+    400 ``plugin_error`` with *plugin_error_message* (a fixed, safe string);
+    the known failures are mapped by :func:`known_failure_outcome`, and
+    anything else is 500 ``internal_error``. *fallback* runs on every failure
+    with the error and whether it counts as a real render attempt.
+    """
     started = perf_counter()
     with track_progress() as tracker:
         generating = True
@@ -91,7 +110,7 @@ def execute_direct_render(
             display(image)
         except Exception as error:
             outcome = (
-                _render_failure_outcome(error)
+                _render_failure_outcome(error, plugin_error_message)
                 if generating
                 else internal_failure_outcome()
             )

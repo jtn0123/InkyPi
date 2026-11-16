@@ -5,7 +5,21 @@
   "type": "object",
   "additionalProperties": true,
   "properties": {
-    "name": { "type": "string" },
+    "name": {
+      "type": "string",
+      "description": "Tabs are allowed; other control characters are not. A longer name saved before the limit existed is cut to maxLength when the config loads.",
+      "maxLength": 64,
+      "pattern": "^[^\\u0000-\\u0008\\u000a-\\u001f\\u007f-\\u009f]*$"
+    },
+    "time_format": { "type": "string", "enum": ["12h", "24h"] },
+    "log_system_stats": {
+      "description": "Only a default: readers treat any value as true or false. Safe reset restores the default.",
+      "default": false
+    },
+    "isolated_plugins": {
+      "description": "Only a default: the isolation routes treat a non-list as empty. Safe reset restores the default.",
+      "default": []
+    },
     "display_type": {
       "type": "string",
       "anyOf": [
@@ -20,17 +34,22 @@
       "items": { "type": "integer" }
     },
     "orientation": { "type": "string", "enum": ["horizontal", "vertical"] },
-    "plugin_cycle_interval_seconds": { "type": "integer", "minimum": 1, "maximum": 86400 },
+    "plugin_cycle_interval_seconds": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 86400,
+      "default": 3600
+    },
     "preview_size_mode": { "type": "string", "enum": ["native", "scaled", "fit"] },
     "image_settings": {
       "type": "object",
       "additionalProperties": true,
       "properties": {
-        "saturation": { "type": "number" },
-        "brightness": { "type": "number" },
-        "sharpness": { "type": "number" },
-        "contrast": { "type": "number" },
-        "inky_saturation": { "type": "number" },
+        "saturation": { "type": "number", "minimum": 0, "maximum": 10 },
+        "brightness": { "type": "number", "minimum": 0, "maximum": 10 },
+        "sharpness": { "type": "number", "minimum": 0, "maximum": 10 },
+        "contrast": { "type": "number", "minimum": 0, "maximum": 10 },
+        "inky_saturation": { "type": "number", "minimum": 0, "maximum": 10 },
         "screen_rendering": { "type": "string", "enum": ["auto", "dithered"] }
       }
     },

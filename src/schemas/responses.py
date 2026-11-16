@@ -50,6 +50,8 @@ class ActionMetrics(TypedDict, total=False):
     preprocess_ms: int | None
     display_ms: int | None
     steps: list[ActionMetricStep]
+    # True when the plugin returned no image and the display was left alone.
+    no_image: bool
 
 
 # ---------------------------------------------------------------------------

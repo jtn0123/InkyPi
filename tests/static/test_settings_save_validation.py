@@ -115,13 +115,17 @@ def test_device_name_declares_client_side_length_cap() -> None:
     characters and only discover the problem via a 422 response. Pin the
     ``maxlength="64"`` attribute here so the two validation layers cannot
     drift apart silently.
+
+    The number is the config schema's ``maxLength`` for ``name``, which the
+    route passes in; tests/unit/test_settings_schema_rules.py renders the page
+    and checks the attribute follows the schema.
     """
     html = _read_html()
     device_line = next(line for line in html.splitlines() if 'id="deviceName"' in line)
-    assert 'maxlength="64"' in device_line, (
-        'deviceName must declare maxlength="64" to mirror the server-side '
-        "cap from JTN-746 — otherwise the browser silently accepts input "
-        "that the server will reject with 422"
+    assert 'maxlength="{{ device_name_max_length }}"' in device_line, (
+        "deviceName must declare the schema's maxlength to mirror the "
+        "server-side cap from JTN-746 — otherwise the browser silently accepts "
+        "input that the server will reject with 422"
     )
 
 

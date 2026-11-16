@@ -319,9 +319,9 @@ def test_history_sorting_and_size_formatting(
     os.truncate(a, 100)
     os.truncate(b, 2048)
 
-    from blueprints import history as history_mod
+    from services import history as history_mod
 
-    images, total = history_mod._list_history_images(d)
+    images, total = history_mod.list_images(d)
     names = [img["filename"] for img in images]
     assert "b.png" in names and "a.png" in names
     assert total == 2
@@ -337,7 +337,7 @@ def test_history_sorting_and_size_formatting(
 def test_history_sorting_uses_embedded_timestamp_when_mtimes_match(
     device_config_dev: Any,
 ) -> None:
-    from blueprints import history as history_mod
+    from services import history as history_mod
 
     d = device_config_dev.history_image_dir
     os.makedirs(d, exist_ok=True)
@@ -353,7 +353,7 @@ def test_history_sorting_uses_embedded_timestamp_when_mtimes_match(
     for name in names:
         os.utime(os.path.join(d, name), (identical_time, identical_time))
 
-    images, total = history_mod._list_history_images(d)
+    images, total = history_mod.list_images(d)
     assert total == 3
     ordered_names = [img["filename"] for img in images[:3]]
     assert ordered_names == [
@@ -444,11 +444,11 @@ def test_history_template_scripts_closed_and_grid_renders(client: FlaskClient) -
 
 
 def test_format_size_exception_handling(monkeypatch: pytest.MonkeyPatch) -> None:
-    from blueprints.history import _format_size
+    from services.history import format_size
 
-    # Test exception handling in _format_size - negative numbers don't trigger exception
+    # Test exception handling in format_size - negative numbers don't trigger exception
     # Let's test with a very large number that might cause issues
-    result = _format_size(10**20)  # Very large number
+    result = format_size(10**20)  # Very large number
     # Should still format properly or fall back to exception path
     assert isinstance(result, str)
 
@@ -456,16 +456,14 @@ def test_format_size_exception_handling(monkeypatch: pytest.MonkeyPatch) -> None
 def test_list_history_images_exception_handling(
     client: FlaskClient, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    import blueprints.history as history_mod
+    import services.history as history_mod
 
     # Mock os.listdir to raise exception
     monkeypatch.setattr(
-        history_mod.os, "listdir", lambda p: (_ for _ in ()).throw(Exception("test"))
+        os, "listdir", lambda p: (_ for _ in ()).throw(Exception("test"))
     )
 
-    result, total = history_mod._list_history_images(
-        device_config_dev.history_image_dir
-    )
+    result, total = history_mod.list_images(device_config_dev.history_image_dir)
     assert result == []
     assert total == 0
 
@@ -473,11 +471,11 @@ def test_list_history_images_exception_handling(
 def test_history_delete_exception_handling(
     client: FlaskClient, flask_app: Flask, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    import blueprints.history as history_mod
+    import services.history as history_mod
 
     monkeypatch.setattr(
         history_mod,
-        "_resolve_history_path",
+        "resolve_requested_path",
         lambda *_args, **_kwargs: (_ for _ in ()).throw(Exception("test")),
     )
 
@@ -489,10 +487,8 @@ def test_history_delete_exception_handling(
 def test_history_clear_exception_handling(
     client: FlaskClient, flask_app: Flask, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    import blueprints.history as history_mod
-
     monkeypatch.setattr(
-        history_mod.os, "listdir", lambda p: (_ for _ in ()).throw(Exception("test"))
+        os, "listdir", lambda p: (_ for _ in ()).throw(Exception("test"))
     )
 
     resp = client.post("/history/clear")
@@ -711,7 +707,7 @@ def test_list_history_images_total_count_accurate(device_config_dev: Any) -> Non
     """Total count reflects all PNG files, not just the returned page."""
     import json
 
-    from blueprints import history as history_mod
+    from services import history as history_mod
 
     d = device_config_dev.history_image_dir
     os.makedirs(d, exist_ok=True)
@@ -726,14 +722,14 @@ def test_list_history_images_total_count_accurate(device_config_dev: Any) -> Non
             ) as fh:
                 json.dump(sidecar, fh)
 
-    images, total = history_mod._list_history_images(d)
+    images, total = history_mod.list_images(d)
     assert total == 10
     assert len(images) == 10
 
 
 def test_list_history_images_offset_limit_slicing(device_config_dev: Any) -> None:
     """offset/limit correctly slices: 10 items, offset=2, limit=3 -> items 2,3,4."""
-    from blueprints import history as history_mod
+    from services import history as history_mod
 
     d = device_config_dev.history_image_dir
     os.makedirs(d, exist_ok=True)
@@ -742,11 +738,11 @@ def test_list_history_images_offset_limit_slicing(device_config_dev: Any) -> Non
         name = f"display_20250201_{i:06d}.png"
         Image.new("RGB", (10, 10), "white").save(os.path.join(d, name))
 
-    all_images, total = history_mod._list_history_images(d)
+    all_images, total = history_mod.list_images(d)
     assert total == 10
     all_names = [img["filename"] for img in all_images]
 
-    page_images, page_total = history_mod._list_history_images(d, offset=2, limit=3)
+    page_images, page_total = history_mod.list_images(d, offset=2, limit=3)
     assert page_total == 10
     assert len(page_images) == 3
     page_names = [img["filename"] for img in page_images]
@@ -755,7 +751,7 @@ def test_list_history_images_offset_limit_slicing(device_config_dev: Any) -> Non
 
 def test_list_history_images_offset_beyond_total(device_config_dev: Any) -> None:
     """Offset beyond total returns empty list but correct total count."""
-    from blueprints import history as history_mod
+    from services import history as history_mod
 
     d = device_config_dev.history_image_dir
     os.makedirs(d, exist_ok=True)
@@ -764,14 +760,14 @@ def test_list_history_images_offset_beyond_total(device_config_dev: Any) -> None
             os.path.join(d, f"display_20250201_{i:06d}.png")
         )
 
-    images, total = history_mod._list_history_images(d, offset=100, limit=10)
+    images, total = history_mod.list_images(d, offset=100, limit=10)
     assert total == 5
     assert images == []
 
 
 def test_list_history_images_no_limit_returns_all(device_config_dev: Any) -> None:
     """When limit=None (default), all items are returned for backward compat."""
-    from blueprints import history as history_mod
+    from services import history as history_mod
 
     d = device_config_dev.history_image_dir
     os.makedirs(d, exist_ok=True)
@@ -780,7 +776,7 @@ def test_list_history_images_no_limit_returns_all(device_config_dev: Any) -> Non
             os.path.join(d, f"display_20250201_{i:06d}.png")
         )
 
-    images, total = history_mod._list_history_images(d)
+    images, total = history_mod.list_images(d)
     assert total == 7
     assert len(images) == 7
 
@@ -889,7 +885,7 @@ def test_list_history_images_only_reads_limit_sidecars(
     """Only `limit` number of sidecar JSON files are read, not all."""
     import json as _json
 
-    from blueprints import history as history_mod
+    from services import history as history_mod
 
     d = device_config_dev.history_image_dir
     os.makedirs(d, exist_ok=True)
@@ -909,10 +905,10 @@ def test_list_history_images_only_reads_limit_sidecars(
         load_count["n"] += 1
         return original_load(fh)
 
-    monkeypatch.setattr(history_mod.json, "load", counting_load)
+    monkeypatch.setattr(_json, "load", counting_load)
 
     limit = 3
-    images, total = history_mod._list_history_images(d, offset=0, limit=limit)
+    images, total = history_mod.list_images(d, offset=0, limit=limit)
     assert total == 10
     assert len(images) == limit
     # Should have loaded at most `limit` sidecars, not all 10
@@ -1166,43 +1162,43 @@ def _sample_png_name(d: Any) -> Any:
 
 
 def test_resolve_history_path_rejects_dotdot_traversal(device_config_dev: Any) -> None:
-    from blueprints.history import _resolve_history_path
+    from services.history import resolve_requested_path
 
     d = device_config_dev.history_image_dir
     os.makedirs(d, exist_ok=True)
     import pytest
 
     with pytest.raises(ValueError, match="invalid filename"):
-        _resolve_history_path(d, "../../etc/passwd")
+        resolve_requested_path(d, "../../etc/passwd")
 
 
 def test_resolve_history_path_rejects_absolute_path(device_config_dev: Any) -> None:
-    from blueprints.history import _resolve_history_path
+    from services.history import resolve_requested_path
 
     d = device_config_dev.history_image_dir
     os.makedirs(d, exist_ok=True)
     import pytest
 
     with pytest.raises(ValueError, match="invalid filename"):
-        _resolve_history_path(d, "/etc/passwd")
+        resolve_requested_path(d, "/etc/passwd")
 
 
 def test_resolve_history_path_rejects_null_byte(device_config_dev: Any) -> None:
-    from blueprints.history import _resolve_history_path
+    from services.history import resolve_requested_path
 
     d = device_config_dev.history_image_dir
     os.makedirs(d, exist_ok=True)
     import pytest
 
     with pytest.raises(ValueError, match="invalid filename"):
-        _resolve_history_path(d, "good.png\x00evil")
+        resolve_requested_path(d, "good.png\x00evil")
 
 
 def test_resolve_history_path_rejects_symlink_escape(
     device_config_dev: Any, tmp_path: Path
 ) -> None:
     """A symlink inside the history directory pointing outside must be rejected."""
-    from blueprints.history import _resolve_history_path
+    from services.history import resolve_requested_path
 
     d = device_config_dev.history_image_dir
     os.makedirs(d, exist_ok=True)
@@ -1219,15 +1215,15 @@ def test_resolve_history_path_rejects_symlink_escape(
     import pytest
 
     with pytest.raises(ValueError, match="invalid filename"):
-        _resolve_history_path(d, link_name)
+        resolve_requested_path(d, link_name)
 
 
 def test_resolve_history_path_accepts_valid_basename(device_config_dev: Any) -> None:
-    from blueprints.history import _resolve_history_path
+    from services.history import resolve_requested_path
 
     d = device_config_dev.history_image_dir
     name = _sample_png_name(d)
-    resolved = _resolve_history_path(d, name)
+    resolved = resolve_requested_path(d, name)
     assert os.path.isfile(resolved)
     assert os.path.realpath(resolved).startswith(os.path.realpath(d))
 
@@ -1274,3 +1270,46 @@ def test_history_delete_removes_sidecar(
     assert resp.status_code == 200
     assert not os.path.exists(os.path.join(d, name))
     assert not os.path.exists(os.path.join(d, sidecar_name))
+
+
+def test_deleting_a_sidecar_also_deletes_its_image(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
+    """Delete removes the pair whichever half is named."""
+    d = device_config_dev.history_image_dir
+    os.makedirs(d, exist_ok=True)
+    name = "display_20260202_020304.png"
+    sidecar_name = "display_20260202_020304.json"
+    Image.new("RGB", (10, 10), "white").save(os.path.join(d, name))
+    with open(os.path.join(d, sidecar_name), "w", encoding="utf-8") as fh:
+        json.dump({"plugin_id": "x"}, fh)
+
+    resp = client.post("/history/delete", json={"filename": sidecar_name})
+    assert resp.status_code == 200
+    assert not os.path.exists(os.path.join(d, sidecar_name))
+    assert not os.path.exists(os.path.join(d, name))
+
+
+def test_a_sidecar_that_is_not_an_object_is_ignored(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
+    """A sidecar holding a JSON list made the History page and the CSV
+    export fail; it is now treated like a missing one."""
+    d = device_config_dev.history_image_dir
+    os.makedirs(d, exist_ok=True)
+    name = "display_20260203_040506.png"
+    Image.new("RGB", (10, 10), "white").save(os.path.join(d, name))
+    with open(
+        os.path.join(d, "display_20260203_040506.json"), "w", encoding="utf-8"
+    ) as fh:
+        json.dump(["not", "an", "object"], fh)
+
+    page = client.get("/history")
+    assert page.status_code == 200
+    assert name in page.get_data(as_text=True)
+
+    export = client.get("/history/export.csv")
+    assert export.status_code == 200
+    rows = export.get_data(as_text=True).splitlines()
+    assert len(rows) == 2
+    assert rows[1].endswith(",,,,,")
