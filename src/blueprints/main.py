@@ -495,10 +495,6 @@ def _configure_app_static(state: Any) -> None:
 
 _display_next_limiter = CooldownLimiter(10)
 
-# The 400 message when a plugin fails on the direct path; the exception text
-# goes to the log only.
-_MSG_PLUGIN_GENERATION_FAILED = "Plugin image generation failed"
-
 
 def _reset_display_next_cooldown() -> None:
     """Reset the display-next rate limiter. Exposed for testing."""
@@ -569,7 +565,6 @@ def _display_next_direct(
         display,
         read_timings,
         log_failure,
-        plugin_error_message=_MSG_PLUGIN_GENERATION_FAILED,
     )
     if not outcome.ok:
         return json_error(
@@ -739,17 +734,14 @@ def _show_next_plugin() -> JsonResponse:
     from refresh_task import PlaylistRefresh, manual_update_timings
 
     try:
-        try:
-            with mapped_render_errors("display_next", logger=logger):
-                update_metrics = refresh_task.manual_update(
-                    PlaylistRefresh(playlist, plugin_instance, force=True)
-                )
-        except RuntimeError:
-            logger.exception("manual_update failed")
-            return json_error("Plugin update failed", status=400)
+        with mapped_render_errors("display_next", logger=logger):
+            update_metrics = refresh_task.manual_update(
+                PlaylistRefresh(playlist, plugin_instance, force=True)
+            )
     except APIError as exc:
         # A known failure (blackout, the loop stopping between the
-        # ``running`` check and the enqueue, a timeout ...), mapped above.
+        # ``running`` check and the enqueue, a failed render, a timeout ...),
+        # mapped above the same way as on every other display route.
         return json_error(
             exc.message, status=exc.status, code=exc.code, details=exc.details
         )

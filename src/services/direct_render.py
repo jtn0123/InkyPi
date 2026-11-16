@@ -13,6 +13,7 @@ from time import perf_counter
 from PIL import Image
 
 from utils.backend_errors import route_error_for
+from utils.domain_errors import as_render_failure
 from utils.json_types import JsonObject
 from utils.plugin_errors import URLValidationError
 from utils.progress import track_progress
@@ -42,9 +43,10 @@ def known_failure_outcome(error: BaseException) -> DirectRenderOutcome | None:
     """Return the outcome for a failure every display route reports alike.
 
     :func:`utils.backend_errors.route_error_for` owns that mapping (blackout,
-    a stopped loop, a rejected URL, a provider refusal, chromium down, a
-    timeout). Its messages are module constants or ``safe_message()``, so no
-    exception text reaches a response. None means *error* is not one of them.
+    a stopped loop, a missing plugin, a failed render, a rejected URL, a
+    provider refusal, chromium down, a timeout). Its messages are module
+    constants or ``safe_message()``, so no exception text reaches a response.
+    None means *error* is not one of them.
     """
     mapped = route_error_for(error)
     if mapped is None:
@@ -63,17 +65,15 @@ def internal_failure_outcome() -> DirectRenderOutcome:
     return DirectRenderOutcome(False, INTERNAL_ERROR_MSG, 500, "internal_error")
 
 
-def _render_failure_outcome(
-    error: Exception, plugin_error_message: str
-) -> DirectRenderOutcome:
-    known = known_failure_outcome(error)
-    if known is not None:
-        return known
-    if isinstance(error, RuntimeError):
-        # A plugin that gave up. Its text goes to the log (and, on
-        # /update_now, the error card on the panel), not into the response.
-        return DirectRenderOutcome(False, plugin_error_message, 400, "plugin_error")
-    return internal_failure_outcome()
+def _render_failure_outcome(error: Exception) -> DirectRenderOutcome:
+    """Report what the plugin raised while generating, as the loop does.
+
+    :func:`as_render_failure` is the refresh loop's rule too, so a broken
+    plugin gets the same status and code whether or not the loop is running.
+    Its text goes to the log (and, on /update_now, the error card on the
+    panel), not into the response.
+    """
+    return known_failure_outcome(as_render_failure(error)) or internal_failure_outcome()
 
 
 def execute_direct_render(
@@ -81,18 +81,18 @@ def execute_direct_render(
     display: Callable[[Image.Image], None],
     read_timings: Callable[[], tuple[int | None, int | None]],
     fallback: Callable[[BaseException, bool], None],
-    *,
-    plugin_error_message: str = INTERNAL_ERROR_MSG,
 ) -> DirectRenderOutcome:
     """Apply identical no-image, failure, fallback and metric rules to all callers.
 
     A plugin that returns no image (a control-only plugin) is a completed
     refresh with nothing to show: 200 with ``metrics={"no_image": True}`` and
-    the display left alone, as the refresh loop treats it. A plugin failure is
-    400 ``plugin_error`` with *plugin_error_message* (a fixed, safe string);
-    the known failures are mapped by :func:`known_failure_outcome`, and
-    anything else is 500 ``internal_error``. *fallback* runs on every failure
-    with the error and whether it counts as a real render attempt.
+    the display left alone, as the refresh loop treats it. A plugin's
+    ``RuntimeError`` is a failed render: 400 ``plugin_error``, or its own
+    answer for a rejected URL, a provider refusal or chromium being down. A
+    timeout is 504; any other failure, and a failure while displaying, is
+    500 ``internal_error``. *fallback*
+    runs on every failure with the error and whether it counts as a real
+    render attempt.
     """
     started = perf_counter()
     with track_progress() as tracker:
@@ -110,7 +110,7 @@ def execute_direct_render(
             display(image)
         except Exception as error:
             outcome = (
-                _render_failure_outcome(error, plugin_error_message)
+                _render_failure_outcome(error)
                 if generating
                 else internal_failure_outcome()
             )

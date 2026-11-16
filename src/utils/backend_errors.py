@@ -9,7 +9,13 @@ from typing import Any
 
 from utils.api_responses import APIError
 from utils.blackout import BLOCKED_MESSAGE, BlackoutActiveError
-from utils.domain_errors import DomainError, RefreshLoopBusy, RefreshTaskUnavailable
+from utils.domain_errors import (
+    DomainError,
+    PluginNotFound,
+    PluginRenderFailed,
+    RefreshLoopBusy,
+    RefreshTaskUnavailable,
+)
 from utils.plugin_errors import (
     MANUAL_UPDATE_TIMEOUT_MSG,
     SCREENSHOT_BACKEND_UNAVAILABLE_MSG,
@@ -163,12 +169,13 @@ class InternalOperationError(BackendRouteError):
         super().__init__(message, status=status, code=code, details=merged_details)
 
 
-#: Response text for RefreshTaskUnavailable and RefreshLoopBusy. Module
-#: constants, like the other
+#: Response text for the domain errors. Module constants, like the other
 #: messages below, so no exception text reaches a response body (CodeQL
 #: ``py/stack-trace-exposure``).
 REFRESH_TASK_UNAVAILABLE_MSG = RefreshTaskUnavailable.default_message
 REFRESH_LOOP_BUSY_MSG = RefreshLoopBusy.default_message
+PLUGIN_NOT_FOUND_MSG = PluginNotFound.default_message
+PLUGIN_RENDER_FAILED_MSG = PluginRenderFailed.default_message
 
 
 def route_error_for(err: BaseException) -> BackendRouteError | None:
@@ -188,6 +195,12 @@ def route_error_for(err: BaseException) -> BackendRouteError | None:
         return ServiceUnavailableRouteError(
             REFRESH_LOOP_BUSY_MSG, code="refresh_loop_busy"
         )
+    if isinstance(err, PluginNotFound):
+        return ResourceLookupError(
+            PLUGIN_NOT_FOUND_MSG, status=404, code="plugin_not_found"
+        )
+    if isinstance(err, PluginRenderFailed):
+        return _render_failed_route_error(err)
     if isinstance(err, URLValidationError):
         return ClientInputError(
             err.safe_message(), status=422, code="validation_error", field="url"
@@ -201,6 +214,21 @@ def route_error_for(err: BaseException) -> BackendRouteError | None:
             MANUAL_UPDATE_TIMEOUT_MSG, status=504, code="manual_update_timeout"
         )
     return None
+
+
+def _render_failed_route_error(err: PluginRenderFailed) -> BackendRouteError:
+    """400 ``plugin_error``, unless the plugin's error has its own answer.
+
+    A rejected URL, a provider refusal or the screenshot backend being down
+    are ``RuntimeError`` subclasses with answers of their own, so the cause
+    is mapped first.
+    """
+    cause = err.__cause__
+    if cause is not None and not isinstance(cause, PluginRenderFailed):
+        mapped = route_error_for(cause)
+        if mapped is not None:
+            return mapped
+    return ClientInputError(PLUGIN_RENDER_FAILED_MSG, code="plugin_error")
 
 
 @contextmanager

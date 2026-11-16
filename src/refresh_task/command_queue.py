@@ -162,7 +162,7 @@ class CommandQueueMixin:
             queue = self.manual_update_requests
             if queue.maxlen is not None and len(queue) >= queue.maxlen:
                 # A full deque would silently evict the oldest waiter.
-                raise RuntimeError("Refresh queue is full; try again shortly")
+                raise RefreshLoopBusy
             queue.append(request)
             self.condition.notify_all()
         if not wait:
@@ -189,9 +189,9 @@ class CommandQueueMixin:
                 and len(self.manual_update_requests)
                 >= self.manual_update_requests.maxlen
             ):
-                raise RuntimeError(
-                    "Manual update queue is full. Please wait for pending requests to complete."
-                )
+                # Busy with earlier requests: the same answer as a request
+                # the loop never got to (503 refresh_loop_busy).
+                raise RefreshLoopBusy
             self.recorder.publish_queued(
                 plugin_id=refresh_action.get_plugin_id(),
                 request_id=request.request_id,
@@ -296,6 +296,10 @@ class CommandQueueMixin:
                 pick the request up. Routes report it as unavailable rather
                 than as a display that never happened.
             BlackoutActiveError: blackout is active.
+            RefreshLoopBusy: the queue is full, or the loop never took the
+                request.
+            PluginNotFound: the plugin is not installed.
+            PluginRenderFailed: the plugin failed to render.
         """
         if not self.running:
             logger.warning(

@@ -68,7 +68,7 @@ def test_missing_plugin_update_now(client: FlaskClient) -> None:
     assert resp.status_code == 404
     body = resp.get_json()
     assert body["success"] is False
-    assert body["code"] == "not_found"
+    assert body["code"] == "plugin_not_found"
 
 
 def test_invalid_json_body(client: FlaskClient) -> None:

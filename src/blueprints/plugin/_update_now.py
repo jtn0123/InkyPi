@@ -18,6 +18,7 @@ from services.direct_render import (
 )
 from utils.api_responses import JsonResponse, json_error, json_success
 from utils.backend_errors import ClientInputError, route_error_for
+from utils.domain_errors import PluginNotFound
 from utils.fallback_image import render_error_image
 from utils.form_utils import sanitize_log_field
 from utils.output_validator import fit_image_to_device
@@ -26,7 +27,6 @@ from utils.request_models import RequestModelError, parse_plugin_update_now_requ
 from ._common import (
     _CONFIG_KEY,
     _ERR_INTERNAL,
-    _ERR_PLUGIN_NOT_FOUND,
     _MSG_DISPLAY_UPDATED,
     _plugin_form_data,
     _raise_request_model_error,
@@ -43,7 +43,8 @@ def _direct_render_outcome(
 ) -> DirectRenderOutcome:
     plugin_config = device_config.get_plugin(plugin_id)
     if not plugin_config:
-        return DirectRenderOutcome(False, _ERR_PLUGIN_NOT_FOUND, 404, "not_found")
+        # Removed after the route checked it (a queued job): the same answer.
+        return known_failure_outcome(PluginNotFound()) or internal_failure_outcome()
     history_meta = {
         "refresh_type": "Manual Update",
         "plugin_id": plugin_id,
@@ -239,6 +240,10 @@ def update_now() -> ResponseReturnValue:
             )
         plugin_id = parsed.plugin_id
         plugin_settings = parsed.plugin_settings
+        if not device_config.get_plugin(plugin_id):
+            # Checked before anything is queued. The refresh loop used to
+            # take the request, find no plugin, and report "Display updated".
+            raise PluginNotFound
 
         if parsed.want_async:
             queue = get_job_queue()

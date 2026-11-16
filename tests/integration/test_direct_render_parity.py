@@ -9,6 +9,7 @@ from flask.testing import FlaskClient
 from PIL import Image
 
 from refresh_task.job_queue import reset_job_queue
+from utils.backend_errors import PLUGIN_RENDER_FAILED_MSG
 from utils.plugin_errors import (
     PROVIDER_REJECTED_MSG,
     ProviderReportedPluginError,
@@ -206,8 +207,9 @@ def test_display_next_and_update_now_answer_alike(
         assert body["message"] == "Display updated"
         assert set(body["metrics"]) == set(expected["metrics"])
     elif case == "runtime":
-        # Same status and code; the route keeps its own wording.
-        assert body["error"] == "Plugin image generation failed"
+        # One message now; "Update now" used to say "An internal error
+        # occurred" for the same failure.
+        assert body["error"] == expected["error"] == PLUGIN_RENDER_FAILED_MSG
     else:
         assert body["error"] == expected["error"]
 

@@ -33,7 +33,7 @@ def test_update_now_surfaces_plugin_error_json(
     # JTN-326: plugin RuntimeError text must NOT be echoed back
     # (py/stack-trace-exposure).  Response is now a generic message.
     assert "boom" not in data["error"]
-    assert data["error"] == "An internal error occurred"
+    assert data["error"] == "Plugin image generation failed"
     assert data.get("code") == "plugin_error"
 
 

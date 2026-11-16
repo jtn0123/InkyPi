@@ -235,7 +235,7 @@ class TestNonUrlFailuresStillOpaque:
         assert resp.status_code == 400
         body = resp.get_json()
         assert body["code"] == "plugin_error"
-        assert body["error"] == "An internal error occurred"
+        assert body["error"] == "Plugin image generation failed"
         # No plugin exception text should leak.
         assert "API Key" not in body["error"]
 

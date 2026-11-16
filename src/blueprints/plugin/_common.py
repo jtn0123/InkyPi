@@ -31,7 +31,6 @@ _ERR_NOT_FOUND = "Not Found"
 _MSG_DISPLAY_UPDATED = "Display updated"
 _ERR_PLUGIN_ID_REQUIRED = "plugin_id is required"
 _ERR_PLUGIN_INSTANCE_NOT_FOUND = "Plugin instance not found"
-_ERR_PLUGIN_NOT_FOUND = "Plugin not found"
 _ERR_PLAYLIST_NOT_FOUND = "Playlist not found"
 _MSG_CIRCUIT_BREAKER_RESET = "Circuit-breaker reset for plugin instance."
 

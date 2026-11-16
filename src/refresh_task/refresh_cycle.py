@@ -13,6 +13,7 @@ from model import RefreshInfo
 from refresh_task import plugin_lookup
 from refresh_task.actions import ManualUpdateRequest, PlaylistRefresh, RefreshAction
 from refresh_task.plugin_lookup import _plugin_requires_api_key
+from utils.domain_errors import PluginNotFound, PluginRenderFailed, as_render_failure
 from utils.image_utils import compute_image_hash
 from utils.output_validator import (
     OutputDimensionMismatch,
@@ -147,7 +148,7 @@ class RefreshCycleMixin:
         Threading:
             Must be called without holding ``self.condition``.
         """
-        plugin_config = self._plugin_config_for(refresh_action)
+        plugin_config = self._plugin_config_for(refresh_action, manual_request)
         if plugin_config is None:
             return None, False, {}
 
@@ -194,21 +195,30 @@ class RefreshCycleMixin:
         )
 
     def _plugin_config_for(
-        self, refresh_action: RefreshAction
+        self,
+        refresh_action: RefreshAction,
+        manual_request: ManualUpdateRequest | None = None,
     ) -> dict[str, Any] | None:
         """Return the plugin's config, or ``None`` if it is not installed.
 
-        Raises ``RuntimeError`` when the plugin has been isolated.
+        A scheduled turn of a plugin that is not installed is logged and
+        skipped. A manual request for one raises :class:`PluginNotFound`,
+        so the caller hears "not found" rather than "Display updated".
+        Raises :class:`PluginRenderFailed` when the plugin has been isolated.
         """
         plugin_id = refresh_action.get_plugin_id()
         plugin_config = self.device_config.get_plugin(plugin_id)
         if plugin_config is None:
             logger.error(f"Plugin config not found for '{plugin_id}'.")
+            if manual_request is not None:
+                raise PluginNotFound
             return None
 
         isolated_plugins = self.device_config.get_config("isolated_plugins", default=[])
         if isinstance(isolated_plugins, list) and plugin_id in isolated_plugins:
-            raise RuntimeError(f"Plugin '{plugin_id}' is currently isolated/disabled.")
+            raise PluginRenderFailed(
+                f"Plugin '{plugin_id}' is currently isolated/disabled."
+            )
         return cast(dict[str, Any], plugin_config)
 
     def _skip_turn(self, turn: _Turn) -> dict[str, Any] | None:
@@ -252,7 +262,9 @@ class RefreshCycleMixin:
         """Render the plugin's image; return ``(image, meta, ms, tracker)``.
 
         A failure is recorded (health, error event, fallback card) and then
-        re-raised.
+        raised. A plugin's ``RuntimeError`` is raised as
+        :class:`PluginRenderFailed`, with the plugin's error as its cause, so
+        every route that asked for the render reports it alike.
         """
         logger.info(
             "plugin_lifecycle: generate_start",
@@ -278,7 +290,10 @@ class RefreshCycleMixin:
                 )
             except Exception as exc:
                 self._record_generate_failure(turn, exc)
-                raise
+                failure = as_render_failure(exc)
+                if failure is exc:
+                    raise
+                raise failure from exc
             # A control-only plugin returns before the normal refresh-info
             # write in ``_run``, so its new timestamp is persisted here.
             self._commit_refresh_state(turn.refresh_action, persist=image is None)
