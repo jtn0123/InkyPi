@@ -8,9 +8,10 @@ import json
 from collections.abc import Mapping
 from typing import Any, cast
 
-from flask import current_app, request
+from flask import request
 from flask.typing import ResponseReturnValue
 
+from blueprints._deps import get_device_config
 from blueprints._refresh_loop import wake_refresh_loop
 from services.playlist_workflows import prepare_add_plugin_workflow
 from utils.api_responses import JsonResponse, json_error, json_success
@@ -79,7 +80,7 @@ def _parse_add_plugin_form(
 
 @playlist_bp.route("/add_plugin", methods=["POST"])
 def add_plugin() -> ResponseReturnValue:
-    device_config = current_app.config["DEVICE_CONFIG"]
+    device_config = get_device_config()
     playlist_manager = device_config.get_playlist_manager()
 
     with route_error_boundary(

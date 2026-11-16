@@ -4,11 +4,14 @@ Includes the AI Image prompt-suggestion endpoint the settings page calls and
 the API-key presence resolution used to render the settings template.
 """
 
-from typing import Any
+from __future__ import annotations
 
-from flask import abort, current_app, render_template, request
+from typing import TYPE_CHECKING, Any
+
+from flask import abort, render_template, request
 from flask.typing import ResponseReturnValue
 
+from blueprints._deps import get_device_config
 from plugins.plugin_registry import get_plugin_instance
 from utils.api_responses import json_error, json_success
 from utils.backend_errors import (
@@ -18,12 +21,15 @@ from utils.backend_errors import (
 )
 from utils.form_utils import sanitize_log_field
 
-from ._common import _CONFIG_KEY, _ERR_PLUGIN_INSTANCE_NOT_FOUND, logger, plugin_bp
+from ._common import _ERR_PLUGIN_INSTANCE_NOT_FOUND, logger, plugin_bp
 from ._images import _find_latest_plugin_refresh_time
+
+if TYPE_CHECKING:
+    from config import Config
 
 
 def _resolve_multi_service_api_key(
-    api_key_meta: dict[str, Any], device_config: Any
+    api_key_meta: dict[str, Any], device_config: Config
 ) -> None:
     """Populate per-service presence + a display label for plugins that list
     multiple providers under ``services``. Mutates *api_key_meta* in place.
@@ -56,7 +62,7 @@ def _resolve_multi_service_api_key(
 
 
 def _resolve_api_key_presence(
-    template_params: dict[str, Any], device_config: Any
+    template_params: dict[str, Any], device_config: Config
 ) -> None:
     """Attach ``present`` and provider-aware display metadata to ``api_key``.
 
@@ -76,7 +82,7 @@ def _resolve_api_key_presence(
 
 @plugin_bp.route("/plugin/<plugin_id>", methods=["GET"])
 def plugin_page(plugin_id: str) -> ResponseReturnValue:
-    device_config = current_app.config[_CONFIG_KEY]
+    device_config = get_device_config()
     playlist_manager = device_config.get_playlist_manager()
 
     plugin_config = device_config.get_plugin(plugin_id)
@@ -157,7 +163,7 @@ def plugin_page(plugin_id: str) -> ResponseReturnValue:
 @plugin_bp.route("/plugin/ai_image/random_prompt", methods=["POST"])
 def ai_image_random_prompt() -> ResponseReturnValue:
     """Generate a prompt suggestion for the AI Image plugin."""
-    device_config = current_app.config[_CONFIG_KEY]
+    device_config = get_device_config()
     data = request.get_json(silent=True) or {}
     if not isinstance(data, dict):
         return json_error("Invalid JSON payload", status=400)
@@ -209,7 +215,7 @@ def ai_image_random_prompt() -> ResponseReturnValue:
 
 @plugin_bp.route("/plugins", methods=["GET"])
 def plugins_page() -> ResponseReturnValue:
-    device_config = current_app.config[_CONFIG_KEY]
+    device_config = get_device_config()
     plugins = device_config.get_plugins()
 
     return render_template(

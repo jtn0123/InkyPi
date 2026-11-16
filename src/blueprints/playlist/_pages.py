@@ -4,9 +4,10 @@
 from datetime import UTC, datetime
 from typing import Any
 
-from flask import current_app, has_app_context, redirect, render_template, url_for
+from flask import has_app_context, redirect, render_template, url_for
 from flask.typing import ResponseReturnValue
 
+from blueprints._deps import get_device_config, get_refresh_task
 from refresh_task import schedule
 from refresh_task.health import PluginHealthTracker
 from utils.time_utils import now_device_tz
@@ -27,7 +28,7 @@ def playlists_redirect() -> ResponseReturnValue:
 
 @playlist_bp.route("/playlist", methods=["GET"])
 def playlists() -> ResponseReturnValue:
-    device_config = current_app.config["DEVICE_CONFIG"]
+    device_config = get_device_config()
     playlist_manager = device_config.get_playlist_manager()
     refresh_info = device_config.get_refresh_info()
     plugins_list = device_config.get_plugins()
@@ -65,7 +66,7 @@ def playlists() -> ResponseReturnValue:
     except Exception:
         last_dt = None
         last_playlist = None
-    last_attempt = schedule.last_attempt_of(current_app.config.get("REFRESH_TASK"))
+    last_attempt = schedule.last_attempt_of(get_refresh_task())
     playlist_timing: dict[str, dict[str, int | str | None]] = {}
     rotation_eta: dict[str, dict[str, dict[str, int | str]]] = {}
     try:
@@ -138,7 +139,7 @@ def format_relative_time(iso_date_string: str) -> str:
     # Get the current time using the device's configured timezone, if available
     if has_app_context():
         try:
-            now = now_device_tz(current_app.config["DEVICE_CONFIG"])  # timezone-aware
+            now = now_device_tz(get_device_config())  # timezone-aware
         except Exception:
             now = datetime.now(dt.tzinfo)
     else:

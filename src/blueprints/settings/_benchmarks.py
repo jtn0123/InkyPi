@@ -3,8 +3,9 @@
 import sqlite3
 import time
 
-from flask import Response, current_app, request
+from flask import Response, request
 
+from blueprints._deps import get_device_config
 from blueprints.settings import logger, settings_bp
 from utils.api_responses import (
     JsonResponse,
@@ -23,7 +24,7 @@ def _benchmarks_enabled() -> bool:
 def _get_bench_db_path() -> str:
     from benchmarks.benchmark_storage import _get_db_path
 
-    return str(_get_db_path(current_app.config["DEVICE_CONFIG"]))
+    return str(_get_db_path(get_device_config()))
 
 
 def _ensure_bench_schema(conn: sqlite3.Connection) -> None:

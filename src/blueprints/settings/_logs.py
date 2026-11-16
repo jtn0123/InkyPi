@@ -4,9 +4,10 @@ import io
 import re
 from collections.abc import Mapping
 
-from flask import Response, current_app, jsonify, request
+from flask import Response, jsonify, request
 from flask.typing import ResponseReturnValue
 
+from blueprints._deps import get_device_config
 from blueprints.settings import logger, settings_bp
 from services import logs, updates
 from utils.api_responses import json_error
@@ -50,9 +51,7 @@ def download_logs() -> Response:
         buffer = io.StringIO("\n".join(lines))
         buffer.seek(0)
         # Add date and time to the filename
-        now_str = now_device_tz(current_app.config["DEVICE_CONFIG"]).strftime(
-            "%Y%m%d-%H%M%S"
-        )
+        now_str = now_device_tz(get_device_config()).strftime("%Y%m%d-%H%M%S")
         filename = f"inkypi_{now_str}.log"
         return Response(
             buffer.read(),

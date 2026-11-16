@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 
-from flask import current_app
+from blueprints._deps import get_refresh_task
 
 logger = logging.getLogger(__name__)
 
@@ -18,10 +18,7 @@ def wake_refresh_loop(reason: str) -> None:
     interval (up to 24 hours). The change itself is already saved, so a
     failure here is logged rather than raised.
     """
-    refresh_task = current_app.config.get("REFRESH_TASK")
-    if refresh_task is None:
-        return
     try:
-        refresh_task.signal_config_change()
+        get_refresh_task().signal_config_change()
     except Exception:
         logger.exception("Could not wake the refresh loop after %s", reason)

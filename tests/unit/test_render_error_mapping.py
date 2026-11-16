@@ -8,6 +8,7 @@ route that asks the refresh loop to render goes through it.
 
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 import sys
@@ -179,7 +180,7 @@ def test_queued_update_now_reports_what_the_synchronous_route_does(
     # The plugin page sends "Update now" as a queued job and shows the job's
     # error. With the refresh loop running (the normal case on the Pi) that
     # error used to be the raw exception text.
-    from refresh_task.job_queue import get_job_queue, reset_job_queue
+    from services.job_queue import get_job_queue, reset_job_queue
 
     rt = flask_app.config["REFRESH_TASK"]
     monkeypatch.setattr(rt, "running", True)
@@ -266,19 +267,46 @@ def test_app_handler_maps_domain_errors_that_escape_a_route(
     assert "no mapping for this one" not in resp.get_data(as_text=True)
 
 
-def test_refresh_loop_does_not_import_the_web_error_layer() -> None:
+# Run in a fresh interpreter: imports every refresh_task module (and
+# utils.blackout, which the loop uses), then reports which web-layer modules
+# that loaded.
+_REFRESH_LOOP_IMPORT_PROBE = """
+import importlib, json, pkgutil, sys
+
+import refresh_task
+import utils.blackout
+
+imported = [
+    importlib.import_module(info.name).__name__
+    for info in pkgutil.walk_packages(refresh_task.__path__, "refresh_task.")
+]
+web_layer = ("services", "blueprints", "flask", "utils.backend_errors")
+loaded = sorted(
+    name
+    for name in sys.modules
+    if any(name == root or name.startswith(root + ".") for root in web_layer)
+)
+print(json.dumps({"imported": imported, "loaded": loaded}))
+"""
+
+
+def test_refresh_loop_does_not_import_the_web_layer() -> None:
+    """No refresh_task module loads the routes, services, Flask or route errors.
+
+    Every module in the package is imported, not only the ones the loop loads
+    at run time, so a web-only module placed in refresh_task/ still fails this.
+    """
     src = Path(__file__).resolve().parents[2] / "src"
-    code = (
-        "import sys, refresh_task.command_queue, utils.blackout;"
-        "print('utils.backend_errors' in sys.modules)"
-    )
     env = {**os.environ, "PYTHONPATH": str(src)}
     out = subprocess.run(
-        [sys.executable, "-c", code],
+        [sys.executable, "-c", _REFRESH_LOOP_IMPORT_PROBE],
         capture_output=True,
         text=True,
         env=env,
         check=True,
         timeout=60,
     )
-    assert out.stdout.strip() == "False"
+    result = json.loads(out.stdout)
+    assert "refresh_task.task" in result["imported"]
+    assert "refresh_task.command_queue" in result["imported"]
+    assert result["loaded"] == []

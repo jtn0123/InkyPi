@@ -4,9 +4,10 @@ import threading
 from datetime import datetime
 from typing import Any
 
-from flask import current_app, request
+from flask import request
 from flask.typing import ResponseReturnValue
 
+from blueprints._deps import get_device_config, get_refresh_task
 from refresh_task import PlaylistRefresh, manual_update_timings, schedule
 from refresh_task.health import PluginHealthTracker
 from utils.api_responses import json_success
@@ -37,8 +38,8 @@ _eta_cache_lock = threading.Lock()
 # Trigger next eligible instance in a specific playlist immediately
 @playlist_bp.route("/display_next_in_playlist", methods=["POST"])
 def display_next_in_playlist() -> ResponseReturnValue:
-    device_config = current_app.config["DEVICE_CONFIG"]
-    refresh_task = current_app.config["REFRESH_TASK"]
+    device_config = get_device_config()
+    refresh_task = get_refresh_task()
     playlist_manager = device_config.get_playlist_manager()
 
     with route_error_boundary(
@@ -113,7 +114,7 @@ def playlist_eta(playlist_name: str) -> ResponseReturnValue:
 
     Cached per minute to keep route lightweight.
     """
-    device_config = current_app.config["DEVICE_CONFIG"]
+    device_config = get_device_config()
     playlist_manager = device_config.get_playlist_manager()
 
     pl = playlist_manager.get_playlist(playlist_name)
@@ -168,9 +169,7 @@ def playlist_eta(playlist_name: str) -> ResponseReturnValue:
             pl,
             last_refresh=last_dt if isinstance(last_dt, datetime) else None,
             last_refresh_playlist=last_playlist,
-            last_attempt=schedule.last_attempt_of(
-                current_app.config.get("REFRESH_TASK")
-            ),
+            last_attempt=schedule.last_attempt_of(get_refresh_task()),
             cycle_seconds=cycle_sec,
             now=now,
         )

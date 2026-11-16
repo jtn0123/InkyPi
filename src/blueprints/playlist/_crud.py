@@ -2,9 +2,10 @@
 
 from typing import Any
 
-from flask import current_app, request
+from flask import request
 from flask.typing import ResponseReturnValue
 
+from blueprints._deps import get_device_config
 from blueprints._refresh_loop import wake_refresh_loop
 from utils.api_responses import json_error, json_success
 from utils.backend_errors import (
@@ -71,7 +72,7 @@ def _parse_playlist_update_payload(
 
 @playlist_bp.route("/create_playlist", methods=["POST"])
 def create_playlist() -> ResponseReturnValue:
-    device_config = current_app.config["DEVICE_CONFIG"]
+    device_config = get_device_config()
     playlist_manager = device_config.get_playlist_manager()
 
     data, err = _parse_playlist_request_data(
@@ -153,7 +154,7 @@ def _apply_cycle_override(
 
 @playlist_bp.route("/update_playlist/<string:playlist_name>", methods=["PUT"])
 def update_playlist(playlist_name: str) -> ResponseReturnValue:
-    device_config = current_app.config["DEVICE_CONFIG"]
+    device_config = get_device_config()
     playlist_manager = device_config.get_playlist_manager()
 
     data, body_err = _parse_playlist_request_data(
@@ -237,7 +238,7 @@ def update_playlist(playlist_name: str) -> ResponseReturnValue:
 
 @playlist_bp.route("/delete_playlist/<string:playlist_name>", methods=["DELETE"])
 def delete_playlist(playlist_name: str) -> ResponseReturnValue:
-    device_config = current_app.config["DEVICE_CONFIG"]
+    device_config = get_device_config()
     playlist_manager = device_config.get_playlist_manager()
 
     if not playlist_name:
@@ -283,7 +284,7 @@ def delete_playlist(playlist_name: str) -> ResponseReturnValue:
 
 @playlist_bp.route("/update_device_cycle", methods=["PUT"])
 def update_device_cycle() -> ResponseReturnValue:
-    device_config = current_app.config["DEVICE_CONFIG"]
+    device_config = get_device_config()
     parsed, parse_error = parse_device_cycle_request(request.get_json(silent=True))
     if parse_error is not None:
         return _request_model_error_response(parse_error)
@@ -304,7 +305,7 @@ def update_device_cycle() -> ResponseReturnValue:
 
 @playlist_bp.route("/reorder_plugins", methods=["POST"])
 def reorder_plugins() -> ResponseReturnValue:
-    device_config = current_app.config["DEVICE_CONFIG"]
+    device_config = get_device_config()
     playlist_manager = device_config.get_playlist_manager()
 
     with route_error_boundary(

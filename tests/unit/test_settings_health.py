@@ -103,20 +103,6 @@ class TestHealthPlugins:
         assert data["success"] is True
         assert "plugin" in data["items"]
 
-    def test_no_snapshot_method(
-        self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        """RefreshTask without get_health_snapshot returns empty dict."""
-        rt = MagicMock(spec=[])  # no methods at all
-
-        with client.application.app_context():
-            client.application.config["REFRESH_TASK"] = rt
-
-        resp = client.get("/api/health/plugins")
-        data = resp.get_json()
-        assert data["success"] is True
-        assert data["items"] == {}
-
     def test_exception_returns_500(
         self, client: FlaskClient, monkeypatch: pytest.MonkeyPatch
     ) -> None:
