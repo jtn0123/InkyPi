@@ -931,6 +931,16 @@ main[data-page-shell="workflow"] .frame {
   line-height: 1.5;
 }
 
+.info-banner.warning {
+  background: var(--warning-bg);
+  border-color: var(--warning-border);
+}
+
+.set-aside-list {
+  margin: 6px 0;
+  padding-left: 18px;
+}
+
 .displayed-now {
     background-color: var(--accent);
     color: var(--on-accent);
@@ -938,7 +948,6 @@ main[data-page-shell="workflow"] .frame {
     border-radius: 999px; /* pill */
     font-size: 0.78rem;
 }
-
 
 /* Snackbar for undo */
 #undoSnackbar {

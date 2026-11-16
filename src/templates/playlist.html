@@ -51,6 +51,22 @@
             {% endif %}
         </div>
 
+        {% if set_aside_playlists %}
+        {# Playlists the config loader moved out because they broke the
+           playlist rules (see set_aside_invalid_playlists). #}
+        <div class="info-banner warning" id="setAsidePlaylistsBanner" role="status">
+            <div class="info-banner-text">
+                <strong>{{ set_aside_playlists | length }} {{ 'playlist was' if set_aside_playlists | length == 1 else 'playlists were' }} set aside</strong> when settings loaded, because of a problem below. Set-aside playlists are not shown or scheduled.
+                <ul class="set-aside-list">
+                    {% for item in set_aside_playlists %}
+                    <li><strong>{{ item.name }}</strong>: {{ item.reason }}</li>
+                    {% endfor %}
+                </ul>
+                They are kept under <code>skipped_playlists</code> in device.json. To bring one back, stop the service, fix it, and move it into <code>playlist_config.playlists</code>.
+            </div>
+        </div>
+        {% endif %}
+
         <!-- Playlists Container -->
         <div class="playlist-list">
             {% if not playlist_config.playlists %}
