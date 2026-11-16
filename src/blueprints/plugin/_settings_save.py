@@ -6,6 +6,7 @@ from typing import Any
 from flask import Response, current_app, make_response, render_template, request
 from flask.typing import ResponseReturnValue
 
+from blueprints._refresh_loop import wake_refresh_loop
 from plugins.plugin_registry import get_plugin_instance
 from services.plugin_workflows import save_plugin_settings_workflow
 from utils.api_responses import json_error, json_success
@@ -167,6 +168,10 @@ def _save_plugin_settings_common(
             )
         return json_error(error.message, **error.as_json_kwargs())
 
+    # The instance may be new to the playlist, or due again now that its
+    # settings changed, so the loop re-plans its wait instead of sleeping out
+    # the one it worked out before.
+    wake_refresh_loop("saving plugin settings")
     success_message = result.message
     saved_files = _saved_upload_settings(plugin_settings)
     if htmx:

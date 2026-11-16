@@ -28,7 +28,6 @@ logger = logging.getLogger(__name__)
 DEFAULT_PLAYLIST_NAME = "Default"
 DEFAULT_PLUGIN_INSTANCE_SUFFIX = "_saved_settings"
 DEFAULT_PLUGIN_REFRESH_INTERVAL_SECONDS = 3600
-DEFAULT_SUCCESS_MESSAGE = "Settings saved. Add to Playlist to schedule this instance."
 DEFAULT_PLUGIN_NOT_FOUND_MESSAGE = "Plugin not found"
 DEFAULT_PLUGIN_VALIDATION_MESSAGE = (
     "Settings validation failed. Please check your input."
@@ -59,6 +58,18 @@ class PluginSettingsWorkflowResult:
     after_settings: JsonObject = field(default_factory=dict)
     error: WorkflowError | None = None
     warnings: list[str] = field(default_factory=list)
+
+
+def saved_settings_message(playlist_name: str) -> str:
+    """Say where the saved settings went.
+
+    They are saved as an instance in *playlist_name*, so the plugin is
+    already in that playlist's rotation; there is nothing left to add.
+    """
+    return (
+        f"Settings saved. The {playlist_name} playlist shows them on this "
+        "plugin's next turn."
+    )
 
 
 def build_saved_settings_instance_name(
@@ -196,6 +207,13 @@ def _persist_plugin_settings(
             if inst:
                 before_settings = copy.deepcopy(inst.settings or {})
                 inst.settings = copy.deepcopy(plugin_settings)
+                if plugin_settings != before_settings:
+                    # The cached picture was drawn with the old settings. Mark
+                    # the instance never-refreshed so its next playlist turn
+                    # renders a new one, instead of reusing that picture until
+                    # its own interval runs out. Saving the same settings keeps
+                    # it: a new render can cost a paid API call.
+                    inst.latest_refresh_time = None
             else:
                 added = playlist.add_plugin(
                     {
@@ -327,7 +345,7 @@ def save_plugin_settings_workflow(
 
     return PluginSettingsWorkflowResult(
         ok=True,
-        message=history_warning or DEFAULT_SUCCESS_MESSAGE,
+        message=history_warning or saved_settings_message(default_playlist_name),
         warnings=[history_warning] if history_warning else [],
         instance_name=instance_name,
         playlist_name=default_playlist_name,

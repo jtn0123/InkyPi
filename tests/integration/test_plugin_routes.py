@@ -532,7 +532,11 @@ def test_save_plugin_settings_persist_and_load_on_plugin_page(
     assert resp.status_code == 200
     j = resp.get_json()
     assert j.get("success") is True
-    assert "Add to Playlist" in j.get("message", "")
+    # The saved settings are an instance in the Default playlist already, so
+    # the message no longer tells the user to add them to a playlist.
+    assert j.get("message") == (
+        "Settings saved. The Default playlist shows them on this plugin's next turn."
+    )
 
     # Then open plugin page and confirm settings prepopulate (not tied to any instance)
     page = client.get("/plugin/ai_text")
