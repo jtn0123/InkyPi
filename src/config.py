@@ -699,7 +699,10 @@ class Config:
             try:
                 unset_key(env_path, key)
             except Exception as e:
-                logger.warning("Failed to unset env key %s: %s", key, e)
+                logger.warning(
+                    "Failed to remove an API key from the .env file: %s",
+                    type(e).__name__,
+                )
         os.environ.pop(key, None)
         return True
 
