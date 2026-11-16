@@ -119,6 +119,48 @@ def test_generate_image_invalid_comic_falls_back_to_xkcd(
     assert captured["comic"] == "XKCD"
 
 
+def test_generate_image_refuses_a_download_that_is_not_an_image(
+    monkeypatch: pytest.MonkeyPatch, plugin_config: Any, device_config_dev: Any
+) -> None:
+    """The loader turns undecodable bytes into None; the plugin then fails
+    with a message the dashboard can show, not a blank frame."""
+    from plugins.comic.comic import Comic
+
+    monkeypatch.setattr(
+        "plugins.comic.comic.get_panel",
+        lambda c: {"image_url": "http://img/broken.png", "title": "X", "caption": ""},
+    )
+    _serve_image(monkeypatch, b"<html>not a picture</html>")
+
+    with pytest.raises(RuntimeError, match="^Failed to load comic image$"):
+        Comic(plugin_config).generate_image({"comic": "XKCD"}, device_config_dev)
+
+
+def test_generate_image_asks_for_the_panel_at_full_size_and_keeps_loader_errors(
+    monkeypatch: pytest.MonkeyPatch, plugin_config: Any, device_config_dev: Any
+) -> None:
+    """The panel is fetched unresized at the frame size; a loader error is
+    not swallowed or rewrapped."""
+    from plugins.comic.comic import Comic
+
+    monkeypatch.setattr(
+        "plugins.comic.comic.get_panel",
+        lambda c: {"image_url": "http://img/bad.png", "title": "", "caption": ""},
+    )
+    p = Comic(plugin_config)
+    loader = MagicMock()
+    loader.from_url.side_effect = OSError("decode error")
+    p.image_loader = loader
+
+    with pytest.raises(OSError, match="^decode error$"):
+        p.generate_image({"comic": "XKCD"}, device_config_dev)
+    loader.from_url.assert_called_once_with(
+        "http://img/bad.png",
+        dimensions=tuple(device_config_dev.get_resolution()),
+        resize=False,
+    )
+
+
 def test_generate_image_centering(
     monkeypatch: pytest.MonkeyPatch, plugin_config: Any, device_config_dev: Any
 ) -> Any:

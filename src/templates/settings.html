@@ -11,6 +11,7 @@
         'scripts/settings/logs.js',
         'scripts/settings/diagnostics.js',
         'scripts/settings/navigation.js',
+        'scripts/settings/update_tracker.js',
         'scripts/settings/actions.js',
         'scripts/settings_page.js',
     ] %}
@@ -248,6 +249,14 @@
                 </div>
                 <div class="card-body">
                 <div class="update-panel" id="updatePanel">
+                    {# Progress of an update or rollback, written by
+                       settings/update_tracker.js: it follows the run through
+                       InkyPi's restart and says how it ended. #}
+                    <div class="update-progress" id="updateProgress" role="status" aria-live="polite" hidden>
+                        <span class="update-progress-spinner" aria-hidden="true"></span>
+                        <span class="update-progress-text" id="updateProgressText"></span>
+                        <button type="button" id="updateReloadBtn" class="action-button compact is-secondary" hidden>Reload page</button>
+                    </div>
                     {# JTN-710: banner populated from /settings/update_status
                        when install/update.sh's EXIT trap (JTN-704) wrote a
                        .last-update-failure record on the previous run. #}
@@ -262,11 +271,12 @@
                             <summary>Recent journal output</summary>
                             <pre id="updateFailureJournal" class="update-failure-journal"></pre>
                         </details>
-                        {# JTN-708: rollback button is injected only when
-                           /settings/update_status reports a non-null
-                           last_failure AND a validated prev_version. Kept
-                           inside the failure banner so the visibility rule
-                           is obvious to readers of the template. #}
+                        {# JTN-708: rollback button is shown only when
+                           /settings/update_status reports rollback_eligible
+                           (the rule the rollback route applies) and a
+                           prev_version. Kept inside the failure banner so the
+                           visibility rule is obvious to readers of the
+                           template. #}
                         <div class="update-failure-actions">
                             <button type="button" id="rollbackUpdateBtn" class="action-button compact is-warning" hidden>
                                 Roll back to <span id="rollbackTargetVersion">previous version</span>

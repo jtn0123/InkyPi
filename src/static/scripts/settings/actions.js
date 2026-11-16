@@ -164,12 +164,19 @@
     }
   }
 
+  // True while an update or rollback runs (set by update_tracker.js).
+  function isUpdatePanelBusy() {
+    return (
+      document.getElementById("updatePanel")?.getAttribute("aria-busy") === "true"
+    );
+  }
+
   function renderVersionCheckResult(elements, data) {
     if (elements.latestEl) {
       elements.latestEl.textContent = data.latest || "\u2014";
     }
     if (elements.updateBtn) {
-      elements.updateBtn.disabled = !data.update_available;
+      elements.updateBtn.disabled = !data.update_available || isUpdatePanelBusy();
     }
     syncReleaseNotes(
       data.release_notes,
@@ -231,14 +238,7 @@
     };
   }
 
-  function setHeaderButtonsDisabled(disabled) {
-    for (const btn of document.querySelectorAll(".header-actions .header-button")) {
-      btn.disabled = disabled;
-    }
-  }
-
-  function createActionsModule({ config, state, shared, logs, modals }) {
-    const { renderUpdateFailureBanner } = shared;
+  function createActionsModule({ config, modals, tracker }) {
     const {
       closeRebootConfirm,
       closeRollbackConfirm,
@@ -250,6 +250,7 @@
       openWhatsNew,
     } = modals;
 
+    // Resolves to the version data, or to nothing when the check failed.
     async function checkForUpdates(options) {
       const elements = getVersionElements();
       const silent = !!(options && options.silent);
@@ -257,10 +258,12 @@
       // can't hide a release that actually exists. Silent/background
       // refreshes reuse whatever the server already has.
       const force = !silent;
+      let result = null;
       setCheckButtonLoading(elements.checkBtn, true);
       try {
         const data = await fetchVersionData(config.versionUrl, { force });
         renderVersionCheckResult(elements, data);
+        result = data;
         if (!silent) {
           if (data.update_available) {
             showResponseModal(
@@ -305,77 +308,45 @@
       } finally {
         setCheckButtonLoading(elements.checkBtn, false);
       }
+      return result;
     }
 
-    async function refreshUpdateStatus() {
-      try {
-        const data = await fetchJson(config.updateStatusUrl, { cache: "no-store" });
-        renderUpdateFailureBanner(
-          data?.last_failure ?? null,
-          data?.prev_version ?? null
-        );
-      } catch (e) {
-        // An error reply leaves the banner as it was, as it always has.
-        if (e?.kind !== "http") console.warn("Update status refresh failed:", e);
-      }
-    }
-
-    function pollUpdateStatusUntilDone(logLabel) {
-      if (state.updateTimer) clearInterval(state.updateTimer);
-      state.updateTimer = setInterval(async () => {
-        try {
-          await logs.fetchAndRenderLogs();
-          const sdata = await fetchJson(config.updateStatusUrl);
-          renderUpdateFailureBanner(
-            sdata?.last_failure ?? null,
-            sdata?.prev_version ?? null
-          );
-          if (!sdata?.running) {
-            clearInterval(state.updateTimer);
-            state.updateTimer = null;
-            setTimeout(() => logs.fetchAndRenderLogs(), 500);
-            // Silent refresh — the user was just watching the update log
-            // stream, they don't need another toast announcing the state.
-            await checkForUpdates({ silent: true });
-        }
-      } catch (e) {
-        console.warn("Settings update status poll failed:", logLabel, e);
-        clearInterval(state.updateTimer);
-        state.updateTimer = null;
-      }
-      }, 2000);
-    }
-
+    // Start an update or rollback, then hand it to the tracker, which
+    // follows it to the end. Update now and Roll back stay disabled from the
+    // click until the run is over.
     async function runUpdateAction({
       url,
       kind,
+      label,
       startingLabel,
       failureMessage,
     }) {
       if (!url) {
-        showResponseModal("failure", `${kind} is not available on this build.`);
+        showResponseModal("failure", `${label} is not available on this build.`);
         return;
       }
+      tracker.setBusy(true);
       try {
-        setHeaderButtonsDisabled(true);
         const data = await fetchJson(url, { method: "POST" });
         showResponseModal("success", data.message || startingLabel);
-        pollUpdateStatusUntilDone(kind);
+        tracker.track(kind);
       } catch (e) {
         console.debug("Failed to start settings action:", kind, e);
+        tracker.setBusy(false);
         showResponseModal(
           "failure",
           globalThis.InkyPiHttp.errorMessage(e, failureMessage)
         );
-      } finally {
-        setHeaderButtonsDisabled(false);
+        // Refused because a run is already going: follow that one.
+        if (e?.status === 409) void tracker.resume();
       }
     }
 
     async function startUpdate() {
       await runUpdateAction({
         url: config.startUpdateUrl,
-        kind: "Update",
+        kind: "update",
+        label: "Update",
         startingLabel: "Update started.",
         failureMessage: "Failed to start update",
       });
@@ -385,7 +356,8 @@
       closeRollbackConfirm();
       await runUpdateAction({
         url: config.rollbackUpdateUrl,
-        kind: "Rollback",
+        kind: "rollback",
+        label: "Rollback",
         startingLabel: "Rollback started.",
         failureMessage: "Failed to start rollback",
       });
@@ -505,13 +477,6 @@
       );
     }
 
-    function stop() {
-      if (state.updateTimer) {
-        clearInterval(state.updateTimer);
-        state.updateTimer = null;
-      }
-    }
-
     function bind() {
       document
         .getElementById("exportConfigBtn")
@@ -586,10 +551,8 @@
       handleShutdown,
       hydrateVersionCheckFromCache,
       importConfig,
-      refreshUpdateStatus,
       startRollback,
       startUpdate,
-      stop,
     };
   }
 

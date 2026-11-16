@@ -1,28 +1,113 @@
+import re
 from collections.abc import Iterator
+from typing import Any
 from zoneinfo import ZoneInfo
 
 import pytest
 from flask.testing import FlaskClient
 
 
-def test_api_logs_clamp_and_meta(
-    client: FlaskClient, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    # Request with out-of-range parameters; expect clamped values in meta
+def test_api_logs_clamp_and_meta(client: FlaskClient) -> None:
+    """Out-of-range parameters are clamped, echoed in meta, and flagged."""
     resp = client.get(
         "/api/logs?hours=9999&limit=999999&level=errors&contains=" + ("x" * 500)
     )
     assert resp.status_code == 200
     data = resp.get_json()
-    assert "meta" in data
-    meta = data["meta"]
-    # Hours clamped to max (24) and limit clamped to max (2000)
-    assert meta["hours"] <= 24
-    assert meta["limit"] <= 2000
-    # Level echoed back
-    assert meta["level"] == "errors"
-    # Contains trimmed to <= 200
-    assert len(meta["contains"]) <= 200
+    assert data["meta"]["hours"] == 24
+    assert data["meta"]["limit"] == 2000
+    assert data["meta"]["level"] == "errors"
+    assert data["meta"]["contains"] == "x" * 200
+    assert data["truncated"] is True
+
+
+_CORPUS = [
+    "Jan 01 host app[1]: INFO started",
+    "Jan 01 host app[1]: WARNING something odd",
+    "Jan 01 host app[1]: Error mixed case error",
+    "Jan 01 host app[1]: critical CRITICAL boom",
+    "Jan 01 host app[1]: DEBUG noisy",
+]
+
+
+@pytest.mark.parametrize(
+    ("query", "expected"),
+    [
+        pytest.param("level=all", _CORPUS, id="all"),
+        pytest.param("level=errors", [_CORPUS[2], _CORPUS[3]], id="errors"),
+        pytest.param(
+            "level=warn_errors", [_CORPUS[1], _CORPUS[2], _CORPUS[3]], id="warn-errors"
+        ),
+        pytest.param(
+            "level=warnings", [_CORPUS[1], _CORPUS[2], _CORPUS[3]], id="warnings-alias"
+        ),
+        pytest.param("level=all&contains=STARTED", [_CORPUS[0]], id="contains"),
+        pytest.param(
+            "level=errors&contains=boom", [_CORPUS[3]], id="contains-and-level"
+        ),
+    ],
+)
+def test_api_logs_filters_lines_by_level_and_text(
+    client: FlaskClient, monkeypatch: pytest.MonkeyPatch, query: str, expected: Any
+) -> None:
+    """Level matching and ``contains`` both ignore case."""
+    from services import logs
+
+    monkeypatch.setattr(logs, "_read_log_lines", lambda _hours: list(_CORPUS))
+
+    resp = client.get(f"/api/logs?{query}")
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["lines"] == expected
+    assert data["count"] == len(expected)
+    assert data["truncated"] is False
+
+
+def test_api_logs_keeps_the_newest_lines_up_to_the_limit(
+    client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A limit below the minimum is raised to 50, and the newest 50 are kept."""
+    from services import logs
+
+    corpus = [f"Jan 01 host app[1]: ERROR line {i}" for i in range(60)]
+    monkeypatch.setattr(logs, "_read_log_lines", lambda _hours: corpus)
+
+    resp = client.get("/api/logs?level=errors&limit=2")
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["meta"]["limit"] == 50
+    assert data["lines"] == corpus[-50:]
+    assert data["count"] == 50
+    assert data["truncated"] is True
+
+
+def test_api_logs_hides_a_read_error(
+    client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """JTN-141: the reader's exception text does not reach the client."""
+    from services import logs
+
+    def failing_read(hours: Any) -> None:
+        raise Exception("secret journal path")
+
+    monkeypatch.setattr(logs, "_read_log_lines", failing_read)
+
+    resp = client.get("/api/logs")
+    assert resp.status_code == 500
+    body = resp.get_json()
+    assert body["success"] is False
+    assert body["error"] == "An error occurred while reading logs"
+    assert "secret journal path" not in resp.get_data(as_text=True)
+
+
+def test_clamp_int_bounds_and_defaults() -> None:
+    from blueprints.settings._logs import _clamp_int
+
+    assert _clamp_int("5", 10, 1, 20) == 5
+    assert _clamp_int("25", 10, 1, 20) == 20
+    assert _clamp_int("0", 10, 1, 20) == 1
+    assert _clamp_int(None, 10, 1, 20) == 10
+    assert _clamp_int("invalid", 10, 1, 20) == 10
 
 
 def test_api_logs_size_guard(
@@ -35,6 +120,21 @@ def test_api_logs_size_guard(
     assert data["count"] <= data["meta"]["limit"]
     # Ensure meta present
     assert "meta" in data
+
+
+def test_rate_limit_without_an_address_shares_one_bucket() -> None:
+    """A request with no remote address is counted under "unknown"."""
+    from blueprints.settings import _logs
+
+    _logs._logs_limiter._requests.pop("unknown", None)
+    max_requests = _logs._logs_limiter._max
+    try:
+        assert all(_logs._rate_limit_ok(None) for _ in range(max_requests))
+        assert _logs._rate_limit_ok(None) is False
+        assert _logs._rate_limit_ok("1.2.3.4") is True
+    finally:
+        _logs._logs_limiter._requests.pop("unknown", None)
+        _logs._logs_limiter._requests.pop("1.2.3.4", None)
 
 
 def test_api_logs_rate_limit(client: FlaskClient) -> None:
@@ -54,29 +154,42 @@ def test_api_logs_rate_limit(client: FlaskClient) -> None:
 # ---- Additional edge-case tests ----
 
 
-def test_download_logs_filename_timestamp(client: FlaskClient) -> None:
-    """Download filename matches inkypi_YYYYMMDD-HHMMSS.log pattern."""
-    import re
+def test_download_logs_is_a_timestamped_text_attachment(
+    client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Without a journal, the download is the dev buffer for the asked hours."""
+    from services import logs
 
-    resp = client.get("/download-logs")
+    monkeypatch.setattr(logs, "JOURNAL_AVAILABLE", False)
+
+    resp = client.get("/download-logs?hours=5")
     assert resp.status_code == 200
-    disposition = resp.headers.get("Content-Disposition", "")
-    match = re.search(r"inkypi_\d{8}-\d{6}\.log", disposition)
-    assert match is not None
+    assert resp.headers["Content-Type"] == "text/plain; charset=utf-8"
+    assert re.fullmatch(
+        r'attachment; filename="inkypi_\d{8}-\d{6}\.log"',
+        resp.headers["Content-Disposition"],
+    )
+    lines = resp.get_data(as_text=True).splitlines()
+    assert lines[0] == "=== Development Mode Logs (In-Memory Buffer) ==="
+    assert lines[1].startswith("Showing logs from the last 5 hours")
 
 
 def test_download_logs_exception_500(
     client: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """_read_log_lines raising returns 500 text response."""
+    """A read error returns a plain 500 without the exception text."""
     from services import logs
 
     monkeypatch.setattr(
-        logs, "_read_log_lines", lambda h: (_ for _ in ()).throw(RuntimeError("fail"))
+        logs,
+        "_read_log_lines",
+        lambda h: (_ for _ in ()).throw(RuntimeError("secret journal path")),
     )
 
     resp = client.get("/download-logs")
     assert resp.status_code == 500
+    assert resp.get_data(as_text=True) == "Error reading logs"
+    assert "Content-Disposition" not in resp.headers
 
 
 def test_api_logs_level_warn_errors(client: FlaskClient) -> None:

@@ -151,17 +151,14 @@
     if (details) details.hidden = !journalText;
   }
 
-  function renderRollbackButton(lastFailure, prevVersion) {
+  // The server decides whether a rollback may start (update_status's
+  // rollback_eligible, the same rule the rollback route applies), so the
+  // button never offers a rollback the route would refuse.
+  function renderRollbackButton(rollbackEligible, prevVersion) {
     const btn = document.getElementById("rollbackUpdateBtn");
     if (!btn) return;
-    // A preflight abort fails before anything is checked out, so the device
-    // is still on the version it was on — there is nothing to roll back.
-    const abortedInPreflight = String(lastFailure?.last_command || "").startsWith(
-      "preflight:"
-    );
     const canRollback =
-      !!lastFailure &&
-      !abortedInPreflight &&
+      rollbackEligible === true &&
       typeof prevVersion === "string" &&
       prevVersion.length > 0;
     btn.hidden = !canRollback;
@@ -174,22 +171,20 @@
     }
   }
 
-  function renderUpdateFailureBanner(lastFailure, prevVersion) {
+  function renderUpdateFailureBanner(lastFailure, prevVersion, rollbackEligible) {
     const banner = document.getElementById("updateFailureBanner");
     if (!banner) return;
+    renderRollbackButton(rollbackEligible, prevVersion);
     if (!lastFailure) {
       banner.hidden = true;
-      renderRollbackButton(null, null);
       return;
     }
     if (lastFailure.parse_error) {
       renderUpdateFailureUnreadable(banner);
-      renderRollbackButton(lastFailure, prevVersion);
       return;
     }
     renderUpdateFailureFields(lastFailure);
     banner.hidden = false;
-    renderRollbackButton(lastFailure, prevVersion);
   }
 
   function prefKey(key) {

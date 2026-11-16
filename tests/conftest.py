@@ -73,6 +73,9 @@ UI_BROWSER_TESTS = {
     # Sidebar update indicator + quick-update modal flow (shows on update
     # available, click opens modal, confirm POSTs, cancel no-POST, hash nav).
     "test_sidebar_update_indicator.py",
+    # Settings follows an update or rollback through the restart to its end
+    # (stubbed /settings/update_status via page.route()).
+    "test_settings_update_progress_e2e.py",
     # Browser error and console-log reports reach the server with CSRF on.
     "test_client_error_reporting_e2e.py",
     # Scripted scrolls jump instead of animating under "reduce motion".
