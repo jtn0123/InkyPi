@@ -82,11 +82,17 @@ dev = [
   "pip-licenses>=5.5,<6",
   # Mutation testing (optional, slow: `mutmut run`).
   "mutmut>=3.8,<4",
-  # Memory profiling for the per-PR memory diff (Linux wheels only;
-  # tracemalloc is the fallback elsewhere).
-  "memray>=1.20,<2; sys_platform == 'linux'",
+  # Memory profiling, also installed on its own by the memory-diff job.
+  { include-group = "memory-diff" },
   # Release tooling, also installed on its own by the release job.
   { include-group = "release" },
+]
+# The memory-diff workflow installs the runtime requirements and only this
+# group, hash-checked from uv.lock, so it measures what the Pi installs:
+#   uv export --frozen --only-group memory-diff --no-emit-project
+# memray has Linux wheels only; tracemalloc is the fallback elsewhere.
+memory-diff = [
+  "memray>=1.20,<2; sys_platform == 'linux'",
 ]
 # The release workflow installs only this group, hash-checked from uv.lock:
 #   uv export --frozen --only-group release --no-emit-project
