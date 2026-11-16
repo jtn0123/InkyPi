@@ -282,6 +282,36 @@ class TestApiKeysMask:
         assert resp.status_code == 200
         assert b"set (3 chars)" in resp.data
 
+    def test_mask_long_key_shows_last_four_and_length(
+        self,
+        client: FlaskClient,
+        device_config_dev: Any,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.setattr(
+            device_config_dev,
+            "load_env_key",
+            lambda k: "sk-abcdef1234567890" if k == "OPEN_AI_SECRET" else None,
+        )
+
+        resp = client.get("/settings/api-keys")
+        assert resp.status_code == 200
+        assert b"...7890 (19 chars)" in resp.data
+        # The rest of the key never reaches the page.
+        assert b"sk-abcdef" not in resp.data
+
+    def test_mask_unset_keys_show_no_length(
+        self,
+        client: FlaskClient,
+        device_config_dev: Any,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.setattr(device_config_dev, "load_env_key", lambda k: None)
+
+        resp = client.get("/settings/api-keys")
+        assert resp.status_code == 200
+        assert b" chars)" not in resp.data
+
     def test_mask_empty_string(
         self,
         client: FlaskClient,

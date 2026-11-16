@@ -1,3 +1,5 @@
+import json
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -903,3 +905,29 @@ def test_playlist_page_instance_image_url_has_no_playlist_name_query_param(
     body = resp.data.decode()
     # The image src should not carry playlist_name as a query param
     assert "playlist_name=" not in body
+
+
+def test_save_plugin_settings_alias_saves_the_default_instance(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
+    """POST /plugin/<id>/save stores the settings as the plugin's saved instance
+    in the Default playlist, as the form's own save route does."""
+    resp = client.post(
+        "/plugin/clock/save",
+        data={"selectedFrame": "Digital Clock", "primaryColor": "#000000"},
+    )
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["success"] is True
+    assert body["instance_name"] == "clock_saved_settings"
+
+    saved = json.loads(Path(device_config_dev.config_file).read_text())
+    default = next(
+        p for p in saved["playlist_config"]["playlists"] if p["name"] == "Default"
+    )
+    instance = next(
+        p for p in default["plugins"] if p["name"] == "clock_saved_settings"
+    )
+    assert instance["plugin_id"] == "clock"
+    assert instance["plugin_settings"]["selectedFrame"] == "Digital Clock"
+    assert instance["plugin_settings"]["primaryColor"] == "#000000"

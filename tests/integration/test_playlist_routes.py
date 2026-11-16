@@ -1,6 +1,12 @@
 # pyright: reportMissingImports=false
+import json
+from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from typing import Any
+from unittest.mock import MagicMock
 
+import pytest
+from flask import Flask
 from flask.testing import FlaskClient
 
 
@@ -71,13 +77,26 @@ def test_playlist_page_paused_label_when_auto_retry_is_off(
     assert "retrying" not in html
 
 
-def test_create_update_delete_playlist_flow(client: FlaskClient) -> None:
+def _saved_playlists(device_config_dev: Any) -> dict[str, dict[str, Any]]:
+    """The playlists in device.json, as the device would load them on boot."""
+    saved = json.loads(Path(device_config_dev.config_file).read_text())
+    return {p["name"]: p for p in saved["playlist_config"]["playlists"]}
+
+
+def test_create_update_delete_playlist_flow(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
     # Create
     payload = {"playlist_name": "Morning", "start_time": "06:00", "end_time": "09:00"}
     resp = client.post("/create_playlist", json=payload)
     assert resp.status_code == 200
+    assert resp.get_json()["success"] is True
+    created = _saved_playlists(device_config_dev)["Morning"]
+    assert (created["start_time"], created["end_time"]) == ("06:00", "09:00")
+    assert "cycle_minutes" not in created
+    assert client.get("/playlist/eta/Morning").status_code == 200
 
-    # Update (also set cycle override to 5 min)
+    # Update: rename, move the window, and set a 5-minute cycle override.
     upd = {
         "new_name": "EarlyMorning",
         "start_time": "05:00",
@@ -86,10 +105,63 @@ def test_create_update_delete_playlist_flow(client: FlaskClient) -> None:
     }
     resp = client.put("/update_playlist/Morning", json=upd)
     assert resp.status_code == 200
+    saved = _saved_playlists(device_config_dev)
+    assert "Morning" not in saved
+    updated = saved["EarlyMorning"]
+    assert (updated["start_time"], updated["end_time"]) == ("05:00", "08:00")
+    assert updated["cycle_minutes"] == 5
+    assert client.get("/playlist/eta/Morning").status_code == 404
 
     # Delete
     resp = client.delete("/delete_playlist/EarlyMorning")
     assert resp.status_code == 200
+    assert "EarlyMorning" not in _saved_playlists(device_config_dev)
+    assert client.get("/playlist/eta/EarlyMorning").status_code == 404
+
+
+def test_create_playlist_from_a_form_post_saves_it(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
+    resp = client.post(
+        "/create_playlist",
+        data={
+            "playlist_name": "Test Playlist",
+            "start_time": "08:00",
+            "end_time": "22:00",
+        },
+    )
+    assert resp.status_code == 200
+    saved = _saved_playlists(device_config_dev)["Test Playlist"]
+    assert (saved["start_time"], saved["end_time"]) == ("08:00", "22:00")
+    assert saved["plugins"] == []
+
+
+def test_create_playlist_refuses_a_duplicate_name(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
+    payload = {"playlist_name": "Evening", "start_time": "18:00", "end_time": "20:00"}
+    assert client.post("/create_playlist", json=payload).status_code == 200
+
+    again = {**payload, "start_time": "20:00", "end_time": "22:00"}
+    resp = client.post("/create_playlist", json=again)
+    assert resp.status_code == 400
+    assert resp.get_json()["error"] == "A playlist with that name already exists"
+    saved = _saved_playlists(device_config_dev)["Evening"]
+    assert (saved["start_time"], saved["end_time"]) == ("18:00", "20:00")
+
+
+def test_delete_unknown_playlist_is_not_found_and_deletes_nothing(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
+    """JTN-782: an unknown name is a 404, not a silent success."""
+    before = set(_saved_playlists(device_config_dev))
+
+    resp = client.delete("/delete_playlist/DoesNotExist")
+    assert resp.status_code == 404
+    data = resp.get_json()
+    assert data["success"] is False
+    assert data["code"] == "not_found"
+    assert set(_saved_playlists(device_config_dev)) == before
 
 
 def test_update_playlist_accepts_form_payload(
@@ -776,3 +848,347 @@ def test_create_playlist_accepts_non_quarter_hour_times(client: FlaskClient) -> 
     }
     resp = client.put("/update_playlist/OddHours", json=upd)
     assert resp.status_code == 200
+
+
+# ---- /update_device_cycle: the loop's default interval ----
+
+
+def _saved_device_cycle_seconds(device_config_dev: Any) -> Any:
+    saved = json.loads(Path(device_config_dev.config_file).read_text())
+    return saved["plugin_cycle_interval_seconds"]
+
+
+@pytest.mark.parametrize("minutes", [1, 30, 1440])
+def test_update_device_cycle_saves_the_interval(
+    client: FlaskClient, device_config_dev: Any, minutes: int
+) -> None:
+    resp = client.put("/update_device_cycle", json={"minutes": minutes})
+    assert resp.status_code == 200
+    assert resp.get_json()["success"] is True
+    assert _saved_device_cycle_seconds(device_config_dev) == minutes * 60
+
+
+@pytest.mark.parametrize(
+    ("payload", "error"),
+    [
+        pytest.param({"minutes": 0}, "between 1 and 1440", id="zero"),
+        pytest.param({"minutes": 1441}, "between 1 and 1440", id="over-a-day"),
+        pytest.param({"minutes": "abc"}, "Invalid minutes", id="not-a-number"),
+        pytest.param({}, None, id="missing"),
+    ],
+)
+def test_update_device_cycle_rejects_a_bad_interval_and_keeps_the_old_one(
+    client: FlaskClient, device_config_dev: Any, payload: Any, error: str | None
+) -> None:
+    assert client.put("/update_device_cycle", json={"minutes": 30}).status_code == 200
+
+    resp = client.put("/update_device_cycle", json=payload)
+    assert resp.status_code == 400
+    body = resp.get_json()
+    assert body["success"] is False
+    if error is not None:
+        assert error in body["error"]
+    assert _saved_device_cycle_seconds(device_config_dev) == 30 * 60
+
+
+def test_update_device_cycle_wakes_the_refresh_loop(
+    client: FlaskClient, flask_app: Flask
+) -> None:
+    signal = MagicMock()
+    flask_app.config["REFRESH_TASK"].signal_config_change = signal
+
+    assert client.put("/update_device_cycle", json={"minutes": 60}).status_code == 200
+    signal.assert_called_once_with()
+
+
+def test_update_device_cycle_is_saved_even_if_the_wake_up_fails(
+    client: FlaskClient, flask_app: Flask, device_config_dev: Any
+) -> None:
+    def raise_error() -> None:
+        raise RuntimeError("signal failed")
+
+    flask_app.config["REFRESH_TASK"].signal_config_change = raise_error
+
+    resp = client.put("/update_device_cycle", json={"minutes": 60})
+    assert resp.status_code == 200
+    assert _saved_device_cycle_seconds(device_config_dev) == 60 * 60
+
+
+# ---- playlist time windows may not overlap ----
+
+
+def _create(client: FlaskClient, name: str, start: str, end: str) -> Any:
+    return client.post(
+        "/create_playlist",
+        json={"playlist_name": name, "start_time": start, "end_time": end},
+    )
+
+
+def test_create_playlist_refuses_an_overlapping_window(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
+    assert _create(client, "Morning", "06:00", "09:00").status_code == 200
+
+    resp = _create(client, "Overlap", "08:00", "10:00")
+    assert resp.status_code == 400
+    assert "overlaps" in resp.get_json()["error"].lower()
+    assert "Overlap" not in _saved_playlists(device_config_dev)
+
+
+def test_create_playlist_accepts_separate_windows(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
+    assert _create(client, "Morning", "06:00", "09:00").status_code == 200
+    assert _create(client, "Afternoon", "12:00", "15:00").status_code == 200
+
+    saved = _saved_playlists(device_config_dev)
+    assert (saved["Morning"]["start_time"], saved["Morning"]["end_time"]) == (
+        "06:00",
+        "09:00",
+    )
+    assert (saved["Afternoon"]["start_time"], saved["Afternoon"]["end_time"]) == (
+        "12:00",
+        "15:00",
+    )
+
+
+@pytest.mark.parametrize(
+    ("start", "end"), [("22:00", "24:00"), ("22:00", "05:00")], ids=str
+)
+def test_create_playlist_saves_windows_that_reach_midnight(
+    client: FlaskClient, device_config_dev: Any, start: str, end: str
+) -> None:
+    assert _create(client, "Night", start, end).status_code == 200
+    saved = _saved_playlists(device_config_dev)["Night"]
+    assert (saved["start_time"], saved["end_time"]) == (start, end)
+
+
+def test_update_playlist_may_overlap_its_own_old_window(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
+    _create(client, "First", "06:00", "09:00")
+    _create(client, "Second", "12:00", "15:00")
+
+    resp = client.put(
+        "/update_playlist/First",
+        json={"new_name": "First", "start_time": "05:00", "end_time": "10:00"},
+    )
+    assert resp.status_code == 200
+    saved = _saved_playlists(device_config_dev)["First"]
+    assert (saved["start_time"], saved["end_time"]) == ("05:00", "10:00")
+
+
+def test_update_playlist_refuses_to_overlap_another(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
+    _create(client, "First", "06:00", "09:00")
+    _create(client, "Second", "12:00", "15:00")
+
+    resp = client.put(
+        "/update_playlist/First",
+        json={"new_name": "First", "start_time": "11:00", "end_time": "13:00"},
+    )
+    assert resp.status_code == 400
+    assert "overlaps" in resp.get_json()["error"].lower()
+    saved = _saved_playlists(device_config_dev)["First"]
+    assert (saved["start_time"], saved["end_time"]) == ("06:00", "09:00")
+
+
+def test_update_playlist_rejects_a_body_that_is_not_json_or_a_form(
+    client: FlaskClient,
+) -> None:
+    resp = client.put(
+        "/update_playlist/Any", data="not-json", content_type="text/plain"
+    )
+    assert resp.status_code == 400
+    assert resp.get_json()["success"] is False
+
+
+# ---- /display_next_in_playlist ----
+
+
+def test_display_next_in_playlist_needs_a_playlist_name(client: FlaskClient) -> None:
+    resp = client.post("/display_next_in_playlist", json={})
+    assert resp.status_code == 400
+    assert "required" in resp.get_json()["error"].lower()
+
+
+def test_display_next_in_playlist_unknown_playlist(client: FlaskClient) -> None:
+    resp = client.post("/display_next_in_playlist", json={"playlist_name": "NoSuch"})
+    assert resp.status_code == 400
+    assert "not found" in resp.get_json()["error"].lower()
+
+
+def test_display_next_in_playlist_with_nothing_to_show(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
+    device_config_dev.get_playlist_manager().add_playlist("Empty", "00:00", "24:00")
+    device_config_dev.write_config()
+
+    resp = client.post("/display_next_in_playlist", json={"playlist_name": "Empty"})
+    assert resp.status_code == 400
+    assert "no eligible" in resp.get_json()["error"].lower()
+
+
+def test_display_next_in_playlist_refreshes_that_playlists_next_item(
+    client: FlaskClient, flask_app: Flask, device_config_dev: Any
+) -> None:
+    pm = device_config_dev.get_playlist_manager()
+    pm.add_playlist("Test", "00:00", "24:00")
+    pm.get_playlist("Test").add_plugin(
+        {
+            "plugin_id": "clock",
+            "name": "TestClock",
+            "plugin_settings": {},
+            "refresh": {"interval": 60},
+        }
+    )
+    device_config_dev.write_config()
+    manual_update = MagicMock(return_value={})
+    flask_app.config["REFRESH_TASK"].manual_update = manual_update
+
+    resp = client.post("/display_next_in_playlist", json={"playlist_name": "Test"})
+    assert resp.status_code == 200
+    assert resp.get_json()["success"] is True
+    manual_update.assert_called_once()
+    action = manual_update.call_args.args[0]
+    assert action.get_refresh_info() == {
+        "refresh_type": "Playlist",
+        "playlist": "Test",
+        "plugin_id": "clock",
+        "plugin_instance": "TestClock",
+    }
+
+
+# ---- /add_plugin with a daily scheduled time ----
+
+
+def test_add_plugin_saves_a_scheduled_refresh(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
+    payload = {
+        "plugin_id": "clock",
+        "refresh_settings": json.dumps(
+            {
+                "playlist": "Default",
+                "instance_name": "ScheduledClock",
+                "refreshType": "scheduled",
+                "refreshTime": "08:00",
+            }
+        ),
+    }
+    resp = client.post("/add_plugin", data=payload)
+    assert resp.status_code == 200
+    assert resp.get_json()["success"] is True
+
+    default = _saved_playlists(device_config_dev)["Default"]
+    instance = next(p for p in default["plugins"] if p["name"] == "ScheduledClock")
+    assert instance["plugin_id"] == "clock"
+    assert instance["refresh"] == {"scheduled": "08:00"}
+
+
+# ---- /reorder_plugins failures leave the order alone ----
+
+
+def test_reorder_plugins_unknown_playlist(client: FlaskClient) -> None:
+    payload = {
+        "playlist_name": "NoSuch",
+        "ordered": [{"plugin_id": "clock", "name": "A"}],
+    }
+    resp = client.post("/reorder_plugins", json=payload)
+    assert resp.status_code == 400
+    assert "not found" in resp.get_json()["error"].lower()
+
+
+def test_reorder_plugins_refuses_an_order_naming_other_instances(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
+    pm = device_config_dev.get_playlist_manager()
+    pm.add_playlist("Test", "00:00", "24:00")
+    for name in ("A", "B"):
+        pm.get_playlist("Test").add_plugin(
+            {
+                "plugin_id": "clock",
+                "name": name,
+                "plugin_settings": {},
+                "refresh": {"interval": 60},
+            }
+        )
+    device_config_dev.write_config()
+
+    payload = {
+        "playlist_name": "Test",
+        "ordered": [
+            {"plugin_id": "clock", "name": "B"},
+            {"plugin_id": "weather", "name": "C"},
+        ],
+    }
+    resp = client.post("/reorder_plugins", json=payload)
+    assert resp.status_code == 400
+    assert resp.get_json()["success"] is False
+    saved = _saved_playlists(device_config_dev)["Test"]
+    assert [p["name"] for p in saved["plugins"]] == ["A", "B"]
+
+
+def test_reorder_plugins_needs_an_order(client: FlaskClient) -> None:
+    resp = client.post("/reorder_plugins", json={"playlist_name": "Test"})
+    assert resp.status_code == 400
+    assert resp.get_json()["success"] is False
+
+
+# ---- /playlist/eta ----
+
+
+def test_playlist_eta_of_an_empty_playlist_is_empty(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
+    device_config_dev.get_playlist_manager().add_playlist("Empty", "00:00", "24:00")
+    device_config_dev.write_config()
+
+    resp = client.get("/playlist/eta/Empty")
+    assert resp.status_code == 200
+    assert resp.get_json()["eta"] == {}
+
+
+def test_playlist_eta_is_stable_within_a_minute(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
+    pm = device_config_dev.get_playlist_manager()
+    pm.add_playlist("Cached", "00:00", "24:00")
+    pm.get_playlist("Cached").add_plugin(
+        {
+            "plugin_id": "clock",
+            "name": "A",
+            "plugin_settings": {},
+            "refresh": {"interval": 60},
+        }
+    )
+    device_config_dev.write_config()
+
+    first = client.get("/playlist/eta/Cached").get_json()["eta"]
+    second = client.get("/playlist/eta/Cached").get_json()["eta"]
+    assert list(first) == ["A"]
+    assert first == second
+
+
+# ---- relative times on the playlist page ----
+
+
+def test_format_relative_time_reads_a_naive_timestamp_as_utc() -> None:
+    """Bug 13: a timestamp without a zone is UTC, not an error."""
+    from blueprints.playlist._pages import format_relative_time
+
+    naive = (datetime.now(UTC) - timedelta(minutes=30)).replace(tzinfo=None)
+    assert format_relative_time(naive.isoformat()) == "30 minutes ago"
+
+
+def test_format_relative_time_says_just_now_under_two_minutes() -> None:
+    from blueprints.playlist._pages import format_relative_time
+
+    now = datetime.now().astimezone()
+    assert format_relative_time((now - timedelta(seconds=119)).isoformat()) == (
+        "just now"
+    )
+    assert format_relative_time((now - timedelta(seconds=120)).isoformat()) == (
+        "2 minutes ago"
+    )

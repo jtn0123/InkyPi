@@ -1,11 +1,15 @@
 # pyright: reportMissingImports=false
+import json
 import os
 import re
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from typing import Any
 
 import pytest
+from flask import Flask
 from flask.testing import FlaskClient
+from PIL import Image
 
 from model import RefreshInfo
 
@@ -14,6 +18,8 @@ def test_main_page(client: FlaskClient) -> None:
     resp = client.get("/")
     assert resp.status_code == 200
     assert b"/preview" in resp.data
+    # The dashboard's forms send this token with every state-changing request.
+    assert b'<meta name="csrf-token" content="' in resp.data
 
 
 def test_dashboard_header_actions_use_compact_handoff_button_pattern(
@@ -273,16 +279,17 @@ def test_next_up_endpoint_and_ssr(client: FlaskClient, device_config_dev: Any) -
     # cell renders the seeded plugin display name.
     resp = client.get("/")
     assert resp.status_code == 200
-    assert b'id="heroNextValue"' in resp.data
-    assert b"weather" in resp.data or b"clock" in resp.data
+    html = resp.get_data(as_text=True)
+    assert 'id="heroNextValue">Weather</div>' in html
+    assert 'id="heroNextMeta">Playlist: Default</div>' in html
 
-    # Endpoint should return a structured JSON
+    # Nothing has been shown yet, so the first instance is next.
     r = client.get("/next-up")
     assert r.status_code == 200
     data = r.get_json()
-    assert isinstance(data, dict)
-    # One of the seeded plugin ids
-    assert data.get("plugin_id") in ("weather", "clock")
+    assert data["playlist"] == "Default"
+    assert data["plugin_id"] == "weather"
+    assert data["plugin_instance"] == "Home Weather"
 
 
 def _seed_paused_middle(device_config_dev: Any, paused_at: str) -> None:
@@ -434,24 +441,59 @@ def test_refresh_info_endpoint_annotates_labels(
     client: FlaskClient, device_config_dev: Any
 ) -> None:
     """JTN-618: /refresh-info must expose a friendly label and auto flag to JS."""
+    # rss's display name ("RSS Feed") differs from its humanised id ("Rss"),
+    # so these checks fail if the display-name lookup falls back to the id.
     device_config_dev.refresh_info = RefreshInfo(
         refresh_type="Playlist",
-        plugin_id="weather",
+        plugin_id="rss",
         refresh_time="2025-01-01T00:00:00",
         image_hash=123,
         playlist="Default",
-        plugin_instance="weather_saved_settings",
+        plugin_instance="rss_saved_settings",
     )
     device_config_dev.write_config()
 
     resp = client.get("/refresh-info")
     assert resp.status_code == 200
     payload = resp.get_json()
-    assert payload["plugin_id"] == "weather"
+    assert payload["plugin_id"] == "rss"
+    assert payload["plugin_display_name"] == "RSS Feed"
+    # An auto-generated instance key is shown as the plugin's display name.
+    assert payload["plugin_instance_label"] == "RSS Feed"
     assert payload["plugin_instance_is_auto"] is True
-    # Friendly label should not expose the raw key.
-    assert "saved_settings" not in payload["plugin_instance_label"]
-    assert payload["plugin_display_name"]
+
+
+def test_refresh_info_keeps_a_user_named_instance_label(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
+    device_config_dev.refresh_info = RefreshInfo(
+        refresh_type="Playlist",
+        plugin_id="rss",
+        refresh_time="2025-01-01T00:00:00",
+        image_hash=123,
+        playlist="Default",
+        plugin_instance="Morning headlines",
+    )
+    device_config_dev.write_config()
+
+    payload = client.get("/refresh-info").get_json()
+    assert payload["plugin_display_name"] == "RSS Feed"
+    assert payload["plugin_instance_label"] == "Morning headlines"
+    assert payload["plugin_instance_is_auto"] is False
+
+
+def test_refresh_info_is_empty_when_it_cannot_be_read(
+    client: FlaskClient, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The dashboard treats {} as "no refresh yet"; partial data would not be."""
+
+    def broken() -> RefreshInfo:
+        raise RuntimeError("refresh info unreadable")
+
+    monkeypatch.setattr(device_config_dev, "get_refresh_info", broken)
+    resp = client.get("/refresh-info")
+    assert resp.status_code == 200
+    assert resp.get_json() == {}
 
 
 def test_refresh_info_endpoint_includes_next_refresh_schedule(
@@ -491,8 +533,8 @@ def test_next_up_endpoint_annotates_labels(
     pl = pm.get_playlist("Default")
     pl.add_plugin(
         {
-            "plugin_id": "weather",
-            "name": "weather_saved_settings",
+            "plugin_id": "rss",
+            "name": "rss_saved_settings",
             "plugin_settings": {},
             "refresh": {"interval": 600},
         }
@@ -502,6 +544,266 @@ def test_next_up_endpoint_annotates_labels(
     resp = client.get("/next-up")
     assert resp.status_code == 200
     data = resp.get_json()
-    if data:
-        assert data.get("plugin_instance_is_auto") is True
-        assert "saved_settings" not in data.get("plugin_instance_label", "")
+    assert data["plugin_id"] == "rss"
+    assert data["plugin_instance"] == "rss_saved_settings"
+    assert data["plugin_display_name"] == "RSS Feed"
+    assert data["plugin_instance_label"] == "RSS Feed"
+    assert data["plugin_instance_is_auto"] is True
+
+
+def test_next_up_is_empty_without_an_active_playlist(
+    client: FlaskClient, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    pm = device_config_dev.get_playlist_manager()
+    monkeypatch.setattr(pm, "determine_active_playlist", lambda _dt: None)
+
+    resp = client.get("/next-up")
+    assert resp.status_code == 200
+    assert resp.get_json() == {}
+
+
+def test_next_up_is_empty_when_the_playlist_has_nothing_to_show(
+    client: FlaskClient,
+) -> None:
+    # The dev config's Default playlist starts with no plugins.
+    resp = client.get("/next-up")
+    assert resp.status_code == 200
+    assert resp.get_json() == {}
+
+
+def test_next_up_is_empty_when_the_playlist_lookup_fails(
+    client: FlaskClient, device_config_dev: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    pm = device_config_dev.get_playlist_manager()
+
+    def broken(_current_dt: datetime) -> None:
+        raise RuntimeError("playlist config unreadable")
+
+    monkeypatch.setattr(pm, "determine_active_playlist", broken)
+    resp = client.get("/next-up")
+    assert resp.status_code == 200
+    assert resp.get_json() == {}
+
+
+# ---- /api/current_image: the dashboard polls it with If-Modified-Since ----
+
+# 2023-11-14 22:13:20 UTC, a whole second, as HTTP dates have no fractions.
+_IMAGE_MTIME = 1_700_000_000
+_IMAGE_MTIME_HTTP = "Tue, 14 Nov 2023 22:13:20 GMT"
+
+
+def _write_current_image(device_config_dev: Any) -> bytes:
+    path = Path(device_config_dev.current_image_file)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    Image.new("RGB", (8, 8), "white").save(path)
+    os.utime(path, (_IMAGE_MTIME, _IMAGE_MTIME))
+    return path.read_bytes()
+
+
+def test_current_image_is_served_with_its_cache_validators(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
+    image = _write_current_image(device_config_dev)
+    name = Path(device_config_dev.current_image_file).name
+
+    resp = client.get("/api/current_image")
+    assert resp.status_code == 200
+    assert resp.data == image
+    assert resp.mimetype == "image/png"
+    assert resp.headers["Last-Modified"] == _IMAGE_MTIME_HTTP
+    assert resp.headers["Cache-Control"] == "no-cache"
+    assert resp.headers["Content-Disposition"] == f'inline; filename="{name}"'
+
+
+def test_current_image_revalidation_with_last_modified_returns_304(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
+    """The browser sends Last-Modified back; an unchanged image is not resent."""
+    _write_current_image(device_config_dev)
+    last_modified = client.get("/api/current_image").headers["Last-Modified"]
+
+    resp = client.get(
+        "/api/current_image", headers={"If-Modified-Since": last_modified}
+    )
+    assert resp.status_code == 304
+    assert resp.data == b""
+
+
+def test_current_image_changed_since_the_client_copy_is_resent(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
+    image = _write_current_image(device_config_dev)
+    one_second_older = "Tue, 14 Nov 2023 22:13:19 GMT"
+
+    resp = client.get(
+        "/api/current_image", headers={"If-Modified-Since": one_second_older}
+    )
+    assert resp.status_code == 200
+    assert resp.data == image
+
+
+def test_current_image_ignores_an_unreadable_if_modified_since(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
+    image = _write_current_image(device_config_dev)
+
+    resp = client.get(
+        "/api/current_image", headers={"If-Modified-Since": "invalid-date-format"}
+    )
+    assert resp.status_code == 200
+    assert resp.data == image
+
+
+def test_current_image_missing_is_a_json_404(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
+    Path(device_config_dev.current_image_file).unlink(missing_ok=True)
+
+    resp = client.get("/api/current_image")
+    assert resp.status_code == 404
+    body = resp.get_json()
+    assert body["success"] is False
+    assert body["error"] == "Image not found"
+
+
+# ---- /dev/mock-frame ----
+
+
+def _write_mock_frame(flask_app: Flask) -> bytes:
+    frame_path = Path(flask_app.config["DISPLAY_MANAGER"].display.mock_frame_path)
+    frame_path.parent.mkdir(parents=True, exist_ok=True)
+    Image.new("RGB", (8, 8), "black").save(frame_path)
+    return frame_path.read_bytes()
+
+
+def test_dev_mock_frame_serves_the_frame_in_dev_mode(
+    client: FlaskClient, flask_app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("INKYPI_ENV", "dev")
+    frame = _write_mock_frame(flask_app)
+
+    resp = client.get("/dev/mock-frame")
+    assert resp.status_code == 200
+    assert resp.mimetype == "image/png"
+    assert resp.data == frame
+
+
+def test_dev_mock_frame_is_hidden_outside_dev_mode(
+    client: FlaskClient, flask_app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("INKYPI_ENV", "production")
+    _write_mock_frame(flask_app)
+
+    assert client.get("/dev/mock-frame").status_code == 404
+
+
+def test_dev_mock_frame_404_before_the_first_frame(
+    client: FlaskClient, flask_app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("INKYPI_ENV", "dev")
+    frame_path = Path(flask_app.config["DISPLAY_MANAGER"].display.mock_frame_path)
+    frame_path.unlink(missing_ok=True)
+
+    assert client.get("/dev/mock-frame").status_code == 404
+
+
+# ---- /static/<path> ----
+
+
+def test_static_route_serves_a_script_and_404s_a_missing_file(
+    client: FlaskClient,
+) -> None:
+    script = Path(__file__).resolve().parents[2] / "src/static/scripts/csrf.js"
+    resp = client.get("/static/scripts/csrf.js")
+    assert resp.status_code == 200
+    assert resp.data == script.read_bytes()
+
+    assert client.get("/static/scripts/no-such-file.js").status_code == 404
+
+
+# ---- /api/plugin_order: dashboard drag-and-drop ----
+
+
+def _plugin_ids(device_config_dev: Any) -> list[str]:
+    return [p["id"] for p in device_config_dev.get_plugins()]
+
+
+def test_plugin_order_is_saved_and_applied(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
+    order = list(reversed(_plugin_ids(device_config_dev)))
+    assert len(order) > 1, "the dev config registers no plugins to reorder"
+
+    resp = client.post("/api/plugin_order", json={"order": order})
+    assert resp.status_code == 200
+    assert resp.get_json()["success"] is True
+    assert _plugin_ids(device_config_dev) == order
+    saved = json.loads(Path(device_config_dev.config_file).read_text())
+    assert saved["plugin_order"] == order
+
+
+@pytest.mark.parametrize(
+    ("payload", "error"),
+    [
+        pytest.param(["clock", "weather"], "Invalid", id="not-an-object"),
+        pytest.param({"order": "clock"}, None, id="order-not-a-list"),
+        pytest.param({"order": [123]}, "strings", id="non-string-ids"),
+        pytest.param({"order": []}, "include every plugin ID exactly once", id="empty"),
+        pytest.param(
+            {"order": ["nonexistent_plugin_id_xyz"]},
+            "unknown plugin IDs",
+            id="unknown-id",
+        ),
+    ],
+)
+def test_plugin_order_rejects_a_bad_order_and_keeps_the_old_one(
+    client: FlaskClient, device_config_dev: Any, payload: Any, error: str | None
+) -> None:
+    before = _plugin_ids(device_config_dev)
+
+    resp = client.post("/api/plugin_order", json=payload)
+    assert resp.status_code == 400
+    body = resp.get_json()
+    assert body["success"] is False
+    if error is not None:
+        assert error.lower() in body["error"].lower()
+    # User-supplied ids are never echoed back (py/reflective-xss).
+    assert "nonexistent_plugin_id_xyz" not in body["error"]
+    assert _plugin_ids(device_config_dev) == before
+
+
+def test_plugin_order_rejects_duplicates_and_omissions(
+    client: FlaskClient, device_config_dev: Any
+) -> None:
+    ids = _plugin_ids(device_config_dev)
+
+    duplicate = client.post("/api/plugin_order", json={"order": [ids[0], ids[0]]})
+    assert duplicate.status_code == 400
+    assert "duplicate" in duplicate.get_json()["error"].lower()
+
+    partial = client.post("/api/plugin_order", json={"order": [ids[0]]})
+    assert partial.status_code == 400
+    assert "exactly once" in partial.get_json()["error"]
+    assert _plugin_ids(device_config_dev) == ids
+
+
+def test_plugin_order_rejects_malformed_json(client: FlaskClient) -> None:
+    resp = client.post(
+        "/api/plugin_order", data="not json", content_type="application/json"
+    )
+    assert resp.status_code == 400
+    assert resp.get_json()["success"] is False
+
+
+def test_plugin_order_never_reflects_markup(client: FlaskClient) -> None:
+    """Regression for CodeQL py/reflective-xss: ids are not echoed back."""
+    for payload in (
+        "<script>alert(1)</script>",
+        '"><img src=x onerror=alert(1)>',
+        "<svg/onload=alert(1)>",
+        "javascript:alert(1)",
+    ):
+        resp = client.post("/api/plugin_order", json={"order": [payload]})
+        assert resp.status_code == 400
+        assert payload not in resp.get_data(as_text=True)
+        assert resp.headers["Content-Type"].startswith("application/json")

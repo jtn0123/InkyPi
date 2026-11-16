@@ -391,6 +391,10 @@ jobs:
           INKYPI_VALIDATE_FS_PERMS: '1'
           INKYPI_VALIDATE_RECOVERY: '1'
           INKYPI_VALIDATE_API_CONTRACT: '1'
+          # The narrow mutation gate (scripts/mutation_check.py): four
+          # hand-picked mutants, each first run unmutated so a broken command
+          # cannot pass as a caught bug.
+          INKYPI_VALIDATE_MUTATION: '1'
         run: |
           scripts/preflash_validate.sh
 
@@ -520,8 +524,9 @@ jobs:
 
   # Mutation nightly — runs via the workflow-level ``schedule:`` trigger
   # (daily 09:00 UTC) and manual ``workflow_dispatch`` for ad-hoc artifact
-  # collection. Sharded by package so each shard fits in the 120-minute
-  # budget. See docs/mutation_testing.md.
+  # collection. Sharded so each part of the scope gets its own 120-minute
+  # budget, and resumed from the previous night's results so each shard
+  # finishes within a few nights. See docs/mutation_testing.md.
   mutation-nightly:
     name: Mutation nightly (${{ matrix.label }})
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
@@ -530,81 +535,123 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # Labels are the shards in scripts/mutmut_shard.py and the keys of
+        # scripts/mutation_scores.json. `mutated` is the shard's mutated
+        # source, uploaded so `mutmut show` works on the artifact.
         include:
           - label: app-setup
-            mutants: app_setup.*
+            mutated: mutants/src/app_setup/**/*.py
           - label: blueprints
-            mutants: blueprints.*
+            mutated: mutants/src/blueprints/**/*.py
           - label: utils
-            mutants: utils.*
+            mutated: mutants/src/utils/**/*.py
           - label: refresh-task
-            mutants: refresh_task.*
+            mutated: mutants/src/refresh_task/**/*.py
+          - label: core
+            mutated: |
+              mutants/src/config.py
+              mutants/src/model.py
+              mutants/src/services/**/*.py
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup-python-deps
         with:
           os-packages: 'true'
+      # mutmut keeps one result per mutant in mutants/**/*.meta. Restoring
+      # this week's newest copy lets tonight's run carry on where the last
+      # one stopped. A new ISO week, or a new mutmut version, starts from
+      # scratch, so no result is more than a week old. Only the .meta files
+      # are cached: mutmut copies and mutates the source fresh on every run,
+      # and it would not refresh a cached copy of a file that changed since.
+      - name: Pick the mutation cache key
+        id: mutation-cache
+        env:
+          LABEL: ${{ matrix.label }}
+        run: |
+          version=$(python -c 'import importlib.metadata as m; print(m.version("mutmut"))')
+          echo "prefix=mutmut-${LABEL}-${version}-$(date -u +%G-W%V)-" >> "$GITHUB_OUTPUT"
+      - name: Restore this week's mutation results
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: mutants/**/*.meta
+          key: ${{ steps.mutation-cache.outputs.prefix }}${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: ${{ steps.mutation-cache.outputs.prefix }}
       # No asset build, as in the `tests` job: main.css is committed (and
       # tests/unit/test_main_css_current.py checks it), and bundled JS from
       # scripts/build_assets.py is deliberately absent because
       # tests/static/test_debug_console.py asserts the unbundled <script> tags.
       - name: Run mutmut
+        id: mutmut
         env:
           INKYPI_ENV: dev
           INKYPI_NO_REFRESH: '1'
           SKIP_BROWSER: '1'
-          MUTANTS: ${{ matrix.mutants }}
+          LABEL: ${{ matrix.label }}
         run: |
-          # The larger shards cannot finish every mutant inside the job's
-          # 120-minute cap, so GitHub used to cancel them and the nightly was
-          # red even when nothing was wrong. Stop mutmut at a fixed budget,
-          # keep the partial results (uploaded below), and only fail the job
-          # when mutmut itself fails, e.g. its clean-test run breaks.
+          # A shard that cannot finish inside the job's 120-minute cap stops
+          # at a fixed budget instead of being cancelled. Its results are
+          # saved below, and the next night resumes from them. The job fails
+          # here only when mutmut itself fails, e.g. its clean-test run breaks.
           set +e
           timeout --signal=INT --kill-after=5m 100m \
-            mutmut run --max-children 2 "$MUTANTS"
+            python scripts/mutmut_shard.py "$LABEL" run --max-children 2
           rc=$?
           set -e
           if [ "$rc" -eq 124 ] || [ "$rc" -eq 137 ]; then
-            echo "::notice title=Mutation budget reached::${MUTANTS} stopped after 100 minutes; results are partial."
+            echo "::notice title=Mutation budget reached::${LABEL} stopped after 100 minutes; the next night resumes it."
             exit 0
           fi
           exit "$rc"
+      # Saved even when a later step fails, so a score drop does not throw
+      # away the night's work. Not after a cancel, which can stop mutmut
+      # halfway through writing a file.
+      - name: Save this week's mutation results
+        if: ${{ !cancelled() && steps.mutmut.outcome != 'skipped' }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: mutants/**/*.meta
+          key: ${{ steps.mutation-cache.outputs.prefix }}${{ github.run_id }}-${{ github.run_attempt }}
       # Report the score on the run page, and keep only mutmut's own result
       # files. Uploading the whole mutants/ tree (a ~100 MB copy of the repo
       # that tests write into) failed the nightly when a file vanished while
-      # it was being zipped. The summary never fails the job: mutmut's exit
-      # status above already decides that.
+      # it was being zipped. The summary never fails the job.
       - name: Summarise mutation results
         if: always()
         env:
           LABEL: ${{ matrix.label }}
         run: |
           mkdir -p mutation-report
-          mutmut results > mutation-report/results.txt 2>&1 || true
-          mutmut export-cicd-stats || true
+          python scripts/mutmut_shard.py "$LABEL" results > mutation-report/results.txt 2>&1 || true
+          python scripts/mutmut_shard.py "$LABEL" export-cicd-stats || true
           if [ -f mutants/mutmut-cicd-stats.json ]; then
             cp mutants/mutmut-cicd-stats.json mutation-report/
           fi
           python scripts/mutation_summary.py \
-            mutation-report/mutmut-cicd-stats.json "$LABEL" | tee -a "$GITHUB_STEP_SUMMARY"
+            mutation-report/mutmut-cicd-stats.json "$LABEL" \
+            --floors scripts/mutation_scores.json | tee -a "$GITHUB_STEP_SUMMARY"
           echo "Surviving and unchecked mutants: $(wc -l < mutation-report/results.txt)"
+      # Fails the shard when a complete run's score is more than 2 points
+      # under the floor in scripts/mutation_scores.json.
+      - name: Compare with the committed mutation score
+        env:
+          LABEL: ${{ matrix.label }}
+        run: |
+          python scripts/mutation_summary.py \
+            mutation-report/mutmut-cicd-stats.json "$LABEL" \
+            --floors scripts/mutation_scores.json --check
       - name: Upload mutation results
         if: always()
         continue-on-error: true
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: mutmut-results-${{ matrix.label }}
-          # Results plus the mutated copies of the four mutated packages, so
-          # `mutmut results` / `mutmut show <id>` work after extracting the
-          # artifact into a checkout (see docs/mutation_testing.md).
+          # Results plus the shard's mutated source, so `mutmut results` /
+          # `mutmut show <id>` work after extracting the artifact into a
+          # checkout (see docs/mutation_testing.md).
           path: |
             mutation-report/
             mutants/**/*.meta
-            mutants/src/app_setup/**/*.py
-            mutants/src/blueprints/**/*.py
-            mutants/src/utils/**/*.py
-            mutants/src/refresh_task/**/*.py
+            ${{ matrix.mutated }}
           if-no-files-found: ignore
 
   browser-smoke:

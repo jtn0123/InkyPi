@@ -1,0 +1,30 @@
+{
+  "allowed_drop": 2.0,
+  "shards": {
+    "app-setup": {
+      "score": 65.1,
+      "complete": false,
+      "measured": "nightly 2026-11-15 (CI run 43733926724): 559 of 1169 mutants ran"
+    },
+    "blueprints": {
+      "score": 61.7,
+      "complete": false,
+      "measured": "nightly 2026-11-15 (CI run 43733926724): 5615 of 5874 mutants ran"
+    },
+    "utils": {
+      "score": 66.7,
+      "complete": false,
+      "measured": "nightly 2026-11-15 (CI run 43733926724): 6982 of 8086 mutants ran"
+    },
+    "refresh-task": {
+      "score": 64.8,
+      "complete": false,
+      "measured": "nightly 2026-11-15 (CI run 43733926724): 3516 of 4155 mutants ran"
+    },
+    "core": {
+      "score": null,
+      "complete": false,
+      "measured": null
+    }
+  }
+}

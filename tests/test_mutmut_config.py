@@ -11,12 +11,20 @@ import pytest
 
 PYPROJECT = Path(__file__).resolve().parent.parent / "pyproject.toml"
 
-EXPECTED_FILES = [
-    "src/app_setup/",
-    "src/blueprints/",
-    "src/utils/",
-    "src/refresh_task/",
+EXPECTED_PATTERNS = [
+    "src/app_setup/*",
+    "src/blueprints/*",
+    "src/utils/*",
+    "src/refresh_task/*",
+    "src/config.py",
+    "src/model.py",
+    "src/services/*",
 ]
+
+
+def _example_path(pattern: str) -> str:
+    """A source path the pattern must match: the file itself, or one inside."""
+    return pattern[:-1] + "example.py" if pattern.endswith("*") else pattern
 
 
 def _load_mutmut_config() -> dict:
@@ -41,8 +49,8 @@ class TestMutmutConfig:
     def test_expected_files_in_scope(self) -> None:
         cfg = _load_mutmut_config()
         configured = set(cfg.get("only_mutate", []))
-        for expected in EXPECTED_FILES:
-            assert expected + "*" in configured, (
+        for expected in EXPECTED_PATTERNS:
+            assert expected in configured, (
                 f"{expected} is not in only_mutate — "
                 "do not remove files from mutation scope without a deliberate decision"
             )
@@ -61,8 +69,8 @@ class TestMutmutConfig:
         monkeypatch.chdir(PYPROJECT.parent)
         cfg = _load_config()
         assert cfg.pytest_add_cli_args_test_selection == ["tests/"]
-        for expected in EXPECTED_FILES:
-            assert cfg.should_mutate(expected + "example.py")
+        for expected in EXPECTED_PATTERNS:
+            assert cfg.should_mutate(_example_path(expected))
         assert not cfg.should_mutate("src/plugins/clock/clock.py")
 
     def test_scoped_files_exist_on_disk(self) -> None:
