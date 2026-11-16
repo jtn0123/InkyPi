@@ -298,13 +298,13 @@
 
   function handleVisibility() {
     if (document.visibilityState === "visible" && !disabled) {
-      poll();
+      void poll(); // never rejects: it catches its own errors
     }
   }
 
   function init() {
     ensureBadge();
-    poll();
+    void poll(); // never rejects: it catches its own errors
     startPolling();
     document.addEventListener("visibilitychange", handleVisibility);
   }
