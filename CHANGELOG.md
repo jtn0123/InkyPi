@@ -2,6 +2,41 @@
 
 <!-- version list -->
 
+## v1.10.0 (2026-11-16)
+
+### Bug Fixes
+
+- One api-key list and schema-checked playlist times
+  ([#891](https://github.com/jtn0123/InkyPi/pull/891),
+  [`8712e96`](https://github.com/jtn0123/InkyPi/commit/8712e965875b195d34f9b47bfe1d01f847c41ead))
+
+- **ui**: Keep accent buttons readable, show playlist progress, and fix the header landmark
+  ([#894](https://github.com/jtn0123/InkyPi/pull/894),
+  [`7559a66`](https://github.com/jtn0123/InkyPi/commit/7559a661ceb88741bc2862498542bdd3cbce667b))
+
+- **ui**: Make the accent chip text readable in light mode
+  ([#896](https://github.com/jtn0123/InkyPi/pull/896),
+  [`f398770`](https://github.com/jtn0123/InkyPi/commit/f398770012eac7fd010d9e7cf3c2e343edcb210c))
+
+### Features
+
+- **playlist**: Show which playlists were set aside at load
+  ([#895](https://github.com/jtn0123/InkyPi/pull/895),
+  [`57551e3`](https://github.com/jtn0123/InkyPi/commit/57551e3705c8c062de6e3af3aa872ec0ffeaab4c))
+
+### Refactoring
+
+- **css**: Collapse responsive breakpoints to four named tokens
+  ([#897](https://github.com/jtn0123/InkyPi/pull/897),
+  [`361da43`](https://github.com/jtn0123/InkyPi/commit/361da43a90e7d5e0e5ccc0407cf1275af62db6a0))
+
+### Testing
+
+- Keep update-unit test ids the same on every xdist worker
+  ([#898](https://github.com/jtn0123/InkyPi/pull/898),
+  [`cdb3c16`](https://github.com/jtn0123/InkyPi/commit/cdb3c163f94b0908ec76f448a9aadc48659a482d))
+
+
 ## v1.9.12 (2026-11-16)
 
 ### Bug Fixes
