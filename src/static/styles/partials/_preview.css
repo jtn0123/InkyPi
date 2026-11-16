@@ -180,11 +180,14 @@
 /* Handoff parity: accent chip + dot variant. Used by the dashboard stage
    "Live" descriptor and anywhere a ghost accent chip is desired. The `.dot`
    modifier prefixes a small filled circle (same as `.has-dot` but scoped to
-   match the handoff's `chip-dot` naming in screens.jsx). */
+   match the handoff's `chip-dot` naming in screens.jsx). The text uses
+   --info-contrast, like .status-chip.info: plain --accent on its own tint was
+   about 4.0:1 on the light --surface-2
+   (tests/unit/test_accent_hue_contrast.py). */
 .status-chip.accent {
     background: color-mix(in oklab, var(--accent) 14%, transparent);
     border-color: color-mix(in oklab, var(--accent) 40%, transparent);
-    color: var(--accent);
+    color: var(--info-contrast);
     text-transform: none;
     letter-spacing: 0;
     font-weight: 500;
