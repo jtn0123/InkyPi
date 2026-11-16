@@ -435,11 +435,17 @@ def api_diagnostics() -> ResponseReturnValue:
         "boot_self_test": {"version": "1.4.16", "status": "pass", "...": "..."},
         "blackout": {"active": false, "since": null}
       }
+
+    ``?summary=1`` leaves out ``disk``, ``log_tail_100`` and ``asset_check``
+    and adds ``"summary": true``. The status badge polls that every 30 s and
+    uses none of them; the log tail alone reads two hours of journal, 60 to
+    90 ms on a Pi Zero 2 W.
     """
     allowed, reason = _access_allowed()
     if not allowed:
         return json_error(reason or "forbidden", status=403)
 
+    summary = request.args.get("summary") == "1"
     payload: dict[str, Any] = {
         "ts": datetime.now(UTC).isoformat(),
         "version": _read_version(),
@@ -449,10 +455,8 @@ def api_diagnostics() -> ResponseReturnValue:
         # G7: whether the service's memory caps can apply at all. False on
         # Raspberry Pi OS, which boots with cgroup_disable=memory.
         "memory_controller": _memory_controller_info(),
-        "disk": _disk_info("/"),
         "refresh_task": _refresh_task_snapshot(),
         "plugin_health": _plugin_health_summary(),
-        "log_tail_100": _log_tail(_LOG_TAIL_LINES),
         "last_update_failure": _read_last_update_failure(),
         # What the service was doing when it last died mid-operation, and how
         # often that has happened. A hard kill (OOM, segfault) leaves no
@@ -461,11 +465,16 @@ def api_diagnostics() -> ResponseReturnValue:
         "last_death": crash_breadcrumb.last_death(),
         "death_count": crash_breadcrumb.death_count(),
         "recent_client_log_errors": _recent_client_log_summary(),
-        # B10: assets the app needs that were missing at boot.
-        "asset_check": _asset_check(),
         # B9: outcome of the once-per-version panel self-test.
         "boot_self_test": _boot_self_test(),
         # B12: whether refreshes are paused and the panel blanked.
         "blackout": _blackout_state(),
     }
+    if summary:
+        payload["summary"] = True
+    else:
+        payload["disk"] = _disk_info("/")
+        payload["log_tail_100"] = _log_tail(_LOG_TAIL_LINES)
+        # B10: assets the app needs that were missing at boot.
+        payload["asset_check"] = _asset_check()
     return jsonify(payload), 200

@@ -761,6 +761,20 @@
         "summary": "Consolidated diagnostics payload",
         "description": "Returns system/app diagnostics used by the in-app status badge and support tooling.",
         "operationId": "apiDiagnostics",
+        "parameters": [
+          {
+            "name": "summary",
+            "in": "query",
+            "description": "1 leaves out disk, log_tail_100 and asset_check (the slow part) and adds summary: true. The status badge polls with it.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1"
+              ]
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Diagnostics payload",
@@ -2576,10 +2590,8 @@
           "prev_version",
           "uptime_s",
           "memory",
-          "disk",
           "refresh_task",
           "plugin_health",
-          "log_tail_100",
           "last_update_failure",
           "recent_client_log_errors"
         ],
@@ -2605,7 +2617,12 @@
             "$ref": "#/components/schemas/DiagnosticsMemoryController"
           },
           "disk": {
-            "$ref": "#/components/schemas/DiagnosticsDisk"
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DiagnosticsDisk"
+              }
+            ],
+            "description": "Left out of a summary=1 response."
           },
           "refresh_task": {
             "$ref": "#/components/schemas/DiagnosticsRefreshTask"
@@ -2620,7 +2637,8 @@
             "type": "array",
             "items": {
               "type": "string"
-            }
+            },
+            "description": "Left out of a summary=1 response."
           },
           "last_update_failure": {
             "type": "object",
@@ -2637,7 +2655,7 @@
               }
             ],
             "nullable": true,
-            "description": "Boot-time asset manifest check (fonts, plugin icons/templates, bundles). Null before the first check."
+            "description": "Boot-time asset manifest check (fonts, plugin icons/templates, bundles). Null before the first check. Left out of a summary=1 response."
           },
           "boot_self_test": {
             "allOf": [
@@ -2650,6 +2668,10 @@
           },
           "blackout": {
             "$ref": "#/components/schemas/BlackoutState"
+          },
+          "summary": {
+            "type": "boolean",
+            "description": "True in a summary=1 response; absent otherwise."
           }
         }
       },

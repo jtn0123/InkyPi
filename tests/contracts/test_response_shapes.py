@@ -36,6 +36,7 @@ from schemas.responses import (  # sys.path set up by conftest
     BenchmarksStagesResponse,
     BenchmarksSummaryResponse,
     DiagnosticsResponse,
+    DiagnosticsSummaryResponse,
     HealthPluginsResponse,
     HealthSystemResponse,
     HistoryStorageResponse,
@@ -306,6 +307,15 @@ def test_diagnostics_shape(client: FlaskClient) -> None:
     body = _get_json(client, "/api/diagnostics")
     assert_shape(body, DiagnosticsResponse)
     assert "plugin_health" in body
+    # Optional in the schema only because a summary leaves them out.
+    assert {"disk", "log_tail_100", "asset_check"} <= body.keys()
+
+
+def test_diagnostics_summary_shape(client: FlaskClient) -> None:
+    body = _get_json(client, "/api/diagnostics?summary=1")
+    assert_shape(body, DiagnosticsSummaryResponse)
+    assert_shape(body, DiagnosticsResponse)
+    assert body.get("summary") is True
 
 
 def test_job_status_shape(client: FlaskClient) -> None:

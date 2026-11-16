@@ -8,8 +8,13 @@ When the API has no usable picture (an error, or the NASA-logo placeholder it
 has returned for every date since the APOD site moved to science.nasa.gov),
 the picture is read from the APOD website instead: the dated page's
 ``og:image``, or for today the newest entry of the APOD feed.
+
+A picture is kept on disk once found, keyed by its date, so later turns for
+the same date make no request at all. Random mode always fetches.
 """
 
+import contextlib
+import json
 import logging
 import os
 import re
@@ -19,6 +24,7 @@ from html.parser import HTMLParser
 from random import randint
 from typing import cast
 from urllib.parse import urlparse
+from zoneinfo import ZoneInfo
 
 import requests
 from PIL import Image
@@ -26,6 +32,11 @@ from PIL import Image
 from plugins.base_plugin.base_plugin import BasePlugin, DeviceConfigLike
 from plugins.base_plugin.settings_schema import callout, field, schema, section
 from utils.http_client import get_http_session
+from utils.image_utils import (
+    FAST_PNG_COMPRESS_LEVEL,
+    save_image_atomic,
+    write_bytes_atomic,
+)
 from utils.safe_fetch import safe_fetch_bytes
 
 logger = logging.getLogger(__name__)
@@ -51,6 +62,95 @@ _LANDING_PATH = "/apod/"
 # "APOD: 2026 November 14 – Apollo 12 and Surveyor 3 - NASA Science"
 _TITLE_PREFIX = re.compile(r"^APOD:\s*\d{4}\s+\w+\s+\d{1,2}\s*[-\u2013\u2014]\s*")
 _TITLE_SUFFIX = " - NASA Science"
+
+# Pictures already found, under the plugin image folder (ADR-0002: a plugin
+# that needs a cache keeps it on disk, keyed on what it fetches). One entry
+# is a date and picture size; the least recently used go first.
+_CACHE_DIR_NAME = "apod_cache"
+_CACHE_MAX_ENTRIES = 8
+
+# APOD dates its pictures in US Eastern time, so "today" changes at
+# midnight there, not at midnight UTC.
+_APOD_TZ = ZoneInfo("America/New_York")
+
+
+def _apod_today() -> date:
+    return datetime.now(tz=_APOD_TZ).date()
+
+
+class _PictureCache:
+    """Resolved pictures and their metadata, one pair of files per entry.
+
+    Nothing here fails a render: a cache that can't be read is a miss, and
+    one that can't be written is skipped.
+    """
+
+    def __init__(self, directory: str) -> None:
+        self.directory = directory
+
+    def _paths(self, day: date, dimensions: tuple[int, int]) -> tuple[str, str]:
+        width, height = dimensions
+        stem = os.path.join(self.directory, f"{day.isoformat()}_{width}x{height}")
+        return f"{stem}.json", f"{stem}.png"
+
+    def load(
+        self, day: date, dimensions: tuple[int, int]
+    ) -> tuple[Image.Image, dict[str, object]] | None:
+        meta_path, png_path = self._paths(day, dimensions)
+        try:
+            with open(meta_path, encoding="utf-8") as fh:
+                metadata = json.load(fh)
+            with Image.open(png_path) as cached:
+                image = cached.copy()
+        except FileNotFoundError:
+            return None
+        except (OSError, ValueError) as exc:
+            logger.warning("APOD cache entry for %s is unreadable: %s", day, exc)
+            return None
+        if not isinstance(metadata, dict):
+            return None
+        # Marks the entry as recently used, so eviction keeps it.
+        with contextlib.suppress(OSError):
+            os.utime(meta_path)
+        return image, metadata
+
+    def store(
+        self,
+        day: date,
+        dimensions: tuple[int, int],
+        image: Image.Image,
+        metadata: Mapping[str, object],
+    ) -> None:
+        meta_path, png_path = self._paths(day, dimensions)
+        try:
+            os.makedirs(self.directory, exist_ok=True)
+            save_image_atomic(
+                image, png_path, format="PNG", compress_level=FAST_PNG_COMPRESS_LEVEL
+            )
+            # The metadata goes last: an entry counts once both files exist.
+            write_bytes_atomic(json.dumps(dict(metadata)).encode("utf-8"), meta_path)
+        except (OSError, ValueError, TypeError) as exc:
+            logger.warning("Could not cache the APOD for %s: %s", day, exc)
+            return
+        self._evict()
+
+    def _evict(self) -> None:
+        """Keep the newest ``_CACHE_MAX_ENTRIES`` entries; drop strays."""
+        try:
+            names = os.listdir(self.directory)
+            entries = sorted(
+                (os.path.getmtime(os.path.join(self.directory, name)), name[:-5])
+                for name in names
+                if name.endswith(".json")
+            )
+        except OSError:
+            return
+        keep = {stem for _mtime, stem in entries[-_CACHE_MAX_ENTRIES:]}
+        for name in names:
+            stem, ext = os.path.splitext(name)
+            if ext in (".json", ".png") and stem not in keep:
+                with contextlib.suppress(OSError):
+                    os.remove(os.path.join(self.directory, name))
 
 
 class _MetaTags(HTMLParser):
@@ -228,6 +328,17 @@ class Apod(BasePlugin):
             request_date = cast(str, settings["customDate"]).strip()
             params["date"] = request_date
 
+        dimensions = self.get_oriented_dimensions(device_config)
+        cache = self._picture_cache(device_config)
+        cache_day = self._cache_day(settings, request_date)
+        if cache is not None and cache_day is not None:
+            hit = cache.load(cache_day, dimensions)
+            if hit is not None:
+                cached_image, cached_metadata = hit
+                logger.info("APOD for %s reused from the cache", cache_day)
+                self.set_latest_metadata(cached_metadata)
+                return cached_image
+
         apod_url = os.getenv("INKYPI_NASA_API_URL", "https://api.nasa.gov")
         logger.info(
             "APOD request: date=%s randomized=%s base_url=%s timeout_s=%.1f",
@@ -252,7 +363,6 @@ class Apod(BasePlugin):
         image: Image.Image | None = None
         selected_image_url = None
         timeout_ms = int(self._request_timeout() * 1000)
-        dimensions = self.get_oriented_dimensions(device_config)
         candidate_urls = self._candidate_image_urls(data)
         logger.info(
             "APOD image candidates: count=%d low_resource=%s target=%dx%d",
@@ -291,21 +401,52 @@ class Apod(BasePlugin):
         if image is None:
             raise RuntimeError("Failed to load APOD image.")
 
-        self.set_latest_metadata(
-            {
-                "date": data.get("date"),
-                "title": data.get("title"),
-                "caption": data.get("copyright"),
-                "explanation": data.get("explanation"),
-                "page_url": data.get("page_url")
-                or selected_image_url
-                or data.get("hdurl")
-                or data.get("url"),
-                "description_url": data.get("url"),
-            }
-        )
+        metadata: dict[str, object] = {
+            "date": data.get("date"),
+            "title": data.get("title"),
+            "caption": data.get("copyright"),
+            "explanation": data.get("explanation"),
+            "page_url": data.get("page_url")
+            or selected_image_url
+            or data.get("hdurl")
+            or data.get("url"),
+            "description_url": data.get("url"),
+        }
+        self.set_latest_metadata(metadata)
+
+        # Today's picture is kept only once NASA has published it: before
+        # that the newest one is yesterday's, and caching it as today's
+        # would hide the new picture until tomorrow.
+        if (
+            cache is not None
+            and cache_day is not None
+            and (request_date != "today" or data.get("date") == cache_day.isoformat())
+        ):
+            cache.store(cache_day, dimensions, image, metadata)
 
         return image
+
+    @staticmethod
+    def _picture_cache(device_config: DeviceConfigLike) -> _PictureCache | None:
+        directory = getattr(device_config, "plugin_image_dir", None)
+        if not isinstance(directory, str) or not directory:
+            return None
+        return _PictureCache(os.path.join(directory, _CACHE_DIR_NAME))
+
+    @staticmethod
+    def _cache_day(settings: Mapping[str, object], request_date: str) -> date | None:
+        """The date whose picture this render shows, or None to skip the cache.
+
+        Random mode picks a new date every turn, so it is never cached.
+        """
+        if settings.get("randomizeApod") == "true":
+            return None
+        if request_date == "today":
+            return _apod_today()
+        try:
+            return date.fromisoformat(request_date)
+        except ValueError:
+            return None
 
     def _fetch_from_api(
         self, apod_url: str, params: dict[str, str], api_key: str

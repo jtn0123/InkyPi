@@ -455,8 +455,8 @@ class BlackoutResponse(TypedDict, total=False):
     display: str
 
 
-class DiagnosticsResponse(TypedDict):
-    """Response body for ``GET /api/diagnostics``."""
+class DiagnosticsSummaryResponse(TypedDict):
+    """Response body for ``GET /api/diagnostics?summary=1``."""
 
     ts: str
     version: str
@@ -464,12 +464,22 @@ class DiagnosticsResponse(TypedDict):
     uptime_s: int | None
     memory: DiagnosticsMemory
     memory_controller: DiagnosticsMemoryController
-    disk: DiagnosticsDisk
     refresh_task: DiagnosticsRefreshTask
     plugin_health: dict[str, str]
-    log_tail_100: list[str]
     last_update_failure: Any | None
     recent_client_log_errors: DiagnosticsClientLogErrors
-    asset_check: DiagnosticsAssetCheck | None
     boot_self_test: DiagnosticsBootSelfTest | None
     blackout: BlackoutState
+
+
+class DiagnosticsResponse(DiagnosticsSummaryResponse, total=False):
+    """Response body for ``GET /api/diagnostics``.
+
+    A full response has ``disk``, ``log_tail_100`` and ``asset_check``; a
+    ``?summary=1`` response has ``summary`` instead.
+    """
+
+    disk: DiagnosticsDisk
+    log_tail_100: list[str]
+    asset_check: DiagnosticsAssetCheck | None
+    summary: bool

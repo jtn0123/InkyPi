@@ -75,7 +75,7 @@ Every frame shown on the panel is kept on the History page. The oldest frames ar
 
 | Key | Default | Meaning |
 |---|---|---|
-| `max_count` | `500` | Keep at most this many frames. Applied after every save. |
+| `max_count` | `500` | Keep at most this many frames. When a save goes over it, the oldest frames are deleted down to 25 below it (a tenth below it for a cap under 250), so the next saves don't have to check the folder again. |
 | `max_age_days` | `30` | Delete frames older than this. |
 | `min_free_bytes` | `500000000` | Delete the oldest frames while the SD card has less free space than this. |
 
@@ -138,7 +138,9 @@ a third-party page cannot black out your frame.
 
 ## Boot checks in diagnostics
 
-`/api/diagnostics` includes two boot-time checks:
+`/api/diagnostics` includes two boot-time checks (the status badge polls
+`/api/diagnostics?summary=1`, which leaves out `asset_check`, `disk` and the
+log tail; open the plain URL to see them):
 
 - `asset_check` lists fonts, plugin icons, render templates and script bundles
   that were missing when the service started. Anything in `missing` usually

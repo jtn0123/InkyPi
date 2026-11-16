@@ -250,6 +250,54 @@ def test_log_tail_handles_reader_error(
 
 
 # ---------------------------------------------------------------------------
+# ?summary=1 (what the status badge polls)
+# ---------------------------------------------------------------------------
+
+
+def test_summary_skips_the_log_tail_disk_and_asset_work(
+    client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The badge polls every 30 s and reads none of these, so none are made."""
+    import blueprints.diagnostics as diag
+
+    def must_not_run(*_args: Any) -> None:
+        raise AssertionError("summary=1 must not do this work")
+
+    monkeypatch.setattr(diag, "_log_tail", must_not_run)
+    monkeypatch.setattr(diag, "_disk_info", must_not_run)
+    monkeypatch.setattr(diag, "_asset_check", must_not_run)
+
+    resp = client.get("/api/diagnostics?summary=1")
+
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["summary"] is True
+    assert not {"disk", "log_tail_100", "asset_check"} & data.keys()
+    # Everything the badge reads is still there.
+    assert {
+        "refresh_task",
+        "plugin_health",
+        "last_update_failure",
+        "recent_client_log_errors",
+    } <= data.keys()
+
+
+@pytest.mark.parametrize("query", ["", "?summary=0", "?summary=true"])
+def test_without_summary_1_the_full_payload_is_returned(
+    client: FlaskClient, monkeypatch: pytest.MonkeyPatch, query: str
+) -> None:
+    from services import logs
+
+    monkeypatch.setattr(logs, "_read_log_lines", lambda hours: ["a line"])
+
+    data = client.get(f"/api/diagnostics{query}").get_json()
+
+    assert "summary" not in data
+    assert data["log_tail_100"] == ["a line"]
+    assert {"disk", "asset_check"} <= data.keys()
+
+
+# ---------------------------------------------------------------------------
 # Access control
 # ---------------------------------------------------------------------------
 
