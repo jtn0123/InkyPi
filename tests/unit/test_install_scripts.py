@@ -3496,7 +3496,7 @@ class TestInstallPreflight:
         """Regression gate for CodeRabbit review on PR #546.
 
         Canonical production flow:
-            git clone https://github.com/fatihak/InkyPi.git ~/inkypi
+            git clone https://github.com/jtn0123/InkyPi.git ~/inkypi
             sudo bash ~/inkypi/install/install.sh
 
         After CVE-2022-24765 (fixed in git 2.35.2+), git refuses to operate on
@@ -3570,6 +3570,16 @@ class TestInstallPreflight:
         )
 
     # --- Source inspection: env-var override contract ---------------------
+
+    def test_install_scripts_point_at_this_fork(self) -> None:
+        """E10: the installer's clone and issue links named the upstream
+        project (fatihak/InkyPi); this fork is jtn0123/InkyPi, as in
+        services.version_check."""
+        for path in sorted(INSTALL_DIR.rglob("*")):
+            if path.is_file() and path.suffix in {"", ".sh", ".py", ".service"}:
+                text = path.read_text(encoding="utf-8", errors="replace")
+                assert "fatihak/InkyPi" not in text, path
+        assert "https://github.com/jtn0123/InkyPi.git" in self.INSTALL_SH.read_text()
 
     def test_install_sh_declares_preflight_env_hooks(self) -> None:
         """Source inspection: the preflight env-var contract documented in
@@ -3648,8 +3658,9 @@ class TestMemoryCapTiering:
         return result.stdout.strip()
 
     def test_pick_caps_512mb_pi_zero_2w(self, tmp_path: Path) -> None:
-        # Pi Zero 2 W reports ~498 MB MemTotal after kernel + GPU carveout.
-        out = self._invoke_pick("MemTotal:         498064 kB\n", tmp_path)
+        # A Pi Zero 2 W reports MemTotal 436204 kB (~426 MiB): the GPU and
+        # kernel keep the rest of its 512 MB.
+        out = self._invoke_pick("MemTotal:         436204 kB\n", tmp_path)
         assert (
             out == "350 500 low-mem"
         ), f"512 MB Pi must get low-mem tier (350M/500M); got {out!r}"

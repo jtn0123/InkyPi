@@ -169,7 +169,7 @@ GitHub Actions runs the pytest matrix, pre-flash validation matrix, coverage gat
 
 ### CI memory budgets
 
-The `install-smoke-memcap` job (`scripts/test_install_memcap.sh`, Phase 4) asserts the running web service stays within the Pi Zero 2 W memory envelope. Budgets map to the hardware: the Pi Zero 2 W has 512 MB RAM and the systemd unit caps InkyPi at `MemoryMax=350M`, so a PR that ships an idle RSS of ~250 MB passes the install step but OOMs on real hardware.
+The `install-smoke-memcap` job (`scripts/test_install_memcap.sh`, Phase 4) asserts the running web service stays within the Pi Zero 2 W memory envelope. Budgets map to the hardware: the Pi Zero 2 W has 512 MB RAM, of which the kernel reports about 426 MiB (`MemTotal`), shared with the OS and Chromium renders. Nothing caps InkyPi's memory there: the `memory.conf` drop-in sets `MemoryHigh=350M` and `MemoryMax=500M`, but Raspberry Pi OS boots with `cgroup_disable=memory`, so systemd can't apply them (`memory_controller.active` in `/api/diagnostics` shows whether it can). When memory runs out, earlyoom kills a process, preferring Chromium's. So a PR that ships an idle RSS of ~250 MB passes the install step but runs the Pi out of memory on real hardware.
 
 The checks run inside the 512 MB-capped Phase 3 container and read `VmRSS` from `/proc/1/status` (the `CMD` python process). Both failures print a `BUDGET CHECK:` line to the CI log so regressions are easy to grep for.
 

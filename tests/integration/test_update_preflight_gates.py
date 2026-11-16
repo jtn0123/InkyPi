@@ -47,14 +47,22 @@ def _git(repo: Path, *args: str) -> str:
     ).stdout.strip()
 
 
+EXPECTED_ORIGIN = "https://github.com/jtn0123/InkyPi.git"
+
+
 def _make_repo(
-    root: Path, *, v2_has_version: bool = True, v2_python_floor: str | None = None
+    root: Path,
+    *,
+    v2_has_version: bool = True,
+    v2_python_floor: str | None = None,
+    origin: str | None = EXPECTED_ORIGIN,
 ) -> None:
     """Two tags; HEAD left at v0.0.1. The stub update.sh drops a marker so a
     test can tell whether do_update.sh got as far as delegating.
 
     *v2_python_floor* gives v0.0.2 a pyproject.toml with that
-    ``requires-python`` floor."""
+    ``requires-python`` floor. *origin* is the configured origin URL (None:
+    no origin); a url rewrite makes fetches from it read this repo, offline."""
     subprocess.run(
         ["git", "init", "-q", "-b", "main", str(root)], check=True, capture_output=True
     )
@@ -82,7 +90,9 @@ def _make_repo(
     _git(root, "add", "-A")
     _git(root, "commit", "-q", "-m", "v0.0.2")
     _git(root, "tag", "v0.0.2")
-    _git(root, "remote", "add", "origin", str(root))
+    if origin is not None:
+        _git(root, "remote", "add", "origin", origin)
+        _git(root, "config", f"url.{root}.insteadOf", origin)
     _git(root, "checkout", "-q", "refs/tags/v0.0.1", "--")
 
 
@@ -118,6 +128,7 @@ def _do_update(
     env = dict(os.environ)
     env.pop("INKYPI_UPDATE_MIN_FREE_MB", None)
     env.pop("INKYPI_CONFIG_FILE", None)
+    env.pop("INKYPI_GITHUB_REPO", None)
     env.update(
         {
             "INKYPI_LOCKFILE_DIR": str(device["state"]),
@@ -234,6 +245,81 @@ class TestDoUpdatePreflight:
         )
         proc = _do_update(device, "v0.0.2")
         _assert_aborted_untouched(device, proc, "epd7in3e.py is missing")
+
+
+class TestDoUpdateOrigin:
+    """E10: do_update.sh installs whatever origin serves, as root, so it
+    refuses an origin other than the repo the version check reads releases
+    from, before fetching anything."""
+
+    @pytest.mark.parametrize(
+        "origin",
+        [
+            "https://github.com/jtn0123/InkyPi.git",
+            "https://github.com/jtn0123/InkyPi",
+            "https://github.com/jtn0123/InkyPi/",
+            "git@github.com:jtn0123/InkyPi.git",
+            "git@github.com:jtn0123/InkyPi",
+            "ssh://git@github.com/jtn0123/InkyPi.git",
+            "https://github.com/JTN0123/inkypi.git",
+        ],
+    )
+    def test_accepts_the_fork_in_https_or_ssh_form(
+        self, device: dict[str, Path], origin: str
+    ) -> None:
+        _make_repo(device["repo"], origin=origin)
+        proc = _do_update(device, "v0.0.2")
+        assert proc.returncode == 0, proc.stdout + proc.stderr
+        assert _git(device["repo"], "describe", "--tags") == "v0.0.2"
+
+    @pytest.mark.parametrize(
+        "origin",
+        [
+            "https://github.com/fatihak/InkyPi.git",
+            "git@github.com:fatihak/InkyPi.git",
+            "https://github.com/jtn0123/InkyPi-old.git",
+            "https://github.com/jtn0123/InkyPi.git.bak",
+            "https://gitlab.com/jtn0123/InkyPi.git",
+            "https://example.com/github.com/jtn0123/InkyPi.git",
+            None,
+        ],
+    )
+    def test_refuses_any_other_origin_before_fetching(
+        self, device: dict[str, Path], origin: str | None
+    ) -> None:
+        _make_repo(device["repo"], origin=origin)
+        proc = _do_update(device, "v0.0.2")
+        assert proc.returncode != 0
+        assert "Update aborted: origin is" in proc.stderr
+        assert "updates come from github.com/jtn0123/InkyPi" in proc.stderr
+        assert "Nothing was changed" in proc.stderr
+        assert "Fetching latest from origin" not in proc.stdout
+        assert not (device["repo"] / ".git" / "FETCH_HEAD").exists()
+        assert _git(device["repo"], "describe", "--tags") == "v0.0.1"
+        assert (device["state"] / "prev_version").read_text() == "v0.0.0\n"
+        assert not (device["state"] / "stub-update-ran").exists()
+        record = json.loads((device["state"] / ".last-update-failure").read_text())
+        assert record["last_command"] == "verify_origin"
+
+    def test_inkypi_github_repo_lets_a_device_follow_another_fork(
+        self, device: dict[str, Path]
+    ) -> None:
+        """The same override the version check honours
+        (services.version_check._GITHUB_REPO)."""
+        _make_repo(device["repo"], origin="git@github.com:someone/InkyPi.git")
+        proc = _do_update(device, "v0.0.2", {"INKYPI_GITHUB_REPO": "someone/InkyPi"})
+        assert proc.returncode == 0, proc.stdout + proc.stderr
+
+        refused = _do_update(device, "v0.0.2")
+        assert refused.returncode != 0
+        assert "Update aborted: origin is" in refused.stderr
+
+    def test_a_malformed_override_is_refused(self, device: dict[str, Path]) -> None:
+        _make_repo(device["repo"])
+        proc = _do_update(device, "v0.0.2", {"INKYPI_GITHUB_REPO": "jtn0123 InkyPi"})
+        assert proc.returncode != 0
+        assert "INKYPI_GITHUB_REPO must look like owner/name" in proc.stderr
+        assert _git(device["repo"], "describe", "--tags") == "v0.0.1"
 
 
 @pytest.fixture

@@ -45,6 +45,7 @@ diagnostics_bp = Blueprint("diagnostics", __name__)
 _LOG_TAIL_LINES = 100
 _PREV_VERSION_PATH = Path("/var/lib/inkypi/prev_version")
 _LAST_UPDATE_FAILURE_PATH = Path("/var/lib/inkypi/.last-update-failure")
+_CGROUP_CONTROLLERS_PATH = Path("/sys/fs/cgroup/cgroup.controllers")
 
 
 # ---------------------------------------------------------------------------
@@ -138,6 +139,22 @@ def _memory_info() -> dict[str, Any]:
         return {"total_mb": total_mb, "used_mb": used_mb, "pct": pct}
     except Exception:
         return {"total_mb": None, "used_mb": None, "pct": None}
+
+
+def _memory_controller_info() -> dict[str, Any]:
+    """Return {active, controllers} for the kernel's cgroup v2 controllers (G7).
+
+    The service's MemoryHigh/MemoryMax caps (memory.conf drop-in) only apply
+    when the ``memory`` controller is on. Raspberry Pi OS boots with
+    ``cgroup_disable=memory``, so on a Pi ``active`` is False and earlyoom is
+    the memory guard. Both values are None when cgroup v2 isn't mounted (a
+    Mac dev box, or a cgroup v1 host).
+    """
+    try:
+        controllers = _CGROUP_CONTROLLERS_PATH.read_text().split()
+    except OSError:
+        return {"active": None, "controllers": None}
+    return {"active": "memory" in controllers, "controllers": controllers}
 
 
 def _disk_info(path: str = "/") -> dict[str, Any]:
@@ -400,6 +417,7 @@ def api_diagnostics() -> ResponseReturnValue:
         "prev_version": "0.51.7",
         "uptime_s": 12345,
         "memory": {"total_mb": 512, "used_mb": 310, "pct": 60.5},
+        "memory_controller": {"active": false, "controllers": ["cpu", "..."]},
         "disk": {"total_mb": 16000, "used_mb": 5200, "pct": 32.5, "path": "/"},
         "refresh_task": {"running": true, "last_run_ts": "...", "last_error": null},
         "plugin_health": {"clock": "ok", "weather": "fail"},
@@ -428,6 +446,9 @@ def api_diagnostics() -> ResponseReturnValue:
         "prev_version": _read_text_file(_PREV_VERSION_PATH),
         "uptime_s": _uptime_seconds(),
         "memory": _memory_info(),
+        # G7: whether the service's memory caps can apply at all. False on
+        # Raspberry Pi OS, which boots with cgroup_disable=memory.
+        "memory_controller": _memory_controller_info(),
         "disk": _disk_info("/"),
         "refresh_task": _refresh_task_snapshot(),
         "plugin_health": _plugin_health_summary(),

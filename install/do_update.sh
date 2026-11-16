@@ -147,6 +147,49 @@ fi
 
 echo "Repository root: $REPO_DIR"
 
+# ---------------------------------------------------------------------------
+# E10: Only update from the expected repository.
+#
+# The app decides an update is available from the GitHub Releases of
+# INKYPI_GITHUB_REPO (src/services/version_check.py), but this script installs
+# whatever `origin` serves, as root. If origin points somewhere else (the
+# upstream project, an old fork), the version check and the code installed
+# would come from different projects. Refuse before fetching anything.
+# Accepts the https and ssh forms, with or without ".git"; GitHub names are
+# case-insensitive. This checks the configured URL, not the result of any
+# url.<base>.insteadOf rewrite (the tests use one to fetch from a local repo).
+# ---------------------------------------------------------------------------
+_current_step="verify_origin"
+EXPECTED_REPO="${INKYPI_GITHUB_REPO:-jtn0123/InkyPi}"
+if ! [[ "$EXPECTED_REPO" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]]; then
+  echo "ERROR: INKYPI_GITHUB_REPO must look like owner/name; got '$EXPECTED_REPO'." >&2
+  exit 1
+fi
+
+origin_is_expected_repo() {
+  # tr, not ${1,,}: the tests also run this under macOS's bash 3.2.
+  local url repo
+  url=$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')
+  repo=$(printf '%s' "$2" | tr '[:upper:]' '[:lower:]')
+  url="${url%/}"
+  url="${url%.git}"
+  case "$url" in
+    "https://github.com/$repo" | "git@github.com:$repo" | "ssh://git@github.com/$repo")
+      return 0
+      ;;
+  esac
+  return 1
+}
+
+ORIGIN_URL=$(git_repo config --get remote.origin.url 2>/dev/null || true)
+if ! origin_is_expected_repo "$ORIGIN_URL" "$EXPECTED_REPO"; then
+  echo "ERROR: Update aborted: origin is '${ORIGIN_URL:-<not set>}', but updates come from github.com/$EXPECTED_REPO." >&2
+  echo "  Nothing was changed. To fix it, run:" >&2
+  echo "    git -C $REPO_DIR remote set-url origin https://github.com/$EXPECTED_REPO.git" >&2
+  echo "  If this device follows another fork on purpose, set INKYPI_GITHUB_REPO to its owner/name." >&2
+  exit 1
+fi
+
 CURRENT_VERSION=$(git_repo describe --tags --abbrev=0 2>/dev/null || echo "unknown")
 echo "Current version: $CURRENT_VERSION"
 

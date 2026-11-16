@@ -617,3 +617,48 @@ def test_boot_self_test_record_is_surfaced(
 def test_blackout_state_defaults_off(client: FlaskClient) -> None:
     state = client.get("/api/diagnostics").get_json()["blackout"]
     assert state == {"active": False, "since": None}
+
+
+# ---------------------------------------------------------------------------
+# G7: is the cgroup memory controller on, so the memory caps can apply?
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("controllers", "active"),
+    [
+        # A Raspberry Pi: the firmware boots with cgroup_disable=memory.
+        ("cpuset cpu io pids\n", False),
+        ("cpuset cpu io memory hugetlb pids rdma misc\n", True),
+    ],
+    ids=["raspberry-pi-os", "memory-on"],
+)
+def test_memory_controller_reports_whether_memory_caps_can_apply(
+    client: FlaskClient,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    controllers: str,
+    active: bool,
+) -> None:
+    import blueprints.diagnostics as diag
+
+    path = tmp_path / "cgroup.controllers"
+    path.write_text(controllers)
+    monkeypatch.setattr(diag, "_CGROUP_CONTROLLERS_PATH", path)
+
+    report = client.get("/api/diagnostics").get_json()["memory_controller"]
+
+    assert report == {"active": active, "controllers": controllers.split()}
+
+
+def test_memory_controller_is_unknown_without_cgroup_v2(
+    client: FlaskClient, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A Mac dev box or a cgroup v1 host has no cgroup.controllers."""
+    import blueprints.diagnostics as diag
+
+    monkeypatch.setattr(diag, "_CGROUP_CONTROLLERS_PATH", tmp_path / "missing")
+
+    report = client.get("/api/diagnostics").get_json()["memory_controller"]
+
+    assert report == {"active": None, "controllers": None}

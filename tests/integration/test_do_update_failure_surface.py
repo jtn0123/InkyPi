@@ -31,6 +31,17 @@ def _require_bash_git() -> None:
         pytest.skip("git not available")
 
 
+def _add_offline_origin(root: Path) -> None:
+    """Point origin at the repo do_update.sh expects (E10), and rewrite that
+    URL to *root* itself so `git fetch origin` succeeds without the network."""
+    url = "https://github.com/jtn0123/InkyPi.git"
+    for args in (
+        ["remote", "add", "origin", url],
+        ["config", f"url.{root}.insteadOf", url],
+    ):
+        subprocess.run(["git", "-C", str(root), *args], check=True, capture_output=True)
+
+
 def _run(
     env_overrides: dict[str, str],
     cwd: Path | None = None,
@@ -38,6 +49,7 @@ def _run(
     timeout: int = 30,
 ) -> subprocess.CompletedProcess[str]:
     env = dict(os.environ)
+    env.pop("INKYPI_GITHUB_REPO", None)
     env.update(env_overrides)
     cmd = ["bash", str(DO_UPDATE_SH)]
     if args:
@@ -192,13 +204,7 @@ class TestDirtyGeneratedCssDoesNotBlockCheckout:
             check=True,
             capture_output=True,
         )
-        # Arrange a fake "origin" pointing at itself so `git fetch origin`
-        # succeeds without hitting the network.
-        subprocess.run(
-            ["git", "-C", str(root), "remote", "add", "origin", str(root)],
-            check=True,
-            capture_output=True,
-        )
+        _add_offline_origin(root)
 
     def test_dirty_main_css_does_not_block_checkout(self, tmp_path: Path) -> None:
         _require_bash_git()
@@ -319,11 +325,7 @@ class TestK2SafeDirectoryAndAutoStash:
             check=True,
             capture_output=True,
         )
-        subprocess.run(
-            ["git", "-C", str(root), "remote", "add", "origin", str(root)],
-            check=True,
-            capture_output=True,
-        )
+        _add_offline_origin(root)
 
     def test_safe_directory_override_tolerates_dubious_ownership(
         self, tmp_path: Path

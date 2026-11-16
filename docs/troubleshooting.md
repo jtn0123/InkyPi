@@ -496,11 +496,14 @@ journalctl -u inkypi -n 100 | grep dimension_mismatch
 
 **Symptom:** The service is killed silently (`Main process exited`) or the journal shows `MemoryError` / Python `Killed`. Chromium-based plugins (Weather, Calendar, AI Text) are most affected. The Pi Zero W has only 512 MB of RAM shared with the OS.
 
-**Likely cause:** Launching a headless Chromium instance for `render_image` consumes ~150–200 MB. Under memory pressure the Linux OOM killer terminates either Chromium or the InkyPi process.
+**Likely cause:** Launching a headless Chromium instance for `render_image` consumes ~150–200 MB. When available memory runs low, earlyoom kills a process. `install.sh` and `update.sh` set it to prefer Chromium's processes (`chromium-headle` in its log) and to avoid sshd, systemd and journald. If earlyoom can't act in time, the kernel's OOM killer does, and `OOMScoreAdjust=500` makes InkyPi its first choice.
+
+The `MemoryHigh` and `MemoryMax` caps in `/etc/systemd/system/inkypi.service.d/memory.conf` don't apply on Raspberry Pi OS: it boots with `cgroup_disable=memory`, so the kernel's memory controller is off. `memory_controller.active` in `/api/diagnostics` is `false` when that is the case.
 
 **How to verify:**
 ```bash
 journalctl -u inkypi -n 50 | grep -E 'Killed|MemoryError|OOM'
+journalctl -u earlyoom -n 50 | grep 'sending SIG'
 free -m
 ```
 

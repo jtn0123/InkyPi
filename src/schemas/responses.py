@@ -379,6 +379,13 @@ class DiagnosticsMemory(TypedDict):
     pct: float | None
 
 
+class DiagnosticsMemoryController(TypedDict):
+    """``memory_controller`` object in ``GET /api/diagnostics`` (G7)."""
+
+    active: bool | None
+    controllers: list[str] | None
+
+
 class DiagnosticsDisk(TypedDict):
     """``disk`` object in ``GET /api/diagnostics``."""
 
@@ -456,6 +463,7 @@ class DiagnosticsResponse(TypedDict):
     prev_version: str | None
     uptime_s: int | None
     memory: DiagnosticsMemory
+    memory_controller: DiagnosticsMemoryController
     disk: DiagnosticsDisk
     refresh_task: DiagnosticsRefreshTask
     plugin_health: dict[str, str]
