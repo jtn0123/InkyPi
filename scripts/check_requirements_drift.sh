@@ -13,8 +13,11 @@
 #
 # This script:
 #   1. Ensures uv.lock is up to date with pyproject.toml (`uv lock --check`).
-#   2. Regenerates install/requirements.txt into a temp file and diffs against
-#      the committed copy.
+#   2. Exports install/requirements.txt and install/requirements-dev.txt into
+#      temp files with scripts/export_requirements.sh and diffs them against
+#      the committed copies.
+#   3. Checks the installer requirement files against their .in files and
+#      against uv.lock.
 #
 # Usage:
 #   scripts/check_requirements_drift.sh
@@ -24,8 +27,6 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-REQ_TXT="${REPO_ROOT}/install/requirements.txt"
-DEV_TXT="${REPO_ROOT}/install/requirements-dev.txt"
 
 cd "${REPO_ROOT}"
 
@@ -45,91 +46,29 @@ else
     echo "    OK — uv.lock is up to date."
 fi
 
-echo "==> Checking install/requirements.txt matches uv export ..."
+echo "==> Checking install/requirements.txt and install/requirements-dev.txt match uv export ..."
 tmp_export="$(mktemp /tmp/requirements-check-XXXXXX.txt)"
 tmp_dev="$(mktemp /tmp/requirements-dev-check-XXXXXX.txt)"
 trap 'rm -f "${tmp_export}" "${tmp_dev}"' EXIT
 
-uv export \
-    --format requirements.txt \
-    --no-dev \
-    --no-emit-project \
-    --output-file "${tmp_export}" \
-    --quiet
+# The same script regenerates the committed files (and the Dependabot exports
+# workflow runs it on every uv.lock bump), so this compares like with like.
+bash scripts/export_requirements.sh "${tmp_export}" "${tmp_dev}"
 
-# Normalise the auto-generated header of the fresh export so that the temp
-# output path in the header matches the relative committed path.
-python3 - <<'PY' "${tmp_export}" "install/requirements.txt"
-import sys
-src, rel_out = sys.argv[1], sys.argv[2]
-with open(src) as f:
-    content = f.read()
-lines = content.splitlines(keepends=True)
-# Replace the command comment line with the canonical form that references the
-# committed output path. Line 2 (index 1) is the command comment per uv's
-# deterministic header layout.
-for i, line in enumerate(lines):
-    if line.startswith("#    uv export ") and "--output-file" in line:
-        lines[i] = (
-            "#    uv export --format requirements.txt --no-dev "
-            "--no-emit-project --output-file " + rel_out + "\n"
-        )
-        break
-with open(src, "w") as f:
-    f.writelines(lines)
-PY
-
-if diff -u "${REQ_TXT}" "${tmp_export}"; then
-    echo "    OK — install/requirements.txt is up to date."
-else
-    echo ""
-    echo "ERROR: install/requirements.txt is out of sync with uv.lock."
-    echo "Run the following command to regenerate it and commit the result:"
-    echo ""
-    echo "  uv export --format requirements.txt --no-dev --no-emit-project \\"
-    echo "      --output-file install/requirements.txt"
-    echo ""
-    DRIFT_FOUND=1
-fi
-
-echo "==> Checking install/requirements-dev.txt matches uv export ..."
-# The dev group in pyproject.toml is locked in uv.lock with the runtime
-# dependencies; the dev file is that lock exported with the dev group.
-uv export \
-    --format requirements.txt \
-    --group dev \
-    --no-emit-project \
-    --output-file "${tmp_dev}" \
-    --quiet
-
-python3 - <<'PY' "${tmp_dev}" "install/requirements-dev.txt"
-import sys
-src, rel_out = sys.argv[1], sys.argv[2]
-with open(src) as f:
-    lines = f.read().splitlines(keepends=True)
-for i, line in enumerate(lines):
-    if line.startswith("#    uv export ") and "--output-file" in line:
-        lines[i] = (
-            "#    uv export --format requirements.txt --group dev "
-            "--no-emit-project --output-file " + rel_out + "\n"
-        )
-        break
-with open(src, "w") as f:
-    f.writelines(lines)
-PY
-
-if diff -u "${DEV_TXT}" "${tmp_dev}"; then
-    echo "    OK — install/requirements-dev.txt is up to date."
-else
-    echo ""
-    echo "ERROR: install/requirements-dev.txt is out of sync with uv.lock."
-    echo "Run the following command to regenerate it and commit the result:"
-    echo ""
-    echo "  uv export --format requirements.txt --group dev --no-emit-project \\"
-    echo "      --output-file install/requirements-dev.txt"
-    echo ""
-    DRIFT_FOUND=1
-fi
+for pair in "install/requirements.txt|${tmp_export}" "install/requirements-dev.txt|${tmp_dev}"; do
+    committed="${pair%%|*}"
+    if diff -u "${committed}" "${pair#*|}"; then
+        echo "    OK — ${committed} is up to date."
+    else
+        echo ""
+        echo "ERROR: ${committed} is out of sync with uv.lock."
+        echo "Regenerate both exports and commit the result:"
+        echo ""
+        echo "  bash scripts/export_requirements.sh"
+        echo ""
+        DRIFT_FOUND=1
+    fi
+done
 
 # Installer tools and optional hardware dependencies use the same integrity
 # contract as runtime dependencies. Resolve against committed versions.

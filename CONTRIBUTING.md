@@ -203,21 +203,14 @@ Before marking your PR ready for review, confirm:
 ## Dependency Management
 
 Runtime dependencies are declared in `pyproject.toml` and locked in `uv.lock`.
-After changing a runtime constraint, regenerate the hashed installer export:
+Dev and CI tools live in the `dev` group under `[dependency-groups]` in the
+same file and the same lock. After changing either, lock and regenerate the
+two hashed exports (`install/requirements.txt` and
+`install/requirements-dev.txt`):
 
 ```bash
 uv lock
-uv export --format requirements.txt --no-dev --no-emit-project \
-    --output-file install/requirements.txt
-```
-
-Dev and CI tools live in the `dev` group under `[dependency-groups]` in
-`pyproject.toml`, locked in the same `uv.lock`. After changing one:
-
-```bash
-uv lock
-uv export --format requirements.txt --group dev --no-emit-project \
-    --output-file install/requirements-dev.txt
+bash scripts/export_requirements.sh
 bash scripts/check_requirements_drift.sh
 ```
 

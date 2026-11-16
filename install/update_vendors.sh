@@ -19,6 +19,7 @@ cd "$REPO_ROOT"
 # Versions
 FULLCALENDAR_VERSION="6.1.22"
 CHARTJS_VERSION="4.6.1"
+SWAGGER_UI_VERSION="5.35.0"
 
 # Define vendor files: name | url | output path | sha256 of the file.
 # E4: each download must match its pinned hash, so a compromised or
@@ -28,6 +29,8 @@ CHARTJS_VERSION="4.6.1"
 declare -a VENDORS=(
   "Chart JS|https://cdn.jsdelivr.net/npm/chart.js@${CHARTJS_VERSION}/dist/chart.umd.min.js|src/static/scripts/chart.js|87364cc2b2a76a6684929e7d6b80b18a897794db38400caff1fcf1791c6925d2"
   "Fullcalendar JS|https://cdn.jsdelivr.net/npm/fullcalendar@${FULLCALENDAR_VERSION}/index.global.min.js|src/static/scripts/calendar.min.js|65f927f1802cb35428b9c5e2a8d2276633880a89ee5ea5f9a7727f79892786ea"
+  "Swagger UI CSS|https://cdn.jsdelivr.net/npm/swagger-ui-dist@${SWAGGER_UI_VERSION}/swagger-ui.css|src/static/vendor/swagger-ui/swagger-ui.css|5ed08757e53da3e026d6cbecc61fe5d43585c9560b302d534ad56692519a273d"
+  "Swagger UI JS|https://cdn.jsdelivr.net/npm/swagger-ui-dist@${SWAGGER_UI_VERSION}/swagger-ui-bundle.js|src/static/vendor/swagger-ui/swagger-ui-bundle.js|e6a898692f2d768e807c3ba4626068a69a2c5dd960dd6c76f3e4d3a3de180af2"
 )
 
 sha256_of() {
@@ -48,6 +51,8 @@ for vendor in "${VENDORS[@]}"; do
     exit 1
   fi
   echo "Updating $name..."
+  # Swagger UI's folder is git-ignored, so a fresh checkout doesn't have it.
+  mkdir -p "$(dirname "$output")"
   tmp="$(mktemp "${output}.download.XXXXXX")"
   # JTN-534: --retry-all-errors retries write errors too (curl exit 23) which
   # bit us during the JTN-528 sim run. --retry-delay 2 spaces retries to avoid

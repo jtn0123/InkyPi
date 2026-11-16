@@ -6,8 +6,9 @@ updates:
   # and duplicated every security bump across both paths. The uv ecosystem updates
   # pyproject.toml and uv.lock together, keeping `uv lock --check` green. That
   # covers the dev tools too: they are the `dev` dependency group in the same
-  # lock. A bump PR still needs the two exports regenerated (the drift check
-  # in CI's lint job names the commands).
+  # lock. The two files exported from the lock are regenerated on each bump's
+  # branch by .github/workflows/dependabot-exports.yml; approve the workflows
+  # on the commit it pushes so CI runs (docs/dependencies.md).
   - package-ecosystem: "uv"
     directory: "/"
     schedule:

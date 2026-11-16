@@ -121,3 +121,43 @@ def test_license_check_installs_nothing() -> None:
         dev_lock,
         re.M,
     )
+
+
+PLAYWRIGHT_ACTION = ROOT / ".github/actions/setup-playwright/action.yml"
+LOCAL_PLAYWRIGHT_ACTION = "./.github/actions/setup-playwright"
+#: Jobs whose screenshots are compared with each other: the refresh workflow
+#: writes the baselines that the two CI browser jobs check against, so all
+#: three must set up Python and the browser the same way.
+BROWSER_JOBS = (
+    ("ci.yml", "browser-smoke"),
+    ("ci.yml", "browser-full"),
+    ("refresh-visual-baselines.yml", "refresh"),
+)
+
+
+def test_browser_jobs_share_one_python_and_browser_setup() -> None:
+    for workflow, job in BROWSER_JOBS:
+        steps = _steps(WORKFLOWS / workflow)[job]
+        uses = [str(step.get("uses", "")) for step in steps]
+        assert LOCAL_ACTION in uses, f"{workflow}:{job} skips setup-python-deps"
+        assert (
+            LOCAL_PLAYWRIGHT_ACTION in uses
+        ), f"{workflow}:{job} skips setup-playwright"
+        assert uses.index(LOCAL_ACTION) < uses.index(LOCAL_PLAYWRIGHT_ACTION)
+        setup = steps[uses.index(LOCAL_ACTION)].get("with")
+        # The OS libraries include the font set the baselines depend on.
+        assert (
+            isinstance(setup, dict) and setup.get("os-packages") == "true"
+        ), f"{workflow}:{job} installs no OS packages"
+
+
+def test_apparmor_allowance_lives_only_in_the_playwright_action() -> None:
+    action = yaml.safe_load(PLAYWRIGHT_ACTION.read_text())
+    assert action["runs"]["using"] == "composite"
+    runs = "\n".join(step.get("run", "") for step in action["runs"]["steps"])
+    assert "python -m playwright install --with-deps chromium" in runs
+    assert "apparmor_parser -r" in runs
+    for path in sorted(WORKFLOWS.glob("*.yml")):
+        assert (
+            "apparmor" not in path.read_text().lower()
+        ), f"{path.name} carries its own AppArmor script; use setup-playwright"

@@ -7,7 +7,9 @@ Zero 2 W (512 MB RAM). Start with `docs/architecture.md`; setup is in
 ## Environment
 
 - Python 3.13 only (Raspberry Pi OS Trixie). Don't add code paths or CI for
-  other versions.
+  other versions. The one exception is `.github/workflows/python-next.yml`:
+  a weekly, non-gating run on the next Python that warns before Debian
+  moves. Keep it.
 - `source scripts/venv.sh` creates and activates `.venv` with the locked,
   hash-checked dev requirements and sets `PYTHONPATH`.
 
@@ -31,9 +33,12 @@ Zero 2 W (512 MB RAM). Start with `docs/architecture.md`; setup is in
 ## Lint and format
 
 - `scripts/lint.sh` is the gate: ruff, Black, mypy (strict; `src/` and
-  `scripts/` must be clean, and `tests/` is held to the baseline in
-  `scripts/mypy_tests_baseline.txt`) and shellcheck. Biome
-  lints the web scripts: `pre-commit run biome-ci --all-files`.
+  `scripts/` must be clean, and `tests/` must match the `path:error-code`
+  fingerprints in `scripts/mypy_tests_baseline.txt`: a new error fails, and so
+  does a fixed one until you run
+  `python scripts/mypy_ratchet.py tests scripts/mypy_tests_baseline.txt --update`)
+  and shellcheck. Biome lints the web scripts:
+  `pre-commit run biome-ci --all-files`.
 - Format Python with **Black**, not `ruff format`; they disagree and CI checks
   Black.
 - `src/static/styles/main.css` is generated but committed. After editing a CSS

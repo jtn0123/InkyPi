@@ -122,3 +122,83 @@ def test_sync_refuses_another_python_before_installing(
 
     assert doctor.main() == 1
     assert "wrong python" in capsys.readouterr().err
+
+
+def test_a_missing_stamp_only_matters_when_required(
+    doctor: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(doctor, "installed_drift", list)
+    stamp = tmp_path / "stamp.json"
+    assert doctor.check_environment(stamp, "current") == []
+    assert doctor.check_environment(stamp, "current", require_stamp=True) == [
+        "no record of a hash-verified sync of this lock"
+    ]
+    stamp.write_text('{"fingerprint":"current"}')
+    assert doctor.check_environment(stamp, "current", require_stamp=True) == []
+
+
+def test_sync_installs_uv_first_then_lets_uv_install_the_lock(doctor: Any) -> None:
+    fresh = doctor.sync_commands("/venv/bin/python", uv_installed=False)
+    assert fresh == [
+        [
+            "/venv/bin/python",
+            "-m",
+            "pip",
+            "install",
+            "--require-hashes",
+            "-r",
+            str(doctor.UV_LOCK),
+        ],
+        [
+            "/venv/bin/python",
+            "-m",
+            "uv",
+            "--no-config",
+            "pip",
+            "install",
+            "--python",
+            "/venv/bin/python",
+            "--require-hashes",
+            "-r",
+            str(doctor.LOCK),
+        ],
+    ]
+    # With uv already there, only the lock is installed.
+    assert doctor.sync_commands("/venv/bin/python", uv_installed=True) == fresh[1:]
+    assert doctor.UV_LOCK.name == "uv-requirements.txt" and doctor.UV_LOCK.is_file()
+
+
+def test_sync_runs_its_commands_in_order_and_stamps_the_venv(
+    doctor: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ran: list[list[str]] = []
+
+    def run(command: list[str], **kwargs: object) -> None:
+        assert kwargs == {"cwd": doctor.ROOT, "check": True}
+        ran.append(command)
+
+    monkeypatch.setattr(doctor.subprocess, "run", run)
+    monkeypatch.setattr(doctor, "_uv_installed", lambda: False)
+    monkeypatch.setattr(doctor, "installed_drift", list)
+    monkeypatch.setattr(doctor, "interpreter_problem", lambda: "")
+    monkeypatch.setattr(doctor.sys, "argv", ["dev_environment.py", "--sync"])
+    monkeypatch.setattr(doctor.sys, "base_prefix", "/usr")
+    monkeypatch.setattr(doctor.sys, "prefix", str(tmp_path))
+
+    assert doctor.main() == 0
+    assert ran == doctor.sync_commands(doctor.sys.executable, uv_installed=False)
+    stamp = tmp_path / ".inkypi-dev-lock.json"
+    assert (
+        doctor.check_environment(stamp, doctor.lock_fingerprint(), require_stamp=True)
+        == []
+    )
+
+
+def test_require_stamp_refuses_another_python(
+    doctor: Any, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr(doctor, "interpreter_problem", lambda: "wrong python")
+    monkeypatch.setattr(doctor.sys, "argv", ["dev_environment.py", "--require-stamp"])
+
+    assert doctor.main() == 1
+    assert "wrong python" in capsys.readouterr().err

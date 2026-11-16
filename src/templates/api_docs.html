@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>InkyPi API Docs</title>
+  {% if swagger %}
+  <link rel="stylesheet" href="{{ url_for('static', filename=swagger.css) }}"
+        integrity="{{ swagger.css_integrity }}" crossorigin="anonymous" />
+  {% endif %}
+</head>
+<body>
+  {% if swagger %}
+  <div id="swagger-ui"></div>
+  <script src="{{ url_for('static', filename=swagger.js) }}"
+          integrity="{{ swagger.js_integrity }}" crossorigin="anonymous"></script>
+  <script nonce="{{ csp_nonce }}">
+    SwaggerUIBundle({
+      url: "{{ url_for('api_docs.openapi_spec') }}",
+      dom_id: "#swagger-ui",
+      presets: [SwaggerUIBundle.presets.apis, SwaggerUIBundle.SwaggerUIStandalonePreset],
+      layout: "BaseLayout",
+      deepLinking: true
+    });
+  </script>
+  {% else %}
+  <main>
+    <h1>InkyPi API docs</h1>
+    <p>Swagger UI isn't installed on this device, so the interactive explorer
+      can't load. <code>install/update_vendors.sh</code> downloads it; the
+      installer and every update run that script.</p>
+    <p>The OpenAPI spec itself is here:
+      <a href="{{ url_for('api_docs.openapi_spec') }}">/api/openapi.json</a>.</p>
+  </main>
+  {% endif %}
+</body>
+</html>

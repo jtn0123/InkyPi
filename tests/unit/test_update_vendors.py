@@ -67,7 +67,12 @@ def test_every_vendor_file_has_a_pinned_sha256() -> None:
     entries = re.findall(
         r'^\s*"([^"|]+)\|https://[^"|]+\|[^"|]+\|([^"|]*)"', _SCRIPT.read_text(), re.M
     )
-    assert len(entries) == 2
+    assert [name for name, _ in entries] == [
+        "Chart JS",
+        "Fullcalendar JS",
+        "Swagger UI CSS",
+        "Swagger UI JS",
+    ]
     for name, digest in entries:
         assert re.fullmatch(r"[0-9a-f]{64}", digest), f"{name} has no sha256"
 

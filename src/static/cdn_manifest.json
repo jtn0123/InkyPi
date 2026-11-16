@@ -1,12 +1,1 @@
-{
-  "swagger-ui-css": {
-    "url": "https://unpkg.com/swagger-ui-dist@5.35.0/swagger-ui.css",
-    "version": "5.35.0",
-    "integrity": "sha384-WlYgdmXYOOBWL5apwjDEZwN+U3HmXSSu5R6V5aGxEcf7z+KuRNwBhoxKVN1i3D5I"
-  },
-  "swagger-ui-bundle": {
-    "url": "https://unpkg.com/swagger-ui-dist@5.35.0/swagger-ui-bundle.js",
-    "version": "5.35.0",
-    "integrity": "sha384-gjRm0bEPMeTmMh5jT2cHccIwCUZSTd8YC+j0d0sXw0MdGEfScduGpSyF3ZSSLkX9"
-  }
-}
+{}
