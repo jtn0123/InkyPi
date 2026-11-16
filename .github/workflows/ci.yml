@@ -67,22 +67,12 @@ jobs:
       # from install/requirements-dev.txt installed above.
       - name: Check dependency licenses
         run: scripts/check_licenses.sh
-      # Restore and save are separate steps so that only main writes the
-      # baseline, under a new key each run. actions/cache never saves over a
-      # key that already exists, so a fixed key froze the baseline at the
-      # first main run that wrote it. Restore takes the newest key with the
-      # prefix.
-      - name: Restore benchmark baseline cache
-        id: bench-cache
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: /tmp/bench-baseline.json
-          key: benchmark-baseline-${{ runner.os }}-py3.13-${{ github.run_id }}
-          # The last entry also matches the old fixed-key cache until main
-          # saves its first per-run baseline.
-          restore-keys: |
-            benchmark-baseline-${{ runner.os }}-py3.13-
-            benchmark-baseline-${{ runner.os }}-
+      # The gate times the base commit (HEAD^1: the PR's base branch, or the
+      # previous commit on main) on this runner, in this job. A baseline
+      # cached from an earlier run made unrelated PRs fail: two hosted
+      # runners with the same CPU model can differ by 25-33%. Each side
+      # runs twice, in turn, and benchmark_compare.py takes each benchmark's
+      # lowest median, so one slow run doesn't fail the gate.
       - name: Run perf benchmarks
         env:
           SKIP_BROWSER: '1'
@@ -91,56 +81,35 @@ jobs:
           PERF_COLD_START_BUDGET_S: ${{ vars.PERF_COLD_START_BUDGET_S || '3' }}
           PERF_COLD_START_SAMPLES: ${{ vars.PERF_COLD_START_SAMPLES || '3' }}
           PERF_COLD_START_TIMEOUT_S: ${{ vars.PERF_COLD_START_TIMEOUT_S || '90' }}
-          GITHUB_REF_VALUE: ${{ github.ref }}
         run: |
           set -o pipefail
-          python -m pytest tests/benchmarks/ --benchmark-only \
-            --benchmark-columns=min,mean,median,stddev,ops \
-            --benchmark-json=/tmp/bench-current.json -q
-          # Compare against CI-cached baseline if available, otherwise
-          # fall back to the repo-committed baseline. Both paths are blocking
-          # so cache misses cannot silently hide PR regressions.
-          if [ -f /tmp/bench-baseline.json ]; then
-            echo "Using CI cached benchmark baseline." | tee /tmp/benchmark-compare.txt
-            cp /tmp/bench-baseline.json /tmp/bench-effective-baseline.json
-            # --expected: a benchmark this PR deleted (and removed from the
-            # committed baseline) is retired, not "missing".
-            python scripts/benchmark_compare.py \
-              --baseline /tmp/bench-effective-baseline.json \
-              --current /tmp/bench-current.json \
-              --expected tests/benchmarks/baseline.json \
-              | tee -a /tmp/benchmark-compare.txt
-          else
-            echo "No CI baseline cache found — using repo baseline as blocking fallback." \
-              | tee /tmp/benchmark-compare.txt
-            cp tests/benchmarks/baseline.json /tmp/bench-effective-baseline.json
-            python scripts/benchmark_compare.py \
-              --baseline /tmp/bench-effective-baseline.json \
-              --current /tmp/bench-current.json \
-              | tee -a /tmp/benchmark-compare.txt
-          fi
+          mkdir -p /tmp/bench
+          git worktree add --detach /tmp/bench-base HEAD^1
+          bench() {
+            (cd "$1" && python -m pytest tests/benchmarks/ --benchmark-only \
+              --benchmark-columns=min,mean,median,stddev,ops \
+              --benchmark-json="$2" -q -p no:cacheprovider)
+          }
+          for round in 1 2; do
+            bench "$GITHUB_WORKSPACE" "/tmp/bench/current-$round.json"
+            bench /tmp/bench-base "/tmp/bench/base-$round.json"
+          done
+          # --expected: a benchmark this PR deletes (and removes from the
+          # committed baseline) is retired, not "missing".
+          python scripts/benchmark_compare.py \
+            --baseline /tmp/bench/base-1.json /tmp/bench/base-2.json \
+            --current /tmp/bench/current-1.json /tmp/bench/current-2.json \
+            --expected tests/benchmarks/baseline.json \
+            | tee /tmp/bench/compare.txt
           # JTN-738: hard performance budgets on plugin render latency and
           # cold-start startup time.
-          python scripts/perf_budget_gate.py --bench-json /tmp/bench-current.json
-          # On main branch pushes, update the cached baseline for future PRs
-          if [ "$GITHUB_REF_VALUE" = "refs/heads/main" ]; then
-            cp /tmp/bench-current.json /tmp/bench-baseline.json
-          fi
-      - name: Save benchmark baseline cache
-        if: github.ref == 'refs/heads/main'
-        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: /tmp/bench-baseline.json
-          key: benchmark-baseline-${{ runner.os }}-py3.13-${{ github.run_id }}
+          python scripts/perf_budget_gate.py --bench-json /tmp/bench/current-1.json
       - name: Upload benchmark artifacts
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: benchmark-results
-          path: |
-            /tmp/bench-current.json
-            /tmp/benchmark-compare.txt
-            /tmp/bench-effective-baseline.json
+          path: /tmp/bench/
           if-no-files-found: ignore
 
   lockfile-drift:

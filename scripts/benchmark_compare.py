@@ -1,27 +1,35 @@
 #!/usr/bin/env python3
-"""Compare pytest-benchmark JSON output against a stored baseline.
+"""Compare pytest-benchmark JSON output against a baseline run.
 
 Exit 0 if all benchmarks are within the allowed regression threshold.
 Exit 1 if any benchmark regressed beyond the threshold.
 
-Timings are only comparable on the same CPU. GitHub's hosted runners mix
-Intel Xeon and several AMD EPYC models, and a cached baseline from one model
-made unrelated PRs fail by 40-140% on another. When both files record a CPU
-model and they differ, the timing comparison is reported but not enforced
-(a benchmark missing from the current run still fails); the absolute budgets
-in ``scripts/perf_budget_gate.py`` keep guarding real regressions.
+CI measures the base commit and the change on the same runner, in the same
+job, and passes both here. Comparing against a stored baseline from an earlier
+run failed unrelated PRs: two hosted runners with the same CPU model can
+differ by 25-33%, and runners with different CPUs by more.
+
+``--baseline`` and ``--current`` each take one or more JSON files, for
+example two runs of each side taken in turn. Each benchmark's time is the
+lowest median across that side's files. Noise only ever adds time, so one slow
+run on either side doesn't fail the gate.
+
+When both sides record a CPU model and they differ (files from two machines),
+the timing comparison is reported but not enforced; a benchmark missing from
+the current run still fails. The absolute budgets in
+``scripts/perf_budget_gate.py`` guard real regressions either way.
 
 A benchmark in the baseline but not in the current run fails the gate, so a
 benchmark can't quietly stop running. With ``--expected``, a benchmark that is
 also absent from that file (the committed ``tests/benchmarks/baseline.json``)
-counts as retired instead: CI's cached baseline comes from an older main run,
-so it still lists a benchmark a PR deletes on purpose. To retire one, delete
-the test and its entry in the committed baseline.
+counts as retired instead: the base commit still has a benchmark that a PR
+deletes on purpose. To retire one, delete the test and its entry in the
+committed baseline.
 
 Usage:
     python scripts/benchmark_compare.py \
-        --baseline tests/benchmarks/baseline.json \
-        --current  /tmp/bench-current.json \
+        --baseline /tmp/bench/base-1.json /tmp/bench/base-2.json \
+        --current  /tmp/bench/current-1.json /tmp/bench/current-2.json \
         [--expected tests/benchmarks/baseline.json] \
         [--threshold 15]
 
@@ -42,6 +50,15 @@ def load_benchmarks(path: str) -> dict[str, float]:
     with open(path) as f:
         data = json.load(f)
     return {b["name"]: b["stats"]["median"] for b in data["benchmarks"]}
+
+
+def load_runs(paths: list[str]) -> dict[str, float]:
+    """Return each benchmark's lowest median across several runs."""
+    best: dict[str, float] = {}
+    for path in paths:
+        for name, median in load_benchmarks(path).items():
+            best[name] = min(median, best.get(name, median))
+    return best
 
 
 def cpu_model(path: str) -> str | None:
@@ -97,13 +114,18 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--baseline",
-        default="tests/benchmarks/baseline.json",
-        help="Path to the stored baseline JSON (default: tests/benchmarks/baseline.json)",
+        nargs="+",
+        default=["tests/benchmarks/baseline.json"],
+        help=(
+            "Baseline JSON file(s), such as runs of the base commit "
+            "(default: tests/benchmarks/baseline.json)"
+        ),
     )
     parser.add_argument(
         "--current",
+        nargs="+",
         required=True,
-        help="Path to the current benchmark JSON output",
+        help="JSON file(s) from runs of the change being checked",
     )
     parser.add_argument(
         "--expected",
@@ -127,12 +149,12 @@ def main() -> int:
         threshold = float(os.environ.get("BENCHMARK_THRESHOLD_PCT", "15"))
 
     print(f"Benchmark regression gate (threshold: +{threshold:.0f}%)")
-    print(f"  Baseline: {args.baseline}")
-    print(f"  Current:  {args.current}")
+    print(f"  Baseline: {' '.join(args.baseline)}")
+    print(f"  Current:  {' '.join(args.current)}")
     print()
 
-    baseline = load_benchmarks(args.baseline)
-    current = load_benchmarks(args.current)
+    baseline = load_runs(args.baseline)
+    current = load_runs(args.current)
     expected = set(load_benchmarks(args.expected)) if args.expected else None
 
     if not baseline:
@@ -141,7 +163,7 @@ def main() -> int:
 
     failures = compare(baseline, current, threshold, expected)
 
-    base_cpu, cur_cpu = cpu_model(args.baseline), cpu_model(args.current)
+    base_cpu, cur_cpu = cpu_model(args.baseline[0]), cpu_model(args.current[0])
     if base_cpu and cur_cpu and base_cpu != cur_cpu:
         missing = [f for f in failures if "missing in current run" in f]
         print()

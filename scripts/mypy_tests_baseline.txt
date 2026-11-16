@@ -58,4 +58,7 @@
 # 132931337390 (#830; local mypy on main at 35b20e6f also counts 485). #830
 # gave tests a SettingsValidator Protocol, NoReturn fail() helpers and real
 # array types for crisp.
-485
+# 485 -> 450 (2026-11-15): Linux Python 3.13 CI run 43782522367, lint job
+# 133022706240 (#879, on main at 317f5fe7; local mypy also counts 450).
+# The regrade's fixes in #869-#878 typed more of the suite.
+450

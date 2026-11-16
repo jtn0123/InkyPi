@@ -3,9 +3,9 @@
 These benchmarks are deterministic, hermetic, and fast (each <1s). They run in CI
 on every PR via the dedicated benchmark step (see .github/workflows/ci.yml).
 
-Results are compared against a stored baseline (tests/benchmarks/baseline.json)
-and fail CI when any benchmark regresses beyond the configured threshold
-(default +15%). See docs/benchmarking.md for the full workflow.
+CI times the base commit on the same runner and fails when any benchmark is
+more than the configured threshold (default +15%) slower than there. See
+docs/benchmarking.md for the full workflow.
 
 Add a new benchmark only if it:
   * Has no network dependency
