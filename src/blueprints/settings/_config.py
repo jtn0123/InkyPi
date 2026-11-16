@@ -1,12 +1,15 @@
 """Settings pages, save, import/export, API keys, isolation, and safe-reset route handlers."""
 
-from typing import Any
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any
 from zoneinfo import available_timezones
 
 from flask import current_app, redirect, render_template, request
 from flask.typing import ResponseReturnValue
 
 from app_setup.logging_setup import configure_log_timezone
+from blueprints._deps import get_device_config
 from blueprints._refresh_loop import wake_refresh_loop
 from blueprints.settings import logger, settings_bp
 from display.rendering_settings import SCREEN_RENDERING_KEY
@@ -15,6 +18,9 @@ from utils.api_responses import JsonResponse, json_error, json_success
 from utils.backend_errors import ClientInputError, route_error_boundary
 from utils.config_schema import ConfigValidationError
 from utils.time_utils import calculate_seconds
+
+if TYPE_CHECKING:
+    from config import Config
 
 # The runtime controls a safe reset puts back to the schema's defaults.
 _SAFE_RESET_KEYS = (
@@ -80,7 +86,7 @@ _BACKUP_ENV_KEYS = frozenset(
 
 
 def _isolation_state() -> tuple[Any, list[Any], set[Any]]:
-    device_config = current_app.config["DEVICE_CONFIG"]
+    device_config = get_device_config()
     isolated = device_config.get_config("isolated_plugins", default=[])
     if not isinstance(isolated, list):
         isolated = []
@@ -167,7 +173,7 @@ def safe_reset() -> ResponseReturnValue:
         logger=logger,
         hint="Check config readability and write permissions.",
     ):
-        device_config = current_app.config["DEVICE_CONFIG"]
+        device_config = get_device_config()
         # Reset only these runtime controls, to the defaults the config schema
         # declares. update_config merges, so every other key (plugins,
         # playlists, name, display) is left as it was; copying them in here
@@ -182,7 +188,7 @@ def safe_reset() -> ResponseReturnValue:
 
 
 def _render_settings_page() -> str:
-    device_config = current_app.config["DEVICE_CONFIG"]
+    device_config = get_device_config()
     return render_template(
         "settings.html",
         device_settings=device_config.get_config(),
@@ -256,7 +262,7 @@ def export_settings() -> ResponseReturnValue:
                 "anyone on your network could download them.",
                 status=403,
             )
-        device_config = current_app.config["DEVICE_CONFIG"]
+        device_config = get_device_config()
 
         # Build export object with config plus env keys when requested
         data = {
@@ -295,7 +301,7 @@ def _extract_import_payload() -> dict[str, Any] | None:
     return dict(payload)
 
 
-def _apply_imported_config(device_config: Any, filtered_cfg: dict[str, Any]) -> None:
+def _apply_imported_config(device_config: Config, filtered_cfg: dict[str, Any]) -> None:
     """Write imported settings and rebuild the models they feed.
 
     Every config write serialises ``playlist_config`` from the in-memory
@@ -338,7 +344,7 @@ def import_settings() -> ResponseReturnValue:
         logger=logger,
         hint="Verify JSON structure and file permissions.",
     ):
-        device_config = current_app.config["DEVICE_CONFIG"]
+        device_config = get_device_config()
         # Accept JSON body or form upload with a JSON file
         payload = _extract_import_payload()
         if payload is None:
@@ -387,7 +393,7 @@ def import_settings() -> ResponseReturnValue:
 
 @settings_bp.route("/settings/api-keys", methods=["GET"])
 def api_keys_page() -> ResponseReturnValue:
-    device_config = current_app.config["DEVICE_CONFIG"]
+    device_config = get_device_config()
 
     def mask(value: str | None) -> str | None:
         if not value:
@@ -430,7 +436,7 @@ def api_keys_page() -> ResponseReturnValue:
 
 @settings_bp.route("/settings/save_api_keys", methods=["POST"])
 def save_api_keys() -> ResponseReturnValue:
-    device_config = current_app.config["DEVICE_CONFIG"]
+    device_config = get_device_config()
     with route_error_boundary(
         "saving API keys",
         logger=logger,
@@ -484,7 +490,7 @@ def save_api_keys() -> ResponseReturnValue:
 
 @settings_bp.route("/settings/delete_api_key", methods=["POST"])
 def delete_api_key() -> ResponseReturnValue:
-    device_config = current_app.config["DEVICE_CONFIG"]
+    device_config = get_device_config()
     key = request.form.get("key")
     valid_keys = {
         "OPEN_AI_SECRET",
@@ -700,7 +706,7 @@ def _build_settings_dict(
 
 @settings_bp.route("/save_settings", methods=["POST"])
 def save_settings() -> ResponseReturnValue:
-    device_config = current_app.config["DEVICE_CONFIG"]
+    device_config = get_device_config()
 
     with route_error_boundary(
         "saving device settings",

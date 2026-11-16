@@ -19,9 +19,10 @@ from __future__ import annotations
 import logging
 from typing import cast
 
-from flask import Blueprint, current_app, jsonify
+from flask import Blueprint, jsonify
 from flask.typing import ResponseReturnValue
 
+from blueprints._deps import get_device_config
 from schemas.responses import RefreshStatsResponse, RefreshStatsWindow
 from utils.api_responses import json_error
 from utils.refresh_stats import compute_stats_windows
@@ -40,8 +41,7 @@ _WINDOWS = {
 @stats_bp.route("/api/stats", methods=["GET"])
 def refresh_stats() -> ResponseReturnValue:
     """Return aggregated refresh statistics for 1h, 24h, and 7d windows."""
-    device_config = current_app.config.get("DEVICE_CONFIG")
-    history_dir: str = getattr(device_config, "history_image_dir", "")
+    history_dir = get_device_config().history_image_dir
 
     try:
         windows = compute_stats_windows(history_dir, _WINDOWS)

@@ -1,13 +1,14 @@
 """``/history`` routes: HTTP glue around :mod:`services.history`."""
 
+from __future__ import annotations
+
 import logging
 from datetime import UTC, datetime
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from flask import (
     Blueprint,
     Response,
-    current_app,
     has_app_context,
     jsonify,
     render_template,
@@ -17,6 +18,7 @@ from flask import (
 from flask.typing import ResponseReturnValue
 from werkzeug.exceptions import BadRequest
 
+from blueprints._deps import get_device_config, get_refresh_task
 from services import history as history_files
 from utils.api_responses import (
     JsonResponse,
@@ -27,12 +29,14 @@ from utils.api_responses import (
 from utils.image_serving import THUMBNAIL_WIDTHS, maybe_serve_webp
 from utils.time_utils import now_device_tz
 
+if TYPE_CHECKING:
+    from config import Config
+
 logger = logging.getLogger(__name__)
 
 history_bp = Blueprint("history", __name__)
 
 # Sonar S1192 — duplicate string constants
-_CONFIG_KEY = "DEVICE_CONFIG"
 _ERR_INVALID_FILENAME = "invalid filename"
 _ERR_INVALID_WIDTH = "invalid thumbnail width"
 #: Width of the History grid thumbnails. The lightbox and download links
@@ -79,7 +83,7 @@ def _now_in_device_tz() -> datetime:
     Safe to call without an app context (falls back to UTC), which keeps
     it usable from unit tests that call it directly.
     """
-    device_config = current_app.config.get(_CONFIG_KEY) if has_app_context() else None
+    device_config = get_device_config() if has_app_context() else None
     return now_device_tz(device_config)
 
 
@@ -101,7 +105,7 @@ def _parse_filename_from_request() -> tuple[str | None, str | None]:
     return filename, None
 
 
-def _latest_metrics(device_config: Any) -> dict[str, Any]:
+def _latest_metrics(device_config: Config) -> dict[str, Any]:
     """Per-stage latencies from the most recent refresh (None when absent)."""
     try:
         ri = device_config.get_refresh_info()
@@ -120,7 +124,7 @@ def _latest_metrics(device_config: Any) -> dict[str, Any]:
         }
 
 
-def _panel_thumb_ratio(device_config: Any) -> str | None:
+def _panel_thumb_ratio(device_config: Config) -> str | None:
     """CSS aspect-ratio for exact-ratio thumbnails (History v2).
 
     The design's 5:3 fallback matches 800x480 panels; other resolutions get
@@ -141,7 +145,7 @@ def _panel_thumb_ratio(device_config: Any) -> str | None:
 
 @history_bp.route("/history", methods=["GET"])
 def history_page() -> Response | str:
-    device_config = current_app.config[_CONFIG_KEY]
+    device_config = get_device_config()
     history_dir = device_config.history_image_dir
 
     # Parse pagination parameters BEFORE listing so we can push them down
@@ -197,7 +201,7 @@ def history_page() -> Response | str:
 
 @history_bp.route("/history/image/<path:filename>", methods=["GET"])
 def history_image(filename: str) -> Response | JsonResponse:
-    device_config = current_app.config[_CONFIG_KEY]
+    device_config = get_device_config()
     history_dir = device_config.history_image_dir
     try:
         history_files.resolve_requested_path(history_dir, filename)
@@ -218,9 +222,8 @@ def history_image(filename: str) -> Response | JsonResponse:
 
 @history_bp.route("/history/redisplay", methods=["POST"])
 def history_redisplay() -> ResponseReturnValue:
-    device_config = current_app.config[_CONFIG_KEY]
-    display_manager = current_app.config["DISPLAY_MANAGER"]
-    refresh_task = current_app.config.get("REFRESH_TASK")
+    device_config = get_device_config()
+    refresh_task = get_refresh_task()
     history_dir = device_config.history_image_dir
 
     try:
@@ -235,15 +238,13 @@ def history_redisplay() -> ResponseReturnValue:
             return _filename_error_response(err_code)
 
         safe_path = cast(str, _safe_path)
-        if refresh_task is not None:
-            # Serialise through the refresh loop so this panel write cannot
-            # overlap a refresh the loop is already pushing to the display.
-            refresh_task.run_display_command(
-                "history_redisplay",
-                lambda dm: dm.display_preprocessed_image(safe_path),
-            )
-        else:
-            display_manager.display_preprocessed_image(safe_path)
+        # Serialise through the refresh loop so this panel write cannot
+        # overlap a refresh the loop is already pushing to the display. With
+        # the loop stopped (web-only mode) the command runs inline.
+        refresh_task.run_display_command(
+            "history_redisplay",
+            lambda dm: dm.display_preprocessed_image(safe_path),
+        )
         return json_success("Display updated")
     except Exception:
         logger.exception("Error redisplaying history image")
@@ -255,7 +256,7 @@ def history_redisplay() -> ResponseReturnValue:
 
 @history_bp.route("/history/delete", methods=["POST"])
 def history_delete() -> ResponseReturnValue:
-    device_config = current_app.config[_CONFIG_KEY]
+    device_config = get_device_config()
     history_dir = device_config.history_image_dir
     try:
         filename, err_code = _parse_filename_from_request()
@@ -289,7 +290,7 @@ def history_delete() -> ResponseReturnValue:
 
 @history_bp.route("/history/clear", methods=["POST"])
 def history_clear() -> ResponseReturnValue:
-    device_config = current_app.config[_CONFIG_KEY]
+    device_config = get_device_config()
     history_dir = device_config.history_image_dir
     try:
         count = history_files.clear(history_dir)
@@ -309,7 +310,7 @@ def history_export_csv() -> Response:
     Columns: timestamp, plugin_id, instance_name, status, duration_ms,
     error_message.
     """
-    device_config = current_app.config[_CONFIG_KEY]
+    device_config = get_device_config()
     history_dir = device_config.history_image_dir
 
     date_str = datetime.now(tz=UTC).strftime("%Y%m%d")
@@ -332,7 +333,7 @@ def history_storage() -> ResponseReturnValue:
 
     Values returned: free_gb, total_gb, used_gb, pct_free
     """
-    device_config = current_app.config[_CONFIG_KEY]
+    device_config = get_device_config()
     history_dir = device_config.history_image_dir
     try:
         return jsonify(history_files.storage_summary(history_dir)), 200

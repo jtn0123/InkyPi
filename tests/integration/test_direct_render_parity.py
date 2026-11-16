@@ -8,7 +8,7 @@ from flask import Flask
 from flask.testing import FlaskClient
 from PIL import Image
 
-from refresh_task.job_queue import reset_job_queue
+from services.job_queue import reset_job_queue
 from utils.backend_errors import PLUGIN_RENDER_FAILED_MSG
 from utils.plugin_errors import (
     PROVIDER_REJECTED_MSG,

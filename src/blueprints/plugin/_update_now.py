@@ -1,14 +1,16 @@
 """``/update_now`` manual render (sync and job-queue async) and its job poller."""
 
-from collections.abc import Mapping
-from typing import Any, cast
+from __future__ import annotations
 
-from flask import current_app, jsonify, request
+from collections.abc import Mapping
+from typing import TYPE_CHECKING, Any, cast
+
+from flask import Flask, current_app, jsonify, request
 from flask.typing import ResponseReturnValue
 
+from blueprints._deps import get_device_config, get_display_manager, get_refresh_task
 from plugins.plugin_registry import get_plugin_instance
 from refresh_task import ManualRefresh
-from refresh_task.job_queue import get_job_queue
 from services.direct_render import (
     DirectRenderFailure,
     DirectRenderOutcome,
@@ -16,6 +18,7 @@ from services.direct_render import (
     internal_failure_outcome,
     known_failure_outcome,
 )
+from services.job_queue import get_job_queue
 from utils.api_responses import JsonResponse, json_error, json_success
 from utils.backend_errors import ClientInputError, route_error_for
 from utils.domain_errors import PluginNotFound
@@ -25,7 +28,6 @@ from utils.output_validator import fit_image_to_device
 from utils.request_models import RequestModelError, parse_plugin_update_now_request
 
 from ._common import (
-    _CONFIG_KEY,
     _ERR_INTERNAL,
     _MSG_DISPLAY_UPDATED,
     _plugin_form_data,
@@ -34,12 +36,16 @@ from ._common import (
     plugin_bp,
 )
 
+if TYPE_CHECKING:
+    from config import Config
+    from display.display_manager import DisplayManager
+
 
 def _direct_render_outcome(
     plugin_id: str,
     plugin_settings: dict[str, Any],
-    device_config: Any,
-    display_manager: Any,
+    device_config: Config,
+    display_manager: DisplayManager,
 ) -> DirectRenderOutcome:
     plugin_config = device_config.get_plugin(plugin_id)
     if not plugin_config:
@@ -94,8 +100,8 @@ def _direct_render_outcome(
 def _update_now_direct(
     plugin_id: str,
     plugin_settings: dict[str, Any],
-    device_config: Any,
-    display_manager: Any,
+    device_config: Config,
+    display_manager: DisplayManager,
 ) -> JsonResponse:
     outcome = _direct_render_outcome(
         plugin_id, plugin_settings, device_config, display_manager
@@ -113,8 +119,8 @@ def _update_now_direct(
 def _push_update_now_fallback(
     plugin_id: str,
     plugin_config: dict[str, Any] | Mapping[str, Any],
-    device_config: Any,
-    display_manager: Any,
+    device_config: Config,
+    display_manager: DisplayManager,
     exc: BaseException,
     *,
     record_history: bool = True,
@@ -172,7 +178,7 @@ def job_status(job_id: str) -> ResponseReturnValue:
 
 
 def _run_update_now(
-    app: Any, plugin_id: str, plugin_settings: dict[str, Any]
+    app: Flask, plugin_id: str, plugin_settings: dict[str, Any]
 ) -> dict[str, Any]:
     """Execute plugin render in a background thread (job-queue worker).
 
@@ -180,9 +186,9 @@ def _run_update_now(
     thread has none by default.
     """
     with app.app_context():
-        device_config = app.config[_CONFIG_KEY]
-        refresh_task = app.config["REFRESH_TASK"]
-        display_manager = app.config["DISPLAY_MANAGER"]
+        device_config = get_device_config()
+        refresh_task = get_refresh_task()
+        display_manager = get_display_manager()
 
         if refresh_task.running:
             try:
@@ -221,9 +227,9 @@ def update_now() -> ResponseReturnValue:
     Without the async flag the request behaves synchronously (legacy mode) so
     existing callers and tests are unaffected.
     """
-    device_config = current_app.config[_CONFIG_KEY]
-    refresh_task = current_app.config["REFRESH_TASK"]
-    display_manager = current_app.config["DISPLAY_MANAGER"]
+    device_config = get_device_config()
+    refresh_task = get_refresh_task()
+    display_manager = get_display_manager()
 
     plugin_id: str | None = None
     try:

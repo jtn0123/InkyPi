@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from types import SimpleNamespace
-from typing import Any
+from typing import TYPE_CHECKING, Any, cast
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -21,6 +21,9 @@ from blueprints.main import (
     _parse_refresh_datetime,
     _playlist_cycle_seconds,
 )
+
+if TYPE_CHECKING:
+    from config import Config
 
 # ---------------------------------------------------------------------------
 # _playlist_cycle_seconds — the loop's cycle for the last refresh's playlist
@@ -65,7 +68,7 @@ def test_playlist_cycle_falls_back_on_playlist_manager_error() -> None:
         def get_playlist_manager(self) -> Any:
             raise RuntimeError("playlist_manager unavailable")
 
-    assert _playlist_cycle_seconds(_Cfg(), "Focus") == 3600
+    assert _playlist_cycle_seconds(cast("Config", _Cfg()), "Focus") == 3600
 
 
 def test_sub_minute_cycle_reads_one_minute_not_zero(monkeypatch: Any) -> None:
@@ -237,7 +240,7 @@ def test_annotate_refresh_schedule_projects_next_refresh(monkeypatch: Any) -> No
         "refresh_time": "2025-01-01T07:55:00+00:00",
     }
 
-    result = _annotate_refresh_schedule(payload, _Cfg())
+    result = _annotate_refresh_schedule(payload, cast("Config", _Cfg()))
 
     assert result["cycle_minutes"] == 5
     assert result["next_refresh_time"] == "2025-01-01T08:00:00+00:00"
