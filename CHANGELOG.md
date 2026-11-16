@@ -2,6 +2,21 @@
 
 <!-- version list -->
 
+## v1.9.7 (2026-11-16)
+
+### Chores
+
+- **lint**: Type-check scripts/ with its own ratchet
+  ([#876](https://github.com/jtn0123/InkyPi/pull/876),
+  [`09a0d63`](https://github.com/jtn0123/InkyPi/commit/09a0d6359705b6625be1c62b980ec08b1eb7e67c))
+
+### Performance Improvements
+
+- **render**: Copy the cached png, prune the benchmark db, and stop workers loading jsonschema
+  ([#874](https://github.com/jtn0123/InkyPi/pull/874),
+  [`960c499`](https://github.com/jtn0123/InkyPi/commit/960c49990e1d6a3fc9968522ebd66f33aa530f99))
+
+
 ## v1.9.6 (2026-11-16)
 
 ### Bug Fixes
