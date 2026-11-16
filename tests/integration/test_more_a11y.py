@@ -60,6 +60,7 @@ def test_plugin_settings_accessibility(client: FlaskClient) -> None:
     assert resp.status_code == 200
     html = resp.get_data(as_text=True)
     from playwright.sync_api import sync_playwright
+    from tests.integration.browser_helpers import assert_axe_allowlist
 
     # Load axe-core from local fixture
     axe_path = Path(__file__).parent.parent / "fixtures" / "axe.min.js"
@@ -73,17 +74,7 @@ def test_plugin_settings_accessibility(client: FlaskClient) -> None:
         result = page.evaluate("() => axe.run(document)")
         browser.close()
 
-    # Filter out known violations that are pre-existing upstream issues
-    # "label" and "select-name" have been fixed by JTN-315
-    known_violations = {"landmark-one-main", "region"}
-    violations = [
-        v
-        for v in (result.get("violations") or [])
-        if v.get("id") not in known_violations
-    ]
-    assert (
-        not violations
-    ), f"New A11y violations detected: {[v.get('id') for v in violations]}"
+    assert_axe_allowlist(result, set(), "/plugin/clock")
 
 
 @pytest.mark.skipif(
@@ -96,6 +87,7 @@ def test_settings_page_accessibility(client: FlaskClient) -> None:
     assert resp.status_code == 200
     html = resp.get_data(as_text=True)
     from playwright.sync_api import sync_playwright
+    from tests.integration.browser_helpers import assert_axe_allowlist
 
     # Load axe-core from local fixture
     axe_path = Path(__file__).parent.parent / "fixtures" / "axe.min.js"
@@ -109,23 +101,7 @@ def test_settings_page_accessibility(client: FlaskClient) -> None:
         result = page.evaluate("() => axe.run(document)")
         browser.close()
 
-    # Filter out known violations that are pre-existing upstream issues
-    # "label" and "select-name" have been fixed by JTN-315
-    # landmark-banner-is-top-level: pageheader sits inside <main> on the
-    # settings page; tracked with other nested-banner routes in JTN-508.
-    known_violations = {
-        "landmark-one-main",
-        "region",
-        "landmark-banner-is-top-level",  # TODO(JTN-508)
-    }
-    violations = [
-        v
-        for v in (result.get("violations") or [])
-        if v.get("id") not in known_violations
-    ]
-    assert (
-        not violations
-    ), f"New A11y violations detected: {[v.get('id') for v in violations]}"
+    assert_axe_allowlist(result, set(), "/settings")
 
 
 @pytest.mark.skipif(
@@ -138,6 +114,7 @@ def test_history_page_accessibility(client: FlaskClient) -> None:
     assert resp.status_code == 200
     html = resp.get_data(as_text=True)
     from playwright.sync_api import sync_playwright
+    from tests.integration.browser_helpers import assert_axe_allowlist
 
     # Load axe-core from local fixture
     axe_path = Path(__file__).parent.parent / "fixtures" / "axe.min.js"
@@ -151,20 +128,4 @@ def test_history_page_accessibility(client: FlaskClient) -> None:
         result = page.evaluate("() => axe.run(document)")
         browser.close()
 
-    # Filter out known violations that are pre-existing upstream issues
-    # "label" and "select-name" have been fixed by JTN-315
-    # landmark-banner-is-top-level: pageheader sits inside <main> on the
-    # history page; tracked with other nested-banner routes in JTN-508.
-    known_violations = {
-        "landmark-one-main",
-        "region",
-        "landmark-banner-is-top-level",  # TODO(JTN-508)
-    }
-    violations = [
-        v
-        for v in (result.get("violations") or [])
-        if v.get("id") not in known_violations
-    ]
-    assert (
-        not violations
-    ), f"New A11y violations detected: {[v.get('id') for v in violations]}"
+    assert_axe_allowlist(result, set(), "/history")

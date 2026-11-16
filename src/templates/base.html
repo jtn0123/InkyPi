@@ -22,10 +22,10 @@
             root.setAttribute("data-aesthetic", tweaks.aesthetic);
           }
           if (tweaks && typeof tweaks.accent === "number") {
-            var h = Math.max(0, Math.min(360, tweaks.accent));
-            var isDark = theme !== "light";
-            root.style.setProperty("--accent", "oklch(" + (isDark ? "68%" : "56%") + " 0.08 " + h + ")");
-            root.style.setProperty("--accent-hover", "oklch(" + (isDark ? "74%" : "48%") + " 0.09 " + h + ")");
+            // Hue only: the tokens pick lightness per theme, and
+            // high-contrast mode replaces --accent outright.
+            var h = Math.max(0, Math.min(360, Math.round(tweaks.accent)));
+            root.style.setProperty("--accent-h", String(h));
           }
         } catch (e) {}
       })();

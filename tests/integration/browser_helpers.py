@@ -37,6 +37,31 @@ _SHELL_ANIMATION_DONE_JS = """
 """
 
 
+def assert_axe_allowlist(
+    result: dict[str, Any], allowed: set[str] | frozenset[str], where: str
+) -> None:
+    """Fail on an axe violation that isn't allowed, or an allowance not used.
+
+    *result* is what ``axe.run`` returned and *allowed* the rule ids the page
+    may still violate. An allowed rule that no longer fires would quietly
+    excuse the next regression of that rule, so it fails the test too, and
+    its entry has to go once the fix lands.
+    """
+    violations = result.get("violations") or []
+    problems = [
+        f"  - {v['id']} ({v.get('impact')}): {v.get('description')}"
+        for v in violations
+        if v["id"] not in allowed
+    ]
+    fired = {v["id"] for v in violations}
+    problems += [
+        f"  - {rule} is allowed but no longer fires; remove the entry"
+        for rule in sorted(set(allowed) - fired)
+    ]
+    if problems:
+        pytest.fail(f"A11y allowlist out of date on {where}:\n" + "\n".join(problems))
+
+
 def leaflet_stub_js() -> str:
     """Return a minimal Leaflet stub to prevent browser-side map side effects."""
     return """

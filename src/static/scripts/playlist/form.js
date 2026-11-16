@@ -112,33 +112,37 @@
     return true;
   }
 
+  // The page reloads to show the saved playlist, and the server's message is
+  // shown after the reload. A warning (the new hours overlap Default's) goes
+  // in the same toast, so it isn't lost behind the success message.
   function handlePlaylistMutationSuccess(result) {
     ns.closeModal();
-    if (result.warning) {
-      sessionStorage.setItem(
-        "storedMessage",
-        JSON.stringify({ type: "warning", text: result.warning })
-      );
+    const message = result?.message || "Saved playlist.";
+    if (result?.warning) {
+      ns.reloadWithMessage("warning", `${message} ${result.warning}`);
+      return;
     }
-    location.reload();
+    ns.reloadWithMessage("success", message);
   }
 
-  async function runPlaylistMutation(fs, requestFactory) {
+  // The Save button shows its busy state for as long as this runs (the
+  // callers wrap it in FormState.run). A refusal names the field when the
+  // server says which one, and is toasted either way.
+  async function runPlaylistMutation(fs, url, init) {
+    let result;
     try {
-      const response = await requestFactory();
-      const result = await handleJsonResponse(response);
-      if (response.ok && result?.success) {
-        handlePlaylistMutationSuccess(result);
-      } else if (fs && result) {
-        applyFieldErrorFromResponse(fs, result);
-      }
+      result = await fetchJson(url, init);
     } catch (error) {
-      console.error("Error:", error);
+      // Shown in the toast below, so it isn't logged as an error.
+      console.debug("Playlist save failed:", error);
+      applyFieldErrorFromResponse(fs, error?.data);
       showResponseModal(
         "failure",
-        "An error occurred while processing your request."
+        `Failed to save playlist: ${globalThis.InkyPiHttp.errorMessage(error)}`
       );
+      return;
     }
+    handlePlaylistMutationSuccess(result);
   }
 
   async function createPlaylist() {
@@ -151,20 +155,17 @@
     const endTime = document.getElementById("end_time").value;
     const cycleMinutes = document.getElementById("cycle_minutes")?.value || "";
 
-    const submit = async () => {
-      await runPlaylistMutation(fs, () =>
-        fetch(ns.config.create_playlist_url, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            playlist_name: playlistName,
-            start_time: startTime,
-            end_time: endTime,
-            cycle_minutes: cycleMinutes || null,
-          }),
-        })
-      );
-    };
+    const submit = () =>
+      runPlaylistMutation(fs, ns.config.create_playlist_url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          playlist_name: playlistName,
+          start_time: startTime,
+          end_time: endTime,
+          cycle_minutes: cycleMinutes || null,
+        }),
+      });
 
     if (fs) {
       await fs.run(submit);
@@ -190,23 +191,21 @@
         : endInput.value;
     const cycleMinutes = document.getElementById("cycle_minutes").value;
 
-    const submit = async () => {
-      await runPlaylistMutation(fs, () =>
-        fetch(
-          ns.config.update_playlist_base_url + encodeURIComponent(oldName),
-          {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              new_name: newName,
-              start_time: startTime,
-              end_time: endTime,
-              cycle_minutes: cycleMinutes || null,
-            }),
-          }
-        )
+    const submit = () =>
+      runPlaylistMutation(
+        fs,
+        ns.config.update_playlist_base_url + encodeURIComponent(oldName),
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            new_name: newName,
+            start_time: startTime,
+            end_time: endTime,
+            cycle_minutes: cycleMinutes || null,
+          }),
+        }
       );
-    };
 
     if (fs) {
       await fs.run(submit);
@@ -225,9 +224,13 @@
     ns.openDeletePlaylistModal(name, document.activeElement);
   }
 
+  // Only a bug in this page gets here: request failures are handled above.
   function reportPlaylistSaveFailure(error) {
     console.error("Failed to save playlist:", error);
-    showResponseModal("failure", "An error occurred while processing your request.");
+    showResponseModal(
+      "failure",
+      `Failed to save playlist: ${globalThis.InkyPiHttp.errorMessage(error)}`
+    );
   }
 
   function initFormControls() {

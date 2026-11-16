@@ -15,7 +15,10 @@ def test_base_inlines_theme_and_tweaks_before_css() -> None:
     assert inline_theme < stylesheet
     assert "inkypi_tweaks_v1" in html
     assert 'root.setAttribute("data-aesthetic"' in html
-    assert 'root.style.setProperty("--accent"' in html
+    # Hue only: a full --accent here would outrank high-contrast mode and
+    # keep one theme's lightness after a theme switch.
+    assert 'root.style.setProperty("--accent-h"' in html
+    assert 'root.style.setProperty("--accent",' not in html
 
 
 def test_ai_image_prompt_tool_checks_selected_provider_key() -> None:

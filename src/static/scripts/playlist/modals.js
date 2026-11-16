@@ -176,34 +176,39 @@
     txt.textContent = `Delete playlist '${name}'?`;
     setModalOpen("deletePlaylistModal", true, triggerEl);
     btn.onclick = () =>
-      runConfirmed(btn, "cancelDeletePlaylistBtn", async () => {
+      runConfirmed(btn, "cancelDeletePlaylistBtn", "Deleting\u2026", async () => {
         try {
-          const resp = await fetch(
+          const result = await fetchJson(
             ns.config.delete_playlist_base_url + encodeURIComponent(name),
             { method: "DELETE" }
           );
-          const result = await handleJsonResponse(resp);
-          if (resp.ok && result?.success) {
-            location.reload();
-            return true;
-          }
+          ns.reloadWithMessage("success", result?.message || "Deleted playlist.");
+          return true;
         } catch (error) {
+          // Shown in the toast below, so it isn't logged as an error.
           console.debug("Failed to delete playlist from modal:", error);
-          showResponseModal("failure", "Failed to delete playlist");
+          showResponseModal(
+            "failure",
+            `Failed to delete playlist: ${globalThis.InkyPiHttp.errorMessage(error)}`
+          );
+          return false;
         }
-        return false;
       });
   }
 
-  // Run a confirm dialog's request with its buttons locked, so a double
-  // click sends one request. *request* resolves true when the page is
-  // reloading; otherwise the buttons unlock so the user can retry or cancel.
-  async function runConfirmed(confirmBtn, cancelBtnId, request) {
+  // Run a confirm dialog's request with its buttons locked and the confirm
+  // button saying what is happening (busyLabel, such as "Deleting…"), so a
+  // double click sends one request and a slow reply doesn't look like a dead
+  // button. *request* resolves true when the page is reloading; otherwise the
+  // buttons unlock so the user can retry or cancel.
+  async function runConfirmed(confirmBtn, cancelBtnId, busyLabel, request) {
     if (confirmBtn.disabled) return;
     const cancelBtn = document.getElementById(cancelBtnId);
+    const idleLabel = confirmBtn.textContent;
     const setLocked = (locked) => {
       confirmBtn.disabled = locked;
       confirmBtn.setAttribute("aria-busy", String(locked));
+      confirmBtn.textContent = locked ? busyLabel : idleLabel;
       if (cancelBtn) cancelBtn.disabled = locked;
     };
     setLocked(true);
@@ -234,9 +239,9 @@
     txt.textContent = `Delete instance '${label}'?`;
     setModalOpen("deleteInstanceModal", true, triggerEl);
     btn.onclick = () =>
-      runConfirmed(btn, "cancelDeleteInstanceBtn", async () => {
+      runConfirmed(btn, "cancelDeleteInstanceBtn", "Deleting\u2026", async () => {
         try {
-          const resp = await fetch(ns.config.delete_plugin_instance_url, {
+          const result = await fetchJson(ns.config.delete_plugin_instance_url, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -245,16 +250,17 @@
               plugin_instance: instanceName,
             }),
           });
-          const result = await handleJsonResponse(resp);
-          if (resp.ok && result?.success) {
-            location.reload();
-            return true;
-          }
+          ns.reloadWithMessage("success", result?.message || "Deleted instance.");
+          return true;
         } catch (error) {
+          // Shown in the toast below, so it isn't logged as an error.
           console.debug("Failed to delete playlist instance from modal:", error);
-          showResponseModal("failure", "Failed to delete instance");
+          showResponseModal(
+            "failure",
+            `Failed to delete instance: ${globalThis.InkyPiHttp.errorMessage(error)}`
+          );
+          return false;
         }
-        return false;
       });
   }
 
@@ -272,10 +278,13 @@
     }
     txt.textContent = `Advance '${name}' to the next plugin now?`;
     setModalOpen("displayNextConfirmModal", true, triggerEl);
-    btn.onclick = async function () {
-      ns.closeDisplayNextConfirmModal();
-      await ns.displayNextInPlaylist(name);
-    };
+    // The dialog stays open, its button reading "Displaying…", until the
+    // panel has been drawn: success reloads the page, and a failure leaves
+    // the dialog up so the user can retry or cancel.
+    btn.onclick = () =>
+      runConfirmed(btn, "cancelDisplayNextBtn", "Displaying\u2026", () =>
+        ns.displayNextInPlaylist(name)
+      );
   }
 
   function closeDisplayNextConfirmModal() {
