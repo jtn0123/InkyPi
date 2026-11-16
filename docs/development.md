@@ -80,6 +80,12 @@ validation. Ruff, Black and mypy run from `.venv`, so they are the same pinned v
 `scripts/lint.sh` and CI use. See [`.pre-commit-config.yaml`](../.pre-commit-config.yaml) for
 the full hook list.
 
+Before a `git push` whose commits change `src/static/` or `src/templates/`, the pre-push hook
+runs the browser smoke gate (`scripts/test.sh browser-smoke`, about 45 seconds). It's skipped
+with a message when Playwright Chromium isn't installed; CI's browser-smoke job runs it on every
+pull request either way. If you installed the hooks before the pre-push stage existed, run
+`pre-commit install` again to add it.
+
 > **Bypass when needed:** `git commit --no-verify` skips the hooks locally, but CI enforces the
 > same checks: the lint job runs `scripts/lint.sh`, Biome on every web script, and the hygiene
 > hooks on the files your change touches, and gitleaks has its own workflow.

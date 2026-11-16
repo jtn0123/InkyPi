@@ -1,6 +1,6 @@
 [project]
 name = "inkypi"
-version = "1.9.5"
+version = "1.9.6"
 description = "InkyPi — e-ink dashboard for Raspberry Pi"
 requires-python = ">=3.13,<3.14"
 # Runtime dependencies. The source of truth is this pyproject.toml + uv.lock;
@@ -48,6 +48,9 @@ dev = [
   "pytest-rerunfailures>=16.7,<17",
   # Per-test hang protection (pytest.ini `timeout`).
   "pytest-timeout>=2.4,<3",
+  # Random test order. Off by default (pytest.ini adds -p no:randomly); the
+  # nightly random-order.yml run and `pytest -p randomly` turn it on.
+  "pytest-randomly>=5.1,<6",
   "requests-mock>=1.12,<2",
   "freezegun>=1.5,<2",
   "hypothesis>=6.168,<7",
@@ -74,18 +77,24 @@ dev = [
   "defusedxml>=0.7,<1",
   # Audit / compliance
   "pip-audit>=2.10,<3",
-  "cyclonedx-bom>=8.0,<9",
   "pre-commit>=4.6,<5",
-  # Matches the pin in .github/workflows/release.yml.
-  "python-semantic-release==10.7.0",
-  # Patched floor for python-semantic-release's GitPython.
-  "GitPython>=3.1.59,<4",
   "pip-licenses>=5.5,<6",
   # Mutation testing (optional, slow: `mutmut run`).
   "mutmut>=3.8,<4",
   # Memory profiling for the per-PR memory diff (Linux wheels only;
   # tracemalloc is the fallback elsewhere).
   "memray>=1.20,<2; sys_platform == 'linux'",
+  # Release tooling, also installed on its own by the release job.
+  { include-group = "release" },
+]
+# The release workflow installs only this group, hash-checked from uv.lock:
+#   uv export --frozen --only-group release --no-emit-project
+release = [
+  "python-semantic-release==10.7.0",
+  # Patched floor for python-semantic-release's GitPython.
+  "GitPython>=3.1.59,<4",
+  # The release SBOM (`python -m cyclonedx_py`).
+  "cyclonedx-bom>=8.0,<9",
 ]
 
 [tool.uv]
@@ -198,7 +207,7 @@ version_toml = [
   "pyproject.toml:project.version",
   "pyproject.toml:tool.semantic_release.version",
 ]
-version = "1.9.5"
+version = "1.9.6"
 commit_parser = "conventional"
 tag_format = "v{version}"
 # Regenerate VERSION from the canonical pyproject.toml value on each release.

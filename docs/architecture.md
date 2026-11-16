@@ -72,9 +72,9 @@ flowchart TD
 1. `RefreshTask.start()` launches the `RefreshTask` thread (`_run`), plus a systemd watchdog heartbeat thread when `cysystemd` is available. In normal operation `inkypi.py`'s `__main__` block starts it; web-only mode skips it.
 2. The loop waits on a condition variable (`RefreshScheduler.wait_for_trigger`) until the active playlist's next refresh is due, a playlist window opens or closes, or a web thread queues a manual request or signals a config change.
 3. A queued display command runs as is, and a queued manual refresh brings its own action. Otherwise, unless blackout is active, the loop picks the next plugin instance (`_determine_next_plugin`) when the wake-up found a scheduled refresh due (`Trigger.due`): the active playlist's next eligible instance, skipping instances paused by the circuit breaker unless a probe is due.
-4. `RefreshExecutor.execute_with_policy` runs the plugin in a **child process** (`forkserver` where available) with a timeout and retries. The child (`_execute_refresh_attempt_worker`) rebuilds `Config` from a picklable `RefreshContext`, re-registers plugins, runs the refresh action (which calls the plugin's `generate_image()`), writes the PNG to a tempfile and sends back the path plus any plugin-state changes over a `multiprocessing` queue. Setting `INKYPI_PLUGIN_ISOLATION=none` runs plugins in a thread in the main process instead.
+4. `RefreshExecutor.execute_with_policy` runs the plugin in a **child process** (`forkserver` where available) with a timeout and retries. The child (`_execute_refresh_attempt_worker`) rebuilds `Config` from a picklable `RefreshContext` (which carries the hash of the `device.json` content the parent already validated, so the child skips validating identical bytes and never imports jsonschema), re-registers plugins, runs the refresh action (which calls the plugin's `generate_image()` and saves the plugin's cache PNG), and sends back that file's path (or a tempfile's, when there is no cache file) plus any plugin-state changes over a `multiprocessing` queue. Setting `INKYPI_PLUGIN_ISOLATION=none` runs plugins in a thread in the main process instead.
 5. Back on the refresh thread (`_perform_refresh`), the image is fitted to the panel size and hashed. The panel write is skipped only when the panel already shows this image with the current display settings (`DisplayManager.panel_shows`); an error card, a history redisplay or a settings change since the last refresh means it is written again. A plugin failure pushes a fallback error card (`utils/fallback_image.py`), except on the automatic retry of a paused plugin, which keeps the current frame.
-6. `DisplayManager.display_image()` saves the raw preview, applies orientation, resizing, enhancement and crisp colour snapping, saves the processed image and a history entry, signals any waiting manual request, then writes to the panel driver.
+6. `DisplayManager.display_image()` saves the raw preview (a byte copy of the plugin's cache PNG when the frame was not refitted, so the same pixels are not encoded twice), applies orientation, resizing, enhancement and crisp colour snapping, saves the processed image and a history entry, signals any waiting manual request, then writes to the panel driver.
 7. The loop updates plugin health (success/failure counts, circuit-breaker state, failure webhooks), publishes progress and SSE events, records benchmarks, and persists `refresh_info` to `device.json`.
 
 ## Config and storage
@@ -151,7 +151,7 @@ One directory per plugin (`<id>/<id>.py`, `plugin-info.json`, templates and asse
 
 ### `src/benchmarks/`
 
-`benchmark_storage.py` writes refresh and stage timings to the SQLite benchmarks database. Writing is best-effort and controlled by `enable_benchmarks` and `benchmark_sample_rate`.
+`benchmark_storage.py` writes refresh and stage timings to the SQLite benchmarks database. Writing is best-effort and controlled by `enable_benchmarks` and `benchmark_sample_rate`. The schema is checked once per database per process, and `prune_benchmarks` (run by the refresh loop's housekeeping) deletes rows older than 30 days.
 
 ### `src/schemas/`
 

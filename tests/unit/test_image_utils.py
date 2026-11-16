@@ -47,6 +47,7 @@ def test_get_image_typeerror_fallback(monkeypatch: pytest.MonkeyPatch) -> Any:
     assert isinstance(img, Image.Image)
 
 
+@pytest.mark.usefixtures("public_dns")
 def test_get_image_non200(monkeypatch: pytest.MonkeyPatch) -> Any:
     def fake_get(url: Any, timeout: Any = None, **kwargs: Any) -> Any:
         return FakeResp(b"", 404)
@@ -116,6 +117,7 @@ def test_compute_image_hash_deterministic() -> None:
     assert compute_image_hash(img1) == compute_image_hash(img2)
 
 
+@pytest.mark.usefixtures("public_dns")
 def test_get_image_exception_handling(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test get_image with exception handling."""
 
@@ -219,6 +221,7 @@ def test_get_image_returns_correct_size(monkeypatch: pytest.MonkeyPatch) -> None
     assert img.size == (5, 5)
 
 
+@pytest.mark.usefixtures("public_dns")
 def test_get_image_error_500(monkeypatch: pytest.MonkeyPatch) -> None:
     """get_image returns None for a 500 response."""
 
@@ -231,6 +234,7 @@ def test_get_image_error_500(monkeypatch: pytest.MonkeyPatch) -> None:
     assert img is None
 
 
+@pytest.mark.usefixtures("public_dns")
 def test_get_image_304_not_modified(monkeypatch: pytest.MonkeyPatch) -> None:
     """get_image handles a 304 response gracefully (returns None on decode failure)."""
 

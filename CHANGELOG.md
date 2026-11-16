@@ -2,6 +2,121 @@
 
 <!-- version list -->
 
+## v1.9.6 (2026-11-16)
+
+### Bug Fixes
+
+- **a11y**: Make high-contrast mode apply, and mark fire-and-forget calls
+  ([#873](https://github.com/jtn0123/InkyPi/pull/873),
+  [`a0d276c`](https://github.com/jtn0123/InkyPi/commit/a0d276cc9b6964ea9a9ad174d2b4f4dd1ecb2dfa))
+
+- **api-docs**: Let the API docs page load swagger ui under the app's csp
+  ([#869](https://github.com/jtn0123/InkyPi/pull/869),
+  [`76d5448`](https://github.com/jtn0123/InkyPi/commit/76d5448be253c756ca41c82a9f7223979dfc45a3))
+
+- **auth**: Pause logins for everyone after repeated wrong pins
+  ([#854](https://github.com/jtn0123/InkyPi/pull/854),
+  [`4ea79b2`](https://github.com/jtn0123/InkyPi/commit/4ea79b2f0d30116a51e0e4b855dc8e612f0f30fd))
+
+- **dev**: Re-read page templates in dev mode, and say what reloads
+  ([#859](https://github.com/jtn0123/InkyPi/pull/859),
+  [`ebd5c5e`](https://github.com/jtn0123/InkyPi/commit/ebd5c5e078410c8e01ca50b93c6cf5f06952c456))
+
+- **plugin-io**: Imported instance names follow the same rule as typed ones
+  ([#853](https://github.com/jtn0123/InkyPi/pull/853),
+  [`f173cd9`](https://github.com/jtn0123/InkyPi/commit/f173cd9931b832dcedb19d864e897cc7e0c5094e))
+
+- **settings**: Keep the logs when a refresh fails, and keep focus after Clear All
+  ([#852](https://github.com/jtn0123/InkyPi/pull/852),
+  [`0175931`](https://github.com/jtn0123/InkyPi/commit/01759313864c0de555e19a8b546afea944b9eed6))
+
+### Chores
+
+- **devbox**: Run the tests through scripts/test.sh
+  ([#863](https://github.com/jtn0123/InkyPi/pull/863),
+  [`8c2eb36`](https://github.com/jtn0123/InkyPi/commit/8c2eb36d5958928486a6904dbc2dd034791bfef9))
+
+- **hooks**: Run the browser smoke gate before a push, not every commit
+  ([#866](https://github.com/jtn0123/InkyPi/pull/866),
+  [`59b2bc0`](https://github.com/jtn0123/InkyPi/commit/59b2bc07c180284f89f1e5d1599b7084fa494e46))
+
+- **lint**: Run Biome in lint.sh, and lint the service worker
+  ([#864](https://github.com/jtn0123/InkyPi/pull/864),
+  [`b8c57f8`](https://github.com/jtn0123/InkyPi/commit/b8c57f82b92301a66d49a0a70294c501d5077896))
+
+- **vendor**: Check the committed htmx and Leaflet versions, and update htmx to 2.0.11
+  ([#870](https://github.com/jtn0123/InkyPi/pull/870),
+  [`bc49944`](https://github.com/jtn0123/InkyPi/commit/bc49944e762792644dabc49a769475ebc41d3c4d))
+
+### Continuous Integration
+
+- Check the committed main.css instead of rebuilding it
+  ([#862](https://github.com/jtn0123/InkyPi/pull/862),
+  [`5ba7e7d`](https://github.com/jtn0123/InkyPi/commit/5ba7e7d10256b8ed45c56e6343639b7520bfbb8b))
+
+- **deps**: Audit the installer's own requirement files and keep them in step with the lock
+  ([#871](https://github.com/jtn0123/InkyPi/pull/871),
+  [`ead7056`](https://github.com/jtn0123/InkyPi/commit/ead7056803aaf3c547a8fa921bbb9454b386f442))
+
+### Documentation
+
+- Add AGENTS.md with the house rules (CLAUDE.md links to it)
+  ([#865](https://github.com/jtn0123/InkyPi/pull/865),
+  [`094351e`](https://github.com/jtn0123/InkyPi/commit/094351ec0b3f8072fce03a6644952bcec65bdd38))
+
+- One dev setup recipe, in development.md ([#861](https://github.com/jtn0123/InkyPi/pull/861),
+  [`8a2729d`](https://github.com/jtn0123/InkyPi/commit/8a2729d0df337477635e3ecb22753950f9f38a53))
+
+- **testing**: Drop the out-of-date AI image quality section
+  ([#860](https://github.com/jtn0123/InkyPi/pull/860),
+  [`2bf86a3`](https://github.com/jtn0123/InkyPi/commit/2bf86a32a49213714aeffcd8b1c20b8310698a00))
+
+- **troubleshooting**: Stop the service before running inkypi by hand
+  ([#858](https://github.com/jtn0123/InkyPi/pull/858),
+  [`156f78b`](https://github.com/jtn0123/InkyPi/commit/156f78b2692709cf695ae33eadeee65f45d914be))
+
+- **webhooks**: Point to the real config file and say to stop the service
+  ([#857](https://github.com/jtn0123/InkyPi/pull/857),
+  [`26f5fbe`](https://github.com/jtn0123/InkyPi/commit/26f5fbeb801af662e31c73051b4d10ab828310cb))
+
+### Performance Improvements
+
+- **uploads**: Delete uploaded photos nothing refers to any more
+  ([#868](https://github.com/jtn0123/InkyPi/pull/868),
+  [`6c084ef`](https://github.com/jtn0123/InkyPi/commit/6c084ef3451f08b569056ed6c58becd83ca9dd15))
+
+- **uploads**: Store photos as sent and rotate them at render time
+  ([#867](https://github.com/jtn0123/InkyPi/pull/867),
+  [`0ed6366`](https://github.com/jtn0123/InkyPi/commit/0ed6366e3007856ea3ad0bf98ac784d0d01ade55))
+
+### Refactoring
+
+- **playlist**: Remove code for parts of the page that no longer exist
+  ([#851](https://github.com/jtn0123/InkyPi/pull/851),
+  [`32b81da`](https://github.com/jtn0123/InkyPi/commit/32b81da6550fe10c0d460b18a6e97a1143852ab3))
+
+- **ui**: Remove the old response dialog and two dead page handlers
+  ([#850](https://github.com/jtn0123/InkyPi/pull/850),
+  [`e134c45`](https://github.com/jtn0123/InkyPi/commit/e134c45cfc33781cb7c63578798fc61b3ad11052))
+
+### Testing
+
+- Block real network in tests; release jobs install from hashed pins
+  ([#875](https://github.com/jtn0123/InkyPi/pull/875),
+  [`ae42f0e`](https://github.com/jtn0123/InkyPi/commit/ae42f0e10ab0b1d5ddba11b323b03effd1df2ea4))
+
+- Check the refresh interval with the scheduler's own due rule
+  ([#856](https://github.com/jtn0123/InkyPi/pull/856),
+  [`425f022`](https://github.com/jtn0123/InkyPi/commit/425f02243ab773c1b5ee012b059538e93c8c248c))
+
+- Stop two browser tests from skipping halfway ([#855](https://github.com/jtn0123/InkyPi/pull/855),
+  [`8e4ba94`](https://github.com/jtn0123/InkyPi/commit/8e4ba94b74430c3f1697b524622628e4c71c0372))
+
+- **suite**: Run the tests in random order nightly, and stop new source-text tests
+  ([#872](https://github.com/jtn0123/InkyPi/pull/872),
+  [`d923b9a`](https://github.com/jtn0123/InkyPi/commit/d923b9a3f506678ce1f110bf34819f73cfe4c7dc))
+
+
 ## v1.9.5 (2026-11-15)
 
 ### Bug Fixes

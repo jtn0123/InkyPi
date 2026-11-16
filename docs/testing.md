@@ -80,6 +80,21 @@ Notes:
   - Builds a minimal Flask app mirroring production blueprints and config.
   - Exposes a `test_client` for endpoint tests.
 
+- no_outside_network (autouse):
+  - A test may only connect to this machine (loopback and Unix sockets). Any
+    other connect or DNS lookup raises `NetworkBlocked`, an `OSError`, so the
+    code under test behaves as if it were offline. The test then fails even if
+    that code swallowed the error. Chromium runs in its own process and isn't
+    covered.
+  - Code that checks a URL resolves to a public address (image downloads, RSS,
+    Calendar, Screenshot) needs `@pytest.mark.usefixtures("public_dns")`. That
+    fixture answers every lookup with a public address without asking DNS.
+    Stub the HTTP call as well.
+  - Anything that builds the startup screen needs `lan_address`, which fixes
+    the IP shown on it.
+  - `@pytest.mark.allow_network` turns the guard off for one test. Nothing in
+    the suite uses it.
+
 ---
 
 ### Test Coverage Focus
@@ -173,6 +188,22 @@ Notes:
 ### OS drift nightly (JTN-535)
 
 `.github/workflows/os-drift-nightly.yml` runs daily at 08:00 UTC against the unpinned Trixie base — the only supported installer target, since InkyPi requires Python 3.13 (`python-next.yml` runs the tests weekly on Python 3.14 as an early warning; it gates nothing). Bookworm (Python 3.11) and Bullseye (Python 3.9) are no longer probed. Package discovery runs natively on ARM64 with the same simulation-only Pi OS repository overlay as the installer simulator; resolver checks verify hashes and the install simulation still runs with a 512 MB cap. Container commands select bash explicitly. Failures publish a job summary and artifacts; repositories with Issues enabled also receive the existing issue notification. The nightly has no PR trigger. Dispatch the feature branch to validate changes, and keep package errors distinct from harness failures. These are simulation checks, not physical display/GPIO evidence.
+
+---
+
+### Random test order
+
+`pytest-randomly` is installed, but it is off by default (`pytest.ini` has `-p no:randomly`). A test that only passes in one order hides state leaks, so run the suite shuffled when you change shared state. Turn it on with `-p randomly`:
+
+```bash
+PYTHONPATH=src:. SKIP_BROWSER=1 pytest -p randomly
+```
+
+The header prints `Using --randomly-seed=N`. To replay a failing order, pass the same seed: `pytest -p randomly --randomly-seed=N <file>`. `.github/workflows/random-order-nightly.yml` runs the suite shuffled every night, without browsers.
+
+### tests/static ratchet
+
+`tests/static/` holds tests that grep JS and CSS source text instead of driving the page. They miss real behaviour, so new ones are not allowed. `tests/unit/test_static_text_tests_ratchet.py` counts the `test_*.py` files there and fails if the count goes up. Write a Playwright test in `tests/integration/` instead. The test also fails if the count goes down, so lower `CEILING` in that file to the new count.
 
 ---
 

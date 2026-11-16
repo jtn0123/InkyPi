@@ -11,8 +11,6 @@ from dataclasses import dataclass, field
 from html import escape
 from typing import Any
 
-import jsonschema
-
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
@@ -138,6 +136,11 @@ def validate_json_schema(data: dict[str, Any], schema: dict[str, Any]) -> list[s
         A list of human-readable error strings.  An empty list means
         validation passed.
     """
+    # Imported on use: render workers import this module (through the
+    # refresh_task package) but never validate a form, and jsonschema costs a
+    # Pi Zero ~8 MB and up to 0.7 s to import.
+    import jsonschema
+
     errors: list[str] = []
     try:
         validator = jsonschema.Draft202012Validator(schema)

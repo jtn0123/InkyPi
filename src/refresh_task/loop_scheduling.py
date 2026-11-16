@@ -123,7 +123,7 @@ class SchedulingMixin:
     _CLEANUP_INTERVAL_TICKS = 10
 
     def _maybe_run_history_cleanup(self) -> None:
-        """Every N ticks, trim history and delete unused uploads.
+        """Every N ticks, trim history and delete unused uploads and old benchmarks.
 
         Non-blocking; errors are logged only.
         """
@@ -132,6 +132,10 @@ class SchedulingMixin:
             cleanup_interval_ticks=self._CLEANUP_INTERVAL_TICKS,
         )
         self.housekeeper.maybe_prune_uploads(
+            tick_count=self._tick_count,
+            cleanup_interval_ticks=self._CLEANUP_INTERVAL_TICKS,
+        )
+        self.housekeeper.maybe_prune_benchmarks(
             tick_count=self._tick_count,
             cleanup_interval_ticks=self._CLEANUP_INTERVAL_TICKS,
         )

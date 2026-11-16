@@ -441,8 +441,9 @@
       if (instTimeEl) {
         instTimeEl.textContent = formatPreviewTimestamp(config.lastRefresh);
       }
-      refreshPreviewImage();
-      refreshInstancePreview();
+      // Both catch their own fetch failures and fall back to the empty state.
+      void refreshPreviewImage();
+      void refreshInstancePreview();
     }
 
     function initPreviewInteractions() {

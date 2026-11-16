@@ -19,6 +19,8 @@ Add these to `src/config/device.json` as needed. Defaults are safe in production
 - Table `stage_events` per stage within a refresh:
   - `refresh_id`, `ts`, `stage`, `duration_ms`, `extra_json`
 
+Rows older than 30 days (`BENCHMARK_RETENTION_DAYS` in `src/benchmarks/benchmark_storage.py`) are deleted every 10 refreshes, with the history cleanup, so the database stays at roughly a month of rows. The diagnostics page shows at most the last 7 days.
+
 ### Where instrumentation lives
 
 - `src/refresh_task/refresh_cycle.py`:

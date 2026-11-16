@@ -110,6 +110,7 @@ def test_history_redisplay_goes_through_refresh_task(
     assert len(shown) == 1 and shown[0].endswith(fname)
 
 
+@pytest.mark.usefixtures("lan_address")
 def test_startup_image_goes_through_refresh_task(
     flask_app: Flask, monkeypatch: pytest.MonkeyPatch
 ) -> None:

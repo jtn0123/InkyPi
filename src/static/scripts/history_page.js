@@ -144,7 +144,7 @@
           showResponseModal("failure", `Error! ${result.error}`);
         } else {
           showResponseModal("success", `Success! ${result.message}`);
-          updateStorage();
+          void updateStorage(); // reports its own failures
         }
       } catch (e) {
         console.error(e);
@@ -371,7 +371,7 @@
           const action = actionButton.dataset.historyAction;
           const filename = actionButton.dataset.filename;
           if (action === "display" && filename) {
-            redisplay(filename, actionButton);
+            void redisplay(filename, actionButton); // reports its own failures
           } else if (action === "delete" && filename) {
             openDeleteModal(filename, actionButton);
           }
@@ -396,7 +396,7 @@
 
     function init() {
       showStoredMessage();
-      updateStorage();
+      void updateStorage(); // reports its own failures
       bindImages();
       bindThumbLightbox();
       bindLightboxActions();

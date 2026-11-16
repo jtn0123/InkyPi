@@ -9,6 +9,8 @@ exercises the adoption pattern required by docs/http_performance.md.
 from typing import Any
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 
 def _make_fake_session(image_bytes: bytes) -> MagicMock:
     """Build a MagicMock session whose .get() returns plausible Wikimedia responses."""
@@ -46,6 +48,7 @@ def _make_fake_session(image_bytes: bytes) -> MagicMock:
     return session
 
 
+@pytest.mark.usefixtures("public_dns")
 def test_wpotd_calls_get_http_session(device_config_dev: Any) -> None:
     """wpotd.generate_image() must go through get_http_session(), not bare requests."""
     from io import BytesIO
@@ -58,9 +61,14 @@ def test_wpotd_calls_get_http_session(device_config_dev: Any) -> None:
 
     fake_session = _make_fake_session(image_bytes)
 
-    with patch(
-        "plugins.wpotd.wpotd.get_http_session", return_value=fake_session
-    ) as mock_get_session:
+    # The image itself comes through the image loader's session; stub it too
+    # so the download never leaves the machine.
+    with (
+        patch(
+            "plugins.wpotd.wpotd.get_http_session", return_value=fake_session
+        ) as mock_get_session,
+        patch("utils.image_loader.get_http_session", return_value=fake_session),
+    ):
         from plugins.wpotd.wpotd import Wpotd
 
         plugin = Wpotd({"id": "wpotd"})

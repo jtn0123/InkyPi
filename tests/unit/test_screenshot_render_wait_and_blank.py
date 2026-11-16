@@ -88,6 +88,7 @@ class TestBlankDetection:
         assert Screenshot._is_blank(image) is False
 
 
+@pytest.mark.usefixtures("public_dns")
 class TestSkipIfBlankBehaviour:
     def _generate(
         self, monkeypatch: pytest.MonkeyPatch, *, captured: Any, settings: Any

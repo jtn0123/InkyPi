@@ -121,10 +121,20 @@ class Config:
         self._config_lock = threading.RLock()
         self._atomic_depth = 0
 
-    def __init__(self) -> None:
+    def __init__(self, *, trusted_config_digest: str | None = None) -> None:
+        """Load the device config and plugin list.
+
+        *trusted_config_digest* is :meth:`validated_config_digest` from a
+        ``Config`` that already validated the file (a render worker gets the
+        parent's). When the file's content still hashes to it, the schema
+        check is skipped: validation depends only on the content, and that
+        exact content already passed.
+        """
         self._config_lock = threading.RLock()
         self._atomic_depth = 0
         self._last_written_hash: str | None = None
+        self._trusted_config_digest = trusted_config_digest
+        self._validated_config_digest: str | None = None
         # mtime-based read cache: skip JSON parse + schema validation when the
         # file has not changed.  Stored as (mtime_ns: int, data: dict).
         self._config_cache_mtime: int | None = None
@@ -316,15 +326,21 @@ class Config:
 
             logger.debug("Reading device config from %s", self.config_file)
             with open(self.config_file) as f:
-                config = cast(dict[str, Any], json.load(f))
+                text = f.read()
+            config = cast(dict[str, Any], json.loads(text))
+            # Same hash as ``_write_config`` records for what it writes.
+            digest = hashlib.sha256(text.encode()).hexdigest()
 
             # JTN-777: a name saved before the length cap existed would fail
             # the schema's maxLength, so cut it first and keep the device
             # starting. The next config write persists the shorter name.
             truncate_device_name(config)
 
-            # Validate against JSON Schema — raises ConfigValidationError on failure
-            validate_device_config(config)
+            # Validate against JSON Schema — raises ConfigValidationError on
+            # failure — unless this exact content was validated already.
+            if digest != getattr(self, "_trusted_config_digest", None):
+                validate_device_config(config)
+            self._validated_config_digest = digest
 
             # Log a sanitized summary instead of full config to avoid leaking secrets
             try:
@@ -463,6 +479,8 @@ class Config:
                     os.fsync(outfile.fileno())
                 os.replace(tmp_path, self.config_file)
                 self._last_written_hash = content_hash
+                # Validated above, so a worker reading it back can skip that.
+                self._validated_config_digest = content_hash
                 # Refresh the read cache so the next read_config() call sees the
                 # newly written content without re-parsing.  We stat() after the
                 # replace so the recorded mtime is the actual on-disk mtime.
@@ -480,6 +498,14 @@ class Config:
                         os.unlink(tmp_path)
                 except OSError:
                     pass
+
+    def validated_config_digest(self) -> str | None:
+        """Hash of the config file content this instance last validated.
+
+        Covers the file as last read or written; ``None`` before either. A
+        render worker passes it back as ``trusted_config_digest``.
+        """
+        return getattr(self, "_validated_config_digest", None)
 
     def get_config(self, key: str | None = None, default: Any | None = None) -> Any:
         """Gets the value of a specific configuration key or returns the entire config if none provided.

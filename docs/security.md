@@ -205,6 +205,10 @@ the locked requirement files:
 source scripts/venv.sh
 python -m pip_audit -r install/requirements.txt --format=json --output runtime-audit.json
 python -m pip_audit -r install/requirements-dev.txt --format=json --output dev-audit.json
+# The installer's own files (pip, uv, GPIO libraries); fully hashed, so no install
+for name in bootstrap uv ws; do
+  python -m pip_audit --disable-pip -r "install/${name}-requirements.txt"
+done
 ```
 
 Generate a CycloneDX inventory separately:

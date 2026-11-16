@@ -28,6 +28,8 @@ from utils.time_utils import now_device_tz
 
 logger = logging.getLogger(__name__)
 
+_PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
+
 # A processed frame with at most this many colours is stored as a palette PNG.
 PALETTE_PNG_MAX_COLOURS = 256
 
@@ -284,6 +286,31 @@ class DisplayManager:
             image, path, format="PNG", compress_level=FAST_PNG_COMPRESS_LEVEL
         )
 
+    def _save_current(self, image: Image.Image, source_png: str | None) -> None:
+        """Write the unprocessed preview, copying *source_png* when given.
+
+        *source_png* is a PNG file that already holds exactly *image* (the
+        plugin's cache file), so copying its bytes gives the same picture
+        without a second PNG encode. If the copy fails the image is encoded
+        as before.
+        """
+        path = self.device_config.current_image_file
+        if source_png is not None:
+            try:
+                with open(source_png, "rb") as fh:
+                    data = fh.read()
+                if not data.startswith(_PNG_SIGNATURE):
+                    raise ValueError("not a PNG file")
+                write_bytes_atomic(data, path)
+                return
+            except (OSError, ValueError) as exc:
+                logger.warning(
+                    "Could not copy %s to the current image (%s); encoding it",
+                    source_png,
+                    exc,
+                )
+        self._save_preview(image, path)
+
     def _maybe_crisp(
         self, image: Image.Image, image_settings: list[object]
     ) -> Image.Image:
@@ -365,6 +392,7 @@ class DisplayManager:
         history_meta: Mapping[str, object] | None = None,
         on_image_saved: Callable[[dict[str, int]], object] | None = None,
         image_hash: str | None = None,
+        source_png: str | None = None,
     ) -> dict[str, int | str]:
         """
         Delegates image rendering to the appropriate display instance.
@@ -383,6 +411,10 @@ class DisplayManager:
             image_hash (str, optional): ``compute_image_hash(image)`` when the
                 caller already has it (the refresh task hashes every render for
                 its cache check), so the image is not hashed twice per refresh.
+            source_png (str, optional): A PNG file holding exactly *image*
+                (the plugin's cache file). It is copied to the current-image
+                preview instead of encoding *image* again; pass it only when
+                the pixels are unchanged since that file was written.
 
         Raises:
             ValueError: If no valid display instance is found.
@@ -415,7 +447,7 @@ class DisplayManager:
             # Save the raw image
             logger.info(f"Saving image to {self.device_config.current_image_file}")
             try:
-                self._save_preview(image, self.device_config.current_image_file)
+                self._save_current(image, source_png)
             except (OSError, ValueError, RuntimeError):
                 logger.exception("Failed to save current image preview")
 

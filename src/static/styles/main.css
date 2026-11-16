@@ -8476,15 +8476,18 @@ body[data-page="api-keys"] .status-popover {
     }
 }
 
-/* High contrast mode support */
-@media (prefers-contrast: high) {
+/* High contrast mode support ("Increase contrast" in the OS settings).
+   "more" is the standard value; browsers ignore a block written for "high". */
+@media (prefers-contrast: more) {
     :root {
         --surface-border: #000;
         --text: #000;
         --accent: #0066cc;
     }
 
-    [data-theme="dark"] {
+    /* The paper and minimal looks set their own dark colours with a
+       two-part selector; :root[...] has the same weight and loads later. */
+    :root[data-theme="dark"] {
         --surface-border: #fff;
         --text: #fff;
         --accent: #4d9fff;

@@ -3,10 +3,12 @@
 from io import BytesIO
 from unittest.mock import patch
 
+import pytest
 from PIL import Image
 from werkzeug.datastructures import FileStorage, ImmutableMultiDict
 
 
+@pytest.mark.usefixtures("lan_address")
 def test_generate_startup_image_default() -> None:
     """Test generate_startup_image creates image with default dimensions."""
     from utils.app_utils import generate_startup_image
@@ -18,6 +20,7 @@ def test_generate_startup_image_default() -> None:
     assert img.mode == "RGBA"
 
 
+@pytest.mark.usefixtures("lan_address")
 def test_generate_startup_image_custom_dimensions() -> None:
     """Test generate_startup_image with custom dimensions."""
     from utils.app_utils import generate_startup_image
@@ -27,6 +30,7 @@ def test_generate_startup_image_custom_dimensions() -> None:
     assert img.size == (400, 300)
 
 
+@pytest.mark.usefixtures("lan_address")
 def test_generate_startup_image_font_fallback() -> None:
     """Test generate_startup_image falls back to default font if custom font fails."""
     from utils.app_utils import generate_startup_image

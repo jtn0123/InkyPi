@@ -11,6 +11,8 @@ enums, ranges and limits through :func:`field_rules` instead of keeping its
 own copies, so the form, the saver and the loader cannot disagree.
 """
 
+from __future__ import annotations
+
 import json
 import logging
 import os
@@ -18,9 +20,10 @@ import re
 from collections.abc import Mapping
 from copy import deepcopy
 from functools import lru_cache
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
-import jsonschema
+if TYPE_CHECKING:
+    import jsonschema
 
 logger = logging.getLogger(__name__)
 
@@ -145,6 +148,11 @@ def validate_device_config(config_dict: dict[str, Any]) -> None:
             "Device config schema not found at %s; skipping validation", schema_path
         )
         return
+
+    # Imported here, not at module level: it costs a Pi Zero ~8 MB and up to
+    # 0.7 s, and render workers, which import this module through Config,
+    # normally skip validation (see Config's trusted_config_digest).
+    import jsonschema
 
     try:
         schema = _load_schema(schema_path)

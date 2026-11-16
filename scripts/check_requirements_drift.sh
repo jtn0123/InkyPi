@@ -147,6 +147,14 @@ for lock_name in bootstrap uv ws; do
     fi
 done
 
+echo "==> Checking installer requirement files agree with uv.lock ..."
+# Those files aren't exported from the lock, so a Dependabot bump never
+# touches them; a package pinned in both must match the lock's version and
+# hashes, and one pinned in two of them must match itself.
+if ! python3 scripts/check_install_pins.py; then
+    DRIFT_FOUND=1
+fi
+
 if [ "${DRIFT_FOUND}" -ne 0 ]; then
     echo "Lockfile drift detected. See diff output above."
     exit 1
