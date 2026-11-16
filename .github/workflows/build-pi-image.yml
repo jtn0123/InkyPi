@@ -16,30 +16,27 @@ name: Build pre-installed Pi image
 #   6. Boot-verify the shrunken image in qemu-system-aarch64 until "login:"
 #      appears on the serial console.
 #   7. Only if boot verification succeeds, attach the image + sha256 to the
-#      release (same pattern as .github/workflows/build-wheelhouse.yml).
+#      draft release (same pattern as .github/workflows/build-wheelhouse.yml).
 #
 # Related: JTN-604 (wheelhouse), JTN-529 (install path hardening epic).
 # Does NOT modify install.sh — option 2 (source install) stays self-contained.
 
 on:
-  # JTN-745 FIX: semantic-release publishes via GITHUB_TOKEN, so the standalone
-  # `release` trigger does not fire for automated releases (GitHub's anti-loop
-  # rule blocks GITHUB_TOKEN-originated events from starting new workflows).
-  # Mirroring build-wheelhouse.yml, this workflow is now reusable via
-  # `workflow_call`, and release.yml invokes it directly after publish so the
-  # parent Release workflow goes red if Pi image build fails. We keep the
-  # release/manual triggers for maintainers who publish or rebuild outside the
-  # default semantic-release path.
+  # release.yml calls this workflow (JTN-745) while the release is still a
+  # draft, and publishes the release only after this succeeds, so a failed
+  # build fails the Release run and leaves the release unpublished. The image
+  # is attached only to a draft: once published, an immutable release's files
+  # can't change. That is also why there is no `release: published` trigger.
   workflow_call:
     inputs:
       tag:
         description: Release tag to build an image for (e.g. v0.42.3)
         required: true
         type: string
-  release:
-    types: [published]
-  # Manual trigger so maintainers can rebuild against an existing tag
-  # without cutting a new release.
+  # Manual recheck: rebuild and boot-verify an image for an existing tag. It
+  # is attached only if that release is still a draft (for example, one whose
+  # Release run failed); otherwise it stays in this run's artifacts. With
+  # reuse_run_id the run only boot-verifies and never attaches.
   workflow_dispatch:
     inputs:
       tag:
@@ -57,7 +54,7 @@ permissions:
   actions: read
 
 concurrency:
-  group: build-pi-image-${{ github.event.release.tag_name || inputs.tag || github.run_id }}
+  group: build-pi-image-${{ inputs.tag || github.run_id }}
   cancel-in-progress: false
 
 # =============================================================================
@@ -98,7 +95,7 @@ jobs:
       - name: Resolve release tag
         id: tag
         env:
-          RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
+          RELEASE_TAG: ${{ inputs.tag }}
         run: |
           set -euo pipefail
           TAG="$RELEASE_TAG"
@@ -347,7 +344,8 @@ jobs:
       - name: Upload unverified image as workflow artifact
         # Always uploaded (even on workflow_dispatch) so maintainers can
         # inspect it before the boot-verification job decides whether to
-        # attach it to the release.
+        # attach it to the release. A recheck for a published release keeps
+        # the image here only.
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: inkypi-pi-image-${{ steps.tag.outputs.version }}
@@ -357,6 +355,8 @@ jobs:
             build/inkypi-${{ steps.tag.outputs.version }}-os-list.json
           if-no-files-found: error
           retention-days: 7
+          # A re-run of a failed job uploads it again.
+          overwrite: true
 
   verify-boot:
     name: Boot-verify image in qemu
@@ -443,11 +443,15 @@ jobs:
           path: build/qemu-boot.log
           if-no-files-found: warn
           retention-days: 7
+          # A re-run of a failed job uploads it again.
+          overwrite: true
 
   attach-release:
-    name: Attach image to GitHub release
+    name: Attach image to the draft release
+    # Needs a boot pass, and an image built in this run: a reuse_run_id run
+    # skips build-image, so it never attaches.
     needs: [build-image, verify-boot]
-    if: github.event_name != 'workflow_dispatch' && needs.verify-boot.outputs.verified == 'true'
+    if: needs.verify-boot.outputs.verified == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -457,12 +461,29 @@ jobs:
           name: inkypi-pi-image-${{ needs.build-image.outputs.version }}
           path: build
 
-      - name: Attach to release
-        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
-        with:
-          tag_name: ${{ needs.build-image.outputs.tag }}
-          files: |
-            build/inkypi-*-pi-zero-2-w.img.xz
-            build/inkypi-*-pi-zero-2-w.img.xz.sha256
-            build/inkypi-*-os-list.json
-          fail_on_unmatched_files: true
+      # gh, not softprops/action-gh-release: that action publishes a draft
+      # once it has uploaded to it, unless told `draft: true`. --clobber
+      # replaces files of the same name, so a re-run is safe.
+      - name: Attach to the draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          EVENT: ${{ github.event_name }}
+          TAG: ${{ needs.build-image.outputs.tag }}
+          VERSION: ${{ needs.build-image.outputs.version }}
+          IMAGE: ${{ needs.build-image.outputs.image_name }}
+        run: |
+          set -euo pipefail
+          is_draft=$(gh release view "$TAG" --repo "$REPO" --json isDraft --jq .isDraft) \
+            || is_draft="no release"
+          if [ "$is_draft" = "true" ]; then
+            gh release upload "$TAG" --repo "$REPO" --clobber \
+              "build/${IMAGE}" "build/${IMAGE}.sha256" \
+              "build/inkypi-${VERSION}-os-list.json"
+            echo "Attached ${IMAGE} to draft release ${TAG}"
+          elif [ "$EVENT" = "workflow_dispatch" ]; then
+            echo "::notice title=Image not attached::${TAG} is not a draft release, so the image stays in this run's artifacts."
+          else
+            echo "::error title=Image not attached::${TAG} is not a draft release; a published release can't take new files."
+            exit 1
+          fi

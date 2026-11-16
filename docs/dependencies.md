@@ -39,10 +39,10 @@ uv export --format requirements.txt --group dev --no-emit-project \
 The release tools (Python Semantic Release, GitPython's patched floor and
 cyclonedx-bom) are a separate `release` group, which `dev` includes. The
 release workflow installs only that group, exported from `uv.lock` with hashes,
-because that job can push tags and publish releases. In the same way, memray is
-in a `memory-diff` group: the per-PR memory report installs the runtime
-requirements and that group only, so it measures what the Pi installs rather
-than the dev environment.
+because its jobs push the release commit and tag and upload release files. In
+the same way, memray is in a `memory-diff` group: the per-PR memory report
+installs the runtime requirements and that group only, so it measures what the
+Pi installs rather than the dev environment.
 
 The lock must satisfy `required-environments`, which includes the 32-bit ARM
 Pis. A dev tool with no build for them (Playwright) carries a
