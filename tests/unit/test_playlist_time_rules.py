@@ -244,3 +244,35 @@ def test_the_update_gate_passes_a_config_the_app_would_load(tmp_path: Path) -> N
 
     # The gate checks a copy; what it returns is the file as read.
     assert len(data["playlist_config"]["playlists"]) == 2
+
+
+def test_the_playlists_page_lists_set_aside_playlists(client: Any) -> None:
+    device_config = client.application.config["DEVICE_CONFIG"]
+    device_config.config["skipped_playlists"] = [
+        {
+            "reason": "start time '25:00' is not a time from 00:00 to 24:00",
+            "playlist": _playlist("Evening <b>", "25:00", "23:00"),
+        },
+        {"reason": "", "playlist": {"start_time": "07:00"}},
+        "not an entry",
+    ]
+
+    html = client.get("/playlist").get_data(as_text=True)
+
+    assert 'id="setAsidePlaylistsBanner"' in html
+    assert "2 playlists were set aside" in html
+    assert (
+        "<strong>Evening &lt;b&gt;</strong>: start time &#39;25:00&#39; is not a "
+        "time from 00:00 to 24:00"
+    ) in html
+    assert "<strong>#2</strong>: it breaks the playlist rules" in html
+    # Set aside means not shown as a playlist card.
+    assert 'data-playlist-name="Evening' not in html
+
+
+def test_the_playlists_page_has_no_banner_when_nothing_is_set_aside(
+    client: Any,
+) -> None:
+    html = client.get("/playlist").get_data(as_text=True)
+
+    assert "setAsidePlaylistsBanner" not in html

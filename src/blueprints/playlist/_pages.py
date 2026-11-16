@@ -10,6 +10,7 @@ from flask.typing import ResponseReturnValue
 from blueprints._deps import get_device_config, get_refresh_task
 from refresh_task import schedule
 from refresh_task.health import PluginHealthTracker
+from utils.config_schema import SKIPPED_PLAYLISTS_KEY
 from utils.time_utils import now_device_tz
 
 from ._common import playlist_bp
@@ -24,6 +25,35 @@ from ._schedule import (
 @playlist_bp.route("/playlists", methods=["GET"])
 def playlists_redirect() -> ResponseReturnValue:
     return redirect(url_for("playlist.playlists"))
+
+
+def _set_aside_playlists(skipped: object) -> list[dict[str, str]]:
+    """Name and reason for each playlist the config loader set aside.
+
+    The loader moves a playlist that breaks the playlist rules out of
+    ``playlist_config`` into ``skipped_playlists`` so it can't stop the device
+    starting. The page lists them, so the owner learns why one disappeared.
+    """
+    if not isinstance(skipped, list):
+        return []
+    rows: list[dict[str, str]] = []
+    for index, entry in enumerate(skipped):
+        if not isinstance(entry, dict):
+            continue
+        playlist = entry.get("playlist")
+        name = playlist.get("name") if isinstance(playlist, dict) else None
+        reason = entry.get("reason")
+        rows.append(
+            {
+                "name": name if isinstance(name, str) and name else f"#{index + 1}",
+                "reason": (
+                    reason
+                    if isinstance(reason, str) and reason
+                    else "it breaks the playlist rules"
+                ),
+            }
+        )
+    return rows
 
 
 @playlist_bp.route("/playlist", methods=["GET"])
@@ -123,6 +153,9 @@ def playlists() -> ResponseReturnValue:
         device_cycle_minutes=device_cycle_minutes,
         playlist_timing=playlist_timing,
         rotation_eta=rotation_eta,
+        set_aside_playlists=_set_aside_playlists(
+            device_config.get_config(SKIPPED_PLAYLISTS_KEY)
+        ),
         active_nav="playlists",
     )
 
