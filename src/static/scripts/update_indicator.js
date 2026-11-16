@@ -3,8 +3,8 @@
 // Polls /api/version once per page load. When an update is available the
 // sidebar download button unhides; clicking it opens the shared confirm
 // modal rendered in base.html. Confirming POSTs /settings/update, shows a
-// toast, and forwards the user to /settings so they can watch the log
-// stream take over.
+// toast, and forwards the user to /settings, which follows the update to
+// the end.
 (function () {
   "use strict";
 
@@ -105,9 +105,12 @@
         data.message || "Update started. Streaming progress on Settings → Updates."
       );
       closeModal(modal);
-      // Redirect to settings so the user can watch the log stream take
-      // over. On the settings page, actions.js already polls update
-      // status and will show the spinner / completion banner.
+      // Settings follows the run to the end (settings/update_tracker.js):
+      // on that page this event starts the tracker; elsewhere, go there and
+      // the page picks the run up from /settings/update_status.
+      document.dispatchEvent(
+        new CustomEvent("inkypi:update-started", { detail: { kind: "update" } })
+      );
       if (!location.pathname.startsWith("/settings")) {
         setTimeout(() => {
           location.href = "/settings#section-software-update";
