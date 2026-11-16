@@ -106,9 +106,17 @@ def breakpoint_violations_in(css: str, tokens: Iterable[int]) -> list[tuple[int,
     return found
 
 
-def breakpoint_violations(imports_css: Path = IMPORTS_CSS) -> list[str]:
-    """``partial:line (feature)`` for each width query that is not a token."""
-    tokens = breakpoint_tokens().values()
+def breakpoint_violations(
+    imports_css: Path = IMPORTS_CSS, tokens_css: Path = TOKENS_CSS
+) -> list[str]:
+    """``partial:line (feature)`` for each width query that is not a token.
+
+    Empty when there is no token list to check against, as in a stripped-down
+    tree: the install build runs this script and must not fail on a check.
+    """
+    if not tokens_css.is_file():
+        return []
+    tokens = breakpoint_tokens(tokens_css).values()
     violations: list[str] = []
     for rel in IMPORT_RE.findall(imports_css.read_text(encoding="utf-8")):
         partial = (imports_css.parent / rel).resolve()
@@ -141,9 +149,15 @@ def main() -> None:
 
     bundled = resolve_imports(IMPORTS_CSS)
 
-    # Warn, don't fail: the dev watcher rebuilds on every save, and
-    # tests/unit/test_css_breakpoints.py is the gate.
-    for violation in breakpoint_violations():
+    # Warn, don't fail: the dev watcher rebuilds on every save, the install
+    # and update builds run this too, and tests/unit/test_css_breakpoints.py
+    # is the gate.
+    try:
+        violations = breakpoint_violations()
+    except (OSError, UnicodeDecodeError) as exc:
+        print(f"WARNING: breakpoint check skipped: {exc}", file=sys.stderr)
+        violations = []
+    for violation in violations:
         print(
             f"WARNING: {violation} is not a breakpoint token "
             f"(see the --bp-* list in {TOKENS_CSS.name})",

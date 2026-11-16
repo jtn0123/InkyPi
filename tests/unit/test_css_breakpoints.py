@@ -59,3 +59,17 @@ def test_checker_accepts_tokens_and_reports_one_offs() -> None:
         (10, "(width <= 640px)"),
         (11, "(max-width: 40em)"),
     ]
+
+
+def test_no_token_list_means_nothing_to_check(tmp_path: Path) -> None:
+    # The install build bundles CSS with this script; a tree without
+    # _tokens.css must still build (tests/unit/test_install_asset_build.py).
+    imports = tmp_path / "_imports.css"
+    partial = tmp_path / "partials" / "_a.css"
+    partial.parent.mkdir()
+    partial.write_text("@media (max-width: 123px) { a { color: red; } }")
+    imports.write_text('@import "partials/_a.css";')
+
+    found = _build_css().breakpoint_violations(imports, tmp_path / "_tokens.css")
+
+    assert found == []
