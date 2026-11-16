@@ -2,6 +2,39 @@
 
 <!-- version list -->
 
+## v1.9.8 (2026-11-16)
+
+### Bug Fixes
+
+- **release**: Publish each release only after all its files are attached
+  ([#881](https://github.com/jtn0123/InkyPi/pull/881),
+  [`bde3c2b`](https://github.com/jtn0123/InkyPi/commit/bde3c2b346e99087280c9e090c5ec0f05cd5b74c))
+
+### Continuous Integration
+
+- **perf**: Time benchmarks against the base on one runner, measure memory with runtime deps, and
+  reconcile the roadmap ([#879](https://github.com/jtn0123/InkyPi/pull/879),
+  [`4c00272`](https://github.com/jtn0123/InkyPi/commit/4c00272c8cbf0ca1624ad58d70d60c93da2e96bf))
+
+- **security**: Fail a pull request on a new advisory only when it changes dependencies
+  ([#882](https://github.com/jtn0123/InkyPi/pull/882),
+  [`78c797a`](https://github.com/jtn0123/InkyPi/commit/78c797ad85d09e9955cab6433fd7729557073444))
+
+### Refactoring
+
+- **settings**: Take form rules from the config schema and move route logic into services
+  ([#877](https://github.com/jtn0123/InkyPi/pull/877),
+  [`0ddae5c`](https://github.com/jtn0123/InkyPi/commit/0ddae5ce74c5aff93132a65293abffd56ae83d8a))
+
+- **status-badge**: Mark the badge's unawaited polls as intentional
+  ([#880](https://github.com/jtn0123/InkyPi/pull/880),
+  [`8ee0f10`](https://github.com/jtn0123/InkyPi/commit/8ee0f105682a4dbf22c057dec60fe30deaa6f50f))
+
+- **web**: Read JSON replies through one shared fetchJson helper
+  ([#878](https://github.com/jtn0123/InkyPi/pull/878),
+  [`317f5fe`](https://github.com/jtn0123/InkyPi/commit/317f5fe71311a9932f5a11ae40c7c6d19de75a49))
+
+
 ## v1.9.7 (2026-11-16)
 
 ### Chores
