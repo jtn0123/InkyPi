@@ -59,7 +59,7 @@ in the Waveshare `epdconfig.py` it showed a `RuntimeError` that was built but
 never raised. When a package gets to zero, add it to that section;
 `tests/unit/test_mypy_config.py` checks the list never shrinks.
 
-## Current CI behavior: clean `src/`, ratcheted `tests/`
+## Current CI behavior: clean `src/` and `scripts/`, ratcheted `tests/`
 
 `scripts/lint.sh` runs mypy as **three separate invocations**:
 
@@ -68,7 +68,8 @@ never raised. When a package gets to zero, add it to that section;
 2. `mypy tests/` — test suite, compared against the checked-in baseline in
    `scripts/mypy_tests_baseline.txt`
 3. `mypy scripts/` — the developer, CI and device tools, compared against the
-   checked-in baseline in `scripts/mypy_scripts_baseline.txt`
+   checked-in baseline in `scripts/mypy_scripts_baseline.txt`; this baseline
+   is `0` too
 
 CI fails if `mypy src/` reports any issue or cannot produce a summary, and if
 the test or script error count rises above its committed baseline or mypy
@@ -78,8 +79,6 @@ cannot produce a summary to compare against.
 Its modules are not a package, so `mypy.ini` puts `scripts/` on `mypy_path`:
 that lets `restore_config.py` resolve its sibling `backup_config.py`. Runtime
 imports are unchanged; the scripts still add their own directory to `sys.path`.
-Its remaining baseline entries are the `defusedxml` stub errors, which stay
-until a stub package is added as a dependency.
 
 ### Why the split?
 
@@ -128,8 +127,9 @@ If `tests/` goes down:
 
 ### What to do if the `scripts/` count changes
 
-The same rules as `tests/` apply, using `scripts/mypy_scripts_baseline.txt`.
-A new script should pass `mypy scripts/` without adding to the baseline.
+The same rules as `src/` apply: the baseline is `0`, so a new or changed
+script must pass `mypy scripts/` cleanly. Add a stub package to the dev group
+for an untyped library rather than raising the baseline.
 
 ## Coding guidelines for typed modules
 

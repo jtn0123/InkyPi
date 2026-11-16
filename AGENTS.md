@@ -30,9 +30,9 @@ Zero 2 W (512 MB RAM). Start with `docs/architecture.md`; setup is in
 
 ## Lint and format
 
-- `scripts/lint.sh` is the gate: ruff, Black, mypy (strict; `tests/` and
-  `scripts/` are held to the baselines in `scripts/mypy_tests_baseline.txt` and
-  `scripts/mypy_scripts_baseline.txt`) and shellcheck. Biome
+- `scripts/lint.sh` is the gate: ruff, Black, mypy (strict; `src/` and
+  `scripts/` must be clean, and `tests/` is held to the baseline in
+  `scripts/mypy_tests_baseline.txt`) and shellcheck. Biome
   lints the web scripts: `pre-commit run biome-ci --all-files`.
 - Format Python with **Black**, not `ruff format`; they disagree and CI checks
   Black.

@@ -17,6 +17,8 @@
 # callers), Optional and Any-returning json.loads results narrowed or annotated,
 # Pillow's Optional PixelAccess replaced by a typed getpixel helper, and
 # monkeypatches moved from bare assignment to unittest.mock.patch.object.
-# The two that remain are both defusedxml (coverage_gate.py): it is a dev
-# dependency with no stub package, and pyproject.toml is not changed to add one.
-2
+#
+# 2 -> 0 (2026-11-15): the last two were defusedxml imports in coverage_gate.py.
+# types-defusedxml is now in the dev group; with real types, mypy also caught
+# that getroot() can return None, which coverage_gate.py now checks.
+0
