@@ -3,6 +3,7 @@ import math
 from datetime import datetime
 from typing import Any
 
+import numpy as np
 import pytest
 from PIL import Image
 
@@ -127,6 +128,56 @@ def test_draw_word_clock() -> None:
     img = clock.draw_word_clock(dimensions, dt)
     assert img is not None
     assert img.size == dimensions
+
+
+# The Spectra 6 panel's pure inks, in the inky_e673 driver's order.
+_SPECTRA6 = [
+    (0, 0, 0),
+    (255, 255, 255),
+    (255, 255, 0),
+    (255, 0, 0),
+    (0, 0, 255),
+    (0, 255, 0),
+]
+
+
+@pytest.mark.parametrize(
+    ("background", "letters"),
+    [((0, 0, 0), (255, 255, 255)), ((255, 255, 255), (0, 0, 0))],
+    ids=["light-on-dark", "dark-on-light"],
+)
+def test_word_clock_letters_are_not_doubled_on_the_panel(
+    background: tuple[int, int, int], letters: tuple[int, int, int]
+) -> None:
+    """The crisp panel frame shows each lit letter once, not an offset copy too.
+
+    A translucent drop shadow behind the lit letters was bright enough for the
+    crisp conversion to snap it to full ink, so the panel showed every lit
+    letter twice, slightly offset.
+    """
+    from display.crisp import crisp_image
+    from plugins.clock.clock import Clock
+
+    source = (
+        Clock({"id": "clock"})
+        .draw_word_clock((800, 480), _fixed_dt(15, 40), background, letters)
+        .convert("RGB")
+    )
+    panel = np.asarray(crisp_image(source, _SPECTRA6))
+    ink = (panel != background).any(axis=2)
+
+    # Where the letters are drawn at least half strength, plus one pixel of
+    # anti-aliasing around them.
+    luma = np.asarray(source.convert("L"), dtype=np.int16)
+    lit = np.abs(luma - luma[0, 0]) >= 128
+    near = lit.copy()
+    for dy in (-1, 0, 1):
+        for dx in (-1, 0, 1):
+            near |= np.roll(lit, (dy, dx), axis=(0, 1))
+
+    assert ink.any()
+    stray = np.argwhere(ink & ~near)
+    assert stray.size == 0, f"{len(stray)} ink pixels outside the letters"
 
 
 def test_draw_word_clock_minute_logic() -> None:

@@ -386,16 +386,12 @@ class Clock(BasePlugin):
                 x_pos = x * (canvas_size / (len(grid_row) - 1)) + border[0]
                 y_pos = y * (canvas_size / (len(letter_grid) - 1)) + border[1]
 
+                # No drop shadow behind lit letters: on e-ink a faint offset
+                # copy either dithers to speckle or, in crisp rendering, snaps
+                # to full ink and doubles every lit letter.
                 fill = secondary_color + (50,)
                 if [y, x] in letter_positions:
                     fill = secondary_color + (255,)
-                    image_draw.text(
-                        (x_pos + 2, y_pos + 2),
-                        letter,
-                        anchor="mm",
-                        fill=secondary_color + (80,),
-                        font=fnt,
-                    )
 
                 image_draw.text(
                     (x_pos, y_pos), letter, anchor="mm", fill=fill, font=fnt
