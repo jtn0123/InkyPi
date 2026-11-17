@@ -2,6 +2,15 @@
 
 <!-- version list -->
 
+## v1.10.1 (2026-11-17)
+
+### Bug Fixes
+
+- **clock**: Stop the word clock showing every lit letter twice
+  ([#899](https://github.com/jtn0123/InkyPi/pull/899),
+  [`bbe7d3f`](https://github.com/jtn0123/InkyPi/commit/bbe7d3fdd99bb271b2f8508e45e1330bb9837a76))
+
+
 ## v1.10.0 (2026-11-16)
 
 ### Bug Fixes
